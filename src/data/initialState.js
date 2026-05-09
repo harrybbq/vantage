@@ -87,4 +87,17 @@ export const DEFAULT_STATE = {
   // the linked achievement is auto-marked complete + its coin reward
   // fires. Same pipeline as the Achievements board.
   savings: [],
+  // ── Friend-card privacy (FEATURE 1 follow-up) ────────────────────
+  // Per-field toggles for what friends see on the profile card.
+  // Defaults preserve existing behavior (everything visible).
+  // usePublishProfile reads these and zeros-out hidden fields when
+  // it writes public_stats — so server-side data simply doesn't have
+  // the value when a friend reads it. Toggling off a field clears
+  // the value on the next debounced publish.
+  privacy: {
+    shareStreak:   true,  // current_streak + streak_habit
+    shareHeatmap:  true,  // 91-day heatmap_days
+    shareWins:     true,  // recent_wins (last 3 completed achievements)
+    sharePresence: true,  // last_active_at + online dot heartbeat
+  },
 };

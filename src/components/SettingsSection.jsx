@@ -88,7 +88,17 @@ export const OPTIONAL_PANELS = [
  * state through. Silently no-ops if the social schema isn't
  * present (the read just fails and the card hides itself).
  */
-function FriendsPrivacyCard({ userId }) {
+// Per-field profile-card privacy toggles. Live in S.privacy (no
+// schema migration); usePublishProfile reads them and zeroes-out
+// hidden fields on the next debounced publish.
+const SHARE_TOGGLES = [
+  { id: 'shareStreak',   label: 'Active habit streak',  desc: 'Days clean + habit name (e.g. "12d Alcohol").' },
+  { id: 'shareHeatmap',  label: '91-day activity heatmap', desc: 'Coloured grid of days you logged anything.' },
+  { id: 'shareWins',     label: 'Recent achievement wins', desc: 'Last 3 completed achievements with their icons.' },
+  { id: 'sharePresence', label: 'Online status',         desc: 'Green dot when you\'re active in the last 3 minutes.' },
+];
+
+function FriendsPrivacyCard({ userId, S, update }) {
   const [searchable, setSearchable] = useState(null);
   const [handle, setHandle] = useState(null);
   const [saving, setSaving] = useState(false);
@@ -176,6 +186,55 @@ function FriendsPrivacyCard({ userId }) {
           {error}
         </div>
       )}
+
+      {/* Per-field profile-card toggles. Defaults all ON (existing
+          behavior). Toggling OFF clears the field on the next 4s
+          debounced publish — friends will see the empty value the
+          next time they refresh the rail. */}
+      <div style={{
+        marginTop: 18, paddingTop: 14, borderTop: '1px solid var(--border)',
+      }}>
+        <div style={{
+          fontFamily: 'var(--mono)', fontSize: '10px', letterSpacing: '1.4px',
+          textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: 8,
+        }}>What friends see on your profile card</div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          {SHARE_TOGGLES.map(t => {
+            const on = S?.privacy?.[t.id] !== false;
+            return (
+              <label key={t.id} style={{
+                display: 'flex', alignItems: 'center', gap: 12,
+                padding: '10px 12px', borderRadius: 8,
+                border: on ? '2px solid var(--em)' : '2px solid var(--border)',
+                background: on ? 'rgba(var(--em-rgb),0.06)' : 'var(--card, rgba(255,255,255,0.04))',
+                cursor: 'pointer', transition: 'all .18s',
+              }}>
+                <input
+                  type="checkbox"
+                  checked={on}
+                  onChange={() => update(prev => ({
+                    ...prev,
+                    privacy: { ...(prev.privacy || {}), [t.id]: !on },
+                  }))}
+                  style={{ width: 16, height: 16, accentColor: 'var(--em)', cursor: 'pointer' }}
+                />
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontFamily: 'var(--sans)', fontSize: 12.5, fontWeight: 600, color: 'var(--text)' }}>
+                    {t.label}
+                  </div>
+                  <div style={{ fontFamily: 'var(--mono)', fontSize: 10, color: 'var(--text-muted)', letterSpacing: 0.4, marginTop: 2 }}>
+                    {t.desc}
+                  </div>
+                </div>
+                <span style={{
+                  fontFamily: 'var(--mono)', fontSize: 9, letterSpacing: 1.2,
+                  textTransform: 'uppercase', color: on ? 'var(--em)' : 'var(--text-muted)',
+                }}>{on ? 'On' : 'Off'}</span>
+              </label>
+            );
+          })}
+        </div>
+      </div>
     </div>
   );
 }
@@ -471,7 +530,7 @@ export default function SettingsSection({ S, update, active, userId, onOpenLegal
         <>
         {/* Friends privacy */}
         {userId
-          ? <FriendsPrivacyCard userId={userId} />
+          ? <FriendsPrivacyCard userId={userId} S={S} update={update} />
           : <div className="settings-empty">Sign in to manage privacy.</div>}
         </>
         )}

@@ -87,17 +87,25 @@ export function usePublishProfile(userId, S, hasPro, visionState) {
     // loaded yet; skip until we have a real level.
     const level = visionState?.level || 1;
 
-    const streak = currentStreak(S);
+    // Privacy toggles — per-field opt-out on what friends see. When a
+    // toggle is off we publish a zeroed-out value so the friend card
+    // simply has nothing to render for that field. Server-side schema
+    // is unchanged; toggling off CLEARS the previous value on the
+    // next debounced publish.
+    const priv = S.privacy || {};
+    const streak = priv.shareStreak !== false ? currentStreak(S) : null;
     const payload = {
       // profiles slice
       display_name: (S.profile?.name || '').trim() || null,
       level,
-      last_active_at: new Date().toISOString(),
+      // last_active_at gates on sharePresence — see also the heartbeat
+      // effect below which won't ping if presence is opted out.
+      last_active_at: priv.sharePresence !== false ? new Date().toISOString() : null,
       // public_stats slice
       current_streak: streak?.days || 0,
-      streak_habit: streak?.name || null,
-      heatmap_days: buildHeatmap(S),
-      recent_wins: recentWins(S),
+      streak_habit:   streak?.name || null,
+      heatmap_days:   priv.shareHeatmap !== false ? buildHeatmap(S) : [],
+      recent_wins:    priv.shareWins    !== false ? recentWins(S)   : [],
     };
 
     // Skip the network round-trip if the meaningful slice hasn't
@@ -164,8 +172,13 @@ export function usePublishProfile(userId, S, hasPro, visionState) {
   // network requests for a backgrounded app, and visibility change
   // re-fires this immediately on focus return so the gap is
   // ~unnoticeable.
+  // Note: presence heartbeat below ALSO checks S.privacy.sharePresence
+  // so opting out fully stops the heartbeat (not just the debounced
+  // publish). Without this guard the user's online dot would still
+  // tick every 60s even after they turned presence off.
   useEffect(() => {
     if (!userId) return;
+    if (S?.privacy?.sharePresence === false) return;
     let intervalId = null;
 
     async function ping() {
@@ -200,5 +213,7 @@ export function usePublishProfile(userId, S, hasPro, visionState) {
       stop();
       document.removeEventListener('visibilitychange', onVisibilityChange);
     };
-  }, [userId]);
+  // Re-bind when sharePresence flips so toggling off stops the heartbeat
+  // immediately rather than waiting for unmount.
+  }, [userId, S?.privacy?.sharePresence]);
 }
