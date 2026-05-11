@@ -15,6 +15,7 @@ import AiCoachWidget from './AiCoachWidget';
 import CoachBriefPanel from './CoachBriefPanel';
 import QuickLog from './QuickLog';
 import FriendsRail from './friends/FriendsRail';
+import RatingsPanel from './RatingsPanel';
 
 // ── Panel primitive ──────────────────────────────────────────────────────
 function OsPanel({ label, right, children, bodyClass = '', innerPadding = true }) {
@@ -129,8 +130,11 @@ export function OsSessionPanel({ name }) {
   );
 }
 
-// ── Panel: Vitals (coins + streak + level) ────────────────────────────────
-export function OsVitalsPanel({ coins = 0, streak = 0, level = 1 }) {
+// ── Panel: Vitals (coins + streak + OVR) ──────────────────────────────────
+// `level` retained as a prop for backwards compatibility / coin-tier
+// progression math, but the displayed Level slot was replaced by OVR
+// (F5 Sprint 3) — Level is no longer the headline user metric.
+export function OsVitalsPanel({ coins = 0, streak = 0, level = 1, ovr = 1 }) {
   const coinTierCap = level * 500;
   const pct = Math.min(100, Math.round((coins % coinTierCap) / coinTierCap * 100));
 
@@ -158,11 +162,25 @@ export function OsVitalsPanel({ coins = 0, streak = 0, level = 1 }) {
           </div>
           <div className="os-vitals-mini">
             <div className="os-vitals-hero">
-              <span className="os-vitals-val">{level}</span>
+              <span className="os-vitals-val">{ovr}</span>
             </div>
-            <div className="os-vitals-label">Level</div>
+            <div className="os-vitals-label">OVR</div>
           </div>
         </div>
+      </div>
+    </OsPanel>
+  );
+}
+
+// ── Panel: Ratings (F5 Sprint 3) ──────────────────────────────────────────
+// Wraps the shared RatingsPanel so the dark-os / cream-pro grid gets
+// a category breakdown without duplicating the component. Compact
+// variant fits the column width.
+export function OsRatingsPanel({ S }) {
+  return (
+    <OsPanel label="Ratings" right={`OVR ${S?.ratings?.ovr || 1}`} innerPadding={false}>
+      <div className="os-panel-body" style={{ padding: '12px' }}>
+        <RatingsPanel S={S} compact />
       </div>
     </OsPanel>
   );
@@ -499,7 +517,12 @@ export default function HubOsLayout({
           onUploadPhoto={onUploadPhoto}
         />
         <OsSessionPanel name={profile.name} />
-        <OsVitalsPanel coins={coins} streak={streak} level={level} />
+        <OsVitalsPanel
+          coins={coins}
+          streak={streak}
+          level={level}
+          ovr={S?.ratings?.ovr || 1}
+        />
       </div>
 
       {/* ── MAIN ROW ── */}
@@ -511,6 +534,7 @@ export default function HubOsLayout({
             onSort={onSort}
             onNavigateSettings={onNavigateSettings}
           />
+          <OsRatingsPanel S={S} />
           <OsTrackersPanel trackers={S.trackers} logs={S.logs} />
           {/* Friends rail — same component as cream hub, retinted via
               dark-os overrides on the .fc-* classes in hub-dark.css. */}

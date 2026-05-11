@@ -6,6 +6,7 @@ import CoachBriefPanel from './CoachBriefPanel';
 import QuickLog from './QuickLog';
 import HubOsLayout from './HubOsLayout';
 import FriendsRail from './friends/FriendsRail';
+import RatingsPanel from './RatingsPanel';
 import { useSubscriptionContext } from '../context/SubscriptionContext';
 
 // ── GitHub helpers ──
@@ -97,11 +98,12 @@ function useWidgetDrag(canvasRef, S, update) {
 // after the action buttons — used by the cream layout to slot the
 // QuickLog trackers under "Sort". The `--with-rail` modifier widens
 // the column so the trackers stack vertically without being clipped.
-function ProfileCard({ profile, onSaveName, onSaveTagline, onUploadPhoto, onAddWidget, onSortWidgets, onNavigateSettings, visionState, children }) {
-  // visionState is optional — older callers (e.g. tests) won't pass it.
-  // Render the badge only when we actually have a level to show; that
-  // also future-proofs against the hook returning a fallback shape.
-  const showLevelBadge = visionState && typeof visionState.level === 'number';
+function ProfileCard({ profile, S, onSaveName, onSaveTagline, onUploadPhoto, onAddWidget, onSortWidgets, onNavigateSettings, visionState, children }) {
+  // OVR replaces the old Lvl badge (F5 Sprint 3). Read from S.ratings
+  // — which is refreshed by useRatings on a 1.5s debounce. Falls back
+  // to 1 if no rating computed yet (fresh user) so the chip never
+  // shows an empty value.
+  const ovr = S?.ratings?.ovr || 1;
   return (
     <div className={`profile-col${children ? ' profile-col--with-rail' : ''}`}>
       <div className="card profile-card">
@@ -118,10 +120,10 @@ function ProfileCard({ profile, onSaveName, onSaveTagline, onUploadPhoto, onAddW
         </div>
         <input type="file" id="photoFileInput" accept="image/*" style={{ display: 'none' }} onChange={onUploadPhoto} />
         <div className="profile-info-area">
-          {/* Name + Lvl badge share a row so the badge sits visually
-              "next to" the name. The input flexes; the badge is a
-              fixed-width chip that doesn't shrink. Tooltip surfaces
-              the full XP / progress detail without bloating the rail. */}
+          {/* Name + OVR badge share a row. OVR replaced Lvl (F5 Sprint 3)
+              — more informative number (1-99 with category breakdown
+              one tap away in the RatingsPanel below). Tooltip surfaces
+              the same vision XP context the old Lvl badge had. */}
           <div className="profile-name-row">
             <input
               className="profile-name-input"
@@ -130,14 +132,14 @@ function ProfileCard({ profile, onSaveName, onSaveTagline, onUploadPhoto, onAddW
               defaultValue={profile.name}
               onChange={e => onSaveName(e.target.value)}
             />
-            {showLevelBadge && (
-              <span
-                className="profile-level-badge"
-                title={`Level ${visionState.level} · ${visionState.xp} XP · ${visionState.unlockedCount}/${visionState.totalCount} visions unlocked`}
-              >
-                Lvl {visionState.level}
-              </span>
-            )}
+            <span
+              className="profile-level-badge"
+              title={visionState
+                ? `OVR ${ovr}/99 · ${visionState.unlockedCount}/${visionState.totalCount} visions unlocked`
+                : `OVR ${ovr}/99`}
+            >
+              OVR {ovr}
+            </span>
           </div>
           <input
             className="profile-tagline-input"
@@ -148,6 +150,11 @@ function ProfileCard({ profile, onSaveName, onSaveTagline, onUploadPhoto, onAddW
           />
         </div>
       </div>
+
+      {/* Ratings breakdown — OVR + 4 category tiles + tap-to-explain
+          modal. Compact variant matches the profile rail's width. */}
+      <RatingsPanel S={S} compact />
+
       <motion.button className="hub-action-btn add-widget" onClick={onAddWidget}
         whileHover={{ scale: 1.04 }} whileTap={{ scale: 0.96 }}
         transition={{ type: 'spring', stiffness: 400, damping: 17 }}>＋ Add widget</motion.button>
@@ -350,6 +357,7 @@ export default function HubSection({ S, update, active, onOpenModal, onOpenWaitl
         >
         <ProfileCard
           profile={S.profile}
+          S={S}
           onSaveName={name => update(prev => ({ ...prev, profile: { ...prev.profile, name } }))}
           onSaveTagline={tagline => update(prev => ({ ...prev, profile: { ...prev.profile, tagline } }))}
           onUploadPhoto={handleUploadPhoto}
