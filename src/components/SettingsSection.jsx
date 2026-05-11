@@ -68,12 +68,22 @@ function resolveEffectiveTheme(saved, hasPro) {
  * Called on boot from main.jsx and whenever the user toggles the theme.
  * Cream is the default (no data-theme attribute); all other themes set
  * data-theme="<id>" so CSS rules can scope on it.
+ *
+ * Also sets data-hub-os="1" on <html> whenever the active theme uses
+ * the operator-console hub layout (dark-os OR cream-pro). hub-dark.css
+ * layout rules key on this attribute so cream-pro inherits the OS
+ * panel/grid structure without picking up dark-os's palette.
  */
 export function applyTheme(theme, { hasPro = false } = {}) {
   const effective = resolveEffectiveTheme(theme || 'cream', hasPro);
   const r = document.documentElement;
   if (effective === 'cream') r.removeAttribute('data-theme');
   else r.setAttribute('data-theme', effective);
+  if (effective === 'dark-os' || effective === 'cream-pro') {
+    r.setAttribute('data-hub-os', '1');
+  } else {
+    r.removeAttribute('data-hub-os');
+  }
   return effective;
 }
 

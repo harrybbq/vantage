@@ -26,6 +26,17 @@ html[data-theme="cream-pro"] {
   --cream:        #faf5e9;
   --card:         rgba(255, 250, 240, 0.85);
 
+  /* OS panel tokens — referenced by hub-dark.css layout rules now
+     that those are scoped on [data-hub-os] (theme-agnostic). We
+     map them to cream-pro's parchment palette so the operator-
+     console hub renders in CREAM tones, not dark. */
+  --os-surface:    #faf5e9;
+  --os-surface2:   #f4eddb;
+  --os-surface3:   #ede4ce;
+  --os-border:     #d8c89a;
+  --os-border-md:  #cbb681;
+  --os-border-hi:  #b89e65;
+
   /* Text — keep cream's near-black ink, slightly warmer */
   --text:        #2a2622;
   --text-mid:    #6a5f53;

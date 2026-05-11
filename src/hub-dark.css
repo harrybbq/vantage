@@ -63,16 +63,16 @@ html[data-theme="dark-os"] {
 }
 
 /* ── 2. Body background + scan-line texture ─────────────────────────────── */
-html[data-theme="dark-os"] body {
+html[data-hub-os] body {
   background:
     radial-gradient(circle at 20% 0%, rgba(var(--em-rgb), 0.05), transparent 60%),
     radial-gradient(circle at 80% 100%, rgba(var(--em-rgb), 0.03), transparent 55%),
-    #0c0c0b;
+    var(--bg-base);
   color: var(--text);
 }
 
 /* Subtle CRT scan-line overlay — decorative only, low z-index */
-html[data-theme="dark-os"] body::before {
+html[data-hub-os] body::before {
   content: '';
   position: fixed; inset: 0;
   pointer-events: none;
@@ -89,13 +89,13 @@ html[data-theme="dark-os"] body::before {
    base position:fixed to stay pinned (sidebar + chrome bar).
    Both already have high z-index in base CSS (200 / 195), which
    clears the scan-line overlay without help from this rule. */
-html[data-theme="dark-os"] .section {
+html[data-hub-os] .section {
   position: relative;
   z-index: 2;
 }
 
 /* ── 3. Chrome bar (re-skins existing #pageHeader) ──────────────────────── */
-html[data-theme="dark-os"] #pageHeader {
+html[data-hub-os] #pageHeader {
   /* Base CSS pins #pageHeader at left:56px to clear the cream sidebar.
      Dark OS shrinks <nav> to 48px (and 168px on hover), so we need
      matching left offsets here or a thin gap appears between the
@@ -116,9 +116,9 @@ html[data-theme="dark-os"] #pageHeader {
   color: var(--text-muted);
   box-shadow: none;
 }
-html[data-theme="dark-os"] nav:hover ~ #pageHeader { left: 168px; }
+html[data-hub-os] nav:hover ~ #pageHeader { left: 168px; }
 
-html[data-theme="dark-os"] #pageHeader-title {
+html[data-hub-os] #pageHeader-title {
   font-family: var(--mono);
   font-size: 9px;
   letter-spacing: 2px;
@@ -126,11 +126,11 @@ html[data-theme="dark-os"] #pageHeader-title {
   font-weight: 500;
 }
 
-html[data-theme="dark-os"] #pageHeader-sub {
+html[data-hub-os] #pageHeader-sub {
   display: none;
 }
 
-html[data-theme="dark-os"] #pageHeader-section {
+html[data-hub-os] #pageHeader-section {
   font-family: var(--mono) !important;
   font-size: 9px !important;
   font-style: normal !important;
@@ -144,12 +144,12 @@ html[data-theme="dark-os"] #pageHeader-section {
    bigger "Night, Harry." so the chrome-bar version is redundant.
    Scoped via :has(#hub.active) so other sections keep their label
    (Achievements, Track, etc.) visible in the chrome bar. */
-html[data-theme="dark-os"]:has(#hub.section.active) #pageHeader-section {
+html[data-hub-os]:has(#hub.section.active) #pageHeader-section {
   display: none;
 }
 
 /* Coin wallet compacted + repositioned in chrome */
-html[data-theme="dark-os"] #coinWallet {
+html[data-hub-os] #coinWallet {
   background: none;
   border: 1px solid var(--os-border-md);
   padding: 3px 9px;
@@ -157,51 +157,51 @@ html[data-theme="dark-os"] #coinWallet {
   gap: 6px;
   font-family: var(--mono);
 }
-html[data-theme="dark-os"] #coinWallet .cw-icon { color: var(--gold-lt); font-size: 11px; }
-html[data-theme="dark-os"] #coinWallet .cw-amount {
+html[data-hub-os] #coinWallet .cw-icon { color: var(--gold-lt); font-size: 11px; }
+html[data-hub-os] #coinWallet .cw-amount {
   font-size: 11px;
   font-family: var(--mono);
   color: var(--gold-lt);
   letter-spacing: 0.5px;
 }
-html[data-theme="dark-os"] #coinWallet .cw-label {
+html[data-hub-os] #coinWallet .cw-label {
   font-size: 7px;
   letter-spacing: 1.2px;
   color: var(--text-muted);
 }
 
 /* ── 4. Sidebar — tightens existing <nav> ───────────────────────────────── */
-html[data-theme="dark-os"] nav {
+html[data-hub-os] nav {
   width: 48px;
-  background: #0a0a09;
+  background: var(--bg-base);
   backdrop-filter: none;
   -webkit-backdrop-filter: none;
   border-right: 1px solid var(--os-border);
 }
-html[data-theme="dark-os"] nav:hover { width: 168px; }
+html[data-hub-os] nav:hover { width: 168px; }
 
-html[data-theme="dark-os"] .nav-logo {
+html[data-hub-os] .nav-logo {
   padding: 10px 0 12px;
   border-bottom: 1px solid var(--os-border);
 }
-html[data-theme="dark-os"] .nav-logo-icon {
+html[data-hub-os] .nav-logo-icon {
   width: 48px;
   min-width: 48px;
   height: 28px;
   font-size: 16px;
   color: var(--em-light);
 }
-html[data-theme="dark-os"] .nav-logo-text {
+html[data-hub-os] .nav-logo-text {
   font-family: var(--display);
   font-size: 13px;
   letter-spacing: 0.5px;
 }
 
-html[data-theme="dark-os"] .nav-tabs {
+html[data-hub-os] .nav-tabs {
   padding: 10px 4px;
   gap: 2px;
 }
-html[data-theme="dark-os"] .nav-tab {
+html[data-hub-os] .nav-tab {
   height: 36px;
   padding: 0;
   gap: 10px;
@@ -212,44 +212,44 @@ html[data-theme="dark-os"] .nav-tab {
   color: var(--text-muted);
   border-radius: 4px;
 }
-html[data-theme="dark-os"] .nav-tab-icon {
+html[data-hub-os] .nav-tab-icon {
   width: 40px;
   min-width: 40px;
   height: 36px;
   font-size: 14px;
   border-radius: 4px;
 }
-html[data-theme="dark-os"] .nav-tab-label {
+html[data-hub-os] .nav-tab-label {
   font-family: var(--mono);
   font-size: 9.5px;
   font-weight: 400;
   letter-spacing: 1.2px;
 }
-html[data-theme="dark-os"] .nav-tab:hover:not(.active) {
+html[data-hub-os] .nav-tab:hover:not(.active) {
   background: var(--os-surface2);
   color: var(--text);
 }
-html[data-theme="dark-os"] .nav-tab:hover:not(.active) .nav-tab-icon {
+html[data-hub-os] .nav-tab:hover:not(.active) .nav-tab-icon {
   background: transparent;
   color: var(--text);
 }
-html[data-theme="dark-os"] .nav-tab.active {
+html[data-hub-os] .nav-tab.active {
   background: rgba(var(--em-rgb), 0.08);
   color: var(--em-light);
 }
-html[data-theme="dark-os"] .nav-tab.active .nav-tab-icon {
+html[data-hub-os] .nav-tab.active .nav-tab-icon {
   background: transparent;
   color: var(--em-light);
 }
-html[data-theme="dark-os"] .nav-tab.active .nav-tab-label { color: var(--em-light); }
+html[data-hub-os] .nav-tab.active .nav-tab-label { color: var(--em-light); }
 
-html[data-theme="dark-os"] .nav-bottom {
+html[data-hub-os] .nav-bottom {
   padding: 10px 4px;
   border-top: 1px solid var(--os-border);
 }
 
 /* ── 5. Panel primitives — used by the Hub OS grid ──────────────────────── */
-html[data-theme="dark-os"] .os-panel {
+html[data-hub-os] .os-panel {
   background: var(--os-surface);
   border: 1px solid var(--os-border);
   border-radius: 9px;
@@ -260,7 +260,7 @@ html[data-theme="dark-os"] .os-panel {
   min-height: 0;
 }
 
-html[data-theme="dark-os"] .os-panel-label {
+html[data-hub-os] .os-panel-label {
   font-family: var(--mono);
   font-size: 8.5px;
   letter-spacing: 2px;
@@ -274,37 +274,37 @@ html[data-theme="dark-os"] .os-panel-label {
   flex-shrink: 0;
   user-select: none;
 }
-html[data-theme="dark-os"] .os-panel-label-text {
+html[data-hub-os] .os-panel-label-text {
   display: flex;
   align-items: center;
   gap: 6px;
 }
-html[data-theme="dark-os"] .os-panel-label-text::before {
+html[data-hub-os] .os-panel-label-text::before {
   content: '//';
   color: var(--em);
   opacity: 0.7;
 }
-html[data-theme="dark-os"] .os-panel-label-right {
+html[data-hub-os] .os-panel-label-right {
   color: var(--text-muted);
   font-size: 8px;
   letter-spacing: 1.5px;
 }
 
-html[data-theme="dark-os"] .os-panel-body {
+html[data-hub-os] .os-panel-body {
   flex: 1;
   min-height: 0;
   overflow: auto;
 }
 
 /* Thin scrollbars */
-html[data-theme="dark-os"] .os-panel-body::-webkit-scrollbar { width: 4px; height: 4px; }
-html[data-theme="dark-os"] .os-panel-body::-webkit-scrollbar-thumb {
+html[data-hub-os] .os-panel-body::-webkit-scrollbar { width: 4px; height: 4px; }
+html[data-hub-os] .os-panel-body::-webkit-scrollbar-thumb {
   background: var(--os-border-md);
   border-radius: 2px;
 }
 
 /* ── 6. Hub OS grid layout ──────────────────────────────────────────────── */
-html[data-theme="dark-os"] .hub-os {
+html[data-hub-os] .hub-os {
   display: flex;
   flex-direction: column;
   gap: 10px;
@@ -314,14 +314,14 @@ html[data-theme="dark-os"] .hub-os {
   overflow: hidden;
 }
 
-html[data-theme="dark-os"] .hub-os-top {
+html[data-hub-os] .hub-os-top {
   display: grid;
   grid-template-columns: 240px 1fr 240px;
   gap: 10px;
   flex-shrink: 0;
 }
 
-html[data-theme="dark-os"] .hub-os-main {
+html[data-hub-os] .hub-os-main {
   display: grid;
   grid-template-columns: 240px 1fr 260px;
   gap: 10px;
@@ -329,7 +329,7 @@ html[data-theme="dark-os"] .hub-os-main {
   min-height: 0;
 }
 
-html[data-theme="dark-os"] .hub-os-main > .os-col {
+html[data-hub-os] .hub-os-main > .os-col {
   display: flex;
   flex-direction: column;
   gap: 10px;
@@ -342,24 +342,24 @@ html[data-theme="dark-os"] .hub-os-main > .os-col {
   overflow-x: hidden;
 }
 /* Thin scrollbars to match panel bodies */
-html[data-theme="dark-os"] .hub-os-main > .os-col::-webkit-scrollbar { width: 4px; }
-html[data-theme="dark-os"] .hub-os-main > .os-col::-webkit-scrollbar-thumb {
+html[data-hub-os] .hub-os-main > .os-col::-webkit-scrollbar { width: 4px; }
+html[data-hub-os] .hub-os-main > .os-col::-webkit-scrollbar-thumb {
   background: var(--os-border-md);
   border-radius: 2px;
 }
 
-html[data-theme="dark-os"] .hub-os-bottom {
+html[data-hub-os] .hub-os-bottom {
   flex-shrink: 0;
 }
 
 /* ── Profile panel ── */
-html[data-theme="dark-os"] .os-profile {
+html[data-hub-os] .os-profile {
   display: flex;
   align-items: center;
   gap: 0;
   padding: 0;
 }
-html[data-theme="dark-os"] .os-profile-photo {
+html[data-hub-os] .os-profile-photo {
   width: 52px; height: 52px;
   margin: 12px;
   flex-shrink: 0;
@@ -370,21 +370,21 @@ html[data-theme="dark-os"] .os-profile-photo {
   cursor: pointer;
   position: relative;
 }
-html[data-theme="dark-os"] .os-profile-photo img {
+html[data-hub-os] .os-profile-photo img {
   width: 100%; height: 100%; object-fit: cover; display: block;
 }
-html[data-theme="dark-os"] .os-profile-photo-placeholder {
+html[data-hub-os] .os-profile-photo-placeholder {
   width: 100%; height: 100%;
   display: flex; align-items: center; justify-content: center;
   font-size: 20px; color: var(--text-muted);
   background: var(--os-surface3);
 }
-html[data-theme="dark-os"] .os-profile-info {
+html[data-hub-os] .os-profile-info {
   flex: 1;
   padding: 12px 12px 12px 0;
   min-width: 0;
 }
-html[data-theme="dark-os"] .os-profile-name {
+html[data-hub-os] .os-profile-name {
   font-family: var(--display);
   font-size: 15px;
   font-weight: 600;
@@ -397,8 +397,8 @@ html[data-theme="dark-os"] .os-profile-name {
   width: 100%;
   outline: none;
 }
-html[data-theme="dark-os"] .os-profile-name::placeholder { color: var(--text-muted); }
-html[data-theme="dark-os"] .os-profile-tagline {
+html[data-hub-os] .os-profile-name::placeholder { color: var(--text-muted); }
+html[data-hub-os] .os-profile-tagline {
   font-family: var(--mono);
   font-size: 9px;
   letter-spacing: 1.5px;
@@ -410,14 +410,14 @@ html[data-theme="dark-os"] .os-profile-tagline {
   width: 100%;
   outline: none;
 }
-html[data-theme="dark-os"] .os-profile-tagline::placeholder { color: var(--text-muted); opacity: 0.5; }
+html[data-hub-os] .os-profile-tagline::placeholder { color: var(--text-muted); opacity: 0.5; }
 
-html[data-theme="dark-os"] .os-profile-status {
+html[data-hub-os] .os-profile-status {
   display: flex;
   gap: 6px;
   margin-top: 8px;
 }
-html[data-theme="dark-os"] .os-status-badge {
+html[data-hub-os] .os-status-badge {
   font-family: var(--mono);
   font-size: 8px;
   letter-spacing: 1.2px;
@@ -430,25 +430,25 @@ html[data-theme="dark-os"] .os-status-badge {
 }
 
 /* ── Session panel ── */
-html[data-theme="dark-os"] .os-session {
+html[data-hub-os] .os-session {
   padding: 14px 20px;
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 16px;
 }
-html[data-theme="dark-os"] .os-session-greeting {
+html[data-hub-os] .os-session-greeting {
   font-family: var(--display);
   font-size: 22px;
   line-height: 1.2;
   color: var(--text);
   font-weight: 400;
 }
-html[data-theme="dark-os"] .os-session-greeting em {
+html[data-hub-os] .os-session-greeting em {
   font-style: italic;
   color: var(--em-light);
 }
-html[data-theme="dark-os"] .os-session-date {
+html[data-hub-os] .os-session-date {
   font-family: var(--mono);
   font-size: 9px;
   letter-spacing: 2px;
@@ -456,7 +456,7 @@ html[data-theme="dark-os"] .os-session-date {
   color: var(--text-muted);
   margin-top: 5px;
 }
-html[data-theme="dark-os"] .os-session-clock {
+html[data-hub-os] .os-session-clock {
   font-family: var(--mono);
   font-size: 28px;
   letter-spacing: -1px;
@@ -468,42 +468,42 @@ html[data-theme="dark-os"] .os-session-clock {
   gap: 2px;
   flex-shrink: 0;
 }
-html[data-theme="dark-os"] .os-session-clock-secs {
+html[data-hub-os] .os-session-clock-secs {
   font-size: 14px;
   color: var(--text-muted);
   margin-left: 4px;
 }
-html[data-theme="dark-os"] .os-session-clock-sep {
+html[data-hub-os] .os-session-clock-sep {
   opacity: 0.4;
   animation: osBlink 1s infinite;
 }
 @keyframes osBlink { 0%,100% { opacity: 1; } 50% { opacity: 0.25; } }
 
 /* ── Vitals panel ── */
-html[data-theme="dark-os"] .os-vitals {
+html[data-hub-os] .os-vitals {
   padding: 10px 14px;
   display: flex;
   flex-direction: column;
   gap: 8px;
 }
-html[data-theme="dark-os"] .os-vitals-hero { display: flex; align-items: baseline; gap: 6px; }
-html[data-theme="dark-os"] .os-vitals-val {
+html[data-hub-os] .os-vitals-hero { display: flex; align-items: baseline; gap: 6px; }
+html[data-hub-os] .os-vitals-val {
   font-family: var(--mono);
   font-size: 22px;
   color: var(--text);
   font-weight: 400;
   line-height: 1;
 }
-html[data-theme="dark-os"] .os-vitals-val.gold { color: var(--gold-lt); }
-html[data-theme="dark-os"] .os-vitals-val.green { color: var(--em-light); }
-html[data-theme="dark-os"] .os-vitals-unit {
+html[data-hub-os] .os-vitals-val.gold { color: var(--gold-lt); }
+html[data-hub-os] .os-vitals-val.green { color: var(--em-light); }
+html[data-hub-os] .os-vitals-unit {
   font-family: var(--mono);
   font-size: 8.5px;
   color: var(--text-muted);
   letter-spacing: 1px;
   text-transform: uppercase;
 }
-html[data-theme="dark-os"] .os-vitals-label {
+html[data-hub-os] .os-vitals-label {
   font-family: var(--mono);
   font-size: 8px;
   letter-spacing: 1.5px;
@@ -511,41 +511,41 @@ html[data-theme="dark-os"] .os-vitals-label {
   color: var(--text-muted);
   margin-top: 1px;
 }
-html[data-theme="dark-os"] .os-vitals-track {
+html[data-hub-os] .os-vitals-track {
   height: 2px;
   background: var(--os-surface3);
   border-radius: 1px;
   overflow: hidden;
 }
-html[data-theme="dark-os"] .os-vitals-fill {
+html[data-hub-os] .os-vitals-fill {
   height: 100%;
   background: var(--em);
   transition: width 0.4s ease;
 }
-html[data-theme="dark-os"] .os-vitals-fill.gold { background: var(--gold); }
-html[data-theme="dark-os"] .os-vitals-divider {
+html[data-hub-os] .os-vitals-fill.gold { background: var(--gold); }
+html[data-hub-os] .os-vitals-divider {
   height: 1px;
   background: var(--os-border);
   margin: 2px 0;
 }
-html[data-theme="dark-os"] .os-vitals-mini-row {
+html[data-hub-os] .os-vitals-mini-row {
   display: flex;
   gap: 12px;
 }
-html[data-theme="dark-os"] .os-vitals-mini {
+html[data-hub-os] .os-vitals-mini {
   flex: 1;
   min-width: 0;
 }
-html[data-theme="dark-os"] .os-vitals-mini .os-vitals-val { font-size: 15px; }
+html[data-hub-os] .os-vitals-mini .os-vitals-val { font-size: 15px; }
 
 /* ── Left column — Quick actions + Trackers preview ── */
-html[data-theme="dark-os"] .os-actions {
+html[data-hub-os] .os-actions {
   padding: 8px;
   display: flex;
   flex-direction: column;
   gap: 6px;
 }
-html[data-theme="dark-os"] .os-action-btn {
+html[data-hub-os] .os-action-btn {
   display: flex;
   align-items: center;
   justify-content: center;
@@ -564,12 +564,12 @@ html[data-theme="dark-os"] .os-action-btn {
   width: 100%;
   padding: 0 10px;
 }
-html[data-theme="dark-os"] .os-action-btn:hover {
+html[data-hub-os] .os-action-btn:hover {
   border-color: var(--em);
   color: var(--em-light);
   background: rgba(var(--em-rgb), 0.05);
 }
-html[data-theme="dark-os"] .os-action-btn.primary {
+html[data-hub-os] .os-action-btn.primary {
   border-color: rgba(var(--em-rgb), 0.35);
   color: var(--em-light);
   background: rgba(var(--em-rgb), 0.06);
@@ -577,20 +577,20 @@ html[data-theme="dark-os"] .os-action-btn.primary {
 }
 
 /* Trackers mini */
-html[data-theme="dark-os"] .os-trackers-mini {
+html[data-hub-os] .os-trackers-mini {
   padding: 8px 10px 10px;
   display: flex;
   flex-direction: column;
   gap: 6px;
 }
-html[data-theme="dark-os"] .os-tracker-row {
+html[data-hub-os] .os-tracker-row {
   display: flex;
   align-items: center;
   gap: 10px;
   font-family: var(--mono);
   font-size: 10px;
 }
-html[data-theme="dark-os"] .os-tracker-name {
+html[data-hub-os] .os-tracker-name {
   flex: 1;
   color: var(--text-mid);
   font-size: 10.5px;
@@ -599,7 +599,7 @@ html[data-theme="dark-os"] .os-tracker-name {
   overflow: hidden;
   text-overflow: ellipsis;
 }
-html[data-theme="dark-os"] .os-tracker-pill {
+html[data-hub-os] .os-tracker-pill {
   font-family: var(--mono);
   font-size: 8.5px;
   letter-spacing: 0.5px;
@@ -608,63 +608,63 @@ html[data-theme="dark-os"] .os-tracker-pill {
   border: 1px solid var(--os-border-md);
   color: var(--text-muted);
 }
-html[data-theme="dark-os"] .os-tracker-pill.hit {
+html[data-hub-os] .os-tracker-pill.hit {
   color: var(--em-light);
   border-color: rgba(var(--em-rgb), 0.35);
   background: rgba(var(--em-rgb), 0.08);
 }
 
 /* ── Widgets canvas panel — holds the existing imperative canvas ── */
-html[data-theme="dark-os"] .os-widgets {
+html[data-hub-os] .os-widgets {
   display: flex;
   flex-direction: column;
   overflow: hidden;
   min-height: 0;
 }
-html[data-theme="dark-os"] .os-widgets-body {
+html[data-hub-os] .os-widgets-body {
   flex: 1;
   overflow: auto;
   padding: 8px;
   min-height: 0;
   position: relative;
 }
-html[data-theme="dark-os"] .os-widgets-body::-webkit-scrollbar { width: 4px; height: 4px; }
-html[data-theme="dark-os"] .os-widgets-body::-webkit-scrollbar-thumb {
+html[data-hub-os] .os-widgets-body::-webkit-scrollbar { width: 4px; height: 4px; }
+html[data-hub-os] .os-widgets-body::-webkit-scrollbar-thumb {
   background: var(--os-border-md);
   border-radius: 2px;
 }
 
 /* Re-skin the existing widget/link islands when they live inside the dark panel */
-html[data-theme="dark-os"] .os-widgets-body .card {
+html[data-hub-os] .os-widgets-body .card {
   background: var(--os-surface2);
   border-color: var(--os-border-md);
   border-radius: 7px;
   box-shadow: none;
   color: var(--text);
 }
-html[data-theme="dark-os"] .os-widgets-body .link-island-name { color: var(--text); }
-html[data-theme="dark-os"] .os-widgets-body .link-island-url { color: var(--text-muted); }
-html[data-theme="dark-os"] .os-widgets-body .link-island-notes { color: var(--text-mid); }
-html[data-theme="dark-os"] .os-widgets-body .notepad-island {
+html[data-hub-os] .os-widgets-body .link-island-name { color: var(--text); }
+html[data-hub-os] .os-widgets-body .link-island-url { color: var(--text-muted); }
+html[data-hub-os] .os-widgets-body .link-island-notes { color: var(--text-mid); }
+html[data-hub-os] .os-widgets-body .notepad-island {
   background: var(--os-surface2);
   border-color: var(--os-border-md);
   color: var(--text);
 }
-html[data-theme="dark-os"] .os-widgets-body .notepad-textarea {
+html[data-hub-os] .os-widgets-body .notepad-textarea {
   background: none;
   color: var(--text-mid);
 }
-html[data-theme="dark-os"] .os-widgets-body .gh-stat-val,
-html[data-theme="dark-os"] .os-widgets-body .gh-repo-name { color: var(--text); }
+html[data-hub-os] .os-widgets-body .gh-stat-val,
+html[data-hub-os] .os-widgets-body .gh-repo-name { color: var(--text); }
 
 /* ── Right column — Habits mini, QuickLog wrapper, AI Coach wrapper ── */
-html[data-theme="dark-os"] .os-habits-mini {
+html[data-hub-os] .os-habits-mini {
   padding: 6px 10px 10px;
   display: flex;
   flex-direction: column;
   gap: 5px;
 }
-html[data-theme="dark-os"] .os-habit-row {
+html[data-hub-os] .os-habit-row {
   display: flex;
   align-items: center;
   gap: 9px;
@@ -672,15 +672,15 @@ html[data-theme="dark-os"] .os-habit-row {
   border-radius: 5px;
   user-select: none;
 }
-html[data-theme="dark-os"] .os-habit-row:hover { background: var(--os-surface2); }
-html[data-theme="dark-os"] .os-habit-dot {
+html[data-hub-os] .os-habit-row:hover { background: var(--os-surface2); }
+html[data-hub-os] .os-habit-dot {
   width: 10px; height: 10px;
   border-radius: 50%;
   background: rgba(var(--em-rgb), 0.25);
   flex-shrink: 0;
 }
-html[data-theme="dark-os"] .os-habit-dot.danger { background: #c07070; }
-html[data-theme="dark-os"] .os-habit-name {
+html[data-hub-os] .os-habit-dot.danger { background: #c07070; }
+html[data-hub-os] .os-habit-name {
   flex: 1;
   font-size: 11px;
   color: var(--text-mid);
@@ -688,12 +688,12 @@ html[data-theme="dark-os"] .os-habit-name {
   overflow: hidden;
   text-overflow: ellipsis;
 }
-html[data-theme="dark-os"] .os-habit-streak {
+html[data-hub-os] .os-habit-streak {
   font-family: var(--mono);
   font-size: 9px;
   color: var(--text-muted);
 }
-html[data-theme="dark-os"] .os-habits-empty {
+html[data-hub-os] .os-habits-empty {
   padding: 12px 10px;
   font-size: 10.5px;
   color: var(--text-muted);
@@ -702,12 +702,12 @@ html[data-theme="dark-os"] .os-habits-empty {
 }
 
 /* Wrap existing QuickLog + Coach widget to sit naturally inside OS panels */
-html[data-theme="dark-os"] .os-quicklog-body,
-html[data-theme="dark-os"] .os-coach-body {
+html[data-hub-os] .os-quicklog-body,
+html[data-hub-os] .os-coach-body {
   padding: 0;
 }
-html[data-theme="dark-os"] .os-quicklog-body > *,
-html[data-theme="dark-os"] .os-coach-body > * {
+html[data-hub-os] .os-quicklog-body > *,
+html[data-hub-os] .os-coach-body > * {
   background: transparent !important;
   border: none !important;
   border-radius: 0 !important;
@@ -716,41 +716,41 @@ html[data-theme="dark-os"] .os-coach-body > * {
 }
 
 /* ── Bottom row — Activity strip ── */
-html[data-theme="dark-os"] .os-activity {
+html[data-hub-os] .os-activity {
   display: flex;
   align-items: center;
   gap: 18px;
   padding: 8px 14px;
   flex-wrap: wrap;
 }
-html[data-theme="dark-os"] .os-activity-item {
+html[data-hub-os] .os-activity-item {
   display: flex;
   align-items: center;
   gap: 8px;
 }
-html[data-theme="dark-os"] .os-activity-dot {
+html[data-hub-os] .os-activity-dot {
   width: 6px; height: 6px;
   border-radius: 50%;
   background: var(--os-border-hi);
   flex-shrink: 0;
 }
-html[data-theme="dark-os"] .os-activity-dot.live {
+html[data-hub-os] .os-activity-dot.live {
   background: var(--em);
   box-shadow: 0 0 6px var(--em);
   animation: osBlink 2s infinite;
 }
-html[data-theme="dark-os"] .os-activity-dot.gold { background: var(--gold); }
-html[data-theme="dark-os"] .os-activity-text {
+html[data-hub-os] .os-activity-dot.gold { background: var(--gold); }
+html[data-hub-os] .os-activity-text {
   font-family: var(--mono);
   font-size: 9.5px;
   color: var(--text-muted);
   letter-spacing: 0.4px;
 }
-html[data-theme="dark-os"] .os-activity-text strong {
+html[data-hub-os] .os-activity-text strong {
   color: var(--text-mid);
   font-weight: 500;
 }
-html[data-theme="dark-os"] .os-activity-meta {
+html[data-hub-os] .os-activity-meta {
   margin-left: auto;
   font-family: var(--mono);
   font-size: 9px;
@@ -759,8 +759,8 @@ html[data-theme="dark-os"] .os-activity-meta {
 }
 
 /* Hide the old hub-layout content when OS theme is active on the hub */
-html[data-theme="dark-os"] #hub > .hub-layout,
-html[data-theme="dark-os"] #hub > .hub-footer-wrap { display: none; }
+html[data-hub-os] #hub > .hub-layout,
+html[data-hub-os] #hub > .hub-footer-wrap { display: none; }
 
 /* ── Global dark adaptations for non-hub sections ───────────────────────── */
 /* These sections keep their structure — just need token-driven colors. */

@@ -167,10 +167,12 @@ export default function HubSection({ S, update, active, onOpenModal, onOpenWaitl
   const canvasRef = useRef(null);
   const makeDraggable = useWidgetDrag(canvasRef, S, update);
   const { hasPro } = useSubscriptionContext();
-  // Pro-gated: dark-os theme requires Pro or Lifetime. Free users fall
-  // back to cream even if S.theme somehow = 'dark-os' (e.g. after a
-  // tier downgrade).
-  const isDarkOs = hasPro && S.theme === 'dark-os';
+  // Pro-gated: the operator-console layout (HubOsLayout) renders for
+  // EITHER dark-os OR cream-pro when the user has Pro. Free users
+  // never see it. The two themes share the same panel/grid structure
+  // but keep their own palettes (dark for dark-os, cream for cream-pro)
+  // via the data-hub-os attribute + theme-scoped token overrides.
+  const isOsLayout = hasPro && (S.theme === 'dark-os' || S.theme === 'cream-pro');
 
   function handleUploadPhoto(e) {
     const file = e.target.files[0];
@@ -312,10 +314,10 @@ export default function HubSection({ S, update, active, onOpenModal, onOpenWaitl
 
   useEffect(() => {
     if (active) renderCanvas();
-  }, [active, renderCanvas, isDarkOs]);
+  }, [active, renderCanvas, isOsLayout]);
 
   // ── Dark OS layout (Pro only) ─────────────────────────────────────────
-  if (isDarkOs) {
+  if (isOsLayout) {
     return (
       <section id="hub" className={`section${active ? ' active' : ''}`}>
         <HubOsLayout
