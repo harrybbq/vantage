@@ -173,17 +173,16 @@ export function OsVitalsPanel({ coins = 0, streak = 0, level = 1, ovr = 1 }) {
 }
 
 // ── Panel: Ratings (F5 Sprint 3) ──────────────────────────────────────────
-// Wraps the shared RatingsPanel so the dark-os / cream-pro grid gets
-// a category breakdown without duplicating the component. Compact
-// variant fits the column width.
+// The Ledger card IS the panel — its own border, eyebrow header
+// ("RATINGS · LEDGER"), and per-row layout already match the OS
+// chrome treatment. Wrapping it in an OsPanel duplicated the label
+// and produced a visible double-layer (reported 2026-05-12).
+//
+// Rendering RatingsPanel directly means it sits in the grid as a
+// peer of other OsPanels. The compact variant matches the column
+// width without overflow.
 export function OsRatingsPanel({ S }) {
-  return (
-    <OsPanel label="Ratings" right={`OVR ${S?.ratings?.ovr || 1}`} innerPadding={false}>
-      <div className="os-panel-body" style={{ padding: '12px' }}>
-        <RatingsPanel S={S} compact />
-      </div>
-    </OsPanel>
-  );
+  return <RatingsPanel S={S} compact />;
 }
 
 // ── Panel: Quick Actions ──────────────────────────────────────────────────
