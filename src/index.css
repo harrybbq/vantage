@@ -3438,97 +3438,169 @@ button:active:not(:disabled),
 }
 
 /* ──────────────────────────────────────────────────────────────────────────
-   Ratings panel (F5 Sprint 3) — OVR + 4 categories
+   Ratings — "Ledger" design (F5 Sprint 3, 2026-05-12)
+   Dense monospace card; bracket OVR label, big serif italic number,
+   per-row dotted track with a coloured fill bar.
    ────────────────────────────────────────────────────────────────────────── */
-.ratings-panel {
+.ratings-ledger {
   border: 1px solid var(--border);
-  border-radius: 12px;
+  border-radius: 10px;
   background: var(--card, rgba(255,255,255,0.04));
   padding: 14px 16px;
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: 12px;
+  font-family: var(--mono);
+  color: var(--text);
 }
-.ratings-ovr {
+.ratings-ledger-head {
   display: flex;
   align-items: center;
-  gap: 14px;
-  padding-bottom: 10px;
-  border-bottom: 1px solid var(--border);
+  justify-content: space-between;
+  padding-bottom: 8px;
+  border-bottom: 1px dashed var(--border);
 }
-.ratings-ovr-value {
-  font-family: var(--serif, Georgia, serif);
-  font-style: italic;
-  font-size: 56px;
-  font-weight: 600;
-  line-height: 1;
-  letter-spacing: -2px;
-  font-variant-numeric: tabular-nums;
-}
-.ratings-ovr-meta {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-.ratings-ovr-label {
-  font-family: var(--mono);
+.ratings-ledger-eyebrow {
   font-size: 10px;
-  letter-spacing: 2px;
+  letter-spacing: 1.8px;
   text-transform: uppercase;
+  color: var(--em);
+  font-weight: 700;
+}
+.ratings-ledger-tag {
+  font-size: 9px;
+  letter-spacing: 1.4px;
   color: var(--text-muted);
 }
-.ratings-ovr-tier {
-  font-family: var(--mono);
-  font-size: 13px;
-  font-weight: 700;
-  letter-spacing: 1px;
-  text-transform: uppercase;
+.ratings-ledger-ovr-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
 }
-.ratings-grid {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
+.ratings-ledger-ovr-block {
+  display: flex;
+  align-items: baseline;
   gap: 8px;
+  min-width: 0;
 }
-.ratings-tile {
+.ratings-ledger-ovr-label {
+  font-size: 11px;
+  letter-spacing: 1.4px;
+  color: var(--text-muted);
+}
+.ratings-ledger-ovr-value {
+  font-family: var(--serif, Georgia, serif);
+  font-style: italic;
+  font-weight: 700;
+  font-size: 48px;
+  line-height: 1;
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -1px;
+}
+.ratings-ledger-ovr-suffix {
+  font-size: 12px;
+  color: var(--text-muted);
+  letter-spacing: 0.5px;
+}
+.ratings-ledger-ovr-tier {
+  font-size: 11px;
+  letter-spacing: 1.6px;
+  text-transform: uppercase;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.ratings-ledger-rows {
+  list-style: none;
+  margin: 0;
+  padding: 0;
   display: flex;
   flex-direction: column;
-  align-items: center;
   gap: 4px;
-  padding: 10px 6px;
-  border-radius: 8px;
-  border: 1px solid var(--border);
+}
+.ratings-ledger-row {
+  display: grid;
+  grid-template-columns: 22px 18px 70px 1fr 32px;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 6px 4px;
+  border-radius: 6px;
   background: transparent;
+  border: none;
   cursor: pointer;
   font: inherit;
   color: inherit;
-  transition: all .15s;
+  text-align: left;
+  transition: background .15s;
   -webkit-tap-highlight-color: transparent;
 }
-.ratings-tile:hover {
-  border-color: var(--em);
-  background: rgba(var(--em-rgb), 0.04);
-}
-.ratings-tile-icon {
-  font-size: 16px;
-  line-height: 1;
-}
-.ratings-tile-score {
-  font-family: var(--mono);
-  font-size: 18px;
-  font-weight: 700;
-  font-variant-numeric: tabular-nums;
-  line-height: 1;
-}
-.ratings-tile-label {
-  font-family: var(--mono);
-  font-size: 9px;
-  letter-spacing: 1px;
-  text-transform: uppercase;
+.ratings-ledger-row:hover { background: rgba(var(--em-rgb), 0.05); }
+.ratings-ledger-row-idx {
+  font-size: 10px;
   color: var(--text-muted);
+  letter-spacing: 0.4px;
 }
-.ratings-panel-compact .ratings-ovr-value { font-size: 36px; }
-.ratings-panel-compact .ratings-tile { padding: 6px 4px; }
-.ratings-panel-compact .ratings-tile-score { font-size: 14px; }
+.ratings-ledger-row-icon {
+  font-size: 12px;
+  color: var(--text-muted);
+  text-align: center;
+}
+.ratings-ledger-row-label {
+  font-size: 10.5px;
+  letter-spacing: 1.4px;
+  text-transform: uppercase;
+  color: var(--text);
+}
+.ratings-ledger-row-track {
+  position: relative;
+  height: 8px;
+  display: flex;
+  align-items: center;
+  /* Dotted baseline — the "empty" portion of the bar reads as dots */
+  background-image: radial-gradient(circle, var(--border) 0.8px, transparent 1.2px);
+  background-size: 5px 8px;
+  background-position: 0 center;
+  background-repeat: repeat-x;
+  border-radius: 2px;
+  overflow: hidden;
+}
+.ratings-ledger-row-fill {
+  position: absolute;
+  inset: 2px 0;
+  border-radius: 1px;
+  transition: width .4s ease;
+}
+.ratings-ledger-row-fill-starting {
+  background: var(--text-muted);
+  opacity: 0.45;
+}
+.ratings-ledger-row-fill-mid {
+  background: var(--em, #1a7a4a);
+}
+.ratings-ledger-row-fill-elite {
+  background: var(--gold, #c8970a);
+}
+.ratings-ledger-row-score {
+  font-size: 14px;
+  font-weight: 700;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Compact variant for desktop profile rail + dark-os column. Tightens
+   spacing; OVR number stays large because it's the headline number. */
+.ratings-ledger-compact { padding: 12px 14px; gap: 10px; }
+.ratings-ledger-compact .ratings-ledger-ovr-value { font-size: 38px; }
+.ratings-ledger-compact .ratings-ledger-row {
+  grid-template-columns: 20px 16px 56px 1fr 28px;
+  gap: 8px;
+  padding: 4px 2px;
+}
+.ratings-ledger-compact .ratings-ledger-row-label { font-size: 9.5px; letter-spacing: 1.2px; }
+.ratings-ledger-compact .ratings-ledger-row-score { font-size: 12.5px; }
 
 /* ──────────────────────────────────────────────────────────────────────────
    Mobile widget stack (below AI Coach on the mobile hub)
