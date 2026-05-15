@@ -133,6 +133,13 @@ body{
 }
 .auth-google:active{ background:#f0f0f0; }
 .auth-google:disabled{ opacity:0.6; cursor:not-allowed; }
+.auth-apple:hover{
+  background:#1c1c1c;
+  border-color:#1c1c1c;
+  box-shadow:0 1px 3px rgba(0,0,0,0.18), 0 2px 8px rgba(0,0,0,0.12);
+}
+.auth-apple:active{ background:#000; }
+.auth-apple:disabled{ opacity:0.6; cursor:not-allowed; }
 .auth-mode-link,
 .auth-legal-link{
   background:none; border:none; cursor:pointer; padding:2px 0;

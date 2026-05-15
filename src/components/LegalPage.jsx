@@ -39,11 +39,13 @@ function PrivacyPolicyContent() {
         <P>We collect only what is necessary to provide the service:</P>
         <Ul items={[
           'Email address — used to create and authenticate your account.',
+          'Display name and profile picture (optional) — what you choose to show on your profile and to friends.',
           'User-generated content — boards, trackers, achievements, shop wish-list items, holiday plans, habit entries, and notes that you create inside the App. This is stored in our database.',
           'Nutrition data — food log entries and macro goals you record in the App, stored in our database and linked to your account.',
           'Session data — a short-lived session token stored in your browser to keep you signed in.',
           'Preferences — colour scheme and background image choice, stored in your browser\'s localStorage.',
           'Camera images (Pro users only, optional) — if you use the AI food scanner, a single frame is captured from your device camera and sent to Anthropic\'s API to identify the food. This image is not stored by us or by Anthropic beyond the duration of the API request.',
+          'Third-party sign-in data (optional) — if you sign in with Google or Apple instead of an email/password, we receive a minimal profile from that provider (see section 7).',
         ]} />
         <P>We do not collect payment card details, precise location data, biometric data, or any special-category personal data.</P>
       </Section>
@@ -73,11 +75,25 @@ function PrivacyPolicyContent() {
           'Supabase (EU-hosted) — database and authentication. Processes your email, app data, and nutrition logs under a Data Processing Agreement.',
           'Anthropic (AI camera scanner, Pro users only) — if you use the AI food identification feature, a camera image is sent to Anthropic\'s API. The image is used solely to identify the food and is not retained. Anthropic\'s privacy policy applies to this processing.',
           'Open Food Facts (openfoodfacts.org) — food search results are sourced from the Open Food Facts database (CC BY-SA 4.0). No personal data is sent to Open Food Facts; only your search query is included in the API request.',
+          'Google (optional, only if you sign in with Google) — receives an authentication request, returns a basic profile. See section 7 below.',
+          'Apple (optional, only if you sign in with Apple) — same pattern as Google. See section 7 below.',
         ]} />
         <P>We do not sell, rent, or share your data with advertisers or data brokers.</P>
       </Section>
 
-      <Section title="7. Cookies &amp; Local Storage">
+      <Section title="7. Third-Party Sign-In (Google &amp; Apple)">
+        <P>You can choose to sign in with Google or Apple instead of creating a password. This is optional — email and password sign-in works without either.</P>
+        <P><strong>If you sign in with Google</strong>, Google shares with us: your email address, your display name, your Google profile picture, and a unique Google account identifier. We use these solely to create and authenticate your VisionBoard account. <strong>We do not request access to your Gmail, Google Drive, Google Calendar, or any other Google services</strong>; only the basic profile data needed to sign you in.</P>
+        <P><strong>If you sign in with Apple</strong>, Apple shares with us: your email address (or a private relay address if you choose to hide it), your name (only on first sign-in), and a unique Apple identifier. We use these in the same way as the Google data above.</P>
+        <P><strong>Revoking access:</strong></P>
+        <Ul items={[
+          'For Google: visit your Google Account → Security → Third-party apps and remove VisionBoard.',
+          'For Apple: System Settings → Apple ID → Sign in with Apple → VisionBoard → Stop using.',
+        ]} />
+        <P>Revoking provider access doesn\'t delete your VisionBoard data. To remove your data from our servers, use Settings → Subscription → Delete account inside the App.</P>
+      </Section>
+
+      <Section title="8. Cookies &amp; Local Storage">
         <P>We use:</P>
         <Ul items={[
           'Session cookies — set by Supabase to keep you authenticated. These are essential and cannot be disabled without breaking the service.',
@@ -85,7 +101,7 @@ function PrivacyPolicyContent() {
         ]} />
       </Section>
 
-      <Section title="8. Your Rights (UK GDPR)">
+      <Section title="9. Your Rights (UK GDPR)">
         <P>You have the right to:</P>
         <Ul items={[
           'Access — request a copy of your personal data.',
@@ -98,16 +114,16 @@ function PrivacyPolicyContent() {
         <P>To exercise any right not available in-app, contact us at the email used for your account.</P>
       </Section>
 
-      <Section title="9. Children">
+      <Section title="10. Children">
         <P>The App is not intended for children under 13. We do not knowingly collect data from anyone under 13. If you believe a child has registered, please contact us and we will delete the account promptly.</P>
       </Section>
 
-      <Section title="10. Changes to This Policy">
+      <Section title="11. Changes to This Policy">
         <P>We will notify registered users of material changes by updating the "Last updated" date below. Continued use of the App after changes constitutes acceptance.</P>
-        <P style={{ fontFamily: 'var(--mono)', fontSize: '11px', color: 'rgba(255,255,255,.4)' }}>Last updated: April 2026</P>
+        <P style={{ fontFamily: 'var(--mono)', fontSize: '11px', color: 'rgba(255,255,255,.4)' }}>Last updated: May 2026</P>
       </Section>
 
-      <Section title="11. Complaints">
+      <Section title="12. Complaints">
         <P>If you are unhappy with how we handle your data, you have the right to lodge a complaint with the Information Commissioner's Office (ICO) at <span style={{ fontFamily: 'var(--mono)', color: 'var(--em-light, #4dc485)' }}>ico.org.uk</span> or by calling 0303 123 1113.</P>
       </Section>
     </>
@@ -132,6 +148,7 @@ function TermsContent() {
           'You must not share your account with others.',
           'You are responsible for all activity that takes place under your account.',
           'You must provide a valid email address.',
+          'If you sign in via a third-party provider (Google or Apple), you are bound by that provider\'s terms in addition to these. Loss of access to your provider account may mean loss of access to your VisionBoard account — keep a recovery method enabled with the provider.',
         ]} />
       </Section>
 
@@ -182,7 +199,7 @@ function TermsContent() {
 
       <Section title="12. Governing Law">
         <P>These terms are governed by the law of England and Wales. Any disputes will be subject to the exclusive jurisdiction of the courts of England and Wales.</P>
-        <P style={{ fontFamily: 'var(--mono)', fontSize: '11px', color: 'rgba(255,255,255,.4)' }}>Last updated: April 2026</P>
+        <P style={{ fontFamily: 'var(--mono)', fontSize: '11px', color: 'rgba(255,255,255,.4)' }}>Last updated: May 2026</P>
       </Section>
     </>
   );

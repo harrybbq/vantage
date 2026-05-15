@@ -79,6 +79,21 @@ function GoogleGlyph() {
   );
 }
 
+/**
+ * Apple logo glyph. Apple's HIG mandates a black-on-white OR
+ * white-on-black button — we use black-on-white to match the Google
+ * button treatment so the two read as a pair.
+ */
+function AppleGlyph() {
+  // Inherits parent text colour via currentColor so the same SVG
+  // works on a black (white logo) or white (black logo) button.
+  return (
+    <svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true" style={{ flexShrink: 0 }}>
+      <path fill="currentColor" d="M14.04 9.56c-.02-2.04 1.67-3.02 1.74-3.07-.95-1.39-2.42-1.58-2.95-1.6-1.26-.13-2.45.74-3.09.74-.65 0-1.63-.72-2.68-.7-1.38.02-2.65.8-3.36 2.04-1.43 2.48-.37 6.15 1.03 8.16.68.98 1.5 2.09 2.56 2.05 1.03-.04 1.42-.66 2.66-.66 1.24 0 1.59.66 2.68.64 1.11-.02 1.81-1 2.49-1.98.78-1.14 1.11-2.24 1.13-2.3-.02-.01-2.18-.83-2.21-3.32ZM12.05 3.7c.56-.69.95-1.64.84-2.59-.81.03-1.81.54-2.4 1.22-.52.6-.99 1.57-.87 2.49.91.07 1.85-.46 2.43-1.12Z" />
+    </svg>
+  );
+}
+
 export default function AuthScreen({ onOpenLegal }) {
   const [mode, setMode] = useState('login');
   const [email, setEmail] = useState('');
@@ -134,6 +149,38 @@ export default function AuthScreen({ onOpenLegal }) {
       // No state to set on success — the page is about to redirect away.
     } catch (err) {
       setError(err.message || 'Could not start Google sign-in.');
+    }
+  }
+
+  /**
+   * Apple OAuth sign-in. Required by App Store rule 4.8 — if any
+   * third-party social sign-in (Google here) is offered, Sign in
+   * with Apple MUST also be offered on iOS. Easier to ship it on
+   * web too than to render conditionally on platform.
+   *
+   * Pre-requisites (one-time, outside the app — see playbook):
+   *   1. Apple Developer Portal → Certificates, IDs & Profiles →
+   *      Identifiers — register an App ID + a Services ID. Enable
+   *      'Sign in with Apple' on both.
+   *   2. Create a Sign in with Apple key (.p8). Note the Key ID +
+   *      Team ID.
+   *   3. Supabase Dashboard → Authentication → Providers → Apple →
+   *      paste the Services ID (client_id), Team ID, Key ID, and
+   *      the .p8 contents. Enable.
+   *   4. Supabase URL config already covers the redirect — same
+   *      origin allow-list as Google.
+   */
+  async function handleAppleSignIn() {
+    setError('');
+    setInfo('');
+    try {
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: 'apple',
+        options: { redirectTo: window.location.origin },
+      });
+      if (error) throw error;
+    } catch (err) {
+      setError(err.message || 'Could not start Apple sign-in.');
     }
   }
 
@@ -287,11 +334,11 @@ export default function AuthScreen({ onOpenLegal }) {
           </motion.form>
         </AnimatePresence>
 
-        {/* Google sign-in — sits BELOW the email/password form so the
-            primary affordance stays the credentials flow; the OAuth
-            option is a secondary path. Hidden on reset mode (Google
-            doesn't go through password reset). The OR divider above
-            the button reads as "or use this alternative". */}
+        {/* OAuth sign-in — Google + Apple. Sit BELOW the email/password
+            form so credentials stay the primary affordance. Apple is
+            mandatory for App Store review (rule 4.8) if any other
+            social sign-in is offered — present on web too so the
+            iOS native build doesn't need a platform-specific render. */}
         {mode !== 'reset' && (
           <>
             <div style={S.divider} aria-hidden="true">
@@ -299,19 +346,34 @@ export default function AuthScreen({ onOpenLegal }) {
               <span style={S.dividerText}>OR</span>
               <span style={S.dividerLine} />
             </div>
-            <button
-              type="button"
-              onClick={handleGoogleSignIn}
-              disabled={loading}
-              className="auth-google"
-              style={S.googleBtn}
-              aria-label={mode === 'signup' ? 'Sign up with Google' : 'Sign in with Google'}
-            >
-              <GoogleGlyph />
-              <span style={S.googleLabel}>
-                {mode === 'signup' ? 'Sign up with Google' : 'Continue with Google'}
-              </span>
-            </button>
+            <div style={S.oauthStack}>
+              <button
+                type="button"
+                onClick={handleGoogleSignIn}
+                disabled={loading}
+                className="auth-google"
+                style={S.googleBtn}
+                aria-label={mode === 'signup' ? 'Sign up with Google' : 'Sign in with Google'}
+              >
+                <GoogleGlyph />
+                <span style={S.googleLabel}>
+                  {mode === 'signup' ? 'Sign up with Google' : 'Continue with Google'}
+                </span>
+              </button>
+              <button
+                type="button"
+                onClick={handleAppleSignIn}
+                disabled={loading}
+                className="auth-apple"
+                style={S.appleBtn}
+                aria-label={mode === 'signup' ? 'Sign up with Apple' : 'Sign in with Apple'}
+              >
+                <AppleGlyph />
+                <span style={S.googleLabel}>
+                  {mode === 'signup' ? 'Sign up with Apple' : 'Continue with Apple'}
+                </span>
+              </button>
+            </div>
           </>
         )}
 
@@ -426,6 +488,9 @@ const S = {
   // Google OAuth button. White surface + 'Continue with Google' wording
   // is the standard Google sign-in branding pattern — users recognise
   // it immediately, which is the whole point of OAuth.
+  oauthStack: {
+    display: 'flex', flexDirection: 'column', gap: 8,
+  },
   googleBtn: {
     width: '100%',
     display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -439,6 +504,21 @@ const S = {
     fontSize: 13,
     fontWeight: 600,
     color: 'var(--text, #1c1a17)',
+    transition: 'background 0.15s, border-color 0.15s, box-shadow 0.15s',
+  },
+  appleBtn: {
+    width: '100%',
+    display: 'flex', alignItems: 'center', justifyContent: 'center',
+    gap: 10,
+    padding: '11px 16px',
+    background: '#000',
+    border: '1px solid #000',
+    borderRadius: 10,
+    cursor: 'pointer',
+    fontFamily: 'var(--sans, "DM Sans", sans-serif)',
+    fontSize: 13,
+    fontWeight: 600,
+    color: '#fff',
     transition: 'background 0.15s, border-color 0.15s, box-shadow 0.15s',
   },
   googleLabel: {
