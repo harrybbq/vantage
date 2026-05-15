@@ -196,31 +196,6 @@ export default function AuthScreen({ onOpenLegal }) {
         {error && <div style={S.errorBanner} role="alert" aria-live="assertive">{error}</div>}
         {info  && <div style={S.infoBanner}  role="status" aria-live="polite">{info}</div>}
 
-        {/* Google sign-in — only on login / signup modes. The OAuth
-            redirect dance is owned by Supabase; we just kick it off. */}
-        {mode !== 'reset' && (
-          <>
-            <button
-              type="button"
-              onClick={handleGoogleSignIn}
-              disabled={loading}
-              className="auth-google"
-              style={S.googleBtn}
-              aria-label={mode === 'signup' ? 'Sign up with Google' : 'Sign in with Google'}
-            >
-              <GoogleGlyph />
-              <span style={S.googleLabel}>
-                {mode === 'signup' ? 'Sign up with Google' : 'Continue with Google'}
-              </span>
-            </button>
-            <div style={S.divider} aria-hidden="true">
-              <span style={S.dividerLine} />
-              <span style={S.dividerText}>OR</span>
-              <span style={S.dividerLine} />
-            </div>
-          </>
-        )}
-
         <AnimatePresence mode="wait" initial={false}>
           <motion.form
             key={`f-${mode}`}
@@ -311,6 +286,34 @@ export default function AuthScreen({ onOpenLegal }) {
             </motion.button>
           </motion.form>
         </AnimatePresence>
+
+        {/* Google sign-in — sits BELOW the email/password form so the
+            primary affordance stays the credentials flow; the OAuth
+            option is a secondary path. Hidden on reset mode (Google
+            doesn't go through password reset). The OR divider above
+            the button reads as "or use this alternative". */}
+        {mode !== 'reset' && (
+          <>
+            <div style={S.divider} aria-hidden="true">
+              <span style={S.dividerLine} />
+              <span style={S.dividerText}>OR</span>
+              <span style={S.dividerLine} />
+            </div>
+            <button
+              type="button"
+              onClick={handleGoogleSignIn}
+              disabled={loading}
+              className="auth-google"
+              style={S.googleBtn}
+              aria-label={mode === 'signup' ? 'Sign up with Google' : 'Sign in with Google'}
+            >
+              <GoogleGlyph />
+              <span style={S.googleLabel}>
+                {mode === 'signup' ? 'Sign up with Google' : 'Continue with Google'}
+              </span>
+            </button>
+          </>
+        )}
 
         {/* Mode-switch links */}
         <div style={S.links}>
@@ -437,14 +440,13 @@ const S = {
     fontWeight: 600,
     color: 'var(--text, #1c1a17)',
     transition: 'background 0.15s, border-color 0.15s, box-shadow 0.15s',
-    marginBottom: 14,
   },
   googleLabel: {
     letterSpacing: 0.2,
   },
   divider: {
     display: 'flex', alignItems: 'center', gap: 10,
-    marginBottom: 14,
+    margin: '14px 0',
   },
   dividerLine: {
     flex: 1, height: 1,
