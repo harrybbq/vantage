@@ -63,6 +63,22 @@ function Spinner() {
   );
 }
 
+/**
+ * Google "G" mark — official 4-colour glyph. Inline SVG to avoid an
+ * extra image fetch on the auth screen (and to dodge the privacy
+ * concern of any third-party CDN serving the icon).
+ */
+function GoogleGlyph() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true" style={{ flexShrink: 0 }}>
+      <path fill="#4285F4" d="M17.64 9.2c0-.64-.06-1.25-.16-1.84H9v3.48h4.84a4.14 4.14 0 0 1-1.79 2.72v2.26h2.9c1.7-1.56 2.69-3.86 2.69-6.62Z" />
+      <path fill="#34A853" d="M9 18c2.43 0 4.47-.81 5.96-2.18l-2.9-2.26c-.8.54-1.83.86-3.06.86-2.35 0-4.34-1.58-5.05-3.71H.96v2.33A9 9 0 0 0 9 18Z" />
+      <path fill="#FBBC05" d="M3.95 10.71A5.41 5.41 0 0 1 3.66 9c0-.6.1-1.17.29-1.71V4.96H.96A9 9 0 0 0 0 9c0 1.45.35 2.83.96 4.04l2.99-2.33Z" />
+      <path fill="#EA4335" d="M9 3.58c1.32 0 2.51.45 3.44 1.35l2.58-2.58A8.94 8.94 0 0 0 9 0 9 9 0 0 0 .96 4.96l2.99 2.33C4.66 5.16 6.65 3.58 9 3.58Z" />
+    </svg>
+  );
+}
+
 export default function AuthScreen({ onOpenLegal }) {
   const [mode, setMode] = useState('login');
   const [email, setEmail] = useState('');
@@ -77,6 +93,49 @@ export default function AuthScreen({ onOpenLegal }) {
   const switchMode = useCallback(next => {
     setMode(next); setError(''); setInfo('');
   }, []);
+
+  /**
+   * Google OAuth sign-in. Supabase handles the full redirect dance —
+   * we just point it at the Google provider and tell it where to send
+   * the user back to. `redirectTo` is the current origin (preserves
+   * port for local dev, falls back to the deployed origin in prod).
+   *
+   * The browser will full-page navigate away to accounts.google.com,
+   * so any state we set here is discarded — no need for a loading
+   * spinner on success.
+   *
+   * Pre-requisites (one-time, outside the app — see playbook F5):
+   *   1. Google Cloud Console → OAuth 2.0 Client ID with this app's
+   *      origins as Authorized JavaScript Origins + Supabase callback
+   *      URL as Authorized Redirect URI.
+   *   2. Supabase Dashboard → Authentication → Providers → Google →
+   *      paste the client ID + secret and enable.
+   *   3. Supabase Dashboard → Authentication → URL Configuration →
+   *      add this app's origins to the allowed redirect list.
+   *
+   * Without those, the Google button still renders (so the UI is
+   * complete) but clicking it surfaces the Supabase error message
+   * via the existing error banner.
+   */
+  async function handleGoogleSignIn() {
+    setError('');
+    setInfo('');
+    try {
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          redirectTo: window.location.origin,
+          // queryParams.prompt forces the account chooser so a user with
+          // multiple Google accounts isn't auto-signed-in to the wrong one.
+          queryParams: { prompt: 'select_account' },
+        },
+      });
+      if (error) throw error;
+      // No state to set on success — the page is about to redirect away.
+    } catch (err) {
+      setError(err.message || 'Could not start Google sign-in.');
+    }
+  }
 
   async function handleSubmit(e) {
     e.preventDefault();
@@ -136,6 +195,31 @@ export default function AuthScreen({ onOpenLegal }) {
 
         {error && <div style={S.errorBanner} role="alert" aria-live="assertive">{error}</div>}
         {info  && <div style={S.infoBanner}  role="status" aria-live="polite">{info}</div>}
+
+        {/* Google sign-in — only on login / signup modes. The OAuth
+            redirect dance is owned by Supabase; we just kick it off. */}
+        {mode !== 'reset' && (
+          <>
+            <button
+              type="button"
+              onClick={handleGoogleSignIn}
+              disabled={loading}
+              className="auth-google"
+              style={S.googleBtn}
+              aria-label={mode === 'signup' ? 'Sign up with Google' : 'Sign in with Google'}
+            >
+              <GoogleGlyph />
+              <span style={S.googleLabel}>
+                {mode === 'signup' ? 'Sign up with Google' : 'Continue with Google'}
+              </span>
+            </button>
+            <div style={S.divider} aria-hidden="true">
+              <span style={S.dividerLine} />
+              <span style={S.dividerText}>OR</span>
+              <span style={S.dividerLine} />
+            </div>
+          </>
+        )}
 
         <AnimatePresence mode="wait" initial={false}>
           <motion.form
@@ -334,6 +418,42 @@ const S = {
     border: '1px solid rgba(26,122,74,0.22)',
     borderRadius: 9, padding: '10px 14px',
     color: 'var(--em, #1a7a4a)', fontSize: 13, lineHeight: 1.5, marginBottom: 14,
+  },
+
+  // Google OAuth button. White surface + 'Continue with Google' wording
+  // is the standard Google sign-in branding pattern — users recognise
+  // it immediately, which is the whole point of OAuth.
+  googleBtn: {
+    width: '100%',
+    display: 'flex', alignItems: 'center', justifyContent: 'center',
+    gap: 10,
+    padding: '11px 16px',
+    background: '#fff',
+    border: '1px solid var(--border, #e2dccf)',
+    borderRadius: 10,
+    cursor: 'pointer',
+    fontFamily: 'var(--sans, "DM Sans", sans-serif)',
+    fontSize: 13,
+    fontWeight: 600,
+    color: 'var(--text, #1c1a17)',
+    transition: 'background 0.15s, border-color 0.15s, box-shadow 0.15s',
+    marginBottom: 14,
+  },
+  googleLabel: {
+    letterSpacing: 0.2,
+  },
+  divider: {
+    display: 'flex', alignItems: 'center', gap: 10,
+    marginBottom: 14,
+  },
+  dividerLine: {
+    flex: 1, height: 1,
+    background: 'var(--border, #e2dccf)',
+  },
+  dividerText: {
+    fontFamily: 'var(--mono, "DM Mono", monospace)',
+    fontSize: 9, letterSpacing: '2px',
+    color: 'var(--text-muted, #8a8278)',
   },
 
   form: { display: 'flex', flexDirection: 'column', gap: 14 },
