@@ -21,6 +21,7 @@
  */
 import { useState } from 'react';
 import { categoryBreakdown } from '../lib/ratings/derive';
+import { ovrTier } from '../lib/ratings/tiers';
 import { isCooldownActive, daysUntilRetake } from './SelfCheck';
 import BrainCheck   from './BrainCheck';
 import FinanceCheck from './FinanceCheck';
@@ -78,7 +79,10 @@ function tier(score) {
 export default function RatingsPanel({ S, update, compact = false }) {
   const r = S?.ratings || {};
   const ovr = r.ovr || 1;
-  const ovrTier = tier(ovr);
+  // Prestige band drives the headline glow + the OVR-row tier label.
+  // (Per-category rows below still use the 3-tier Starting/Mid/Elite
+  // `tier()` scale — a different axis.)
+  const prestige = ovrTier(ovr);
   const [activeBreakdown, setActiveBreakdown] = useState(null);
   const [activeCheck, setActiveCheck] = useState(null);
 
@@ -97,11 +101,11 @@ export default function RatingsPanel({ S, update, compact = false }) {
         <div className="ratings-ledger-ovr-row">
           <div className="ratings-ledger-ovr-block">
             <span className="ratings-ledger-ovr-label">[ OVR ]</span>
-            <span className="ratings-ledger-ovr-value">{ovr}</span>
+            <span className={`ratings-ledger-ovr-value ovr-num ovr-tier-${prestige.key}`}>{ovr}</span>
             <span className="ratings-ledger-ovr-suffix">/99</span>
           </div>
-          <span className="ratings-ledger-ovr-tier" style={{ color: ovrTier.color }}>
-            → {ovrTier.label.toUpperCase()}
+          <span className="ratings-ledger-ovr-tier" style={{ color: prestige.color }}>
+            → {prestige.label.toUpperCase()}
           </span>
         </div>
 

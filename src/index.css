@@ -59,6 +59,16 @@
   --gold-lt:     #e8b830;
   --amber:       #d4700a;
 
+  /* ── OVR prestige tiers (F5 Sprint 6) ──
+     Paired hex + rgb triplet so glows can use rgba(). See
+     src/lib/ratings/tiers.js for the band boundaries. */
+  --tier-bronze:      #b97a3a;  --tier-bronze-rgb:  185,122,58;
+  --tier-silver:      #8c97a8;  --tier-silver-rgb:  140,151,168;
+  --tier-gold:        #c8970a;  --tier-gold-rgb:    200,151,10;
+  --tier-emerald:     #12a45f;  --tier-emerald-rgb: 18,164,95;
+  --tier-diamond:     #2bb6cc;  --tier-diamond-rgb: 43,182,204;
+  --tier-ruby:        #d11f4f;  --tier-ruby-rgb:    209,31,79;
+
   /* ── App gradient ── */
   --grad: linear-gradient(145deg, #f7f4ef 0%, #ede8e0 40%, #e0d8cc 70%, #d4cab8 100%);
 
@@ -3535,6 +3545,56 @@ button:active:not(:disabled),
   text-transform: uppercase;
   font-weight: 700;
   white-space: nowrap;
+}
+
+/* ── OVR prestige glow (F5 Sprint 6) ──────────────────────────────
+   Each `.ovr-tier-{key}` sets the two custom props the role classes
+   below consume. Put `ovr-tier-{key}` + a role class (`ovr-num` for
+   the big serif headline, `ovr-chip` for the small badges/chips) on
+   the same element. */
+.ovr-tier-bronze  { --tc: var(--tier-bronze);  --tc-rgb: var(--tier-bronze-rgb); }
+.ovr-tier-silver  { --tc: var(--tier-silver);  --tc-rgb: var(--tier-silver-rgb); }
+.ovr-tier-gold    { --tc: var(--tier-gold);    --tc-rgb: var(--tier-gold-rgb); }
+.ovr-tier-emerald { --tc: var(--tier-emerald); --tc-rgb: var(--tier-emerald-rgb); }
+.ovr-tier-diamond { --tc: var(--tier-diamond); --tc-rgb: var(--tier-diamond-rgb); }
+.ovr-tier-ruby    { --tc: var(--tier-ruby);    --tc-rgb: var(--tier-ruby-rgb); }
+
+/* Headline OVR number — colour the glyph + radiate a soft halo. */
+.ovr-num {
+  color: var(--tc);
+  text-shadow:
+    0 0 10px rgba(var(--tc-rgb), 0.50),
+    0 0 24px rgba(var(--tc-rgb), 0.28);
+}
+
+/* Compact chip / badge (own profile badge + friend level chips). */
+.ovr-chip {
+  color: var(--tc) !important;
+  background: rgba(var(--tc-rgb), 0.12) !important;
+  border-color: rgba(var(--tc-rgb), 0.42) !important;
+  box-shadow: 0 0 7px rgba(var(--tc-rgb), 0.38);
+}
+
+/* The two top bands get a gentle breathing halo so reaching them
+   feels like an event. Bronze→Emerald stay calm/static. */
+.ovr-num.ovr-tier-diamond,
+.ovr-num.ovr-tier-ruby {
+  animation: ovrPrestigePulse 2.8s ease-in-out infinite;
+}
+@keyframes ovrPrestigePulse {
+  0%, 100% {
+    text-shadow:
+      0 0 10px rgba(var(--tc-rgb), 0.50),
+      0 0 24px rgba(var(--tc-rgb), 0.28);
+  }
+  50% {
+    text-shadow:
+      0 0 16px rgba(var(--tc-rgb), 0.72),
+      0 0 36px rgba(var(--tc-rgb), 0.44);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .ovr-num { animation: none !important; }
 }
 
 .ratings-ledger-rows {

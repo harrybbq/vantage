@@ -66,7 +66,6 @@ export default function MobileHubSection({ S, update, visionState, hasPro, navig
   const g = greeting(profileName);
   const coins = S.coins || 0;
   const streak = S.currentStreak || 0;
-  const level = visionState?.level || 1;
   const pctToNext = Math.round((visionState?.pctToNext || 0) * 100);
 
   const trackers = S.trackers || [];

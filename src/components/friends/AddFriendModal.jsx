@@ -147,7 +147,7 @@ export default function AddFriendModal({
                         {profile.display_name || `@${profile.handle}`}
                       </div>
                       <div className="add-friend-result-meta">
-                        @{profile.handle} · Lvl {profile.level || 1}
+                        @{profile.handle} · OVR {profile.ratings_ovr || 1}
                       </div>
                     </div>
                     {status ? (

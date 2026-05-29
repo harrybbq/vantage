@@ -1,11 +1,12 @@
 import { useEffect, useRef, useState } from 'react';
 import FriendsHeatmap from './FriendsHeatmap';
+import { ovrTier } from '../../lib/ratings/tiers';
 
 /**
  * Expanded "cheerleader" view of a single friend.
  *
  * Sections (top-to-bottom):
- *   1. Header — avatar, name, @handle, Lvl badge, ⋯ menu (Report/Block)
+ *   1. Header — avatar, name, @handle, OVR badge, ⋯ menu (Report/Block)
  *   2. Streak strip — big number + habit name OR a quiet "last active"
  *      line for friends without an active streak (no shaming language)
  *   3. 91-day activity heatmap (with hover tooltip)
@@ -67,6 +68,8 @@ export default function FriendCard({
   }, [menuOpen]);
 
   if (!friend) return null;
+  const ovr = friend.ovr || 1;
+  const prestige = ovrTier(ovr);
   const hasStreak = friend.streak > 0;
   const hasHeatmap = Array.isArray(friend.heatmap) && friend.heatmap.length > 0;
   // Only Report + Block live in the kebab now. Unfriend has its own
@@ -100,7 +103,7 @@ export default function FriendCard({
           <div className="fc-name">{friend.name}</div>
           <div className="fc-meta-row">
             <span className="fc-handle">@{friend.handle}</span>
-            <span className="fc-level">Lvl {friend.level}</span>
+            <span className={`fc-level ovr-chip ovr-tier-${prestige.key}`} title={`${prestige.label} tier`}>OVR {ovr}</span>
           </div>
         </div>
         {hasMenu && (

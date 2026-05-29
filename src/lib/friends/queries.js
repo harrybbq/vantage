@@ -183,8 +183,10 @@ export async function listAcceptedFriends(userId) {
     .from('profiles')
     // last_active_at drives the online-bubble heuristic in the rail.
     // Pulled here (rather than per-friend on selection) so the list
-    // can sort online-first without an N+1 round-trip.
-    .select('id, handle, display_name, avatar_url, level, last_active_at')
+    // can sort online-first without an N+1 round-trip. ratings_ovr is
+    // the server-canonical overall rating (written by the recompute
+    // function) — it replaced `level` on the friend card.
+    .select('id, handle, display_name, avatar_url, level, ratings_ovr, last_active_at')
     .in('id', otherIds);
   if (pErr) throw new Error(friendlyError(pErr, 'Could not load friend profiles.'));
   return (profiles || []).map(p => ({
@@ -207,7 +209,7 @@ export async function listPendingRequests(userId) {
   if (ids.length === 0) return [];
   const { data: profiles, error: pErr } = await supabase
     .from('profiles')
-    .select('id, handle, display_name, avatar_url, level')
+    .select('id, handle, display_name, avatar_url, level, ratings_ovr')
     .in('id', ids);
   if (pErr) throw new Error(friendlyError(pErr, 'Could not load requesters.'));
   return (profiles || []).map(p => ({

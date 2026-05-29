@@ -69,7 +69,7 @@ export default function FriendsRail({ userId, onUpgrade }) {
       id: base.id,
       name: base.display_name || `@${base.handle}`,
       handle: base.handle,
-      level: base.level || 1,
+      ovr: base.ratings_ovr || 1,
       online: !!base.online,
       avatar_url: base.avatar_url || null,
       streak: selectedStats?.current_streak || 0,
@@ -84,14 +84,14 @@ export default function FriendsRail({ userId, onUpgrade }) {
   }, [selectedId, friends.friends, selectedStats]);
 
   // ── friend list row shape (FriendListRow expects the mock shape) ──
-  // Sort online-first, then by level desc as a tie-breaker so the
-  // most-engaged friend tops the list when several are online.
+  // Sort online-first, then by OVR desc as a tie-breaker so the
+  // highest-rated friend tops the list when several are online.
   const rows = useMemo(() => {
     const mapped = friends.friends.map(f => ({
       id: f.id,
       name: f.display_name || `@${f.handle}`,
       handle: f.handle,
-      level: f.level || 1,
+      ovr: f.ratings_ovr || 1,
       online: !!f.online,
       streak: 0,           // not in list view; row shows handle / last-seen instead
       streakHabit: null,
@@ -99,7 +99,7 @@ export default function FriendsRail({ userId, onUpgrade }) {
     }));
     return mapped.sort((a, b) => {
       if (a.online !== b.online) return a.online ? -1 : 1;
-      return (b.level || 0) - (a.level || 0);
+      return (b.ovr || 0) - (a.ovr || 0);
     });
   }, [friends.friends]);
 

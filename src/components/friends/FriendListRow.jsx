@@ -1,6 +1,6 @@
 /**
  * Single row in the compact Friends panel. Renders avatar + name + a
- * short status line + a small level chip.
+ * short status line + a small OVR chip (glow-tinted by prestige tier).
  *
  * Status line precedence:
  *   1. Active streak (with flame) if streak > 0
@@ -22,6 +22,8 @@ function initials(name) {
   return name.split(' ').map(p => p[0]).join('').slice(0, 2).toUpperCase();
 }
 
+import { ovrTier } from '../../lib/ratings/tiers';
+
 function statusLine(friend) {
   if (friend.streak > 0) return `🔥 ${friend.streak}d`;
   if (friend.lastSeenDays != null) return `${friend.lastSeenDays}d ago`;
@@ -29,6 +31,8 @@ function statusLine(friend) {
 }
 
 export default function FriendListRow({ friend, selected, onClick }) {
+  const ovr = friend.ovr || 1;
+  const prestige = ovrTier(ovr);
   return (
     <button
       type="button"
@@ -56,7 +60,7 @@ export default function FriendListRow({ friend, selected, onClick }) {
         <div className="fc-row-name">{friend.name}</div>
         <div className="fc-row-status">{statusLine(friend)}</div>
       </div>
-      <div className="fc-row-level">{friend.level}</div>
+      <div className={`fc-row-level ovr-chip ovr-tier-${prestige.key}`} title={`OVR ${ovr} · ${prestige.label}`}>{ovr}</div>
     </button>
   );
 }

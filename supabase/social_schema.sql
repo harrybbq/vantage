@@ -265,10 +265,11 @@ returns table (
   handle        text,
   display_name  text,
   avatar_url    text,
-  level         int
+  level         int,
+  ratings_ovr   int
 )
 language sql security definer set search_path = public as $$
-  select p.id, p.handle::text, p.display_name, p.avatar_url, p.level
+  select p.id, p.handle::text, p.display_name, p.avatar_url, p.level, p.ratings_ovr
   from profiles p
   where p.is_searchable = true
     and p.handle is not null

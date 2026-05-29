@@ -7,6 +7,7 @@ import QuickLog from './QuickLog';
 import HubOsLayout from './HubOsLayout';
 import FriendsRail from './friends/FriendsRail';
 import RatingsPanel from './RatingsPanel';
+import { ovrTier } from '../lib/ratings/tiers';
 import { useSubscriptionContext } from '../context/SubscriptionContext';
 
 // ── GitHub helpers ──
@@ -104,6 +105,7 @@ function ProfileCard({ profile, S, update, onSaveName, onSaveTagline, onUploadPh
   // to 1 if no rating computed yet (fresh user) so the chip never
   // shows an empty value.
   const ovr = S?.ratings?.ovr || 1;
+  const prestige = ovrTier(ovr);
   return (
     <div className={`profile-col${children ? ' profile-col--with-rail' : ''}`}>
       <div className="card profile-card">
@@ -133,10 +135,10 @@ function ProfileCard({ profile, S, update, onSaveName, onSaveTagline, onUploadPh
               onChange={e => onSaveName(e.target.value)}
             />
             <span
-              className="profile-level-badge"
+              className={`profile-level-badge ovr-chip ovr-tier-${prestige.key}`}
               title={visionState
-                ? `OVR ${ovr}/99 · ${visionState.unlockedCount}/${visionState.totalCount} visions unlocked`
-                : `OVR ${ovr}/99`}
+                ? `OVR ${ovr}/99 · ${prestige.label} tier · ${visionState.unlockedCount}/${visionState.totalCount} visions unlocked`
+                : `OVR ${ovr}/99 · ${prestige.label} tier`}
             >
               OVR {ovr}
             </span>
