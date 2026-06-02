@@ -136,12 +136,120 @@ async function saveToCloud(userId, state) {
   const stateToSave = stripForSave(state);
   const photo = state.profile?.photo || null;
 
-  await supabase.from('user_data').upsert({
+  // History note (2026-06): saves used to be fire-and-forget — the
+  // upsert error was never inspected, so a failed write looked
+  // identical to a successful one. We now surface failures so the
+  // caller can keep the last-known-good data and retry rather than
+  // assume the cloud is in sync.
+  const { error } = await supabase.from('user_data').upsert({
     id: userId,
     state: stateToSave,
     photo,
     updated_at: new Date().toISOString(),
   });
+  if (error) {
+    const e = new Error(error.message || 'Could not save your data.');
+    e.cause = error;
+    throw e;
+  }
+}
+
+// ── Anti-wipe content signals ───────────────────────────────────────────────
+//
+// DEFAULT_STATE is NOT empty — it ships with 4 seed achievements + 3
+// seed trackers. So a wiped state doesn't look empty; it looks like
+// factory defaults. These two predicates let the save path tell the
+// difference between "user genuinely has data" and "state has been
+// reset to the out-of-box seed", so we can refuse the one transition
+// that is never a legitimate single edit: real data → factory default.
+
+/** True if the state carries any evidence of real user activity. */
+function hasMeaningfulData(state) {
+  if (!state || typeof state !== 'object') return false;
+  return (
+    Object.keys(state.logs || {}).length > 0 ||
+    (state.savings || []).length > 0 ||
+    Object.keys(state.visions || {}).length > 0 ||
+    (state.coins || 0) > 0 ||
+    !!(state.profile && state.profile.name) ||
+    !!(state.profile && state.profile.tagline) ||
+    (state.habits || []).length > 0 ||
+    (state.links || []).length > 0 ||
+    (state.shopItems || []).length > 0 ||
+    (state.achievements || []).some(a => a.completed) ||
+    (state.achievements || []).length > 4 ||
+    (state.trackers || []).length > 3 ||
+    !!state.brainScore || !!state.financeScore ||
+    !!state.fitnessScore || !!state.socialScore
+  );
+}
+
+/** True if the state is indistinguishable from the out-of-box seed:
+ *  no logs / savings / visions / coins, no profile identity, only the
+ *  seed achievements (none completed) and seed trackers. This is the
+ *  exact shape a wipe-to-defaults produces. */
+function looksLikeFactoryDefault(state) {
+  if (!state || typeof state !== 'object') return false;
+  return (
+    Object.keys(state.logs || {}).length === 0 &&
+    (state.savings || []).length === 0 &&
+    Object.keys(state.visions || {}).length === 0 &&
+    (state.coins || 0) === 0 &&
+    !(state.profile && state.profile.name) &&
+    !(state.profile && state.profile.tagline) &&
+    (state.habits || []).length === 0 &&
+    (state.achievements || []).length <= 4 &&
+    !(state.achievements || []).some(a => a.completed) &&
+    (state.trackers || []).length <= 3
+  );
+}
+
+// ── Local last-known-good backup ─────────────────────────────────────────────
+//
+// Belt-and-braces: on every successful load and every successful save
+// we mirror the state into localStorage. If the cloud ever does get
+// into a bad state, the user can restore from here in one tap. We
+// strip the heavy photo blobs (profile + savings images) so a large
+// board can't blow the ~5 MB localStorage quota — data is recovered,
+// photos are re-addable.
+
+const BACKUP_PREFIX = 'vb4_backup:';
+
+function slimForBackup(state) {
+  const s = stripForSave(state); // drops transient keys + profile.photo
+  if (Array.isArray(s.savings)) {
+    s.savings = s.savings.map(g => (g && g.image ? { ...g, image: null } : g));
+  }
+  return s;
+}
+
+function writeBackup(userId, state) {
+  if (!userId) return;
+  try {
+    localStorage.setItem(
+      BACKUP_PREFIX + userId,
+      JSON.stringify({ ts: Date.now(), state: slimForBackup(state) })
+    );
+  } catch {
+    // Quota or serialization failure — non-fatal; backup is optional.
+  }
+}
+
+export function readBackup(userId) {
+  if (!userId) return null;
+  try {
+    const raw = localStorage.getItem(BACKUP_PREFIX + userId);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (parsed && parsed.state && hasMeaningfulData(parsed.state)) return parsed;
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+export function hasBackup(userId) {
+  return !!readBackup(userId);
 }
 
 // ── localStorage fallback (migration source) ──────────────────────────────
@@ -187,12 +295,26 @@ export function useVisionBoardState(userId) {
   const userIdRef = useRef(userId);
   userIdRef.current = userId;
 
+  // ── Anti-wipe refs ──
+  // loadingRef: true until the initial cloud load resolves. Blocks the
+  //   debounced writer from persisting the in-memory default state
+  //   before real data has arrived (closes the load-race window).
+  // lastGoodMeaningfulRef: true once we've confirmed this user has real
+  //   data. While true, the save path refuses any write that would
+  //   reduce the state to factory defaults.
+  // allowEmptyRef: briefly flipped on during a user-confirmed reset
+  //   (startFresh) so the legitimate wipe IS allowed through the guard.
+  const loadingRef = useRef(true);
+  const lastGoodMeaningfulRef = useRef(false);
+  const allowEmptyRef = useRef(false);
+
   useEffect(() => {
     if (!userId) return;
     let cancelled = false;
 
     async function init() {
       setLoading(true);
+      loadingRef.current = true;
       setLoadError(null);
 
       let result;
@@ -204,6 +326,7 @@ export function useVisionBoardState(userId) {
           kind: 'load_failed',
           message: e?.message || 'Could not reach the server. Check your connection and try again.',
         });
+        loadingRef.current = false;
         setLoading(false);
         return;
       }
@@ -216,7 +339,15 @@ export function useVisionBoardState(userId) {
         // suspicious and refuses to seed defaults. See the history
         // note above the helpers for context.
         markUserSeen(userId);
+        // Record whether this user has real data — gates the save-path
+        // anti-clobber guard. Mirror to the local backup so a future
+        // cloud problem is recoverable.
+        if (hasMeaningfulData(result.state)) {
+          lastGoodMeaningfulRef.current = true;
+          writeBackup(userId, result.state);
+        }
         setS(result.state);
+        loadingRef.current = false;
         setLoading(false);
         return;
       }
@@ -239,6 +370,7 @@ export function useVisionBoardState(userId) {
                 "We refused to overwrite the cloud with defaults. " +
                 "Try Try Again. If it persists, check your network and reach out before signing out.",
             });
+            loadingRef.current = false;
             setLoading(false);
           }
           return;
@@ -256,6 +388,7 @@ export function useVisionBoardState(userId) {
             kind: 'load_failed',
             message: e?.message || 'Could not create your initial data on the server.',
           });
+          loadingRef.current = false;
           setLoading(false);
           return;
         }
@@ -263,8 +396,13 @@ export function useVisionBoardState(userId) {
         // Mark seen now that we've created the row, so even THIS user
         // can't be wiped if maybeSingle returns no_row again later.
         markUserSeen(userId);
+        if (hasMeaningfulData(initial)) {
+          lastGoodMeaningfulRef.current = true;
+          writeBackup(userId, initial);
+        }
         if (local) setJustMigrated(true);
         setS(initial);
+        loadingRef.current = false;
         setLoading(false);
         return;
       }
@@ -282,6 +420,7 @@ export function useVisionBoardState(userId) {
             'This is unusual — refreshing may help. If the problem persists, ' +
             'please don\'t edit anything and reach out for help.',
         });
+        loadingRef.current = false;
         setLoading(false);
       }
     }
@@ -296,12 +435,52 @@ export function useVisionBoardState(userId) {
     setS(prev => {
       const next = typeof updater === 'function' ? updater(prev) : { ...prev, ...updater };
 
-      // Debounce cloud saves — 1.5 s after last change. Skip entirely
-      // if we're parked on a load error: saving in that state could
-      // overwrite the very data we're trying not to clobber.
+      // Once this user is known to have real data, remember it so the
+      // save guard below can refuse a regression to factory defaults.
+      if (hasMeaningfulData(next)) lastGoodMeaningfulRef.current = true;
+
+      // Debounce cloud saves — 1.5 s after last change.
       clearTimeout(saveTimer.current);
       saveTimer.current = setTimeout(() => {
-        if (userIdRef.current && !loadError) saveToCloud(userIdRef.current, next);
+        const uid = userIdRef.current;
+        if (!uid) return;
+
+        // Skip if parked on a load error — saving now could overwrite
+        // the very data we're trying not to clobber.
+        if (loadError) return;
+
+        // Skip while the initial load is still in flight — the
+        // in-memory state is the default seed until real data arrives,
+        // and persisting it would be a wipe. (Closes the load race.)
+        if (loadingRef.current) return;
+
+        // ── Anti-wipe guard ───────────────────────────────────────
+        // Never let an in-memory anomaly overwrite real cloud data
+        // with the factory-default seed. This is the one transition
+        // that is never a legitimate single edit. The user's real
+        // data stays in the cloud; a refresh restores the UI. The
+        // only way past this is an explicit, user-confirmed reset
+        // (startFresh), which flips allowEmptyRef.
+        if (
+          lastGoodMeaningfulRef.current &&
+          !allowEmptyRef.current &&
+          looksLikeFactoryDefault(next)
+        ) {
+          console.error(
+            '[useVisionBoardState] BLOCKED save: refusing to overwrite real data with factory defaults. ' +
+            'Cloud data preserved; reload to restore.'
+          );
+          return;
+        }
+
+        saveToCloud(uid, next)
+          .then(() => {
+            // Successful write is a new known-good snapshot.
+            if (hasMeaningfulData(next)) writeBackup(uid, next);
+          })
+          .catch(err => {
+            console.error('[useVisionBoardState] Save failed — keeping last-known-good:', err?.message || err);
+          });
       }, 1500);
 
       return next;
@@ -331,9 +510,13 @@ export function useVisionBoardState(userId) {
     if (!userIdRef.current) return;
     const fresh = addTransient({ ...DEFAULT_STATE });
     try {
+      // Authorise the one write that the anti-wipe guard would
+      // otherwise block: a deliberate reset to factory defaults.
+      allowEmptyRef.current = true;
       clearUserSeen(userIdRef.current);
       await saveToCloud(userIdRef.current, fresh);
       markUserSeen(userIdRef.current);
+      lastGoodMeaningfulRef.current = false;
       setS(fresh);
       setLoadError(null);
     } catch (e) {
@@ -341,11 +524,46 @@ export function useVisionBoardState(userId) {
         kind: 'load_failed',
         message: e?.message || 'Could not save fresh state.',
       });
+    } finally {
+      // Re-arm the guard immediately — only the single reset write is
+      // exempt; ordinary edits after a fresh start are protected again.
+      allowEmptyRef.current = false;
+    }
+  }
+
+  /**
+   * Restore the last-known-good snapshot saved in localStorage. Used
+   * from the error UI when the cloud row is bad but a local backup
+   * exists. Photos (profile + savings images) aren't in the backup, so
+   * they'll need re-adding, but all data is recovered.
+   */
+  async function restoreFromBackup() {
+    const uid = userIdRef.current;
+    if (!uid) return false;
+    const backup = readBackup(uid);
+    if (!backup || !backup.state) return false;
+    const restored = addTransient({ ...DEFAULT_STATE, ...backup.state });
+    try {
+      clearUserSeen(uid);
+      await saveToCloud(uid, restored);
+      markUserSeen(uid);
+      lastGoodMeaningfulRef.current = hasMeaningfulData(restored);
+      setS(restored);
+      setLoadError(null);
+      return true;
+    } catch (e) {
+      setLoadError({
+        kind: 'load_failed',
+        message: e?.message || 'Could not restore your backup.',
+      });
+      return false;
     }
   }
 
   return {
     S, update, loading, justMigrated, dismissMigrationBanner,
     loadError, retryLoad, startFresh,
+    restoreFromBackup,
+    hasBackup: () => hasBackup(userIdRef.current),
   };
 }

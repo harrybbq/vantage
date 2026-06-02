@@ -72,7 +72,7 @@ const MODAL_CAPS = {
 function Board({ userId, userEmail, onSignOut }) {
   const {
     S, update, loading, justMigrated, dismissMigrationBanner,
-    loadError, retryLoad, startFresh,
+    loadError, retryLoad, startFresh, restoreFromBackup, hasBackup,
   } = useVisionBoardState(userId);
   const { atLimit } = useTierLimits();
   const { hasPro } = useSubscriptionContext();
@@ -322,6 +322,7 @@ function Board({ userId, userEmail, onSignOut }) {
     // anomalous states where we refused to overwrite ambiguous cloud
     // data. Plain `load_failed` only gets Try-again + Sign-out.
     const isAlarm = isEmpty || isSeenBefore;
+    const backupAvailable = isAlarm && typeof hasBackup === 'function' && hasBackup();
     const eyebrow =
       isSeenBefore ? 'Refused to overwrite' :
       isEmpty      ? 'No data found'        :
@@ -378,6 +379,20 @@ function Board({ userId, userEmail, onSignOut }) {
             >
               Try again
             </button>
+            {backupAvailable && (
+              <button
+                type="button"
+                className="btn btn-primary"
+                onClick={() => {
+                  if (window.confirm('Restore your most recent local backup to the cloud? Photos will need re-adding, but your goals, trackers, logs and progress will come back.')) {
+                    restoreFromBackup();
+                  }
+                }}
+                style={{ padding: '10px 20px' }}
+              >
+                Restore backup
+              </button>
+            )}
             {isAlarm && (
               <button
                 type="button"
