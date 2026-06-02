@@ -15,7 +15,12 @@
   # Add any new VITE_* var here when you introduce one. NEVER add
   # server-side secrets (SUPABASE_SERVICE_ROLE_KEY, FCM_*, etc.) —
   # those should never appear in the bundle in the first place.
-  SECRETS_SCAN_OMIT_KEYS = "VITE_SUPABASE_URL,VITE_SUPABASE_ANON_KEY,VITE_REVENUECAT_API_KEY_IOS,VITE_REVENUECAT_API_KEY_ANDROID"
+  #
+  # VITE_OWNER_EMAIL is a client-side UI gate (useIsOwner) — it's an
+  # email identifier bundled on purpose, not a credential. It must be
+  # omitted too or the scanner flags its value in dist/ and fails the
+  # build (this was the cause of every failed deploy after 37d55f0).
+  SECRETS_SCAN_OMIT_KEYS = "VITE_SUPABASE_URL,VITE_SUPABASE_ANON_KEY,VITE_REVENUECAT_API_KEY_IOS,VITE_REVENUECAT_API_KEY_ANDROID,VITE_OWNER_EMAIL"
 
   # Smart detection scans for things that LOOK like secrets by
   # pattern (long base64 strings, JWT shapes, keys with known
