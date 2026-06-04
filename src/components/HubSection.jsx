@@ -1,4 +1,4 @@
-import { useEffect, useRef, useCallback } from 'react';
+import { useEffect, useRef, useCallback, useState } from 'react';
 import { motion } from 'framer-motion';
 import { timeAgo } from '../utils/helpers';
 import AiCoachWidget from './AiCoachWidget';
@@ -9,6 +9,7 @@ import FriendsRail from './friends/FriendsRail';
 import RatingsPanel from './RatingsPanel';
 import { ovrTier } from '../lib/ratings/tiers';
 import { useSubscriptionContext } from '../context/SubscriptionContext';
+import HubModuleMenu, { resolveModuleFromEvent, useModuleTransparency } from './HubModuleMenu';
 
 // ── GitHub helpers ──
 async function fetchGitHub(username, cache) {
@@ -174,8 +175,38 @@ function ProfileCard({ profile, S, update, onSaveName, onSaveTagline, onUploadPh
 // ── Widget Canvas (imperative DOM approach) ──
 export default function HubSection({ S, update, active, onOpenModal, onOpenWaitlist, onNavigateSettings, onNavigateTrack, onShowCoinToast, onCoachAct, visionState, userId, onUpgrade }) {
   const canvasRef = useRef(null);
+  const hubLayoutRef = useRef(null);
   const makeDraggable = useWidgetDrag(canvasRef, S, update);
   const { hasPro } = useSubscriptionContext();
+
+  // Right-click a hub module → toggle its background transparency.
+  // Preference persists per module in S.moduleTransparency; the sync
+  // effect mirrors it onto each module's data-transparent attribute.
+  const [moduleMenu, setModuleMenu] = useState(null);
+  const moduleTransparency = S.moduleTransparency || {};
+
+  function handleModuleContextMenu(e) {
+    const hit = resolveModuleFromEvent(e, hubLayoutRef.current);
+    if (!hit) return; // not over a module — let the native menu show
+    e.preventDefault();
+    setModuleMenu({ id: hit.id, label: hit.label, x: e.clientX, y: e.clientY });
+  }
+
+  function toggleModuleTransparency(id) {
+    update(prev => {
+      const cur = prev.moduleTransparency || {};
+      return { ...prev, moduleTransparency: { ...cur, [id]: !cur[id] } };
+    });
+    setModuleMenu(null);
+  }
+
+  // Re-apply on transparency change AND after the imperative canvas
+  // re-renders (S.links etc.), so the attribute isn't lost.
+  useModuleTransparency(
+    hubLayoutRef,
+    moduleTransparency,
+    `${S.links?.length || 0}:${S.ytWidgets?.length || 0}:${active}`
+  );
   // Pro-gated: the operator-console layout (HubOsLayout) renders for
   // EITHER dark-os OR cream-pro when the user has Pro. Free users
   // never see it. The two themes share the same panel/grid structure
@@ -367,7 +398,7 @@ export default function HubSection({ S, update, active, onOpenModal, onOpenWaitl
   // ── Cream (default) layout ────────────────────────────────────────────
   return (
     <section id="hub" className={`section${active ? ' active' : ''}`}>
-      <div className="hub-layout">
+      <div className="hub-layout" ref={hubLayoutRef} onContextMenu={handleModuleContextMenu}>
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -414,6 +445,12 @@ export default function HubSection({ S, update, active, onOpenModal, onOpenWaitl
       </div>
       <AiCoachWidget S={S} update={update} onOpenWaitlist={onOpenWaitlist} onCoachAct={onCoachAct} />
       <CoachBriefPanel S={S} update={update} onCoachAct={onCoachAct} userId={userId} />
+      <HubModuleMenu
+        menu={moduleMenu}
+        transparency={moduleTransparency}
+        onToggle={toggleModuleTransparency}
+        onClose={() => setModuleMenu(null)}
+      />
     </section>
   );
 }

@@ -139,4 +139,10 @@ export const DEFAULT_STATE = {
     shareWins:     true,  // recent_wins (last 3 completed achievements)
     sharePresence: true,  // last_active_at + online dot heartbeat
   },
+  // ── Hub module appearance ────────────────────────────────────────
+  // Per-module background-transparency toggles, set via the right-click
+  // menu on each hub module (Widgets / Ratings / Profile / Trackers /
+  // Friends). { [moduleId]: true } makes that module's surface
+  // transparent so the page shows through, like the Ratings Ledger.
+  moduleTransparency: {},
 };
