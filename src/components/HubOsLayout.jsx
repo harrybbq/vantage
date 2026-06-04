@@ -101,8 +101,12 @@ export function OsProfilePanel({ profile, onSaveName, onSaveTagline, onUploadPho
   );
 }
 
-// ── Panel: Session (greeting + clock) ─────────────────────────────────────
-export function OsSessionPanel({ name }) {
+// ── Panel: Session (greeting + clock + tracker nodes) ─────────────────────
+function trackerInitial(name) {
+  return (name || '?').trim().charAt(0).toUpperCase() || '?';
+}
+
+export function OsSessionPanel({ name, trackers, logs }) {
   const time = useClock();
   const h = pad2(time.getHours());
   const m = pad2(time.getMinutes());
@@ -112,14 +116,47 @@ export function OsSessionPanel({ name }) {
     weekday: 'long', month: 'long', day: 'numeric', year: 'numeric',
   }).toUpperCase();
 
+  // Tracker completion nodes (moved here from the standalone Trackers
+  // panel). Each node = one tracker; filled when completed today. A
+  // boolean tracker is "hit" when logged truthy; a number tracker when
+  // it reaches its goal. Read-only indicators — toggling still happens
+  // in the QuickLog panel.
+  const today = (() => {
+    const d = new Date();
+    return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
+  })();
+  const nodes = (trackers || []).map(t => {
+    const v = logs?.[today]?.[t.id];
+    const hit = t.type === 'boolean'
+      ? !!v
+      : !!(t.goal && (Number(v) || 0) >= t.goal);
+    return { t, hit };
+  });
+  const doneCount = nodes.filter(n => n.hit).length;
+
   return (
     <OsPanel label="Session" right={`Day ${dayOfYear(time)} of ${time.getFullYear()}`} innerPadding={false}>
       <div className="os-session">
-        <div>
+        <div className="os-session-main">
           <div className="os-session-greeting">
             {part} <em>{who}.</em>
           </div>
           <div className="os-session-date">{dateStr}</div>
+          {nodes.length > 0 && (
+            <div className="os-session-trackers" role="list" aria-label="Today's trackers">
+              {nodes.map(({ t, hit }) => (
+                <span
+                  key={t.id}
+                  className={`os-session-node${hit ? ' is-hit' : ''}`}
+                  role="listitem"
+                  title={`${t.name} · ${hit ? 'Done today' : 'Not yet'}`}
+                >
+                  {hit ? '✓' : trackerInitial(t.name)}
+                </span>
+              ))}
+              <span className="os-session-trackers-meta">{doneCount}/{nodes.length}</span>
+            </div>
+          )}
         </div>
         <div className="os-session-clock">
           {h}<span className="os-session-clock-sep">:</span>{m}
@@ -515,7 +552,7 @@ export default function HubOsLayout({
           onSaveTagline={tagline => update(prev => ({ ...prev, profile: { ...prev.profile, tagline } }))}
           onUploadPhoto={onUploadPhoto}
         />
-        <OsSessionPanel name={profile.name} />
+        <OsSessionPanel name={profile.name} trackers={S.trackers} logs={S.logs} />
         <OsVitalsPanel
           coins={coins}
           streak={streak}
@@ -534,7 +571,9 @@ export default function HubOsLayout({
             onNavigateSettings={onNavigateSettings}
           />
           <OsRatingsPanel S={S} update={update} />
-          <OsTrackersPanel trackers={S.trackers} logs={S.logs} />
+          {/* Trackers moved into the Session panel as completion nodes
+              under the date (see OsSessionPanel). The interactive
+              QuickLog panel in the right column remains for toggling. */}
           {/* Friends rail — same component as cream hub, retinted via
               dark-os overrides on the .fc-* classes in hub-dark.css. */}
           <FriendsRail userId={userId} onUpgrade={onUpgrade} />

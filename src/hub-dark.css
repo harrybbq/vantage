@@ -448,6 +448,9 @@ html[data-hub-os] .os-session-greeting em {
   font-style: italic;
   color: var(--em-light);
 }
+html[data-hub-os] .os-session-main {
+  min-width: 0;
+}
 html[data-hub-os] .os-session-date {
   font-family: var(--mono);
   font-size: 9px;
@@ -455,6 +458,44 @@ html[data-hub-os] .os-session-date {
   text-transform: uppercase;
   color: var(--text-muted);
   margin-top: 5px;
+}
+/* Tracker completion nodes — one circle per tracker, under the date.
+   Filled when the tracker is completed today; hollow otherwise. The
+   trailing meta shows done/total at a glance. */
+html[data-hub-os] .os-session-trackers {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 10px;
+}
+html[data-hub-os] .os-session-node {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--mono);
+  font-size: 9px;
+  font-weight: 700;
+  background: transparent;
+  border: 1px solid var(--border-strong, var(--border));
+  color: var(--text-muted);
+  transition: background .18s, border-color .18s, color .18s, box-shadow .18s;
+}
+html[data-hub-os] .os-session-node.is-hit {
+  background: var(--em);
+  border-color: var(--em);
+  color: #fff;
+  box-shadow: 0 0 0 3px rgba(var(--em-rgb), .14);
+}
+html[data-hub-os] .os-session-trackers-meta {
+  font-family: var(--mono);
+  font-size: 9px;
+  letter-spacing: 1px;
+  color: var(--text-muted);
+  margin-left: 2px;
 }
 html[data-hub-os] .os-session-clock {
   font-family: var(--mono);
