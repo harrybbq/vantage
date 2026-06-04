@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import AddMobileWidgetModal from './mobile/AddMobileWidgetModal';
+import { APP_PRESETS, appPresetToLink } from '../data/appPresets';
 
 function Modal({ id, openId, onClose, children, style }) {
   return (
@@ -17,7 +18,7 @@ function Modal({ id, openId, onClose, children, style }) {
 }
 
 // ── Add Widget picker ──
-function AddLinkModal({ openId, onClose, onSwitchModal, onAddNotepad }) {
+function AddLinkModal({ openId, onClose, onSwitchModal, onAddNotepad, onAddApp }) {
   return (
     <Modal id="addLinkModal" openId={openId} onClose={onClose}>
       <h3>Add Widget</h3>
@@ -41,6 +42,47 @@ function AddLinkModal({ openId, onClose, onSwitchModal, onAddNotepad }) {
           <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Latest uploads from a channel</span>
         </button>
       </div>
+
+      {/* My Apps — one-click presets for the user's own apps. A preset
+          with no URL yet (not deployed) renders disabled with its
+          deploy hint, so the slot exists without a dead link. */}
+      <div style={{
+        fontFamily: 'var(--mono)', fontSize: 10, letterSpacing: 1.6,
+        textTransform: 'uppercase', color: 'var(--text-muted)',
+        margin: '14px 0 8px',
+      }}>My Apps</div>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+        {APP_PRESETS.map(preset => {
+          const disabled = !preset.url;
+          return (
+            <button
+              key={preset.id}
+              className="btn btn-ghost"
+              disabled={disabled}
+              title={disabled ? preset.requires : `Add ${preset.name} to your hub`}
+              style={{
+                padding: '16px', display: 'flex', flexDirection: 'column',
+                alignItems: 'center', gap: '6px', borderRadius: '12px', height: 'auto',
+                opacity: disabled ? 0.5 : 1, cursor: disabled ? 'not-allowed' : 'pointer',
+              }}
+              onClick={() => { if (!disabled) onAddApp(preset); }}
+            >
+              <span style={{
+                width: 36, height: 36, borderRadius: 9,
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                fontSize: 18, lineHeight: 1,
+                background: preset.color + '1a',
+                border: '1px solid ' + preset.color + '55',
+              }}>{preset.icon}</span>
+              <span style={{ fontWeight: 700, fontSize: '13px', color: 'var(--text)' }}>{preset.name}</span>
+              <span style={{ fontSize: '11px', color: 'var(--text-muted)', textAlign: 'center' }}>
+                {disabled ? 'Deploy first to enable' : preset.tagline}
+              </span>
+            </button>
+          );
+        })}
+      </div>
+
       <div className="modal-actions" style={{ marginTop: '14px' }}>
         <button className="btn btn-ghost" onClick={() => onClose('addLinkModal')}>Cancel</button>
       </div>
@@ -1514,6 +1556,7 @@ export default function Modals({ openModal, S, update, onClose, onOpen, onShowCo
         onClose={onClose}
         onSwitchModal={onOpen}
         onAddNotepad={handleAddNotepad}
+        onAddApp={preset => { handleAddLink(appPresetToLink(preset)); onClose('addLinkModal'); }}
       />
       <AddLinkOnlyModal openId={effectiveOpen} onClose={onClose} onAdd={handleAddLink} />
       <AddYouTubeModal openId={effectiveOpen} onClose={onClose} onAdd={handleAddYT} />

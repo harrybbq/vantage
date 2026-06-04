@@ -13,8 +13,23 @@
  *   3. Add an option in AddMobileWidgetModal's picker
  */
 import { useState } from 'react';
+import { APP_PRESETS, getAppPreset } from '../../data/appPresets';
 
-const WIDGET_META = {
+// App presets (FloorplanStudio / TubeLube / …) become mobile widget
+// types too — generated from the shared config so adding an app in one
+// place lights it up on both surfaces. A preset with no URL carries a
+// `requires` hint and renders as a "deploy first" stub.
+const APP_WIDGET_META = Object.fromEntries(
+  APP_PRESETS.map(p => [p.id, {
+    label: p.name,
+    eyebrow: p.name.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 12),
+    icon: p.icon,
+    accent: p.color,
+    ...(p.url ? {} : { requires: p.requires }),
+  }])
+);
+
+const BASE_WIDGET_META = {
   'notepad': {
     label: 'Notepad',
     eyebrow: 'NOTES',
@@ -72,6 +87,9 @@ const WIDGET_META = {
   },
 };
 
+// App presets slot in alongside the built-in widget types.
+const WIDGET_META = { ...BASE_WIDGET_META, ...APP_WIDGET_META };
+
 export default function MobileWidget({ widget, S, update, onRemove }) {
   const meta = WIDGET_META[widget.type] || { label: widget.type, eyebrow: '?', icon: '·' };
 
@@ -113,6 +131,10 @@ function renderBody(widget, meta, S, update) {
       </div>
     );
   }
+  // App presets (FloorplanStudio / TubeLube / …) — render a static
+  // brand card straight from the shared config. No state, no fetch.
+  const preset = getAppPreset(widget.type);
+  if (preset) return <AppPresetBody preset={preset} />;
   switch (widget.type) {
     case 'notepad':     return <NotepadBody S={S} update={update} />;
     case 'recent-wins': return <RecentWinsBody S={S} />;
@@ -219,6 +241,20 @@ function BrandCard({ title, host, openHref, accent, info }) {
         >Open ↗</a>
       )}
     </div>
+  );
+}
+
+// Static brand card for a user app preset (FloorplanStudio etc).
+function AppPresetBody({ preset }) {
+  const host = preset.url.replace(/^https?:\/\//, '').replace(/\/$/, '');
+  return (
+    <BrandCard
+      title={preset.name}
+      host={host}
+      openHref={preset.url}
+      accent={preset.color}
+      info={preset.tagline ? <div className="m-widget-brand-note">{preset.tagline}</div> : null}
+    />
   );
 }
 

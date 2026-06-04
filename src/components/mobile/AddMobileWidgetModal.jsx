@@ -10,6 +10,7 @@
  * "Coming soon" stub from MobileWidget.
  */
 import { WIDGET_META } from './MobileWidget';
+import { APP_PRESETS } from '../../data/appPresets';
 
 const PICKER_ORDER = [
   'notepad',
@@ -19,6 +20,8 @@ const PICKER_ORDER = [
   'github',
   'linkedin',
   'youtube',
+  // User app presets (FloorplanStudio / TubeLube / …) from shared config.
+  ...APP_PRESETS.map(p => p.id),
   'vitals',
   'calories',
   'mail',
