@@ -132,9 +132,27 @@ async function loadFromCloud(userId) {
   return { kind: 'loaded', state };
 }
 
-async function saveToCloud(userId, state) {
+async function saveToCloud(userId, state, { allowEmpty = false } = {}) {
   const stateToSave = stripForSave(state);
   const photo = state.profile?.photo || null;
+
+  // ── Definitive anti-wipe guard (read-before-write) ──────────────────
+  // If we're about to persist a factory-default-looking state, re-read
+  // the cloud row first and REFUSE if it still holds real data. This is
+  // the backstop that doesn't depend on any in-memory flag — it catches
+  // every wipe vector (load races, the backgrounds migration, focus
+  // refresh, etc.) by checking the actual server state at write time.
+  // Only `startFresh` (user-confirmed reset) passes allowEmpty.
+  if (!allowEmpty && looksLikeFactoryDefault(stateToSave)) {
+    const { data: existing, error: readErr } = await supabase
+      .from('user_data').select('state').eq('id', userId).maybeSingle();
+    if (!readErr && existing?.state && hasMeaningfulData(existing.state)) {
+      const e = new Error('Refused to overwrite real cloud data with defaults (wipe guard).');
+      e.code = 'WIPE_GUARD';
+      console.error('[useVisionBoardState] ' + e.message);
+      throw e;
+    }
+  }
 
   // History note (2026-06): saves used to be fire-and-forget — the
   // upsert error was never inspected, so a failed write looked
@@ -468,10 +486,19 @@ export function useVisionBoardState(userId) {
       }
       if (cancelled || dirtyRef.current) return; // user started editing meanwhile
       if (result.kind === 'loaded') {
+        // Never let a focus refresh blank a good screen: if the cloud
+        // copy is factory-default but we currently hold real data, keep
+        // what's on screen (and don't overwrite the good local backup).
+        if (looksLikeFactoryDefault(result.state) && lastGoodMeaningfulRef.current) {
+          console.warn('[useVisionBoardState] Focus refresh skipped: cloud looks wiped but local has data.');
+          return;
+        }
         markUserSeen(userId);
-        if (hasMeaningfulData(result.state)) lastGoodMeaningfulRef.current = true;
+        if (hasMeaningfulData(result.state)) {
+          lastGoodMeaningfulRef.current = true;
+          writeBackup(userId, result.state);
+        }
         setS(result.state);
-        writeBackup(userId, result.state);
       }
     }
 
@@ -574,7 +601,7 @@ export function useVisionBoardState(userId) {
       // otherwise block: a deliberate reset to factory defaults.
       allowEmptyRef.current = true;
       clearUserSeen(userIdRef.current);
-      await saveToCloud(userIdRef.current, fresh);
+      await saveToCloud(userIdRef.current, fresh, { allowEmpty: true });
       markUserSeen(userIdRef.current);
       lastGoodMeaningfulRef.current = false;
       setS(fresh);
