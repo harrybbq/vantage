@@ -37,7 +37,8 @@
       "Bash(/c/Users/Harry/source/repos/VisionBoard/netlify.toml:*)",
       "Bash(git -C \"C:\\\\Users\\\\Harry\\\\source\\\\repos\\\\VisionBoard\" add -A)",
       "Bash(git -C:*)",
-      "Bash(git -C \"C:\\\\Users\\\\Harry\\\\source\\\\repos\\\\VisionBoard\" push)"
+      "Bash(git -C \"C:\\\\Users\\\\Harry\\\\source\\\\repos\\\\VisionBoard\" push)",
+      "mcp__6f0808f7-091d-4286-afc7-4f4436e19676__execute_sql"
     ]
   }
 }
