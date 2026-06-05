@@ -49,7 +49,6 @@ export default function PageHeader({ activeSection, coins, onOpenCoinHistory, pr
           <Logo size={16} strokeWidth={8} c2={null} />
         </span>
       </span>
-      <span id="pageHeader-sub">// my space</span>
 
       {activeSection === 'hub'
         ? <span ref={labelRef} id="pageHeader-section" key="greeting" style={{ fontSize: '13px', fontStyle: 'italic', opacity: 0.9 }}>{greeting}</span>

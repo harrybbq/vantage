@@ -758,8 +758,8 @@ function MultiLogModal({ openId, onClose, trackers, multiSelectedDays, onSave })
 }
 
 // ── Add Shop Item ──
-function AddShopModal({ openId, onClose, onAdd }) {
-  const [form, setForm] = useState({ name: '', price: '', url: '', imageUrl: '', priority: 'med', notes: '', coinCost: '' });
+function AddShopModal({ openId, onClose, onAdd, categories = [] }) {
+  const [form, setForm] = useState({ name: '', price: '', url: '', imageUrl: '', priority: 'med', notes: '', coinCost: '', categoryId: '' });
   const [status, setStatus] = useState('');
   const [fetching, setFetching] = useState(false);
   const timerRef = useRef(null);
@@ -808,7 +808,7 @@ function AddShopModal({ openId, onClose, onAdd }) {
     onAdd({
       id: 's' + Date.now(),
       name: form.name,
-      categoryId: null,
+      categoryId: form.categoryId || null,
       price: form.price,
       url: form.url,
       imageUrl: form.imageUrl,
@@ -817,7 +817,7 @@ function AddShopModal({ openId, onClose, onAdd }) {
       coinCost: parseInt(form.coinCost) || 0,
       bought: false,
     });
-    setForm({ name: '', price: '', url: '', imageUrl: '', priority: 'med', notes: '', coinCost: '' });
+    setForm({ name: '', price: '', url: '', imageUrl: '', priority: 'med', notes: '', coinCost: '', categoryId: '' });
     setStatus('');
     onClose('addShopModal');
   }
@@ -844,11 +844,91 @@ function AddShopModal({ openId, onClose, onAdd }) {
           <option value="low">🟢 Low — nice to have</option>
         </select>
       </div>
+      <div className="fg">
+        <label>Category</label>
+        <select value={form.categoryId} onChange={e => setForm(f => ({ ...f, categoryId: e.target.value }))}>
+          <option value="">Uncategorised</option>
+          {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+        </select>
+      </div>
       <div className="fg"><label>Notes</label><input type="text" placeholder="Why you want it, alternatives..." value={form.notes} onChange={e => setForm(f => ({ ...f, notes: e.target.value }))} /></div>
       <div className="fg"><label>⬡ Coin Cost (optional)</label><input type="number" placeholder="e.g. 100" min="0" value={form.coinCost} onChange={e => setForm(f => ({ ...f, coinCost: e.target.value }))} /></div>
       <div className="modal-actions">
         <button className="btn btn-ghost" onClick={() => onClose('addShopModal')}>Cancel</button>
         <button className="btn btn-primary" onClick={submit}>Add Item</button>
+      </div>
+    </Modal>
+  );
+}
+
+// ── Edit Shop Item ──
+function EditShopModal({ openId, onClose, shopItems, categories = [], onEdit, onDelete }) {
+  const isOpen = typeof openId === 'string' && openId.startsWith('editShopModal:');
+  const itemId = isOpen ? openId.split(':')[1] : null;
+  const item = itemId ? (shopItems || []).find(s => s.id === itemId) : null;
+  const [form, setForm] = useState({ name: '', price: '', url: '', imageUrl: '', priority: 'med', notes: '', coinCost: '', categoryId: '' });
+  useEffect(() => {
+    if (item) setForm({
+      name: item.name || '',
+      price: item.price || '',
+      url: item.url || '',
+      imageUrl: item.imageUrl || '',
+      priority: item.priority || 'med',
+      notes: item.notes || '',
+      coinCost: item.coinCost ? String(item.coinCost) : '',
+      categoryId: item.categoryId || '',
+    });
+  }, [itemId]);
+  if (!isOpen || !item) return null;
+  function submit() {
+    if (!form.name) return;
+    onEdit(itemId, {
+      name: form.name,
+      price: form.price,
+      url: form.url,
+      imageUrl: form.imageUrl,
+      priority: form.priority,
+      notes: form.notes,
+      coinCost: parseInt(form.coinCost) || 0,
+      categoryId: form.categoryId || null,
+    });
+    onClose(openId);
+  }
+  function handleDelete() {
+    if (!window.confirm('Delete this item? This cannot be undone.')) return;
+    onDelete(itemId);
+    onClose(openId);
+  }
+  return (
+    <Modal id={openId} openId={openId} onClose={onClose}>
+      <h3>Edit Item</h3>
+      <div className="fg"><label>Item Name</label><input type="text" value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} /></div>
+      <div className="fg"><label>Price (optional)</label><input type="text" placeholder="£149.99" value={form.price} onChange={e => setForm(f => ({ ...f, price: e.target.value }))} /></div>
+      <div className="fg"><label>Link (optional)</label><input type="url" placeholder="https://..." value={form.url} onChange={e => setForm(f => ({ ...f, url: e.target.value }))} /></div>
+      <div className="fg"><label>Image URL (optional)</label><input type="url" placeholder="https://..." value={form.imageUrl} onChange={e => setForm(f => ({ ...f, imageUrl: e.target.value }))} /></div>
+      <div className="fg">
+        <label>Priority</label>
+        <select value={form.priority} onChange={e => setForm(f => ({ ...f, priority: e.target.value }))}>
+          <option value="high">🔴 High — want soon</option>
+          <option value="med">🟡 Medium</option>
+          <option value="low">🟢 Low — nice to have</option>
+        </select>
+      </div>
+      <div className="fg">
+        <label>Category</label>
+        <select value={form.categoryId} onChange={e => setForm(f => ({ ...f, categoryId: e.target.value }))}>
+          <option value="">Uncategorised</option>
+          {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+        </select>
+      </div>
+      <div className="fg"><label>Notes</label><input type="text" value={form.notes} onChange={e => setForm(f => ({ ...f, notes: e.target.value }))} /></div>
+      <div className="fg"><label>⬡ Coin Cost (optional)</label><input type="number" min="0" value={form.coinCost} onChange={e => setForm(f => ({ ...f, coinCost: e.target.value }))} /></div>
+      <div className="modal-actions" style={{ justifyContent: 'space-between' }}>
+        <button className="btn btn-ghost" onClick={handleDelete} style={{ color: 'rgb(220,60,60)' }}>Delete</button>
+        <div style={{ display: 'flex', gap: '8px' }}>
+          <button className="btn btn-ghost" onClick={() => onClose(openId)}>Cancel</button>
+          <button className="btn btn-primary" onClick={submit}>Save</button>
+        </div>
       </div>
     </Modal>
   );
@@ -1545,6 +1625,15 @@ export default function Modals({ openModal, S, update, onClose, onOpen, onShowCo
   function handleAddShopItem(item) {
     update(prev => ({ ...prev, shopItems: [...prev.shopItems, item] }));
   }
+  function handleEditShopItem(id, patch) {
+    update(prev => ({
+      ...prev,
+      shopItems: prev.shopItems.map(s => s.id === id ? { ...s, ...patch } : s),
+    }));
+  }
+  function handleDeleteShopItem(id) {
+    update(prev => ({ ...prev, shopItems: prev.shopItems.filter(s => s.id !== id) }));
+  }
   function handleAddCategory(cat) {
     update(prev => ({ ...prev, shopCategories: [...prev.shopCategories, cat] }));
   }
@@ -1620,7 +1709,8 @@ export default function Modals({ openModal, S, update, onClose, onOpen, onShowCo
         multiSelectedDays={S.multiSelectedDays || []}
         onSave={handleMultiLogSave}
       />
-      <AddShopModal openId={effectiveOpen} onClose={onClose} onAdd={handleAddShopItem} />
+      <AddShopModal openId={effectiveOpen} onClose={onClose} onAdd={handleAddShopItem} categories={S.shopCategories} />
+      <EditShopModal openId={effectiveOpen} onClose={onClose} shopItems={S.shopItems} categories={S.shopCategories} onEdit={handleEditShopItem} onDelete={handleDeleteShopItem} />
       <AddCategoryModal openId={effectiveOpen} onClose={onClose} onAdd={handleAddCategory} />
       <AddHolidayModal openId={effectiveOpen} onClose={onClose} onAdd={handleAddHoliday} />
       <EditHolidayModal openId={effectiveOpen} onClose={onClose} holidays={S.holidays} onEdit={handleEditHoliday} onDelete={handleDeleteHoliday} />

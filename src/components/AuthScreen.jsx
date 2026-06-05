@@ -227,7 +227,6 @@ export default function AuthScreen({ onOpenLegal }) {
         <div style={S.logoMark}><Logo size={28} strokeWidth={7} /></div>
         <div>
           <div style={S.logoTitle}>Vision Board</div>
-          <div style={S.logoSub}>my space</div>
         </div>
       </div>
 

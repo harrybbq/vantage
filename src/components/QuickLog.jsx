@@ -224,14 +224,23 @@ export default function QuickLog({ S, update, onNavigateTrack, onShowCoinToast }
       const newStreaks = recalcStreaks(newLogs, prev.trackers || [], prev.streaks || {});
       next = { ...next, streaks: newStreaks };
 
-      // 3. Check weekly coin challenge
+      // 3. Weekly coin challenge — symmetric award/refund.
+      //
+      // Anti-scam (2026-06): the award used to be one-way — once you hit
+      // the weekly target you kept the coins even if you immediately
+      // unticked. That let a user tick to claim, then untick to "not do
+      // it" and keep the reward. Now crossing back below the target
+      // reverses the award and re-opens the key, so any tick/untick pair
+      // nets exactly zero. Coins are only ever held while the weekly goal
+      // is genuinely met.
       (prev.trackers || []).forEach(t => {
         if (!t.weeklyTarget || !t.weeklyCoins) return;
         const weekKey = getWeekKey(today);
         const awardKey = 'awarded_' + t.id + '_' + weekKey;
-        if (next[awardKey]) return;
         const count = countWeekLogs(newLogs, t.id, today);
-        if (count >= t.weeklyTarget) {
+        const alreadyAwarded = !!next[awardKey];
+
+        if (count >= t.weeklyTarget && !alreadyAwarded) {
           const coins = (next.coins || 0) + t.weeklyCoins;
           const coinHistory = [
             { type: 'earn', label: t.name + ' weekly goal (' + t.weeklyTarget + 'x)', amount: t.weeklyCoins, ts: Date.now() },
@@ -240,6 +249,15 @@ export default function QuickLog({ S, update, onNavigateTrack, onShowCoinToast }
           onShowCoinToast('+' + t.weeklyCoins + ' ⬡ — ' + t.name + ' weekly goal!', true);
           fireGoal();
           next = { ...next, [awardKey]: true, coins, coinHistory };
+        } else if (count < t.weeklyTarget && alreadyAwarded) {
+          const coins = Math.max(0, (next.coins || 0) - t.weeklyCoins);
+          const coinHistory = [
+            { type: 'refund', label: t.name + ' weekly goal reversed', amount: -t.weeklyCoins, ts: Date.now() },
+            ...(next.coinHistory || []),
+          ];
+          const reversed = { ...next, coins, coinHistory };
+          delete reversed[awardKey];
+          next = reversed;
         }
       });
 

@@ -8,7 +8,7 @@ const PRIORITY_CLASS = { high: 'priority-high', med: 'priority-med', low: 'prior
 
 let _dragItemId = null;
 
-function ShopCard({ item, coins, onToggleBought, onDelete, revealDelay }) {
+function ShopCard({ item, coins, onToggleBought, onDelete, onEdit, revealDelay }) {
   const hasLink = !!item.url;
   const canAfford = (coins || 0) >= item.coinCost || item.bought;
 
@@ -66,13 +66,14 @@ function ShopCard({ item, coins, onToggleBought, onDelete, revealDelay }) {
           onClick={() => onToggleBought(item.id)}>
           {item.bought ? '✓ Bought' : 'Mark Bought'}
         </motion.button>
+        <button className="shop-edit-btn" title="Edit item" onClick={() => onEdit(item.id)}>✎</button>
         <button className="shop-del-btn" onClick={() => onDelete(item.id)}>✕</button>
       </div>
     </motion.div>
   );
 }
 
-function DropZone({ categoryId, items, coins, onToggleBought, onDeleteItem, onDrop }) {
+function DropZone({ categoryId, items, coins, onToggleBought, onDeleteItem, onEditItem, onDrop }) {
   const handleDragEnter = e => {
     e.preventDefault();
     e.currentTarget._enterCount = (e.currentTarget._enterCount || 0) + 1;
@@ -121,6 +122,7 @@ function DropZone({ categoryId, items, coins, onToggleBought, onDeleteItem, onDr
             coins={coins}
             onToggleBought={onToggleBought}
             onDelete={onDeleteItem}
+            onEdit={onEditItem}
             revealDelay={index * 0.06}
           />
         ))}
@@ -178,6 +180,10 @@ export default function ShopSection({ S, update, active, onOpenModal, onShowCoin
 
   function handleDeleteItem(id) {
     update(prev => ({ ...prev, shopItems: prev.shopItems.filter(s => s.id !== id) }));
+  }
+
+  function handleEditItem(id) {
+    onOpenModal('editShopModal:' + id);
   }
 
   function handleDeleteCategory(id) {
@@ -294,6 +300,7 @@ export default function ShopSection({ S, update, active, onOpenModal, onShowCoin
                     coins={coins}
                     onToggleBought={handleToggleBought}
                     onDeleteItem={handleDeleteItem}
+                    onEditItem={handleEditItem}
                     onDrop={handleDrop}
                   />
                 </div>
@@ -314,6 +321,7 @@ export default function ShopSection({ S, update, active, onOpenModal, onShowCoin
                     coins={coins}
                     onToggleBought={handleToggleBought}
                     onDeleteItem={handleDeleteItem}
+                    onEditItem={handleEditItem}
                     onDrop={handleDrop}
                   />
                 </div>

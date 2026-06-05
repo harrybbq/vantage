@@ -1563,6 +1563,8 @@ nav:hover .nav-tab-label{opacity:1;}
 .shop-item-card.bought .shop-bought-btn{background:var(--em-ghost);color:var(--em);border-color:var(--em);}
 .shop-del-btn{width:28px;height:28px;border-radius:50%;background:rgba(180,40,40,.08);border:none;color:#b92020;font-size:12px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:background .18s;}
 .shop-del-btn:hover{background:rgba(180,40,40,.2);}
+.shop-edit-btn{width:28px;height:28px;border-radius:50%;background:rgba(var(--em-rgb),.08);border:none;color:var(--em);font-size:12px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:background .18s;}
+.shop-edit-btn:hover{background:rgba(var(--em-rgb),.18);}
 .shop-empty{text-align:center;padding:60px 20px;color:var(--text-muted);font-family:var(--mono);font-size:13px;}
 .shop-empty .shop-empty-icon{font-size:44px;margin-bottom:14px;}
 .shop-summary{display:flex;gap:14px;flex-wrap:wrap;margin-bottom:20px;}
