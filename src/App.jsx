@@ -19,7 +19,7 @@ import MobileHabitsSection from './components/mobile/MobileHabitsSection';
 import MobileFriendsSection from './components/mobile/MobileFriendsSection';
 import MobileProfileSection from './components/mobile/MobileProfileSection';
 import SettingsSection from './components/SettingsSection';
-import { SCHEMES, applyScheme, applyTheme } from './components/SettingsSection';
+import { SCHEMES, applyScheme, applyTheme, schemeFromHex } from './components/SettingsSection';
 import { useSubscriptionContext } from './context/SubscriptionContext';
 import Modals from './components/Modals';
 import PaywallModal from './components/PaywallModal';
@@ -138,12 +138,14 @@ function Board({ userId, userEmail, onSignOut }) {
 
   // Apply stored colour scheme once state loads
   useEffect(() => {
-    if (S.colorScheme) {
+    if (S.colorScheme === 'custom' && S.customColor) {
+      applyScheme(schemeFromHex(S.customColor));
+    } else if (S.colorScheme) {
       const scheme = SCHEMES.find(s => s.id === S.colorScheme);
       if (scheme) applyScheme(scheme);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [S.colorScheme]);
+  }, [S.colorScheme, S.customColor]);
 
   // One-time migration: backgrounds used to be stored device-locally in
   // localStorage('vb4_bg'). Move any found into the synced state so they

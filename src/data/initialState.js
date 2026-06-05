@@ -17,6 +17,9 @@ export const DEFAULT_STATE = {
   shopItems: [],
   shopCategories: [],
   shopFilter: 'all',
+  // colorScheme: scheme id ('green' default, or 'custom'). customColor
+  // holds the hex when colorScheme === 'custom' (Pro colour wheel).
+  customColor: null,
   widgetPositions: {},
   // Per-section background images (data URLs), keyed by section id.
   // Synced in state so they follow the account across devices (migrated

@@ -1,12 +1,35 @@
 import { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import { supabase } from '../lib/supabase';
+import { adjustColour } from '../utils/helpers';
 import MacroGoalsPanel from './MacroGoalsPanel';
 import NotificationsPanel from './NotificationsPanel';
 import SubscriptionPanel from './SubscriptionPanel';
 import { useSubscriptionContext } from '../context/SubscriptionContext';
 import { getOwnProfile, updateOwnProfile } from '../lib/friends/queries';
 
+// Pastel app-gradient derived from a dark accent by lightening it.
+function pastelGrad(em) {
+  return `linear-gradient(145deg,${adjustColour(em, 150)} 0%,${adjustColour(em, 110)} 40%,${adjustColour(em, 70)} 70%,${adjustColour(em, 40)} 100%)`;
+}
+
+// Build a full scheme object from a single accent hex. Used by the
+// Pro custom-colour picker. em is treated as the darkest tone; mid /
+// light / grad are derived by lightening.
+export function schemeFromHex(hex) {
+  return {
+    id: 'custom',
+    name: 'Custom',
+    custom: true,
+    em: hex,
+    mid: adjustColour(hex, 28),
+    light: adjustColour(hex, 64),
+    grad: pastelGrad(hex),
+  };
+}
+
+// First 6 are free; the rest (pro: true) and the custom-colour picker
+// are gated behind Pro.
 export const SCHEMES = [
   { id: 'green',  name: 'Forest Green', em: '#1a7a4a', mid: '#2a9e62', light: '#4dc485', grad: 'linear-gradient(145deg,#f0f7f3 0%,#d8eee5 40%,#b0d9c5 70%,#7ec8a8 100%)' },
   { id: 'blue',   name: 'Ocean Blue',   em: '#1a4a7a', mid: '#2a629e', light: '#4d9ec4', grad: 'linear-gradient(145deg,#f0f3f7 0%,#d8e5ee 40%,#b0c5d9 70%,#7ea8c8 100%)' },
@@ -14,6 +37,13 @@ export const SCHEMES = [
   { id: 'orange', name: 'Sunset',       em: '#7a3a1a', mid: '#9e5a2a', light: '#c47a4d', grad: 'linear-gradient(145deg,#f7f3f0 0%,#eee0d8 40%,#d9c0b0 70%,#c8977e 100%)' },
   { id: 'pink',   name: 'Rose',         em: '#7a1a4a', mid: '#9e2a62', light: '#c44d85', grad: 'linear-gradient(145deg,#f7f0f3 0%,#eed8e5 40%,#d9b0c5 70%,#c87ea8 100%)' },
   { id: 'slate',  name: 'Slate',        em: '#1a3a5a', mid: '#2a5a8e', light: '#4d8ab0', grad: 'linear-gradient(145deg,#f0f2f7 0%,#d8dfe8 40%,#b0bece 70%,#7ea0be 100%)' },
+  // ── Pro accents ──
+  { id: 'teal',    name: 'Teal',    em: '#0f5e5a', mid: '#1a8c84', light: '#4dc4ba', grad: pastelGrad('#0f5e5a'), pro: true },
+  { id: 'crimson', name: 'Crimson', em: '#7a1a1a', mid: '#9e2a2a', light: '#c44d4d', grad: pastelGrad('#7a1a1a'), pro: true },
+  { id: 'indigo',  name: 'Indigo',  em: '#2a1a7a', mid: '#3f2a9e', light: '#6d4dc4', grad: pastelGrad('#2a1a7a'), pro: true },
+  { id: 'amber',   name: 'Amber',   em: '#7a5a1a', mid: '#9e7a2a', light: '#c4a04d', grad: pastelGrad('#7a5a1a'), pro: true },
+  { id: 'magenta', name: 'Magenta', em: '#7a1a6a', mid: '#9e2a8a', light: '#c44db0', grad: pastelGrad('#7a1a6a'), pro: true },
+  { id: 'steel',   name: 'Steel',   em: '#33414f', mid: '#4f6478', light: '#8a9caf', grad: pastelGrad('#33414f'), pro: true },
 ];
 
 function hexToRgb(hex) {
@@ -328,8 +358,16 @@ export default function SettingsSection({ S, update, active, userId, onOpenLegal
   }
 
   function handleSchemeChange(scheme) {
+    if (scheme.pro && !hasPro) return; // Pro accent — gated
     applyScheme(scheme);
     update(prev => ({ ...prev, colorScheme: scheme.id }));
+  }
+
+  function handleCustomColor(hex) {
+    if (!hasPro) return; // custom colour is Pro-only
+    const scheme = schemeFromHex(hex);
+    applyScheme(scheme);
+    update(prev => ({ ...prev, colorScheme: 'custom', customColor: hex }));
   }
 
   async function handleDeleteAccount() {
@@ -398,18 +436,27 @@ export default function SettingsSection({ S, update, active, userId, onOpenLegal
           <div className="scheme-grid">
             {SCHEMES.map(scheme => {
               const isActive = currentScheme === scheme.id;
+              const locked = scheme.pro && !hasPro;
               return (
                 <button
                   key={scheme.id}
                   onClick={() => handleSchemeChange(scheme)}
+                  disabled={locked}
+                  title={locked ? 'Upgrade to Pro to unlock this accent' : ''}
                   style={{
+                    position: 'relative',
                     display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px',
-                    padding: '14px 10px', borderRadius: '12px', cursor: 'pointer',
+                    padding: '14px 10px', borderRadius: '12px',
+                    cursor: locked ? 'not-allowed' : 'pointer',
                     border: isActive ? `2px solid ${scheme.mid}` : '2px solid var(--border)',
                     background: isActive ? `rgba(${hexToRgb(scheme.em)},0.10)` : 'var(--card)',
+                    opacity: locked ? 0.55 : 1,
                     transition: 'all .18s',
                   }}
                 >
+                  {locked && (
+                    <span style={{ position: 'absolute', top: 6, right: 8, fontSize: 10, color: 'var(--gold)' }}>🔒</span>
+                  )}
                   <div style={{
                     width: '36px', height: '36px', borderRadius: '10px',
                     background: `linear-gradient(135deg,${scheme.em} 0%,${scheme.mid} 55%,${scheme.light} 100%)`,
@@ -431,6 +478,41 @@ export default function SettingsSection({ S, update, active, userId, onOpenLegal
                 </button>
               );
             })}
+          </div>
+
+          {/* Custom colour (Pro) — pick any accent with a colour wheel. */}
+          <div style={{
+            marginTop: 16, paddingTop: 16, borderTop: '1px solid var(--border)',
+            display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap',
+          }}>
+            <div style={{ flex: 1, minWidth: 160 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontFamily: 'var(--sans)', fontSize: 14, fontWeight: 600, color: 'var(--text)' }}>
+                Custom colour
+                <span style={{
+                  fontFamily: 'var(--mono)', fontSize: '8px', letterSpacing: '1.4px',
+                  textTransform: 'uppercase', padding: '2px 6px', borderRadius: '3px',
+                  background: hasPro ? 'rgba(var(--em-rgb),0.14)' : 'rgba(200,151,10,0.12)',
+                  color: hasPro ? 'var(--em)' : 'var(--gold)',
+                  border: `1px solid ${hasPro ? 'rgba(var(--em-rgb),0.28)' : 'rgba(200,151,10,0.28)'}`,
+                }}>{hasPro ? 'Pro' : '🔒 Pro'}</span>
+              </div>
+              <div style={{ fontFamily: 'var(--mono)', fontSize: '10px', color: 'var(--text-muted)', letterSpacing: '0.5px', marginTop: 4 }}>
+                {hasPro ? 'Pick any accent — the app derives matching tones.' : 'Upgrade to choose any accent colour.'}
+              </div>
+            </div>
+            <input
+              type="color"
+              disabled={!hasPro}
+              value={(currentScheme === 'custom' && S.customColor) || '#1a7a4a'}
+              onChange={e => handleCustomColor(e.target.value)}
+              title={hasPro ? 'Choose a custom accent' : 'Upgrade to Pro'}
+              style={{
+                width: 48, height: 36, padding: 0, border: '2px solid var(--border)',
+                borderRadius: 10, background: 'none',
+                cursor: hasPro ? 'pointer' : 'not-allowed', opacity: hasPro ? 1 : 0.5,
+                ...(currentScheme === 'custom' ? { borderColor: 'var(--em)' } : {}),
+              }}
+            />
           </div>
         </div>
 
