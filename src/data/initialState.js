@@ -21,6 +21,9 @@ export const DEFAULT_STATE = {
   // holds the hex when colorScheme === 'custom' (Pro colour wheel).
   customColor: null,
   widgetPositions: {},
+  // Desktop hub content widgets added via the Add-Widget picker.
+  // [{ id, type: 'habits' | 'holidays' }] — rendered in the canvas.
+  hubWidgets: [],
   // Per-section background images (data URLs), keyed by section id.
   // Synced in state so they follow the account across devices (migrated
   // from the old device-local localStorage('vb4_bg')).

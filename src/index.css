@@ -768,6 +768,31 @@ nav:hover .nav-tab-label{opacity:1;}
 /* Generic link body */
 .link-island-notes{font-family:var(--sans);font-size:11.5px;color:var(--text-mid);line-height:1.55;}
 
+/* ── Hub content widgets (Habits / Holidays) ── */
+.hub-widget-body{display:flex;flex-direction:column;gap:12px;}
+.hub-widget-empty{font-family:var(--mono);font-size:11px;color:var(--text-muted);line-height:1.5;}
+/* Habits — name + live timer + progress bar toward next milestone */
+.hub-habit{display:flex;flex-direction:column;gap:5px;}
+.hub-habit-top{display:flex;align-items:baseline;justify-content:space-between;gap:10px;}
+.hub-habit-name{font-family:var(--sans);font-size:13px;font-weight:600;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.hub-habit-time{font-family:var(--mono);font-size:11px;color:var(--em);font-variant-numeric:tabular-nums;flex-shrink:0;}
+.hub-habit-bar{height:6px;border-radius:4px;background:var(--border);overflow:hidden;}
+.hub-habit-fill{height:100%;border-radius:4px;background:var(--em);transition:width .5s linear;}
+.hub-habit-next{font-family:var(--mono);font-size:9px;letter-spacing:.4px;color:var(--text-muted);}
+/* Holidays — destination card with optional attached image background */
+.hub-trip{
+  position:relative;overflow:hidden;
+  display:flex;align-items:center;justify-content:space-between;gap:10px;
+  padding:12px;border-radius:10px;
+  border:1px solid var(--border);
+  background:rgba(var(--em-rgb),.05);
+  background-size:cover;background-position:center;
+}
+.hub-trip.has-img::before{content:'';position:absolute;inset:0;background:linear-gradient(180deg,rgba(0,0,0,.25),rgba(0,0,0,.6));}
+.hub-trip.has-img .hub-trip-name,.hub-trip.has-img .hub-trip-when{color:#fff;position:relative;text-shadow:0 1px 3px rgba(0,0,0,.5);}
+.hub-trip-name{font-family:var(--display);font-style:italic;font-weight:700;font-size:15px;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.hub-trip-when{font-family:var(--mono);font-size:11px;letter-spacing:.5px;color:var(--text-muted);flex-shrink:0;}
+
 /* Add link tile — kept for renderLinks trailing tile */
 .add-link-tile{display:none;}
 
@@ -4410,6 +4435,33 @@ button:active:not(:disabled),
   font-family: var(--mono);
   font-size: 11.5px;
 }
+/* Habit widget — name + live timer + progress bar toward next milestone */
+.m-widget-habits { display: flex; flex-direction: column; gap: 12px; }
+.m-widget-habit { display: flex; flex-direction: column; gap: 5px; }
+.m-widget-habit-top { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
+.m-widget-habit-name { font-family: var(--sans); font-size: 13px; font-weight: 600; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.m-widget-habit-time { font-family: var(--mono); font-size: 11px; color: var(--em); font-variant-numeric: tabular-nums; flex-shrink: 0; }
+.m-widget-habit-bar { height: 6px; border-radius: 4px; background: var(--border); overflow: hidden; }
+.m-widget-habit-fill { height: 100%; border-radius: 4px; background: var(--em); transition: width .5s linear; }
+.m-widget-habit-next { font-family: var(--mono); font-size: 9px; letter-spacing: .4px; color: var(--text-muted); }
+/* Holiday widget — destination card with optional attached image bg */
+.m-widget-trips { display: flex; flex-direction: column; gap: 8px; }
+.m-widget-trip {
+  position: relative; overflow: hidden;
+  display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  padding: 12px 12px; border-radius: 10px;
+  border: 1px solid var(--border);
+  background: rgba(var(--em-rgb), .05);
+  background-size: cover; background-position: center;
+}
+.m-widget-trip.has-img::before {
+  content: ''; position: absolute; inset: 0;
+  background: linear-gradient(180deg, rgba(0,0,0,.25), rgba(0,0,0,.6));
+}
+.m-widget-trip.has-img .m-widget-trip-name,
+.m-widget-trip.has-img .m-widget-trip-when { color: #fff; position: relative; text-shadow: 0 1px 3px rgba(0,0,0,.5); }
+.m-widget-trip-name { font-family: var(--display); font-style: italic; font-weight: 700; font-size: 15px; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.m-widget-trip-when { font-family: var(--mono); font-size: 11px; letter-spacing: .5px; color: var(--text-muted); flex-shrink: 0; }
 .m-widget-list-icon {
   font-size: 14px;
   width: 18px;

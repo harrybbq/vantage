@@ -42,6 +42,64 @@ async function resolveChannelId(handle, apiKey) {
   return { id: item.id?.channelId || item.snippet?.channelId, resolvedName: item.snippet?.channelTitle, thumb: item.snippet?.thumbnails?.default?.url };
 }
 
+// ── Hub content widgets (Habits / Holidays) — imperative HTML ──
+function escapeHtml(s) {
+  return String(s == null ? '' : s)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+function fmtHabitElapsed(ms) {
+  if (ms < 0) ms = 0;
+  const s = Math.floor(ms / 1000);
+  const d = Math.floor(s / 86400);
+  const h = Math.floor((s % 86400) / 3600);
+  const m = Math.floor((s % 3600) / 60);
+  const sec = s % 60;
+  if (d > 0) return `${d}d ${h}h ${m}m`;
+  if (h > 0) return `${h}h ${m}m ${sec}s`;
+  if (m > 0) return `${m}m ${sec}s`;
+  return `${sec}s`;
+}
+function habitTarget(h, elapsed) {
+  const ms = (h.milestones || []).slice().sort((a, b) => a.duration - b.duration);
+  const next = ms.find(m => m.duration > elapsed);
+  const target = next ? next.duration : (ms.length ? ms[ms.length - 1].duration : elapsed || 1);
+  return { target, next };
+}
+function habitsWidgetHtml(S) {
+  const habits = (S.habits || []).filter(h => h.startTime).slice()
+    .sort((a, b) => a.startTime - b.startTime).slice(0, 5); // oldest = longest running
+  if (!habits.length) return '<div class="hub-widget-empty">No habits yet — add one in Habits.</div>';
+  const now = Date.now();
+  return habits.map(h => {
+    const elapsed = now - h.startTime;
+    const { target, next } = habitTarget(h, elapsed);
+    const pct = Math.max(0, Math.min(100, target ? (elapsed / target) * 100 : 100));
+    return `<div class="hub-habit">
+      <div class="hub-habit-top"><span class="hub-habit-name">${escapeHtml(h.name)}</span><span class="hub-habit-time" data-habit-timer="${escapeHtml(h.id)}">${fmtHabitElapsed(elapsed)}</span></div>
+      <div class="hub-habit-bar"><div class="hub-habit-fill" data-habit-bar="${escapeHtml(h.id)}" style="width:${pct}%"></div></div>
+      ${next ? `<div class="hub-habit-next">${escapeHtml(next.label || '')}</div>` : ''}
+    </div>`;
+  }).join('');
+}
+function holidaysWidgetHtml(S) {
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  const trips = (S.holidays || []).filter(h => h.status !== 'completed').map(h => {
+    let dep = null;
+    if (h.from) { dep = new Date(h.from); dep.setHours(0, 0, 0, 0); }
+    return { h, dep };
+  }).filter(x => !x.dep || x.dep >= today)
+    .sort((a, b) => { if (!a.dep) return 1; if (!b.dep) return -1; return a.dep - b.dep; })
+    .slice(0, 5);
+  if (!trips.length) return '<div class="hub-widget-empty">No upcoming trips — plan one in Holidays.</div>';
+  return trips.map(({ h, dep }) => {
+    const days = dep ? Math.round((dep - today) / 86400000) : null;
+    const label = days == null ? 'TBC' : days === 0 ? 'Today' : days === 1 ? 'Tomorrow' : `${days}d`;
+    const img = h.imageUrl ? ` style="background-image:url(&quot;${escapeHtml(h.imageUrl)}&quot;)"` : '';
+    return `<div class="hub-trip${h.imageUrl ? ' has-img' : ''}"${img}><span class="hub-trip-name">${escapeHtml(h.dest || 'Trip')}</span><span class="hub-trip-when">${label}</span></div>`;
+  }).join('');
+}
+
 // ── Widget canvas (DOM-based dragging) ──
 function useWidgetDrag(canvasRef, S, update) {
   const makeDraggable = useCallback((wrapper, linkId) => {
@@ -185,6 +243,34 @@ export default function HubSection({ S, update, active, onOpenModal, onOpenWaitl
     S, update,
     syncKey: `${S.links?.length || 0}:${S.ytWidgets?.length || 0}:${active}`,
   });
+
+  // Live habit-timer ticks for Habits hub widgets — update the timer
+  // text + progress bar widths in place each second (no canvas rebuild,
+  // so drag/positions are preserved). Reads latest habits via a ref.
+  const stateRef = useRef(S);
+  stateRef.current = S;
+  useEffect(() => {
+    if (!active) return undefined;
+    const id = setInterval(() => {
+      const habits = stateRef.current.habits || [];
+      if (!habits.length) return;
+      const now = Date.now();
+      const byId = {};
+      habits.forEach(h => { byId[h.id] = h; });
+      document.querySelectorAll('#widgetCanvas [data-habit-timer]').forEach(el => {
+        const h = byId[el.getAttribute('data-habit-timer')];
+        if (h && h.startTime) el.textContent = fmtHabitElapsed(now - h.startTime);
+      });
+      document.querySelectorAll('#widgetCanvas [data-habit-bar]').forEach(el => {
+        const h = byId[el.getAttribute('data-habit-bar')];
+        if (!h || !h.startTime) return;
+        const elapsed = now - h.startTime;
+        const { target } = habitTarget(h, elapsed);
+        el.style.width = Math.max(0, Math.min(100, target ? (elapsed / target) * 100 : 100)) + '%';
+      });
+    }, 1000);
+    return () => clearInterval(id);
+  }, [active]);
   // Pro-gated: the operator-console layout (HubOsLayout) renders for
   // EITHER dark-os OR cream-pro when the user has Pro. Free users
   // never see it. The two themes share the same panel/grid structure
@@ -380,12 +466,70 @@ export default function HubSection({ S, update, active, onOpenModal, onOpenWaitl
       loadYouTubeFeed(yt);
     });
 
+    // Hub content widgets (Habits / Holidays) — added via the Add-Widget
+    // picker, stored in S.hubWidgets. Same draggable/resizable island
+    // shell as links. Habit timers tick via the interval effect below
+    // (targeted DOM updates, no canvas rebuild).
+    (S.hubWidgets || []).forEach(hw => {
+      const wrapper = document.createElement('div');
+      wrapper.className = 'widget-wrapper' + (hasPositions ? '' : ' snapping');
+      wrapper.dataset.linkId = hw.id;
+      if (hasPositions) {
+        const pos = S.widgetPositions[hw.id];
+        wrapper.style.cssText = `position:absolute;min-width:280px;max-width:360px;width:300px;user-select:none;left:${pos ? pos.x : 40}px;top:${pos ? pos.y : 40}px;`;
+      }
+
+      const island = document.createElement('div');
+      island.className = 'card link-island';
+      island.id = 'island-' + hw.id;
+      const isHabits = hw.type === 'habits';
+      const eyebrow = isHabits ? 'WIDGET · HABITS' : 'WIDGET · HOLIDAYS';
+      const icon = isHabits ? '◷' : '✈';
+      const title = isHabits ? 'Habits' : 'Holidays';
+      const sub = isHabits ? 'Longest streaks' : 'Upcoming trips';
+      const body = isHabits ? habitsWidgetHtml(S) : holidaysWidgetHtml(S);
+
+      island.innerHTML = `
+        <div class="widget-drag-handle" data-drag="${hw.id}"><span></span></div>
+        <div class="link-island-header">
+          <div class="link-island-icon" style="background:rgba(var(--em-rgb),.10);border-color:rgba(var(--em-rgb),.32);color:var(--em);">${icon}</div>
+          <div class="link-island-info">
+            <span class="link-island-name">${eyebrow}</span>
+            <span class="link-island-url">${sub}</span>
+          </div>
+          <div class="link-island-actions">
+            <button class="link-del-btn" data-del-hw="${hw.id}">✕</button>
+          </div>
+        </div>
+        <div class="link-island-brand">
+          <div class="link-island-brand-info">
+            <div class="link-island-brand-title">${title}</div>
+          </div>
+        </div>
+        <div class="link-island-body hub-widget-body">${body}</div>
+      `;
+
+      island.querySelector('[data-del-hw]')?.addEventListener('click', e => {
+        e.stopPropagation();
+        update(prev => ({
+          ...prev,
+          hubWidgets: (prev.hubWidgets || []).filter(w => w.id !== hw.id),
+          widgetPositions: (() => { const p = { ...prev.widgetPositions }; delete p[hw.id]; return p; })(),
+        }));
+      });
+
+      wrapper.appendChild(island);
+      canvas.appendChild(wrapper);
+      makeDraggable(wrapper, hw.id);
+      makeResizable(wrapper, hw.id);
+    });
+
     // Notepad — show if text exists, position saved, or explicitly shown via _showNotepad flag
     if (S.notepadText || S.notepadPos || S._showNotepad) {
       renderNotepadInCanvas(canvas, S, update, hasPositions);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [S.links, S.ytWidgets, S.widgetPositions, S.notepadText, S.notepadPos, S.notepadWidth, S._showNotepad]);
+  }, [S.links, S.ytWidgets, S.hubWidgets, S.holidays, S.habits, S.widgetPositions, S.notepadText, S.notepadPos, S.notepadWidth, S._showNotepad]);
 
   useEffect(() => {
     if (active) renderCanvas();

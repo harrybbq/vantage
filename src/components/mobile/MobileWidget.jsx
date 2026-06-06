@@ -352,8 +352,18 @@ function fmtElapsed(ms) {
   if (m > 0) return `${m}m ${sec}s`;
   return `${sec}s`;
 }
+// Progress toward the next un-reached milestone (or the last one once
+// all are hit). Returns { pct, label }.
+function habitProgress(h, elapsed) {
+  const ms = (h.milestones || []).slice().sort((a, b) => a.duration - b.duration);
+  if (!ms.length) return { pct: 0, label: null };
+  const next = ms.find(m => m.duration > elapsed);
+  const target = next ? next.duration : ms[ms.length - 1].duration;
+  const pct = Math.max(0, Math.min(100, target ? (elapsed / target) * 100 : 100));
+  return { pct, label: next ? next.label : 'All milestones hit' };
+}
 function HabitsBody({ S }) {
-  // Tick once a second so the timers stay live.
+  // Tick once a second so the timers + bars stay live.
   const [, setTick] = useState(0);
   useEffect(() => {
     const id = setInterval(() => setTick(t => t + 1), 1000);
@@ -369,15 +379,21 @@ function HabitsBody({ S }) {
   }
   const now = Date.now();
   return (
-    <ul className="m-widget-list">
-      {habits.map(h => (
-        <li key={h.id} className="m-widget-list-row">
-          <span className="m-widget-list-name">{h.name}</span>
-          <span className="m-widget-list-meta" style={{ fontVariantNumeric: 'tabular-nums' }}>
-            {fmtElapsed(now - h.startTime)}
-          </span>
-        </li>
-      ))}
+    <ul className="m-widget-list m-widget-habits">
+      {habits.map(h => {
+        const elapsed = now - h.startTime;
+        const { pct, label } = habitProgress(h, elapsed);
+        return (
+          <li key={h.id} className="m-widget-habit">
+            <div className="m-widget-habit-top">
+              <span className="m-widget-habit-name">{h.name}</span>
+              <span className="m-widget-habit-time">{fmtElapsed(elapsed)}</span>
+            </div>
+            <div className="m-widget-habit-bar"><div className="m-widget-habit-fill" style={{ width: `${pct}%` }} /></div>
+            {label && <div className="m-widget-habit-next">{label}</div>}
+          </li>
+        );
+      })}
     </ul>
   );
 }
@@ -403,7 +419,7 @@ function HolidaysBody({ S }) {
     return <div className="m-widget-empty">No upcoming trips — plan one in Holidays.</div>;
   }
   return (
-    <ul className="m-widget-list">
+    <ul className="m-widget-list m-widget-trips">
       {trips.map(({ h, dep }) => {
         const days = dep ? Math.round((dep - today) / 86400000) : null;
         const label = days == null ? 'TBC'
@@ -411,9 +427,13 @@ function HolidaysBody({ S }) {
           : days === 1 ? 'Tomorrow'
           : `${days}d`;
         return (
-          <li key={h.id} className="m-widget-list-row">
-            <span className="m-widget-list-name">{h.dest || 'Trip'}</span>
-            <span className="m-widget-list-meta">{label}</span>
+          <li
+            key={h.id}
+            className={`m-widget-trip${h.imageUrl ? ' has-img' : ''}`}
+            style={h.imageUrl ? { backgroundImage: `url(${h.imageUrl})` } : undefined}
+          >
+            <span className="m-widget-trip-name">{h.dest || 'Trip'}</span>
+            <span className="m-widget-trip-when">{label}</span>
           </li>
         );
       })}
