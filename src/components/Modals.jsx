@@ -1087,7 +1087,7 @@ function EditHolidayModal({ openId, onClose, holidays, onEdit, onDelete }) {
 // ── Add Habit ──
 function AddHabitModal({ openId, onClose, onAdd }) {
   const emptyMs = () => ({ _id: 'ms' + Date.now() + Math.random(), amount: '1', unit: 'weeks', coins: '' });
-  const [form, setForm] = useState({ name: '', color: '#1a7a4a', endless: false, milestones: [emptyMs()] });
+  const [form, setForm] = useState({ name: '', color: '#1a7a4a', endless: false, strikes: '0', strikesUnit: 'week', milestones: [emptyMs()] });
 
   function toDuration(amount, unit) {
     const mul = { hours: 3600000, days: 86400000, weeks: 604800000, months: 2592000000 };
@@ -1124,9 +1124,12 @@ function AddHabitModal({ openId, onClose, onAdd }) {
       endless: form.endless,
       startTime: Date.now(),
       relapseCount: 0,
+      strikesAllowed: parseInt(form.strikes) || 0,
+      strikesPeriod: form.strikesUnit,
+      strikeTimes: [],
       milestones,
     });
-    setForm({ name: '', color: '#1a7a4a', endless: false, milestones: [emptyMs()] });
+    setForm({ name: '', color: '#1a7a4a', endless: false, strikes: '0', strikesUnit: 'week', milestones: [emptyMs()] });
     onClose('addHabitModal');
   }
 
@@ -1176,6 +1179,23 @@ function AddHabitModal({ openId, onClose, onAdd }) {
           <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '2px' }}>Track this habit forever — the counter never ends, even after all milestones are earned</div>
         </div>
       </label>
+
+      <div style={{ borderTop: '1px solid var(--border-lt)', margin: '14px 0' }}></div>
+      <div className="fg" style={{ marginBottom: 0 }}>
+        <label>Strikes allowed before the timer restarts</label>
+        <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+          <input type="number" min="0" value={form.strikes} onChange={e => setForm(f => ({ ...f, strikes: e.target.value }))} style={{ flex: '0 0 64px', textAlign: 'center' }} />
+          <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>relapse(s) per</span>
+          <select value={form.strikesUnit} onChange={e => setForm(f => ({ ...f, strikesUnit: e.target.value }))} style={{ flex: 1 }}>
+            <option value="week">week</option>
+            <option value="month">month</option>
+            <option value="ever">ever (total)</option>
+          </select>
+        </div>
+        <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '4px' }}>
+          0 = any relapse restarts the timer. Otherwise the streak survives until you exceed the allowance.
+        </div>
+      </div>
 
       <div className="modal-actions" style={{ marginTop: '18px' }}>
         <button className="btn btn-ghost" onClick={() => onClose('addHabitModal')}>Cancel</button>
@@ -1678,13 +1698,24 @@ export default function Modals({ openModal, S, update, onClose, onOpen, onShowCo
     update(prev => ({ ...prev, habits: (prev.habits || []).filter(h => h.id !== id) }));
   }
   function handleRelapseHabit(id, whenTs) {
+    const PER = { week: 604800000, month: 2592000000, ever: Infinity };
     update(prev => ({
       ...prev,
-      habits: (prev.habits || []).map(h => h.id !== id ? h : {
-        ...h,
-        startTime: whenTs,
-        relapseCount: (h.relapseCount || 0) + 1,
-        milestones: (h.milestones || []).map(m => ({ ...m, awarded: false })),
+      habits: (prev.habits || []).map(h => {
+        if (h.id !== id) return h;
+        const allowed = h.strikesAllowed || 0;
+        const cutoff = whenTs - (PER[h.strikesPeriod] ?? Infinity);
+        const recent = [...(h.strikeTimes || []).filter(t => t > cutoff), whenTs];
+        // Restart only when strikes in the period exceed the allowance.
+        if (recent.length > allowed) {
+          return {
+            ...h, startTime: whenTs, strikeTimes: [],
+            relapseCount: (h.relapseCount || 0) + 1,
+            milestones: (h.milestones || []).map(m => ({ ...m, awarded: false })),
+          };
+        }
+        // Streak survives — just bank the strike.
+        return { ...h, strikeTimes: recent, relapseCount: (h.relapseCount || 0) + 1 };
       }),
     }));
   }

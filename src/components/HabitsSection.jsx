@@ -3,6 +3,12 @@ import { motion } from 'framer-motion';
 import { fireGoal } from '../utils/confetti';
 import SectionHelp from './SectionHelp';
 
+// Strikes used in the current period (week/month/ever).
+function strikesUsed(h) {
+  const PER = { week: 604800000, month: 2592000000, ever: Infinity };
+  const cutoff = Date.now() - (PER[h.strikesPeriod] ?? Infinity);
+  return (h.strikeTimes || []).filter(t => t > cutoff).length;
+}
 function formatElapsed(ms) {
   if (ms < 0) ms = 0;
   const secs = Math.floor(ms / 1000);
@@ -113,7 +119,11 @@ function HabitCard({ habit, update, onShowCoinToast, onOpenModal }) {
 
       <div className="habit-elapsed">{formatElapsed(elapsed)}</div>
 
-      {habit.relapseCount > 0 && (
+      {habit.strikesAllowed > 0 ? (
+        <div className="habit-relapse-count">
+          {strikesUsed(habit)}/{habit.strikesAllowed} strikes · {habit.strikesPeriod === 'ever' ? 'total' : 'this ' + habit.strikesPeriod}
+        </div>
+      ) : habit.relapseCount > 0 && (
         <div className="habit-relapse-count">
           {habit.relapseCount} relapse{habit.relapseCount !== 1 ? 's' : ''}
         </div>

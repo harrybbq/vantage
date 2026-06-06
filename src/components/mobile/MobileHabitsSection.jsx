@@ -24,6 +24,11 @@
 import { useState, useEffect, useRef } from 'react';
 import { fireGoal } from '../../utils/confetti';
 
+function mStrikesUsed(h) {
+  const PER = { week: 604800000, month: 2592000000, ever: Infinity };
+  const cutoff = Date.now() - (PER[h.strikesPeriod] ?? Infinity);
+  return (h.strikeTimes || []).filter(t => t > cutoff).length;
+}
 function formatElapsedShort(ms) {
   if (ms < 0) ms = 0;
   const secs = Math.floor(ms / 1000);
@@ -140,7 +145,9 @@ function MobileHabitCard({ habit, update, onShowCoinToast, onOpenModal }) {
       {/* Footer — relapse count + button */}
       <div className="m-habit-footer">
         <div className="m-habit-count">
-          {habit.relapseCount || 0} relapse{habit.relapseCount === 1 ? '' : 's'}
+          {habit.strikesAllowed > 0
+            ? `${mStrikesUsed(habit)}/${habit.strikesAllowed} strikes`
+            : `${habit.relapseCount || 0} relapse${habit.relapseCount === 1 ? '' : 's'}`}
         </div>
         <button
           className="m-habit-relapse-btn"
