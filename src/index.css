@@ -4200,6 +4200,13 @@ button:active:not(:disabled),
   flex-direction: column;
   overflow: hidden;
 }
+/* Long-press → "Transparent background": drop the fill so the page
+   shows through, keeping the hairline border (matches the desktop
+   module transparency toggle). */
+.m-widget.is-transparent,
+.m-widget.is-transparent .m-widget-head {
+  background: transparent !important;
+}
 .m-widget-head {
   display: flex;
   align-items: center;

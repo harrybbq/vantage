@@ -12,7 +12,7 @@
  *   2. Add a case in renderBody()
  *   3. Add an option in AddMobileWidgetModal's picker
  */
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { APP_PRESETS, getAppPreset } from '../../data/appPresets';
 
 // App presets (FloorplanStudio / TubeLube / …) become mobile widget
@@ -102,89 +102,170 @@ export default function MobileWidget({ widget, S, update, onRemove }) {
     borderColor: meta.accent + '55',
   } : undefined;
 
-  // ── Swipe-left to reveal a red Delete button ──
-  // Foreground card translates left up to REVEAL px; past half it snaps
-  // open, otherwise snaps closed. touch-action: pan-y keeps vertical
-  // scrolling native while we own the horizontal gesture.
+  // ── Gestures ──
+  // Swipe left → reveal a red Delete button. Long-press → a small menu
+  // (transparency toggle + delete), matching the desktop right-click
+  // module menu. A single touchstart decides which: horizontal drag =
+  // swipe, holding still = menu, vertical = native scroll.
   const REVEAL = 84;
   const [offset, setOffset] = useState(0);
+  const [menu, setMenu] = useState(null); // { x, y } | null
   const startX = useRef(0);
+  const startY = useRef(0);
   const startOff = useRef(0);
-  const dragging = useRef(false);
+  const mode = useRef(null); // null | 'swipe' | 'scroll' | 'menu'
+  const lpTimer = useRef(0);
+
+  const transparent = !!widget.transparent;
+
+  function clearLP() { clearTimeout(lpTimer.current); lpTimer.current = 0; }
+  function setTransparent(val) {
+    update(prev => ({
+      ...prev,
+      mobileWidgets: (prev.mobileWidgets || []).map(w => w.id === widget.id ? { ...w, transparent: val } : w),
+    }));
+  }
 
   function onTouchStart(e) {
     if (e.touches.length !== 1) return;
-    dragging.current = true;
     startX.current = e.touches[0].clientX;
+    startY.current = e.touches[0].clientY;
     startOff.current = offset;
+    mode.current = null;
+    clearLP();
+    lpTimer.current = setTimeout(() => {
+      mode.current = 'menu';
+      setOffset(0);
+      setMenu({ x: startX.current, y: startY.current });
+      if (navigator.vibrate) { try { navigator.vibrate(15); } catch { /* ignore */ } }
+    }, 450);
   }
   function onTouchMove(e) {
-    if (!dragging.current) return;
-    const dx = e.touches[0].clientX - startX.current;
-    const next = Math.max(-REVEAL, Math.min(0, startOff.current + dx));
-    setOffset(next);
+    const t = e.touches[0];
+    if (!t) return;
+    const dx = t.clientX - startX.current;
+    const dy = t.clientY - startY.current;
+    if (mode.current === null) {
+      if (Math.abs(dx) > 8 && Math.abs(dx) > Math.abs(dy)) { mode.current = 'swipe'; clearLP(); }
+      else if (Math.abs(dy) > 8) { mode.current = 'scroll'; clearLP(); }
+    }
+    if (mode.current === 'swipe') {
+      setOffset(Math.max(-REVEAL, Math.min(0, startOff.current + dx)));
+    }
   }
   function onTouchEnd() {
-    if (!dragging.current) return;
-    dragging.current = false;
-    setOffset(o => (o < -REVEAL / 2 ? -REVEAL : 0));
+    clearLP();
+    if (mode.current === 'swipe') setOffset(o => (o < -REVEAL / 2 ? -REVEAL : 0));
+    mode.current = null;
   }
+
+  // Dismiss the long-press menu on any outside tap / scroll.
+  useEffect(() => {
+    if (!menu) return;
+    const close = () => setMenu(null);
+    const id = setTimeout(() => {
+      document.addEventListener('pointerdown', close);
+      document.addEventListener('scroll', close, true);
+    }, 0);
+    return () => {
+      clearTimeout(id);
+      document.removeEventListener('pointerdown', close);
+      document.removeEventListener('scroll', close, true);
+    };
+  }, [menu]);
 
   const open = offset < 0;
 
   return (
-    <div className="m-widget-swipe" style={{ position: 'relative', overflow: 'hidden', borderRadius: 12 }}>
-      {/* Red delete action behind the card */}
-      <button
-        type="button"
-        className="m-widget-delete"
-        onClick={() => onRemove(widget.id)}
-        aria-label="Delete widget"
-        style={{
-          position: 'absolute', top: 0, right: 0, bottom: 0, width: REVEAL,
-          border: 'none', background: 'rgb(220,60,60)', color: '#fff',
-          display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-          gap: 3, fontFamily: 'var(--mono)', fontSize: 10, letterSpacing: 1,
-          textTransform: 'uppercase', fontWeight: 700, cursor: 'pointer',
-        }}
-      >
-        <span style={{ fontSize: 16 }}>🗑</span>
-        Delete
-      </button>
-
-      {/* Foreground card — slides left to reveal the button */}
-      <div
-        className="m-widget"
-        style={{
-          transform: `translateX(${offset}px)`,
-          transition: dragging.current ? 'none' : 'transform .2s ease',
-          touchAction: 'pan-y',
-          position: 'relative',
-        }}
-        onTouchStart={onTouchStart}
-        onTouchMove={onTouchMove}
-        onTouchEnd={onTouchEnd}
-        onTouchCancel={onTouchEnd}
-        // When open, a tap anywhere on the card just closes it (and is
-        // swallowed so it doesn't trigger anything underneath).
-        onClickCapture={e => { if (open) { e.preventDefault(); e.stopPropagation(); setOffset(0); } }}
-      >
-        <div className="m-widget-head">
-          <span className="m-widget-icon m-widget-chip" style={chipStyle}>{meta.icon}</span>
-          <span className="m-widget-eyebrow">// {meta.eyebrow}</span>
+    <>
+      <div className="m-widget-swipe" style={{ position: 'relative', overflow: 'hidden', borderRadius: 12 }}>
+        {/* Red delete action — only mounted while swiping, so it never
+            shows through a transparent widget when closed. */}
+        {open && (
           <button
             type="button"
-            className="m-widget-remove"
+            className="m-widget-delete"
             onClick={() => onRemove(widget.id)}
-            aria-label="Remove widget"
-            title="Remove"
-          >×</button>
-        </div>
-        <div className="m-widget-body">
-          {renderBody(widget, meta, S, update)}
+            aria-label="Delete widget"
+            style={{
+              position: 'absolute', top: 0, right: 0, bottom: 0, width: REVEAL,
+              border: 'none', background: 'rgb(214,69,69)', color: '#fff',
+              display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+              gap: 5, fontFamily: 'var(--mono)', fontSize: 9.5, letterSpacing: 1.2,
+              textTransform: 'uppercase', fontWeight: 700, cursor: 'pointer',
+            }}
+          >
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+              strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6M10 11v6M14 11v6" />
+            </svg>
+            Delete
+          </button>
+        )}
+
+        {/* Foreground card */}
+        <div
+          className={`m-widget${transparent ? ' is-transparent' : ''}`}
+          style={{
+            transform: `translateX(${offset}px)`,
+            transition: mode.current === 'swipe' ? 'none' : 'transform .2s ease',
+            touchAction: 'pan-y',
+            position: 'relative',
+          }}
+          onTouchStart={onTouchStart}
+          onTouchMove={onTouchMove}
+          onTouchEnd={onTouchEnd}
+          onTouchCancel={onTouchEnd}
+          onClickCapture={e => { if (open) { e.preventDefault(); e.stopPropagation(); setOffset(0); } }}
+        >
+          <div className="m-widget-head">
+            <span className="m-widget-icon m-widget-chip" style={chipStyle}>{meta.icon}</span>
+            <span className="m-widget-eyebrow">// {meta.eyebrow}</span>
+            <button
+              type="button"
+              className="m-widget-remove"
+              onClick={() => onRemove(widget.id)}
+              aria-label="Remove widget"
+              title="Remove"
+            >×</button>
+          </div>
+          <div className="m-widget-body">
+            {renderBody(widget, meta, S, update)}
+          </div>
         </div>
       </div>
-    </div>
+
+      {/* Long-press menu — transparency toggle + delete */}
+      {menu && (
+        <div
+          className="hub-module-menu"
+          style={{ left: Math.min(menu.x, window.innerWidth - 230), top: Math.min(menu.y, window.innerHeight - 150) }}
+          onPointerDown={e => e.stopPropagation()}
+          role="menu"
+        >
+          <div className="hub-module-menu-head">{meta.label}</div>
+          <button
+            type="button"
+            className="hub-module-menu-row"
+            onClick={() => setTransparent(!transparent)}
+            role="menuitemcheckbox"
+            aria-checked={transparent}
+          >
+            <span className="hub-module-menu-label">Transparent background</span>
+            <span className={`hub-switch${transparent ? ' is-on' : ''}`} aria-hidden="true">
+              <span className="hub-switch-knob" />
+            </span>
+          </button>
+          <button
+            type="button"
+            className="hub-module-menu-row"
+            onClick={() => { setMenu(null); onRemove(widget.id); }}
+          >
+            <span className="hub-module-menu-label" style={{ color: 'rgb(214,69,69)' }}>Delete widget</span>
+          </button>
+        </div>
+      )}
+    </>
   );
 }
 
