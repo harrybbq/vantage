@@ -11,6 +11,14 @@ let _dragItemId = null;
 function ShopCard({ item, coins, onToggleBought, onDelete, onEdit, revealDelay }) {
   const hasLink = !!item.url;
   const canAfford = (coins || 0) >= item.coinCost || item.bought;
+  // Names > 50 chars truncate with an ellipsis the user can tap to
+  // expand. Persists per-card session-only — not worth storing.
+  const NAME_LIMIT = 50;
+  const longName = item.name && item.name.length > NAME_LIMIT;
+  const [nameExpanded, setNameExpanded] = useState(false);
+  const shownName = longName && !nameExpanded
+    ? item.name.slice(0, NAME_LIMIT).trimEnd() + '…'
+    : item.name;
 
   return (
     <motion.div
@@ -44,7 +52,13 @@ function ShopCard({ item, coins, onToggleBought, onDelete, onEdit, revealDelay }
       </div>
       <div className="shop-item-body">
         <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '8px' }}>
-          <div className="shop-item-name">{item.name}</div>
+          <div
+            className={`shop-item-name${longName ? ' is-truncatable' : ''}${nameExpanded ? ' is-expanded' : ''}`}
+            onClick={() => longName && setNameExpanded(v => !v)}
+            role={longName ? 'button' : undefined}
+            tabIndex={longName ? 0 : undefined}
+            title={longName && !nameExpanded ? 'Tap to show full name' : undefined}
+          >{shownName}</div>
           <span className={`shop-item-priority ${PRIORITY_CLASS[item.priority]}`}>{PRIORITY_LABEL[item.priority]}</span>
         </div>
         {item.price && <div className="shop-item-price">{item.price}</div>}
@@ -57,17 +71,19 @@ function ShopCard({ item, coins, onToggleBought, onDelete, onEdit, revealDelay }
       </div>
       <div className="shop-item-footer">
         {hasLink
-          ? <a className="shop-link-btn" href={item.url} target="_blank" rel="noreferrer">View Online ↗</a>
+          ? <a className="shop-link-btn" href={item.url} target="_blank" rel="noreferrer">View Online</a>
           : <span className="shop-link-btn no-link">No link added</span>
         }
-        <motion.button className="shop-bought-btn"
+        <motion.button className="shop-icon-btn shop-bought-btn"
           whileHover={{ scale: 1.04 }} whileTap={{ scale: 0.95 }}
           transition={{ type: 'spring', stiffness: 400, damping: 17 }}
-          onClick={() => onToggleBought(item.id)}>
-          {item.bought ? '✓ Bought' : 'Mark Bought'}
+          onClick={() => onToggleBought(item.id)}
+          title={item.bought ? 'Mark as not bought' : 'Mark as bought'}
+        >
+          {item.bought ? '✓' : '⬡'}
         </motion.button>
-        <button className="shop-edit-btn" title="Edit item" onClick={() => onEdit(item.id)}>✎</button>
-        <button className="shop-del-btn" onClick={() => onDelete(item.id)}>✕</button>
+        <button className="shop-icon-btn shop-edit-btn" title="Edit item" onClick={() => onEdit(item.id)}>✎</button>
+        <button className="shop-icon-btn shop-del-btn" onClick={() => onDelete(item.id)}>✕</button>
       </div>
     </motion.div>
   );
