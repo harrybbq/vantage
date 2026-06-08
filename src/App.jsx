@@ -33,6 +33,7 @@ import CookieBanner from './components/CookieBanner';
 import InstallPrompt from './components/InstallPrompt';
 import TutorialOverlay from './components/TutorialOverlay';
 import BackgroundCropModal from './components/BackgroundCropModal';
+import LeaderboardSection from './components/LeaderboardSection';
 import { useCapacitor, haptic } from './hooks/useCapacitor';
 import { useIsMobile } from './hooks/useIsMobile';
 import { useVisions } from './lib/visions/useVisions';
@@ -626,6 +627,16 @@ function Board({ userId, userEmail, onSignOut }) {
             ) : (
               <HabitsSection S={S} update={update} active onOpenModal={handleOpenModal} onShowCoinToast={showCoinToast} />
             )}
+          </motion.div>
+        )}
+        {activeSection === 'leaderboard' && (
+          <motion.div key="leaderboard" {...pageMotion}>
+            <LeaderboardSection
+              active
+              onOpenSelfBreakdown={() => navigate('hub')}
+              onAddFriends={() => navigate('hub')}
+              onOpenSettings={() => navigate('settings')}
+            />
           </motion.div>
         )}
         {activeSection === 'settings' && (

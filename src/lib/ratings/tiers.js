@@ -29,11 +29,11 @@ export const OVR_TIERS = [
   { key: 'ruby',    label: 'Ruby',    min: 90, max: 99, color: 'var(--tier-ruby)'    },
 ];
 
-/** Map a 1-99 OVR to its prestige band. Values below 0 fall to the
- *  bottom band; values above 99 (shouldn't happen — derive clamps at
- *  99) fall to the top band. */
-export function ovrTier(ovr) {
-  const n = Number(ovr);
+/** Internal — map a 1-99 score to a band entry from OVR_TIERS. Below 0
+ *  → bottom band; above 99 → top band. Shared by ovrTier + categoryTier
+ *  so they can't drift in band logic. */
+function bandFor(score) {
+  const n = Number(score);
   if (!Number.isFinite(n)) return OVR_TIERS[0];
   for (const t of OVR_TIERS) {
     if (n >= t.min && n <= t.max) return t;
@@ -41,7 +41,13 @@ export function ovrTier(ovr) {
   return n < 0 ? OVR_TIERS[0] : OVR_TIERS[OVR_TIERS.length - 1];
 }
 
+/** Map a 1-99 OVR to its prestige band (Bronze … Ruby). */
+export function ovrTier(ovr) { return bandFor(ovr); }
+
+/** Map a 1-99 category score (brain/finance/fitness/social) to the
+ *  same prestige band scale. Used by the leaderboard's read-only
+ *  FriendRatingsModal to show per-category tier badges. */
+export function categoryTier(score) { return bandFor(score); }
+
 /** Convenience for className templates: returns just the tier key. */
-export function ovrTierKey(ovr) {
-  return ovrTier(ovr).key;
-}
+export function ovrTierKey(ovr) { return ovrTier(ovr).key; }

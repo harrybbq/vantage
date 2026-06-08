@@ -62,3 +62,9 @@
 # the function returns immediately when the queue is empty.
 [functions."push-dispatch"]
   schedule = "* * * * *"
+
+# snapshot-ratings writes one rating snapshot per opted-in user per day.
+# Powers the leaderboard's weekly-climb metric (current_ovr − snap_ovr).
+# 03:00 UTC = low-traffic window.
+[functions."snapshot-ratings"]
+  schedule = "0 3 * * *"

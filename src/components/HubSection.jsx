@@ -482,12 +482,17 @@ export default function HubSection({ S, update, active, onOpenModal, onOpenWaitl
       const island = document.createElement('div');
       island.className = 'card link-island';
       island.id = 'island-' + hw.id;
-      const isHabits = hw.type === 'habits';
-      const eyebrow = isHabits ? 'WIDGET · HABITS' : 'WIDGET · HOLIDAYS';
-      const icon = isHabits ? '◷' : '✈';
-      const title = isHabits ? 'Habits' : 'Holidays';
-      const sub = isHabits ? 'Longest streaks' : 'Upcoming trips';
-      const body = isHabits ? habitsWidgetHtml(S) : holidaysWidgetHtml(S);
+      const META = {
+        habits:      { eyebrow: 'WIDGET · HABITS',      icon: '◷', title: 'Habits',      sub: 'Longest streaks',   body: () => habitsWidgetHtml(S) },
+        holidays:    { eyebrow: 'WIDGET · HOLIDAYS',    icon: '✈', title: 'Holidays',    sub: 'Upcoming trips',    body: () => holidaysWidgetHtml(S) },
+        // Leaderboard is rendered as a placeholder shell; live data is
+        // fetched async after mount (we don't have the leaderboard data
+        // synchronously here). The body fills in via fetch + DOM patch.
+        leaderboard: { eyebrow: 'WIDGET · LEADERBOARD', icon: '⊿', title: 'Leaderboard', sub: 'Friends · all-time', body: () => `<div class="hub-widget-empty" data-lb-host="${hw.id}">Loading leaderboard…</div>` },
+      };
+      const meta = META[hw.type] || META.habits;
+      const { eyebrow, icon, title, sub } = meta;
+      const body = meta.body();
 
       island.innerHTML = `
         <div class="widget-drag-handle" data-drag="${hw.id}"><span></span></div>
@@ -522,6 +527,7 @@ export default function HubSection({ S, update, active, onOpenModal, onOpenWaitl
       canvas.appendChild(wrapper);
       makeDraggable(wrapper, hw.id);
       makeResizable(wrapper, hw.id);
+      if (hw.type === 'leaderboard') loadLeaderboardIntoWidget(hw.id);
     });
 
     // Notepad — show if text exists, position saved, or explicitly shown via _showNotepad flag
@@ -670,6 +676,37 @@ async function loadGHIsland(link, cache, update) {
 }
 
 // ── YouTube feed loader ──
+// Async fetch for the Leaderboard hub widget — friends/all-time top 5,
+// patched into the placeholder host span on mount. Read-only summary;
+// detailed views live on the dedicated Leaderboard page.
+async function loadLeaderboardIntoWidget(hwId) {
+  const host = document.querySelector(`[data-lb-host="${hwId}"]`);
+  if (!host) return;
+  try {
+    const { supabase } = await import('../lib/supabase');
+    const session = (await supabase.auth.getSession()).data?.session;
+    const token = session?.access_token;
+    if (!token) { host.textContent = 'Sign in to see the leaderboard.'; return; }
+    const res = await fetch('/.netlify/functions/get-leaderboard', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ scope: 'friends', timeframe: 'alltime' }),
+    });
+    if (!res.ok) { host.textContent = 'Leaderboard unavailable.'; return; }
+    const data = await res.json();
+    const rows = (data.rows || []).slice(0, 5);
+    if (!rows.length) { host.textContent = 'No friends yet — add some to compete.'; return; }
+    host.outerHTML = `<div class="hub-lb-list">${rows.map(r => `
+      <div class="hub-lb-row${r.isSelf ? ' is-self' : ''}">
+        <span class="hub-lb-rank">${r.rank}</span>
+        <span class="hub-lb-name">${escapeHtml(r.username)}</span>
+        <span class="hub-lb-ovr">${r.ovr}</span>
+      </div>`).join('')}</div>`;
+  } catch {
+    host.textContent = 'Leaderboard unavailable.';
+  }
+}
+
 async function loadYouTubeFeed(yt) {
   const bodyEl = document.getElementById('yt-body-' + yt.id);
   const subEl = document.getElementById('yt-sub-' + yt.id);

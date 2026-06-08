@@ -4278,6 +4278,113 @@ button:active:not(:disabled),
 .profile-col--with-rail .ratings-ledger-row-track { height: 6px; background-size: 4px 6px; }
 .profile-col--with-rail .ratings-ledger-row-score { font-size: 11px; }
 
+/* ── Leaderboard ── */
+.lb-panel{
+  border:1px solid var(--border); border-radius:10px;
+  background:var(--bg-raised, #fff);
+  padding:14px 16px; display:flex; flex-direction:column; gap:12px;
+  font-family:var(--mono); color:var(--text);
+}
+.lb-head{display:flex; align-items:center; justify-content:space-between; gap:10px;}
+.lb-eyebrow{font-size:10px; letter-spacing:2px; color:var(--text-muted); font-weight:700;}
+.lb-meta{font-size:9px; letter-spacing:1.4px; color:var(--text-muted); display:flex; align-items:center; gap:10px;}
+.lb-refresh{
+  background:transparent; border:1px solid var(--border); color:var(--em);
+  font-family:var(--mono); font-size:9px; letter-spacing:1px; font-weight:700;
+  padding:3px 8px; border-radius:6px; cursor:pointer;
+}
+.lb-tabs{display:flex; gap:0; border-bottom:1px solid var(--border);}
+.lb-tab{
+  flex:1; background:transparent; border:none; cursor:pointer;
+  padding:8px 0; font-family:var(--mono); font-size:11px; letter-spacing:1.2px;
+  text-transform:uppercase; color:var(--text-muted); font-weight:600;
+  border-bottom:2px solid transparent; transition:color .15s, border-color .15s;
+}
+.lb-tab.is-active{color:var(--em); border-bottom-color:var(--em);}
+.lb-subtabs{
+  display:flex; gap:6px; background:rgba(var(--em-rgb), .05);
+  border:1px solid var(--border); border-radius:8px; padding:4px;
+}
+.lb-subtab{
+  flex:1; background:transparent; border:none; cursor:pointer;
+  padding:6px 8px; border-radius:6px;
+  font-family:var(--mono); font-size:10px; letter-spacing:1px;
+  text-transform:uppercase; color:var(--text-muted); font-weight:700;
+  transition:background .15s, color .15s;
+}
+.lb-subtab.is-active{background:var(--em); color:var(--em-on, #fff);}
+.lb-banner{
+  display:flex; align-items:center; gap:10px; justify-content:space-between;
+  padding:10px 12px; border-radius:8px;
+  background:rgba(200,151,10,.10); border:1px solid rgba(200,151,10,.30);
+  font-family:var(--sans); font-size:12px; color:var(--text);
+}
+.lb-empty{
+  text-align:center; padding:22px 8px;
+  font-family:var(--mono); font-size:11px; color:var(--text-muted);
+  line-height:1.55;
+}
+.lb-rows{list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:2px;}
+.lb-row{
+  width:100%; background:transparent; border:1px solid transparent;
+  display:flex; align-items:center; gap:10px;
+  padding:8px 8px; border-radius:8px;
+  cursor:pointer; text-align:left; transition:background .12s, border-color .12s;
+}
+.lb-row:hover{background:rgba(var(--em-rgb), .05); border-color:var(--border);}
+.lb-row.is-self{
+  background:rgba(var(--em-rgb), .08);
+  border-color:rgba(var(--em-rgb), .28);
+}
+.lb-rank{
+  font-family:var(--mono); font-size:13px; font-weight:700;
+  width:24px; text-align:center; flex-shrink:0;
+  font-variant-numeric:tabular-nums;
+}
+.lb-rank.is-medal{font-size:16px;}
+.lb-avatar{
+  width:28px; height:28px; border-radius:50%; flex-shrink:0;
+  display:inline-flex; align-items:center; justify-content:center;
+  font-family:var(--display); font-style:italic; font-weight:700; font-size:12px; color:#fff;
+}
+.lb-avatar-img{object-fit:cover; background:transparent;}
+.lb-name{
+  flex:1; min-width:0;
+  font-family:var(--sans); font-size:13px; font-weight:600; color:var(--text);
+  white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+}
+.lb-secondary{
+  font-family:var(--mono); font-size:9.5px; letter-spacing:.4px; color:var(--text-muted);
+  font-variant-numeric:tabular-nums; flex-shrink:0;
+}
+.lb-primary{
+  font-family:var(--serif, Georgia, serif); font-style:italic; font-weight:700;
+  font-size:22px; line-height:1; min-width:36px; text-align:right;
+  font-variant-numeric:tabular-nums; flex-shrink:0;
+}
+.lb-footer{
+  text-align:center; padding-top:6px;
+  font-family:var(--mono); font-size:10px; letter-spacing:.6px; color:var(--text-muted);
+}
+
+/* Inline mini-leaderboard rendered inside a hub canvas widget. */
+.hub-lb-list{display:flex; flex-direction:column; gap:6px;}
+.hub-lb-row{
+  display:flex; align-items:center; gap:10px;
+  padding:6px 8px; border-radius:6px;
+  font-family:var(--sans); font-size:12.5px;
+}
+.hub-lb-row.is-self{background:rgba(var(--em-rgb), .10);}
+.hub-lb-rank{
+  font-family:var(--mono); font-size:11px; font-weight:700;
+  width:18px; text-align:center; color:var(--text-muted);
+}
+.hub-lb-name{flex:1; min-width:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; color:var(--text);}
+.hub-lb-ovr{
+  font-family:var(--mono); font-size:13px; font-weight:700; color:var(--em);
+  font-variant-numeric:tabular-nums;
+}
+
 /* QuickLog rows are designed for full-width mobile; tighten for the
    144px profile rail so they don't overflow / split awkwardly. */
 .profile-col--with-rail .quick-log-row {

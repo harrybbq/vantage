@@ -167,6 +167,7 @@ const SHARE_TOGGLES = [
 
 function FriendsPrivacyCard({ userId, S, update }) {
   const [searchable, setSearchable] = useState(null);
+  const [leaderboardOptin, setLeaderboardOptin] = useState(null);
   const [handle, setHandle] = useState(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
@@ -177,10 +178,16 @@ function FriendsPrivacyCard({ userId, S, update }) {
     let cancelled = false;
     (async () => {
       try {
+        // getOwnProfile selects a fixed column set that may not include
+        // leaderboard_optin (added later) — read it directly to avoid
+        // editing the friends query module.
         const p = await getOwnProfile(userId);
         if (cancelled) return;
         setSearchable(p?.is_searchable ?? true);
         setHandle(p?.handle || null);
+        const optRes = await supabase.from('profiles')
+          .select('leaderboard_optin').eq('id', userId).maybeSingle();
+        if (!cancelled) setLeaderboardOptin(optRes.data?.leaderboard_optin ?? true);
         setAvailable(true);
       } catch {
         if (!cancelled) setAvailable(false);
@@ -188,6 +195,18 @@ function FriendsPrivacyCard({ userId, S, update }) {
     })();
     return () => { cancelled = true; };
   }, [userId]);
+
+  async function handleToggleLeaderboard() {
+    const next = !leaderboardOptin;
+    setLeaderboardOptin(next); // optimistic
+    setError(null);
+    try {
+      await updateOwnProfile(userId, { leaderboard_optin: next });
+    } catch (e) {
+      setLeaderboardOptin(!next); // revert
+      setError(e.message || 'Could not update leaderboard setting.');
+    }
+  }
 
   if (available === false) return null; // schema not present → hide entirely
   if (available === null) return null;   // still loading on first paint
@@ -248,6 +267,42 @@ function FriendsPrivacyCard({ userId, S, update }) {
           {searchable ? 'On' : 'Off'}
         </span>
       </label>
+
+      {/* Global leaderboard opt-in. Defaults true. Off → caller is
+          excluded from global queries entirely (friends scope unaffected,
+          friendship is the consent). */}
+      <label
+        style={{
+          marginTop: '10px',
+          display: 'flex', alignItems: 'center', gap: '14px',
+          padding: '12px 14px', borderRadius: '10px',
+          border: leaderboardOptin ? '2px solid var(--em)' : '2px solid var(--border)',
+          background: leaderboardOptin ? 'rgba(var(--em-rgb),0.08)' : 'var(--card, rgba(255,255,255,0.04))',
+          cursor: 'pointer', transition: 'all .18s',
+        }}
+      >
+        <input
+          type="checkbox"
+          checked={!!leaderboardOptin}
+          onChange={handleToggleLeaderboard}
+          style={{ width: '18px', height: '18px', accentColor: 'var(--em)', cursor: 'pointer' }}
+        />
+        <div style={{ flex: 1 }}>
+          <div style={{ fontFamily: 'var(--sans)', fontSize: '13px', fontWeight: 600, color: 'var(--text)' }}>
+            Show me on the global leaderboard
+          </div>
+          <div style={{ fontFamily: 'var(--mono)', fontSize: '10px', color: 'var(--text-muted)', letterSpacing: '0.5px', marginTop: '2px' }}>
+            When off, you're hidden from the global board. Friends can still see your ratings.
+          </div>
+        </div>
+        <span style={{
+          fontFamily: 'var(--mono)', fontSize: '9px', letterSpacing: '1.4px',
+          textTransform: 'uppercase', color: leaderboardOptin ? 'var(--em)' : 'var(--text-muted)',
+        }}>
+          {leaderboardOptin ? 'On' : 'Off'}
+        </span>
+      </label>
+
       {error && (
         <div style={{ marginTop: 10, color: '#c43232', fontSize: 12, fontFamily: 'var(--mono)' }}>
           {error}

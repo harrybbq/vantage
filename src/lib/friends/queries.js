@@ -113,7 +113,7 @@ export async function setHandle(userId, handle) {
 /** Update display_name / avatar_url / is_searchable. Each call
  *  upserts the row in case the paywall init missed it (defensive). */
 export async function updateOwnProfile(userId, patch) {
-  const allowed = ['display_name', 'avatar_url', 'is_searchable', 'level', 'last_active_at'];
+  const allowed = ['display_name', 'avatar_url', 'is_searchable', 'level', 'last_active_at', 'leaderboard_optin'];
   const clean = Object.fromEntries(
     Object.entries(patch).filter(([k]) => allowed.includes(k))
   );

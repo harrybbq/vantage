@@ -55,6 +55,12 @@ function AddLinkModal({ openId, onClose, onSwitchModal, onAddNotepad, onAddApp, 
           <span style={{ fontWeight: 700, fontSize: '13px', color: 'var(--text)' }}>Holidays</span>
           <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Closest upcoming trips</span>
         </button>
+        <button className="btn btn-ghost" style={{ padding: '16px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px', borderRadius: '12px', height: 'auto' }}
+          onClick={() => { onClose('addLinkModal'); onAddHubWidget('leaderboard'); }}>
+          <span style={{ fontSize: '22px' }}>⊿</span>
+          <span style={{ fontWeight: 700, fontSize: '13px', color: 'var(--text)' }}>Leaderboard</span>
+          <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Top friends, at a glance</span>
+        </button>
       </div>
 
       {/* Our Apps — one-click presets for our own apps, a Pro bonus.
