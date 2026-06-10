@@ -128,6 +128,31 @@ or a hard cap) **in `deriveRatings`** so the server enforces it.
 
 ---
 
+## 4b. Prestige (competitive reset, lifetime standing)
+
+OVR stays 0–99. At **canonical OVR 99** the user may **prestige** (explicit,
+user-confirmed, server-validated): `profiles.prestige += 1` (cap 99) and the
+competitive climb restarts — **no user data is wiped**.
+
+- Mechanism: `prestige-up.js` snapshots the user's current **raw per-category
+  points** (`derivePoints` in `netlify/lib/recompute.js`) into
+  `profiles.prestige_baseline`; `recomputeUser` then derives ratings from
+  `max(0, rawPts − baseline)`. Each prestige overwrites (not adds to) the
+  baseline, so every climb starts from zero.
+- Cooldowns / self-check results / achievements / logs are untouched —
+  competitive reset only.
+- **Client `derive.js` stays un-baselined** (local preview may briefly read
+  higher than the canonical value right after prestiging; server is canonical).
+- Lifetime sort key: `profiles.lifetime_rating` (generated column,
+  `prestige*100 + ratings_ovr`). All-time leaderboards sort by it.
+- Display: colour band + Roman numeral badge (e.g. GREEN IV) —
+  `src/lib/ratings/prestige.js` (bands config) + `PrestigeBadge.jsx` +
+  `.prestige-*` CSS. Bands: P1-9 forest green, 10-19 yellow, 20-29 indigo,
+  30-39 red, 40-49 burgundy, 50-59 purple, 60-69 ocean, 70-79 cyan,
+  80-89 gold, 90-99 crimson. P0 = no badge.
+- `S.prestige` is a display-only local cache (fed by the recompute response);
+  the server enforces everything.
+
 ## 5. Prestige tiers (display only — NOT part of the maths)
 
 `src/lib/ratings/tiers.js` → `ovrTier(ovr)` maps the OVR to a glow band. Purely

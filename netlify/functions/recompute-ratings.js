@@ -66,8 +66,8 @@ exports.handler = async (event) => {
   if (!userId) return { statusCode: 401, headers: CORS, body: JSON.stringify({ error: 'no user id' }) };
 
   try {
-    const { ratings, computedAt } = await recomputeUser(userId, { supabaseUrl, serviceKey });
-    return { statusCode: 200, headers: CORS, body: JSON.stringify({ ok: true, ratings, computedAt }) };
+    const { ratings, computedAt, prestige } = await recomputeUser(userId, { supabaseUrl, serviceKey });
+    return { statusCode: 200, headers: CORS, body: JSON.stringify({ ok: true, ratings, computedAt, prestige }) };
   } catch (e) {
     return {
       statusCode: 500, headers: CORS,

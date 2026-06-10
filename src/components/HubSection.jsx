@@ -696,12 +696,20 @@ async function loadLeaderboardIntoWidget(hwId) {
     const data = await res.json();
     const rows = (data.rows || []).slice(0, 5);
     if (!rows.length) { host.textContent = 'No friends yet — add some to compete.'; return; }
-    host.outerHTML = `<div class="hub-lb-list">${rows.map(r => `
+    const { prestigeBadge } = await import('../lib/ratings/prestige');
+    host.outerHTML = `<div class="hub-lb-list">${rows.map(r => {
+      const badge = prestigeBadge(r.prestige);
+      const badgeHtml = badge
+        ? `<span class="prestige-badge prestige-badge-sm prestige-${badge.band.key}">${badge.text}</span>`
+        : '';
+      return `
       <div class="hub-lb-row${r.isSelf ? ' is-self' : ''}">
         <span class="hub-lb-rank">${r.rank}</span>
         <span class="hub-lb-name">${escapeHtml(r.username)}</span>
+        ${badgeHtml}
         <span class="hub-lb-ovr">${r.ovr}</span>
-      </div>`).join('')}</div>`;
+      </div>`;
+    }).join('')}</div>`;
   } catch {
     host.textContent = 'Leaderboard unavailable.';
   }

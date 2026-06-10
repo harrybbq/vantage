@@ -10,6 +10,7 @@
  * function reads raw state, which we don't have here and shouldn't.
  */
 import { ovrTier, categoryTier } from '../lib/ratings/tiers';
+import PrestigeBadge from './PrestigeBadge';
 
 const COLORS = ['#1a7a4a', '#2563eb', '#7c3aed', '#c2410c', '#0891b2', '#be185d', '#854d0e'];
 function avatarColor(name) {
@@ -53,8 +54,9 @@ export default function FriendRatingsModal({ row, onClose }) {
               }}>{initials(row.username)}</div>
           }
           <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ fontFamily: 'var(--display)', fontStyle: 'italic', fontWeight: 700, fontSize: 18, color: 'var(--text)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontFamily: 'var(--display)', fontStyle: 'italic', fontWeight: 700, fontSize: 18, color: 'var(--text)' }}>
               {row.username}
+              <PrestigeBadge prestige={row.prestige} size="sm" />
             </div>
             <div style={{ fontFamily: 'var(--mono)', fontSize: 10, letterSpacing: 1.2, textTransform: 'uppercase', color: 'var(--text-muted)' }}>
               Updated {timeAgo(row.ratingsComputedAt)}

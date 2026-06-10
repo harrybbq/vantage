@@ -4367,6 +4367,56 @@ button:active:not(:disabled),
   font-family:var(--mono); font-size:10px; letter-spacing:.6px; color:var(--text-muted);
 }
 
+/* ── Prestige badge ──
+   Colour band + Roman numeral (e.g. GREEN IV). Bands are declared in
+   src/lib/ratings/prestige.js; each gets a .prestige-{key} block here
+   setting the two custom props the base class consumes. */
+.prestige-badge{
+  display:inline-flex; align-items:center; flex-shrink:0;
+  font-family:var(--mono); font-weight:700;
+  letter-spacing:1.1px; text-transform:uppercase;
+  border-radius:5px;
+  color:var(--pb-c);
+  background:color-mix(in srgb, var(--pb-c) 14%, transparent);
+  border:1px solid color-mix(in srgb, var(--pb-c) 45%, transparent);
+  white-space:nowrap; line-height:1;
+}
+.prestige-badge-sm{ font-size:8px;  padding:2px 6px; }
+.prestige-badge-md{ font-size:10px; padding:4px 8px; }
+/* P1-9 — Light Forest Green */
+.prestige-forest  { --pb-c:#5dbb7a; }
+/* P10-19 — Yellow */
+.prestige-yellow  { --pb-c:#d6b80e; }
+/* P20-29 — Indigo */
+.prestige-indigo  { --pb-c:#5a55e0; }
+/* P30-39 — Red */
+.prestige-red     { --pb-c:#d64545; }
+/* P40-49 — Burgundy */
+.prestige-burgundy{ --pb-c:#8e1f3a; }
+/* P50-59 — Purple */
+.prestige-purple  { --pb-c:#8e44ad; }
+/* P60-69 — Ocean Blue */
+.prestige-ocean   { --pb-c:#2a629e; }
+/* P70-79 — Cyan */
+.prestige-cyan    { --pb-c:#0891b2; }
+/* P80-89 — Gold */
+.prestige-gold    { --pb-c:#c8970a; }
+/* P90-99 — Crimson */
+.prestige-crimson { --pb-c:#dc143c; }
+
+/* Prestige-up CTA — appears in the Ratings Ledger at OVR 99. */
+.prestige-up-cta{
+  width:100%; padding:9px 12px; border-radius:8px;
+  border:1px solid var(--gold, #c8970a);
+  background:rgba(200,151,10,.12);
+  color:var(--gold, #c8970a);
+  font-family:var(--mono); font-size:10px; font-weight:700;
+  letter-spacing:1.4px; text-transform:uppercase;
+  cursor:pointer; transition:background .15s;
+}
+.prestige-up-cta:hover{ background:rgba(200,151,10,.22); }
+.prestige-up-cta:disabled{ opacity:.6; cursor:wait; }
+
 /* Inline mini-leaderboard rendered inside a hub canvas widget. */
 .hub-lb-list{display:flex; flex-direction:column; gap:6px;}
 .hub-lb-row{

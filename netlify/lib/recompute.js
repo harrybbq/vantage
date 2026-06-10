@@ -116,36 +116,51 @@ function visionPoints(state /* , category */) {
 }
 
 // ── Public API ───────────────────────────────────────────────────────────
-function deriveRatings(state, friendCount = 0) {
-  const brainPts =
-    brainScorePoints(state) +
-    trackerPoints(state, 'brain') * 1.0 +
-    achievementPoints(state, 'brain') * 2.5 +
-    visionPoints(state, 'brain');
 
-  const financePts =
-    financeScorePoints(state) +
-    savingsPoints(state) +
-    trackerPoints(state, 'finance') * 1.0 +
-    achievementPoints(state, 'finance') * 2.5 +
-    visionPoints(state, 'finance');
+/**
+ * Raw per-category point sums BEFORE the sqrt rating curve. Exposed so
+ * prestige-up.js can snapshot them as the new competitive baseline.
+ */
+function derivePoints(state, friendCount = 0) {
+  return {
+    brain:
+      brainScorePoints(state) +
+      trackerPoints(state, 'brain') * 1.0 +
+      achievementPoints(state, 'brain') * 2.5 +
+      visionPoints(state, 'brain'),
+    finance:
+      financeScorePoints(state) +
+      savingsPoints(state) +
+      trackerPoints(state, 'finance') * 1.0 +
+      achievementPoints(state, 'finance') * 2.5 +
+      visionPoints(state, 'finance'),
+    fitness:
+      fitnessScorePoints(state) +
+      trackerPoints(state, 'fitness') * 1.2 +
+      achievementPoints(state, 'fitness') * 2.5 +
+      visionPoints(state, 'fitness'),
+    social:
+      socialSelfCheckPoints(state) +
+      socialPoints(state, friendCount) +
+      achievementPoints(state, 'social') * 2.5 +
+      visionPoints(state, 'social'),
+  };
+}
 
-  const fitnessPts =
-    fitnessScorePoints(state) +
-    trackerPoints(state, 'fitness') * 1.2 +
-    achievementPoints(state, 'fitness') * 2.5 +
-    visionPoints(state, 'fitness');
+/**
+ * Points → 1-99 ratings. `baseline` is the prestige snapshot
+ * (profiles.prestige_baseline): per-category raw points captured at
+ * prestige time, subtracted here so the post-prestige climb starts
+ * from the floor without wiping any user data. {} = no prestige yet.
+ */
+function deriveRatings(state, friendCount = 0, baseline = {}) {
+  const pts = derivePoints(state, friendCount);
+  const adj = cat => Math.max(0, pts[cat] - (Number(baseline?.[cat]) || 0));
 
-  const socialPts =
-    socialSelfCheckPoints(state) +
-    socialPoints(state, friendCount) +
-    achievementPoints(state, 'social') * 2.5 +
-    visionPoints(state, 'social');
-
-  const brain   = toRating(brainPts);
-  const finance = toRating(financePts);
-  const fitness = toRating(fitnessPts);
-  const social  = toRating(socialPts);
+  const brain   = toRating(adj('brain'));
+  const finance = toRating(adj('finance'));
+  const fitness = toRating(adj('fitness'));
+  const social  = toRating(adj('social'));
   const ovr     = clamp((brain + finance + fitness + social) / 4);
 
   return { brain, finance, fitness, social, ovr };
@@ -173,7 +188,20 @@ async function recomputeUser(userId, { supabaseUrl, serviceKey }) {
   );
   const friends = friendsRes.ok ? (await friendsRes.json()).length : 0;
 
-  const ratings = deriveRatings(state, friends);
+  // Prestige baseline: raw points snapshotted at prestige time. The
+  // canonical (friend-visible) ratings are computed net of it so each
+  // prestige climb restarts from the floor. Client derive.js stays
+  // un-baselined (local preview may briefly run higher post-prestige —
+  // accepted skew; server value is canonical).
+  const profRes = await fetch(
+    `${supabaseUrl}/rest/v1/profiles?id=eq.${userId}&select=prestige,prestige_baseline`,
+    { headers: { apikey: serviceKey, Authorization: `Bearer ${serviceKey}` } }
+  );
+  const prof = profRes.ok ? (await profRes.json())[0] : null;
+  const prestige = prof?.prestige || 0;
+  const baseline = prof?.prestige_baseline || {};
+
+  const ratings = deriveRatings(state, friends, baseline);
   const computedAt = new Date().toISOString();
 
   const patchRes = await fetch(
@@ -200,7 +228,7 @@ async function recomputeUser(userId, { supabaseUrl, serviceKey }) {
     throw e;
   }
 
-  return { ratings, computedAt };
+  return { ratings, computedAt, prestige };
 }
 
-module.exports = { deriveRatings, recomputeUser };
+module.exports = { deriveRatings, derivePoints, recomputeUser };

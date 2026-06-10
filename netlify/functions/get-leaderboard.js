@@ -93,22 +93,30 @@ function rowFromProfile(p, snapshotOvr, callerId) {
       social:  ratings.social  || 1,
     },
     climb,
+    prestige: p.prestige || 0,
     ratingsComputedAt: p.ratings_computed_at || null,
     isSelf: p.id === callerId,
   };
+}
+
+// Lifetime sort key: prestige × 100 + OVR (mirrors the generated
+// profiles.lifetime_rating column).
+function lifetimeOf(r) {
+  return (r.prestige || 0) * 100 + (r.ovr || 0);
 }
 
 function sortRows(rows, timeframe) {
   if (timeframe === 'weekly') {
     return rows.slice().sort((a, b) => {
       const av = a.climb, bv = b.climb;
-      if (av == null && bv == null) return (b.ovr || 0) - (a.ovr || 0);
+      if (av == null && bv == null) return lifetimeOf(b) - lifetimeOf(a);
       if (av == null) return 1;   // nulls last
       if (bv == null) return -1;
       return bv - av;
     });
   }
-  return rows.slice().sort((a, b) => (b.ovr || 0) - (a.ovr || 0));
+  // All-time ranks by lifetime (prestige first, then current OVR).
+  return rows.slice().sort((a, b) => lifetimeOf(b) - lifetimeOf(a));
 }
 
 // ── Scope handlers ───────────────────────────────────────────────────────
@@ -121,7 +129,7 @@ async function buildFriendsBoard({ supabaseUrl, serviceKey, callerId, timeframe 
   const ids = Array.from(new Set([callerId, ...friendIds]));
 
   const pRes = await sb(supabaseUrl, serviceKey,
-    `/rest/v1/profiles?id=in.(${ids.join(',')})&select=id,handle,display_name,avatar_url,ratings,ratings_ovr,ratings_computed_at`
+    `/rest/v1/profiles?id=in.(${ids.join(',')})&select=id,handle,display_name,avatar_url,ratings,ratings_ovr,ratings_computed_at,prestige`
   );
   const profiles = pRes.ok ? await pRes.json() : [];
 
@@ -138,7 +146,7 @@ async function buildGlobalBoard({ supabaseUrl, serviceKey, callerId, timeframe }
   // Caller's own profile (whether opted in or not — used for the pinned
   // row and to detect opt-out state). The board excludes opted-out users.
   const meRes = await sb(supabaseUrl, serviceKey,
-    `/rest/v1/profiles?id=eq.${callerId}&select=id,handle,display_name,avatar_url,ratings,ratings_ovr,ratings_computed_at,leaderboard_optin`
+    `/rest/v1/profiles?id=eq.${callerId}&select=id,handle,display_name,avatar_url,ratings,ratings_ovr,ratings_computed_at,leaderboard_optin,prestige,lifetime_rating`
   );
   const meRows = meRes.ok ? await meRes.json() : [];
   const me = meRows[0] || null;
@@ -147,7 +155,7 @@ async function buildGlobalBoard({ supabaseUrl, serviceKey, callerId, timeframe }
   // the pool because climb leaders aren't always OVR leaders.
   const limit = timeframe === 'weekly' ? WEEKLY_CANDIDATE_POOL : GLOBAL_TOP_N;
   const candRes = await sb(supabaseUrl, serviceKey,
-    `/rest/v1/profiles?leaderboard_optin=eq.true&ratings_ovr=not.is.null&select=id,handle,display_name,avatar_url,ratings,ratings_ovr,ratings_computed_at&order=ratings_ovr.desc&limit=${limit}`
+    `/rest/v1/profiles?leaderboard_optin=eq.true&ratings_ovr=not.is.null&select=id,handle,display_name,avatar_url,ratings,ratings_ovr,ratings_computed_at,prestige&order=lifetime_rating.desc&limit=${limit}`
   );
   const candidates = candRes.ok ? await candRes.json() : [];
 
@@ -165,8 +173,9 @@ async function buildGlobalBoard({ supabaseUrl, serviceKey, callerId, timeframe }
   } else if (me && me.leaderboard_optin && me.ratings_ovr != null) {
     // Compute caller's true rank among opted-in users.
     if (timeframe === 'alltime') {
+      const myLifetime = (me.prestige || 0) * 100 + (me.ratings_ovr || 0);
       const cntRes = await sb(supabaseUrl, serviceKey,
-        `/rest/v1/profiles?leaderboard_optin=eq.true&ratings_ovr=gt.${me.ratings_ovr}&select=id`,
+        `/rest/v1/profiles?leaderboard_optin=eq.true&lifetime_rating=gt.${myLifetime}&select=id`,
         { headers: { Prefer: 'count=exact' } }
       );
       const range = cntRes.headers.get('content-range') || '';

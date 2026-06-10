@@ -135,6 +135,11 @@ export const DEFAULT_STATE = {
     ovr:     1,
     computedAt: null,
   },
+  // Local cache of the canonical prestige level (profiles.prestige).
+  // Written by useRatings from the server recompute response and by
+  // the prestige-up flow. Display-only — the server enforces all
+  // prestige rules; editing this changes nothing friend-visible.
+  prestige: 0,
   // Result of the most-recent IQ self-check (F5 Sprint 4). Optional;
   // null means the user hasn't taken it. testVersion lets us migrate
   // the test bank later without invalidating old scores silently.

@@ -22,6 +22,9 @@
 import { useState, useRef, useEffect } from 'react';
 import { categoryBreakdown } from '../lib/ratings/derive';
 import { ovrTier } from '../lib/ratings/tiers';
+import { PRESTIGE_MAX } from '../lib/ratings/prestige';
+import PrestigeBadge from './PrestigeBadge';
+import { supabase } from '../lib/supabase';
 import { isCooldownActive, daysUntilRetake } from './SelfCheck';
 import BrainCheck   from './BrainCheck';
 import FinanceCheck from './FinanceCheck';
@@ -79,13 +82,49 @@ function tier(score) {
 export default function RatingsPanel({ S, update, compact = false }) {
   const r = S?.ratings || {};
   const ovr = r.ovr || 1;
-  // Prestige band drives the headline glow + the OVR-row tier label.
-  // (Per-category rows below still use the 3-tier Starting/Mid/Elite
-  // `tier()` scale — a different axis.)
-  const prestige = ovrTier(ovr);
+  // OVR glow band (Bronze…Ruby) — distinct from the prestige LEVEL
+  // (S.prestige / profiles.prestige, the colour+numeral badge).
+  const glow = ovrTier(ovr);
+  const prestigeLevel = S?.prestige || 0;
   const [activeBreakdown, setActiveBreakdown] = useState(null);
   const [activeCheck, setActiveCheck] = useState(null);
   const [menu, setMenu] = useState(null); // long-press transparency menu { x, y }
+  const [prestiging, setPrestiging] = useState(false);
+  const [prestigeError, setPrestigeError] = useState(null);
+  // CTA shows on the local OVR hitting 99; the endpoint re-checks the
+  // CANONICAL profiles.ratings_ovr, so a gamed local value gets a 400.
+  const canPrestige = ovr >= 99 && prestigeLevel < PRESTIGE_MAX && !!update;
+
+  async function handlePrestigeUp() {
+    if (prestiging) return;
+    if (!window.confirm(
+      `Prestige up? Your OVR resets to climb again from the floor and you earn the P${prestigeLevel + 1} badge. ` +
+      'Achievements, logs, coins and self-check results all stay. This is permanent.'
+    )) return;
+    setPrestiging(true);
+    setPrestigeError(null);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const token = session?.access_token;
+      if (!token) throw new Error('Not signed in.');
+      const res = await fetch('/.netlify/functions/prestige-up', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(body.error || 'Prestige failed.');
+      // Adopt the server's post-prestige numbers immediately.
+      update(prev => ({
+        ...prev,
+        prestige: body.prestige,
+        ratings: { ...(prev.ratings || {}), ...(body.ratings || {}), computedAt: body.computedAt },
+      }));
+    } catch (e) {
+      setPrestigeError(e.message || 'Prestige failed.');
+    } finally {
+      setPrestiging(false);
+    }
+  }
 
   const ActiveCheckCmp = activeCheck ? SELF_CHECKS[activeCheck]?.Component : null;
 
@@ -154,17 +193,38 @@ export default function RatingsPanel({ S, update, compact = false }) {
           <span className="ratings-ledger-tag">F5 · S3</span>
         </div>
 
-        {/* OVR hero — bracket label, big italic number, /99 suffix, tier */}
+        {/* OVR hero — bracket label, big italic number, /99 suffix, tier.
+            Prestige badge (colour band + Roman numeral) sits beside the
+            number once the user has prestiged at least once. */}
         <div className="ratings-ledger-ovr-row">
           <div className="ratings-ledger-ovr-block">
             <span className="ratings-ledger-ovr-label">[ OVR ]</span>
-            <span className={`ratings-ledger-ovr-value ovr-num ovr-tier-${prestige.key}`}>{ovr}</span>
+            <span className={`ratings-ledger-ovr-value ovr-num ovr-tier-${glow.key}`}>{ovr}</span>
             <span className="ratings-ledger-ovr-suffix">/99</span>
+            <PrestigeBadge prestige={prestigeLevel} size="md" />
           </div>
-          <span className="ratings-ledger-ovr-tier" style={{ color: prestige.color }}>
-            → {prestige.label.toUpperCase()}
+          <span className="ratings-ledger-ovr-tier" style={{ color: glow.color }}>
+            → {glow.label.toUpperCase()}
           </span>
         </div>
+
+        {/* Prestige-up CTA — only at OVR 99 and below the prestige cap.
+            The server re-validates against canonical profiles values. */}
+        {canPrestige && (
+          <button
+            type="button"
+            className="prestige-up-cta"
+            onClick={handlePrestigeUp}
+            disabled={prestiging}
+          >
+            {prestiging ? 'Prestiging…' : `★ Prestige up — earn P${prestigeLevel + 1}`}
+          </button>
+        )}
+        {prestigeError && (
+          <div style={{ fontFamily: 'var(--mono)', fontSize: 10, color: 'rgb(220,60,60)' }}>
+            {prestigeError}
+          </div>
+        )}
 
         {/* Per-category rows */}
         <ul className="ratings-ledger-rows">

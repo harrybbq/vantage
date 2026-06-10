@@ -77,7 +77,7 @@ export function useRatings(userId, S, update, friendCount = 0) {
           const { data: { session } } = await supabase.auth.getSession();
           const token = session?.access_token;
           if (!token) return;
-          await fetch('/.netlify/functions/recompute-ratings', {
+          const res = await fetch('/.netlify/functions/recompute-ratings', {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
@@ -85,6 +85,15 @@ export function useRatings(userId, S, update, friendCount = 0) {
             },
             body: JSON.stringify({ userId }),
           });
+          // Cache the canonical prestige locally (S.prestige) so badge
+          // surfaces don't need a profiles round-trip. Server remains
+          // the source of truth (profiles.prestige).
+          if (res.ok) {
+            const body = await res.json().catch(() => null);
+            if (body && typeof body.prestige === 'number') {
+              update(p => (p.prestige === body.prestige ? p : { ...p, prestige: body.prestige }));
+            }
+          }
           lastServerSigRef.current = sig;
         } catch {
           // Silent — server recompute is a nice-to-have, not a blocker.

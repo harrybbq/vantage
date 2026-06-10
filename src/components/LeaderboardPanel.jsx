@@ -12,6 +12,7 @@
 import { useState } from 'react';
 import { useLeaderboard } from '../hooks/useLeaderboard';
 import { ovrTier } from '../lib/ratings/tiers';
+import PrestigeBadge from './PrestigeBadge';
 import FriendRatingsModal from './FriendRatingsModal';
 
 const COLORS = ['#1a7a4a', '#2563eb', '#7c3aed', '#c2410c', '#0891b2', '#be185d', '#854d0e'];
@@ -156,6 +157,7 @@ export default function LeaderboardPanel({
                         </span>
                     }
                     <span className="lb-name">{row.username}</span>
+                    <PrestigeBadge prestige={row.prestige} size="sm" />
                     <span className="lb-secondary">{secondary}</span>
                     <span className={`lb-primary ovr-num ovr-tier-${prestige.key}`}>
                       {timeframe === 'weekly' && primary != null && primary >= 0 ? '+' : ''}{primary == null ? '—' : primary}
