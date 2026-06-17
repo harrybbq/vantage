@@ -2,6 +2,7 @@ import { useState, useCallback } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { supabase } from '../lib/supabase';
 import Logo from './Logo';
+import { useIsMobile } from '../hooks/useIsMobile';
 
 /**
  * AuthScreen
@@ -95,6 +96,13 @@ function AppleGlyph() {
 }
 
 export default function AuthScreen({ onOpenLegal }) {
+  // Sign in with Apple is mobile-only for now. App Store rule 4.8
+  // (must offer SIWA alongside any other OAuth) only bites on iOS, so
+  // hiding it on desktop while we don't have the Apple Developer
+  // membership configured is safe — desktop users can still email-auth
+  // or Google. Re-enable everywhere by removing this gate once the
+  // Apple Services ID + .p8 setup is done.
+  const isMobile = useIsMobile();
   const [mode, setMode] = useState('login');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -359,19 +367,21 @@ export default function AuthScreen({ onOpenLegal }) {
                   {mode === 'signup' ? 'Sign up with Google' : 'Continue with Google'}
                 </span>
               </button>
-              <button
-                type="button"
-                onClick={handleAppleSignIn}
-                disabled={loading}
-                className="auth-apple"
-                style={S.appleBtn}
-                aria-label={mode === 'signup' ? 'Sign up with Apple' : 'Sign in with Apple'}
-              >
-                <AppleGlyph />
-                <span style={S.googleLabel}>
-                  {mode === 'signup' ? 'Sign up with Apple' : 'Continue with Apple'}
-                </span>
-              </button>
+              {isMobile && (
+                <button
+                  type="button"
+                  onClick={handleAppleSignIn}
+                  disabled={loading}
+                  className="auth-apple"
+                  style={S.appleBtn}
+                  aria-label={mode === 'signup' ? 'Sign up with Apple' : 'Sign in with Apple'}
+                >
+                  <AppleGlyph />
+                  <span style={S.googleLabel}>
+                    {mode === 'signup' ? 'Sign up with Apple' : 'Continue with Apple'}
+                  </span>
+                </button>
+              )}
             </div>
           </>
         )}
