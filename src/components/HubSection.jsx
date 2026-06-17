@@ -191,7 +191,7 @@ function useWidgetDrag(canvasRef, S, update) {
 // after the action buttons — used by the cream layout to slot the
 // QuickLog trackers under "Sort". The `--with-rail` modifier widens
 // the column so the trackers stack vertically without being clipped.
-function ProfileCard({ profile, S, update, onSaveName, onSaveTagline, onUploadPhoto, onAddWidget, onSortWidgets, onNavigateSettings, visionState, children }) {
+function ProfileCard({ profile, S, update, onSaveName, onSaveTagline, onUploadPhoto, onAddWidget, onSortWidgets, onSnapFill, onNavigateSettings, visionState, children }) {
   // OVR replaces the old Lvl badge (F5 Sprint 3). Read from S.ratings
   // — which is refreshed by useRatings on a 1.5s debounce. Falls back
   // to 1 if no rating computed yet (fresh user) so the chip never
@@ -255,6 +255,11 @@ function ProfileCard({ profile, S, update, onSaveName, onSaveTagline, onUploadPh
       <motion.button className="hub-action-btn sort-widgets" onClick={onSortWidgets}
         whileHover={{ scale: 1.04 }} whileTap={{ scale: 0.96 }}
         transition={{ type: 'spring', stiffness: 400, damping: 17 }}>⊞ Sort</motion.button>
+      {onSnapFill && (
+        <motion.button className="hub-action-btn sort-widgets" onClick={onSnapFill}
+          whileHover={{ scale: 1.04 }} whileTap={{ scale: 0.96 }}
+          transition={{ type: 'spring', stiffness: 400, damping: 17 }}>▦ Snap to fill</motion.button>
+      )}
       <motion.button className="hub-action-btn settings-mobile-btn" onClick={onNavigateSettings}
         whileHover={{ scale: 1.04 }} whileTap={{ scale: 0.96 }}
         transition={{ type: 'spring', stiffness: 400, damping: 17 }}>⚙ Settings</motion.button>
@@ -325,6 +330,96 @@ export default function HubSection({ S, update, active, onOpenModal, onOpenWaitl
     // Sort re-flows widgets into the grid AND resets any custom sizes
     // the user dragged the widgets to (per the resize feature).
     update(prev => ({ ...prev, widgetPositions: {}, widgetSizes: {}, notepadPos: null }));
+  }
+
+  // Snap-to-fill: pack every widget into a balanced weighted-row grid
+  // that uses the full canvas area. Heavier widgets (notepad, GitHub,
+  // YouTube) take proportionally more horizontal space; row heights are
+  // equal. Read-only over current S — writes positions + sizes once.
+  const WIDGET_WEIGHT = {
+    notepad: 2.6,
+    youtube: 2.4,
+    github:  2.4,
+    leaderboard: 1.6,
+    holidays: 1.6,
+    habits:   1.6,
+    link:     1.0,
+  };
+  function handleSnapToFill() {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    // Gather every widget currently on the canvas. ghUser links count
+    // as 'github' (richer body), plain links as 'link'.
+    const items = [];
+    for (const l of (S.links || [])) {
+      const type = l.ghUser ? 'github' : 'link';
+      items.push({ id: l.id, weight: WIDGET_WEIGHT[type] });
+    }
+    for (const y of (S.ytWidgets || [])) items.push({ id: y.id, weight: WIDGET_WEIGHT.youtube });
+    for (const h of (S.hubWidgets || [])) items.push({ id: h.id, weight: WIDGET_WEIGHT[h.type] || 1.6 });
+    // Notepad lives outside hubWidgets — included only if visible.
+    if (S.notepadText || S.notepadPos || S._showNotepad) {
+      items.push({ id: '__notepad__', weight: WIDGET_WEIGHT.notepad });
+    }
+    if (!items.length) return;
+
+    // Switch canvas to absolute-positioned mode (matches drag flow).
+    canvas.style.cssText = 'position:relative;flex:1;min-height:calc(100vh - 180px);display:block;';
+    const cw = canvas.clientWidth;
+    const ch = Math.max(420, canvas.clientHeight);
+
+    // Pick rows so cells are roughly square (cap 4 rows for legibility).
+    const n = items.length;
+    const rowCount = Math.min(4, Math.max(1, Math.round(Math.sqrt(n * (ch / cw)))));
+
+    // Greedy least-loaded-bucket distribution — gives each row a
+    // similar total weight so widths balance across rows.
+    const sorted = items.slice().sort((a, b) => b.weight - a.weight);
+    const rows = Array.from({ length: rowCount }, () => ({ items: [], total: 0 }));
+    for (const it of sorted) {
+      let target = 0;
+      for (let i = 1; i < rows.length; i++) {
+        if (rows[i].total < rows[target].total) target = i;
+      }
+      rows[target].items.push(it);
+      rows[target].total += it.weight;
+    }
+
+    const gap = 12;
+    const rowH = Math.floor((ch - gap * (rowCount - 1)) / rowCount);
+
+    const newPositions = {};
+    const newSizes = {};
+    let y = 0;
+    let notepadW = null, notepadPos = null;
+    for (const row of rows) {
+      if (!row.items.length) { y += rowH + gap; continue; }
+      const totalGap = gap * (row.items.length - 1);
+      const usable = cw - totalGap;
+      let x = 0;
+      row.items.forEach((it, i) => {
+        const w = i === row.items.length - 1
+          ? (cw - x)                                              // last fills remainder (avoid sub-pixel gap)
+          : Math.max(220, Math.floor((it.weight / row.total) * usable));
+        if (it.id === '__notepad__') {
+          notepadPos = { x, y };
+          notepadW = w;
+        } else {
+          newPositions[it.id] = { x, y };
+          newSizes[it.id] = { w, h: rowH };
+        }
+        x += w + gap;
+      });
+      y += rowH + gap;
+    }
+
+    update(prev => ({
+      ...prev,
+      widgetPositions: { ...(prev.widgetPositions || {}), ...newPositions },
+      widgetSizes:     { ...(prev.widgetSizes || {}),     ...newSizes     },
+      ...(notepadPos ? { notepadPos, notepadWidth: notepadW } : {}),
+    }));
   }
 
   // Make a widget wrapper user-resizable: apply any saved size, show a
@@ -584,6 +679,7 @@ export default function HubSection({ S, update, active, onOpenModal, onOpenWaitl
           canvasRef={canvasRef}
           onAddWidget={() => onOpenModal('addLinkModal')}
           onSort={handleSortWidgets}
+          onSnapFill={handleSnapToFill}
           onNavigateSettings={onNavigateSettings}
           onNavigateTrack={onNavigateTrack}
           onShowCoinToast={onShowCoinToast}
@@ -615,6 +711,7 @@ export default function HubSection({ S, update, active, onOpenModal, onOpenWaitl
           onUploadPhoto={handleUploadPhoto}
           onAddWidget={() => onOpenModal('addLinkModal')}
           onSortWidgets={handleSortWidgets}
+          onSnapFill={handleSnapToFill}
           onNavigateSettings={onNavigateSettings}
           visionState={visionState}
         >

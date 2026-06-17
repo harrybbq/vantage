@@ -226,7 +226,7 @@ export function OsRatingsPanel({ S, update }) {
 }
 
 // ── Panel: Quick Actions ──────────────────────────────────────────────────
-export function OsActionsPanel({ onAddWidget, onSort, onNavigateSettings }) {
+export function OsActionsPanel({ onAddWidget, onSort, onSnapFill, onNavigateSettings }) {
   return (
     <OsPanel label="Actions" innerPadding={false}>
       <div className="os-actions">
@@ -238,6 +238,12 @@ export function OsActionsPanel({ onAddWidget, onSort, onNavigateSettings }) {
           whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
           ⊞ Sort
         </motion.button>
+        {onSnapFill && (
+          <motion.button className="os-action-btn" onClick={onSnapFill}
+            whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
+            ▦ Snap to fill
+          </motion.button>
+        )}
         <motion.button className="os-action-btn" onClick={onNavigateSettings}
           whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
           ⚙ Settings
@@ -535,7 +541,7 @@ export function OsActivityPanel({ S }) {
 // ── Main OS layout ────────────────────────────────────────────────────────
 export default function HubOsLayout({
   S, update, canvasRef,
-  onAddWidget, onSort, onNavigateSettings, onNavigateTrack,
+  onAddWidget, onSort, onSnapFill, onNavigateSettings, onNavigateTrack,
   onShowCoinToast, onOpenWaitlist, onCoachAct,
   onUploadPhoto,
   userId, onUpgrade,
@@ -577,6 +583,7 @@ export default function HubOsLayout({
           <OsActionsPanel
             onAddWidget={onAddWidget}
             onSort={onSort}
+            onSnapFill={onSnapFill}
             onNavigateSettings={onNavigateSettings}
           />
           <OsRatingsPanel S={S} update={update} />
