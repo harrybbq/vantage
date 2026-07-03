@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import AddMobileWidgetModal from './mobile/AddMobileWidgetModal';
 import { APP_PRESETS, appPresetToLink } from '../data/appPresets';
+import { periodStart } from '../lib/habits/strikes';
 import { useSubscriptionContext } from '../context/SubscriptionContext';
 
 function Modal({ id, openId, onClose, children, style }) {
@@ -1199,7 +1200,7 @@ function AddHabitModal({ openId, onClose, onAdd }) {
           </select>
         </div>
         <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '4px' }}>
-          Every relapse restarts the timer. Strikes are your damage record for the period — a timer with 0 strikes shows unscathed (green), a struck timer turns amber, and spending the whole allowance turns it red until the period rolls over.
+          Your planned allowance — e.g. quit drinking but allow 1 night a week. Every relapse restarts the timer and spends a strike; the allowance replenishes each Monday (week) or on the 1st (month). Unscathed timers show green, struck turns amber, a spent allowance turns red until it replenishes.
         </div>
       </div>
 
@@ -1718,18 +1719,18 @@ export default function Modals({ openModal, S, update, onClose, onOpen, onShowCo
     update(prev => ({ ...prev, habits: (prev.habits || []).filter(h => h.id !== id) }));
   }
   function handleRelapseHabit(id, whenTs) {
-    // Every relapse restarts the timer — strikes don't keep the streak
-    // alive, they're a damage record for the current period. The strike
-    // banks (so the card shows 1/1, not 0/1) and expires with its
-    // period via the cutoff filter; display logic lives in
-    // src/lib/habits/strikes.js.
-    const PER = { week: 604800000, month: 2592000000, ever: Infinity };
+    // Every relapse restarts the timer — strikes are the period's
+    // planned allowance (e.g. 1 night a week), replenishing at the
+    // calendar boundary. The strike banks (so the card shows 1/1, not
+    // 0/1); counting + reset logic lives in src/lib/habits/strikes.js.
+    // We keep only current-period timestamps — older ones can never
+    // count again, so they're dead weight.
     update(prev => ({
       ...prev,
       habits: (prev.habits || []).map(h => {
         if (h.id !== id) return h;
-        const cutoff = whenTs - (PER[h.strikesPeriod] ?? Infinity);
-        const recent = [...(h.strikeTimes || []).filter(t => t > cutoff), whenTs];
+        const start = periodStart(h.strikesPeriod, Date.now());
+        const recent = [...(h.strikeTimes || []).filter(t => t >= start), whenTs];
         return {
           ...h, startTime: whenTs, strikeTimes: recent,
           relapseCount: (h.relapseCount || 0) + 1,

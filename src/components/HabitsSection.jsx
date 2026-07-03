@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
 import { fireGoal } from '../utils/confetti';
 import SectionHelp from './SectionHelp';
-import { strikeState } from '../lib/habits/strikes';
+import { strikeState, replenishLabel } from '../lib/habits/strikes';
 function formatElapsed(ms) {
   if (ms < 0) ms = 0;
   const secs = Math.floor(ms / 1000);
@@ -117,6 +117,7 @@ function HabitCard({ habit, update, onShowCoinToast, onOpenModal }) {
       {strikes.state !== 'off' ? (
         <div className={`habit-relapse-count habit-strikes strikes-${strikes.state}`}>
           {strikes.state === 'clean' ? '✦ unscathed · ' : ''}{strikes.used}/{strikes.allowed} strikes · {habit.strikesPeriod === 'ever' ? 'total' : 'this ' + habit.strikesPeriod}
+          {replenishLabel(strikes, now) ? ` · ${replenishLabel(strikes, now)}` : ''}
         </div>
       ) : habit.relapseCount > 0 && (
         <div className="habit-relapse-count">

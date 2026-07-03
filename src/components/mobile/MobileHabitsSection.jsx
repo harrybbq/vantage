@@ -23,7 +23,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { fireGoal } from '../../utils/confetti';
-import { strikeState } from '../../lib/habits/strikes';
+import { strikeState, replenishLabel } from '../../lib/habits/strikes';
 function formatElapsedShort(ms) {
   if (ms < 0) ms = 0;
   const secs = Math.floor(ms / 1000);
@@ -142,7 +142,7 @@ function MobileHabitCard({ habit, update, onShowCoinToast, onOpenModal }) {
       <div className="m-habit-footer">
         <div className={`m-habit-count${strikes.state !== 'off' ? ` habit-strikes strikes-${strikes.state}` : ''}`}>
           {strikes.state !== 'off'
-            ? `${strikes.state === 'clean' ? '✦ ' : ''}${strikes.used}/${strikes.allowed} strikes`
+            ? `${strikes.state === 'clean' ? '✦ ' : ''}${strikes.used}/${strikes.allowed} strikes${replenishLabel(strikes, now) ? ` · ${replenishLabel(strikes, now)}` : ''}`
             : `${habit.relapseCount || 0} relapse${habit.relapseCount === 1 ? '' : 's'}`}
         </div>
         <button
