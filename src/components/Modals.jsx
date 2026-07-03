@@ -1188,7 +1188,7 @@ function AddHabitModal({ openId, onClose, onAdd }) {
 
       <div style={{ borderTop: '1px solid var(--border-lt)', margin: '14px 0' }}></div>
       <div className="fg" style={{ marginBottom: 0 }}>
-        <label>Strikes allowed before the timer restarts</label>
+        <label>Strike allowance</label>
         <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
           <input type="number" min="0" value={form.strikes} onChange={e => setForm(f => ({ ...f, strikes: e.target.value }))} style={{ flex: '0 0 64px', textAlign: 'center' }} />
           <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>relapse(s) per</span>
@@ -1199,7 +1199,7 @@ function AddHabitModal({ openId, onClose, onAdd }) {
           </select>
         </div>
         <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '4px' }}>
-          0 = any relapse restarts the timer. Otherwise the streak survives until you exceed the allowance.
+          Every relapse restarts the timer. Strikes are your damage record for the period — a timer with 0 strikes shows unscathed (green), a struck timer turns amber, and spending the whole allowance turns it red until the period rolls over.
         </div>
       </div>
 
@@ -1718,24 +1718,23 @@ export default function Modals({ openModal, S, update, onClose, onOpen, onShowCo
     update(prev => ({ ...prev, habits: (prev.habits || []).filter(h => h.id !== id) }));
   }
   function handleRelapseHabit(id, whenTs) {
+    // Every relapse restarts the timer — strikes don't keep the streak
+    // alive, they're a damage record for the current period. The strike
+    // banks (so the card shows 1/1, not 0/1) and expires with its
+    // period via the cutoff filter; display logic lives in
+    // src/lib/habits/strikes.js.
     const PER = { week: 604800000, month: 2592000000, ever: Infinity };
     update(prev => ({
       ...prev,
       habits: (prev.habits || []).map(h => {
         if (h.id !== id) return h;
-        const allowed = h.strikesAllowed || 0;
         const cutoff = whenTs - (PER[h.strikesPeriod] ?? Infinity);
         const recent = [...(h.strikeTimes || []).filter(t => t > cutoff), whenTs];
-        // Restart only when strikes in the period exceed the allowance.
-        if (recent.length > allowed) {
-          return {
-            ...h, startTime: whenTs, strikeTimes: [],
-            relapseCount: (h.relapseCount || 0) + 1,
-            milestones: (h.milestones || []).map(m => ({ ...m, awarded: false })),
-          };
-        }
-        // Streak survives — just bank the strike.
-        return { ...h, strikeTimes: recent, relapseCount: (h.relapseCount || 0) + 1 };
+        return {
+          ...h, startTime: whenTs, strikeTimes: recent,
+          relapseCount: (h.relapseCount || 0) + 1,
+          milestones: (h.milestones || []).map(m => ({ ...m, awarded: false })),
+        };
       }),
     }));
   }

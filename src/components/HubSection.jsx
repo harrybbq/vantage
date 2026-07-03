@@ -12,6 +12,7 @@ import { useSubscriptionContext } from '../context/SubscriptionContext';
 import { useHubModuleMenu } from './HubModuleMenu';
 import { APP_PRESETS } from '../data/appPresets';
 import { fetchAppPreview } from '../lib/appPreview';
+import { strikeState } from '../lib/habits/strikes';
 
 // ── GitHub helpers ──
 async function fetchGitHub(username, cache) {
@@ -77,8 +78,10 @@ function habitsWidgetHtml(S) {
     const elapsed = now - h.startTime;
     const { target, next } = habitTarget(h, elapsed);
     const pct = Math.max(0, Math.min(100, target ? (elapsed / target) * 100 : 100));
+    const strikes = strikeState(h, now);
+    const struckCls = strikes.state === 'struck' ? ' is-struck' : strikes.state === 'maxed' ? ' is-maxed' : '';
     return `<div class="hub-habit hub-row-go" data-go-to="habits" role="link" tabindex="0">
-      <div class="hub-habit-top"><span class="hub-habit-name">${escapeHtml(h.name)}</span><span class="hub-habit-time" data-habit-timer="${escapeHtml(h.id)}">${fmtHabitElapsed(elapsed)}</span></div>
+      <div class="hub-habit-top"><span class="hub-habit-name">${escapeHtml(h.name)}</span><span class="hub-habit-time${struckCls}" data-habit-timer="${escapeHtml(h.id)}">${fmtHabitElapsed(elapsed)}</span></div>
       <div class="hub-habit-bar"><div class="hub-habit-fill" data-habit-bar="${escapeHtml(h.id)}" style="width:${pct}%"></div></div>
       ${next ? `<div class="hub-habit-next">${escapeHtml(next.label || '')}</div>` : ''}
     </div>`;

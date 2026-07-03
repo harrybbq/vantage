@@ -15,6 +15,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { APP_PRESETS, getAppPreset } from '../../data/appPresets';
 import { fetchAppPreview } from '../../lib/appPreview';
+import { strikeState } from '../../lib/habits/strikes';
 
 // App presets (FloorplanStudio / TubeLube / …) become mobile widget
 // types too — generated from the shared config so adding an app in one
@@ -385,11 +386,13 @@ function HabitsBody({ S, navigate }) {
       {habits.map(h => {
         const elapsed = now - h.startTime;
         const { pct, label } = habitProgress(h, elapsed);
+        const strikes = strikeState(h, now);
+        const struckCls = strikes.state === 'struck' ? ' is-struck' : strikes.state === 'maxed' ? ' is-maxed' : '';
         return (
           <li key={h.id} className="m-widget-habit m-widget-clickable" onClick={go}>
             <div className="m-widget-habit-top">
               <span className="m-widget-habit-name">{h.name}</span>
-              <span className="m-widget-habit-time">{fmtElapsed(elapsed)}</span>
+              <span className={`m-widget-habit-time${struckCls}`}>{fmtElapsed(elapsed)}</span>
             </div>
             <div className="m-widget-habit-bar"><div className="m-widget-habit-fill" style={{ width: `${pct}%` }} /></div>
             {label && <div className="m-widget-habit-next">{label}</div>}

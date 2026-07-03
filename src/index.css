@@ -1608,6 +1608,19 @@ html[data-theme="dark"] {
 .habit-ms.awarded .habit-ms-label,.habit-ms.awarded .habit-ms-coins{opacity:.4;text-decoration:line-through;}
 /* Footer info */
 .habit-elapsed{font-family:var(--mono);font-size:13px;font-weight:700;color:var(--text-mid);text-align:center;}
+/* Strike states — a timer that has taken hits this period wears them.
+   Shared across every habit-timer surface: Habits page (desktop +
+   mobile) and the hub Habits widget (desktop + mobile).
+     clean  → unscathed, green chip
+     struck → amber (strikes used, allowance not spent)
+     maxed  → red (allowance spent; heals when the period rolls over) */
+.habit-elapsed.is-struck, .m-habit-time.is-struck,
+.hub-habit-time.is-struck, .m-widget-habit-time.is-struck { color: var(--strike-amber, #d99114); }
+.habit-elapsed.is-maxed, .m-habit-time.is-maxed,
+.hub-habit-time.is-maxed, .m-widget-habit-time.is-maxed { color: var(--strike-red, #c84040); }
+.habit-strikes.strikes-clean { color: var(--em); }
+.habit-strikes.strikes-struck { color: var(--strike-amber, #d99114); }
+.habit-strikes.strikes-maxed { color: var(--strike-red, #c84040); font-weight: 700; }
 .habit-relapse-count{font-family:var(--mono);font-size:10px;color:var(--text-muted);text-align:center;margin-top:-4px;}
 .habit-relapse-btn{padding:8px 0;border-radius:9px;border:1px solid var(--border);background:none;color:var(--text-muted);font-family:var(--body);font-size:12px;font-weight:600;cursor:pointer;transition:all .18s;width:100%;}
 .habit-relapse-btn:hover{border-color:#c84040;color:#c84040;background:rgba(200,64,64,.06);}
