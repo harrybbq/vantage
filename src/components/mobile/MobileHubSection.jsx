@@ -203,6 +203,7 @@ export default function MobileHubSection({ S, update, visionState, hasPro, navig
           widget={w}
           S={S}
           update={update}
+          navigate={navigate}
           onRemove={id => update(prev => ({
             ...prev,
             mobileWidgets: (prev.mobileWidgets || []).filter(x => x.id !== id),

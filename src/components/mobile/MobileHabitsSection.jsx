@@ -23,12 +23,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { fireGoal } from '../../utils/confetti';
-
-function mStrikesUsed(h) {
-  const PER = { week: 604800000, month: 2592000000, ever: Infinity };
-  const cutoff = Date.now() - (PER[h.strikesPeriod] ?? Infinity);
-  return (h.strikeTimes || []).filter(t => t > cutoff).length;
-}
+import { strikeState, replenishLabel } from '../../lib/habits/strikes';
 function formatElapsedShort(ms) {
   if (ms < 0) ms = 0;
   const secs = Math.floor(ms / 1000);
@@ -95,6 +90,7 @@ function MobileHabitCard({ habit, update, onShowCoinToast, onOpenModal }) {
   }, [now]);
 
   const elapsed = now - habit.startTime;
+  const strikes = strikeState(habit, now);
   const maxDuration = habit.milestones?.length
     ? Math.max(...habit.milestones.map(m => m.duration))
     : 7 * 24 * 3600 * 1000;
@@ -137,16 +133,16 @@ function MobileHabitCard({ habit, update, onShowCoinToast, onOpenModal }) {
           />
         </div>
         <div className="m-habit-time-block">
-          <div className="m-habit-time">{formatElapsedShort(elapsed)}</div>
+          <div className={`m-habit-time${strikes.state === 'struck' ? ' is-struck' : ''}${strikes.state === 'maxed' ? ' is-maxed' : ''}`}>{formatElapsedShort(elapsed)}</div>
           <div className="m-habit-time-eyebrow">Since last relapse</div>
         </div>
       </div>
 
       {/* Footer — relapse count + button */}
       <div className="m-habit-footer">
-        <div className="m-habit-count">
-          {habit.strikesAllowed > 0
-            ? `${mStrikesUsed(habit)}/${habit.strikesAllowed} strikes`
+        <div className={`m-habit-count${strikes.state !== 'off' ? ` habit-strikes strikes-${strikes.state}` : ''}`}>
+          {strikes.state !== 'off'
+            ? `${strikes.state === 'clean' ? '✦ ' : ''}${strikes.used}/${strikes.allowed} strikes${replenishLabel(strikes, now) ? ` · ${replenishLabel(strikes, now)}` : ''}`
             : `${habit.relapseCount || 0} relapse${habit.relapseCount === 1 ? '' : 's'}`}
         </div>
         <button

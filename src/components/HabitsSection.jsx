@@ -2,13 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
 import { fireGoal } from '../utils/confetti';
 import SectionHelp from './SectionHelp';
-
-// Strikes used in the current period (week/month/ever).
-function strikesUsed(h) {
-  const PER = { week: 604800000, month: 2592000000, ever: Infinity };
-  const cutoff = Date.now() - (PER[h.strikesPeriod] ?? Infinity);
-  return (h.strikeTimes || []).filter(t => t > cutoff).length;
-}
+import { strikeState, replenishLabel } from '../lib/habits/strikes';
 function formatElapsed(ms) {
   if (ms < 0) ms = 0;
   const secs = Math.floor(ms / 1000);
@@ -70,6 +64,7 @@ function HabitCard({ habit, update, onShowCoinToast, onOpenModal }) {
   }, [now]);
 
   const elapsed = now - habit.startTime;
+  const strikes = strikeState(habit, now);
   const maxDuration = habit.milestones.length > 0
     ? Math.max(...habit.milestones.map(m => m.duration))
     : 7 * 24 * 3600 * 1000; // default 1-week reference if no milestones
@@ -117,11 +112,12 @@ function HabitCard({ habit, update, onShowCoinToast, onOpenModal }) {
         })}
       </div>
 
-      <div className="habit-elapsed">{formatElapsed(elapsed)}</div>
+      <div className={`habit-elapsed${strikes.state === 'struck' ? ' is-struck' : ''}${strikes.state === 'maxed' ? ' is-maxed' : ''}`}>{formatElapsed(elapsed)}</div>
 
-      {habit.strikesAllowed > 0 ? (
-        <div className="habit-relapse-count">
-          {strikesUsed(habit)}/{habit.strikesAllowed} strikes · {habit.strikesPeriod === 'ever' ? 'total' : 'this ' + habit.strikesPeriod}
+      {strikes.state !== 'off' ? (
+        <div className={`habit-relapse-count habit-strikes strikes-${strikes.state}`}>
+          {strikes.state === 'clean' ? '✦ unscathed · ' : ''}{strikes.used}/{strikes.allowed} strikes · {habit.strikesPeriod === 'ever' ? 'total' : 'this ' + habit.strikesPeriod}
+          {replenishLabel(strikes, now) ? ` · ${replenishLabel(strikes, now)}` : ''}
         </div>
       ) : habit.relapseCount > 0 && (
         <div className="habit-relapse-count">

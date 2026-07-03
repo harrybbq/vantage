@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import AddMobileWidgetModal from './mobile/AddMobileWidgetModal';
 import { APP_PRESETS, appPresetToLink } from '../data/appPresets';
+import { periodStart } from '../lib/habits/strikes';
 import { useSubscriptionContext } from '../context/SubscriptionContext';
 
 function Modal({ id, openId, onClose, children, style }) {
@@ -1091,9 +1092,25 @@ function EditHolidayModal({ openId, onClose, holidays, onEdit, onDelete }) {
 }
 
 // ── Add Habit ──
+// Kept deliberately simple for first-time users: name + colour are the
+// only things you have to touch (a starter "1 week → ⬡ 20" milestone
+// is prefilled). Milestones and the planned allowance live in
+// collapsed sections that summarise their state when closed.
+const HABIT_SWATCHES = ['#1a7a4a', '#2d6cdf', '#c84040', '#d99114', '#7a4fd0', '#12a5a5', '#d0498f', '#5a6472'];
+
 function AddHabitModal({ openId, onClose, onAdd }) {
-  const emptyMs = () => ({ _id: 'ms' + Date.now() + Math.random(), amount: '1', unit: 'weeks', coins: '' });
-  const [form, setForm] = useState({ name: '', color: '#1a7a4a', endless: false, strikes: '0', strikesUnit: 'week', milestones: [emptyMs()] });
+  const emptyMs = (coins = '') => ({ _id: 'ms' + Date.now() + Math.random(), amount: '1', unit: 'weeks', coins });
+  const freshForm = () => ({ name: '', color: '#1a7a4a', endless: false, strikes: '0', strikesUnit: 'week', milestones: [emptyMs('20')] });
+  const [form, setForm] = useState(freshForm);
+  const [open, setOpen] = useState({ rewards: false, allowance: false });
+  const customColorRef = useRef(null);
+  const nameRef = useRef(null);
+
+  // Modal shells stay mounted (visibility is a class toggle), so
+  // focus the name field on open rather than with autoFocus.
+  useEffect(() => {
+    if (openId === 'addHabitModal') setTimeout(() => nameRef.current?.focus(), 60);
+  }, [openId]);
 
   function toDuration(amount, unit) {
     const mul = { hours: 3600000, days: 86400000, weeks: 604800000, months: 2592000000 };
@@ -1135,77 +1152,130 @@ function AddHabitModal({ openId, onClose, onAdd }) {
       strikeTimes: [],
       milestones,
     });
-    setForm({ name: '', color: '#1a7a4a', endless: false, strikes: '0', strikesUnit: 'week', milestones: [emptyMs()] });
+    setForm(freshForm());
+    setOpen({ rewards: false, allowance: false });
     onClose('addHabitModal');
   }
+
+  // Collapsed-state summaries so a closed section still tells you what
+  // it's set to (new users can safely ignore both sections entirely).
+  const validMs = form.milestones.filter(m => m.amount && m.coins && parseInt(m.coins) > 0);
+  const rewardsSummary = !validMs.length
+    ? 'None'
+    : validMs.length === 1
+      ? `${msLabel(parseInt(validMs[0].amount), validMs[0].unit)} → ⬡ ${validMs[0].coins}`
+      : `${validMs.length} milestones`;
+  const strikesN = parseInt(form.strikes) || 0;
+  const allowanceSummary = strikesN > 0
+    ? `${strikesN}/${form.strikesUnit === 'ever' ? 'total' : form.strikesUnit}`
+    : 'Off';
 
   return (
     <Modal id="addHabitModal" openId={openId} onClose={onClose} style={{ maxWidth: '460px' }}>
       <h3>New Habit</h3>
-      <div className="fg"><label>Habit Name</label><input type="text" placeholder="e.g. Alcohol, Fast Food, Smoking..." value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} /></div>
-      <div className="fg"><label>Colour</label><input type="color" value={form.color} onChange={e => setForm(f => ({ ...f, color: e.target.value }))} /></div>
+      <div style={{ fontSize: '12px', color: 'var(--text-muted)', margin: '-6px 0 16px' }}>
+        Your clean-time counter starts the moment you hit Start.
+      </div>
 
-      <div style={{ borderTop: '1px solid var(--border-lt)', margin: '14px 0' }}></div>
-      <div style={{ fontFamily: 'var(--mono)', fontSize: '10px', color: 'var(--em-mid)', letterSpacing: '2px', textTransform: 'uppercase', marginBottom: '12px' }}>⬡ Reward Milestones</div>
+      <div className="fg">
+        <label>What are you quitting?</label>
+        <input ref={nameRef} type="text" placeholder="e.g. Alcohol, Fast Food, Smoking..." value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} />
+      </div>
 
-      {form.milestones.map((m, i) => (
-        <div key={m._id} style={{ display: 'flex', gap: '8px', alignItems: 'flex-end', marginBottom: '10px' }}>
-          <div className="fg" style={{ flex: '0 0 54px', marginBottom: 0 }}>
-            {i === 0 && <label style={{ fontSize: '9px' }}>After</label>}
-            <input type="number" min="1" value={m.amount} onChange={e => updateMs(m._id, 'amount', e.target.value)} style={{ textAlign: 'center' }} />
-          </div>
-          <div className="fg" style={{ flex: 1, marginBottom: 0 }}>
-            {i === 0 && <label style={{ fontSize: '9px' }}>Unit</label>}
-            <select value={m.unit} onChange={e => updateMs(m._id, 'unit', e.target.value)}>
-              <option value="hours">Hours</option>
-              <option value="days">Days</option>
-              <option value="weeks">Weeks</option>
-              <option value="months">Months</option>
-            </select>
-          </div>
-          <div className="fg" style={{ flex: '0 0 72px', marginBottom: 0 }}>
-            {i === 0 && <label style={{ fontSize: '9px' }}>⬡ Coins</label>}
-            <input type="number" min="1" placeholder="e.g. 20" value={m.coins} onChange={e => updateMs(m._id, 'coins', e.target.value)} />
-          </div>
+      <div className="fg">
+        <label>Colour</label>
+        <div className="habit-swatches">
+          {HABIT_SWATCHES.map(c => (
+            <button
+              key={c}
+              type="button"
+              className={`habit-swatch${form.color === c ? ' sel' : ''}`}
+              style={{ background: c }}
+              onClick={() => setForm(f => ({ ...f, color: c }))}
+              aria-label={`Colour ${c}`}
+            />
+          ))}
           <button
-            onClick={() => removeMs(m._id)}
-            style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', fontSize: '13px', padding: '8px 4px', flexShrink: 0, lineHeight: 1, marginBottom: '1px' }}
-          >✕</button>
+            type="button"
+            className={`habit-swatch habit-swatch-custom${HABIT_SWATCHES.includes(form.color) ? '' : ' sel'}`}
+            style={HABIT_SWATCHES.includes(form.color) ? undefined : { background: form.color }}
+            onClick={() => customColorRef.current?.click()}
+            aria-label="Custom colour"
+          >{HABIT_SWATCHES.includes(form.color) ? '+' : ''}</button>
+          <input ref={customColorRef} type="color" value={form.color} onChange={e => setForm(f => ({ ...f, color: e.target.value }))} style={{ position: 'absolute', width: 0, height: 0, opacity: 0, pointerEvents: 'none' }} />
         </div>
-      ))}
-      <button className="btn btn-ghost btn-sm" onClick={() => setForm(f => ({ ...f, milestones: [...f.milestones, emptyMs()] }))} style={{ marginBottom: '14px', fontSize: '12px' }}>
-        + Add Milestone
-      </button>
+      </div>
 
-      <div style={{ borderTop: '1px solid var(--border-lt)', margin: '4px 0 14px' }}></div>
-      <label style={{ display: 'flex', alignItems: 'flex-start', gap: '10px', cursor: 'pointer' }}>
-        <input type="checkbox" checked={form.endless} onChange={e => setForm(f => ({ ...f, endless: e.target.checked }))} style={{ marginTop: '3px', accentColor: 'var(--em)', flexShrink: 0 }} />
-        <div>
-          <div style={{ fontWeight: 600, fontSize: '13px', color: 'var(--text)' }}>∞ Endless</div>
-          <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '2px' }}>Track this habit forever — the counter never ends, even after all milestones are earned</div>
-        </div>
-      </label>
+      {/* Optional: reward milestones */}
+      <div className="habit-opt-sec">
+        <button type="button" className="habit-opt-head" onClick={() => setOpen(o => ({ ...o, rewards: !o.rewards }))}>
+          <div>
+            <div className="habit-opt-title">⬡ Reward milestones</div>
+            <div className="habit-opt-sub">Earn coins for staying clean</div>
+          </div>
+          <span className="habit-opt-sum">{rewardsSummary}</span>
+          <span className={`habit-opt-chev${open.rewards ? ' open' : ''}`}>▾</span>
+        </button>
+        {open.rewards && (
+          <div className="habit-opt-body">
+            {form.milestones.map(m => (
+              <div key={m._id} className="habit-ms-row">
+                <span className="habit-ms-word">After</span>
+                <input type="number" min="1" value={m.amount} onChange={e => updateMs(m._id, 'amount', e.target.value)} className="habit-ms-num" />
+                <select value={m.unit} onChange={e => updateMs(m._id, 'unit', e.target.value)} className="habit-ms-unit">
+                  <option value="hours">hours</option>
+                  <option value="days">days</option>
+                  <option value="weeks">weeks</option>
+                  <option value="months">months</option>
+                </select>
+                <span className="habit-ms-word">earn ⬡</span>
+                <input type="number" min="1" placeholder="20" value={m.coins} onChange={e => updateMs(m._id, 'coins', e.target.value)} className="habit-ms-num" />
+                <button type="button" className="habit-ms-del" onClick={() => removeMs(m._id)} aria-label="Remove milestone">✕</button>
+              </div>
+            ))}
+            <button className="btn btn-ghost btn-sm" onClick={() => setForm(f => ({ ...f, milestones: [...f.milestones, emptyMs()] }))} style={{ fontSize: '12px' }}>
+              + Add milestone
+            </button>
+            <label className="habit-endless-row">
+              <input type="checkbox" checked={form.endless} onChange={e => setForm(f => ({ ...f, endless: e.target.checked }))} style={{ accentColor: 'var(--em)', flexShrink: 0 }} />
+              <span>∞ Keep counting forever, even after every milestone is earned</span>
+            </label>
+          </div>
+        )}
+      </div>
 
-      <div style={{ borderTop: '1px solid var(--border-lt)', margin: '14px 0' }}></div>
-      <div className="fg" style={{ marginBottom: 0 }}>
-        <label>Strikes allowed before the timer restarts</label>
-        <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-          <input type="number" min="0" value={form.strikes} onChange={e => setForm(f => ({ ...f, strikes: e.target.value }))} style={{ flex: '0 0 64px', textAlign: 'center' }} />
-          <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>relapse(s) per</span>
-          <select value={form.strikesUnit} onChange={e => setForm(f => ({ ...f, strikesUnit: e.target.value }))} style={{ flex: 1 }}>
-            <option value="week">week</option>
-            <option value="month">month</option>
-            <option value="ever">ever (total)</option>
-          </select>
-        </div>
-        <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '4px' }}>
-          0 = any relapse restarts the timer. Otherwise the streak survives until you exceed the allowance.
-        </div>
+      {/* Optional: planned allowance (strikes) */}
+      <div className="habit-opt-sec">
+        <button type="button" className="habit-opt-head" onClick={() => setOpen(o => ({ ...o, allowance: !o.allowance }))}>
+          <div>
+            <div className="habit-opt-title">↻ Planned allowance</div>
+            <div className="habit-opt-sub">Allow the odd slip-up, e.g. 1 night a week</div>
+          </div>
+          <span className="habit-opt-sum">{allowanceSummary}</span>
+          <span className={`habit-opt-chev${open.allowance ? ' open' : ''}`}>▾</span>
+        </button>
+        {open.allowance && (
+          <div className="habit-opt-body">
+            <div className="habit-ms-row" style={{ marginBottom: '8px' }}>
+              <span className="habit-ms-word">Allow</span>
+              <input type="number" min="0" value={form.strikes} onChange={e => setForm(f => ({ ...f, strikes: e.target.value }))} className="habit-ms-num" />
+              <span className="habit-ms-word">slip-up(s) per</span>
+              <select value={form.strikesUnit} onChange={e => setForm(f => ({ ...f, strikesUnit: e.target.value }))} className="habit-ms-unit">
+                <option value="week">week</option>
+                <option value="month">month</option>
+                <option value="ever">ever (total)</option>
+              </select>
+            </div>
+            <div style={{ fontSize: '11px', color: 'var(--text-muted)', lineHeight: 1.5 }}>
+              A slip-up always restarts your timer, but within your allowance the card shows amber instead of red. The allowance refills every Monday (weekly) or on the 1st (monthly).
+            </div>
+          </div>
+        )}
       </div>
 
       <div className="modal-actions" style={{ marginTop: '18px' }}>
         <button className="btn btn-ghost" onClick={() => onClose('addHabitModal')}>Cancel</button>
-        <button className="btn btn-primary" onClick={submit}>Start Tracking</button>
+        <button className="btn btn-primary" onClick={submit} disabled={!form.name.trim()}>Start Tracking</button>
       </div>
     </Modal>
   );
@@ -1718,24 +1788,23 @@ export default function Modals({ openModal, S, update, onClose, onOpen, onShowCo
     update(prev => ({ ...prev, habits: (prev.habits || []).filter(h => h.id !== id) }));
   }
   function handleRelapseHabit(id, whenTs) {
-    const PER = { week: 604800000, month: 2592000000, ever: Infinity };
+    // Every relapse restarts the timer — strikes are the period's
+    // planned allowance (e.g. 1 night a week), replenishing at the
+    // calendar boundary. The strike banks (so the card shows 1/1, not
+    // 0/1); counting + reset logic lives in src/lib/habits/strikes.js.
+    // We keep only current-period timestamps — older ones can never
+    // count again, so they're dead weight.
     update(prev => ({
       ...prev,
       habits: (prev.habits || []).map(h => {
         if (h.id !== id) return h;
-        const allowed = h.strikesAllowed || 0;
-        const cutoff = whenTs - (PER[h.strikesPeriod] ?? Infinity);
-        const recent = [...(h.strikeTimes || []).filter(t => t > cutoff), whenTs];
-        // Restart only when strikes in the period exceed the allowance.
-        if (recent.length > allowed) {
-          return {
-            ...h, startTime: whenTs, strikeTimes: [],
-            relapseCount: (h.relapseCount || 0) + 1,
-            milestones: (h.milestones || []).map(m => ({ ...m, awarded: false })),
-          };
-        }
-        // Streak survives — just bank the strike.
-        return { ...h, strikeTimes: recent, relapseCount: (h.relapseCount || 0) + 1 };
+        const start = periodStart(h.strikesPeriod, Date.now());
+        const recent = [...(h.strikeTimes || []).filter(t => t >= start), whenTs];
+        return {
+          ...h, startTime: whenTs, strikeTimes: recent,
+          relapseCount: (h.relapseCount || 0) + 1,
+          milestones: (h.milestones || []).map(m => ({ ...m, awarded: false })),
+        };
       }),
     }));
   }

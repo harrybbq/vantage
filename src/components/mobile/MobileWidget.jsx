@@ -14,6 +14,8 @@
  */
 import { useState, useRef, useEffect } from 'react';
 import { APP_PRESETS, getAppPreset } from '../../data/appPresets';
+import { fetchAppPreview } from '../../lib/appPreview';
+import { strikeState } from '../../lib/habits/strikes';
 
 // App presets (FloorplanStudio / TubeLube / …) become mobile widget
 // types too — generated from the shared config so adding an app in one
@@ -100,7 +102,7 @@ const BASE_WIDGET_META = {
 // App presets slot in alongside the built-in widget types.
 const WIDGET_META = { ...BASE_WIDGET_META, ...APP_WIDGET_META };
 
-export default function MobileWidget({ widget, S, update, onRemove }) {
+export default function MobileWidget({ widget, S, update, onRemove, navigate }) {
   const meta = WIDGET_META[widget.type] || { label: widget.type, eyebrow: '?', icon: '·' };
 
   // Brand-tinted icon chip when the type carries an `accent` (the new
@@ -233,7 +235,7 @@ export default function MobileWidget({ widget, S, update, onRemove }) {
             <span className="m-widget-eyebrow">// {meta.eyebrow}</span>
           </div>
           <div className="m-widget-body">
-            {renderBody(widget, meta, S, update)}
+            {renderBody(widget, meta, S, update, navigate)}
           </div>
         </div>
       </div>
@@ -272,7 +274,7 @@ export default function MobileWidget({ widget, S, update, onRemove }) {
   );
 }
 
-function renderBody(widget, meta, S, update) {
+function renderBody(widget, meta, S, update, navigate) {
   if (meta.requires) {
     return (
       <div className="m-widget-stub">
@@ -289,8 +291,8 @@ function renderBody(widget, meta, S, update) {
     case 'notepad':     return <NotepadBody S={S} update={update} />;
     case 'recent-wins': return <RecentWinsBody S={S} />;
     case 'coin-history':return <CoinHistoryBody S={S} />;
-    case 'habits':      return <HabitsBody S={S} />;
-    case 'holidays':    return <HolidaysBody S={S} />;
+    case 'habits':      return <HabitsBody S={S} navigate={navigate} />;
+    case 'holidays':    return <HolidaysBody S={S} navigate={navigate} />;
     case 'github':      return <GithubBody S={S} meta={meta} />;
     case 'linkedin':    return <LinkedinBody S={S} meta={meta} />;
     case 'youtube':     return <YoutubeBody S={S} meta={meta} />;
@@ -362,7 +364,8 @@ function habitProgress(h, elapsed) {
   const pct = Math.max(0, Math.min(100, target ? (elapsed / target) * 100 : 100));
   return { pct, label: next ? next.label : 'All milestones hit' };
 }
-function HabitsBody({ S }) {
+function HabitsBody({ S, navigate }) {
+  const go = () => navigate && navigate('habits');
   // Tick once a second so the timers + bars stay live.
   const [, setTick] = useState(0);
   useEffect(() => {
@@ -383,11 +386,13 @@ function HabitsBody({ S }) {
       {habits.map(h => {
         const elapsed = now - h.startTime;
         const { pct, label } = habitProgress(h, elapsed);
+        const strikes = strikeState(h, now);
+        const struckCls = strikes.state === 'struck' ? ' is-struck' : strikes.state === 'maxed' ? ' is-maxed' : '';
         return (
-          <li key={h.id} className="m-widget-habit">
+          <li key={h.id} className="m-widget-habit m-widget-clickable" onClick={go}>
             <div className="m-widget-habit-top">
               <span className="m-widget-habit-name">{h.name}</span>
-              <span className="m-widget-habit-time">{fmtElapsed(elapsed)}</span>
+              <span className={`m-widget-habit-time${struckCls}`}>{fmtElapsed(elapsed)}</span>
             </div>
             <div className="m-widget-habit-bar"><div className="m-widget-habit-fill" style={{ width: `${pct}%` }} /></div>
             {label && <div className="m-widget-habit-next">{label}</div>}
@@ -399,7 +404,8 @@ function HabitsBody({ S }) {
 }
 
 // ── Holidays — closest upcoming trips first ──
-function HolidaysBody({ S }) {
+function HolidaysBody({ S, navigate }) {
+  const go = () => navigate && navigate('holiday');
   const today = new Date(); today.setHours(0, 0, 0, 0);
   const trips = (S.holidays || [])
     .filter(h => h.status !== 'completed')
@@ -429,8 +435,9 @@ function HolidaysBody({ S }) {
         return (
           <li
             key={h.id}
-            className={`m-widget-trip${h.imageUrl ? ' has-img' : ''}`}
+            className={`m-widget-trip m-widget-clickable${h.imageUrl ? ' has-img' : ''}`}
             style={h.imageUrl ? { backgroundImage: `url(${h.imageUrl})` } : undefined}
+            onClick={go}
           >
             <span className="m-widget-trip-name">{h.dest || 'Trip'}</span>
             <span className="m-widget-trip-when">{label}</span>
@@ -498,17 +505,57 @@ function BrandCard({ title, host, openHref, accent, info }) {
   );
 }
 
-// Static brand card for a user app preset (FloorplanStudio etc).
+// App preset card. When preset.live === true and a URL is set, fetch
+// a richer preview (og image + scraped title/description) via the
+// shared appPreview cache. Falls back to the static brand card if
+// nothing came back (offline / autofill function down / preset.live
+// false).
 function AppPresetBody({ preset }) {
-  const host = preset.url.replace(/^https?:\/\//, '').replace(/\/$/, '');
+  const host = preset.url ? preset.url.replace(/^https?:\/\//, '').replace(/\/$/, '') : '';
+  const [preview, setPreview] = useState(null);
+  useEffect(() => {
+    if (!preset.live || !preset.url) { setPreview(null); return; }
+    let cancelled = false;
+    fetchAppPreview(preset.url).then(p => { if (!cancelled) setPreview(p || {}); });
+    return () => { cancelled = true; };
+  }, [preset.live, preset.url]);
+
+  const hasImage = !!(preview && preview.imageUrl);
+  const snippet  = (preview && (preview.notes || preview.name)) || preset.tagline;
+
+  if (!preset.live) {
+    return (
+      <BrandCard
+        title={preset.name}
+        host={host}
+        openHref={preset.url}
+        accent={preset.color}
+        info={preset.tagline ? <div className="m-widget-brand-note">{preset.tagline}</div> : null}
+      />
+    );
+  }
+
   return (
-    <BrandCard
-      title={preset.name}
-      host={host}
-      openHref={preset.url}
-      accent={preset.color}
-      info={preset.tagline ? <div className="m-widget-brand-note">{preset.tagline}</div> : null}
-    />
+    <div className="m-widget-brand m-widget-brand-live">
+      {hasImage && (
+        <a href={preset.url} target="_blank" rel="noreferrer" className="m-widget-brand-hero">
+          <img src={preview.imageUrl} alt="" loading="lazy"
+            onError={e => { e.target.style.display = 'none'; }} />
+        </a>
+      )}
+      <div className="m-widget-brand-head">
+        <div className="m-widget-brand-title">{preset.name}</div>
+        <div className="m-widget-brand-host">{host}</div>
+      </div>
+      {snippet && <div className="m-widget-brand-note">{snippet}</div>}
+      <a
+        className="m-widget-brand-open"
+        href={preset.url}
+        target="_blank"
+        rel="noreferrer"
+        style={preset.color ? { color: preset.color, borderColor: preset.color + '55' } : undefined}
+      >Open ↗</a>
+    </div>
   );
 }
 

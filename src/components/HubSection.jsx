@@ -10,6 +10,9 @@ import RatingsPanel from './RatingsPanel';
 import { ovrTier } from '../lib/ratings/tiers';
 import { useSubscriptionContext } from '../context/SubscriptionContext';
 import { useHubModuleMenu } from './HubModuleMenu';
+import { APP_PRESETS } from '../data/appPresets';
+import { fetchAppPreview } from '../lib/appPreview';
+import { strikeState } from '../lib/habits/strikes';
 
 // ── GitHub helpers ──
 async function fetchGitHub(username, cache) {
@@ -75,8 +78,10 @@ function habitsWidgetHtml(S) {
     const elapsed = now - h.startTime;
     const { target, next } = habitTarget(h, elapsed);
     const pct = Math.max(0, Math.min(100, target ? (elapsed / target) * 100 : 100));
-    return `<div class="hub-habit">
-      <div class="hub-habit-top"><span class="hub-habit-name">${escapeHtml(h.name)}</span><span class="hub-habit-time" data-habit-timer="${escapeHtml(h.id)}">${fmtHabitElapsed(elapsed)}</span></div>
+    const strikes = strikeState(h, now);
+    const struckCls = strikes.state === 'struck' ? ' is-struck' : strikes.state === 'maxed' ? ' is-maxed' : '';
+    return `<div class="hub-habit hub-row-go" data-go-to="habits" role="link" tabindex="0">
+      <div class="hub-habit-top"><span class="hub-habit-name">${escapeHtml(h.name)}</span><span class="hub-habit-time${struckCls}" data-habit-timer="${escapeHtml(h.id)}">${fmtHabitElapsed(elapsed)}</span></div>
       <div class="hub-habit-bar"><div class="hub-habit-fill" data-habit-bar="${escapeHtml(h.id)}" style="width:${pct}%"></div></div>
       ${next ? `<div class="hub-habit-next">${escapeHtml(next.label || '')}</div>` : ''}
     </div>`;
@@ -96,7 +101,7 @@ function holidaysWidgetHtml(S) {
     const days = dep ? Math.round((dep - today) / 86400000) : null;
     const label = days == null ? 'TBC' : days === 0 ? 'Today' : days === 1 ? 'Tomorrow' : `${days}d`;
     const img = h.imageUrl ? ` style="background-image:url(&quot;${escapeHtml(h.imageUrl)}&quot;)"` : '';
-    return `<div class="hub-trip${h.imageUrl ? ' has-img' : ''}"${img}><span class="hub-trip-name">${escapeHtml(h.dest || 'Trip')}</span><span class="hub-trip-when">${label}</span></div>`;
+    return `<div class="hub-trip hub-row-go${h.imageUrl ? ' has-img' : ''}" data-go-to="holiday" role="link" tabindex="0"${img}><span class="hub-trip-name">${escapeHtml(h.dest || 'Trip')}</span><span class="hub-trip-when">${label}</span></div>`;
   }).join('');
 }
 
@@ -269,7 +274,7 @@ function ProfileCard({ profile, S, update, onSaveName, onSaveTagline, onUploadPh
 }
 
 // ── Widget Canvas (imperative DOM approach) ──
-export default function HubSection({ S, update, active, onOpenModal, onOpenWaitlist, onNavigateSettings, onNavigateTrack, onShowCoinToast, onCoachAct, visionState, userId, onUpgrade }) {
+export default function HubSection({ S, update, active, onOpenModal, onOpenWaitlist, onNavigateSettings, onNavigateTrack, onShowCoinToast, onCoachAct, visionState, userId, onUpgrade, onNavigate }) {
   const canvasRef = useRef(null);
   const makeDraggable = useWidgetDrag(canvasRef, S, update);
   const { hasPro } = useSubscriptionContext();
@@ -309,6 +314,30 @@ export default function HubSection({ S, update, active, onOpenModal, onOpenWaitl
     }, 1000);
     return () => clearInterval(id);
   }, [active]);
+
+  // Click-through: any element inside the imperative canvas tagged
+  // with [data-go-to="<section>"] jumps to that page. Lets habit/trip/
+  // leaderboard rows act as navigational shortcuts without each render
+  // function having to wire its own React handler. Capture-phase, but
+  // we ignore clicks on the drag handle, delete button, or any anchor
+  // so the existing affordances still win.
+  useEffect(() => {
+    if (!active || !onNavigate) return undefined;
+    const canvas = canvasRef.current;
+    if (!canvas) return undefined;
+    const handler = (e) => {
+      if (e.defaultPrevented) return;
+      const skip = e.target.closest('a, button, [data-drag], .link-del-btn, .widget-drag-handle');
+      if (skip) return;
+      const row = e.target.closest('[data-go-to]');
+      if (!row || !canvas.contains(row)) return;
+      const dest = row.getAttribute('data-go-to');
+      if (dest) onNavigate(dest);
+    };
+    canvas.addEventListener('click', handler);
+    return () => canvas.removeEventListener('click', handler);
+  }, [active, onNavigate]);
+
   // Pro-gated: the operator-console layout (HubOsLayout) renders for
   // EITHER dark-os OR cream-pro when the user has Pro. Free users
   // never see it. The two themes share the same panel/grid structure
@@ -497,9 +526,15 @@ export default function HubSection({ S, update, active, onOpenModal, onOpenWaitl
       const eyebrow = isGH ? 'WIDGET · GITHUB' : 'WIDGET · LINK';
       const host = link.url.replace(/^https?:\/\//, '').split('/')[0];
       const handle = isGH ? '@' + link.ghUser : host;
+      // Live-data Our Apps presets — render a hero-image slot the
+      // deferred fetcher (loadLivePreviewIntoLink) fills in after mount.
+      const presetMeta = link.presetId ? APP_PRESETS.find(p => p.id === link.presetId) : null;
+      const isLivePreset = !!(presetMeta && presetMeta.live);
       const bodyHtml = isGH
         ? `<div class="link-island-body"><div class="gh-skeleton" id="gh-body-${link.id}"><div class="sk-stats"><div class="sk-stat"></div><div class="sk-stat"></div><div class="sk-stat"></div></div><div class="sk-repo"></div><div class="sk-repo"></div><div class="sk-repo"></div></div></div>`
-        : (link.notes ? `<div class="link-island-body"><div class="link-island-notes">${link.notes}</div></div>` : '');
+        : isLivePreset
+          ? `<div class="link-island-body link-island-live" id="lp-body-${link.id}"><div class="link-island-live-hero">Loading…</div>${link.notes ? `<div class="link-island-notes">${escapeHtml(link.notes)}</div>` : ''}</div>`
+          : (link.notes ? `<div class="link-island-body"><div class="link-island-notes">${link.notes}</div></div>` : '');
 
       island.innerHTML = `
         <div class="widget-drag-handle" data-drag="${link.id}"><span></span></div>
@@ -535,6 +570,7 @@ export default function HubSection({ S, update, active, onOpenModal, onOpenWaitl
       makeResizable(wrapper, link.id);
 
       if (isGH) loadGHIsland(link, S.ghCache, update);
+      else if (isLivePreset) loadLivePreviewIntoLink(link.id, link.url);
     });
 
     // YouTube widgets
@@ -809,6 +845,28 @@ async function loadGHIsland(link, cache, update) {
 // Async fetch for the Leaderboard hub widget — friends/all-time top 5,
 // patched into the placeholder host span on mount. Read-only summary;
 // detailed views live on the dedicated Leaderboard page.
+// Async hero-image preview for a live-data preset link. Replaces the
+// placeholder slot in #lp-body-{id} once shop-autofill returns
+// (cached 24h via fetchAppPreview).
+async function loadLivePreviewIntoLink(linkId, url) {
+  try {
+    const data = await fetchAppPreview(url);
+    const body = document.getElementById(`lp-body-${linkId}`);
+    if (!body) return;
+    const hero = body.querySelector('.link-island-live-hero');
+    if (!hero) return;
+    if (data && data.imageUrl) {
+      hero.outerHTML = `<a class="link-island-live-hero" href="${url}" target="_blank" rel="noreferrer"><img src="${data.imageUrl}" alt="" loading="lazy" onerror="this.style.display='none'"></a>`;
+    } else if (data && data.notes) {
+      hero.outerHTML = `<div class="link-island-notes">${escapeHtml(data.notes)}</div>`;
+    } else {
+      // Nothing scrapeable — drop the loading slot so the card collapses cleanly.
+      hero.remove();
+      if (!body.children.length) body.remove();
+    }
+  } catch { /* swallow — body keeps its 'Loading…' label which is fine */ }
+}
+
 async function loadLeaderboardIntoWidget(hwId) {
   const host = document.querySelector(`[data-lb-host="${hwId}"]`);
   if (!host) return;
@@ -827,13 +885,13 @@ async function loadLeaderboardIntoWidget(hwId) {
     const rows = (data.rows || []).slice(0, 5);
     if (!rows.length) { host.textContent = 'No friends yet — add some to compete.'; return; }
     const { prestigeBadge } = await import('../lib/ratings/prestige');
-    host.outerHTML = `<div class="hub-lb-list">${rows.map(r => {
+    host.outerHTML = `<div class="hub-lb-list" data-go-to="leaderboard" role="link" tabindex="0">${rows.map(r => {
       const badge = prestigeBadge(r.prestige);
       const badgeHtml = badge
         ? `<span class="prestige-badge prestige-badge-sm prestige-${badge.band.key}">${badge.text}</span>`
         : '';
       return `
-      <div class="hub-lb-row${r.isSelf ? ' is-self' : ''}">
+      <div class="hub-lb-row hub-row-go${r.isSelf ? ' is-self' : ''}">
         <span class="hub-lb-rank">${r.rank}</span>
         <span class="hub-lb-name">${escapeHtml(r.username)}</span>
         ${badgeHtml}

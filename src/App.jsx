@@ -645,7 +645,7 @@ function Board({ userId, userEmail, onSignOut }) {
                 onOpenModal={handleOpenModal}
               />
             ) : (
-              <HubSection S={S} update={update} active onOpenModal={handleOpenModal} onOpenWaitlist={() => handleOpenModal('waitlistModal')} onNavigateSettings={() => navigate('settings')} onNavigateTrack={() => navigate('track')} onShowCoinToast={showCoinToast} onCoachAct={handleCoachAct} visionState={visionState} userId={userId} onUpgrade={() => handleOpenModal('paywall:friends')} />
+              <HubSection S={S} update={update} active onOpenModal={handleOpenModal} onOpenWaitlist={() => handleOpenModal('waitlistModal')} onNavigateSettings={() => navigate('settings')} onNavigateTrack={() => navigate('track')} onShowCoinToast={showCoinToast} onCoachAct={handleCoachAct} visionState={visionState} userId={userId} onUpgrade={() => handleOpenModal('paywall:friends')} onNavigate={navigate} />
             )}
           </motion.div>
         )}

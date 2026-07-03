@@ -25,6 +25,10 @@
  *   color    brand accent (chip tint + Open ↗ pill)
  *   tagline  one-line description (becomes the link's notes)
  *   requires when url is null, the hint shown explaining how to enable
+ *   live     true → mobile widget body fetches a richer preview (og
+ *            image + title + snippet) via /.netlify/functions/shop-autofill,
+ *            cached 24h in localStorage. Falls back to the static
+ *            brand card if the fetch fails. Cheap, no API key needed.
  */
 export const APP_PRESETS = [
   {
@@ -34,6 +38,7 @@ export const APP_PRESETS = [
     icon: '📐',
     color: '#2d6cdf',
     tagline: 'Design floor plans',
+    live: true,
   },
   {
     id: 'tubelube',
@@ -46,6 +51,7 @@ export const APP_PRESETS = [
     color: '#c0392b',
     tagline: 'YouTube tools',
     requires: 'Deploy TubeLube (e.g. GitHub Pages) and set its URL in src/data/appPresets.js.',
+    live: true, // activates the moment a URL is filled in
   },
 ];
 
@@ -54,7 +60,9 @@ export function getAppPreset(id) {
   return APP_PRESETS.find(p => p.id === id) || null;
 }
 
-/** Build a hub link-widget object from a preset (desktop hub). */
+/** Build a hub link-widget object from a preset (desktop hub).
+ *  Stamps presetId so the renderer can detect preset-sourced links
+ *  and opt them into the live-data treatment (og:image hero, etc). */
 export function appPresetToLink(preset) {
   return {
     id: 'l' + Date.now(),
@@ -64,5 +72,6 @@ export function appPresetToLink(preset) {
     color: preset.color || '#1a7a4a',
     notes: preset.tagline || '',
     ghUser: null,
+    presetId: preset.id,
   };
 }
