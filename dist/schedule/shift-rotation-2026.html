@@ -98,6 +98,9 @@
   .cell{aspect-ratio:1;border-radius:8px;padding:5px 4px;position:relative;min-width:0;
     display:flex;flex-direction:column;justify-content:space-between}
   .cell.empty{background:transparent}
+  .cell.past{opacity:.32;filter:saturate(.4)}
+  .cell.today{outline:2px solid var(--cardio);outline-offset:1px;box-shadow:0 0 14px rgba(53,208,165,.35);opacity:1}
+  .cell.today .dt{color:var(--cardio);font-weight:700}
   .cell .dt{font-family:'JetBrains Mono',monospace;font-size:12px;font-weight:500;color:var(--muted);line-height:1}
   .cell .chip{position:absolute;top:4px;right:5px;font-family:'JetBrains Mono',monospace;
     font-size:9px;font-weight:600;letter-spacing:.02em}
@@ -287,6 +290,14 @@
         html+='<span class="sess'+(rest?' rest':'')+'">'+s.sess+'</span>';
       }
       cell.innerHTML=html;
+      // live-date awareness: today glows, days gone by fade out
+      const now=new Date();
+      if(y===now.getFullYear()&&m===now.getMonth()){
+        if(d===now.getDate())cell.classList.add('today');
+        else if(d<now.getDate())cell.classList.add('past');
+      }else if(y<now.getFullYear()||(y===now.getFullYear()&&m<now.getMonth())){
+        cell.classList.add('past');
+      }
       grid.appendChild(cell);
     }
     wrap.appendChild(grid);monthsEl.appendChild(wrap);
