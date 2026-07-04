@@ -585,7 +585,7 @@ function Board({ userId, userEmail, onSignOut }) {
       <div id="shop-overlay" className={activeSection === 'shop' && currentBg ? 'visible' : ''}></div>
 
       {/* Sidebar nav (desktop only — hidden via @media on mobile) */}
-      <Nav activeSection={activeSection} onNavigate={navigate} onSignOut={onSignOut} />
+      <Nav activeSection={activeSection} onNavigate={navigate} onSignOut={onSignOut} isOwner={isOwner} />
 
       {/* Mobile chrome — bottom tab bar + app bar + More drawer.
           Only mounts on mobile viewports so we don't pay for these

@@ -1,6 +1,6 @@
 import Logo from './Logo';
 
-export default function Nav({ activeSection, onNavigate, onSignOut }) {
+export default function Nav({ activeSection, onNavigate, onSignOut, isOwner }) {
   const tabs = [
     { id: 'hub', icon: '⌂', label: 'Hub' },
     { id: 'achievements', icon: '★', label: 'Achievements' },
@@ -9,6 +9,9 @@ export default function Nav({ activeSection, onNavigate, onSignOut }) {
     { id: 'holiday', icon: '✈', label: 'Holiday' },
     { id: 'habits', icon: '⊘', label: 'Habits' },
     { id: 'leaderboard', icon: '⊿', label: 'Leaderboard' },
+    // Owner-only: shift rotation calendar. Slotted above Settings and
+    // simply absent for everyone else.
+    ...(isOwner ? [{ id: 'schedule', icon: '⟳', label: 'Rotation' }] : []),
     { id: 'settings', icon: '⚙', label: 'Settings', mobileHide: true },
   ];
 
