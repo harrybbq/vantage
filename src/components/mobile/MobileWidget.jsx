@@ -13,6 +13,7 @@
  *   3. Add an option in AddMobileWidgetModal's picker
  */
 import { useState, useRef, useEffect } from 'react';
+import { getTodayStr } from '../../utils/helpers';
 import { APP_PRESETS, getAppPreset } from '../../data/appPresets';
 import { fetchAppPreview } from '../../lib/appPreview';
 import { strikeState } from '../../lib/habits/strikes';
@@ -79,11 +80,14 @@ const BASE_WIDGET_META = {
     icon: '▶',
     accent: '#cf5b52',
   },
+  // Vitals — manual daily log (weight / sleep / resting HR). Started
+  // life as a HealthKit stub; reworked to manual entry so it works on
+  // every platform today. When HealthKit lands it can auto-fill the
+  // same S.vitalsLog store.
   'vitals': {
     label: 'Vitals',
     eyebrow: 'HEALTH',
     icon: '◐',
-    requires: 'HealthKit entitlement (Apple Dev account) — coming with F4 Sprint 1',
   },
   'calories': {
     label: 'Calories Burned',
@@ -296,8 +300,122 @@ function renderBody(widget, meta, S, update, navigate) {
     case 'github':      return <GithubBody S={S} meta={meta} />;
     case 'linkedin':    return <LinkedinBody S={S} meta={meta} />;
     case 'youtube':     return <YoutubeBody S={S} meta={meta} />;
+    case 'vitals':      return <VitalsBody S={S} update={update} />;
     default:            return <div className="m-widget-stub-label">Unknown widget type.</div>;
   }
+}
+
+// ── Vitals — manual daily log ──
+// Three tap-to-log tiles (weight / sleep / resting HR) writing to
+// S.vitalsLog = { 'YYYY-MM-DD': { weight, sleep, rhr } }, plus a
+// weight sparkline over the last 14 logged entries. A tile shows
+// today's value; if today isn't logged yet it falls back to the most
+// recent entry, dimmed, so the widget never reads as empty once
+// you've logged anything.
+const VITAL_FIELDS = [
+  { key: 'weight', label: 'WEIGHT',  unit: 'kg',  step: '0.1', max: 400 },
+  { key: 'sleep',  label: 'SLEEP',   unit: 'h',   step: '0.5', max: 24  },
+  { key: 'rhr',    label: 'REST HR', unit: 'bpm', step: '1',   max: 250 },
+];
+
+function VitalsBody({ S, update }) {
+  const today = getTodayStr();
+  const log = S.vitalsLog || {};
+  const dates = Object.keys(log).sort();
+  const [editing, setEditing] = useState(null); // field key | null
+  const [draft, setDraft] = useState('');
+
+  function latest(key) {
+    for (let i = dates.length - 1; i >= 0; i--) {
+      const v = log[dates[i]]?.[key];
+      if (v != null) return { v, date: dates[i] };
+    }
+    return null;
+  }
+  function open(field) {
+    const cur = log[today]?.[field.key] ?? latest(field.key)?.v;
+    setDraft(cur != null ? String(cur) : '');
+    setEditing(field.key);
+  }
+  function save(field) {
+    const num = parseFloat(draft);
+    setEditing(null);
+    if (!Number.isFinite(num) || num <= 0 || num > field.max) return;
+    update(prev => ({
+      ...prev,
+      vitalsLog: {
+        ...(prev.vitalsLog || {}),
+        [today]: { ...((prev.vitalsLog || {})[today] || {}), [field.key]: num },
+      },
+    }));
+  }
+
+  // Weight trend — last 14 logged weights, oldest → newest.
+  const weights = dates.map(d => log[d]?.weight).filter(v => v != null).slice(-14);
+  const prevWeight = weights.length >= 2 ? weights[weights.length - 2] : null;
+  const delta = prevWeight != null ? weights[weights.length - 1] - prevWeight : null;
+
+  return (
+    <div className="m-vitals">
+      <div className="m-vitals-tiles">
+        {VITAL_FIELDS.map(f => {
+          const todayVal = log[today]?.[f.key];
+          const fallback = todayVal == null ? latest(f.key) : null;
+          const shown = todayVal ?? fallback?.v;
+          return editing === f.key ? (
+            <div key={f.key} className="m-vitals-tile is-editing">
+              <input
+                type="number"
+                inputMode="decimal"
+                step={f.step}
+                autoFocus
+                value={draft}
+                onChange={e => setDraft(e.target.value)}
+                onKeyDown={e => { if (e.key === 'Enter') save(f); if (e.key === 'Escape') setEditing(null); }}
+                onBlur={() => save(f)}
+                className="m-vitals-input"
+                aria-label={`${f.label} in ${f.unit}`}
+              />
+              <span className="m-vitals-label">{f.unit.toUpperCase()}</span>
+            </div>
+          ) : (
+            <button key={f.key} type="button" className={`m-vitals-tile${todayVal == null && shown != null ? ' is-stale' : ''}`} onClick={() => open(f)}>
+              <span className="m-vitals-val">
+                {shown != null ? shown : '–'}
+                {shown != null && <span className="m-vitals-unit">{f.unit}</span>}
+              </span>
+              <span className="m-vitals-label">{f.label}</span>
+              {f.key === 'weight' && delta != null && todayVal != null && (
+                <span className={`m-vitals-delta${delta > 0 ? ' up' : delta < 0 ? ' down' : ''}`}>
+                  {delta > 0 ? '▲' : delta < 0 ? '▼' : '•'} {Math.abs(delta).toFixed(1)}
+                </span>
+              )}
+            </button>
+          );
+        })}
+      </div>
+      {weights.length >= 2 && <VitalsSparkline values={weights} />}
+      <div className="m-vitals-hint">
+        {log[today] ? 'Tap a tile to update today’s entry.' : 'Tap a tile to log today.'}
+      </div>
+    </div>
+  );
+}
+
+function VitalsSparkline({ values }) {
+  const W = 260, H = 34, PAD = 3;
+  const min = Math.min(...values), max = Math.max(...values);
+  const span = max - min || 1;
+  const pts = values.map((v, i) => {
+    const x = PAD + (i / (values.length - 1)) * (W - PAD * 2);
+    const y = PAD + (1 - (v - min) / span) * (H - PAD * 2);
+    return `${x.toFixed(1)},${y.toFixed(1)}`;
+  }).join(' ');
+  return (
+    <svg className="m-vitals-spark" viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" aria-hidden="true">
+      <polyline points={pts} fill="none" stroke="var(--em)" strokeWidth="1.6" strokeLinejoin="round" strokeLinecap="round" />
+    </svg>
+  );
 }
 
 // ── Notepad ──

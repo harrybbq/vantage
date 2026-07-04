@@ -4850,6 +4850,34 @@ button:active:not(:disabled),
 .m-widget-clickable { cursor: pointer; transition: background .12s; }
 .m-widget-clickable:active { background: rgba(var(--em-rgb), .08); }
 
+/* ── Vitals widget — tap-to-log daily stats ── */
+.m-vitals { display: flex; flex-direction: column; gap: 10px; }
+.m-vitals-tiles { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.m-vitals-tile {
+  position: relative; display: flex; flex-direction: column; gap: 3px;
+  align-items: flex-start; padding: 10px 10px 8px; border-radius: 10px;
+  border: 1px solid var(--border); background: rgba(255,255,255,.03);
+  cursor: pointer; font-family: var(--mono); text-align: left; min-width: 0;
+  transition: border-color .15s, background .15s;
+}
+.m-vitals-tile:active { background: rgba(var(--em-rgb), .08); border-color: rgba(var(--em-rgb), .35); }
+.m-vitals-tile.is-stale .m-vitals-val { opacity: .45; }
+.m-vitals-val { font-size: 17px; font-weight: 600; color: var(--text); font-variant-numeric: tabular-nums; line-height: 1; }
+.m-vitals-unit { font-size: 9px; color: var(--text-muted); margin-left: 3px; font-weight: 500; }
+.m-vitals-label { font-size: 8.5px; letter-spacing: 1.2px; color: var(--text-muted); }
+.m-vitals-delta { position: absolute; top: 6px; right: 7px; font-size: 8.5px; color: var(--text-muted); }
+.m-vitals-delta.down { color: var(--em); }
+.m-vitals-delta.up { color: #d99114; }
+.m-vitals-tile.is-editing { cursor: default; }
+.m-vitals-input {
+  width: 100%; background: none; border: none; border-bottom: 1px solid var(--em);
+  color: var(--text); font-family: var(--mono); font-size: 16px; font-weight: 600;
+  outline: none; padding: 0 0 2px; -moz-appearance: textfield;
+}
+.m-vitals-input::-webkit-outer-spin-button, .m-vitals-input::-webkit-inner-spin-button { -webkit-appearance: none; }
+.m-vitals-spark { width: 100%; height: 34px; display: block; opacity: .85; }
+.m-vitals-hint { font-family: var(--mono); font-size: 9.5px; letter-spacing: .4px; color: var(--text-muted); }
+
 /* Desktop hub equivalent — habit rows, trip cards, leaderboard rows
    tagged with [data-go-to] become clickable links. Hover gets a faint
    tint; focus ring for keyboard users. The drag handle / delete button
