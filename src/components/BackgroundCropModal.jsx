@@ -14,6 +14,7 @@
  *   onConfirm(croppedDataUrl) — fired with the cropped+resized image
  */
 import { useEffect, useRef, useState } from 'react';
+import { backdropClose } from '../utils/backdropClose';
 
 // Output cap so the cropped blob stays modest (~50-200 KB JPEG). The
 // page background is full-viewport so longest edge matches realistic
@@ -141,7 +142,7 @@ export default function BackgroundCropModal({ src, onCancel, onConfirm }) {
   return (
     <div
       className="modal-overlay open"
-      onClick={e => { if (e.target === e.currentTarget) onCancel(); }}
+      {...backdropClose(() => onCancel())}
     >
       <div className="modal" style={{ maxWidth: FRAME_W + 56 }}>
         <div style={{

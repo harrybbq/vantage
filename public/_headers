@@ -20,8 +20,11 @@
   Cache-Control: public, max-age=2592000, immutable
 
 # All pages: security headers + allow SW registration
+# SAMEORIGIN (not DENY): the owner Rotation section renders
+# /schedule/shift-rotation-2026.html in a same-origin iframe; DENY
+# blocks even that. Cross-origin embedding stays blocked.
 /*
-  X-Frame-Options: DENY
+  X-Frame-Options: SAMEORIGIN
   X-Content-Type-Options: nosniff
   Referrer-Policy: strict-origin-when-cross-origin
   Permissions-Policy: camera=(self), microphone=(), geolocation=()

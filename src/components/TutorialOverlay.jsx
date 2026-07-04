@@ -1,5 +1,6 @@
 import { useEffect, useState, useCallback, useMemo } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
+import { backdropClose } from '../utils/backdropClose';
 
 /**
  * TutorialOverlay
@@ -337,7 +338,7 @@ export default function TutorialOverlay({
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             transition={{ duration: 0.22 }}
-            onClick={e => { if (e.target === e.currentTarget) onClose?.(); }}
+            {...backdropClose(() => onClose?.())}
           >
             <div className="tut-center-card">
               <div className="tut-center-hero">

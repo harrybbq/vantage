@@ -24,6 +24,7 @@
  */
 
 import { useEffect, useState } from 'react';
+import { backdropClose } from '../utils/backdropClose';
 
 const TIME_LIMIT_MS = 12 * 60 * 1000;
 const COOLDOWN_DAYS = 30;
@@ -145,7 +146,7 @@ export default function SelfCheck({
   if (done) {
     const { correct, total, result } = scoreFromAnswers(answers, questions);
     return (
-      <div className="modal-overlay open" onClick={e => { if (e.target === e.currentTarget) onClose(); }}>
+      <div className="modal-overlay open" {...backdropClose(() => onClose())}>
         <div className="modal" style={{ maxWidth: 460 }}>
           <div style={{
             fontFamily: 'var(--mono)', fontSize: 10, letterSpacing: 1.6,

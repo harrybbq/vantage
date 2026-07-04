@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Command } from 'cmdk';
 import { motion, AnimatePresence } from 'framer-motion';
+import { backdropClose } from '../utils/backdropClose';
 
 function KbdHint({ keys }) {
   return (
@@ -65,7 +66,7 @@ export default function CommandPalette({ open, onClose, navigate, openModal, S }
             display: 'flex', alignItems: 'flex-start', justifyContent: 'center',
             paddingTop: '12vh',
           }}
-          onClick={e => { if (e.target === e.currentTarget) onClose(); }}
+          {...backdropClose(() => onClose())}
         >
           <motion.div
             initial={{ scale: 0.95, opacity: 0, y: -10 }}

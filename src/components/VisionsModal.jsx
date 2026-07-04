@@ -10,6 +10,7 @@
  * user knows what to chase). Sorted unlocked-first.
  */
 import { VISIONS } from '../lib/visions/definitions';
+import { backdropClose } from '../utils/backdropClose';
 
 function fmtDate(iso) {
   try {
@@ -35,7 +36,7 @@ export default function VisionsModal({ open, S, onClose }) {
   const total = VISIONS.length;
 
   return (
-    <div className="modal-overlay open" onClick={e => { if (e.target === e.currentTarget) onClose(); }}>
+    <div className="modal-overlay open" {...backdropClose(() => onClose())}>
       <div className="modal" style={{ maxWidth: 520 }}>
         <div style={{
           display: 'flex', alignItems: 'baseline', justifyContent: 'space-between',

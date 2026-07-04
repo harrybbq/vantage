@@ -1,4 +1,5 @@
 import { motion, AnimatePresence } from 'framer-motion';
+import { backdropClose } from '../utils/backdropClose';
 
 const SHORTCUTS = {
   Navigation: [
@@ -43,7 +44,7 @@ export default function ShortcutsModal({ open, onClose }) {
             background: 'rgba(0,0,0,.55)', backdropFilter: 'blur(4px)',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
           }}
-          onClick={e => { if (e.target === e.currentTarget) onClose(); }}
+          {...backdropClose(() => onClose())}
         >
           <motion.div
             initial={{ scale: 0.94, opacity: 0 }}

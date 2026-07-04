@@ -12,6 +12,7 @@
 import { WIDGET_META } from './MobileWidget';
 import { APP_PRESETS } from '../../data/appPresets';
 import { useSubscriptionContext } from '../../context/SubscriptionContext';
+import { backdropClose } from '../../utils/backdropClose';
 
 // App-preset widget types (FloorplanStudio / TubeLube / …) — a Pro
 // bonus, so they're locked for free users in the picker below.
@@ -53,7 +54,7 @@ export default function AddMobileWidgetModal({ openId, onClose, existingTypes, o
   return (
     <div
       className="modal-overlay open"
-      onClick={e => { if (e.target === e.currentTarget) onClose('addMobileWidgetModal'); }}
+      {...backdropClose(() => onClose('addMobileWidgetModal'))}
     >
       <div className="modal" style={{ maxWidth: 420 }}>
         <h3>Add Widget</h3>
