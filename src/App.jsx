@@ -616,6 +616,7 @@ function Board({ userId, userEmail, onSignOut }) {
             onNavigate={navigate}
             activeSection={activeSection}
             onUpgrade={() => handleOpenModal('paywall:generic')}
+            isOwner={isOwner}
           />
         </>
       )}

@@ -30,7 +30,13 @@ const MORE_ITEMS = [
   { id: 'settings',     icon: '⚙', label: 'Settings',     desc: 'Theme, privacy, tools' },
 ];
 
-export default function MoreDrawer({ open, onClose, onNavigate, activeSection, onUpgrade }) {
+// Owner-only: shift rotation calendar. Slotted above Settings and
+// simply absent for everyone else (mirrors the desktop sidebar tab).
+const OWNER_ITEMS = [
+  { id: 'schedule', icon: '⟳', label: 'Rotation', desc: 'Shift rotation + training calendar' },
+];
+
+export default function MoreDrawer({ open, onClose, onNavigate, activeSection, onUpgrade, isOwner }) {
   const { hasPro } = useSubscriptionContext();
   // Persistent dismiss for the Pro chip — once the user closes it,
   // don't re-show on later opens. Surfaces again on paywall trigger
@@ -130,7 +136,11 @@ export default function MoreDrawer({ open, onClose, onNavigate, activeSection, o
         <div className="m-drawer-body">
           <div className="m-drawer-eyebrow">More</div>
           <ul className="m-drawer-list">
-            {MORE_ITEMS.map(item => {
+            {[
+              ...MORE_ITEMS.slice(0, -1),
+              ...(isOwner ? OWNER_ITEMS : []),
+              ...MORE_ITEMS.slice(-1),
+            ].map(item => {
               const isActive = activeSection === item.id;
               return (
                 <li key={item.id}>
