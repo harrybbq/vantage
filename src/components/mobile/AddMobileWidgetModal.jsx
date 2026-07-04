@@ -10,7 +10,7 @@
  * "Coming soon" stub from MobileWidget.
  */
 import { WIDGET_META } from './MobileWidget';
-import { APP_PRESETS } from '../../data/appPresets';
+import { APP_PRESETS, visibleAppPresets } from '../../data/appPresets';
 import { useSubscriptionContext } from '../../context/SubscriptionContext';
 import { backdropClose } from '../../utils/backdropClose';
 
@@ -18,27 +18,29 @@ import { backdropClose } from '../../utils/backdropClose';
 // bonus, so they're locked for free users in the picker below.
 const APP_PRESET_TYPES = new Set(APP_PRESETS.map(p => p.id));
 
-const PICKER_ORDER = [
-  'notepad',
-  'recent-wins',
-  'coin-history',
-  'habits',
-  'holidays',
-  // Mobile parity for the desktop hub widgets.
-  'github',
-  'linkedin',
-  // User app presets (FloorplanStudio / TubeLube / …) from shared config.
-  ...APP_PRESETS.map(p => p.id),
-  'vitals',
-  'calories',
-  'mail',
-];
-
 export default function AddMobileWidgetModal({ openId, onClose, existingTypes, onAdd, onUpgrade }) {
   const { hasPro } = useSubscriptionContext();
   const isOpen = openId === 'addMobileWidgetModal';
   if (!isOpen) return null;
   const existing = new Set(existingTypes || []);
+
+  // Built per-open (not module-level) so owner-only presets resolve
+  // against the signed-in account — TubeLube only lists for the owner.
+  const pickerOrder = [
+    'notepad',
+    'recent-wins',
+    'coin-history',
+    'habits',
+    'holidays',
+    // Mobile parity for the desktop hub widgets.
+    'github',
+    'linkedin',
+    // User app presets from shared config (owner-only ones filtered).
+    ...visibleAppPresets().map(p => p.id),
+    'vitals',
+    'calories',
+    'mail',
+  ];
 
   function pick(type) {
     // Our Apps presets are a Pro bonus — route free users to the paywall.
@@ -67,7 +69,7 @@ export default function AddMobileWidgetModal({ openId, onClose, existingTypes, o
         </p>
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-          {PICKER_ORDER.map(type => {
+          {pickerOrder.map(type => {
             const meta = WIDGET_META[type];
             if (!meta) return null;
             const alreadyAdded = existing.has(type);
