@@ -11,6 +11,7 @@
  */
 import { ovrTier, categoryTier } from '../lib/ratings/tiers';
 import PrestigeBadge from './PrestigeBadge';
+import { backdropClose } from '../utils/backdropClose';
 
 const COLORS = ['#1a7a4a', '#2563eb', '#7c3aed', '#c2410c', '#0891b2', '#be185d', '#854d0e'];
 function avatarColor(name) {
@@ -42,7 +43,7 @@ export default function FriendRatingsModal({ row, onClose }) {
   if (!row) return null;
   const prestige = ovrTier(row.ovr || 1);
   return (
-    <div className="modal-overlay open" onClick={e => { if (e.target === e.currentTarget) onClose(); }}>
+    <div className="modal-overlay open" {...backdropClose(() => onClose())}>
       <div className="modal" style={{ maxWidth: 420 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 14 }}>
           {row.avatarUrl

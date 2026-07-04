@@ -4,13 +4,14 @@ import AddMobileWidgetModal from './mobile/AddMobileWidgetModal';
 import { APP_PRESETS, appPresetToLink } from '../data/appPresets';
 import { periodStart } from '../lib/habits/strikes';
 import { useSubscriptionContext } from '../context/SubscriptionContext';
+import { backdropClose } from '../utils/backdropClose';
 
 function Modal({ id, openId, onClose, children, style }) {
   return (
     <div
       className={`modal-overlay${openId === id ? ' open' : ''}`}
       id={id}
-      onClick={e => { if (e.target === e.currentTarget) onClose(id); }}
+      {...backdropClose(() => onClose(id))}
     >
       <div className="modal" style={style}>
         {children}
@@ -1053,7 +1054,7 @@ function EditHolidayModal({ openId, onClose, holidays, onEdit, onDelete }) {
   return (
     <div
       className={`modal-overlay${isOpen ? ' open' : ''}`}
-      onClick={e => { if (e.target === e.currentTarget) onClose(openId); }}
+      {...backdropClose(() => onClose(openId))}
     >
       <div className="modal" style={{ maxWidth: '480px' }}>
         <h3>Edit Trip</h3>
@@ -1372,7 +1373,7 @@ function EditHabitModal({ openId, onClose, habits, onEdit, onDelete }) {
   return (
     <div
       className={`modal-overlay${isOpen ? ' open' : ''}`}
-      onClick={e => { if (e.target === e.currentTarget) onClose(openId); }}
+      {...backdropClose(() => onClose(openId))}
     >
       <div className="modal" style={{ maxWidth: '460px' }}>
         <h3>Edit Habit</h3>
@@ -1473,7 +1474,7 @@ function RelapseModal({ openId, onClose, habits, onRelapse }) {
   return (
     <div
       className={`modal-overlay${isOpen ? ' open' : ''}`}
-      onClick={e => { if (e.target === e.currentTarget) onClose(openId); }}
+      {...backdropClose(() => onClose(openId))}
     >
       <div className="modal" style={{ maxWidth: '420px' }}>
         <h3>Log Relapse{habit ? ` — ${habit.name}` : ''}</h3>

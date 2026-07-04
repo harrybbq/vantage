@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import CameraScanner from './CameraScanner';
 import { useSubscriptionContext } from '../context/SubscriptionContext';
+import { backdropClose } from '../utils/backdropClose';
 
 // Detect mobile device (camera tab only shown on mobile)
 const IS_MOBILE = typeof navigator !== 'undefined' &&
@@ -121,7 +122,7 @@ export default function FoodSearch({ onSelectFood, onClose, onOpenModal }) {
   return (
     <div
       style={{ position: 'fixed', inset: 0, zIndex: 510, background: 'rgba(0,0,0,.45)', display: 'flex', alignItems: 'flex-end' }}
-      onClick={e => e.target === e.currentTarget && onClose()}
+      {...backdropClose(() => onClose())}
     >
       <div style={{ width: '100%', background: 'var(--bg-base)', borderRadius: '20px 20px 0 0', padding: '24px 20px 40px', animation: 'sheet-up 300ms cubic-bezier(0.34,1.56,0.64,1) both', maxHeight: '88dvh', display: 'flex', flexDirection: 'column' }}>
         {/* Handle */}

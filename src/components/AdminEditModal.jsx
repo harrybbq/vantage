@@ -17,6 +17,7 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
 import { PRESTIGE_MAX } from '../lib/ratings/prestige';
+import { backdropClose } from '../utils/backdropClose';
 
 const CATEGORIES = ['brain', 'finance', 'fitness', 'social'];
 
@@ -96,7 +97,7 @@ export default function AdminEditModal({ open, target, userId, S, update, onClos
   }
 
   return (
-    <div className="modal-overlay open" onClick={e => { if (e.target === e.currentTarget) onClose(); }}>
+    <div className="modal-overlay open" {...backdropClose(() => onClose())}>
       <div className="modal" style={{ maxWidth: 420 }}>
         <div style={{
           fontFamily: 'var(--mono)', fontSize: 10, letterSpacing: 1.6,

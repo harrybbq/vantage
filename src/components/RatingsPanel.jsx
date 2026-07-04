@@ -30,6 +30,7 @@ import BrainCheck   from './BrainCheck';
 import FinanceCheck from './FinanceCheck';
 import FitnessCheck from './FitnessCheck';
 import SocialCheck  from './SocialCheck';
+import { backdropClose } from '../utils/backdropClose';
 
 const CATEGORIES = [
   { id: 'brain',   label: 'Brain',   icon: '◉' },
@@ -329,7 +330,7 @@ function BreakdownModal({ S, category, onClose, onTakeCheck }) {
   return (
     <div
       className="modal-overlay open"
-      onClick={e => { if (e.target === e.currentTarget) onClose(); }}
+      {...backdropClose(() => onClose())}
     >
       <div className="modal" style={{ maxWidth: 420 }}>
         <h3 style={{ display: 'flex', alignItems: 'center', gap: 10 }}>

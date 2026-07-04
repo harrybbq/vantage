@@ -6,6 +6,7 @@ import { getTodayStr } from '../utils/helpers';
 import FoodLogSheet from './FoodLogSheet';
 import FoodLogList from './FoodLogList';
 import FoodSearch from './FoodSearch';
+import { backdropClose } from '../utils/backdropClose';
 
 // ── Helpers ───────────────────────────────────────────────────────────────
 function fmt(n) {
@@ -157,7 +158,7 @@ function AddMacroSheet({ onClose, onSave }) {
   };
 
   return (
-    <div style={{ position: 'fixed', inset: 0, zIndex: 500, background: 'rgba(0,0,0,.4)', display: 'flex', alignItems: 'flex-end' }} onClick={e => e.target === e.currentTarget && onClose()}>
+    <div style={{ position: 'fixed', inset: 0, zIndex: 500, background: 'rgba(0,0,0,.4)', display: 'flex', alignItems: 'flex-end' }} {...backdropClose(() => onClose())}>
       <div style={{ width: '100%', background: 'var(--bg-base)', borderRadius: '20px 20px 0 0', padding: '24px 20px 40px', animation: 'sheet-up 300ms cubic-bezier(0.34,1.56,0.64,1) both', maxHeight: '85dvh', overflowY: 'auto' }}>
         <div style={{ width: '40px', height: '4px', background: 'var(--border)', borderRadius: '2px', margin: '0 auto 20px' }} />
         <h3 style={{ margin: '0 0 16px', fontSize: 'var(--text-md)', color: 'var(--text)' }}>Add Macro</h3>

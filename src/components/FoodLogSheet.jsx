@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { supabase } from '../lib/supabase';
+import { backdropClose } from '../utils/backdropClose';
 
 const MEAL_TYPES = ['breakfast', 'lunch', 'dinner', 'snack'];
 
@@ -77,7 +78,7 @@ export default function FoodLogSheet({ userId, logDate, onClose, onSaved, prefil
   return (
     <div
       style={{ position: 'fixed', inset: 0, zIndex: 500, background: 'rgba(0,0,0,.45)', display: 'flex', alignItems: 'flex-end' }}
-      onClick={e => e.target === e.currentTarget && onClose()}
+      {...backdropClose(() => onClose())}
     >
       <div style={{ width: '100%', background: 'var(--bg-base)', borderRadius: '20px 20px 0 0', padding: '24px 20px 44px', animation: 'sheet-up 300ms cubic-bezier(0.34,1.56,0.64,1) both', maxHeight: '92dvh', overflowY: 'auto' }}>
         {/* Handle */}
