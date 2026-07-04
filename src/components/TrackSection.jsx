@@ -13,10 +13,71 @@ function getWeekProgress(logs, trackerId, weeklyTarget) {
   return { count, target: weeklyTarget };
 }
 
-function TrackersList({ trackers, logs, streaks, onDelete, onOpenModal }) {
+/**
+ * TrackersList — compact rows (2026-07 redesign). Each tracker is one
+ * ~56px row: a progress-ring button on the left (fills with weekly
+ * progress, tap = log today), name + colour dot, then a right-aligned
+ * mono column with the weekly fraction and streak/coin meta. Replaces
+ * the old ~330px cards with the fat grey week pill.
+ *
+ * Ring tap semantics mirror the hub QuickLog: boolean trackers toggle
+ * today's log; number trackers increment today by 1 (long math still
+ * lives in the calendar day editor). Streaks recalc on every change.
+ */
+function TrackerRing({ tracker, count, target, doneToday, onClick }) {
+  const R = 13, C = 2 * Math.PI * R;
+  const pct = target ? Math.min(1, count / target) : (doneToday ? 1 : 0);
+  const weekDone = target > 0 && count >= target;
+  const stroke = weekDone ? 'var(--gold)' : (tracker.color || 'var(--em)');
+  return (
+    <button
+      type="button"
+      className={`tracker-ring${doneToday ? ' is-done' : ''}`}
+      onClick={onClick}
+      aria-label={`${tracker.name}: ${doneToday ? 'logged today — tap to undo' : 'tap to log today'}`}
+      title={doneToday ? 'Logged today — tap to undo' : 'Log today'}
+    >
+      <svg width="34" height="34" viewBox="0 0 34 34" aria-hidden="true">
+        <circle cx="17" cy="17" r={R} fill="none" stroke="var(--border)" strokeWidth="3" />
+        {pct > 0 && (
+          <circle cx="17" cy="17" r={R} fill="none" stroke={stroke} strokeWidth="3"
+            strokeDasharray={`${(pct * C).toFixed(1)} ${C.toFixed(1)}`}
+            strokeLinecap="round" transform="rotate(-90 17 17)" />
+        )}
+      </svg>
+      <span className="tracker-ring-center">{doneToday ? '✓' : ''}</span>
+    </button>
+  );
+}
+
+function TrackersList({ trackers, logs, streaks, onDelete, onOpenModal, update }) {
+  const today = getTodayStr();
+  const todayLogs = logs?.[today] || {};
+
+  // Log today from the ring — boolean toggles, number increments by 1.
+  // Mirrors the hub QuickLog boolean branch (logs + streak recalc, no
+  // direct coin writes — weekly-challenge coins pay out through the
+  // same flow they always have).
+  function logToday(t) {
+    update(prev => {
+      const newLogs = { ...prev.logs };
+      const dayLog = { ...(newLogs[today] || {}) };
+      if (t.type === 'boolean') {
+        if (dayLog[t.id]) delete dayLog[t.id];
+        else dayLog[t.id] = true;
+      } else {
+        dayLog[t.id] = (typeof dayLog[t.id] === 'number' ? dayLog[t.id] : 0) + 1;
+      }
+      if (Object.keys(dayLog).length) newLogs[today] = dayLog;
+      else delete newLogs[today];
+      const newStreaks = recalcStreaks(newLogs, prev.trackers || [], prev.streaks || {});
+      return { ...prev, logs: newLogs, streaks: newStreaks };
+    });
+  }
+
   return (
     <div className="card trackers-panel">
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '14px' }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
         <h3 style={{ margin: 0 }}>Trackers</h3>
         <motion.button className="btn btn-primary btn-sm" onClick={() => onOpenModal('addTrackerModal')}
           whileHover={{ scale: 1.08 }} whileTap={{ scale: 0.93 }}
@@ -32,64 +93,52 @@ function TrackersList({ trackers, logs, streaks, onDelete, onOpenModal }) {
           </div>
         )}
         {trackers.map((t, index) => {
-          let challengeHtml = null;
-          if (t.weeklyTarget && t.weeklyCoins) {
-            const { count, target } = getWeekProgress(logs, t.id, t.weeklyTarget);
-            const done = count >= target;
-            const pct = Math.min(100, Math.round((count / target) * 100));
-            challengeHtml = (
-              <div style={{ marginTop: '6px', padding: '6px 8px', background: done ? 'rgba(200,151,10,.12)' : 'rgba(255,255,255,.5)', border: `1px solid ${done ? 'rgba(200,151,10,.3)' : 'var(--border-lt)'}`, borderRadius: '7px' }}>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '4px' }}>
-                  <span style={{ fontFamily: 'var(--mono)', fontSize: '9px', color: done ? 'var(--gold)' : 'var(--text-muted)', letterSpacing: '.5px', textTransform: 'uppercase' }}>{done ? '✓ ' : ''}{count}/{target}x this week</span>
-                  <span style={{ fontFamily: 'var(--mono)', fontSize: '9px', fontWeight: 700, color: 'var(--gold)' }}>⬡ {t.weeklyCoins}</span>
-                </div>
-                <div style={{ height: '4px', background: 'rgba(0,0,0,.08)', borderRadius: '2px', overflow: 'hidden' }}>
-                  <div style={{ height: '100%', width: `${pct}%`, background: done ? 'var(--gold)' : t.color, borderRadius: '2px', transition: 'width .3s' }}></div>
-                </div>
-              </div>
-            );
-          }
+          const hasChallenge = !!(t.weeklyTarget && t.weeklyCoins);
+          const { count, target } = hasChallenge
+            ? getWeekProgress(logs, t.id, t.weeklyTarget)
+            : { count: 0, target: 0 };
+          const weekDone = hasChallenge && count >= target;
+          const v = todayLogs[t.id];
+          const doneToday = t.type === 'boolean' ? !!v : (typeof v === 'number' && v > 0);
+          const s = t.type === 'boolean' ? streaks?.[t.id] : null;
           return (
             <motion.div
               key={t.id}
-              className="tracker-item"
+              className="tracker-row"
               initial={{ opacity: 0, x: -16 }}
               whileInView={{ opacity: 1, x: 0 }}
               viewport={{ once: true }}
-              transition={{ duration: 0.3, delay: index * 0.06, ease: 'easeOut' }}
+              transition={{ duration: 0.3, delay: index * 0.05, ease: 'easeOut' }}
             >
-              <div style={{ width: '100%' }}>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                  <div className="tracker-left">
-                    <div className="tracker-dot" style={{ background: t.color }}></div>
-                    <div>
-                      <div className="tracker-name">{t.name}</div>
-                      <div className="tracker-type">{t.type === 'boolean' ? '✓ / ✗' : 'Number' + (t.unit ? ' · ' + t.unit : '')}</div>
-                    </div>
-                  </div>
-                  <button
-                    onClick={e => { e.stopPropagation(); onDelete(t.id); }}
-                    style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', fontSize: '12px', borderRadius: '4px', padding: '2px 5px' }}
-                  >✕</button>
+              <TrackerRing tracker={t} count={count} target={target} doneToday={doneToday} onClick={() => logToday(t)} />
+              <div className="tracker-row-main">
+                <div className="tracker-row-name">
+                  <span className="tracker-dot" style={{ background: t.color }}></span>
+                  <span className="tracker-row-label">{t.name}</span>
+                  {t.type !== 'boolean' && typeof v === 'number' && v > 0 && (
+                    <span className="tracker-row-todayval">{v}{t.unit ? ` ${t.unit}` : ''} today</span>
+                  )}
                 </div>
-                {challengeHtml}
-                {t.type === 'boolean' && (() => {
-                  const s = streaks?.[t.id];
-                  if (!s || !s.current) return null;
-                  return (
-                    <div style={{ marginTop: '5px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                      <span style={{ fontFamily: 'var(--mono)', fontSize: '10px', color: 'var(--gold)', fontWeight: 700 }}>
-                        🔥 {s.current} day streak
-                      </span>
-                      {s.best > s.current && (
-                        <span style={{ fontFamily: 'var(--mono)', fontSize: '9px', color: 'var(--text-muted)' }}>
-                          Best: {s.best}
-                        </span>
-                      )}
-                    </div>
-                  );
-                })()}
               </div>
+              <div className="tracker-row-right">
+                {hasChallenge ? (
+                  <div className={`tracker-row-frac${weekDone ? ' is-done' : ''}`}>
+                    {weekDone ? '✓ ' : ''}{count}<span>/{target} wk</span>
+                  </div>
+                ) : (
+                  <div className="tracker-row-frac"><span>{t.type === 'boolean' ? 'daily' : (t.unit || 'number')}</span></div>
+                )}
+                <div className="tracker-row-meta">
+                  {s?.current > 0 && <span className="tracker-row-fire">🔥{s.current}</span>}
+                  {s?.best > (s?.current || 0) && <span> best {s.best}</span>}
+                  {hasChallenge && <span className="tracker-row-coins"> ⬡{t.weeklyCoins}</span>}
+                </div>
+              </div>
+              <button
+                className="tracker-row-del"
+                onClick={e => { e.stopPropagation(); onDelete(t.id); }}
+                aria-label={`Delete ${t.name}`}
+              >✕</button>
             </motion.div>
           );
         })}
@@ -402,6 +451,7 @@ export default function TrackSection({ S, update, active, onOpenModal, onShowCoi
           streaks={S.streaks || {}}
           onDelete={id => update(prev => ({ ...prev, trackers: prev.trackers.filter(t => t.id !== id) }))}
           onOpenModal={onOpenModal}
+          update={update}
         />
         <CalendarView S={S} update={update} onShowCoinToast={onShowCoinToast} nutritionMonthData={nutritionMonthData} />
       </div>

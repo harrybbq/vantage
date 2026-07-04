@@ -1505,6 +1505,28 @@ html[data-theme="dark"] {
 .tracker-name{font-weight:600;font-size:13px;color:var(--text);}
 .tracker-type{font-family:var(--mono);font-size:10px;color:var(--text-muted);}
 
+/* ── Compact tracker rows (2026-07) — ring button + name + mono meta.
+   Replaces the tall .tracker-item cards; each row is ~56px. ── */
+.tracker-row{display:flex;align-items:center;gap:10px;padding:9px 2px;border-bottom:1px solid var(--border-lt);position:relative;}
+.tracker-row:last-child{border-bottom:none;}
+.tracker-ring{position:relative;width:34px;height:34px;flex-shrink:0;background:none;border:none;padding:0;cursor:pointer;border-radius:50%;transition:transform .12s;}
+.tracker-ring:active{transform:scale(.9);}
+.tracker-ring-center{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:800;color:var(--em);}
+.tracker-ring.is-done .tracker-ring-center{color:var(--em);}
+.tracker-row-main{flex:1;min-width:0;}
+.tracker-row-name{display:flex;align-items:center;gap:8px;min-width:0;}
+.tracker-row-label{font-weight:600;font-size:13px;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.tracker-row-todayval{font-family:var(--mono);font-size:9.5px;color:var(--em);flex-shrink:0;}
+.tracker-row-right{flex-shrink:0;text-align:right;}
+.tracker-row-frac{font-family:var(--mono);font-size:12px;font-weight:700;color:var(--text);font-variant-numeric:tabular-nums;}
+.tracker-row-frac span{font-weight:500;font-size:10px;color:var(--text-muted);}
+.tracker-row-frac.is-done{color:var(--gold);}
+.tracker-row-meta{font-family:var(--mono);font-size:9px;color:var(--text-muted);margin-top:2px;}
+.tracker-row-fire{color:var(--gold);font-weight:700;}
+.tracker-row-coins{color:var(--gold);}
+.tracker-row-del{background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:11px;padding:4px;border-radius:4px;flex-shrink:0;opacity:.55;transition:opacity .15s,color .15s;}
+.tracker-row-del:hover{opacity:1;color:#c84040;}
+
 /* Multi-select mode */
 .cal-multiselect-bar{display:flex;align-items:center;justify-content:space-between;padding:10px 14px;background:var(--em);border-radius:10px;margin-bottom:12px;gap:12px;}
 .cal-multiselect-bar span{color:#fff;font-size:13px;font-weight:600;font-family:var(--mono);}
@@ -1574,6 +1596,13 @@ html[data-theme="dark"] {
 #track .tracker-item:hover{background:rgba(255,255,255,.14);border-color:rgba(77,196,133,.45);}
 #track .tracker-name{color:#f0f7f4;}
 #track .tracker-type{color:rgba(255,255,255,.45);}
+#track .tracker-row{border-bottom-color:rgba(255,255,255,.08);}
+#track .tracker-row-label{color:#f0f7f4;}
+#track .tracker-row-frac{color:#f0f7f4;}
+#track .tracker-row-frac.is-done{color:var(--gold-lt,#e3b53e);}
+#track .tracker-row-frac span,#track .tracker-row-meta{color:rgba(255,255,255,.45);}
+#track .tracker-ring svg circle:first-child{stroke:rgba(255,255,255,.16);}
+#track .tracker-row-del{color:rgba(255,255,255,.4);}
 /* Calendar header */
 #track .cal-month-title{color:#e8f7f0;}
 #track .cal-nav-btn{background:rgba(255,255,255,.1);border-color:rgba(255,255,255,.2);color:rgba(255,255,255,.8);}
