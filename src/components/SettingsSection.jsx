@@ -371,7 +371,7 @@ const SETTINGS_TABS = [
   { id: 'data',       label: 'Data'       },
 ];
 
-export default function SettingsSection({ S, update, active, userId, onOpenLegal, onOpenPalette, onOpenShortcuts, onOpenVisions }) {
+export default function SettingsSection({ S, update, active, userId, onOpenLegal, onOpenPalette, onOpenShortcuts, onOpenVisions, onOpenSchedule }) {
   const [deleting, setDeleting] = useState(false);
   const [activeTab, setActiveTab] = useState('appearance');
   const currentScheme = S.colorScheme || 'green';
@@ -860,6 +860,26 @@ export default function SettingsSection({ S, update, active, userId, onOpenLegal
             <span aria-hidden="true">✦</span> Open visions catalogue
           </button>
         </div>
+
+        {/* Shift rotation — owner-only. App.jsx passes onOpenSchedule
+            as null for everyone else, so the card simply never
+            renders for non-owner accounts (same gating pattern as
+            onCoinContextMenu admin powers). */}
+        {onOpenSchedule && (
+          <div className="card" style={{ padding: '22px' }}>
+            <h3 style={{ margin: '0 0 4px' }}>Rotation</h3>
+            <p style={{ fontFamily: 'var(--mono)', fontSize: '11px', color: 'var(--text-muted)', margin: '0 0 16px', lineHeight: '1.7' }}>
+              Owner-only: shift rotation + training calendar, Jul 2026 – Sep 2027.
+            </p>
+            <button
+              type="button"
+              className="tut-replay-btn"
+              onClick={onOpenSchedule}
+            >
+              <span aria-hidden="true">⟳</span> Open rotation calendar
+            </button>
+          </div>
+        )}
 
         {/* Walkthrough / tour */}
         <div className="card" style={{ padding: '22px' }}>

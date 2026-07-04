@@ -1,0 +1,325 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Shift Rotation + Training · Jul 2026 – Sep 2027</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#0b0f14; --surface:#131a22; --border:#1f2a35;
+    --text:#e6edf3; --muted:#7d8b99; --faint:#4a5763;
+    --night:#5b8cff; --night-bg:rgba(91,140,255,.13); --night-ring:rgba(91,140,255,.45);
+    --day:#f5a623; --day-bg:rgba(245,166,35,.13); --day-ring:rgba(245,166,35,.42);
+    --off:#61707e; --off-bg:rgba(120,140,160,.05);
+    --flag:#ff6b81; --cardio:#35d0a5; --cardio-bg:rgba(53,208,165,.12);
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html{-webkit-text-size-adjust:100%}
+  body{
+    background:
+      radial-gradient(900px 500px at 15% -10%, rgba(91,140,255,.07), transparent 60%),
+      radial-gradient(800px 500px at 100% 0%, rgba(245,166,35,.05), transparent 55%),
+      var(--bg);
+    color:var(--text);font-family:'Space Grotesk',system-ui,-apple-system,sans-serif;
+    line-height:1.5;padding:28px 18px 60px;min-height:100vh;
+  }
+  .wrap{max-width:1080px;margin:0 auto}
+  header{margin-bottom:24px}
+  .eyebrow{font-family:'JetBrains Mono',monospace;font-size:11px;letter-spacing:.28em;
+    text-transform:uppercase;color:var(--muted);margin-bottom:10px}
+  h1{font-size:clamp(26px,6vw,40px);font-weight:700;letter-spacing:-.02em;line-height:1.05}
+  h1 .accent{color:var(--night)}
+  .sub{color:var(--muted);margin-top:8px;font-size:15px;max-width:56ch}
+
+  .ribbon{margin:22px 0 8px;padding:16px 16px 12px;background:var(--surface);
+    border:1px solid var(--border);border-radius:14px}
+  .ribbon-label{font-family:'JetBrains Mono',monospace;font-size:11px;letter-spacing:.2em;
+    text-transform:uppercase;color:var(--muted);margin-bottom:12px}
+  .cells{display:flex;gap:4px;margin-bottom:5px}
+  .cells .seg{flex:1;height:30px;border-radius:6px;display:flex;align-items:center;justify-content:center;
+    font-family:'JetBrains Mono',monospace;font-size:11px;font-weight:600;position:relative}
+  .seg.n{background:var(--night-bg);color:var(--night);box-shadow:inset 0 0 0 1px var(--night-ring)}
+  .seg.d{background:var(--day-bg);color:var(--day);box-shadow:inset 0 0 0 1px var(--day-ring)}
+  .seg.o{background:var(--off-bg);color:var(--off);box-shadow:inset 0 0 0 1px var(--border)}
+  .cells.train .seg{height:26px;font-size:9px;letter-spacing:.02em;background:rgba(255,255,255,.02);
+    color:var(--text);box-shadow:inset 0 0 0 1px var(--border)}
+  .cells.train .seg.rest{color:var(--faint)}
+  .cells.train .seg.cardio{background:var(--cardio-bg);box-shadow:inset 0 0 0 1px rgba(53,208,165,.4)}
+  .ribbon-groups{display:flex;gap:4px;margin-top:8px}
+  .ribbon-groups span{flex:1;text-align:center;font-size:11px;color:var(--muted);font-family:'JetBrains Mono',monospace}
+  .ribbon-note{font-size:12px;color:var(--muted);margin-top:10px}
+
+  .stats{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin:20px 0 8px}
+  .stat{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:16px;
+    position:relative;overflow:hidden}
+  .stat::before{content:"";position:absolute;left:0;top:0;bottom:0;width:3px}
+  .stat.n::before{background:var(--night)} .stat.d::before{background:var(--day)} .stat.o::before{background:var(--off)}
+  .stat .num{font-size:30px;font-weight:700;font-family:'JetBrains Mono',monospace;letter-spacing:-.02em}
+  .stat.n .num{color:var(--night)} .stat.d .num{color:var(--day)} .stat.o .num{color:var(--text)}
+  .stat .lbl{font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.12em;margin-top:2px;
+    font-family:'JetBrains Mono',monospace}
+
+  /* macro panel */
+  .macros{margin:20px 0 8px;background:var(--surface);border:1px solid var(--border);
+    border-left:3px solid var(--cardio);border-radius:14px;padding:18px}
+  .macros h3{font-size:14px;font-weight:600;margin-bottom:2px}
+  .macros .goal{font-size:13px;color:var(--muted);margin-bottom:14px}
+  .macro-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  .mcard{background:rgba(255,255,255,.02);border:1px solid var(--border);border-radius:10px;padding:14px}
+  .mcard .mtitle{font-family:'JetBrains Mono',monospace;font-size:11px;letter-spacing:.14em;
+    text-transform:uppercase;color:var(--muted);margin-bottom:10px}
+  .mrow{display:flex;justify-content:space-between;font-size:14px;padding:3px 0}
+  .mrow .k{color:var(--muted)}
+  .mrow .v{font-family:'JetBrains Mono',monospace;font-weight:600}
+  .mrow .v.kcal{color:var(--cardio)}
+  .macros .fine{font-size:12px;color:var(--faint);margin-top:12px;max-width:64ch}
+
+  .legend{display:flex;flex-wrap:wrap;gap:14px 16px;margin:18px 2px 6px;font-size:13px;color:var(--muted)}
+  .legend .item{display:flex;align-items:center;gap:8px}
+  .swatch{width:14px;height:14px;border-radius:4px}
+  .swatch.n{background:var(--night-bg);box-shadow:inset 0 0 0 1px var(--night-ring)}
+  .swatch.d{background:var(--day-bg);box-shadow:inset 0 0 0 1px var(--day-ring)}
+  .swatch.o{background:var(--off-bg);box-shadow:inset 0 0 0 1px var(--border)}
+  .swatch.f{background:transparent;box-shadow:inset 0 0 0 2px var(--flag)}
+  .swatch.c{background:var(--cardio-bg);box-shadow:inset 0 0 0 1px rgba(53,208,165,.5)}
+  .cap{font-size:13px;color:var(--muted);margin:10px 2px 24px;font-family:'JetBrains Mono',monospace}
+  .cap b{color:var(--text);font-weight:600}
+
+  .months{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:20px}
+  .month{background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:16px 16px 18px}
+  .month h2{font-size:17px;font-weight:600;margin-bottom:2px;display:flex;align-items:baseline;gap:8px}
+  .month h2 .yr{font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--faint);font-weight:500}
+  .dow{display:grid;grid-template-columns:repeat(7,1fr);gap:4px;margin:12px 0 5px}
+  .dow span{text-align:center;font-size:10px;color:var(--faint);font-family:'JetBrains Mono',monospace;letter-spacing:.05em}
+  .grid{display:grid;grid-template-columns:repeat(7,1fr);gap:4px}
+  .cell{aspect-ratio:1;border-radius:8px;padding:5px 4px;position:relative;min-width:0;
+    display:flex;flex-direction:column;justify-content:space-between}
+  .cell.empty{background:transparent}
+  .cell .dt{font-family:'JetBrains Mono',monospace;font-size:12px;font-weight:500;color:var(--muted);line-height:1}
+  .cell .chip{position:absolute;top:4px;right:5px;font-family:'JetBrains Mono',monospace;
+    font-size:9px;font-weight:600;letter-spacing:.02em}
+  .cell .sess{font-family:'Space Grotesk',sans-serif;font-size:9px;font-weight:600;
+    text-transform:uppercase;letter-spacing:.02em;line-height:1;color:#f2f6fb}
+  .cell .sess.rest{color:var(--faint);font-weight:500}
+  .cell.n{background:var(--night-bg)} .cell.n .dt{color:#c9d8ff} .cell.n .chip{color:var(--night)}
+  .cell.d{background:var(--day-bg)} .cell.d .dt{color:#ffddaa} .cell.d .chip{color:var(--day)}
+  .cell.o{background:var(--off-bg)}
+  .cell.flag{box-shadow:inset 0 0 0 2px var(--flag)}
+  .cell.cardio::after{content:"";position:absolute;left:0;right:0;bottom:0;height:3px;
+    background:var(--cardio);border-radius:0 0 8px 8px;opacity:.85}
+
+  .flags{margin-top:28px;background:var(--surface);border:1px solid var(--border);
+    border-left:3px solid var(--flag);border-radius:14px;padding:18px 18px 8px}
+  .flags h3{font-size:14px;font-weight:600;margin-bottom:4px}
+  .flags p.note{font-size:13px;color:var(--muted);margin-bottom:14px;max-width:60ch}
+  .flags ul{list-style:none;display:grid;gap:8px}
+  .flags li{display:flex;align-items:center;gap:12px;font-size:14px;padding-bottom:8px;flex-wrap:wrap}
+  .flags .fdate{font-family:'JetBrains Mono',monospace;font-size:13px;color:var(--text);min-width:96px}
+  .fpill{font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:600;padding:3px 8px;border-radius:20px}
+  .fpill.n{background:var(--night-bg);color:var(--night);box-shadow:inset 0 0 0 1px var(--night-ring)}
+  .fpill.d{background:var(--day-bg);color:var(--day);box-shadow:inset 0 0 0 1px var(--day-ring)}
+  .fpill.o{background:var(--off-bg);color:var(--off);box-shadow:inset 0 0 0 1px var(--border)}
+  .flags .fname{color:var(--muted);font-size:13px}
+  .flags .fsess{font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--faint)}
+
+  footer{margin-top:34px;text-align:center;color:var(--faint);font-size:12px;font-family:'JetBrains Mono',monospace}
+  @media (max-width:640px){.macro-grid{grid-template-columns:1fr}}
+  @media (max-width:480px){
+    body{padding:22px 12px 50px}.stats{gap:8px}.stat{padding:13px}.stat .num{font-size:24px}
+    .cell .sess{font-size:8px}.flags .fdate{min-width:82px}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="eyebrow">DXC · SCCL SOC · 4-4-4-4 rotation + PPLUL</div>
+    <h1>Shifts &amp; training<br><span class="accent">Jul 2026 – Sep 2027</span></h1>
+    <p class="sub">Lifting on every shift day plus two sessions per off-block. Cardio (tower stepper on shift, Stairmaster otherwise) rides on every upper-body day — never on Legs or Lower. PPLUL rolls continuously, so all five sessions get equal frequency.</p>
+  </header>
+
+  <div class="ribbon">
+    <div class="ribbon-label">The cycle · shift + lift + cardio</div>
+    <div class="cells" id="ribbonShift"></div>
+    <div class="cells train" id="ribbonTrain"></div>
+    <div class="ribbon-groups"><span>4 nights</span><span>4 off</span><span>4 days</span><span>4 off</span></div>
+    <div class="ribbon-note">Green segments = cardio day (upper-body sessions). Sessions shown for cycle 1 — the sequence carries over between cycles, so later cycles start on whichever session is next.</div>
+  </div>
+
+  <div class="stats" id="stats"></div>
+
+  <div class="macros">
+    <h3>Macro targets · lean athletic build</h3>
+    <div class="goal">Current: 72 kg @ 5'9" · goal: Spider-Man / Invincible-style physique — broad shoulders, visible abs, no bulk-phase softness. Lean gain at ~0.25 kg/month.</div>
+    <div class="macro-grid">
+      <div class="mcard">
+        <div class="mtitle">Training + cardio days</div>
+        <div class="mrow"><span class="k">Calories</span><span class="v kcal">2,550 kcal</span></div>
+        <div class="mrow"><span class="k">Protein</span><span class="v">180 g</span></div>
+        <div class="mrow"><span class="k">Carbs</span><span class="v">290 g</span></div>
+        <div class="mrow"><span class="k">Fat</span><span class="v">75 g</span></div>
+      </div>
+      <div class="mcard">
+        <div class="mtitle">Lift-only / rest days</div>
+        <div class="mrow"><span class="k">Calories</span><span class="v kcal">2,350 kcal</span></div>
+        <div class="mrow"><span class="k">Protein</span><span class="v">180 g</span></div>
+        <div class="mrow"><span class="k">Carbs</span><span class="v">250 g</span></div>
+        <div class="mrow"><span class="k">Fat</span><span class="v">70 g</span></div>
+      </div>
+    </div>
+    <div class="fine">Protein stays fixed at 2.5 g/kg regardless of day type. On nights, spread it across your actual waking hours — clock-time meals don't matter, totals do. The lean-athletic look is driven by staying in a small surplus and letting shoulders/back volume do the shaping, not by chasing bigger calorie numbers.</div>
+  </div>
+
+  <div class="legend">
+    <div class="item"><span class="swatch n"></span> Night shift</div>
+    <div class="item"><span class="swatch d"></span> Day shift</div>
+    <div class="item"><span class="swatch o"></span> Off</div>
+    <div class="item"><span class="swatch f"></span> Bank holiday</div>
+    <div class="item"><span class="swatch c"></span> Cardio day (green underline)</div>
+  </div>
+  <div class="cap"><b>12 sessions</b> per 16-day cycle ≈ 5.3×/week · rest on the first &amp; last day of each off-block · cardio ~7×/cycle on upper days</div>
+
+  <div class="months" id="months"></div>
+
+  <div class="flags">
+    <h3>Bank holidays &amp; notable dates you're rostered on</h3>
+    <p class="note">Scotland public holidays landing on a working shift — the pay-premium question for Joe. Training shown too so you can plan around them.</p>
+    <ul id="flaglist"></ul>
+  </div>
+
+  <footer id="foot"></footer>
+</div>
+
+<script>
+  const MS=86400000;
+  const dayNum=(y,m,d)=>Math.floor(Date.UTC(y,m,d)/MS);
+  const START=dayNum(2026,6,15);
+
+  // Cycle position 0-15. Training on all shifts + off days 2&3 of each block.
+  // Rest: positions 4,7 (off-block 1 edges) and 12,15 (off-block 2 edges).
+  const TRAINPOS=[0,1,2,3,5,6,8,9,10,11,13,14];           // 12 training slots
+  const RESTPOS=new Set([4,7,12,15]);
+  const SEQ=['Push','Pull','Legs','Upper','Lower'];        // rolls continuously
+  const UPPERDAYS=new Set(['Push','Pull','Upper']);        // cardio days
+
+  // how many training slots occur before position p within one cycle
+  const slotsBefore=p=>TRAINPOS.filter(x=>x<p).length;
+
+  function state(y,m,d){
+    const diff=dayNum(y,m,d)-START;
+    if(diff<0) return {t:'none'};
+    const p=((diff%16)+16)%16;
+    const cyc=Math.floor(diff/16);
+    const t = p<4?'n' : p<8?'o' : p<12?'d' : 'o';
+    const num = p<4?p+1 : (p>=8&&p<12)?p-7 : null;
+    if(RESTPOS.has(p)) return {t,num,sess:'Rest',cardio:false};
+    const idx=(cyc*TRAINPOS.length + slotsBefore(p)) % SEQ.length;
+    const sess=SEQ[idx];
+    return {t,num,sess,cardio:UPPERDAYS.has(sess)};
+  }
+  const chipText=s=> s.t==='n'?'N'+s.num : s.t==='d'?'D'+s.num : '';
+
+  const FLAGS={
+    '2026-7-3':'Summer bank holiday (Scot)',
+    '2026-11-30':"St Andrew's Day",
+    '2026-12-25':'Christmas Day',
+    '2026-12-26':'Boxing Day',
+    '2027-0-1':"New Year's Day",
+    '2027-0-2':'2 January (Scot)',
+    '2027-0-4':'Substitute day — 2 Jan falls on Sat',
+    '2027-2-26':'Good Friday',
+    '2027-4-3':'Early May bank holiday',
+    '2027-4-31':'Spring bank holiday',
+    '2027-7-2':'Summer bank holiday (Scot)'
+  };
+
+  // ribbon (cycle 1 sessions)
+  const rShift=document.getElementById('ribbonShift');
+  const rTrain=document.getElementById('ribbonTrain');
+  const pat=['n','n','n','n','o','o','o','o','d','d','d','d','o','o','o','o'];
+  pat.forEach((c,i)=>{
+    const seg=document.createElement('div');
+    seg.className='seg '+c;
+    seg.textContent = c==='n'?'N'+((i%4)+1) : c==='d'?'D'+((i%4)+1) : '·';
+    rShift.appendChild(seg);
+    const ts=document.createElement('div');
+    let sess,cardio=false;
+    if(RESTPOS.has(i)){sess='Rest';}
+    else{sess=SEQ[slotsBefore(i)%SEQ.length];cardio=UPPERDAYS.has(sess);}
+    ts.className='seg'+(sess==='Rest'?' rest':'')+(cardio?' cardio':'');
+    ts.textContent=sess.slice(0,4).toUpperCase();
+    rTrain.appendChild(ts);
+  });
+
+  // months
+  const MONTHS=['January','February','March','April','May','June','July','August','September','October','November','December'];
+  const DOW=['Mo','Tu','We','Th','Fr','Sa','Su'];
+  const range=[];
+  for(let y=2026,m=6; y<2027||m<=8; m++){ if(m>11){m=0;y++;} range.push([y,m]); }
+  const monthsEl=document.getElementById('months');
+  range.forEach(([y,m])=>{
+    const wrap=document.createElement('div');wrap.className='month';
+    const h=document.createElement('h2');h.innerHTML=MONTHS[m]+' <span class="yr">'+y+'</span>';wrap.appendChild(h);
+    const dow=document.createElement('div');dow.className='dow';
+    DOW.forEach(d=>{const s=document.createElement('span');s.textContent=d;dow.appendChild(s);});wrap.appendChild(dow);
+    const grid=document.createElement('div');grid.className='grid';
+    const first=new Date(Date.UTC(y,m,1));
+    let lead=(first.getUTCDay()+6)%7;
+    for(let i=0;i<lead;i++){const e=document.createElement('div');e.className='cell empty';grid.appendChild(e);}
+    const dim=new Date(Date.UTC(y,m+1,0)).getUTCDate();
+    for(let d=1;d<=dim;d++){
+      const s=state(y,m,d);
+      const cell=document.createElement('div');
+      let cls='cell '+(s.t==='none'?'empty':s.t);
+      const key=y+'-'+m+'-'+d;
+      const isFlag=FLAGS[key]&&s.t!=='none';
+      if(isFlag)cls+=' flag';
+      if(s.cardio)cls+=' cardio';
+      cell.className=cls;
+      let html='<span class="dt">'+d+'</span>';
+      if(s.t!=='none'){
+        const chip=chipText(s);
+        if(chip)html+='<span class="chip">'+chip+'</span>';
+        const rest=s.sess==='Rest';
+        html+='<span class="sess'+(rest?' rest':'')+'">'+s.sess+'</span>';
+      }
+      cell.innerHTML=html;
+      grid.appendChild(cell);
+    }
+    wrap.appendChild(grid);monthsEl.appendChild(wrap);
+  });
+
+  // stats (15 Jul 2026 -> 30 Sep 2027)
+  let cn=0,cd=0,co=0;
+  for(let n=dayNum(2026,6,15);n<=dayNum(2027,8,30);n++){
+    const p=((n-START)%16+16)%16;
+    if(p<4)cn++;else if(p<8)co++;else if(p<12)cd++;else co++;
+  }
+  const statsEl=document.getElementById('stats');
+  [{c:'n',num:cn,lbl:'Night shifts'},{c:'d',num:cd,lbl:'Day shifts'},{c:'o',num:co,lbl:'Days off'}]
+   .forEach(s=>{const el=document.createElement('div');el.className='stat '+s.c;
+     el.innerHTML='<div class="num">'+s.num+'</div><div class="lbl">'+s.lbl+'</div>';statsEl.appendChild(el);});
+
+  // flag list
+  const list=document.getElementById('flaglist');
+  const wk=n=>['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][new Date(n*MS).getUTCDay()];
+  const monShort=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  Object.keys(FLAGS).sort((a,b)=>{const[ay,am,ad]=a.split('-').map(Number),[by,bm,bd]=b.split('-').map(Number);
+    return dayNum(ay,am,ad)-dayNum(by,bm,bd);}).forEach(k=>{
+    const[y,m,d]=k.split('-').map(Number);const s=state(y,m,d);if(s.t==='none')return;
+    const chip=s.t==='n'?'N'+s.num:s.t==='d'?'D'+s.num:'OFF';
+    const li=document.createElement('li');
+    li.innerHTML='<span class="fdate">'+wk(dayNum(y,m,d))+' '+d+' '+monShort[m]+'</span>'+
+      '<span class="fpill '+s.t+'">'+chip+'</span>'+
+      '<span class="fname">'+FLAGS[k]+'</span>'+
+      '<span class="fsess">→ '+s.sess.toUpperCase()+(s.cardio?' + CARDIO':'')+'</span>';
+    list.appendChild(li);
+  });
+
+  document.getElementById('foot').textContent='16-day cycle · PPLUL continuous · cardio on upper days · 15 Jul 2026 → 30 Sep 2027';
+</script>
+</body>
+</html>
