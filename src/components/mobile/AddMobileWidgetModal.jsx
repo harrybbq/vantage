@@ -5,7 +5,7 @@
  * fires onAdd with the new widget descriptor and closes itself.
  *
  * Listed widgets are stubbed when their data source isn't wired
- * yet (Vitals / Calories / Mail); they still get added to the
+ * yet (Calories / Mail); they still get added to the
  * stack so the user can see the slot exist — the body renders a
  * "Coming soon" stub from MobileWidget.
  */
