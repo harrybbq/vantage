@@ -19,6 +19,7 @@ import MobileHabitsSection from './components/mobile/MobileHabitsSection';
 import MobileFriendsSection from './components/mobile/MobileFriendsSection';
 import MobileProfileSection from './components/mobile/MobileProfileSection';
 import SettingsSection from './components/SettingsSection';
+import ScheduleSection from './components/ScheduleSection';
 import { SCHEMES, applyScheme, applyTheme, schemeFromHex } from './components/SettingsSection';
 import { useSubscriptionContext } from './context/SubscriptionContext';
 import Modals from './components/Modals';
@@ -690,7 +691,15 @@ function Board({ userId, userEmail, onSignOut }) {
         )}
         {activeSection === 'settings' && (
           <motion.div key="settings" {...pageMotion}>
-            <SettingsSection S={S} update={update} active userId={userId} onOpenLegal={setLegalPage} onOpenPalette={() => setPaletteOpen(true)} onOpenShortcuts={() => setShortcutsOpen(true)} onOpenVisions={() => setVisionsOpen(true)} />
+            <SettingsSection S={S} update={update} active userId={userId} onOpenLegal={setLegalPage} onOpenPalette={() => setPaletteOpen(true)} onOpenShortcuts={() => setShortcutsOpen(true)} onOpenVisions={() => setVisionsOpen(true)} onOpenSchedule={isOwner ? () => navigate('schedule') : null} />
+          </motion.div>
+        )}
+        {/* Schedule — owner-only shift rotation calendar. No sidebar
+            entry; reached via Settings → Tools (owner accounts only).
+            The section itself re-checks isOwner for deep links. */}
+        {activeSection === 'schedule' && (
+          <motion.div key="schedule" {...pageMotion}>
+            <ScheduleSection active isOwner={isOwner} />
           </motion.div>
         )}
         {/* Friends — mobile-only route. Desktop puts FriendsRail in
