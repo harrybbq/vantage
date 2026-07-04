@@ -5,6 +5,67 @@ import { APP_PRESETS, appPresetToLink } from '../data/appPresets';
 import { periodStart } from '../lib/habits/strikes';
 import { useSubscriptionContext } from '../context/SubscriptionContext';
 import { backdropClose } from '../utils/backdropClose';
+import { useIsMobile } from '../hooks/useIsMobile';
+
+/**
+ * ImageField — URL input plus, on mobile, a photo-library picker.
+ *
+ * A picked photo is resized client-side (long edge `max`, JPEG @ .78 —
+ * same treatment as SavingsImagePicker so the user_data blob stays
+ * lean) and stored as a data URL in the SAME field a pasted URL would
+ * use. Consumers (holiday cards, hub trip widget, shop cards) render
+ * either form without changes. On a phone the hidden file input opens
+ * the native photo library / camera sheet; desktop keeps URL-only to
+ * avoid tempting people into multi-MB uploads from disk.
+ */
+function ImageField({ label, value, onChange, max = 900, placeholder }) {
+  const isMobile = useIsMobile();
+  const inputRef = useRef(null);
+  const isData = (value || '').startsWith('data:');
+  function onFile(e) {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = ev => {
+      const img = new Image();
+      img.onload = () => {
+        const scale = Math.min(1, max / Math.max(img.width, img.height));
+        const canvas = document.createElement('canvas');
+        canvas.width = Math.round(img.width * scale);
+        canvas.height = Math.round(img.height * scale);
+        canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
+        onChange(canvas.toDataURL('image/jpeg', 0.78));
+      };
+      img.src = ev.target.result;
+    };
+    reader.readAsDataURL(file);
+  }
+  return (
+    <div className="fg">
+      <label>{label}</label>
+      {isData ? (
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+          <div style={{ width: 56, height: 56, borderRadius: 10, background: `center/cover no-repeat url(${value})`, border: '1px solid var(--border)', flexShrink: 0 }} />
+          <span style={{ fontSize: '12px', color: 'var(--text-muted)', flex: 1 }}>Photo attached</span>
+          <button type="button" className="btn btn-ghost btn-sm" onClick={() => onChange('')}>Remove</button>
+        </div>
+      ) : (
+        <>
+          <input type="url" placeholder={placeholder} value={value} onChange={e => onChange(e.target.value)} />
+          {isMobile && (
+            <>
+              <input ref={inputRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={onFile} />
+              <button type="button" className="btn btn-ghost btn-sm" style={{ marginTop: '8px', fontSize: '12px' }} onClick={() => inputRef.current?.click()}>
+                📷 Add from your photos
+              </button>
+            </>
+          )}
+        </>
+      )}
+    </div>
+  );
+}
 
 function Modal({ id, openId, onClose, children, style }) {
   return (
@@ -852,7 +913,7 @@ function AddShopModal({ openId, onClose, onAdd, categories = [] }) {
       </div>
       <div className="fg"><label>Item Name</label><input type="text" placeholder="e.g. AirPods Pro" value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} /></div>
       <div className="fg"><label>Price (optional)</label><input type="text" placeholder="£149.99" value={form.price} onChange={e => setForm(f => ({ ...f, price: e.target.value }))} /></div>
-      <div className="fg"><label>Image URL (optional)</label><input type="url" placeholder="Auto-filled from link, or paste directly" value={form.imageUrl} onChange={e => setForm(f => ({ ...f, imageUrl: e.target.value }))} /></div>
+      <ImageField label="Image (optional)" placeholder="Auto-filled from link, or paste directly" max={600} value={form.imageUrl} onChange={v => setForm(f => ({ ...f, imageUrl: v }))} />
       <div className="fg">
         <label>Priority</label>
         <select value={form.priority} onChange={e => setForm(f => ({ ...f, priority: e.target.value }))}>
@@ -922,7 +983,7 @@ function EditShopModal({ openId, onClose, shopItems, categories = [], onEdit, on
       <div className="fg"><label>Item Name</label><input type="text" value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} /></div>
       <div className="fg"><label>Price (optional)</label><input type="text" placeholder="£149.99" value={form.price} onChange={e => setForm(f => ({ ...f, price: e.target.value }))} /></div>
       <div className="fg"><label>Link (optional)</label><input type="url" placeholder="https://..." value={form.url} onChange={e => setForm(f => ({ ...f, url: e.target.value }))} /></div>
-      <div className="fg"><label>Image URL (optional)</label><input type="url" placeholder="https://..." value={form.imageUrl} onChange={e => setForm(f => ({ ...f, imageUrl: e.target.value }))} /></div>
+      <ImageField label="Image (optional)" placeholder="https://..." max={600} value={form.imageUrl} onChange={v => setForm(f => ({ ...f, imageUrl: v }))} />
       <div className="fg">
         <label>Priority</label>
         <select value={form.priority} onChange={e => setForm(f => ({ ...f, priority: e.target.value }))}>
@@ -1002,7 +1063,7 @@ function AddHolidayModal({ openId, onClose, onAdd }) {
           </select>
         </div>
       </div>
-      <div className="fg"><label>Cover Image URL (optional)</label><input type="url" placeholder="https://… paste any photo URL" value={form.imageUrl} onChange={e => setForm(f => ({ ...f, imageUrl: e.target.value }))} /></div>
+      <ImageField label="Cover Image (optional)" placeholder="https://… paste any photo URL" value={form.imageUrl} onChange={v => setForm(f => ({ ...f, imageUrl: v }))} />
       <div className="fg"><label>Notes</label><input type="text" placeholder="Things to do, pack list, ideas..." value={form.notes} onChange={e => setForm(f => ({ ...f, notes: e.target.value }))} /></div>
       <div className="modal-actions">
         <button className="btn btn-ghost" onClick={() => onClose('addHolidayModal')}>Cancel</button>
@@ -1076,7 +1137,7 @@ function EditHolidayModal({ openId, onClose, holidays, onEdit, onDelete }) {
             </select>
           </div>
         </div>
-        <div className="fg"><label>Cover Image URL (optional)</label><input type="url" placeholder="https://… paste any photo URL" value={form.imageUrl} onChange={e => setForm(f => ({ ...f, imageUrl: e.target.value }))} /></div>
+        <ImageField label="Cover Image (optional)" placeholder="https://… paste any photo URL" value={form.imageUrl} onChange={v => setForm(f => ({ ...f, imageUrl: v }))} />
         <div className="fg"><label>Notes</label><input type="text" placeholder="Things to do, pack list, ideas..." value={form.notes} onChange={e => setForm(f => ({ ...f, notes: e.target.value }))} /></div>
         <div className="modal-actions" style={{ justifyContent: 'space-between' }}>
           <button
