@@ -5,6 +5,7 @@ import { fireGoal, fireStreak7, fireStreak30 } from '../utils/confetti';
 import { recalcStreaks } from '../utils/streaks';
 import SectionHelp from './SectionHelp';
 import NutritionSection from './NutritionSection';
+import VitalsHistoryCard from './VitalsHistoryCard';
 
 function getWeekProgress(logs, trackerId, weeklyTarget) {
   const dateStr = getTodayStr();
@@ -404,6 +405,9 @@ export default function TrackSection({ S, update, active, onOpenModal, onShowCoi
         />
         <CalendarView S={S} update={update} onShowCoinToast={onShowCoinToast} nutritionMonthData={nutritionMonthData} />
       </div>
+      {/* Vitals history — line chart + recent entries for the daily
+          vitals logged via the mobile hub widget. */}
+      <VitalsHistoryCard S={S} />
       {userId && (
         <NutritionSection
           userId={userId}
