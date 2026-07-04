@@ -52,12 +52,23 @@ export const APP_PRESETS = [
     tagline: 'YouTube tools',
     requires: 'Deploy TubeLube (e.g. GitHub Pages) and set its URL in src/data/appPresets.js.',
     live: true, // activates the moment a URL is filled in
+    // Hidden from every picker except the owner's account — a
+    // personal tool, not a product surface (yet).
+    ownerOnly: true,
   },
 ];
 
 /** Look up a preset by its id. */
 export function getAppPreset(id) {
   return APP_PRESETS.find(p => p.id === id) || null;
+}
+
+/** Presets the current account may add. Owner-only presets are
+ *  filtered out for everyone else. `isOwner` defaults to the global
+ *  flag App.jsx maintains (window.__vantageOwner) so pickers deep in
+ *  the tree don't need owner state threaded through props. */
+export function visibleAppPresets(isOwner = typeof window !== 'undefined' && !!window.__vantageOwner) {
+  return APP_PRESETS.filter(p => !p.ownerOnly || isOwner);
 }
 
 /** Build a hub link-widget object from a preset (desktop hub).

@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import AddMobileWidgetModal from './mobile/AddMobileWidgetModal';
-import { APP_PRESETS, appPresetToLink } from '../data/appPresets';
+import { appPresetToLink, visibleAppPresets } from '../data/appPresets';
 import { periodStart } from '../lib/habits/strikes';
 import { useSubscriptionContext } from '../context/SubscriptionContext';
 import { backdropClose } from '../utils/backdropClose';
@@ -146,7 +146,7 @@ function AddLinkModal({ openId, onClose, onSwitchModal, onAddNotepad, onAddApp, 
         }}>PRO</span>
       </div>
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
-        {APP_PRESETS.map(preset => {
+        {visibleAppPresets().map(preset => {
           // For Pro users: enabled unless the app isn't deployed yet.
           // For free users: always locked (clicking opens the paywall).
           const notDeployed = !preset.url;
