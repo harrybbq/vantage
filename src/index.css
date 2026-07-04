@@ -4850,6 +4850,44 @@ button:active:not(:disabled),
 .m-widget-clickable { cursor: pointer; transition: background .12s; }
 .m-widget-clickable:active { background: rgba(var(--em-rgb), .08); }
 
+/* ── Vitals history card (Track page) — line chart + table ── */
+.vitals-card { padding: 22px; margin-top: 20px; max-width: 720px; }
+.vitals-sub { font-family: var(--mono); font-size: 11px; color: var(--text-muted); margin: 0 0 14px; line-height: 1.7; }
+.vitals-controls { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 14px; }
+.vitals-seg { display: inline-flex; border: 1px solid var(--border); border-radius: 9px; overflow: hidden; }
+.vitals-seg-btn {
+  padding: 6px 12px; background: none; border: none; cursor: pointer;
+  font-family: var(--mono); font-size: 11px; letter-spacing: .5px; color: var(--text-muted);
+  border-right: 1px solid var(--border); transition: background .15s, color .15s;
+}
+.vitals-seg-btn:last-child { border-right: none; }
+.vitals-seg-btn.on { background: rgba(var(--em-rgb), .12); color: var(--em); font-weight: 700; }
+.vitals-chart-wrap { position: relative; }
+.vitals-chart { width: 100%; height: auto; display: block; touch-action: none; }
+.vitals-grid { stroke: var(--border); stroke-width: 1; }
+.vitals-tick { font-family: var(--mono); font-size: 10px; fill: var(--text-muted); }
+.vitals-line { fill: none; stroke: var(--em); stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
+.vitals-area { fill: rgba(var(--em-rgb), .10); stroke: none; }
+.vitals-dot { fill: var(--em); stroke: var(--card-bg, #fffdf5); stroke-width: 2; }
+.vitals-crosshair { stroke: var(--text-muted); stroke-width: 1; opacity: .5; }
+.vitals-endlabel { font-family: var(--mono); font-size: 11px; font-weight: 700; fill: var(--text); }
+.vitals-tooltip {
+  position: absolute; top: 0; transform: translateX(-50%);
+  background: var(--surface, #fffdf5); border: 1px solid var(--border);
+  border-radius: 8px; padding: 6px 10px; pointer-events: none;
+  box-shadow: 0 4px 14px rgba(0,0,0,.14); white-space: nowrap;
+}
+.vitals-tooltip-date { font-family: var(--mono); font-size: 9.5px; letter-spacing: .5px; color: var(--text-muted); }
+.vitals-tooltip-val { font-size: 14px; font-weight: 700; color: var(--text); font-variant-numeric: tabular-nums; }
+.vitals-tooltip-val span { font-size: 10px; font-weight: 500; color: var(--text-muted); }
+.vitals-table { width: 100%; border-collapse: collapse; margin-top: 14px; font-variant-numeric: tabular-nums; }
+.vitals-table th {
+  font-family: var(--mono); font-size: 9.5px; letter-spacing: 1.2px; text-transform: uppercase;
+  color: var(--text-muted); text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--border);
+}
+.vitals-table td { font-size: 12.5px; color: var(--text-mid); padding: 6px 8px; border-bottom: 1px solid var(--border-lt, var(--border)); }
+.vitals-table tr:last-child td { border-bottom: none; }
+
 /* ── Vitals widget — tap-to-log daily stats ── */
 .m-vitals { display: flex; flex-direction: column; gap: 10px; }
 .m-vitals-tiles { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
