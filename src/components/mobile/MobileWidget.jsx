@@ -15,7 +15,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { getTodayStr } from '../../utils/helpers';
 import { supabase } from '../../lib/supabase';
-import { bmrKcal, currentWeightKg, dayBurn, ACTIVITIES, activityKcal } from '../../lib/burn';
+import { currentWeightKg, dayBurn, ACTIVITIES, activityKcal, stepsKcal } from '../../lib/burn';
 import { APP_PRESETS, getAppPreset } from '../../data/appPresets';
 import { fetchAppPreview } from '../../lib/appPreview';
 import { strikeState } from '../../lib/habits/strikes';
@@ -504,21 +504,26 @@ function BurnBody({ S, update, userId }) {
     );
   }
 
-  const { bmr, activity, total } = dayBurn(S, today);
+  // Net maths uses ACTIVITY burn only (exercise + steps) — resting
+  // burn is shown as an estimate line but never subtracted, else the
+  // donut reads negative all day (owner call).
+  const { bmr, activity } = dayBurn(S, today);
   const eaten = summary?.calories ?? null;
-  const net = eaten != null ? Math.round(eaten - total) : null;
+  const net = eaten != null ? Math.round(eaten - activity) : null;
   const acts = S.burnLog?.[today] || [];
 
   function addActivity() {
     const preset = ACTIVITIES.find(a => a.key === act.key);
-    const mins = parseInt(act.mins);
-    if (!preset || !mins || mins <= 0 || !weight) return;
-    const kcal = activityKcal(preset.met, weight, mins);
+    const amount = parseInt(act.mins);
+    if (!preset || !amount || amount <= 0 || !weight) return;
+    const isSteps = preset.key === 'steps';
+    const kcal = isSteps ? stepsKcal(amount, weight) : activityKcal(preset.met, weight, amount);
+    const label = isSteps ? `${amount.toLocaleString()} steps` : `${preset.label} ${amount}m`;
     update(prev => ({
       ...prev,
       burnLog: {
         ...(prev.burnLog || {}),
-        [today]: [...((prev.burnLog || {})[today] || []), { id: 'a' + Date.now(), label: `${preset.label} ${mins}m`, kcal }],
+        [today]: [...((prev.burnLog || {})[today] || []), { id: 'a' + Date.now(), label, kcal }],
       },
     }));
     setAdding(false);
@@ -533,17 +538,16 @@ function BurnBody({ S, update, userId }) {
   return (
     <div className="m-burn">
       <div className="m-burn-hero">
-        <span className="m-burn-total">{total.toLocaleString()}</span>
+        <span className="m-burn-total">{activity.toLocaleString()}</span>
         <span className="m-burn-unit">kcal burned today</span>
       </div>
       <div className="m-burn-split">
-        <span>Resting {bmr?.toLocaleString() ?? '–'}</span>
-        <span>Activity {activity.toLocaleString()}</span>
         {net != null && (
           <span className={net > 0 ? 'is-surplus' : 'is-deficit'}>
-            {net > 0 ? `+${net.toLocaleString()} surplus` : `${net.toLocaleString()} deficit`}
+            {`net ${net.toLocaleString()} kcal`}
           </span>
         )}
+        <span>Resting est. {bmr?.toLocaleString() ?? '–'} (info only)</span>
       </div>
       {acts.length > 0 && (
         <ul className="m-burn-acts">
@@ -561,7 +565,7 @@ function BurnBody({ S, update, userId }) {
           <select value={act.key} onChange={e => setAct(a => ({ ...a, key: e.target.value }))}>
             {ACTIVITIES.map(a => <option key={a.key} value={a.key}>{a.label}</option>)}
           </select>
-          <input type="number" inputMode="numeric" placeholder="min" value={act.mins} onChange={e => setAct(a => ({ ...a, mins: e.target.value }))} style={{ width: 64 }} />
+          <input type="number" inputMode="numeric" placeholder={act.key === 'steps' ? 'steps' : 'min'} value={act.mins} onChange={e => setAct(a => ({ ...a, mins: e.target.value }))} style={{ width: act.key === 'steps' ? 84 : 64 }} />
           <button type="button" className="m-burn-btn" onClick={addActivity}>Add</button>
         </div>
       ) : (
@@ -602,7 +606,9 @@ function MacrosBody({ S, userId, navigate }) {
   const byName = n => macros.find(m => m.name === n);
   const calGoal = byName('Calories')?.daily_goal || 2000;
   const eaten = summary?.calories || 0;
-  const { total: burned } = dayBurn(S, today);
+  // Activity burn only — resting/BMR is deliberately excluded from
+  // net so the donut doesn't sit negative all day (owner call).
+  const { activity: burned } = dayBurn(S, today);
   const net = Math.round(eaten - burned);
 
   // Calorie ring: eaten arc in the accent; the leading portion that

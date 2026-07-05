@@ -32,7 +32,9 @@ export function bmrKcal(S) {
   return Math.round(p.sex === 'female' ? base - 161 : base + 5);
 }
 
-/** Standard MET presets for the quick-add row. */
+/** Standard MET presets for the quick-add row. `steps` is the odd one
+ *  out: the input is a step count, not minutes (~0.0005 kcal per step
+ *  per kg — ≈35 kcal per 1,000 steps at 70 kg). */
 export const ACTIVITIES = [
   { key: 'weights', label: 'Weights',  met: 5.0 },
   { key: 'run',     label: 'Run',      met: 9.8 },
@@ -40,6 +42,7 @@ export const ACTIVITIES = [
   { key: 'cycle',   label: 'Cycle',    met: 7.5 },
   { key: 'swim',    label: 'Swim',     met: 8.0 },
   { key: 'sport',   label: 'Sport',    met: 7.0 },
+  { key: 'steps',   label: 'Steps',    met: null, perStepKg: 0.0005 },
 ];
 
 /** kcal for `minutes` of an activity at the user's current weight. */
@@ -47,8 +50,17 @@ export function activityKcal(met, weightKg, minutes) {
   return Math.round(met * weightKg * (minutes / 60));
 }
 
-/** Today's burn breakdown: { bmr, activity, total } (kcal). bmr may
- *  be null when the profile isn't set up yet. */
+/** kcal for a raw step count at the user's current weight. */
+export function stepsKcal(steps, weightKg) {
+  return Math.round(steps * weightKg * 0.0005);
+}
+
+/** Today's burn breakdown: { bmr, activity, total } (kcal).
+ *  IMPORTANT: net-intake maths (deficit/surplus, the macros ring's
+ *  burned arc) uses `activity` ONLY — exercise + steps. Resting burn
+ *  (bmr) is informational; counting it made the calorie donut read
+ *  negative all day (owner call, 2026-07-05). bmr may be null when
+ *  the profile isn't set up. */
 export function dayBurn(S, date) {
   const bmr = bmrKcal(S);
   const activity = (S.burnLog?.[date] || []).reduce((sum, a) => sum + (a.kcal || 0), 0);
