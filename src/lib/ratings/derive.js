@@ -197,6 +197,49 @@ function socialPoints(S, friendCount = 0) {
   return (friends / 20) * 12 + (activeDays / 30) * 16;
 }
 
+// ── Health contributions (vitals / burn / macros) — 2026-07 ───────────────
+//
+// Lifetime accumulations (owner call: points feed the prestige climb,
+// so no rolling window). All self-reported, so each is per-day capped —
+// consistency earns, magnitudes don't:
+//
+//   vitals: 0.4 pt per calendar day with any vitals entry (weight /
+//           sleep / resting HR — the Vitals widget writes S.vitalsLog)
+//   burn:   up to 0.5 pt per day, scaled by min(activityKcal, 600)/600
+//           (S.burnLog — exercise + steps; typing a huge number earns
+//           no more than a real session)
+//   macros: 0.5 pt per on-target nutrition day. Nutrition lives in
+//           Supabase tables, not synced state, so the count arrives
+//           via ctx.macroDays (client passes a cached count for the
+//           local view; the server counts the table itself — same
+//           pattern as friendCount).
+
+const BURN_DAY_CAP_KCAL = 600;
+
+function vitalsPoints(S) {
+  const log = S.vitalsLog || {};
+  let days = 0;
+  for (const k of Object.keys(log)) {
+    const e = log[k];
+    if (e && (e.weight != null || e.sleep != null || e.rhr != null)) days++;
+  }
+  return days * 0.4;
+}
+
+function burnPoints(S) {
+  const log = S.burnLog || {};
+  let pts = 0;
+  for (const k of Object.keys(log)) {
+    const kcal = (log[k] || []).reduce((sum, a) => sum + (Number(a.kcal) || 0), 0);
+    if (kcal > 0) pts += Math.min(kcal, BURN_DAY_CAP_KCAL) / BURN_DAY_CAP_KCAL * 0.5;
+  }
+  return pts;
+}
+
+function macroPoints(macroDays = 0) {
+  return Math.max(0, macroDays) * 0.5;
+}
+
 // ── Visions contribution ───────────────────────────────────────────────────
 
 /**
@@ -247,8 +290,10 @@ export function deriveRatings(S, ctx = {}) {
     fitnessScorePoints(S) +
     trackerPoints(S, 'fitness') * 1.2 +
     achievementPoints(S, 'fitness') * 2.5 +
-    visionPoints(S, 'fitness');
-    // Health-data contribution (steps/sleep/active-mins) waits on F4 Sprint 1.
+    visionPoints(S, 'fitness') +
+    vitalsPoints(S) +
+    burnPoints(S) +
+    macroPoints(ctx.macroDays);
 
   const socialPts =
     socialSelfCheckPoints(S) +
@@ -296,7 +341,9 @@ export function categoryBreakdown(S, category, ctx = {}) {
         { label: 'Fitness trackers', points: trackerPoints(S, 'fitness') * 1.2 },
         { label: 'Fitness achievements', points: achievementPoints(S, 'fitness') * 2.5 },
         { label: 'Fitness visions',  points: visionPoints(S, 'fitness') },
-        { label: 'Health data (coming)', points: 0 },
+        { label: 'Vitals log days',  points: vitalsPoints(S) },
+        { label: 'Activity burn',    points: burnPoints(S) },
+        { label: 'On-target macro days', points: macroPoints(ctx.macroDays) },
       ];
     case 'social':
       return [

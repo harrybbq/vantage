@@ -69,10 +69,30 @@ is a `k` multiplier param defaulting to 1; currently unused per-category.)
 ```
 brainPts   = brainScore        + brainTrackers*1.0  + brainAch*2.5   + brainVisions
 financePts = financeScore      + savings            + finTrackers*1.0+ finAch*2.5  + finVisions
-fitnessPts = fitnessScore      + fitTrackers*1.2    + fitAch*2.5     + fitVisions   (+ health data — TODO F4 S1)
+fitnessPts = fitnessScore      + fitTrackers*1.2    + fitAch*2.5     + fitVisions   + vitalsPts + burnPts + macroPts
 socialPts  = socialSelfCheck   + socialPoints(friends+activity) + socAch*2.5 + socVisions
 ovr        = round((brain+finance+fitness+social)/4)
 ```
+
+Health contributions (added 2026-07 — LIFETIME accumulations, owner
+call: they feed the prestige climb, so no rolling window; per-day caps
+are the anti-gaming layer since all inputs are self-reported):
+
+```
+vitalsPts = (days in S.vitalsLog with any entry) × 0.4
+burnPts   = Σ per day: min(dayActivityKcal, 600)/600 × 0.5   (S.burnLog)
+macroPts  = onTargetMacroDays × 0.5
+```
+
+`onTargetMacroDays` = lifetime count of nutrition_daily_summary rows
+with calories within [50%, 130%] of the CURRENT Calories goal (goal
+changes over time — accepted approximation). This is the ONE fitness
+input not in synced state: the client passes a cached count via
+`ctx.macroDays` (5-min TTL in useRatings) for the local preview; the
+server counts the table itself via `fetchMacroDays()` in
+netlify/lib/recompute.js — same pattern as friendCount. prestige-up.js
+includes macroDays in the baseline snapshot so prestige resets these
+points too.
 
 ### 3c. The point sources
 
