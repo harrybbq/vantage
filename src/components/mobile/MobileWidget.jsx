@@ -999,4 +999,6 @@ function YoutubeBody({ S, meta }) {
   );
 }
 
-export { WIDGET_META };
+// Bodies shared with the desktop hub canvas (HubSection mounts them
+// as React islands inside the imperative widget shells).
+export { WIDGET_META, VitalsBody, BurnBody, MacrosBody };
