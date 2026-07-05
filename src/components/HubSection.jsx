@@ -1,5 +1,7 @@
 import { useEffect, useRef, useCallback } from 'react';
+import { createRoot } from 'react-dom/client';
 import { motion } from 'framer-motion';
+import { VitalsBody, BurnBody, MacrosBody } from './mobile/MobileWidget';
 import { timeAgo } from '../utils/helpers';
 import AiCoachWidget from './AiCoachWidget';
 import CoachBriefPanel from './CoachBriefPanel';
@@ -279,6 +281,32 @@ export default function HubSection({ S, update, active, onOpenModal, onOpenWaitl
   const makeDraggable = useWidgetDrag(canvasRef, S, update);
   const { hasPro } = useSubscriptionContext();
 
+  // React islands inside the imperative canvas — Vitals / Macros /
+  // Calories reuse the mobile widget bodies rather than duplicating
+  // their logic as HTML strings. hwId → { root, type }. Mounted by
+  // renderCanvas, re-rendered with fresh props by the effect below,
+  // unmounted before every canvas rebuild.
+  const reactRootsRef = useRef(new Map());
+  function reactWidgetEl(type) {
+    switch (type) {
+      case 'vitals':   return <VitalsBody S={S} update={update} />;
+      case 'macros':   return <MacrosBody S={S} userId={userId} navigate={onNavigate} />;
+      case 'calories': return <BurnBody S={S} update={update} userId={userId} />;
+      default:         return null;
+    }
+  }
+  const reactWidgetElRef = useRef(reactWidgetEl);
+  reactWidgetElRef.current = reactWidgetEl;
+
+  // Keep mounted islands in sync with state — the canvas only rebuilds
+  // on structural changes (widget list, positions), not on every S
+  // mutation (e.g. logging a vital), so re-render the roots directly.
+  useEffect(() => {
+    for (const [, { root, type }] of reactRootsRef.current) {
+      root.render(reactWidgetElRef.current(type));
+    }
+  }, [S, userId]);
+
   // Right-click a hub module → toggle its background transparency.
   // syncKey re-applies after the imperative widget canvas re-renders
   // (S.links / ytWidgets change) so the attribute isn't lost.
@@ -492,6 +520,11 @@ export default function HubSection({ S, update, active, onOpenModal, onOpenWaitl
   const renderCanvas = useCallback(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
+    // Tear down React islands before wiping their DOM.
+    for (const [, { root }] of reactRootsRef.current) {
+      try { root.unmount(); } catch { /* already gone */ }
+    }
+    reactRootsRef.current.clear();
     canvas.innerHTML = '';
 
     const hasPositions = Object.keys(S.widgetPositions).length > 0;
@@ -653,6 +686,12 @@ export default function HubSection({ S, update, active, onOpenModal, onOpenWaitl
         // fetched async after mount (we don't have the leaderboard data
         // synchronously here). The body fills in via fetch + DOM patch.
         leaderboard: { eyebrow: 'WIDGET · LEADERBOARD', icon: '⊿', title: 'Leaderboard', sub: 'Friends · all-time', body: () => `<div class="hub-widget-empty" data-lb-host="${hw.id}">Loading leaderboard…</div>` },
+        // Vitals / Macros / Calories are interactive React components
+        // shared with the mobile hub — rendered as React islands into
+        // hosts the mount pass below picks up (see reactRootsRef).
+        vitals:      { eyebrow: 'WIDGET · VITALS',      icon: '◐', title: 'Vitals',      sub: 'Weight · sleep · HR', body: () => `<div data-react-widget="vitals"></div>` },
+        macros:      { eyebrow: 'WIDGET · MACROS',      icon: '◑', title: 'Macros',      sub: 'Today · net kcal',    body: () => `<div data-react-widget="macros"></div>` },
+        calories:    { eyebrow: 'WIDGET · BURN',        icon: '◔', title: 'Calories Burned', sub: 'Activity · net',  body: () => `<div data-react-widget="calories"></div>` },
       };
       const meta = META[hw.type] || META.habits;
       const { eyebrow, icon, title, sub } = meta;
@@ -692,6 +731,13 @@ export default function HubSection({ S, update, active, onOpenModal, onOpenWaitl
       makeDraggable(wrapper, hw.id);
       makeResizable(wrapper, hw.id);
       if (hw.type === 'leaderboard') loadLeaderboardIntoWidget(hw.id);
+      // Mount React-island bodies (vitals / macros / calories).
+      const host = island.querySelector('[data-react-widget]');
+      if (host) {
+        const root = createRoot(host);
+        root.render(reactWidgetElRef.current(hw.type));
+        reactRootsRef.current.set(hw.id, { root, type: hw.type });
+      }
     });
 
     // Notepad — show if text exists, position saved, or explicitly shown via _showNotepad flag
@@ -704,6 +750,15 @@ export default function HubSection({ S, update, active, onOpenModal, onOpenWaitl
   useEffect(() => {
     if (active) renderCanvas();
   }, [active, renderCanvas, isOsLayout]);
+
+  // Tear down any live React islands when HubSection itself unmounts.
+  // Deferred a tick — unmounting a root synchronously inside React's
+  // own unmount pass triggers a dev warning.
+  useEffect(() => () => {
+    const roots = [...reactRootsRef.current.values()];
+    reactRootsRef.current.clear();
+    setTimeout(() => roots.forEach(({ root }) => { try { root.unmount(); } catch { /* gone */ } }), 0);
+  }, []);
 
   // ── Dark OS layout (Pro only) ─────────────────────────────────────────
   if (isOsLayout) {
