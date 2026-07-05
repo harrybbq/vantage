@@ -56,8 +56,8 @@ function MacroBar({ macro, consumed, isCal, index, onMenuClick }) {
         <span style={{ fontWeight: 700, fontSize: 'var(--text-sm)', color: 'var(--text)', flex: 1, minWidth: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
           {macro.name}
         </span>
-        <span style={{ fontSize: 'var(--text-sm)', color: valueColour, whiteSpace: 'nowrap', opacity: 0.85 }}>
-          {fmt(consumed)}{macro.unit !== 'kcal' ? macro.unit : ''} / {fmt(goal)}{macro.unit}
+        <span style={{ fontFamily: 'var(--mono)', fontSize: '11px', color: valueColour, whiteSpace: 'nowrap', opacity: 0.9, fontVariantNumeric: 'tabular-nums' }}>
+          {fmt(consumed)}<span style={{ color: 'var(--text-muted)' }}>/{fmt(goal)}{macro.unit}</span>
         </span>
         <span style={{ fontFamily: 'var(--mono)', fontSize: 'var(--text-xs)', color: over ? 'var(--amber)' : 'var(--text-mid)', minWidth: '34px', textAlign: 'right' }}>
           {Math.round(pct)}%
@@ -330,24 +330,54 @@ export default function NutritionSection({ userId, selectedDate, calYear, calMon
         </div>
       </div>
 
-      {/* Calorie summary */}
-      {calMacro && (
-        <div style={{ marginBottom: '16px' }}>
-          <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px', flexWrap: 'wrap' }}>
-            <span style={{ fontSize: 'var(--text-2xl)', fontWeight: 700, color: 'var(--text)', fontFamily: 'var(--serif)' }}>
-              {Number(calConsumed).toLocaleString('en-GB', { maximumFractionDigits: 0 })}
-            </span>
-            <span style={{ fontSize: 'var(--text-md)', color: 'var(--text-muted)' }}>
-              / {Number(calGoal).toLocaleString('en-GB', { maximumFractionDigits: 0 })} kcal
-            </span>
+      {/* Calorie summary — donut ring (same language as the tracker
+          rings) + figures + the primary Log Food action beside it. */}
+      {calMacro && (() => {
+        const pct = Math.min(1, calGoal > 0 ? calConsumed / calGoal : 0);
+        const over = calRemaining < 0;
+        const R = 26, C = 2 * Math.PI * R;
+        return (
+          <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginBottom: '18px', flexWrap: 'wrap' }}>
+            <div style={{ position: 'relative', width: 64, height: 64, flexShrink: 0 }}>
+              <svg width="64" height="64" viewBox="0 0 64 64" aria-hidden="true">
+                <circle cx="32" cy="32" r={R} fill="none" stroke="var(--border)" strokeWidth="5" />
+                {pct > 0 && (
+                  <circle cx="32" cy="32" r={R} fill="none"
+                    stroke={over ? 'var(--amber)' : 'var(--em)'} strokeWidth="5"
+                    strokeDasharray={`${(pct * C).toFixed(1)} ${C.toFixed(1)}`}
+                    strokeLinecap="round" transform="rotate(-90 32 32)"
+                    style={{ transition: 'stroke-dasharray .5s var(--ease-out, ease-out)' }} />
+                )}
+              </svg>
+              <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', lineHeight: 1 }}>
+                <span style={{ fontFamily: 'var(--mono)', fontSize: '13px', fontWeight: 700, color: 'var(--text)', fontVariantNumeric: 'tabular-nums' }}>
+                  {Math.round(pct * 100)}%
+                </span>
+              </div>
+            </div>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ display: 'flex', alignItems: 'baseline', gap: '7px', flexWrap: 'wrap' }}>
+                <span style={{ fontSize: 'var(--text-2xl)', fontWeight: 700, color: 'var(--text)', fontFamily: 'var(--serif)' }}>
+                  {Number(calConsumed).toLocaleString('en-GB', { maximumFractionDigits: 0 })}
+                </span>
+                <span style={{ fontSize: 'var(--text-sm)', color: 'var(--text-muted)', fontFamily: 'var(--mono)' }}>
+                  / {Number(calGoal).toLocaleString('en-GB', { maximumFractionDigits: 0 })} kcal
+                </span>
+              </div>
+              <div style={{ fontFamily: 'var(--mono)', fontSize: '11px', color: over ? 'var(--amber)' : 'var(--text-muted)', marginTop: '3px' }}>
+                {over
+                  ? `${Math.abs(Math.round(calRemaining)).toLocaleString()} kcal over`
+                  : `${Math.round(calRemaining).toLocaleString()} kcal remaining`}
+              </div>
+            </div>
+            <button
+              onClick={() => setShowFoodSearch(true)}
+              style={{ padding: '10px 18px', borderRadius: 'var(--radius-md)', border: 'none', background: 'var(--em)', color: '#fff', fontFamily: 'var(--sans)', fontSize: 'var(--text-sm)', fontWeight: 600, cursor: 'pointer', flexShrink: 0 }}>
+              + Log Food
+            </button>
           </div>
-          <div style={{ fontSize: 'var(--text-sm)', color: calRemaining < 0 ? 'var(--amber)' : 'var(--text-muted)', marginTop: '2px' }}>
-            {calRemaining < 0
-              ? `${Math.abs(Math.round(calRemaining)).toLocaleString()} kcal over`
-              : `${Math.round(calRemaining).toLocaleString()} kcal remaining`}
-          </div>
-        </div>
-      )}
+        );
+      })()}
 
       {/* Macro bars */}
       <div style={{ position: 'relative' }}>
@@ -411,14 +441,8 @@ export default function NutritionSection({ userId, selectedDate, calYear, calMon
         </button>
       </div>
 
-      {/* Log Food button */}
-      <button
-        onClick={() => setShowFoodSearch(true)}
-        style={{ marginTop: '18px', width: '100%', padding: '12px', borderRadius: 'var(--radius-md)', border: 'none', background: 'var(--em)', color: '#fff', fontFamily: 'var(--sans)', fontSize: 'var(--text-sm)', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>
-        + Log Food
-      </button>
-
-      {/* Food log list */}
+      {/* Food log list — Log Food lives in the calorie header now;
+          the list's own empty state also offers add. */}
       <FoodLogList
         logEntries={logEntries}
         date={date}
