@@ -59,7 +59,7 @@ function fmtDate(d) {
   return `${WEEKDAYS[d.getDay()]} ${d.getDate()} ${MONTHS[d.getMonth()]}`;
 }
 
-export default function MobileHubSection({ S, update, visionState, hasPro, navigate, onOpenModal }) {
+export default function MobileHubSection({ S, update, visionState, hasPro, navigate, onOpenModal, userId }) {
   const now = useClock();
   const today = getTodayStr();
   const profileName = (S.profile?.name || '').trim();
@@ -204,6 +204,7 @@ export default function MobileHubSection({ S, update, visionState, hasPro, navig
           S={S}
           update={update}
           navigate={navigate}
+          userId={userId}
           onRemove={id => update(prev => ({
             ...prev,
             mobileWidgets: (prev.mobileWidgets || []).filter(x => x.id !== id),

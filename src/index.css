@@ -4917,6 +4917,45 @@ button:active:not(:disabled),
 .vitals-table td { font-size: 12.5px; color: var(--text-mid); padding: 6px 8px; border-bottom: 1px solid var(--border-lt, var(--border)); }
 .vitals-table tr:last-child td { border-bottom: none; }
 
+/* ── Calories Burned widget (Phase 1) ── */
+.m-burn { display: flex; flex-direction: column; gap: 10px; }
+.m-burn-hero { display: flex; align-items: baseline; gap: 8px; }
+.m-burn-total { font-family: var(--mono); font-size: 26px; font-weight: 700; color: var(--text); font-variant-numeric: tabular-nums; line-height: 1; }
+.m-burn-unit { font-family: var(--mono); font-size: 10px; letter-spacing: 1px; text-transform: uppercase; color: var(--text-muted); }
+.m-burn-split { display: flex; gap: 12px; flex-wrap: wrap; font-family: var(--mono); font-size: 10px; color: var(--text-muted); }
+.m-burn-split .is-deficit { color: var(--em); font-weight: 700; }
+.m-burn-split .is-surplus { color: #d99114; font-weight: 700; }
+.m-burn-acts { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 5px; }
+.m-burn-acts li { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--text); }
+.m-burn-act-kcal { margin-left: auto; font-family: var(--mono); font-size: 10.5px; color: var(--text-muted); }
+.m-burn-acts button { background: none; border: none; color: var(--text-muted); cursor: pointer; font-size: 10px; padding: 2px 4px; }
+.m-burn-add { background: none; border: 1px dashed var(--border); border-radius: 9px; color: var(--text-muted); font-family: var(--mono); font-size: 11px; padding: 8px; cursor: pointer; }
+.m-burn-btn { background: var(--em); border: none; border-radius: 9px; color: #fff; font-size: 12px; font-weight: 600; padding: 8px 14px; cursor: pointer; }
+.m-burn-btn:disabled { opacity: .45; cursor: not-allowed; }
+.m-burn-setup { display: flex; flex-direction: column; gap: 8px; }
+.m-burn-setup-title { font-size: 13px; font-weight: 600; color: var(--text); }
+.m-burn-setup-row { display: flex; gap: 7px; }
+.m-burn-setup-row input, .m-burn-setup-row select {
+  flex: 1; min-width: 0; background: rgba(255,255,255,.05); border: 1px solid var(--border);
+  border-radius: 8px; padding: 8px 9px; color: var(--text); font-family: var(--body); font-size: 12.5px; outline: none;
+}
+.m-burn-note { font-family: var(--mono); font-size: 9.5px; color: var(--text-muted); line-height: 1.6; }
+
+/* ── Macros widget — % rings + burn-aware calorie ring ── */
+.m-macros { display: flex; flex-direction: column; gap: 12px; }
+.m-macros-cal { display: flex; align-items: center; gap: 14px; }
+.m-macros-cal-ring { position: relative; width: 76px; height: 76px; flex-shrink: 0; }
+.m-macros-cal-center { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; line-height: 1; gap: 2px; }
+.m-macros-net { font-family: var(--mono); font-size: 15px; font-weight: 700; color: var(--text); font-variant-numeric: tabular-nums; }
+.m-macros-net-label { font-family: var(--mono); font-size: 8px; letter-spacing: 1.4px; text-transform: uppercase; color: var(--text-muted); }
+.m-macros-cal-legend { font-family: var(--mono); font-size: 10.5px; color: var(--text-muted); display: flex; flex-direction: column; gap: 4px; }
+.m-macros-cal-legend i { display: inline-block; width: 10px; height: 3px; border-radius: 2px; margin-right: 6px; vertical-align: middle; }
+.m-macros-goal { font-size: 9px; letter-spacing: .5px; }
+.m-macros-rings { display: flex; gap: 14px; justify-content: space-between; }
+.m-macro-ring { position: relative; display: flex; flex-direction: column; align-items: center; gap: 3px; flex: 1; }
+.m-macro-ring-pct { position: absolute; top: 18px; font-family: var(--mono); font-size: 10.5px; font-weight: 700; color: var(--text); font-variant-numeric: tabular-nums; }
+.m-macro-ring-label { font-family: var(--mono); font-size: 8.5px; letter-spacing: 1.2px; text-transform: uppercase; color: var(--text-muted); }
+
 /* ── Vitals widget — tap-to-log daily stats ── */
 .m-vitals { display: flex; flex-direction: column; gap: 10px; }
 .m-vitals-tiles { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }

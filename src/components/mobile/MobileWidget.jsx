@@ -14,6 +14,8 @@
  */
 import { useState, useRef, useEffect } from 'react';
 import { getTodayStr } from '../../utils/helpers';
+import { supabase } from '../../lib/supabase';
+import { bmrKcal, currentWeightKg, dayBurn, ACTIVITIES, activityKcal } from '../../lib/burn';
 import { APP_PRESETS, getAppPreset } from '../../data/appPresets';
 import { fetchAppPreview } from '../../lib/appPreview';
 import { strikeState } from '../../lib/habits/strikes';
@@ -89,11 +91,20 @@ const BASE_WIDGET_META = {
     eyebrow: 'HEALTH',
     icon: '◐',
   },
+  // Calories Burned — Phase 1 (docs/FEATURES.md): BMR estimate from
+  // the burn profile + manual MET activity log. Health Connect /
+  // HealthKit later overwrite estimates with sensor data.
   'calories': {
     label: 'Calories Burned',
-    eyebrow: 'CALORIES',
+    eyebrow: 'BURN',
     icon: '◔',
-    requires: 'HealthKit + active-energy permission — coming with F4 Sprint 1',
+  },
+  // Macros — % of each macro consumed today as rings; the calorie
+  // ring shows eaten with the burned portion in a second colour.
+  'macros': {
+    label: 'Macros',
+    eyebrow: 'MACROS',
+    icon: '◑',
   },
   'mail': {
     label: 'Recent Mail',
@@ -106,7 +117,7 @@ const BASE_WIDGET_META = {
 // App presets slot in alongside the built-in widget types.
 const WIDGET_META = { ...BASE_WIDGET_META, ...APP_WIDGET_META };
 
-export default function MobileWidget({ widget, S, update, onRemove, navigate }) {
+export default function MobileWidget({ widget, S, update, onRemove, navigate, userId }) {
   const meta = WIDGET_META[widget.type] || { label: widget.type, eyebrow: '?', icon: '·' };
 
   // Brand-tinted icon chip when the type carries an `accent` (the new
@@ -239,7 +250,7 @@ export default function MobileWidget({ widget, S, update, onRemove, navigate }) 
             <span className="m-widget-eyebrow">// {meta.eyebrow}</span>
           </div>
           <div className="m-widget-body">
-            {renderBody(widget, meta, S, update, navigate)}
+            {renderBody(widget, meta, S, update, navigate, userId)}
           </div>
         </div>
       </div>
@@ -278,7 +289,7 @@ export default function MobileWidget({ widget, S, update, onRemove, navigate }) 
   );
 }
 
-function renderBody(widget, meta, S, update, navigate) {
+function renderBody(widget, meta, S, update, navigate, userId) {
   if (meta.requires) {
     return (
       <div className="m-widget-stub">
@@ -301,6 +312,8 @@ function renderBody(widget, meta, S, update, navigate) {
     case 'linkedin':    return <LinkedinBody S={S} meta={meta} />;
     case 'youtube':     return <YoutubeBody S={S} meta={meta} />;
     case 'vitals':      return <VitalsBody S={S} update={update} />;
+    case 'calories':    return <BurnBody S={S} update={update} userId={userId} />;
+    case 'macros':      return <MacrosBody S={S} userId={userId} navigate={navigate} />;
     default:            return <div className="m-widget-stub-label">Unknown widget type.</div>;
   }
 }
@@ -415,6 +428,231 @@ function VitalsSparkline({ values }) {
     <svg className="m-vitals-spark" viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" aria-hidden="true">
       <polyline points={pts} fill="none" stroke="var(--em)" strokeWidth="1.6" strokeLinejoin="round" strokeLinecap="round" />
     </svg>
+  );
+}
+
+// ── Nutrition day summary (shared by Burn + Macros widgets) ──
+// Light direct fetch of today's macros + summary — deliberately NOT
+// useNutrition (which seeds defaults, loads log entries and month
+// data a hub widget doesn't need).
+function useDaySummary(userId) {
+  const [data, setData] = useState({ macros: [], summary: null, loaded: false });
+  useEffect(() => {
+    if (!userId) { setData(d => ({ ...d, loaded: true })); return undefined; }
+    let live = true;
+    (async () => {
+      try {
+        const today = getTodayStr();
+        const [{ data: macros }, { data: summary }] = await Promise.all([
+          supabase.from('nutrition_macros').select('*').eq('user_id', userId).order('display_order', { ascending: true }),
+          supabase.from('nutrition_daily_summary').select('*').eq('user_id', userId).eq('log_date', today).maybeSingle(),
+        ]);
+        if (live) setData({ macros: macros || [], summary: summary || null, loaded: true });
+      } catch {
+        if (live) setData({ macros: [], summary: null, loaded: true });
+      }
+    })();
+    return () => { live = false; };
+  }, [userId]);
+  return data;
+}
+
+// ── Calories Burned — Phase 1 (docs/FEATURES.md) ──
+function BurnBody({ S, update, userId }) {
+  const today = getTodayStr();
+  const { summary } = useDaySummary(userId);
+  const profile = S.burnProfile;
+  const weight = currentWeightKg(S);
+  const [form, setForm] = useState({ heightCm: '', age: '', sex: 'male', weightKg: '' });
+  const [adding, setAdding] = useState(false);
+  const [act, setAct] = useState({ key: 'weights', mins: '45' });
+
+  // One-time setup — height/age/sex (+ weight only if Vitals has none).
+  if (!profile?.heightCm) {
+    const needWeight = weight == null;
+    const canSave = form.heightCm && form.age && (!needWeight || form.weightKg);
+    return (
+      <div className="m-burn-setup">
+        <div className="m-burn-setup-title">Set up your burn profile</div>
+        <div className="m-burn-setup-row">
+          <input type="number" inputMode="numeric" placeholder="Height cm" value={form.heightCm} onChange={e => setForm(f => ({ ...f, heightCm: e.target.value }))} />
+          <input type="number" inputMode="numeric" placeholder="Age" value={form.age} onChange={e => setForm(f => ({ ...f, age: e.target.value }))} />
+          <select value={form.sex} onChange={e => setForm(f => ({ ...f, sex: e.target.value }))}>
+            <option value="male">Male</option>
+            <option value="female">Female</option>
+          </select>
+        </div>
+        {needWeight && (
+          <div className="m-burn-setup-row">
+            <input type="number" inputMode="decimal" placeholder="Weight kg (or log it in Vitals)" value={form.weightKg} onChange={e => setForm(f => ({ ...f, weightKg: e.target.value }))} />
+          </div>
+        )}
+        <button
+          type="button" className="m-burn-btn" disabled={!canSave}
+          onClick={() => update(prev => ({
+            ...prev,
+            burnProfile: {
+              heightCm: parseFloat(form.heightCm),
+              age: parseInt(form.age),
+              sex: form.sex,
+              ...(form.weightKg ? { weightKg: parseFloat(form.weightKg) } : {}),
+            },
+          }))}
+        >Save profile</button>
+        <div className="m-burn-note">Used for your resting-burn estimate (Mifflin-St Jeor). Weight follows your Vitals log automatically.</div>
+      </div>
+    );
+  }
+
+  const { bmr, activity, total } = dayBurn(S, today);
+  const eaten = summary?.calories ?? null;
+  const net = eaten != null ? Math.round(eaten - total) : null;
+  const acts = S.burnLog?.[today] || [];
+
+  function addActivity() {
+    const preset = ACTIVITIES.find(a => a.key === act.key);
+    const mins = parseInt(act.mins);
+    if (!preset || !mins || mins <= 0 || !weight) return;
+    const kcal = activityKcal(preset.met, weight, mins);
+    update(prev => ({
+      ...prev,
+      burnLog: {
+        ...(prev.burnLog || {}),
+        [today]: [...((prev.burnLog || {})[today] || []), { id: 'a' + Date.now(), label: `${preset.label} ${mins}m`, kcal }],
+      },
+    }));
+    setAdding(false);
+  }
+  function removeActivity(id) {
+    update(prev => ({
+      ...prev,
+      burnLog: { ...(prev.burnLog || {}), [today]: ((prev.burnLog || {})[today] || []).filter(a => a.id !== id) },
+    }));
+  }
+
+  return (
+    <div className="m-burn">
+      <div className="m-burn-hero">
+        <span className="m-burn-total">{total.toLocaleString()}</span>
+        <span className="m-burn-unit">kcal burned today</span>
+      </div>
+      <div className="m-burn-split">
+        <span>Resting {bmr?.toLocaleString() ?? '–'}</span>
+        <span>Activity {activity.toLocaleString()}</span>
+        {net != null && (
+          <span className={net > 0 ? 'is-surplus' : 'is-deficit'}>
+            {net > 0 ? `+${net.toLocaleString()} surplus` : `${net.toLocaleString()} deficit`}
+          </span>
+        )}
+      </div>
+      {acts.length > 0 && (
+        <ul className="m-burn-acts">
+          {acts.map(a => (
+            <li key={a.id}>
+              <span>{a.label}</span>
+              <span className="m-burn-act-kcal">{a.kcal} kcal</span>
+              <button type="button" onClick={() => removeActivity(a.id)} aria-label={`Remove ${a.label}`}>✕</button>
+            </li>
+          ))}
+        </ul>
+      )}
+      {adding ? (
+        <div className="m-burn-setup-row">
+          <select value={act.key} onChange={e => setAct(a => ({ ...a, key: e.target.value }))}>
+            {ACTIVITIES.map(a => <option key={a.key} value={a.key}>{a.label}</option>)}
+          </select>
+          <input type="number" inputMode="numeric" placeholder="min" value={act.mins} onChange={e => setAct(a => ({ ...a, mins: e.target.value }))} style={{ width: 64 }} />
+          <button type="button" className="m-burn-btn" onClick={addActivity}>Add</button>
+        </div>
+      ) : (
+        <button type="button" className="m-burn-add" onClick={() => setAdding(true)}>＋ Add activity</button>
+      )}
+    </div>
+  );
+}
+
+// ── Macros — % rings, burn-aware calorie ring (owner idea) ──
+function MacroRing({ label, consumed, goal, color, size = 52 }) {
+  const R = (size - 8) / 2, C = 2 * Math.PI * R, c = size / 2;
+  const pct = goal > 0 ? Math.min(1, consumed / goal) : 0;
+  const over = goal > 0 && consumed > goal;
+  return (
+    <div className="m-macro-ring" style={{ width: size }}>
+      <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} aria-hidden="true">
+        <circle cx={c} cy={c} r={R} fill="none" stroke="rgba(255,255,255,.10)" strokeWidth="4" />
+        {pct > 0 && (
+          <circle cx={c} cy={c} r={R} fill="none" stroke={over ? 'var(--gold, #d4a017)' : color} strokeWidth="4"
+            strokeDasharray={`${(pct * C).toFixed(1)} ${C.toFixed(1)}`} strokeLinecap="round"
+            transform={`rotate(-90 ${c} ${c})`} />
+        )}
+      </svg>
+      <span className="m-macro-ring-pct">{goal > 0 ? Math.round((consumed / goal) * 100) + '%' : '–'}</span>
+      <span className="m-macro-ring-label">{label}</span>
+    </div>
+  );
+}
+
+function MacrosBody({ S, userId, navigate }) {
+  const today = getTodayStr();
+  const { macros, summary, loaded } = useDaySummary(userId);
+  if (!userId) return <div className="m-widget-empty">Sign in to see your macros.</div>;
+  if (!loaded) return <div className="m-widget-empty">Loading macros…</div>;
+  if (!macros.length) return <div className="m-widget-empty">Set up macros in Track → Daily Macros first.</div>;
+
+  const byName = n => macros.find(m => m.name === n);
+  const calGoal = byName('Calories')?.daily_goal || 2000;
+  const eaten = summary?.calories || 0;
+  const { total: burned } = dayBurn(S, today);
+  const net = Math.round(eaten - burned);
+
+  // Calorie ring: eaten arc in the accent; the leading portion that
+  // burn cancels out re-painted in teal, so net intake reads visually.
+  const R = 30, C = 2 * Math.PI * R;
+  const eatenPct = Math.min(1, eaten / calGoal);
+  const burnedPct = Math.min(eatenPct, burned / calGoal);
+  const BURN_COLOR = '#12a5a5';
+
+  const rings = [
+    { name: 'Protein', field: 'protein_g' },
+    { name: 'Carbs',   field: 'carbs_g'  },
+    { name: 'Fat',     field: 'fat_g'    },
+  ].map(r => {
+    const m = byName(r.name);
+    return m ? { label: r.name, consumed: Number(summary?.[r.field] || 0), goal: m.daily_goal || 0, color: m.color || 'var(--em)' } : null;
+  }).filter(Boolean);
+
+  return (
+    <div className="m-macros m-widget-clickable" onClick={() => navigate && navigate('track')} role="link" tabIndex={0}>
+      <div className="m-macros-cal">
+        <div className="m-macros-cal-ring">
+          <svg width="76" height="76" viewBox="0 0 76 76" aria-hidden="true">
+            <circle cx="38" cy="38" r={R} fill="none" stroke="rgba(255,255,255,.10)" strokeWidth="5" />
+            {eatenPct > 0 && (
+              <circle cx="38" cy="38" r={R} fill="none" stroke="var(--em)" strokeWidth="5"
+                strokeDasharray={`${(eatenPct * C).toFixed(1)} ${C.toFixed(1)}`} strokeLinecap="round"
+                transform="rotate(-90 38 38)" />
+            )}
+            {burnedPct > 0 && (
+              <circle cx="38" cy="38" r={R} fill="none" stroke={BURN_COLOR} strokeWidth="5"
+                strokeDasharray={`${(burnedPct * C).toFixed(1)} ${C.toFixed(1)}`} strokeLinecap="round"
+                transform="rotate(-90 38 38)" opacity="0.9" />
+            )}
+          </svg>
+          <div className="m-macros-cal-center">
+            <span className="m-macros-net">{net.toLocaleString()}</span>
+            <span className="m-macros-net-label">net</span>
+          </div>
+        </div>
+        <div className="m-macros-cal-legend">
+          <div><i style={{ background: 'var(--em)' }} /> eaten {Math.round(eaten).toLocaleString()}</div>
+          <div><i style={{ background: BURN_COLOR }} /> burned {Math.round(burned).toLocaleString()}</div>
+          <div className="m-macros-goal">goal {calGoal.toLocaleString()} kcal</div>
+        </div>
+      </div>
+      <div className="m-macros-rings">
+        {rings.map(r => <MacroRing key={r.label} {...r} />)}
+      </div>
+    </div>
   );
 }
 
