@@ -19,8 +19,11 @@ source. Staged plan, agreed with owner:
 2. **Activity on top**: tap-to-add rows with standard MET values
    ("＋ Gym 45min"), and/or auto-add an estimate when the Gym Session
    tracker is ticked.
-3. Widget headline = **today's burn (BMR + activity) vs calories
-   eaten** from nutrition — deficit/surplus is the number users want.
+3. Widget headline = **activity burn (exercise + steps) vs calories
+   eaten** from nutrition. DECIDED 2026-07-05: resting/BMR burn is
+   shown as an info line but NEVER subtracted in net maths — counting
+   it made the calorie donut read negative all day. Net = eaten −
+   activity only. Steps are a quick-add preset (~0.0005 kcal/step/kg).
 4. Store per-day (same shape as `vitalsLog`) so later phases can
    overwrite estimates with sensor truth. Chartable on Track like
    the Vitals history card.
