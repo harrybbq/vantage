@@ -20,7 +20,7 @@
  *      stay untouched.
  */
 
-const { derivePoints, recomputeUser } = require('../lib/recompute');
+const { derivePoints, recomputeUser, fetchMacroDays } = require('../lib/recompute');
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
@@ -98,7 +98,8 @@ exports.handler = async (event) => {
     );
     const friends = friendsRes.ok ? (await friendsRes.json()).length : 0;
 
-    const baseline = derivePoints(state, friends);
+    const macroDays = await fetchMacroDays(userId, { supabaseUrl, serviceKey });
+    const baseline = derivePoints(state, friends, macroDays);
     const newPrestige = (prof.prestige || 0) + 1;
 
     const patchRes = await fetch(`${supabaseUrl}/rest/v1/profiles?id=eq.${userId}`, {

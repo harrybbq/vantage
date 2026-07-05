@@ -105,6 +105,66 @@ function socialPoints(state, friendCount = 0) {
   return (friends / 20) * 12 + (activeDays / 30) * 16;
 }
 
+// Health contributions (vitals / burn / macros) — mirror derive.js.
+// Lifetime accumulations, per-day capped (self-reported data rewards
+// consistency, never magnitudes).
+const BURN_DAY_CAP_KCAL = 600;
+
+function vitalsPoints(state) {
+  const log = state.vitalsLog || {};
+  let days = 0;
+  for (const k of Object.keys(log)) {
+    const e = log[k];
+    if (e && (e.weight != null || e.sleep != null || e.rhr != null)) days++;
+  }
+  return days * 0.4;
+}
+
+function burnPoints(state) {
+  const log = state.burnLog || {};
+  let pts = 0;
+  for (const k of Object.keys(log)) {
+    const kcal = (log[k] || []).reduce((sum, a) => sum + (Number(a.kcal) || 0), 0);
+    if (kcal > 0) pts += Math.min(kcal, BURN_DAY_CAP_KCAL) / BURN_DAY_CAP_KCAL * 0.5;
+  }
+  return pts;
+}
+
+function macroPoints(macroDays = 0) {
+  return Math.max(0, macroDays) * 0.5;
+}
+
+/**
+ * Count the user's lifetime "on-target" nutrition days server-side:
+ * days with a daily summary whose calories land between 50% and 130%
+ * of the CURRENT calorie goal (goal changes over time — accepted
+ * approximation, documented in RANKING_SYSTEM.md). The client passes
+ * its own cached count via ctx for the local preview; this count is
+ * the canonical one.
+ */
+async function fetchMacroDays(userId, { supabaseUrl, serviceKey }) {
+  const headers = { apikey: serviceKey, Authorization: `Bearer ${serviceKey}` };
+  try {
+    const goalRes = await fetch(
+      `${supabaseUrl}/rest/v1/nutrition_macros?user_id=eq.${userId}&name=eq.Calories&select=daily_goal`,
+      { headers }
+    );
+    const goal = goalRes.ok ? Number((await goalRes.json())[0]?.daily_goal) : 0;
+    if (!goal || goal <= 0) return 0;
+    const lo = Math.round(goal * 0.5), hi = Math.round(goal * 1.3);
+    const cntRes = await fetch(
+      `${supabaseUrl}/rest/v1/nutrition_daily_summary?user_id=eq.${userId}&calories=gte.${lo}&calories=lte.${hi}&select=log_date`,
+      { headers: { ...headers, Prefer: 'count=exact', Range: '0-0' } }
+    );
+    if (!cntRes.ok) return 0;
+    const range = cntRes.headers.get('content-range') || '';
+    const total = parseInt(range.split('/')[1]);
+    return Number.isFinite(total) ? total : 0;
+  } catch {
+    return 0;
+  }
+}
+
 function visionPoints(state /* , category */) {
   // Server doesn't import the visions definitions module (separate
   // module graph). Approximation: each unlocked vision = 8 pts / 4
@@ -121,7 +181,7 @@ function visionPoints(state /* , category */) {
  * Raw per-category point sums BEFORE the sqrt rating curve. Exposed so
  * prestige-up.js can snapshot them as the new competitive baseline.
  */
-function derivePoints(state, friendCount = 0) {
+function derivePoints(state, friendCount = 0, macroDays = 0) {
   return {
     brain:
       brainScorePoints(state) +
@@ -138,7 +198,10 @@ function derivePoints(state, friendCount = 0) {
       fitnessScorePoints(state) +
       trackerPoints(state, 'fitness') * 1.2 +
       achievementPoints(state, 'fitness') * 2.5 +
-      visionPoints(state, 'fitness'),
+      visionPoints(state, 'fitness') +
+      vitalsPoints(state) +
+      burnPoints(state) +
+      macroPoints(macroDays),
     social:
       socialSelfCheckPoints(state) +
       socialPoints(state, friendCount) +
@@ -153,8 +216,8 @@ function derivePoints(state, friendCount = 0) {
  * prestige time, subtracted here so the post-prestige climb starts
  * from the floor without wiping any user data. {} = no prestige yet.
  */
-function deriveRatings(state, friendCount = 0, baseline = {}) {
-  const pts = derivePoints(state, friendCount);
+function deriveRatings(state, friendCount = 0, baseline = {}, macroDays = 0) {
+  const pts = derivePoints(state, friendCount, macroDays);
   const adj = cat => Math.max(0, pts[cat] - (Number(baseline?.[cat]) || 0));
 
   const brain   = toRating(adj('brain'));
@@ -201,7 +264,8 @@ async function recomputeUser(userId, { supabaseUrl, serviceKey }) {
   const prestige = prof?.prestige || 0;
   const baseline = prof?.prestige_baseline || {};
 
-  const ratings = deriveRatings(state, friends, baseline);
+  const macroDays = await fetchMacroDays(userId, { supabaseUrl, serviceKey });
+  const ratings = deriveRatings(state, friends, baseline, macroDays);
   const computedAt = new Date().toISOString();
 
   const patchRes = await fetch(
@@ -231,4 +295,4 @@ async function recomputeUser(userId, { supabaseUrl, serviceKey }) {
   return { ratings, computedAt, prestige };
 }
 
-module.exports = { deriveRatings, derivePoints, recomputeUser };
+module.exports = { deriveRatings, derivePoints, recomputeUser, fetchMacroDays };
