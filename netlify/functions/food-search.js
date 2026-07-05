@@ -4,7 +4,17 @@
  * Proxies Open Food Facts requests server-side to avoid browser CORS /
  * connectivity issues from the Netlify edge.
  *
- * No API key required — Open Food Facts is free and open.
+ * No API key required — Open Food Facts is free and open. BUT it
+ * 403-blocks any request without an identifying User-Agent (their
+ * API terms require app name + contact), which is why UA-less
+ * fetches silently die. Every request below sends UA.
+ *
+ * Text search uses the new Search-a-licious API
+ * (search.openfoodfacts.org) — fast, relevance-ranked — with the
+ * legacy cgi/search.pl (popularity-sorted) as fallback. Both are
+ * capped at 8s via AbortController so we never blow Netlify's 10s
+ * function limit; a slow upstream returns a clean error instead of
+ * a gateway timeout.
  *
  * Routes (via ?mode=):
  *   ?mode=name&q=chicken+breast   — text search
@@ -12,6 +22,8 @@
  */
 
 const OFF = 'https://world.openfoodfacts.org';
+const OFF_SEARCH = 'https://search.openfoodfacts.org';
+const UA = 'Vantage/1.0 (https://soft-phoenix-b512b8.netlify.app)';
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
@@ -28,6 +40,17 @@ function checkRate(ip) {
   e.count++;
   rateLimits.set(ip, e);
   return e.count <= 30;
+}
+
+function fetchJson(url, timeoutMs = 8000) {
+  const ctrl = new AbortController();
+  const t = setTimeout(() => ctrl.abort(), timeoutMs);
+  return fetch(url, { headers: { 'User-Agent': UA }, signal: ctrl.signal })
+    .then(res => {
+      if (!res.ok) throw new Error(`upstream ${res.status}`);
+      return res.json();
+    })
+    .finally(() => clearTimeout(t));
 }
 
 function mapProduct(p) {
@@ -49,6 +72,47 @@ function mapProduct(p) {
   };
 }
 
+// Drop entries with no name or no energy value — a result card that
+// reads "0 kcal P 0g C 0g F 0g" is worse than fewer results.
+function usable(prod) {
+  return prod.food_name && prod.calories > 0;
+}
+
+const FIELDS = 'product_name,brands,code,nutriments,serving_quantity';
+
+async function searchByName(q) {
+  // Primary: Search-a-licious (relevance-ranked, fast).
+  try {
+    const params = new URLSearchParams({ q, page_size: '15', fields: FIELDS });
+    const json = await fetchJson(`${OFF_SEARCH}/search?${params}`);
+    const hits = (json.hits || []).map(mapProduct).filter(usable);
+    if (hits.length) return hits;
+  } catch { /* fall through to legacy */ }
+
+  // Fallback: legacy CGI search, popularity-sorted so household brands
+  // beat obscure entries.
+  const params = new URLSearchParams({
+    action: 'process', json: '1',
+    search_terms: q,
+    page_size: '15',
+    sort_by: 'unique_scans_n',
+    fields: FIELDS,
+  });
+  const json = await fetchJson(`${OFF}/cgi/search.pl?${params}`);
+  return (json.products || []).map(mapProduct).filter(usable);
+}
+
+async function searchByBarcode(code) {
+  const json = await fetchJson(`${OFF}/api/v2/product/${encodeURIComponent(code)}.json?fields=${FIELDS}`);
+  if (json.status === 1 && json.product) {
+    const prod = mapProduct({ ...json.product, code });
+    // Barcode hits keep zero-calorie products (water etc.) — the user
+    // scanned this exact item, so returning it beats "not found".
+    if (prod.food_name) return [prod];
+  }
+  return [];
+}
+
 exports.handler = async (event) => {
   if (event.httpMethod === 'OPTIONS') return { statusCode: 204, headers: CORS, body: '' };
 
@@ -63,28 +127,9 @@ exports.handler = async (event) => {
   }
 
   try {
-    let products = [];
-
-    if (mode === 'barcode') {
-      const res = await fetch(`${OFF}/api/v0/product/${encodeURIComponent(q.trim())}.json`);
-      const json = await res.json();
-      if (json.status === 1 && json.product) {
-        products = [mapProduct({ ...json.product, code: q.trim() })];
-      }
-    } else {
-      const params = new URLSearchParams({
-        action: 'process', json: '1',
-        search_terms: q.trim(),
-        page_size: '12',
-        fields: 'product_name,brands,code,nutriments,serving_quantity',
-      });
-      const res = await fetch(`${OFF}/cgi/search.pl?${params}`);
-      const json = await res.json();
-      products = (json.products || [])
-        .filter(p => p.product_name)
-        .map(p => mapProduct(p));
-    }
-
+    const products = mode === 'barcode'
+      ? await searchByBarcode(q.trim())
+      : await searchByName(q.trim());
     return { statusCode: 200, headers: CORS, body: JSON.stringify({ products }) };
   } catch (err) {
     console.error('food-search error:', err.message);
