@@ -4899,6 +4899,7 @@ button:active:not(:disabled),
 .vitals-area { fill: rgba(var(--em-rgb), .10); stroke: none; }
 .vitals-dot { fill: var(--em); stroke: var(--card-bg, #fffdf5); stroke-width: 2; }
 .vitals-crosshair { stroke: var(--text-muted); stroke-width: 1; opacity: .5; }
+.vitals-target { stroke: var(--gold); stroke-width: 1; opacity: .55; }
 .vitals-endlabel { font-family: var(--mono); font-size: 11px; font-weight: 700; fill: var(--text); }
 .vitals-tooltip {
   position: absolute; top: 0; transform: translateX(-50%);
