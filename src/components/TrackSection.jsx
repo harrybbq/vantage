@@ -461,6 +461,7 @@ export default function TrackSection({ S, update, active, onOpenModal, onShowCoi
       {userId && (
         <NutritionSection
           userId={userId}
+          update={update}
           selectedDate={S.selectedLogDate || null}
           calYear={S.calYear}
           calMonth={S.calMonth}

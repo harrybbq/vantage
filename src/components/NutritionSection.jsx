@@ -232,7 +232,7 @@ function AddMacroSheet({ onClose, onSave }) {
 }
 
 // ── Main NutritionSection ────────────────────────────────────────────────
-export default function NutritionSection({ userId, selectedDate, calYear, calMonth, onShowCoinToast, onMonthDataReady, onOpenModal }) {
+export default function NutritionSection({ userId, selectedDate, calYear, calMonth, onShowCoinToast, onMonthDataReady, onOpenModal, update }) {
   const date = selectedDate || getTodayStr();
   const { macros, summary, logEntries, monthSummary, loading, reload, recalcSummary, loadMonth } = useNutrition(userId, date);
 
@@ -275,6 +275,38 @@ export default function NutritionSection({ userId, selectedDate, calYear, calMon
       }
     }
   }, [summary, macros, date, onShowCoinToast]);
+
+  // Macro % history — simplify each day's summary to "% of goal hit"
+  // per core macro and persist it in synced state
+  // (S.macroHistory['YYYY-MM-DD'] = { cal, pro, carb, fat }, integers).
+  // Snapshotting the % (not the grams) keeps history honest if goals
+  // change later. Only writes when a value actually changed so the
+  // update→save loop can't spin.
+  useEffect(() => {
+    if (!update || !summary || !macros.length) return;
+    const spec = {
+      cal:  ['Calories', 'calories'],
+      pro:  ['Protein',  'protein_g'],
+      carb: ['Carbs',    'carbs_g'],
+      fat:  ['Fat',      'fat_g'],
+    };
+    const pct = {};
+    for (const k of Object.keys(spec)) {
+      const [name, field] = spec[k];
+      const m = macros.find(x => x.name === name);
+      if (!m?.daily_goal) continue;
+      pct[k] = Math.min(999, Math.round((Number(summary[field] || 0) / m.daily_goal) * 100));
+    }
+    if (!Object.keys(pct).length) return;
+    update(prev => {
+      const cur = (prev.macroHistory || {})[date];
+      const same = cur &&
+        Object.keys(pct).length === Object.keys(cur).length &&
+        Object.keys(pct).every(k => cur[k] === pct[k]);
+      if (same) return prev;
+      return { ...prev, macroHistory: { ...(prev.macroHistory || {}), [date]: pct } };
+    });
+  }, [summary, macros, date, update]);
 
   const calMacro = macros.find(m => m.name === 'Calories');
   const calConsumed = summary?.calories || 0;

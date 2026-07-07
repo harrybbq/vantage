@@ -12,9 +12,15 @@
 import { useMemo, useRef, useState } from 'react';
 
 const METRICS = [
-  { key: 'weight', label: 'Weight',  unit: 'kg'  },
-  { key: 'sleep',  label: 'Sleep',   unit: 'h'   },
-  { key: 'rhr',    label: 'Rest HR', unit: 'bpm' },
+  { key: 'weight', label: 'Weight',  unit: 'kg',  src: 'vitals' },
+  { key: 'sleep',  label: 'Sleep',   unit: 'h',   src: 'vitals' },
+  { key: 'rhr',    label: 'Rest HR', unit: 'bpm', src: 'vitals' },
+  // Macro % history — written by NutritionSection into S.macroHistory
+  // as "% of goal hit" per day (survives later goal changes).
+  { key: 'cal',  label: 'Cal %',     unit: '%', src: 'macro' },
+  { key: 'pro',  label: 'Protein %', unit: '%', src: 'macro' },
+  { key: 'carb', label: 'Carbs %',   unit: '%', src: 'macro' },
+  { key: 'fat',  label: 'Fat %',     unit: '%', src: 'macro' },
 ];
 const RANGES = [
   { key: '7d',  label: '7D',  days: 7  },
@@ -48,7 +54,7 @@ export default function VitalsHistoryCard({ S }) {
 
   const metric = METRICS.find(m => m.key === metricKey);
   const range = RANGES.find(r => r.key === rangeKey);
-  const log = S.vitalsLog || {};
+  const log = metric.src === 'macro' ? (S.macroHistory || {}) : (S.vitalsLog || {});
 
   // All entries for the metric, oldest → newest, as { ts, v, date }.
   const points = useMemo(() => {
@@ -88,17 +94,21 @@ export default function VitalsHistoryCard({ S }) {
 
   // Recent entries table — newest first, all three metrics, so every
   // value is reachable without hovering the chart.
+  // Table always shows the vitals log (not the chart's metric source —
+  // macro history reads as a chart, the table is the vitals record).
+  const vitalsLog = S.vitalsLog || {};
   const tableRows = useMemo(() =>
-    Object.keys(log).sort().reverse().slice(0, 10)
-      .map(date => ({ date, ...log[date] })),
-  [log]);
+    Object.keys(vitalsLog).sort().reverse().slice(0, 10)
+      .map(date => ({ date, ...vitalsLog[date] })),
+  [vitalsLog]);
 
-  if (!tableRows.length) {
+  const hasMacroHistory = Object.keys(S.macroHistory || {}).length > 0;
+  if (!tableRows.length && !hasMacroHistory) {
     return (
       <div className="card vitals-card">
-        <h3 style={{ margin: '0 0 4px' }}>Vitals</h3>
+        <h3 style={{ margin: '0 0 4px' }}>Vitals &amp; Macros</h3>
         <p className="vitals-sub">
-          No vitals logged yet. Add the Vitals widget on the mobile hub and tap a tile to log weight, sleep, or resting heart rate — entries build your history here.
+          No history yet. Log weight/sleep/HR from the hub Vitals widget, or log food in Daily Macros — each day banks a “% of goal hit” snapshot here.
         </p>
       </div>
     );
@@ -109,13 +119,22 @@ export default function VitalsHistoryCard({ S }) {
 
   return (
     <div className="card vitals-card">
-      <h3 style={{ margin: '0 0 4px' }}>Vitals</h3>
-      <p className="vitals-sub">Logged from the hub Vitals widget. Hover the chart for exact values.</p>
+      <h3 style={{ margin: '0 0 4px' }}>Vitals &amp; Macros</h3>
+      <p className="vitals-sub">Vitals from the hub widget; macro days saved as % of each goal hit. Hover the chart for exact values.</p>
 
       {/* Filter row — metric first (it names the chart), then range. */}
       <div className="vitals-controls">
-        <div className="vitals-seg" role="tablist" aria-label="Metric">
-          {METRICS.map(m => (
+        <div className="vitals-seg" role="tablist" aria-label="Vitals metric">
+          {METRICS.filter(m => m.src === 'vitals').map(m => (
+            <button key={m.key} type="button" role="tab" aria-selected={metricKey === m.key}
+              className={`vitals-seg-btn${metricKey === m.key ? ' on' : ''}`}
+              onClick={() => { setMetricKey(m.key); setHover(null); }}>
+              {m.label}
+            </button>
+          ))}
+        </div>
+        <div className="vitals-seg" role="tablist" aria-label="Macro metric">
+          {METRICS.filter(m => m.src === 'macro').map(m => (
             <button key={m.key} type="button" role="tab" aria-selected={metricKey === m.key}
               className={`vitals-seg-btn${metricKey === m.key ? ' on' : ''}`}
               onClick={() => { setMetricKey(m.key); setHover(null); }}>
@@ -152,6 +171,10 @@ export default function VitalsHistoryCard({ S }) {
                 <text x={PAD_L - 7} y={geom.sy(t) + 3} className="vitals-tick" textAnchor="end">{t}</text>
               </g>
             ))}
+            {/* 100% target line for macro metrics (when in view) */}
+            {metric.src === 'macro' && geom.sy(100) >= PAD_T && geom.sy(100) <= H - PAD_B && (
+              <line x1={PAD_L} x2={W - PAD_R} y1={geom.sy(100)} y2={geom.sy(100)} className="vitals-target" />
+            )}
             {/* x labels — first + last date only; the crosshair carries the rest */}
             <text x={PAD_L} y={H - 8} className="vitals-tick" textAnchor="start">{fmtDay(geom.x0)}</text>
             <text x={W - PAD_R} y={H - 8} className="vitals-tick" textAnchor="end">{fmtDay(geom.x1)}</text>
@@ -203,6 +226,7 @@ export default function VitalsHistoryCard({ S }) {
       )}
 
       {/* Table view — the no-hover home for every value. */}
+      {tableRows.length > 0 && (
       <table className="vitals-table">
         <thead>
           <tr><th>Date</th><th>Weight</th><th>Sleep</th><th>Rest HR</th></tr>
@@ -218,6 +242,7 @@ export default function VitalsHistoryCard({ S }) {
           ))}
         </tbody>
       </table>
+      )}
     </div>
   );
 }
