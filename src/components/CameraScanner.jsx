@@ -52,8 +52,10 @@ export default function CameraScanner({ onBarcode, onAIResult, onError }) {
   const videoRef = useRef(null);
   const canvasRef = useRef(null);      // AI capture canvas
   const decodeCanvasRef = useRef(null); // ZXing decode canvas
+  const viewCanvasRef = useRef(null);  // visible viewfinder (see below)
   const streamRef = useRef(null);
   const rafRef = useRef(null);
+  const paintRafRef = useRef(null);
   const intervalRef = useRef(0);
   const detectorRef = useRef(null);
   const zxingReaderRef = useRef(null);
@@ -95,10 +97,53 @@ export default function CameraScanner({ onBarcode, onAIResult, onError }) {
     function updateDiag() {
       if (!mounted) return;
       const track = video.srcObject?.getVideoTracks?.()[0];
+      // Sample the actual pixel data so "frames flowing but black"
+      // (capture-layer failure) is distinguishable from a paint bug.
+      let luma = '';
+      try {
+        if (video.videoWidth > 0) {
+          const s = document.createElement('canvas');
+          s.width = 16; s.height = 16;
+          const sctx = s.getContext('2d');
+          sctx.drawImage(video, 0, 0, 16, 16);
+          const d = sctx.getImageData(0, 0, 16, 16).data;
+          let sum = 0;
+          for (let i = 0; i < d.length; i += 4) sum += (d[i] + d[i + 1] + d[i + 2]) / 3;
+          luma = ` · luma ${Math.round(sum / (d.length / 4))}`;
+        }
+      } catch { /* tainted/none */ }
       setDiag(
         `${detectorRef.current ? 'native' : 'zxing'} · ${video.videoWidth}×${video.videoHeight} · rs${video.readyState}` +
-        ` · track ${track ? `${track.readyState}${track.muted ? '/muted' : ''}` : 'none'}${isStandalone ? ' · standalone' : ''}`
+        ` · track ${track ? `${track.readyState}${track.muted ? '/muted' : ''}` : 'none'}${luma}${isStandalone ? ' · standalone' : ''}`
       );
+    }
+
+    // ── Viewfinder painting ─────────────────────────────────────────
+    // iOS Safari sometimes decodes the stream fine (readyState 4,
+    // track live) but never PAINTS the <video> — a compositing bug,
+    // typically inside animated/transformed ancestors like our
+    // bottom sheet. So the visible viewfinder is a canvas we draw
+    // ourselves every frame; the video element stays hidden (opacity
+    // 0, still laid out so decoding continues).
+    function paintLoop() {
+      if (!mounted || foundRef.current) return;
+      const v = videoRef.current;
+      const c = viewCanvasRef.current;
+      if (v && c && v.videoWidth > 0) {
+        const dpr = Math.min(2, window.devicePixelRatio || 1);
+        const cw = Math.round(c.clientWidth * dpr);
+        const ch = Math.round(c.clientHeight * dpr);
+        if (cw && (c.width !== cw || c.height !== ch)) { c.width = cw; c.height = ch; }
+        if (c.width) {
+          const ctx = c.getContext('2d');
+          // object-fit: cover, done by hand
+          const scale = Math.max(c.width / v.videoWidth, c.height / v.videoHeight);
+          const dw = v.videoWidth * scale;
+          const dh = v.videoHeight * scale;
+          ctx.drawImage(v, (c.width - dw) / 2, (c.height - dh) / 2, dw, dh);
+        }
+      }
+      paintRafRef.current = requestAnimationFrame(paintLoop);
     }
 
     async function boot() {
@@ -143,6 +188,8 @@ export default function CameraScanner({ onBarcode, onAIResult, onError }) {
         if (mounted && !foundRef.current && video.videoWidth === 0) setNeedsTap(true);
       }, 1500);
 
+      cancelAnimationFrame(paintRafRef.current);
+      paintRafRef.current = requestAnimationFrame(paintLoop);
       if (detectorRef.current) startNativeLoop();
       else startCanvasDecode();
     }
@@ -208,6 +255,7 @@ export default function CameraScanner({ onBarcode, onAIResult, onError }) {
 
   function stopAll() {
     cancelAnimationFrame(rafRef.current);
+    cancelAnimationFrame(paintRafRef.current);
     clearInterval(intervalRef.current);
     streamRef.current?.getTracks().forEach(t => t.stop());
     const v = videoRef.current;
@@ -291,12 +339,20 @@ export default function CameraScanner({ onBarcode, onAIResult, onError }) {
 
   return (
     <div style={{ position: 'relative', borderRadius: 'var(--radius-md)', overflow: 'hidden', background: '#000', width: '100%', aspectRatio: '4/3' }}>
+      {/* Hidden but laid-out (opacity, not display:none — iOS keeps
+          decoding). The visible preview is the canvas below, painted
+          by us, because iOS sometimes never paints the video element
+          itself despite healthy frames. */}
       <video
         ref={videoRef}
         muted
         playsInline
         autoPlay
-        style={{ width: '100%', height: '100%', objectFit: 'cover', display: status === 'error' ? 'none' : 'block' }}
+        style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', opacity: 0.01, pointerEvents: 'none' }}
+      />
+      <canvas
+        ref={viewCanvasRef}
+        style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', display: status === 'error' ? 'none' : 'block' }}
       />
       <canvas ref={canvasRef} style={{ display: 'none' }} />
       <canvas ref={decodeCanvasRef} style={{ display: 'none' }} />
