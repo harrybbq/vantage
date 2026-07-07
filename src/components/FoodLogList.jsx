@@ -2,7 +2,8 @@ import { useState } from 'react';
 import { supabase } from '../lib/supabase';
 
 const MEAL_ORDER = ['breakfast', 'lunch', 'dinner', 'snack'];
-const MEAL_ICONS = { breakfast: '🌅', lunch: '☀️', dinner: '🌙', snack: '🍎' };
+// Mono letter chips instead of emoji — matches the operator-console look.
+const MEAL_ICONS = { breakfast: 'B', lunch: 'L', dinner: 'D', snack: 'S' };
 
 function fmt(n) {
   if (!n && n !== 0) return '—';
@@ -61,7 +62,7 @@ function MealGroup({ mealType, entries, onDeleteEntry }) {
         onClick={() => setExpanded(v => !v)}
         style={{ width: '100%', display: 'flex', alignItems: 'center', gap: '8px', background: 'none', border: 'none', padding: '6px 0', cursor: 'pointer', textAlign: 'left' }}
       >
-        <span style={{ fontSize: '14px' }}>{MEAL_ICONS[mealType] || '🍽️'}</span>
+        <span style={{ width: 20, height: 20, borderRadius: 6, background: 'rgba(var(--em-rgb),.12)', border: '1px solid rgba(var(--em-rgb),.3)', color: 'var(--em)', fontFamily: 'var(--mono)', fontSize: '10px', fontWeight: 700, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>{MEAL_ICONS[mealType] || 'M'}</span>
         <span style={{ fontWeight: 600, fontSize: 'var(--text-sm)', color: 'var(--text)', textTransform: 'capitalize', flex: 1 }}>{mealType}</span>
         <span style={{ fontFamily: 'var(--mono)', fontSize: 'var(--text-xs)', color: 'var(--text-muted)' }}>{Math.round(total)} kcal</span>
         <span style={{ fontSize: '10px', color: 'var(--text-muted)', marginLeft: '4px' }}>{expanded ? '▲' : '▼'}</span>

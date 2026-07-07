@@ -112,9 +112,9 @@ export default function FoodSearch({ onSelectFood, onClose, onOpenModal }) {
   };
 
   const tabs = [
-    ['search', '🔍 Name'],
-    ['barcode', '🔢 Barcode'],
-    ...(canUseCamera ? [['camera', '📷 Scan']] : []),
+    ['search', 'Name'],
+    ['barcode', 'Barcode'],
+    ...(canUseCamera ? [['camera', 'Scan']] : []),
   ];
 
   return (
@@ -132,11 +132,19 @@ export default function FoodSearch({ onSelectFood, onClose, onOpenModal }) {
           <button onClick={onClose} style={{ background: 'none', border: 'none', fontSize: '18px', color: 'var(--text-muted)', cursor: 'pointer', padding: '4px 8px' }}>✕</button>
         </div>
 
-        {/* Mode tabs */}
-        <div style={{ display: 'flex', gap: '6px', marginBottom: '14px', flexShrink: 0 }}>
-          {tabs.map(([m, label]) => (
-            <button key={m} onClick={() => switchMode(m)}
-              style={{ padding: '6px 14px', borderRadius: 'var(--radius-full)', border: '1px solid var(--border)', background: mode === m ? 'var(--em)' : 'transparent', color: mode === m ? '#fff' : 'var(--text-mid)', fontSize: 'var(--text-sm)', cursor: 'pointer', fontFamily: 'var(--sans)' }}>
+        {/* Mode tabs — segmented control, mono caps, no glyphs */}
+        <div role="tablist" aria-label="Search mode" style={{ display: 'inline-flex', border: '1px solid var(--border)', borderRadius: '10px', overflow: 'hidden', marginBottom: '14px', flexShrink: 0, alignSelf: 'flex-start' }}>
+          {tabs.map(([m, label], i) => (
+            <button key={m} role="tab" aria-selected={mode === m} onClick={() => switchMode(m)}
+              style={{
+                padding: '8px 18px', border: 'none',
+                borderRight: i < tabs.length - 1 ? '1px solid var(--border)' : 'none',
+                background: mode === m ? 'rgba(var(--em-rgb), .14)' : 'transparent',
+                color: mode === m ? 'var(--em)' : 'var(--text-muted)',
+                fontFamily: 'var(--mono)', fontSize: '11px', letterSpacing: '1.2px',
+                textTransform: 'uppercase', fontWeight: mode === m ? 700 : 500,
+                cursor: 'pointer', transition: 'background .15s, color .15s',
+              }}>
               {label}
             </button>
           ))}
@@ -151,7 +159,7 @@ export default function FoodSearch({ onSelectFood, onClose, onOpenModal }) {
               onError={handleCameraError}
             />
             <p style={{ fontFamily: 'var(--mono)', fontSize: '11px', color: 'var(--text-muted)', textAlign: 'center', margin: 0 }}>
-              Point at a barcode or GS1 QR to auto-scan, or tap <strong style={{ color: 'var(--text-mid)' }}>Identify Food with AI</strong> to detect what's in frame.
+              Point at a barcode or product QR to auto-scan, or tap <strong style={{ color: 'var(--text-mid)' }}>Identify with AI</strong> to detect what's in frame.
             </p>
             {error && (
               <div style={{ padding: '10px 14px', background: 'rgba(220,38,38,.08)', borderRadius: 'var(--radius-md)', color: '#e05252', fontSize: 'var(--text-sm)', fontFamily: 'var(--mono)' }}>

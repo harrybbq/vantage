@@ -264,14 +264,14 @@ export default function NutritionSection({ userId, selectedDate, calYear, calMon
       const ratio = summary.calories / calMacro.daily_goal;
       if (ratio >= 0.8 && ratio <= 1.1 && !goalHitRef.current[date + '_cal']) {
         goalHitRef.current[date + '_cal'] = true;
-        onShowCoinToast?.('🎯 Calorie goal hit!', false);
+        onShowCoinToast?.('Calorie goal hit!', false);
       }
     }
     if (protMacro && protMacro.daily_goal > 0) {
       const ratio = summary.protein_g / protMacro.daily_goal;
       if (ratio >= 0.9 && !goalHitRef.current[date + '_prot']) {
         goalHitRef.current[date + '_prot'] = true;
-        onShowCoinToast?.('💪 Protein goal hit!', false);
+        onShowCoinToast?.('Protein goal hit!', false);
       }
     }
   }, [summary, macros, date, onShowCoinToast]);
