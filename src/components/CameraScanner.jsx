@@ -3,25 +3,25 @@ import { useRef, useEffect, useState } from 'react';
 /**
  * CameraScanner — camera viewfinder for product-code scanning.
  *
- * Detection engines, in preference order:
- *   1. BarcodeDetector (Chrome 88+ / Android WebView) — native, fast.
- *      We acquire the stream ourselves and run a rAF detect loop.
- *   2. @zxing/browser (dynamic import) — everywhere else, including
- *      iOS Safari and desktop webcams. On this path ZXing OWNS the
- *      camera (decodeFromVideoDevice acquires + plays + decodes) —
- *      letting it manage the stream avoids the iOS black-frame bugs
- *      that come from two owners fighting over one <video>.
+ * Architecture (deliberately conservative for iOS Safari):
+ *   - getUserMedia is called ONCE, with the simplest constraints
+ *     ({ facingMode: environment }). Nothing else ever touches the
+ *     stream — no library-managed video, no automatic re-acquisition.
+ *     iOS returns muted/black tracks when the camera is re-acquired
+ *     rapidly, so every recovery path is a MANUAL tap (a real user
+ *     gesture, which iOS privileges).
+ *   - Decoding:
+ *       1. BarcodeDetector (Chrome/Android) → rAF loop on the video.
+ *       2. Everywhere else (iOS Safari, desktop) → we grab frames to
+ *          a canvas every ~350ms and hand them to ZXing's
+ *          decodeFromCanvas. ZXing never sees the stream.
+ *   - iOS quirks handled: muted/playsinline/autoplay set as
+ *     ATTRIBUTES before play (React only sets the property); track
+ *     mute surfaces a notice + tap-to-retry; element pauses resume
+ *     opportunistically when the track is healthy.
  *
- * iOS Safari specifics handled here:
- *   - React never renders the `muted` ATTRIBUTE (only the property),
- *     and iOS requires the attribute for inline camera autoplay — so
- *     muted/playsinline/autoplay are set imperatively before play.
- *   - If frames still aren't flowing shortly after start (videoWidth
- *     stays 0), a "Tap to start camera" overlay retries play() from
- *     a real user gesture, which iOS always honours.
- *
- * Both engines read 1D barcodes (EAN/UPC) and QR codes. A QR is only
- * accepted when it resolves to a product GTIN (GS1 Digital Link);
+ * Both engines read 1D barcodes (EAN/UPC) and QR codes. QRs are only
+ * accepted when they resolve to a product GTIN (GS1 Digital Link);
  * other QRs show a hint and scanning continues.
  *
  * Callbacks:
@@ -45,24 +45,26 @@ export function normalizeScan(raw) {
   return null;
 }
 
+const DECODE_INTERVAL_MS = 350;
+const DECODE_WIDTH = 720; // downscale target for canvas decode (speed)
+
 export default function CameraScanner({ onBarcode, onAIResult, onError }) {
   const videoRef = useRef(null);
-  const canvasRef = useRef(null);
+  const canvasRef = useRef(null);      // AI capture canvas
+  const decodeCanvasRef = useRef(null); // ZXing decode canvas
   const streamRef = useRef(null);
   const rafRef = useRef(null);
+  const intervalRef = useRef(0);
   const detectorRef = useRef(null);
-  const zxingControlsRef = useRef(null);
-  const restartRef = useRef(null);
+  const zxingReaderRef = useRef(null);
   const foundRef = useRef(false);
+  const bootRef = useRef(null);
 
   const [status, setStatus] = useState('starting'); // starting | scanning | found | identifying | error
   const [msg, setMsg] = useState('');
-  const [scannerLive, setScannerLive] = useState(false);
   const [needsTap, setNeedsTap] = useState(false);
   const [diag, setDiag] = useState('');
 
-  // Home-screen PWA (iOS "standalone") — the environment where iOS
-  // most often grants the camera but never delivers frames.
   const isStandalone = typeof navigator !== 'undefined' &&
     (navigator.standalone === true ||
      (typeof window !== 'undefined' && window.matchMedia?.('(display-mode: standalone)').matches));
@@ -83,160 +85,122 @@ export default function CameraScanner({ onBarcode, onAIResult, onError }) {
     const video = videoRef.current;
     if (!video) return undefined;
 
-    // iOS: these must exist as ATTRIBUTES before play — React only
-    // sets the muted property, which Safari ignores for autoplay
-    // gating. Belt and braces for every engine path.
+    // iOS requires these as ATTRIBUTES before play; React only sets
+    // the muted property.
     video.setAttribute('muted', '');
     video.muted = true;
     video.setAttribute('playsinline', '');
     video.setAttribute('autoplay', '');
 
-    function watchFrames() {
-      const check = () => {
-        if (!mounted || foundRef.current) return;
-        const track = video.srcObject?.getVideoTracks?.()[0];
-        // Diagnostics line — owner-only surface, so it can be frank.
-        setDiag(
-          `${detectorRef.current ? 'native' : 'zxing'} · ${video.videoWidth}×${video.videoHeight} · rs${video.readyState}` +
-          ` · track ${track ? `${track.readyState}${track.muted ? '/muted' : ''}` : 'none'}${isStandalone ? ' · standalone' : ''}`
-        );
-        if (video.videoWidth === 0) {
-          if (isStandalone) {
-            // A tap won't help when iOS itself withholds frames from
-            // home-screen apps — say so instead of a dead-end button.
-            setNeedsTap(false);
-            setMsg('iOS is not delivering camera frames to the home-screen app — open Vantage in Safari to scan.');
-          } else {
-            setNeedsTap(true);
-          }
-        } else {
-          setNeedsTap(false);
-        }
-      };
-      setTimeout(check, 1200);
-      setTimeout(check, 3200);
-      video.addEventListener('playing', () => { if (mounted) { setNeedsTap(false); setStatus(s => (s === 'starting' ? 'scanning' : s)); } });
-    }
-
-    // Simplest constraints iOS reliably honours — width/height ideals
-    // have produced black frames on some iOS builds, so ask only for
-    // the rear camera and take whatever resolution comes.
-    const CONSTRAINTS = { video: { facingMode: { ideal: 'environment' } }, audio: false };
-
-    // ── Mute recovery ─────────────────────────────────────────────
-    // iOS hardware-mutes the track after the first frame in several
-    // states (camera contention, app switching, lock/unlock, Safari
-    // suspensions). It usually un-mutes by itself within a second or
-    // two; when it doesn't, tearing the pipeline down and re-acquiring
-    // the camera fixes it. So: on mute, wait briefly for the free
-    // unmute, then restart the engine — up to 3 attempts before we
-    // fall back to a manual Retry button.
-    let restartAttempts = 0;
-    let muteTimer = 0;
-
-    function restartCamera() {
-      if (!mounted || foundRef.current) return;
-      stopAll();
-      setScannerLive(false);
-      setMsg('Restarting camera…');
-      boot();
-    }
-    restartRef.current = restartCamera;
-
-    function watchTrack(stream) {
-      const track = stream?.getVideoTracks?.()[0];
-      if (!track) return;
-      track.addEventListener('mute', () => {
-        if (!mounted || foundRef.current) return;
-        setMsg('Camera paused by iOS — recovering…');
-        clearTimeout(muteTimer);
-        muteTimer = setTimeout(() => {
-          if (!mounted || !track.muted) return;
-          if (restartAttempts < 3) {
-            restartAttempts++;
-            restartCamera();
-          } else {
-            setMsg('Camera keeps pausing — close other apps using the camera, then tap Retry.');
-            setNeedsTap(true);
-          }
-        }, 1500);
-      });
-      track.addEventListener('unmute', () => {
-        if (!mounted) return;
-        clearTimeout(muteTimer);
-        setMsg('');
-        // iOS sometimes leaves the element paused after an unmute.
-        video.play().catch(() => {});
-      });
-    }
-
-    // The element itself can also end up paused (Low Power Mode,
-    // returning from background) — resume it opportunistically.
-    video.addEventListener('pause', () => {
-      if (mounted && !foundRef.current && video.srcObject) video.play().catch(() => {});
-    });
-    const onVis = () => {
-      if (!mounted || document.visibilityState !== 'visible' || foundRef.current) return;
+    function updateDiag() {
+      if (!mounted) return;
       const track = video.srcObject?.getVideoTracks?.()[0];
-      if (!track || track.readyState === 'ended' || track.muted) {
-        restartAttempts = 0;
-        restartCamera();
-      } else {
-        video.play().catch(() => {});
-      }
-    };
-    document.addEventListener('visibilitychange', onVis);
+      setDiag(
+        `${detectorRef.current ? 'native' : 'zxing'} · ${video.videoWidth}×${video.videoHeight} · rs${video.readyState}` +
+        ` · track ${track ? `${track.readyState}${track.muted ? '/muted' : ''}` : 'none'}${isStandalone ? ' · standalone' : ''}`
+      );
+    }
 
-    async function startNative() {
-      const stream = await navigator.mediaDevices.getUserMedia(CONSTRAINTS);
+    async function boot() {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: { ideal: 'environment' } },
+        audio: false,
+      });
       if (!mounted) { stream.getTracks().forEach(t => t.stop()); return; }
       streamRef.current = stream;
       video.srcObject = stream;
       try { await video.play(); } catch { setNeedsTap(true); }
       setStatus('scanning');
-      setScannerLive(true);
-      watchTrack(stream);
-      watchFrames();
-      startScanLoop();
-    }
 
-    async function startZXing() {
-      const { BrowserMultiFormatReader } = await import('@zxing/browser');
+      const track = stream.getVideoTracks()[0];
+      if (track) {
+        track.addEventListener('mute', () => {
+          if (!mounted || foundRef.current) return;
+          updateDiag();
+          setMsg('iOS paused the camera — tap the viewfinder to resume.');
+          setNeedsTap(true);
+        });
+        track.addEventListener('unmute', () => {
+          if (!mounted) return;
+          updateDiag();
+          setMsg('');
+          setNeedsTap(false);
+          video.play().catch(() => { /* needs gesture — overlay stays */ });
+        });
+      }
+      // Resume opportunistically ONLY when the track is healthy — a
+      // play() against a muted track does nothing useful.
+      video.addEventListener('pause', () => {
+        const t = video.srcObject?.getVideoTracks?.()[0];
+        if (mounted && !foundRef.current && t && t.readyState === 'live' && !t.muted) {
+          video.play().catch(() => {});
+        }
+      });
+
+      setTimeout(updateDiag, 1200);
+      setTimeout(updateDiag, 3200);
+      setTimeout(() => {
+        if (mounted && !foundRef.current && video.videoWidth === 0) setNeedsTap(true);
+      }, 1500);
+
+      if (detectorRef.current) startNativeLoop();
+      else startCanvasDecode();
+    }
+    bootRef.current = boot;
+
+    boot().catch((e) => {
       if (!mounted) return;
-      const reader = new BrowserMultiFormatReader();
-      // decodeFromConstraints so we control the getUserMedia request
-      // (decodeFromVideoDevice(undefined) asks for `video: true`,
-      // which opens the FRONT camera on iPhones).
-      const controls = await reader.decodeFromConstraints(CONSTRAINTS, video, (result) => {
-        if (result) handleRawScan(result.getText());
-      });
-      if (!mounted) { controls.stop(); return; }
-      zxingControlsRef.current = controls;
-      setStatus('scanning');
-      setScannerLive(true);
-      watchTrack(video.srcObject);
-      watchFrames();
+      const errMsg = e?.name === 'NotAllowedError'
+        ? 'Camera permission denied — allow camera access in your browser settings.'
+        : 'Could not access the camera. Use name or barcode search instead.';
+      setStatus('error');
+      setMsg(errMsg);
+      onError?.(errMsg);
+    });
+
+    function startNativeLoop() {
+      async function loop() {
+        if (!mounted || foundRef.current) return;
+        if (videoRef.current && videoRef.current.readyState >= 2) {
+          try {
+            const codes = await detectorRef.current.detect(videoRef.current);
+            if (codes.length > 0 && handleRawScan(codes[0].rawValue)) return;
+          } catch { /* transient decode error */ }
+        }
+        rafRef.current = requestAnimationFrame(loop);
+      }
+      rafRef.current = requestAnimationFrame(loop);
     }
 
-    function boot() {
-      (detectorRef.current ? startNative() : startZXing()).then(() => {
-        if (mounted) setMsg(m => (m === 'Restarting camera…' ? '' : m));
-      }).catch((e) => {
+    // ZXing decodes still frames we hand it — it never manages the
+    // camera or the <video>, which is what kept breaking on iOS.
+    async function startCanvasDecode() {
+      try {
+        const { BrowserMultiFormatReader } = await import('@zxing/browser');
         if (!mounted) return;
-        const errMsg = e?.name === 'NotAllowedError'
-          ? 'Camera permission denied — allow camera access in your browser settings.'
-          : 'Could not access the camera. Use name or barcode search instead.';
-        setStatus('error');
-        setMsg(errMsg);
-        onError?.(errMsg);
-      });
+        zxingReaderRef.current = new BrowserMultiFormatReader();
+      } catch {
+        return; // decoder unavailable — AI identify + text search still work
+      }
+      const dc = decodeCanvasRef.current;
+      const ctx = dc.getContext('2d', { willReadFrequently: true });
+      intervalRef.current = setInterval(() => {
+        if (!mounted || foundRef.current) return;
+        const v = videoRef.current;
+        if (!v || v.readyState < 2 || v.videoWidth === 0) return;
+        const scale = Math.min(1, DECODE_WIDTH / v.videoWidth);
+        dc.width = Math.round(v.videoWidth * scale);
+        dc.height = Math.round(v.videoHeight * scale);
+        ctx.drawImage(v, 0, 0, dc.width, dc.height);
+        try {
+          const result = zxingReaderRef.current.decodeFromCanvas(dc);
+          if (result) handleRawScan(result.getText());
+        } catch { /* NotFound — keep scanning */ }
+      }, DECODE_INTERVAL_MS);
     }
-    boot();
 
     return () => {
       mounted = false;
-      clearTimeout(muteTimer);
-      document.removeEventListener('visibilitychange', onVis);
       stopAll();
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -244,7 +208,7 @@ export default function CameraScanner({ onBarcode, onAIResult, onError }) {
 
   function stopAll() {
     cancelAnimationFrame(rafRef.current);
-    try { zxingControlsRef.current?.stop(); } catch { /* already stopped */ }
+    clearInterval(intervalRef.current);
     streamRef.current?.getTracks().forEach(t => t.stop());
     const v = videoRef.current;
     if (v?.srcObject) {
@@ -252,26 +216,28 @@ export default function CameraScanner({ onBarcode, onAIResult, onError }) {
     }
   }
 
+  // Manual, gesture-driven recovery — the only kind iOS respects.
   async function handleTapToStart() {
     const video = videoRef.current;
     const track = video?.srcObject?.getVideoTracks?.()[0];
-    // Dead or muted track → play() can't help; rebuild the pipeline
-    // from the user gesture (which iOS privileges).
+    setNeedsTap(false);
+    setMsg('');
     if (!track || track.readyState === 'ended' || track.muted) {
-      setNeedsTap(false);
-      restartRef.current?.();
+      stopAll();
+      try {
+        await bootRef.current?.();
+      } catch {
+        setMsg('Camera still blocked — check Settings > Safari > Camera.');
+        setNeedsTap(true);
+      }
       return;
     }
-    try {
-      await video.play();
-      setNeedsTap(false);
-    } catch {
+    try { await video.play(); } catch {
       setMsg('Camera still blocked — check Settings > Safari > Camera.');
+      setNeedsTap(true);
     }
   }
 
-  // Shared: a raw payload came off the camera. Returns true if it was
-  // a usable product code (scanning stops), false to keep scanning.
   function handleRawScan(raw) {
     if (foundRef.current) return true;
     const code = normalizeScan(raw);
@@ -285,21 +251,6 @@ export default function CameraScanner({ onBarcode, onAIResult, onError }) {
     setMsg(`Code ${code}`);
     onBarcode?.(code);
     return true;
-  }
-
-  function startScanLoop() {
-    async function loop() {
-      if (foundRef.current || !videoRef.current || videoRef.current.readyState < 2) {
-        rafRef.current = requestAnimationFrame(loop);
-        return;
-      }
-      try {
-        const codes = await detectorRef.current.detect(videoRef.current);
-        if (codes.length > 0 && handleRawScan(codes[0].rawValue)) return;
-      } catch { /* transient decode error — keep looping */ }
-      rafRef.current = requestAnimationFrame(loop);
-    }
-    rafRef.current = requestAnimationFrame(loop);
   }
 
   async function handleIdentify() {
@@ -340,7 +291,6 @@ export default function CameraScanner({ onBarcode, onAIResult, onError }) {
 
   return (
     <div style={{ position: 'relative', borderRadius: 'var(--radius-md)', overflow: 'hidden', background: '#000', width: '100%', aspectRatio: '4/3' }}>
-      {/* Video */}
       <video
         ref={videoRef}
         muted
@@ -349,9 +299,10 @@ export default function CameraScanner({ onBarcode, onAIResult, onError }) {
         style={{ width: '100%', height: '100%', objectFit: 'cover', display: status === 'error' ? 'none' : 'block' }}
       />
       <canvas ref={canvasRef} style={{ display: 'none' }} />
+      <canvas ref={decodeCanvasRef} style={{ display: 'none' }} />
 
       {/* Scan guide */}
-      {status === 'scanning' && scannerLive && !needsTap && (
+      {status === 'scanning' && !needsTap && (
         <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none' }}>
           {[['8px','8px','borderTop','borderLeft'],['8px','auto','borderTop','borderRight'],['auto','8px','borderBottom','borderLeft'],['auto','auto','borderBottom','borderRight']].map(([t,r,bv,bh], i) => (
             <div key={i} style={{
@@ -368,7 +319,7 @@ export default function CameraScanner({ onBarcode, onAIResult, onError }) {
         </div>
       )}
 
-      {/* iOS gesture fallback — frames not flowing yet */}
+      {/* Tap-to-resume overlay (manual recovery — the iOS-sanctioned path) */}
       {needsTap && status !== 'error' && (
         <button
           type="button"
@@ -385,6 +336,13 @@ export default function CameraScanner({ onBarcode, onAIResult, onError }) {
           </span>
           <span style={{ fontSize: 13, fontWeight: 600 }}>Tap to start camera</span>
         </button>
+      )}
+
+      {/* Diagnostics line — tiny, top-left, owner-only surface */}
+      {diag && status !== 'error' && (
+        <div style={{ position: 'absolute', top: 6, left: 8, fontFamily: 'var(--mono)', fontSize: '9px', color: 'rgba(255,255,255,.55)', background: 'rgba(0,0,0,.45)', padding: '2px 7px', borderRadius: 6, pointerEvents: 'none' }}>
+          {diag}
+        </div>
       )}
 
       {/* Status message bar */}
@@ -405,22 +363,6 @@ export default function CameraScanner({ onBarcode, onAIResult, onError }) {
       {status === 'starting' && !needsTap && (
         <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'rgba(255,255,255,.6)', fontFamily: 'var(--mono)', fontSize: '12px' }}>
           Starting camera…
-        </div>
-      )}
-
-      {/* Diagnostics line — tiny, top-left, owner-only surface */}
-      {diag && status !== 'error' && (
-        <div style={{ position: 'absolute', top: 6, left: 8, fontFamily: 'var(--mono)', fontSize: '9px', color: 'rgba(255,255,255,.55)', background: 'rgba(0,0,0,.45)', padding: '2px 7px', borderRadius: 6, pointerEvents: 'none' }}>
-          {diag}
-        </div>
-      )}
-
-      {/* No decoder notice — only if BOTH engines failed to start */}
-      {status === 'scanning' && !scannerLive && (
-        <div style={{ position: 'absolute', top: 10, left: 0, right: 0, display: 'flex', justifyContent: 'center' }}>
-          <span style={{ background: 'rgba(0,0,0,.65)', color: 'rgba(255,255,255,.8)', padding: '4px 12px', borderRadius: 'var(--radius-full)', fontSize: '11px', fontFamily: 'var(--mono)' }}>
-            Auto-scan unavailable — use AI or text search
-          </span>
         </div>
       )}
 
