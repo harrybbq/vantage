@@ -52,6 +52,7 @@ export default function CameraScanner({ onBarcode, onAIResult, onError }) {
   const rafRef = useRef(null);
   const detectorRef = useRef(null);
   const zxingControlsRef = useRef(null);
+  const restartRef = useRef(null);
   const foundRef = useRef(false);
 
   const [status, setStatus] = useState('starting'); // starting | scanning | found | identifying | error
@@ -122,23 +123,69 @@ export default function CameraScanner({ onBarcode, onAIResult, onError }) {
     // the rear camera and take whatever resolution comes.
     const CONSTRAINTS = { video: { facingMode: { ideal: 'environment' } }, audio: false };
 
+    // ── Mute recovery ─────────────────────────────────────────────
+    // iOS hardware-mutes the track after the first frame in several
+    // states (camera contention, app switching, lock/unlock, Safari
+    // suspensions). It usually un-mutes by itself within a second or
+    // two; when it doesn't, tearing the pipeline down and re-acquiring
+    // the camera fixes it. So: on mute, wait briefly for the free
+    // unmute, then restart the engine — up to 3 attempts before we
+    // fall back to a manual Retry button.
+    let restartAttempts = 0;
+    let muteTimer = 0;
+
+    function restartCamera() {
+      if (!mounted || foundRef.current) return;
+      stopAll();
+      setScannerLive(false);
+      setMsg('Restarting camera…');
+      boot();
+    }
+    restartRef.current = restartCamera;
+
     function watchTrack(stream) {
       const track = stream?.getVideoTracks?.()[0];
       if (!track) return;
-      // iOS mutes the track at the hardware level in some states
-      // (standalone PWAs, camera contention) — frames go black while
-      // the permission indicator stays on. Surface it honestly.
-      const report = () => {
+      track.addEventListener('mute', () => {
+        if (!mounted || foundRef.current) return;
+        setMsg('Camera paused by iOS — recovering…');
+        clearTimeout(muteTimer);
+        muteTimer = setTimeout(() => {
+          if (!mounted || !track.muted) return;
+          if (restartAttempts < 3) {
+            restartAttempts++;
+            restartCamera();
+          } else {
+            setMsg('Camera keeps pausing — close other apps using the camera, then tap Retry.');
+            setNeedsTap(true);
+          }
+        }, 1500);
+      });
+      track.addEventListener('unmute', () => {
         if (!mounted) return;
-        if (track.muted) {
-          setMsg(isStandalone
-            ? 'iOS is blocking camera frames in home-screen apps — open Vantage in Safari to scan.'
-            : 'Camera paused by iOS — reopen this sheet to retry.');
-        }
-      };
-      track.addEventListener('mute', report);
-      if (track.muted) report();
+        clearTimeout(muteTimer);
+        setMsg('');
+        // iOS sometimes leaves the element paused after an unmute.
+        video.play().catch(() => {});
+      });
     }
+
+    // The element itself can also end up paused (Low Power Mode,
+    // returning from background) — resume it opportunistically.
+    video.addEventListener('pause', () => {
+      if (mounted && !foundRef.current && video.srcObject) video.play().catch(() => {});
+    });
+    const onVis = () => {
+      if (!mounted || document.visibilityState !== 'visible' || foundRef.current) return;
+      const track = video.srcObject?.getVideoTracks?.()[0];
+      if (!track || track.readyState === 'ended' || track.muted) {
+        restartAttempts = 0;
+        restartCamera();
+      } else {
+        video.play().catch(() => {});
+      }
+    };
+    document.addEventListener('visibilitychange', onVis);
 
     async function startNative() {
       const stream = await navigator.mediaDevices.getUserMedia(CONSTRAINTS);
@@ -171,18 +218,25 @@ export default function CameraScanner({ onBarcode, onAIResult, onError }) {
       watchFrames();
     }
 
-    (detectorRef.current ? startNative() : startZXing()).catch((e) => {
-      if (!mounted) return;
-      const errMsg = e?.name === 'NotAllowedError'
-        ? 'Camera permission denied — allow camera access in your browser settings.'
-        : 'Could not access the camera. Use name or barcode search instead.';
-      setStatus('error');
-      setMsg(errMsg);
-      onError?.(errMsg);
-    });
+    function boot() {
+      (detectorRef.current ? startNative() : startZXing()).then(() => {
+        if (mounted) setMsg(m => (m === 'Restarting camera…' ? '' : m));
+      }).catch((e) => {
+        if (!mounted) return;
+        const errMsg = e?.name === 'NotAllowedError'
+          ? 'Camera permission denied — allow camera access in your browser settings.'
+          : 'Could not access the camera. Use name or barcode search instead.';
+        setStatus('error');
+        setMsg(errMsg);
+        onError?.(errMsg);
+      });
+    }
+    boot();
 
     return () => {
       mounted = false;
+      clearTimeout(muteTimer);
+      document.removeEventListener('visibilitychange', onVis);
       stopAll();
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -199,8 +253,17 @@ export default function CameraScanner({ onBarcode, onAIResult, onError }) {
   }
 
   async function handleTapToStart() {
+    const video = videoRef.current;
+    const track = video?.srcObject?.getVideoTracks?.()[0];
+    // Dead or muted track → play() can't help; rebuild the pipeline
+    // from the user gesture (which iOS privileges).
+    if (!track || track.readyState === 'ended' || track.muted) {
+      setNeedsTap(false);
+      restartRef.current?.();
+      return;
+    }
     try {
-      await videoRef.current?.play();
+      await video.play();
       setNeedsTap(false);
     } catch {
       setMsg('Camera still blocked — check Settings > Safari > Camera.');
