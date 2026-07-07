@@ -1,11 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import CameraScanner from './CameraScanner';
-import { useSubscriptionContext } from '../context/SubscriptionContext';
 import { backdropClose } from '../utils/backdropClose';
-
-// Detect mobile device (camera tab only shown on mobile)
-const IS_MOBILE = typeof navigator !== 'undefined' &&
-  (/Android|iPhone|iPad/i.test(navigator.userAgent) || ('ontouchstart' in window && navigator.maxTouchPoints > 1));
 
 async function searchByBarcode(barcode) {
   const res = await fetch(`/.netlify/functions/food-search?mode=barcode&q=${encodeURIComponent(barcode)}`);
@@ -22,8 +17,11 @@ async function searchByName(query) {
 }
 
 export default function FoodSearch({ onSelectFood, onClose, onOpenModal }) {
-  const { isPro, isLifetime } = useSubscriptionContext();
-  const canUseCamera = IS_MOBILE && (isPro || isLifetime);
+  // Camera scanning is OWNER-ONLY for now (per owner call, 2026-07) —
+  // the tab simply doesn't exist for other accounts. ZXing fallback
+  // means it works on iOS Safari and desktop webcams too, so no
+  // mobile restriction. Widen to Pro later by loosening this flag.
+  const canUseCamera = typeof window !== 'undefined' && !!window.__vantageOwner;
 
   const [query, setQuery] = useState('');
   const [results, setResults] = useState([]);
@@ -116,7 +114,7 @@ export default function FoodSearch({ onSelectFood, onClose, onOpenModal }) {
   const tabs = [
     ['search', '🔍 Name'],
     ['barcode', '🔢 Barcode'],
-    ...(IS_MOBILE ? [['camera', canUseCamera ? '📷 Camera' : '📷 Camera 🔒']] : []),
+    ...(canUseCamera ? [['camera', '📷 Scan']] : []),
   ];
 
   return (
@@ -144,37 +142,20 @@ export default function FoodSearch({ onSelectFood, onClose, onOpenModal }) {
           ))}
         </div>
 
-        {/* Camera view */}
-        {mode === 'camera' && (
+        {/* Camera view (owner-only — the tab doesn't render otherwise) */}
+        {mode === 'camera' && canUseCamera && (
           <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', gap: '10px' }}>
-            {canUseCamera ? (
-              <>
-                <CameraScanner
-                  onBarcode={handleCameraBarcode}
-                  onAIResult={handleAIResult}
-                  onError={handleCameraError}
-                />
-                <p style={{ fontFamily: 'var(--mono)', fontSize: '11px', color: 'var(--text-muted)', textAlign: 'center', margin: 0 }}>
-                  Point at a barcode to auto-scan, or tap <strong style={{ color: 'var(--text-mid)' }}>Identify Food with AI</strong> to detect what's in frame.
-                </p>
-                {error && (
-                  <div style={{ padding: '10px 14px', background: 'rgba(220,38,38,.08)', borderRadius: 'var(--radius-md)', color: '#e05252', fontSize: 'var(--text-sm)', fontFamily: 'var(--mono)' }}>
-                    {error}
-                  </div>
-                )}
-              </>
-            ) : (
-              <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '14px', padding: '32px 20px', textAlign: 'center' }}>
-                <div style={{ fontSize: '40px' }}>📷</div>
-                <div style={{ fontFamily: 'var(--serif)', fontSize: 'var(--text-lg)', fontWeight: 700, color: 'var(--text)' }}>Camera Scanner</div>
-                <div style={{ fontSize: 'var(--text-sm)', color: 'var(--text-muted)', lineHeight: 1.6, maxWidth: '260px' }}>
-                  Scan barcodes and identify food with AI. Available on the Pro plan.
-                </div>
-                <button
-                  onClick={() => { onClose(); onOpenModal?.('waitlistModal'); }}
-                  style={{ padding: '11px 28px', borderRadius: 'var(--radius-md)', border: 'none', background: 'var(--em)', color: '#fff', fontFamily: 'var(--sans)', fontSize: 'var(--text-sm)', fontWeight: 600, cursor: 'pointer' }}>
-                  Join the waitlist
-                </button>
+            <CameraScanner
+              onBarcode={handleCameraBarcode}
+              onAIResult={handleAIResult}
+              onError={handleCameraError}
+            />
+            <p style={{ fontFamily: 'var(--mono)', fontSize: '11px', color: 'var(--text-muted)', textAlign: 'center', margin: 0 }}>
+              Point at a barcode or GS1 QR to auto-scan, or tap <strong style={{ color: 'var(--text-mid)' }}>Identify Food with AI</strong> to detect what's in frame.
+            </p>
+            {error && (
+              <div style={{ padding: '10px 14px', background: 'rgba(220,38,38,.08)', borderRadius: 'var(--radius-md)', color: '#e05252', fontSize: 'var(--text-sm)', fontFamily: 'var(--mono)' }}>
+                {error}
               </div>
             )}
             <button onClick={() => onSelectFood(null)}
