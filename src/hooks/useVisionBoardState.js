@@ -332,6 +332,12 @@ export function useVisionBoardState(userId) {
   // True while a local edit is pending its debounced save — focus-refresh
   // skips while dirty so it never clobbers unsaved work.
   const dirtyRef = useRef(false);
+  // Latest unsaved state, so the background-flush handler can persist
+  // it when the app is hidden before the 1.5s debounce fires. Without
+  // this, an edit made just before locking the phone (e.g. logging a
+  // relapse at night) dies with the WebView process and the next
+  // morning's load silently reverts it.
+  const pendingStateRef = useRef(null);
   const lastRefreshRef = useRef(0);
 
   useEffect(() => {
@@ -513,6 +519,43 @@ export function useVisionBoardState(userId) {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [userId, loadError]);
 
+  // ── Flush pending saves when the app is backgrounded ────────────────
+  // The 1.5s debounce assumes the JS runtime survives long enough to
+  // fire. On mobile it often doesn't: edit → lock phone → WebView
+  // frozen/killed → timer never runs → the edit only ever existed in
+  // memory. On visibilitychange→hidden / pagehide we fire the save
+  // immediately (browsers let an already-started request complete for
+  // a short grace window after hide). Same guards as the debounced
+  // path so this can't become a new wipe vector.
+  useEffect(() => {
+    function flushPendingSave() {
+      if (!dirtyRef.current) return;
+      const uid = userIdRef.current;
+      const next = pendingStateRef.current;
+      if (!uid || !next) return;
+      if (loadError || loadingRef.current) return;
+      if (
+        lastGoodMeaningfulRef.current &&
+        !allowEmptyRef.current &&
+        looksLikeFactoryDefault(next)
+      ) return;
+      clearTimeout(saveTimer.current);
+      saveToCloud(uid, next)
+        .then(() => {
+          dirtyRef.current = false;
+          if (hasMeaningfulData(next)) writeBackup(uid, next);
+        })
+        .catch(() => { /* dirty stays set; debounce path retries on resume */ });
+    }
+    const onHide = () => { if (document.visibilityState === 'hidden') flushPendingSave(); };
+    document.addEventListener('visibilitychange', onHide);
+    window.addEventListener('pagehide', flushPendingSave);
+    return () => {
+      document.removeEventListener('visibilitychange', onHide);
+      window.removeEventListener('pagehide', flushPendingSave);
+    };
+  }, [loadError]);
+
   const update = useCallback((updater) => {
     setS(prev => {
       const next = typeof updater === 'function' ? updater(prev) : { ...prev, ...updater };
@@ -522,8 +565,11 @@ export function useVisionBoardState(userId) {
       if (hasMeaningfulData(next)) lastGoodMeaningfulRef.current = true;
 
       // Mark unsaved — blocks focus-refresh from overwriting in-flight
-      // local edits. Cleared once the debounced save lands.
+      // local edits. Cleared once the debounced save lands. The latest
+      // unsaved state is kept in a ref so the background-flush handler
+      // can persist it if the app is hidden before the debounce fires.
       dirtyRef.current = true;
+      pendingStateRef.current = next;
 
       // Debounce cloud saves — 1.5 s after last change.
       clearTimeout(saveTimer.current);
