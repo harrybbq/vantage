@@ -5,33 +5,38 @@ import { useRef, useEffect, useState } from 'react';
  *
  * Detection engines, in preference order:
  *   1. BarcodeDetector (Chrome 88+ / Android WebView) — native, fast.
- *   2. @zxing/browser (dynamic import, ~100KB) — everywhere else,
- *      including iOS Safari and desktop webcams, which have no
- *      BarcodeDetector.
- * Both read 1D barcodes (EAN/UPC — what food packaging carries) AND
- * QR codes. A QR is only accepted when it resolves to a product GTIN
- * (GS1 Digital Link URLs like https://id.gs1.org/01/09506000134352);
- * random QRs keep the scanner running with a hint instead of firing
- * a junk lookup.
+ *      We acquire the stream ourselves and run a rAF detect loop.
+ *   2. @zxing/browser (dynamic import) — everywhere else, including
+ *      iOS Safari and desktop webcams. On this path ZXing OWNS the
+ *      camera (decodeFromVideoDevice acquires + plays + decodes) —
+ *      letting it manage the stream avoids the iOS black-frame bugs
+ *      that come from two owners fighting over one <video>.
  *
- * "Identify Food with AI" captures a frame and sends it to the
- * ai-food-detect function.
+ * iOS Safari specifics handled here:
+ *   - React never renders the `muted` ATTRIBUTE (only the property),
+ *     and iOS requires the attribute for inline camera autoplay — so
+ *     muted/playsinline/autoplay are set imperatively before play.
+ *   - If frames still aren't flowing shortly after start (videoWidth
+ *     stays 0), a "Tap to start camera" overlay retries play() from
+ *     a real user gesture, which iOS always honours.
+ *
+ * Both engines read 1D barcodes (EAN/UPC) and QR codes. A QR is only
+ * accepted when it resolves to a product GTIN (GS1 Digital Link);
+ * other QRs show a hint and scanning continues.
  *
  * Callbacks:
- *   onBarcode(code: string)  — normalised GTIN/EAN digits
- *   onAIResult(food: object) — AI-identified food object (matches FoodLogSheet prefill shape)
- *   onError(msg: string)     — camera / AI error message
+ *   onBarcode(code)   — normalised GTIN/EAN digits
+ *   onAIResult(food)  — AI-identified food (FoodLogSheet prefill shape)
+ *   onError(msg)      — camera / AI error message
  */
 
 /** Normalise a scan payload to plain GTIN digits, or null if the
  *  payload isn't a product code (e.g. a marketing QR). */
 export function normalizeScan(raw) {
   const s = String(raw || '').trim();
-  // Plain numeric barcode (EAN-8/12/13, GTIN-14).
   if (/^\d{8,14}$/.test(s)) {
     return s.length === 14 && s.startsWith('0') ? s.slice(1) : s;
   }
-  // GS1 Digital Link QR — .../01/{gtin}(/...)
   const m = s.match(/\/01\/(\d{8,14})(?:[/?#]|$)/);
   if (m) {
     const g = m[1];
@@ -52,6 +57,7 @@ export default function CameraScanner({ onBarcode, onAIResult, onError }) {
   const [status, setStatus] = useState('starting'); // starting | scanning | found | identifying | error
   const [msg, setMsg] = useState('');
   const [scannerLive, setScannerLive] = useState(false);
+  const [needsTap, setNeedsTap] = useState(false);
 
   // Init BarcodeDetector where available
   useEffect(() => {
@@ -64,40 +70,71 @@ export default function CameraScanner({ onBarcode, onAIResult, onError }) {
     }
   }, []);
 
-  // Start camera stream, then whichever decode engine we have.
   useEffect(() => {
     let mounted = true;
+    const video = videoRef.current;
+    if (!video) return undefined;
 
-    async function start() {
-      try {
-        const stream = await navigator.mediaDevices.getUserMedia({
-          video: { facingMode: { ideal: 'environment' }, width: { ideal: 1280 }, height: { ideal: 720 } },
-          audio: false,
-        });
-        if (!mounted) { stream.getTracks().forEach(t => t.stop()); return; }
-        streamRef.current = stream;
-        if (videoRef.current) {
-          videoRef.current.srcObject = stream;
-          await videoRef.current.play();
-          setStatus('scanning');
-          if (detectorRef.current) {
-            setScannerLive(true);
-            startScanLoop();
-          } else {
-            startZXing(mounted);
-          }
-        }
-      } catch (e) {
-        const errMsg = e.name === 'NotAllowedError'
-          ? 'Camera permission denied — please allow camera access in your browser settings.'
-          : 'Could not access camera. Try the text search instead.';
-        setStatus('error');
-        setMsg(errMsg);
-        onError?.(errMsg);
-      }
+    // iOS: these must exist as ATTRIBUTES before play — React only
+    // sets the muted property, which Safari ignores for autoplay
+    // gating. Belt and braces for every engine path.
+    video.setAttribute('muted', '');
+    video.muted = true;
+    video.setAttribute('playsinline', '');
+    video.setAttribute('autoplay', '');
+
+    function watchFrames() {
+      // If frames aren't flowing shortly after start, ask for a tap —
+      // a real gesture always unblocks playback on iOS.
+      setTimeout(() => {
+        if (!mounted || foundRef.current) return;
+        if (video.videoWidth === 0) setNeedsTap(true);
+        else setNeedsTap(false);
+      }, 1200);
+      video.addEventListener('playing', () => { if (mounted) { setNeedsTap(false); setStatus(s => (s === 'starting' ? 'scanning' : s)); } });
     }
 
-    start();
+    async function startNative() {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: { ideal: 'environment' }, width: { ideal: 1280 }, height: { ideal: 720 } },
+        audio: false,
+      });
+      if (!mounted) { stream.getTracks().forEach(t => t.stop()); return; }
+      streamRef.current = stream;
+      video.srcObject = stream;
+      try { await video.play(); } catch { setNeedsTap(true); }
+      setStatus('scanning');
+      setScannerLive(true);
+      watchFrames();
+      startScanLoop();
+    }
+
+    async function startZXing() {
+      const { BrowserMultiFormatReader } = await import('@zxing/browser');
+      if (!mounted) return;
+      const reader = new BrowserMultiFormatReader();
+      // ZXing acquires + attaches + plays the camera itself. undefined
+      // deviceId = its default heuristic, which prefers a rear camera.
+      const controls = await reader.decodeFromVideoDevice(undefined, video, (result) => {
+        if (result) handleRawScan(result.getText());
+      });
+      if (!mounted) { controls.stop(); return; }
+      zxingControlsRef.current = controls;
+      setStatus('scanning');
+      setScannerLive(true);
+      watchFrames();
+    }
+
+    (detectorRef.current ? startNative() : startZXing()).catch((e) => {
+      if (!mounted) return;
+      const errMsg = e?.name === 'NotAllowedError'
+        ? 'Camera permission denied — allow camera access in your browser settings.'
+        : 'Could not access the camera. Use name or barcode search instead.';
+      setStatus('error');
+      setMsg(errMsg);
+      onError?.(errMsg);
+    });
+
     return () => {
       mounted = false;
       stopAll();
@@ -109,6 +146,19 @@ export default function CameraScanner({ onBarcode, onAIResult, onError }) {
     cancelAnimationFrame(rafRef.current);
     try { zxingControlsRef.current?.stop(); } catch { /* already stopped */ }
     streamRef.current?.getTracks().forEach(t => t.stop());
+    const v = videoRef.current;
+    if (v?.srcObject) {
+      try { v.srcObject.getTracks().forEach(t => t.stop()); } catch { /* detached */ }
+    }
+  }
+
+  async function handleTapToStart() {
+    try {
+      await videoRef.current?.play();
+      setNeedsTap(false);
+    } catch {
+      setMsg('Camera still blocked — check Settings > Safari > Camera.');
+    }
   }
 
   // Shared: a raw payload came off the camera. Returns true if it was
@@ -117,13 +167,13 @@ export default function CameraScanner({ onBarcode, onAIResult, onError }) {
     if (foundRef.current) return true;
     const code = normalizeScan(raw);
     if (!code) {
-      setMsg('That QR isn’t a product code — keep aiming at the barcode.');
+      setMsg('That QR isn’t a product code — aim at the barcode.');
       return false;
     }
     foundRef.current = true;
     stopAll();
     setStatus('found');
-    setMsg(`Code: ${code}`);
+    setMsg(`Code ${code}`);
     onBarcode?.(code);
     return true;
   }
@@ -143,34 +193,21 @@ export default function CameraScanner({ onBarcode, onAIResult, onError }) {
     rafRef.current = requestAnimationFrame(loop);
   }
 
-  // ZXing fallback (iOS Safari, desktop browsers without the API).
-  // Dynamically imported so platforms with BarcodeDetector never pay
-  // for the bundle.
-  async function startZXing(mounted) {
-    try {
-      const { BrowserMultiFormatReader } = await import('@zxing/browser');
-      if (!mounted || !videoRef.current || foundRef.current) return;
-      const reader = new BrowserMultiFormatReader();
-      const controls = await reader.decodeFromVideoElement(videoRef.current, (result) => {
-        if (result) handleRawScan(result.getText());
-      });
-      zxingControlsRef.current = controls;
-      setScannerLive(true);
-    } catch {
-      // Decoder failed to boot — AI identify + text search still work.
-      setScannerLive(false);
-    }
-  }
-
   async function handleIdentify() {
-    if (!videoRef.current) return;
+    const video = videoRef.current;
+    if (!video) return;
+    if (!video.videoWidth) {
+      setMsg('Camera hasn’t started yet — tap the viewfinder first.');
+      setNeedsTap(true);
+      return;
+    }
     setStatus('identifying');
     setMsg('');
     try {
       const canvas = canvasRef.current;
-      canvas.width = videoRef.current.videoWidth || 640;
-      canvas.height = videoRef.current.videoHeight || 480;
-      canvas.getContext('2d').drawImage(videoRef.current, 0, 0);
+      canvas.width = video.videoWidth || 640;
+      canvas.height = video.videoHeight || 480;
+      canvas.getContext('2d').drawImage(video, 0, 0);
       const base64 = canvas.toDataURL('image/jpeg', 0.6).split(',')[1];
 
       const res = await fetch('/.netlify/functions/ai-food-detect', {
@@ -205,9 +242,8 @@ export default function CameraScanner({ onBarcode, onAIResult, onError }) {
       <canvas ref={canvasRef} style={{ display: 'none' }} />
 
       {/* Scan guide */}
-      {status === 'scanning' && scannerLive && (
+      {status === 'scanning' && scannerLive && !needsTap && (
         <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none' }}>
-          {/* Corner brackets */}
           {[['8px','8px','borderTop','borderLeft'],['8px','auto','borderTop','borderRight'],['auto','8px','borderBottom','borderLeft'],['auto','auto','borderBottom','borderRight']].map(([t,r,bv,bh], i) => (
             <div key={i} style={{
               position: 'absolute', top: t === 'auto' ? 'auto' : '20%', bottom: t === 'auto' ? '20%' : 'auto',
@@ -215,13 +251,31 @@ export default function CameraScanner({ onBarcode, onAIResult, onError }) {
               width: 24, height: 24, [bv]: '2px solid var(--em)', [bh]: '2px solid var(--em)',
             }} />
           ))}
-          {/* Scan line */}
           <div style={{
             position: 'absolute', left: '10%', right: '10%', height: '2px',
             background: 'var(--em)', boxShadow: '0 0 8px var(--em)',
             animation: 'cam-scan 2s ease-in-out infinite',
           }} />
         </div>
+      )}
+
+      {/* iOS gesture fallback — frames not flowing yet */}
+      {needsTap && status !== 'error' && (
+        <button
+          type="button"
+          onClick={handleTapToStart}
+          style={{
+            position: 'absolute', inset: 0, width: '100%', height: '100%',
+            background: 'rgba(0,0,0,.55)', border: 'none', cursor: 'pointer',
+            display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 8,
+            color: '#fff', fontFamily: 'var(--sans)',
+          }}
+        >
+          <span style={{ width: 46, height: 46, borderRadius: '50%', border: '2px solid var(--em)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <span style={{ width: 0, height: 0, borderLeft: '14px solid var(--em)', borderTop: '9px solid transparent', borderBottom: '9px solid transparent', marginLeft: 4 }} />
+          </span>
+          <span style={{ fontSize: 13, fontWeight: 600 }}>Tap to start camera</span>
+        </button>
       )}
 
       {/* Status message bar */}
@@ -239,7 +293,7 @@ export default function CameraScanner({ onBarcode, onAIResult, onError }) {
       )}
 
       {/* Starting spinner */}
-      {status === 'starting' && (
+      {status === 'starting' && !needsTap && (
         <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'rgba(255,255,255,.6)', fontFamily: 'var(--mono)', fontSize: '12px' }}>
           Starting camera…
         </div>
@@ -255,7 +309,7 @@ export default function CameraScanner({ onBarcode, onAIResult, onError }) {
       )}
 
       {/* AI identify button */}
-      {(status === 'scanning' || status === 'identifying') && (
+      {(status === 'scanning' || status === 'identifying') && !needsTap && (
         <button
           onClick={handleIdentify}
           disabled={status === 'identifying'}
@@ -269,7 +323,7 @@ export default function CameraScanner({ onBarcode, onAIResult, onError }) {
             opacity: status === 'identifying' ? 0.8 : 1,
           }}
         >
-          {status === 'identifying' ? '🤖 Identifying…' : '🤖 Identify Food with AI'}
+          {status === 'identifying' ? 'Identifying…' : 'Identify with AI'}
         </button>
       )}
     </div>
