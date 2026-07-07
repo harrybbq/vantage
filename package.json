@@ -27,6 +27,8 @@
     "@revenuecat/purchases-capacitor-ui": "^13.0.1",
     "@supabase/supabase-js": "^2.100.1",
     "@tanstack/react-query": "^5.90.21",
+    "@zxing/browser": "^0.2.1",
+    "@zxing/library": "^0.23.0",
     "canvas-confetti": "^1.9.4",
     "cmdk": "^1.1.1",
     "framer-motion": "^12.36.0",

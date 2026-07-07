@@ -1,40 +1,70 @@
 import { useRef, useEffect, useState } from 'react';
 
 /**
- * CameraScanner — mobile-only camera viewfinder
+ * CameraScanner — camera viewfinder for product-code scanning.
  *
- * Uses BarcodeDetector (Chrome 88+, Android) for live barcode scanning.
- * Falls back gracefully on unsupported browsers.
- * "Identify Food with AI" captures a frame and sends to the ai-food-detect function.
+ * Detection engines, in preference order:
+ *   1. BarcodeDetector (Chrome 88+ / Android WebView) — native, fast.
+ *   2. @zxing/browser (dynamic import, ~100KB) — everywhere else,
+ *      including iOS Safari and desktop webcams, which have no
+ *      BarcodeDetector.
+ * Both read 1D barcodes (EAN/UPC — what food packaging carries) AND
+ * QR codes. A QR is only accepted when it resolves to a product GTIN
+ * (GS1 Digital Link URLs like https://id.gs1.org/01/09506000134352);
+ * random QRs keep the scanner running with a hint instead of firing
+ * a junk lookup.
+ *
+ * "Identify Food with AI" captures a frame and sends it to the
+ * ai-food-detect function.
  *
  * Callbacks:
- *   onBarcode(code: string)  — raw barcode value detected
+ *   onBarcode(code: string)  — normalised GTIN/EAN digits
  *   onAIResult(food: object) — AI-identified food object (matches FoodLogSheet prefill shape)
  *   onError(msg: string)     — camera / AI error message
  */
+
+/** Normalise a scan payload to plain GTIN digits, or null if the
+ *  payload isn't a product code (e.g. a marketing QR). */
+export function normalizeScan(raw) {
+  const s = String(raw || '').trim();
+  // Plain numeric barcode (EAN-8/12/13, GTIN-14).
+  if (/^\d{8,14}$/.test(s)) {
+    return s.length === 14 && s.startsWith('0') ? s.slice(1) : s;
+  }
+  // GS1 Digital Link QR — .../01/{gtin}(/...)
+  const m = s.match(/\/01\/(\d{8,14})(?:[/?#]|$)/);
+  if (m) {
+    const g = m[1];
+    return g.length === 14 && g.startsWith('0') ? g.slice(1) : g;
+  }
+  return null;
+}
+
 export default function CameraScanner({ onBarcode, onAIResult, onError }) {
   const videoRef = useRef(null);
   const canvasRef = useRef(null);
   const streamRef = useRef(null);
   const rafRef = useRef(null);
   const detectorRef = useRef(null);
+  const zxingControlsRef = useRef(null);
   const foundRef = useRef(false);
 
   const [status, setStatus] = useState('starting'); // starting | scanning | found | identifying | error
   const [msg, setMsg] = useState('');
+  const [scannerLive, setScannerLive] = useState(false);
 
-  // Init BarcodeDetector
+  // Init BarcodeDetector where available
   useEffect(() => {
     if ('BarcodeDetector' in window) {
       try {
         detectorRef.current = new window.BarcodeDetector({
           formats: ['ean_13', 'ean_8', 'upc_a', 'upc_e', 'qr_code', 'code_128', 'code_39', 'itf'],
         });
-      } catch {}
+      } catch { /* fall through to ZXing */ }
     }
   }, []);
 
-  // Start camera stream
+  // Start camera stream, then whichever decode engine we have.
   useEffect(() => {
     let mounted = true;
 
@@ -50,7 +80,12 @@ export default function CameraScanner({ onBarcode, onAIResult, onError }) {
           videoRef.current.srcObject = stream;
           await videoRef.current.play();
           setStatus('scanning');
-          if (detectorRef.current) startScanLoop();
+          if (detectorRef.current) {
+            setScannerLive(true);
+            startScanLoop();
+          } else {
+            startZXing(mounted);
+          }
         }
       } catch (e) {
         const errMsg = e.name === 'NotAllowedError'
@@ -72,7 +107,25 @@ export default function CameraScanner({ onBarcode, onAIResult, onError }) {
 
   function stopAll() {
     cancelAnimationFrame(rafRef.current);
+    try { zxingControlsRef.current?.stop(); } catch { /* already stopped */ }
     streamRef.current?.getTracks().forEach(t => t.stop());
+  }
+
+  // Shared: a raw payload came off the camera. Returns true if it was
+  // a usable product code (scanning stops), false to keep scanning.
+  function handleRawScan(raw) {
+    if (foundRef.current) return true;
+    const code = normalizeScan(raw);
+    if (!code) {
+      setMsg('That QR isn’t a product code — keep aiming at the barcode.');
+      return false;
+    }
+    foundRef.current = true;
+    stopAll();
+    setStatus('found');
+    setMsg(`Code: ${code}`);
+    onBarcode?.(code);
+    return true;
   }
 
   function startScanLoop() {
@@ -83,19 +136,30 @@ export default function CameraScanner({ onBarcode, onAIResult, onError }) {
       }
       try {
         const codes = await detectorRef.current.detect(videoRef.current);
-        if (codes.length > 0 && !foundRef.current) {
-          foundRef.current = true;
-          const raw = codes[0].rawValue;
-          stopAll();
-          setStatus('found');
-          setMsg(`Barcode: ${raw}`);
-          onBarcode?.(raw);
-          return;
-        }
-      } catch {}
+        if (codes.length > 0 && handleRawScan(codes[0].rawValue)) return;
+      } catch { /* transient decode error — keep looping */ }
       rafRef.current = requestAnimationFrame(loop);
     }
     rafRef.current = requestAnimationFrame(loop);
+  }
+
+  // ZXing fallback (iOS Safari, desktop browsers without the API).
+  // Dynamically imported so platforms with BarcodeDetector never pay
+  // for the bundle.
+  async function startZXing(mounted) {
+    try {
+      const { BrowserMultiFormatReader } = await import('@zxing/browser');
+      if (!mounted || !videoRef.current || foundRef.current) return;
+      const reader = new BrowserMultiFormatReader();
+      const controls = await reader.decodeFromVideoElement(videoRef.current, (result) => {
+        if (result) handleRawScan(result.getText());
+      });
+      zxingControlsRef.current = controls;
+      setScannerLive(true);
+    } catch {
+      // Decoder failed to boot — AI identify + text search still work.
+      setScannerLive(false);
+    }
   }
 
   async function handleIdentify() {
@@ -128,8 +192,6 @@ export default function CameraScanner({ onBarcode, onAIResult, onError }) {
     }
   }
 
-  const hasBarcodeDetector = !!detectorRef.current;
-
   return (
     <div style={{ position: 'relative', borderRadius: 'var(--radius-md)', overflow: 'hidden', background: '#000', width: '100%', aspectRatio: '4/3' }}>
       {/* Video */}
@@ -143,7 +205,7 @@ export default function CameraScanner({ onBarcode, onAIResult, onError }) {
       <canvas ref={canvasRef} style={{ display: 'none' }} />
 
       {/* Scan guide */}
-      {status === 'scanning' && hasBarcodeDetector && (
+      {status === 'scanning' && scannerLive && (
         <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none' }}>
           {/* Corner brackets */}
           {[['8px','8px','borderTop','borderLeft'],['8px','auto','borderTop','borderRight'],['auto','8px','borderBottom','borderLeft'],['auto','auto','borderBottom','borderRight']].map(([t,r,bv,bh], i) => (
@@ -183,11 +245,11 @@ export default function CameraScanner({ onBarcode, onAIResult, onError }) {
         </div>
       )}
 
-      {/* No BarcodeDetector notice */}
-      {status === 'scanning' && !hasBarcodeDetector && (
+      {/* No decoder notice — only if BOTH engines failed to start */}
+      {status === 'scanning' && !scannerLive && (
         <div style={{ position: 'absolute', top: 10, left: 0, right: 0, display: 'flex', justifyContent: 'center' }}>
           <span style={{ background: 'rgba(0,0,0,.65)', color: 'rgba(255,255,255,.8)', padding: '4px 12px', borderRadius: 'var(--radius-full)', fontSize: '11px', fontFamily: 'var(--mono)' }}>
-            Auto-scan not supported — use AI or text search
+            Auto-scan unavailable — use AI or text search
           </span>
         </div>
       )}
