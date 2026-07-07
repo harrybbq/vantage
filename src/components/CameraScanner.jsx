@@ -58,6 +58,13 @@ export default function CameraScanner({ onBarcode, onAIResult, onError }) {
   const [msg, setMsg] = useState('');
   const [scannerLive, setScannerLive] = useState(false);
   const [needsTap, setNeedsTap] = useState(false);
+  const [diag, setDiag] = useState('');
+
+  // Home-screen PWA (iOS "standalone") — the environment where iOS
+  // most often grants the camera but never delivers frames.
+  const isStandalone = typeof navigator !== 'undefined' &&
+    (navigator.standalone === true ||
+     (typeof window !== 'undefined' && window.matchMedia?.('(display-mode: standalone)').matches));
 
   // Init BarcodeDetector where available
   useEffect(() => {
@@ -84,27 +91,64 @@ export default function CameraScanner({ onBarcode, onAIResult, onError }) {
     video.setAttribute('autoplay', '');
 
     function watchFrames() {
-      // If frames aren't flowing shortly after start, ask for a tap —
-      // a real gesture always unblocks playback on iOS.
-      setTimeout(() => {
+      const check = () => {
         if (!mounted || foundRef.current) return;
-        if (video.videoWidth === 0) setNeedsTap(true);
-        else setNeedsTap(false);
-      }, 1200);
+        const track = video.srcObject?.getVideoTracks?.()[0];
+        // Diagnostics line — owner-only surface, so it can be frank.
+        setDiag(
+          `${detectorRef.current ? 'native' : 'zxing'} · ${video.videoWidth}×${video.videoHeight} · rs${video.readyState}` +
+          ` · track ${track ? `${track.readyState}${track.muted ? '/muted' : ''}` : 'none'}${isStandalone ? ' · standalone' : ''}`
+        );
+        if (video.videoWidth === 0) {
+          if (isStandalone) {
+            // A tap won't help when iOS itself withholds frames from
+            // home-screen apps — say so instead of a dead-end button.
+            setNeedsTap(false);
+            setMsg('iOS is not delivering camera frames to the home-screen app — open Vantage in Safari to scan.');
+          } else {
+            setNeedsTap(true);
+          }
+        } else {
+          setNeedsTap(false);
+        }
+      };
+      setTimeout(check, 1200);
+      setTimeout(check, 3200);
       video.addEventListener('playing', () => { if (mounted) { setNeedsTap(false); setStatus(s => (s === 'starting' ? 'scanning' : s)); } });
     }
 
+    // Simplest constraints iOS reliably honours — width/height ideals
+    // have produced black frames on some iOS builds, so ask only for
+    // the rear camera and take whatever resolution comes.
+    const CONSTRAINTS = { video: { facingMode: { ideal: 'environment' } }, audio: false };
+
+    function watchTrack(stream) {
+      const track = stream?.getVideoTracks?.()[0];
+      if (!track) return;
+      // iOS mutes the track at the hardware level in some states
+      // (standalone PWAs, camera contention) — frames go black while
+      // the permission indicator stays on. Surface it honestly.
+      const report = () => {
+        if (!mounted) return;
+        if (track.muted) {
+          setMsg(isStandalone
+            ? 'iOS is blocking camera frames in home-screen apps — open Vantage in Safari to scan.'
+            : 'Camera paused by iOS — reopen this sheet to retry.');
+        }
+      };
+      track.addEventListener('mute', report);
+      if (track.muted) report();
+    }
+
     async function startNative() {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: { ideal: 'environment' }, width: { ideal: 1280 }, height: { ideal: 720 } },
-        audio: false,
-      });
+      const stream = await navigator.mediaDevices.getUserMedia(CONSTRAINTS);
       if (!mounted) { stream.getTracks().forEach(t => t.stop()); return; }
       streamRef.current = stream;
       video.srcObject = stream;
       try { await video.play(); } catch { setNeedsTap(true); }
       setStatus('scanning');
       setScannerLive(true);
+      watchTrack(stream);
       watchFrames();
       startScanLoop();
     }
@@ -113,15 +157,17 @@ export default function CameraScanner({ onBarcode, onAIResult, onError }) {
       const { BrowserMultiFormatReader } = await import('@zxing/browser');
       if (!mounted) return;
       const reader = new BrowserMultiFormatReader();
-      // ZXing acquires + attaches + plays the camera itself. undefined
-      // deviceId = its default heuristic, which prefers a rear camera.
-      const controls = await reader.decodeFromVideoDevice(undefined, video, (result) => {
+      // decodeFromConstraints so we control the getUserMedia request
+      // (decodeFromVideoDevice(undefined) asks for `video: true`,
+      // which opens the FRONT camera on iPhones).
+      const controls = await reader.decodeFromConstraints(CONSTRAINTS, video, (result) => {
         if (result) handleRawScan(result.getText());
       });
       if (!mounted) { controls.stop(); return; }
       zxingControlsRef.current = controls;
       setStatus('scanning');
       setScannerLive(true);
+      watchTrack(video.srcObject);
       watchFrames();
     }
 
@@ -296,6 +342,13 @@ export default function CameraScanner({ onBarcode, onAIResult, onError }) {
       {status === 'starting' && !needsTap && (
         <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'rgba(255,255,255,.6)', fontFamily: 'var(--mono)', fontSize: '12px' }}>
           Starting camera…
+        </div>
+      )}
+
+      {/* Diagnostics line — tiny, top-left, owner-only surface */}
+      {diag && status !== 'error' && (
+        <div style={{ position: 'absolute', top: 6, left: 8, fontFamily: 'var(--mono)', fontSize: '9px', color: 'rgba(255,255,255,.55)', background: 'rgba(0,0,0,.45)', padding: '2px 7px', borderRadius: 6, pointerEvents: 'none' }}>
+          {diag}
         </div>
       )}
 
