@@ -34,7 +34,7 @@ function EntryRow({ entry, onDelete, onEdit }) {
           <span style={{ fontFamily: 'var(--mono)', fontSize: 'var(--text-xs)', color: 'var(--text-muted)' }}>C {fmt(entry.carbs_g)}g</span>
           <span style={{ fontFamily: 'var(--mono)', fontSize: 'var(--text-xs)', color: 'var(--text-muted)' }}>F {fmt(entry.fat_g)}g</span>
           {entry.serving_g !== 100 && (
-            <span style={{ fontFamily: 'var(--mono)', fontSize: 'var(--text-xs)', color: 'var(--text-muted)' }}>{entry.serving_g}g</span>
+            <span style={{ fontFamily: 'var(--mono)', fontSize: 'var(--text-xs)', color: 'var(--text-muted)' }}>{entry.serving_g}{entry.additional_nutrients?.serving_unit || 'g'}</span>
           )}
         </div>
       </div>

@@ -19,6 +19,8 @@ const EMPTY_FORM = {
   food_name: '',
   brand: '',
   serving_g: '100',
+  serving_unit: 'g',  // 'g' | 'ml' — ml accommodates liquids; the
+                      // number still drives macro scaling identically
   calories: '',
   protein_g: '',
   carbs_g: '',
@@ -103,7 +105,9 @@ export default function FoodLogSheet({ userId, logDate, onClose, onSaved, prefil
       fibre_g:   parseFloat(form.fibre_g)   || 0,
       sugar_g:   parseFloat(form.sugar_g)   || 0,
       sodium_mg: parseFloat(form.sodium_mg) || 0,
-      additional_nutrients: {},
+      // serving_g column stays numeric; the unit (g/ml) rides in the
+      // JSON so liquid servings display correctly without a schema change.
+      additional_nutrients: form.serving_unit === 'ml' ? { serving_unit: 'ml' } : {},
       source: 'manual',
     };
     const { error: err } = await supabase.from('nutrition_log').insert(row);
@@ -123,6 +127,7 @@ export default function FoodLogSheet({ userId, logDate, onClose, onSaved, prefil
       brand: form.brand.trim(),
       meal_type: form.meal_type,
       serving_g: form.serving_g,
+      serving_unit: form.serving_unit,
       calories: form.calories,
       protein_g: form.protein_g,
       carbs_g: form.carbs_g,
@@ -185,8 +190,18 @@ export default function FoodLogSheet({ userId, logDate, onClose, onSaved, prefil
               <input value={form.brand} onChange={e => set('brand', e.target.value)} style={inputStyle} placeholder="e.g. Tesco" />
             </div>
             <div style={{ flex: 1 }}>
-              <label style={labelStyle}>Serving (g)</label>
-              <input type="number" value={form.serving_g} onChange={e => set('serving_g', e.target.value)} style={inputStyle} placeholder="100" min="0" step="1" />
+              <label style={labelStyle}>Serving ({form.serving_unit})</label>
+              <div style={{ display: 'flex', gap: '6px' }}>
+                <input type="number" value={form.serving_g} onChange={e => set('serving_g', e.target.value)} style={{ ...inputStyle, flex: 1, minWidth: 0 }} placeholder="100" min="0" step="1" />
+                <div style={{ display: 'inline-flex', border: '1px solid var(--border)', borderRadius: 'var(--radius-md)', overflow: 'hidden', flexShrink: 0 }}>
+                  {['g', 'ml'].map(u => (
+                    <button key={u} type="button" onClick={() => set('serving_unit', u)}
+                      style={{ padding: '0 10px', border: 'none', background: form.serving_unit === u ? 'var(--em)' : 'transparent', color: form.serving_unit === u ? '#fff' : 'var(--text-mid)', fontFamily: 'var(--mono)', fontSize: '11px', cursor: 'pointer' }}>
+                      {u}
+                    </button>
+                  ))}
+                </div>
+              </div>
             </div>
           </div>
         </div>
