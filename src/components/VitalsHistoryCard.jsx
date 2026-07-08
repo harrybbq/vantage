@@ -10,6 +10,7 @@
  * (var(--em)); all text wears text tokens.
  */
 import { useMemo, useRef, useState } from 'react';
+import { parseHealthExport, applyHealthImport } from '../lib/appleHealth';
 
 const METRICS = [
   { key: 'weight', label: 'Weight',  unit: 'kg',  src: 'vitals' },
@@ -46,7 +47,50 @@ function fmtDay(ts) {
   return d.getDate() + ' ' + ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][d.getMonth()];
 }
 
-export default function VitalsHistoryCard({ S }) {
+// Owner-only Apple Health import panel. Live HealthKit isn't possible
+// on the web; this parses the manual Health export and fills the
+// vitals/burn stores. Gated on the same window.__vantageOwner flag as
+// other owner tools.
+function AppleHealthImport({ update }) {
+  const inputRef = useRef(null);
+  const [status, setStatus] = useState('idle'); // idle | parsing | done | error
+  const [pct, setPct] = useState(0);
+  const [msg, setMsg] = useState('');
+
+  async function onFile(e) {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+    setStatus('parsing'); setPct(0); setMsg('');
+    try {
+      const res = await parseHealthExport(file, setPct);
+      applyHealthImport(update, res);
+      const c = res.counts;
+      setStatus('done');
+      setMsg(`Imported ${c.weight} weight · ${c.sleep} sleep · ${c.rhr} HR · ${c.burn} burn days.`);
+    } catch (err) {
+      setStatus('error');
+      setMsg(err?.message || 'Could not read that file. Make sure it’s export.zip or export.xml from Apple Health.');
+    }
+  }
+
+  return (
+    <div className="vitals-ah">
+      <input ref={inputRef} type="file" accept=".zip,.xml" style={{ display: 'none' }} onChange={onFile} />
+      <button type="button" className="vitals-ah-btn" disabled={status === 'parsing'} onClick={() => inputRef.current?.click()}>
+        {status === 'parsing' ? `Importing… ${Math.round(pct * 100)}%` : 'Import from Apple Health'}
+      </button>
+      <span className="vitals-ah-hint">
+        {status === 'done' ? msg
+          : status === 'error' ? msg
+          : 'Health app → profile → Export All Health Data → pick the export.zip.'}
+      </span>
+    </div>
+  );
+}
+
+export default function VitalsHistoryCard({ S, update }) {
+  const isOwner = typeof window !== 'undefined' && !!window.__vantageOwner;
   const [metricKey, setMetricKey] = useState('weight');
   const [rangeKey, setRangeKey] = useState('30d');
   const [hover, setHover] = useState(null); // index into points
@@ -110,6 +154,7 @@ export default function VitalsHistoryCard({ S }) {
         <p className="vitals-sub">
           No history yet. Log weight/sleep/HR from the hub Vitals widget, or log food in Daily Macros — each day banks a “% of goal hit” snapshot here.
         </p>
+        {isOwner && update && <AppleHealthImport update={update} />}
       </div>
     );
   }
@@ -121,6 +166,8 @@ export default function VitalsHistoryCard({ S }) {
     <div className="card vitals-card">
       <h3 style={{ margin: '0 0 4px' }}>Vitals &amp; Macros</h3>
       <p className="vitals-sub">Vitals from the hub widget; macro days saved as % of each goal hit. Hover the chart for exact values.</p>
+
+      {isOwner && update && <AppleHealthImport update={update} />}
 
       {/* Filter row — metric first (it names the chart), then range. */}
       <div className="vitals-controls">

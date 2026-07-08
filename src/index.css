@@ -5048,6 +5048,11 @@ button:active:not(:disabled),
 .vitals-area { fill: rgba(var(--em-rgb), .10); stroke: none; }
 .vitals-dot { fill: var(--em); stroke: var(--card-bg, #fffdf5); stroke-width: 2; }
 .vitals-crosshair { stroke: var(--text-muted); stroke-width: 1; opacity: .5; }
+.vitals-ah { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin: 0 0 14px; padding: 10px 12px; border: 1px dashed rgba(var(--em-rgb), .35); border-radius: 10px; background: rgba(var(--em-rgb), .05); }
+.vitals-ah-btn { padding: 8px 14px; border-radius: 8px; border: none; background: var(--em); color: #fff; font-family: var(--sans); font-size: 12.5px; font-weight: 600; cursor: pointer; flex-shrink: 0; }
+.vitals-ah-btn:disabled { opacity: .6; cursor: default; }
+.vitals-ah-hint { font-family: var(--mono); font-size: 10.5px; color: var(--text-muted); line-height: 1.5; flex: 1; min-width: 160px; }
+#track .vitals-ah-hint { color: rgba(255,255,255,.55); }
 .vitals-target { stroke: var(--gold); stroke-width: 1; opacity: .55; }
 .vitals-endlabel { font-family: var(--mono); font-size: 11px; font-weight: 700; fill: var(--text); }
 .vitals-tooltip {
