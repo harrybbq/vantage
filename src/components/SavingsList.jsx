@@ -72,7 +72,7 @@ function monthsUntil(iso) {
   return Math.max(1, months);
 }
 
-function GoalCard({ goal, achievement, onAddContribution, onEdit }) {
+function GoalCard({ goal, achievement, contribMonthly = 0, onAddContribution, onEdit }) {
   const [showContribs, setShowContribs] = useState(false);
   const target = goal.target || 0;
   const current = goal.current || 0;
@@ -82,6 +82,10 @@ function GoalCard({ goal, achievement, onAddContribution, onEdit }) {
   const remaining = Math.max(0, target - current);
   const monthly = months && !done ? remaining / months : null;
   const contribs = goal.contributions || [];
+  // Months-till-achieved from a linked Projections pot contribution.
+  const monthsToGoal = contribMonthly > 0 && remaining > 0 && !done
+    ? Math.ceil(remaining / contribMonthly)
+    : null;
 
   return (
     <div className={`savings-card${done ? ' is-done' : ''}`}>
@@ -148,6 +152,13 @@ function GoalCard({ goal, achievement, onAddContribution, onEdit }) {
           <span className="savings-card-target-amount">{formatGBP(target)}</span>
         </div>
 
+        {monthsToGoal != null && (
+          <div className="savings-card-eta" title="Estimated from the monthly amount you route into this pot in Projections">
+            <span className="savings-card-eta-months">≈ {monthsToGoal} {monthsToGoal === 1 ? 'month' : 'months'} to go</span>
+            <span className="savings-card-eta-rate">at {formatGBPCompact(contribMonthly)}/mo</span>
+          </div>
+        )}
+
         <div className="savings-card-footer">
           {monthly != null && (
             <button
@@ -188,9 +199,22 @@ function GoalCard({ goal, achievement, onAddContribution, onEdit }) {
   );
 }
 
+// Monthly amount routed into each pot via linked Projections expenses.
+function potContributions(projection) {
+  const map = {};
+  for (const it of (projection?.items || [])) {
+    if (it.kind !== 'expense' || !it.goalId) continue;
+    const v = parseFloat(it.amount) || 0;
+    const monthly = it.freq === 'year' ? v / 12 : v;
+    map[it.goalId] = (map[it.goalId] || 0) + monthly;
+  }
+  return map;
+}
+
 export default function SavingsList({ S, update, onOpenModal }) {
   const goals = S.savings || [];
   const achievements = S.achievements || [];
+  const potMonthly = potContributions(S.projection);
 
   if (goals.length === 0) {
     return (
@@ -241,6 +265,7 @@ export default function SavingsList({ S, update, onOpenModal }) {
               key={goal.id}
               goal={goal}
               achievement={achievement}
+              contribMonthly={potMonthly[goal.id] || 0}
               onAddContribution={id => onOpenModal('addContributionModal:' + id)}
               onEdit={id => onOpenModal('editSavingsGoalModal:' + id)}
             />
