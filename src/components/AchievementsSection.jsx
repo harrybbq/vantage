@@ -655,7 +655,7 @@ export default function AchievementsSection({ S, update, active, onOpenModal, on
       </div>
 
       {activeTab === 'savings' ? (
-        <SavingsList S={S} onOpenModal={onOpenModal} />
+        <SavingsList S={S} update={update} onOpenModal={onOpenModal} />
       ) : (<>
 
       {/* Canvas — dot grid background, draggable nodes, SVG connections.

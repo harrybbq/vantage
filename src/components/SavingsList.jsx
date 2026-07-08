@@ -21,6 +21,7 @@
  * savings as count + names only.
  */
 import { useState } from 'react';
+import SavingsProjections from './SavingsProjections';
 
 function formatGBP(n) {
   if (typeof n !== 'number') return '£0';
@@ -187,26 +188,29 @@ function GoalCard({ goal, achievement, onAddContribution, onEdit }) {
   );
 }
 
-export default function SavingsList({ S, onOpenModal }) {
+export default function SavingsList({ S, update, onOpenModal }) {
   const goals = S.savings || [];
   const achievements = S.achievements || [];
 
   if (goals.length === 0) {
     return (
-      <div className="savings-empty">
-        <div className="savings-empty-icon">💰</div>
-        <div className="savings-empty-title">No savings goals yet</div>
-        <p className="savings-empty-body">
-          Track named goals (First Home, Wedding, Emergency Fund). Add a photo,
-          set a target date, and link it to an achievement to auto-complete it
-          when you hit target.
-        </p>
-        <button
-          type="button"
-          className="btn btn-primary"
-          onClick={() => onOpenModal('addSavingsGoalModal')}
-        >+ New Goal</button>
-      </div>
+      <>
+        <div className="savings-empty">
+          <div className="savings-empty-icon">💰</div>
+          <div className="savings-empty-title">No savings goals yet</div>
+          <p className="savings-empty-body">
+            Track named goals (First Home, Wedding, Emergency Fund). Add a photo,
+            set a target date, and link it to an achievement to auto-complete it
+            when you hit target.
+          </p>
+          <button
+            type="button"
+            className="btn btn-primary"
+            onClick={() => onOpenModal('addSavingsGoalModal')}
+          >+ New Goal</button>
+        </div>
+        {update && <SavingsProjections S={S} update={update} />}
+      </>
     );
   }
 
@@ -243,6 +247,7 @@ export default function SavingsList({ S, onOpenModal }) {
           );
         })}
       </div>
+      {update && <SavingsProjections S={S} update={update} />}
     </div>
   );
 }
