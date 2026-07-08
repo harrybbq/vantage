@@ -1178,6 +1178,11 @@ html[data-theme="dark"] {
 .proj-freq{flex-shrink:0;background:var(--bg-base,#fffefa);border:1px solid var(--border);border-radius:8px;padding:8px 4px;color:var(--text);font-family:var(--mono);font-size:12px;outline:none;}
 .proj-del{flex-shrink:0;background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:12px;padding:6px;}
 .proj-del:hover{color:#c84040;}
+.proj-item{display:flex;flex-direction:column;gap:5px;}
+.proj-link-row{display:flex;align-items:center;gap:8px;padding-left:35px;}
+.proj-link-arrow{font-family:var(--mono);font-size:10px;color:var(--text-muted);letter-spacing:.4px;flex-shrink:0;}
+.proj-link-select{flex:1;min-width:0;max-width:260px;background:var(--bg-base,#fffefa);border:1px solid var(--border);border-radius:8px;padding:6px 8px;color:var(--text);font-family:var(--body);font-size:12px;outline:none;}
+.proj-items{gap:10px;}
 .proj-add-row{display:flex;gap:8px;margin-top:2px;}
 .proj-add{flex:1;padding:9px;border-radius:8px;border:1px dashed var(--border);background:none;cursor:pointer;font-family:var(--mono);font-size:11px;letter-spacing:.5px;text-transform:uppercase;}
 .proj-add-income{color:var(--em);}
@@ -1375,6 +1380,9 @@ html[data-theme="dark"] {
 
 /* Footer row: quick-add + contributions toggle. Quiet by design — the
    bottom row above is the visual climax of the card. */
+.savings-card-eta{display:flex;align-items:baseline;gap:7px;margin-top:6px;padding:5px 9px;border-radius:8px;background:rgba(var(--em-rgb),.09);border:1px solid rgba(var(--em-rgb),.22);}
+.savings-card-eta-months{font-family:var(--mono);font-size:11px;font-weight:700;color:var(--em);}
+.savings-card-eta-rate{font-family:var(--mono);font-size:9.5px;color:var(--text-muted);}
 .savings-card-footer{
   display:flex;align-items:center;justify-content:space-between;gap:10px;
   margin-top:4px;

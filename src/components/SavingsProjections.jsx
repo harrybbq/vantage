@@ -37,6 +37,7 @@ function money(n) {
 export default function SavingsProjections({ S, update }) {
   const proj = S.projection || {};
   const items = proj.items || [];
+  const goals = S.savings || [];
   const apy = proj.apy || '';
   const horizon = proj.horizon || 12;
   const [view, setView] = useState('month'); // month | year (summary only)
@@ -137,20 +138,43 @@ export default function SavingsProjections({ S, update }) {
       {/* Line items editor */}
       <div className="proj-items">
         {items.map(it => (
-          <div key={it.id} className={`proj-row proj-row-${it.kind}`}>
-            <button type="button" className="proj-kind" onClick={() => updateItem(it.id, 'kind', it.kind === 'income' ? 'expense' : 'income')} title="Toggle income / expense">
-              {it.kind === 'income' ? '+' : '−'}
-            </button>
-            <input className="proj-label" placeholder={it.kind === 'income' ? 'e.g. Salary' : 'e.g. Rent'} value={it.label} onChange={e => updateItem(it.id, 'label', e.target.value)} />
-            <div className="proj-amt-wrap">
-              <span className="proj-amt-cur">£</span>
-              <input className="proj-amt" type="number" inputMode="decimal" placeholder="0" value={it.amount} onChange={e => updateItem(it.id, 'amount', e.target.value)} />
+          <div key={it.id} className={`proj-item proj-item-${it.kind}`}>
+            <div className={`proj-row proj-row-${it.kind}`}>
+              <button type="button" className="proj-kind" onClick={() => updateItem(it.id, 'kind', it.kind === 'income' ? 'expense' : 'income')} title="Toggle income / expense">
+                {it.kind === 'income' ? '+' : '−'}
+              </button>
+              <input className="proj-label" placeholder={it.kind === 'income' ? 'e.g. Salary' : 'e.g. Rent'} value={it.label} onChange={e => updateItem(it.id, 'label', e.target.value)} />
+              <div className="proj-amt-wrap">
+                <span className="proj-amt-cur">£</span>
+                <input className="proj-amt" type="number" inputMode="decimal" placeholder="0" value={it.amount} onChange={e => updateItem(it.id, 'amount', e.target.value)} />
+              </div>
+              <select className="proj-freq" value={it.freq} onChange={e => updateItem(it.id, 'freq', e.target.value)}>
+                <option value="month">/mo</option>
+                <option value="year">/yr</option>
+              </select>
+              <button type="button" className="proj-del" onClick={() => removeItem(it.id)} aria-label="Remove">✕</button>
             </div>
-            <select className="proj-freq" value={it.freq} onChange={e => updateItem(it.id, 'freq', e.target.value)}>
-              <option value="month">/mo</option>
-              <option value="year">/yr</option>
-            </select>
-            <button type="button" className="proj-del" onClick={() => removeItem(it.id)} aria-label="Remove">✕</button>
+            {/* Expense → savings pot link. Money routed into a pot still
+                reduces net cash flow, and drives the goal's months-to-go
+                estimate on the goals list. */}
+            {it.kind === 'expense' && goals.length > 0 && (
+              <div className="proj-link-row">
+                <span className="proj-link-arrow">↳ into pot</span>
+                <select
+                  className="proj-link-select"
+                  value={it.goalId || ''}
+                  onChange={e => {
+                    const gid = e.target.value || null;
+                    const g = goals.find(x => x.id === gid);
+                    setProj({ items: items.map(x => x.id === it.id
+                      ? { ...x, goalId: gid, label: (!x.label && g) ? g.name : x.label }
+                      : x) });
+                  }}>
+                  <option value="">— none —</option>
+                  {goals.map(g => <option key={g.id} value={g.id}>{g.name}</option>)}
+                </select>
+              </div>
+            )}
           </div>
         ))}
         <div className="proj-add-row">
