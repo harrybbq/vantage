@@ -444,7 +444,10 @@ export default function TrackSection({ S, update, active, onOpenModal, onShowCoi
         <div className="eyebrow">Daily Habits</div>
         <div className="sec-title">Track <SectionHelp text="Log daily habits and numbers against weekly targets. Click any day on the calendar to log, or multi-select to batch-log multiple days at once." /></div>
       </motion.div>
-      <div className="track-layout">
+      {/* Desktop: trackers strip on top, then a 3-column dashboard
+          (Calendar · Vitals & Macros · Daily Macros). Collapses to a
+          single stacked column on narrow/mobile via CSS. */}
+      <div className="track-dash">
         <TrackersList
           trackers={S.trackers}
           logs={S.logs}
@@ -453,24 +456,31 @@ export default function TrackSection({ S, update, active, onOpenModal, onShowCoi
           onOpenModal={onOpenModal}
           update={update}
         />
-        <CalendarView S={S} update={update} onShowCoinToast={onShowCoinToast} nutritionMonthData={nutritionMonthData} />
+        <div className="track-cols">
+          <div className="track-col">
+            <CalendarView S={S} update={update} onShowCoinToast={onShowCoinToast} nutritionMonthData={nutritionMonthData} />
+          </div>
+          <div className="track-col">
+            {/* Vitals + macro-% history chart. */}
+            <VitalsHistoryCard S={S} />
+          </div>
+          <div className="track-col">
+            {userId
+              ? <NutritionSection
+                  userId={userId}
+                  S={S}
+                  update={update}
+                  selectedDate={S.selectedLogDate || null}
+                  calYear={S.calYear}
+                  calMonth={S.calMonth}
+                  onShowCoinToast={onShowCoinToast}
+                  onMonthDataReady={setNutritionMonthData}
+                  onOpenModal={onOpenModal}
+                />
+              : <div className="card" style={{ padding: '22px' }}><div className="settings-empty">Sign in to log nutrition.</div></div>}
+          </div>
+        </div>
       </div>
-      {/* Vitals history — line chart + recent entries for the daily
-          vitals logged via the mobile hub widget. */}
-      <VitalsHistoryCard S={S} />
-      {userId && (
-        <NutritionSection
-          userId={userId}
-          S={S}
-          update={update}
-          selectedDate={S.selectedLogDate || null}
-          calYear={S.calYear}
-          calMonth={S.calMonth}
-          onShowCoinToast={onShowCoinToast}
-          onMonthDataReady={setNutritionMonthData}
-          onOpenModal={onOpenModal}
-        />
-      )}
     </section>
   );
 }
