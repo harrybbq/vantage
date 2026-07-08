@@ -11,12 +11,19 @@
  *   BodyMass            → vitalsLog[day].weight (kg)
  *   RestingHeartRate    → vitalsLog[day].rhr (bpm)
  *   SleepAnalysis       → vitalsLog[day].sleep (hours asleep)
- *   ActiveEnergyBurned  → burnLog[day] "Apple Health" entry (kcal)
+ *   StepCount           → burnLog[day] "N steps" entry, kcal via the
+ *                         app's own steps→kcal formula (so it matches
+ *                         a manually-added Steps activity). We use
+ *                         steps rather than Apple's ActiveEnergyBurned
+ *                         so walking isn't double-counted; gym/workout
+ *                         burn is still logged manually.
  *
  * Parsing streams the file so a large export doesn't have to sit in
  * memory all at once. A .zip is inflated first (via fflate); a raw
  * export.xml is streamed directly.
  */
+
+import { stepsKcal } from './burn';
 
 const LB_TO_KG = 0.45359237;
 
@@ -58,10 +65,10 @@ function processRecord(tag, acc) {
     if (!(ms > 0)) return;
     const d = dayOf(end); // credit the wake-up day
     acc.sleepMs[d] = (acc.sleepMs[d] || 0) + ms;
-  } else if (type === 'HKQuantityTypeIdentifierActiveEnergyBurned') {
+  } else if (type === 'HKQuantityTypeIdentifierStepCount') {
     const d = dayOf(attr(tag, 'startDate'));
     const v = parseFloat(attr(tag, 'value'));
-    if (d && Number.isFinite(v)) acc.burn[d] = (acc.burn[d] || 0) + v;
+    if (d && Number.isFinite(v)) acc.steps[d] = (acc.steps[d] || 0) + v;
   }
 }
 
@@ -79,7 +86,7 @@ async function streamOf(file) {
 
 /** Parse the export, returning aggregated per-day data + counts. */
 export async function parseHealthExport(file, onProgress) {
-  const acc = { weight: {}, rhr: {}, sleepMs: {}, burn: {} };
+  const acc = { weight: {}, rhr: {}, sleepMs: {}, steps: {} };
   const stream = await streamOf(file);
   const reader = stream.getReader();
   const decoder = new TextDecoder('utf-8');
@@ -112,29 +119,42 @@ export async function parseHealthExport(file, onProgress) {
     if (acc.sleepMs[d] != null) e.sleep = Math.round((acc.sleepMs[d] / 3600000) * 10) / 10;
     if (Object.keys(e).length) vitals[d] = e;
   }
-  const burn = {};
-  for (const [d, kcal] of Object.entries(acc.burn)) if (kcal > 0) burn[d] = Math.round(kcal);
+  // Steps → per-day burn entry, using the app's steps→kcal formula at
+  // the weight that applied on that day (latest weight on/before it).
+  const weightDays = Object.keys(acc.weight).sort();
+  const weightFor = day => {
+    let w = null;
+    for (const wd of weightDays) { if (wd <= day) w = acc.weight[wd]; else break; }
+    return w || acc.weight[weightDays[weightDays.length - 1]] || 70;
+  };
+  const steps = {};
+  for (const [d, raw] of Object.entries(acc.steps)) {
+    const s = Math.round(raw);
+    if (s > 0) steps[d] = { steps: s, kcal: stepsKcal(s, weightFor(d)) };
+  }
 
   return {
-    vitals, burn,
+    vitals, steps,
     counts: {
       weight: Object.keys(acc.weight).length,
       rhr: Object.keys(acc.rhr).length,
       sleep: Object.keys(acc.sleepMs).length,
-      burn: Object.keys(burn).length,
+      steps: Object.keys(steps).length,
     },
   };
 }
 
 /** Merge a parse result into synced state via update(). */
-export function applyHealthImport(update, { vitals, burn }) {
+export function applyHealthImport(update, { vitals, steps }) {
   update(prev => {
     const vitalsLog = { ...(prev.vitalsLog || {}) };
     for (const [d, v] of Object.entries(vitals)) vitalsLog[d] = { ...(vitalsLog[d] || {}), ...v };
     const burnLog = { ...(prev.burnLog || {}) };
-    for (const [d, kcal] of Object.entries(burn)) {
-      const others = (burnLog[d] || []).filter(a => a.label !== 'Apple Health');
-      burnLog[d] = [...others, { id: 'ah' + d, label: 'Apple Health', kcal }];
+    for (const [d, { steps: n, kcal }] of Object.entries(steps)) {
+      // Replace any prior imported-steps entry for the day (id prefix),
+      // keep manual + other entries.
+      const others = (burnLog[d] || []).filter(a => !String(a.id || '').startsWith('ah-steps-') && a.label !== 'Apple Health');
+      burnLog[d] = [...others, { id: 'ah-steps-' + d, label: `${n.toLocaleString('en-GB')} steps`, kcal }];
     }
     return { ...prev, vitalsLog, burnLog };
   });

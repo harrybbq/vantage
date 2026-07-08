@@ -67,7 +67,7 @@ function AppleHealthImport({ update }) {
       applyHealthImport(update, res);
       const c = res.counts;
       setStatus('done');
-      setMsg(`Imported ${c.weight} weight · ${c.sleep} sleep · ${c.rhr} HR · ${c.burn} burn days.`);
+      setMsg(`Imported ${c.weight} weight · ${c.sleep} sleep · ${c.rhr} HR · ${c.steps} step days.`);
     } catch (err) {
       setStatus('error');
       setMsg(err?.message || 'Could not read that file. Make sure it’s export.zip or export.xml from Apple Health.');
