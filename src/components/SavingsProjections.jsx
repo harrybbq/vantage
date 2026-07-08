@@ -44,11 +44,15 @@ export default function SavingsProjections({ S, update }) {
   const [hover, setHover] = useState(null);
   const svgRef = useRef(null);
 
-  // Starting balance = everything already saved across goals.
-  const startBalance = useMemo(
+  // Starting balance defaults to everything already saved across
+  // goals, but the user can override it (proj.startBalance) — not
+  // everyone tracks their whole balance as savings goals.
+  const savedTotal = useMemo(
     () => (S.savings || []).reduce((sum, g) => sum + (g.current || 0), 0),
     [S.savings]
   );
+  const hasCustomStart = proj.startBalance != null && proj.startBalance !== '';
+  const startBalance = hasCustomStart ? (parseFloat(proj.startBalance) || 0) : savedTotal;
 
   function setProj(patch) {
     update(prev => ({ ...prev, projection: { items, apy, horizon, ...prev.projection, ...patch } }));
@@ -222,7 +226,18 @@ export default function SavingsProjections({ S, update }) {
           )}
         </div>
         <div className="proj-chart-foot">
-          <span>Start {money(startBalance)}</span>
+          <div className="proj-start">
+            <label>Start from £</label>
+            <input
+              type="number" inputMode="decimal"
+              value={proj.startBalance ?? ''}
+              placeholder={String(Math.round(savedTotal))}
+              onChange={e => setProj({ startBalance: e.target.value })}
+            />
+            {hasCustomStart
+              ? <button type="button" className="proj-start-reset" onClick={() => setProj({ startBalance: '' })} title="Use total saved instead">↺ saved</button>
+              : <span className="proj-start-hint">= total saved</span>}
+          </div>
           <span className="proj-end">In {Math.round(horizon / 12 * 10) / 10}y: <strong>{money(endBal)}</strong></span>
         </div>
       </div>
