@@ -48,6 +48,7 @@ export default function SavingsProjections({ S, update }) {
   const [view, setView] = useState('month');
   const [hover, setHover] = useState(null);
   const [openPots, setOpenPots] = useState(() => new Set());
+  const [openDates, setOpenDates] = useState(() => new Set());
   const [collapsed, setCollapsed] = useState(() => new Set());
   const [dropHint, setDropHint] = useState(null); // { id, before } | { group } | { loose:true }
   const dragId = useRef(null);
@@ -109,38 +110,61 @@ export default function SavingsProjections({ S, update }) {
   function removeAccount(id) { setAccounts(a => a.filter(x => x.id !== id)); }
 
   // ── Maths ──
-  const incomeM = items.filter(i => i.kind === 'income').reduce((s, i) => s + toMonthly(i.amount, i.freq), 0);
-  const expenseM = items.filter(i => i.kind === 'expense').reduce((s, i) => s + toMonthly(i.amount, i.freq), 0);
+  // Time frames: an item may carry `from` / `until` ('YYYY-MM'). It
+  // only contributes while active. Month index m counts forward from
+  // the current calendar month (m=0 = this month).
+  function monthOffset(ym) {
+    if (!ym) return null;
+    const [y, mo] = ym.split('-').map(Number);
+    const now = new Date();
+    return (y - now.getFullYear()) * 12 + (mo - 1 - now.getMonth());
+  }
+  function activeAt(it, m) {
+    const s = monthOffset(it.from), e = monthOffset(it.until);
+    if (s != null && m < s) return false;
+    if (e != null && m > e) return false;
+    return true;
+  }
+  const signedM = (it, m) => activeAt(it, m) ? (it.kind === 'income' ? 1 : -1) * toMonthly(it.amount, it.freq) : 0;
+
+  // Summary reflects the CURRENT month (m=0).
+  const incomeM = items.filter(i => i.kind === 'income').reduce((s, i) => s + (activeAt(i, 0) ? toMonthly(i.amount, i.freq) : 0), 0);
+  const expenseM = items.filter(i => i.kind === 'expense').reduce((s, i) => s + (activeAt(i, 0) ? toMonthly(i.amount, i.freq) : 0), 0);
   const netM = incomeM - expenseM;
   const mult = view === 'year' ? 12 : 1;
 
+  // Net can change month to month as items expire/start.
   const cashSeries = useMemo(() => {
-    const out = []; let bal = startBalance;
-    for (let m = 0; m <= horizon; m++) { out.push({ m, bal }); bal += netM; }
+    const out = [{ m: 0, bal: startBalance }]; let bal = startBalance;
+    for (let m = 1; m <= horizon; m++) { bal += items.reduce((s, it) => s + signedM(it, m), 0); out.push({ m, bal }); }
     return out;
-  }, [startBalance, horizon, netM]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [startBalance, horizon, items]);
 
   const savingsStart = accounts.reduce((s, a) => s + (parseFloat(a.balance) || 0), 0);
   const hasAccounts = accounts.length > 0;
-  // Monthly amount routed into each account via linked expenses.
+  // Current (m=0) monthly amount routed into each account — for the
+  // account row's "+£X/mo" label.
   const acctContribM = useMemo(() => {
     const map = {};
-    for (const it of items) if (it.kind === 'expense' && it.accountId) map[it.accountId] = (map[it.accountId] || 0) + toMonthly(it.amount, it.freq);
+    for (const it of items) if (it.kind === 'expense' && it.accountId && activeAt(it, 0)) map[it.accountId] = (map[it.accountId] || 0) + toMonthly(it.amount, it.freq);
     return map;
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [items]);
   // Each account compounds at its APY AND gains its linked monthly
-  // contributions; the Savings line is their sum.
+  // contributions (which may expire); the Savings line is their sum.
   const savingsSeries = useMemo(() => {
     const cur = accounts.map(a => parseFloat(a.balance) || 0);
     const rate = accounts.map(a => (parseFloat(a.apy) || 0) / 1200);
-    const add = accounts.map(a => acctContribM[a.id] || 0);
+    const addAt = (accId, m) => items.reduce((s, it) => s + ((it.kind === 'expense' && it.accountId === accId && activeAt(it, m)) ? toMonthly(it.amount, it.freq) : 0), 0);
     const out = [{ m: 0, bal: cur.reduce((s, b) => s + b, 0) }];
     for (let m = 1; m <= horizon; m++) {
-      for (let i = 0; i < cur.length; i++) cur[i] = cur[i] * (1 + rate[i]) + add[i];
+      for (let i = 0; i < cur.length; i++) cur[i] = cur[i] * (1 + rate[i]) + addAt(accounts[i].id, m);
       out.push({ m, bal: cur.reduce((s, b) => s + b, 0) });
     }
     return out;
-  }, [accounts, acctContribM, horizon]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [accounts, items, horizon]);
 
   const cashEnd = cashSeries[cashSeries.length - 1].bal;
   const savingsEnd = savingsSeries[savingsSeries.length - 1].bal;
@@ -212,32 +236,45 @@ export default function SavingsProjections({ S, update }) {
           <select className="proj-freq" value={it.freq} onChange={e => updateItem(it.id, 'freq', e.target.value)}><option value="week">/wk</option><option value="month">/mo</option><option value="year">/yr</option></select>
           <button type="button" className="proj-del" onClick={() => removeItem(it.id)} aria-label="Remove">✕</button>
         </div>
-        {it.kind === 'expense' && (goals.length > 0 || accounts.length > 0) && (
-          (it.goalId || it.accountId || openPots.has(it.id)) ? (
-            <div className="proj-link-row">
-              <span className="proj-link-arrow">↳ into</span>
-              <select
-                className="proj-link-select"
-                value={it.goalId ? `goal:${it.goalId}` : it.accountId ? `acct:${it.accountId}` : ''}
-                onChange={e => {
-                  const v = e.target.value;
-                  const goalId = v.startsWith('goal:') ? v.slice(5) : null;
-                  const accountId = v.startsWith('acct:') ? v.slice(5) : null;
-                  const g = goals.find(x => x.id === goalId);
-                  const a = accounts.find(x => x.id === accountId);
-                  const nm = g?.name || a?.name;
-                  setProj({ items: items.map(x => x.id === it.id ? { ...x, goalId, accountId, label: (!x.label && nm) ? nm : x.label } : x) });
-                }}>
-                <option value="">— pick a destination —</option>
-                {goals.length > 0 && <optgroup label="Goal pots">{goals.map(g => <option key={g.id} value={`goal:${g.id}`}>{g.name}</option>)}</optgroup>}
-                {accounts.length > 0 && <optgroup label="Savings accounts">{accounts.map(a => <option key={a.id} value={`acct:${a.id}`}>{a.name || 'Account'}</option>)}</optgroup>}
-              </select>
-              <button type="button" className="proj-link-del" onClick={() => { setProj({ items: items.map(x => x.id === it.id ? { ...x, goalId: null, accountId: null } : x) }); setOpenPots(prev => { const n = new Set(prev); n.delete(it.id); return n; }); }} aria-label="Remove link">✕</button>
+
+        {/* Optional sub-controls: time frame + save-into links */}
+        <div className="proj-sub-controls">
+          {/* Time frame (from / until) */}
+          {(it.from || it.until || openDates.has(it.id)) ? (
+            <div className="proj-dates-row">
+              <span className="proj-link-arrow">⏱</span>
+              <label className="proj-date-field">from<input type="month" value={it.from || ''} onChange={e => updateItem(it.id, 'from', e.target.value || null)} /></label>
+              <label className="proj-date-field">until<input type="month" value={it.until || ''} onChange={e => updateItem(it.id, 'until', e.target.value || null)} /></label>
+              <button type="button" className="proj-link-del" onClick={() => { updateItem(it.id, 'from', null); setProj({ items: items.map(x => x.id === it.id ? { ...x, from: null, until: null } : x) }); setOpenDates(prev => { const n = new Set(prev); n.delete(it.id); return n; }); }} aria-label="Clear dates">✕</button>
             </div>
           ) : (
-            <button type="button" className="proj-add-pot" onClick={() => setOpenPots(prev => new Set(prev).add(it.id))}>+ save into</button>
-          )
-        )}
+            <button type="button" className="proj-add-pot" onClick={() => setOpenDates(prev => new Set(prev).add(it.id))}>+ dates</button>
+          )}
+
+          {/* Save into — a pot and/or an account (both allowed) */}
+          {it.kind === 'expense' && (goals.length > 0 || accounts.length > 0) && (
+            (it.goalId || it.accountId || openPots.has(it.id)) ? (
+              <div className="proj-link-row">
+                <span className="proj-link-arrow">↳ into</span>
+                {goals.length > 0 && (
+                  <select className="proj-link-select" value={it.goalId || ''} onChange={e => { const goalId = e.target.value || null; const g = goals.find(x => x.id === goalId); setProj({ items: items.map(x => x.id === it.id ? { ...x, goalId, label: (!x.label && g) ? g.name : x.label } : x) }); }}>
+                    <option value="">pot: none</option>
+                    {goals.map(g => <option key={g.id} value={g.id}>{g.name}</option>)}
+                  </select>
+                )}
+                {accounts.length > 0 && (
+                  <select className="proj-link-select" value={it.accountId || ''} onChange={e => { const accountId = e.target.value || null; const a = accounts.find(x => x.id === accountId); setProj({ items: items.map(x => x.id === it.id ? { ...x, accountId, label: (!x.label && a) ? a.name : x.label } : x) }); }}>
+                    <option value="">account: none</option>
+                    {accounts.map(a => <option key={a.id} value={a.id}>{a.name || 'Account'}</option>)}
+                  </select>
+                )}
+                <button type="button" className="proj-link-del" onClick={() => { setProj({ items: items.map(x => x.id === it.id ? { ...x, goalId: null, accountId: null } : x) }); setOpenPots(prev => { const n = new Set(prev); n.delete(it.id); return n; }); }} aria-label="Remove link">✕</button>
+              </div>
+            ) : (
+              <button type="button" className="proj-add-pot" onClick={() => setOpenPots(prev => new Set(prev).add(it.id))}>+ save into</button>
+            )
+          )}
+        </div>
       </div>
     );
   }

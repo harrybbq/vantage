@@ -1231,6 +1231,11 @@ html[data-theme="dark"] {
 .proj-link-del:hover{color:#c84040;}
 .proj-add-pot{align-self:flex-start;margin-left:35px;background:none;border:1px dashed var(--border);border-radius:7px;color:var(--text-muted);font-family:var(--mono);font-size:10px;letter-spacing:.5px;padding:4px 10px;cursor:pointer;transition:color .15s,border-color .15s;}
 .proj-add-pot:hover{color:var(--em);border-color:rgba(var(--em-rgb),.4);}
+.proj-sub-controls{display:flex;flex-direction:column;gap:5px;}
+.proj-dates-row{display:flex;align-items:center;gap:8px;padding-left:35px;flex-wrap:wrap;}
+.proj-date-field{display:flex;align-items:center;gap:5px;font-family:var(--mono);font-size:10px;color:var(--text-muted);}
+.proj-date-field input{background:var(--bg-base,#fffefa);border:1px solid var(--border);border-radius:7px;padding:5px 7px;color:var(--text);font-family:var(--mono);font-size:11px;outline:none;}
+#achievements .proj-date-field input{background:rgba(255,255,255,.06);color-scheme:dark;}
 .proj-items{gap:10px;}
 .proj-add-row{display:flex;gap:8px;margin-top:2px;}
 .proj-add{flex:1;padding:9px;border-radius:8px;border:1px dashed var(--border);background:none;cursor:pointer;font-family:var(--mono);font-size:11px;letter-spacing:.5px;text-transform:uppercase;}
