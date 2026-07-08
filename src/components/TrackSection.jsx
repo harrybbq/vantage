@@ -462,7 +462,7 @@ export default function TrackSection({ S, update, active, onOpenModal, onShowCoi
           </div>
           <div className="track-col">
             {/* Vitals + macro-% history chart. */}
-            <VitalsHistoryCard S={S} />
+            <VitalsHistoryCard S={S} update={update} />
           </div>
           <div className="track-col">
             {userId
