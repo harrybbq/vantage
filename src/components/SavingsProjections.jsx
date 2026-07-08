@@ -26,7 +26,9 @@ const HORIZONS = [
 
 function toMonthly(amount, freq) {
   const v = parseFloat(amount) || 0;
-  return freq === 'year' ? v / 12 : v;
+  if (freq === 'year') return v / 12;
+  if (freq === 'week') return v * 52 / 12; // avg weeks per month
+  return v;
 }
 function money(n) {
   const neg = n < 0;
@@ -42,6 +44,7 @@ export default function SavingsProjections({ S, update }) {
   const horizon = proj.horizon || 12;
   const [view, setView] = useState('month'); // month | year (summary only)
   const [hover, setHover] = useState(null);
+  const [openPots, setOpenPots] = useState(() => new Set()); // expense ids showing the pot selector
   const svgRef = useRef(null);
 
   // Starting balance defaults to everything already saved across
@@ -153,31 +156,48 @@ export default function SavingsProjections({ S, update }) {
                 <input className="proj-amt" type="number" inputMode="decimal" placeholder="0" value={it.amount} onChange={e => updateItem(it.id, 'amount', e.target.value)} />
               </div>
               <select className="proj-freq" value={it.freq} onChange={e => updateItem(it.id, 'freq', e.target.value)}>
+                <option value="week">/wk</option>
                 <option value="month">/mo</option>
                 <option value="year">/yr</option>
               </select>
               <button type="button" className="proj-del" onClick={() => removeItem(it.id)} aria-label="Remove">✕</button>
             </div>
-            {/* Expense → savings pot link. Money routed into a pot still
-                reduces net cash flow, and drives the goal's months-to-go
+            {/* Expense → savings pot link. Hidden by default behind a
+                small "+ pot" button; money routed into a pot still
+                reduces net cash flow and drives the goal's months-to-go
                 estimate on the goals list. */}
             {it.kind === 'expense' && goals.length > 0 && (
-              <div className="proj-link-row">
-                <span className="proj-link-arrow">↳ into pot</span>
-                <select
-                  className="proj-link-select"
-                  value={it.goalId || ''}
-                  onChange={e => {
-                    const gid = e.target.value || null;
-                    const g = goals.find(x => x.id === gid);
-                    setProj({ items: items.map(x => x.id === it.id
-                      ? { ...x, goalId: gid, label: (!x.label && g) ? g.name : x.label }
-                      : x) });
-                  }}>
-                  <option value="">— none —</option>
-                  {goals.map(g => <option key={g.id} value={g.id}>{g.name}</option>)}
-                </select>
-              </div>
+              (it.goalId || openPots.has(it.id)) ? (
+                <div className="proj-link-row">
+                  <span className="proj-link-arrow">↳ into pot</span>
+                  <select
+                    className="proj-link-select"
+                    value={it.goalId || ''}
+                    onChange={e => {
+                      const gid = e.target.value || null;
+                      const g = goals.find(x => x.id === gid);
+                      setProj({ items: items.map(x => x.id === it.id
+                        ? { ...x, goalId: gid, label: (!x.label && g) ? g.name : x.label }
+                        : x) });
+                    }}>
+                    <option value="">— pick a pot —</option>
+                    {goals.map(g => <option key={g.id} value={g.id}>{g.name}</option>)}
+                  </select>
+                  <button
+                    type="button" className="proj-link-del"
+                    onClick={() => {
+                      setProj({ items: items.map(x => x.id === it.id ? { ...x, goalId: null } : x) });
+                      setOpenPots(prev => { const n = new Set(prev); n.delete(it.id); return n; });
+                    }}
+                    aria-label="Remove pot link">✕</button>
+                </div>
+              ) : (
+                <button
+                  type="button" className="proj-add-pot"
+                  onClick={() => setOpenPots(prev => new Set(prev).add(it.id))}>
+                  + pot
+                </button>
+              )
             )}
           </div>
         ))}
