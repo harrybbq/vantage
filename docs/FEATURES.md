@@ -64,3 +64,38 @@ rendered in a second colour so net intake reads visually. Depends on:
 nutrition summary (live today) + calories-burned store (Phase 1
 above). Design note: one ring per macro + a larger calorie ring;
 mobile widget first, desktop hub widget after.
+
+---
+
+## Apple Health live sync via iOS Shortcut (owner, 2026-07)
+
+Live HealthKit needs a native iOS build + paid Apple Developer
+entitlement. The zero-cost stand-in that works today: an iOS Shortcut
+reads Health samples and POSTs them to `netlify/functions/health-sync`,
+which writes them into `user_data.state` (vitalsLog + burnLog).
+
+- Enable in-app: Track → Vitals & Macros → **Enable live sync** →
+  **Copy sync URL**. This stores a random `state.healthToken` and gives
+  a URL `…/.netlify/functions/health-sync?token=<token>`.
+- The function resolves the token → user via a JSONB filter
+  (`user_data?state->>healthToken=eq.<token>`) — no schema change.
+- Ingest payload (one day, all fields optional; `date` defaults to
+  server today): `{ "date":"YYYY-MM-DD", "steps":N, "weight":kg,
+  "sleep":hours, "rhr":bpm }`. Steps → burnLog "N steps" via the app's
+  steps→kcal formula; weight/sleep/rhr → vitalsLog.
+
+### The Shortcut recipe ("Vantage Health Sync")
+1. New Shortcut. Add actions:
+   - **Find Health Samples** (Steps, today, sum) → var `Steps`
+   - **Find Health Samples** (Weight, latest) → var `Weight`
+   - **Find Health Samples** (Sleep, today, total asleep hours) → `Sleep`
+   - **Find Health Samples** (Resting Heart Rate, latest) → `RHR`
+   - **Text** → a JSON body: `{"steps":[Steps],"weight":[Weight],"sleep":[Sleep],"rhr":[RHR]}`
+   - **Get Contents of URL**: Method POST, Request Body = JSON (or the
+     Text above), URL = the copied sync URL, Header `Content-Type:
+     application/json`.
+2. Automations tab → new **Personal Automation** → Time of Day (e.g.
+   07:00 daily) → Run the Shortcut → turn OFF "Ask Before Running".
+
+Keep the sync URL secret — the token is a bearer credential. Tapping
+Enable live sync again mints a new token (revokes the old URL).
