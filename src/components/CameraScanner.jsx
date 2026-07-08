@@ -46,7 +46,9 @@ export function normalizeScan(raw) {
 }
 
 const DECODE_INTERVAL_MS = 350;
-const DECODE_WIDTH = 720; // downscale target for canvas decode (speed)
+const DECODE_WIDTH = 1024; // downscale target for canvas decode — 1D
+                           // barcodes need line-level detail, so err
+                           // toward resolution over CPU at ~3 fps
 
 export default function CameraScanner({ onBarcode, onAIResult, onError }) {
   const videoRef = useRef(null);
@@ -147,8 +149,11 @@ export default function CameraScanner({ onBarcode, onAIResult, onError }) {
     }
 
     async function boot() {
+      // Higher resolution = decodable 1D barcodes. (The old fear that
+      // size ideals caused black frames was disproven — that was the
+      // paint bug.) iOS falls back gracefully if 1080p isn't available.
       const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: { ideal: 'environment' } },
+        video: { facingMode: { ideal: 'environment' }, width: { ideal: 1920 }, height: { ideal: 1080 } },
         audio: false,
       });
       if (!mounted) { stream.getTracks().forEach(t => t.stop()); return; }
@@ -223,26 +228,51 @@ export default function CameraScanner({ onBarcode, onAIResult, onError }) {
     // camera or the <video>, which is what kept breaking on iOS.
     async function startCanvasDecode() {
       try {
-        const { BrowserMultiFormatReader } = await import('@zxing/browser');
+        const [{ BrowserMultiFormatReader }, { DecodeHintType, BarcodeFormat }] = await Promise.all([
+          import('@zxing/browser'),
+          import('@zxing/library'),
+        ]);
         if (!mounted) return;
-        zxingReaderRef.current = new BrowserMultiFormatReader();
+        const hints = new Map();
+        hints.set(DecodeHintType.TRY_HARDER, true);
+        hints.set(DecodeHintType.POSSIBLE_FORMATS, [
+          BarcodeFormat.EAN_13, BarcodeFormat.EAN_8,
+          BarcodeFormat.UPC_A, BarcodeFormat.UPC_E,
+          BarcodeFormat.QR_CODE, BarcodeFormat.CODE_128,
+          BarcodeFormat.CODE_39, BarcodeFormat.ITF,
+        ]);
+        zxingReaderRef.current = new BrowserMultiFormatReader(hints);
       } catch {
         return; // decoder unavailable — AI identify + text search still work
       }
       const dc = decodeCanvasRef.current;
       const ctx = dc.getContext('2d', { willReadFrequently: true });
+      let attempts = 0;
       intervalRef.current = setInterval(() => {
         if (!mounted || foundRef.current) return;
         const v = videoRef.current;
         if (!v || v.readyState < 2 || v.videoWidth === 0) return;
-        const scale = Math.min(1, DECODE_WIDTH / v.videoWidth);
-        dc.width = Math.round(v.videoWidth * scale);
-        dc.height = Math.round(v.videoHeight * scale);
-        ctx.drawImage(v, 0, 0, dc.width, dc.height);
+        // Decode the CENTRAL region only (where the guide brackets
+        // point) — the barcode fills more of the decoded image and
+        // background clutter drops out. Crop: middle 86% × 60%.
+        const sx = Math.round(v.videoWidth * 0.07);
+        const sw = Math.round(v.videoWidth * 0.86);
+        const sy = Math.round(v.videoHeight * 0.20);
+        const sh = Math.round(v.videoHeight * 0.60);
+        const scale = Math.min(1, DECODE_WIDTH / sw);
+        dc.width = Math.round(sw * scale);
+        dc.height = Math.round(sh * scale);
+        ctx.drawImage(v, sx, sy, sw, sh, 0, 0, dc.width, dc.height);
+        attempts++;
         try {
           const result = zxingReaderRef.current.decodeFromCanvas(dc);
           if (result) handleRawScan(result.getText());
         } catch { /* NotFound — keep scanning */ }
+        // Heartbeat in the diag line so a silent decode loop is
+        // visibly alive (and its input size inspectable).
+        if (attempts % 6 === 0) {
+          setDiag(d => d.replace(/ · scans .*$/, '') + ` · scans ${attempts} @${dc.width}×${dc.height}`);
+        }
       }, DECODE_INTERVAL_MS);
     }
 
