@@ -232,7 +232,7 @@ function AddMacroSheet({ onClose, onSave }) {
 }
 
 // ── Main NutritionSection ────────────────────────────────────────────────
-export default function NutritionSection({ userId, selectedDate, calYear, calMonth, onShowCoinToast, onMonthDataReady, onOpenModal, update }) {
+export default function NutritionSection({ userId, S, selectedDate, calYear, calMonth, onShowCoinToast, onMonthDataReady, onOpenModal, update }) {
   const date = selectedDate || getTodayStr();
   const { macros, summary, logEntries, monthSummary, loading, reload, recalcSummary, loadMonth } = useNutrition(userId, date);
 
@@ -494,6 +494,8 @@ export default function NutritionSection({ userId, selectedDate, calYear, calMon
         <FoodSearch
           onClose={() => setShowFoodSearch(false)}
           onOpenModal={onOpenModal}
+          savedMeals={S?.savedMeals || []}
+          onDeleteMeal={(id) => update?.(prev => ({ ...prev, savedMeals: (prev.savedMeals || []).filter(m => m.id !== id) }))}
           onSelectFood={(prefill) => {
             setShowFoodSearch(false);
             setFoodPrefill(prefill || null);
@@ -507,6 +509,12 @@ export default function NutritionSection({ userId, selectedDate, calYear, calMon
           userId={userId}
           logDate={date}
           prefill={foodPrefill}
+          onSaveMeal={(meal) => update?.(prev => {
+            // De-dupe by name (case-insensitive) — re-saving an edited
+            // meal replaces the old template rather than piling up.
+            const others = (prev.savedMeals || []).filter(m => m.name.trim().toLowerCase() !== meal.name.trim().toLowerCase());
+            return { ...prev, savedMeals: [...others, meal] };
+          })}
           onClose={() => { setShowFoodSheet(false); setFoodPrefill(null); }}
           onSaved={() => { recalcSummary(date); reload(); }}
         />

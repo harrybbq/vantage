@@ -16,7 +16,7 @@ async function searchByName(query) {
   return json.products || [];
 }
 
-export default function FoodSearch({ onSelectFood, onClose, onOpenModal }) {
+export default function FoodSearch({ onSelectFood, onClose, onOpenModal, savedMeals = [], onDeleteMeal }) {
   // Camera scanning is OWNER-ONLY for now (per owner call, 2026-07) —
   // the tab simply doesn't exist for other accounts. ZXing fallback
   // means it works on iOS Safari and desktop webcams too, so no
@@ -27,13 +27,15 @@ export default function FoodSearch({ onSelectFood, onClose, onOpenModal }) {
   const [results, setResults] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  // mode: 'search' | 'barcode' | 'camera' (camera only available on mobile + pro)
-  const [mode, setMode] = useState('search');
+  // mode: 'search' | 'barcode' | 'camera' | 'meals'
+  // Default to Meals when the user has saved some — that's usually the
+  // fastest path for a repeat log.
+  const [mode, setMode] = useState(savedMeals.length ? 'meals' : 'search');
   const debounceRef = useRef(null);
   const inputRef = useRef(null);
 
   useEffect(() => {
-    if (mode !== 'camera') inputRef.current?.focus();
+    if (mode !== 'camera' && mode !== 'meals') inputRef.current?.focus();
   }, [mode]);
 
   function handleQueryChange(val) {
@@ -112,6 +114,7 @@ export default function FoodSearch({ onSelectFood, onClose, onOpenModal }) {
   };
 
   const tabs = [
+    ...(savedMeals.length ? [['meals', 'Meals']] : []),
     ['search', 'Name'],
     ['barcode', 'Barcode'],
     ...(canUseCamera ? [['camera', 'Scan']] : []),
@@ -173,8 +176,41 @@ export default function FoodSearch({ onSelectFood, onClose, onOpenModal }) {
           </div>
         )}
 
+        {/* Saved meals list */}
+        {mode === 'meals' && (
+          <div style={{ flex: 1, overflowY: 'auto', minHeight: 0 }}>
+            {!savedMeals.length ? (
+              <div style={{ textAlign: 'center', padding: '30px 16px', color: 'var(--text-muted)', fontFamily: 'var(--mono)', fontSize: 'var(--text-sm)', lineHeight: 1.7 }}>
+                No saved meals yet. Log a food with its macros and tap
+                <strong style={{ color: 'var(--text-mid)' }}> Save as a meal for later</strong> to build your quick-log list.
+              </div>
+            ) : savedMeals.map(meal => (
+              <div key={meal.id} style={{ display: 'flex', alignItems: 'stretch', gap: '8px', marginBottom: '8px' }}>
+                <button onClick={() => onSelectFood(meal)}
+                  style={{ flex: 1, display: 'flex', alignItems: 'center', gap: '10px', padding: '12px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border)', background: 'transparent', cursor: 'pointer', textAlign: 'left', fontFamily: 'var(--sans)', minWidth: 0 }}>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontWeight: 600, fontSize: 'var(--text-sm)', color: 'var(--text)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{meal.name}</div>
+                    <div style={{ display: 'flex', gap: '8px', marginTop: '4px', flexWrap: 'wrap' }}>
+                      <span style={{ fontFamily: 'var(--mono)', fontSize: '10px', color: 'var(--text-mid)' }}>{Math.round(parseFloat(meal.calories) || 0)} kcal</span>
+                      <span style={{ fontFamily: 'var(--mono)', fontSize: '10px', color: 'var(--text-muted)' }}>P {Math.round(parseFloat(meal.protein_g) || 0)}g</span>
+                      <span style={{ fontFamily: 'var(--mono)', fontSize: '10px', color: 'var(--text-muted)' }}>C {Math.round(parseFloat(meal.carbs_g) || 0)}g</span>
+                      <span style={{ fontFamily: 'var(--mono)', fontSize: '10px', color: 'var(--text-muted)' }}>F {Math.round(parseFloat(meal.fat_g) || 0)}g</span>
+                      <span style={{ fontFamily: 'var(--mono)', fontSize: '10px', color: 'var(--text-muted)' }}>{Math.round(parseFloat(meal.serving_g) || 0)}g serving</span>
+                    </div>
+                  </div>
+                  <span style={{ color: 'var(--em)', fontSize: '18px', flexShrink: 0 }}>+</span>
+                </button>
+                <button onClick={() => onDeleteMeal?.(meal.id)} aria-label={`Delete ${meal.name}`}
+                  style={{ flexShrink: 0, width: '40px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border)', background: 'transparent', color: 'var(--text-muted)', cursor: 'pointer', fontSize: '13px' }}>
+                  ✕
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+
         {/* Text / barcode search UI */}
-        {mode !== 'camera' && (
+        {mode !== 'camera' && mode !== 'meals' && (
           <>
             {/* Search row */}
             <div style={{ display: 'flex', gap: '8px', marginBottom: '14px', flexShrink: 0 }}>

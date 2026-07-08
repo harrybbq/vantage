@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { supabase } from '../lib/supabase';
 import { backdropClose } from '../utils/backdropClose';
 
@@ -28,12 +28,60 @@ const EMPTY_FORM = {
   sodium_mg: '',
 };
 
-export default function FoodLogSheet({ userId, logDate, onClose, onSaved, prefill }) {
+const NUTRIENT_KEYS = ['calories', 'protein_g', 'carbs_g', 'fat_g', 'fibre_g', 'sugar_g', 'sodium_mg'];
+
+export default function FoodLogSheet({ userId, logDate, onClose, onSaved, prefill, onSaveMeal }) {
   const [form, setForm] = useState(prefill ? { ...EMPTY_FORM, ...prefill } : { ...EMPTY_FORM });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
 
+  // Per-gram nutrient densities so editing the serving size rescales
+  // every macro proportionally (e.g. search prefills per-100g; typing
+  // 150g lifts calories/protein/etc by 1.5×). Seeded from the initial
+  // values; a manual edit to a nutrient re-derives that field's
+  // density at the current serving, so hand-tuned numbers keep
+  // scaling correctly afterwards.
+  const perGramRef = useRef((() => {
+    const initial = prefill ? { ...EMPTY_FORM, ...prefill } : EMPTY_FORM;
+    const serving = parseFloat(initial.serving_g) || 100;
+    const map = {};
+    for (const k of NUTRIENT_KEYS) {
+      const v = parseFloat(initial[k]);
+      map[k] = Number.isFinite(v) && serving > 0 ? v / serving : null;
+    }
+    return map;
+  })());
+
   function set(key, val) {
+    if (key === 'serving_g') {
+      setForm(f => {
+        const next = { ...f, serving_g: val };
+        const g = parseFloat(val);
+        if (Number.isFinite(g) && g > 0) {
+          for (const k of NUTRIENT_KEYS) {
+            const density = perGramRef.current[k];
+            if (density == null) continue;
+            const scaled = density * g;
+            next[k] = k === 'calories' || k === 'sodium_mg'
+              ? String(Math.round(scaled))
+              : String(Math.round(scaled * 10) / 10);
+          }
+        }
+        return next;
+      });
+      return;
+    }
+    // Manual nutrient edit → that field's density follows the new
+    // value at the current serving size.
+    if (NUTRIENT_KEYS.includes(key)) {
+      setForm(f => {
+        const g = parseFloat(f.serving_g);
+        const v = parseFloat(val);
+        perGramRef.current[key] = Number.isFinite(v) && Number.isFinite(g) && g > 0 ? v / g : null;
+        return { ...f, [key]: val };
+      });
+      return;
+    }
     setForm(f => ({ ...f, [key]: val }));
   }
 
@@ -63,6 +111,28 @@ export default function FoodLogSheet({ userId, logDate, onClose, onSaved, prefil
     setSaving(false);
     onSaved?.();
     onClose();
+  }
+
+  const [savedMeal, setSavedMeal] = useState(false);
+  function handleSaveMeal() {
+    if (!form.food_name.trim()) { setError('Give the meal a name before saving it.'); return; }
+    onSaveMeal?.({
+      id: 'meal' + Date.now(),
+      name: form.food_name.trim(),
+      food_name: form.food_name.trim(),
+      brand: form.brand.trim(),
+      meal_type: form.meal_type,
+      serving_g: form.serving_g,
+      calories: form.calories,
+      protein_g: form.protein_g,
+      carbs_g: form.carbs_g,
+      fat_g: form.fat_g,
+      fibre_g: form.fibre_g,
+      sugar_g: form.sugar_g,
+      sodium_mg: form.sodium_mg,
+    });
+    setSavedMeal(true);
+    setTimeout(() => setSavedMeal(false), 2000);
   }
 
   const inputStyle = {
@@ -144,8 +214,16 @@ export default function FoodLogSheet({ userId, logDate, onClose, onSaved, prefil
 
         {error && <div style={{ color: '#e05252', fontSize: 'var(--text-xs)', marginBottom: '10px', fontFamily: 'var(--mono)' }}>{error}</div>}
 
+        {/* Save as reusable meal template */}
+        {onSaveMeal && (
+          <button onClick={handleSaveMeal} type="button"
+            style={{ width: '100%', marginTop: '6px', padding: '10px', borderRadius: 'var(--radius-md)', border: '1px dashed var(--border)', background: 'transparent', color: savedMeal ? 'var(--em)' : 'var(--text-muted)', cursor: 'pointer', fontFamily: 'var(--mono)', fontSize: '11px', letterSpacing: '1px', textTransform: 'uppercase', transition: 'color .15s' }}>
+            {savedMeal ? 'Saved to your meals' : 'Save as a meal for later'}
+          </button>
+        )}
+
         {/* Action buttons */}
-        <div style={{ display: 'flex', gap: '10px', marginTop: '20px' }}>
+        <div style={{ display: 'flex', gap: '10px', marginTop: '12px' }}>
           <button onClick={onClose} style={{ flex: 1, padding: '12px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border)', background: 'transparent', color: 'var(--text-mid)', cursor: 'pointer', fontFamily: 'var(--sans)', fontSize: 'var(--text-sm)' }}>
             Cancel
           </button>
