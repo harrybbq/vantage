@@ -205,7 +205,7 @@ function potContributions(projection) {
   for (const it of (projection?.items || [])) {
     if (it.kind !== 'expense' || !it.goalId) continue;
     const v = parseFloat(it.amount) || 0;
-    const monthly = it.freq === 'year' ? v / 12 : v;
+    const monthly = it.freq === 'year' ? v / 12 : it.freq === 'week' ? v * 52 / 12 : v;
     map[it.goalId] = (map[it.goalId] || 0) + monthly;
   }
   return map;
