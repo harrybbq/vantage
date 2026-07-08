@@ -49,6 +49,8 @@ export default function SavingsProjections({ S, update }) {
   const [hover, setHover] = useState(null);
   const [openPots, setOpenPots] = useState(() => new Set());
   const [collapsed, setCollapsed] = useState(() => new Set());
+  const [dropHint, setDropHint] = useState(null); // { id, before } | { group } | { loose:true }
+  const dragId = useRef(null);
   const svgRef = useRef(null);
 
   const savedTotal = useMemo(() => (S.savings || []).reduce((s, g) => s + (g.current || 0), 0), [S.savings]);
@@ -66,6 +68,36 @@ export default function SavingsProjections({ S, update }) {
   function addItem(kind, groupId = null) { setProj({ items: [...items, { id: uid('p'), kind, label: '', amount: '', freq: 'month', groupId }] }); }
   function updateItem(id, key, val) { setProj({ items: items.map(it => it.id === id ? { ...it, [key]: val } : it) }); }
   function removeItem(id) { setProj({ items: items.filter(it => it.id !== id) }); }
+
+  // ── Drag & drop reordering / folder moves ──
+  // Reorder the dragged item relative to a target row, inheriting the
+  // target's folder (groupId). Native HTML5 DnD — grip starts the drag.
+  function reorder(dragIdVal, targetId, before, newGroupId) {
+    if (!dragIdVal || dragIdVal === targetId) return;
+    const arr = items.slice();
+    const from = arr.findIndex(i => i.id === dragIdVal);
+    if (from < 0) return;
+    const [moved] = arr.splice(from, 1);
+    moved.groupId = newGroupId ?? null;
+    let to = arr.findIndex(i => i.id === targetId);
+    if (to < 0) arr.push(moved);
+    else arr.splice(before ? to : to + 1, 0, moved);
+    setProj({ items: arr });
+  }
+  // Drop into a folder (or loose when groupId is null) with no specific
+  // neighbour — append after that group's last item.
+  function moveToGroup(dragIdVal, groupId) {
+    if (!dragIdVal) return;
+    const arr = items.slice();
+    const from = arr.findIndex(i => i.id === dragIdVal);
+    if (from < 0) return;
+    const [moved] = arr.splice(from, 1);
+    moved.groupId = groupId;
+    let last = -1;
+    arr.forEach((it, idx) => { if ((it.groupId || null) === (groupId || null)) last = idx; });
+    if (last >= 0) arr.splice(last + 1, 0, moved); else arr.push(moved);
+    setProj({ items: arr });
+  }
 
   function addGroup() { setProj({ groups: [...groups, { id: uid('g'), name: 'New folder' }] }); }
   function renameGroup(id, name) { setProj({ groups: groups.map(g => g.id === id ? { ...g, name } : g) }); }
@@ -142,9 +174,38 @@ export default function SavingsProjections({ S, update }) {
   const looseExpenses = items.filter(i => i.kind === 'expense' && !i.groupId);
 
   function renderRow(it) {
+    const hint = dropHint && dropHint.id === it.id ? (dropHint.before ? ' drop-before' : ' drop-after') : '';
     return (
-      <div key={it.id} className={`proj-item proj-item-${it.kind}`}>
+      <div
+        key={it.id}
+        className={`proj-item proj-item-${it.kind}${hint}`}
+        onDragOver={e => {
+          if (!dragId.current || dragId.current === it.id) return;
+          e.preventDefault(); e.stopPropagation();
+          const r = e.currentTarget.getBoundingClientRect();
+          setDropHint({ id: it.id, before: e.clientY < r.top + r.height / 2 });
+        }}
+        onDrop={e => {
+          e.preventDefault(); e.stopPropagation();
+          if (dragId.current && dragId.current !== it.id) {
+            const r = e.currentTarget.getBoundingClientRect();
+            reorder(dragId.current, it.id, e.clientY < r.top + r.height / 2, it.groupId ?? null);
+          }
+          setDropHint(null); dragId.current = null;
+        }}
+      >
         <div className={`proj-row proj-row-${it.kind}`}>
+          <span
+            className="proj-drag" draggable title="Drag to reorder or move"
+            onDragStart={e => {
+              dragId.current = it.id;
+              e.dataTransfer.effectAllowed = 'move';
+              try { e.dataTransfer.setData('text/plain', it.id); } catch { /* ignore */ }
+              const row = e.currentTarget.closest('.proj-item');
+              if (row) e.dataTransfer.setDragImage(row, 24, 18);
+            }}
+            onDragEnd={() => { dragId.current = null; setDropHint(null); }}
+          >⠿</span>
           <button type="button" className="proj-kind" onClick={() => updateItem(it.id, 'kind', it.kind === 'income' ? 'expense' : 'income')} title="Toggle income / expense">{it.kind === 'income' ? '+' : '−'}</button>
           <input className="proj-label" placeholder={it.kind === 'income' ? 'e.g. Salary' : 'e.g. Rent'} value={it.label} onChange={e => updateItem(it.id, 'label', e.target.value)} />
           <div className="proj-amt-wrap"><span className="proj-amt-cur">£</span><input className="proj-amt" type="number" inputMode="decimal" placeholder="0" value={it.amount} onChange={e => updateItem(it.id, 'amount', e.target.value)} /></div>
@@ -234,17 +295,26 @@ export default function SavingsProjections({ S, update }) {
           <div className="proj-tile proj-tile-net"><span className="proj-tile-label">Net / {view}</span><span className={`proj-tile-val ${netM >= 0 ? 'proj-pos' : 'proj-neg'}`}>{netM >= 0 ? '+' : ''}{money(netM * mult)}</span></div>
         </div>
 
-        <div className="proj-items">
+        <div
+          className={`proj-items${dropHint?.loose ? ' drop-loose' : ''}`}
+          onDragOver={e => { if (dragId.current) { e.preventDefault(); setDropHint({ loose: true }); } }}
+          onDrop={e => { if (dragId.current) { e.preventDefault(); moveToGroup(dragId.current, null); } setDropHint(null); dragId.current = null; }}
+        >
           {incomeItems.map(renderRow)}
           {looseExpenses.map(renderRow)}
 
-          {/* Expense folders */}
+          {/* Expense folders — drop anywhere in a folder to move an item in */}
           {groups.map(g => {
             const gItems = items.filter(it => it.groupId === g.id);
             const subtotal = gItems.reduce((s, it) => s + toMonthly(it.amount, it.freq), 0) * mult;
             const isOpen = !collapsed.has(g.id);
             return (
-              <div key={g.id} className="proj-folder">
+              <div
+                key={g.id}
+                className={`proj-folder${dropHint?.group === g.id ? ' drop-into' : ''}`}
+                onDragOver={e => { if (dragId.current) { e.preventDefault(); e.stopPropagation(); setDropHint({ group: g.id }); } }}
+                onDrop={e => { if (dragId.current) { e.preventDefault(); e.stopPropagation(); moveToGroup(dragId.current, g.id); } setDropHint(null); dragId.current = null; }}
+              >
                 <div className="proj-folder-head">
                   <button type="button" className="proj-folder-toggle" onClick={() => toggleCollapse(g.id)} aria-label="Collapse folder">{isOpen ? '▾' : '▸'}</button>
                   <input className="proj-folder-name" value={g.name} onChange={e => renameGroup(g.id, e.target.value)} />
