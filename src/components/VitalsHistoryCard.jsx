@@ -51,11 +51,25 @@ function fmtDay(ts) {
 // on the web; this parses the manual Health export and fills the
 // vitals/burn stores. Gated on the same window.__vantageOwner flag as
 // other owner tools.
-function AppleHealthImport({ update }) {
+function AppleHealthImport({ S, update }) {
   const inputRef = useRef(null);
   const [status, setStatus] = useState('idle'); // idle | parsing | done | error
   const [pct, setPct] = useState(0);
   const [msg, setMsg] = useState('');
+  const [copied, setCopied] = useState(false);
+
+  const token = S?.healthToken || null;
+  const syncUrl = token && typeof window !== 'undefined'
+    ? `${window.location.origin}/.netlify/functions/health-sync?token=${token}`
+    : null;
+  function enableSync() {
+    const t = (window.crypto?.randomUUID?.() || (Date.now().toString(36) + Math.random().toString(36).slice(2))).replace(/-/g, '');
+    update(prev => ({ ...prev, healthToken: t }));
+  }
+  function copyUrl() {
+    if (!syncUrl) return;
+    navigator.clipboard?.writeText(syncUrl).then(() => { setCopied(true); setTimeout(() => setCopied(false), 1600); }).catch(() => {});
+  }
 
   async function onFile(e) {
     const file = e.target.files?.[0];
@@ -76,15 +90,30 @@ function AppleHealthImport({ update }) {
 
   return (
     <div className="vitals-ah">
-      <input ref={inputRef} type="file" accept=".zip,.xml" style={{ display: 'none' }} onChange={onFile} />
-      <button type="button" className="vitals-ah-btn" disabled={status === 'parsing'} onClick={() => inputRef.current?.click()}>
-        {status === 'parsing' ? `Importing… ${Math.round(pct * 100)}%` : 'Import from Apple Health'}
-      </button>
-      <span className="vitals-ah-hint">
-        {status === 'done' ? msg
-          : status === 'error' ? msg
-          : 'Health app → profile → Export All Health Data → pick the export.zip.'}
-      </span>
+      <div className="vitals-ah-row">
+        <input ref={inputRef} type="file" accept=".zip,.xml" style={{ display: 'none' }} onChange={onFile} />
+        <button type="button" className="vitals-ah-btn" disabled={status === 'parsing'} onClick={() => inputRef.current?.click()}>
+          {status === 'parsing' ? `Importing… ${Math.round(pct * 100)}%` : 'Import from Apple Health'}
+        </button>
+        <span className="vitals-ah-hint">
+          {status === 'done' ? msg
+            : status === 'error' ? msg
+            : 'One-off: Health app → profile → Export All Health Data → pick the export.zip.'}
+        </span>
+      </div>
+      <div className="vitals-ah-row vitals-ah-sync">
+        {!syncUrl ? (
+          <>
+            <button type="button" className="vitals-ah-btn vitals-ah-btn-alt" onClick={enableSync}>Enable live sync</button>
+            <span className="vitals-ah-hint">Auto-import daily via an iOS Shortcut — no App Store needed.</span>
+          </>
+        ) : (
+          <>
+            <button type="button" className="vitals-ah-btn vitals-ah-btn-alt" onClick={copyUrl}>{copied ? 'Copied ✓' : 'Copy sync URL'}</button>
+            <span className="vitals-ah-hint">Paste this into your “Vantage Health Sync” Shortcut’s <strong>Get Contents of URL</strong> step (POST). Keep it secret.</span>
+          </>
+        )}
+      </div>
     </div>
   );
 }
@@ -154,7 +183,7 @@ export default function VitalsHistoryCard({ S, update }) {
         <p className="vitals-sub">
           No history yet. Log weight/sleep/HR from the hub Vitals widget, or log food in Daily Macros — each day banks a “% of goal hit” snapshot here.
         </p>
-        {isOwner && update && <AppleHealthImport update={update} />}
+        {isOwner && update && <AppleHealthImport S={S} update={update} />}
       </div>
     );
   }
@@ -167,7 +196,7 @@ export default function VitalsHistoryCard({ S, update }) {
       <h3 style={{ margin: '0 0 4px' }}>Vitals &amp; Macros</h3>
       <p className="vitals-sub">Vitals from the hub widget; macro days saved as % of each goal hit. Hover the chart for exact values.</p>
 
-      {isOwner && update && <AppleHealthImport update={update} />}
+      {isOwner && update && <AppleHealthImport S={S} update={update} />}
 
       {/* Filter row — metric first (it names the chart), then range. */}
       <div className="vitals-controls">
