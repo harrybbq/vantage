@@ -1182,6 +1182,7 @@ html[data-theme="dark"] {
 .proj-acc-apy input{width:52px;background:var(--bg-base,#fffefa);border:1px solid var(--border);border-radius:8px;padding:8px 6px;color:var(--text);font-family:var(--mono);font-size:13px;outline:none;text-align:right;}
 .proj-acc-apy span{font-family:var(--mono);font-size:9px;color:var(--text-muted);}
 .proj-add-account{align-self:flex-start;color:var(--em);}
+.proj-acc-in{font-family:var(--mono);font-size:9.5px;color:var(--em);letter-spacing:.3px;}
 .proj-acc-total{display:flex;flex-direction:column;gap:3px;font-family:var(--mono);font-size:11px;color:var(--text-muted);padding-top:8px;border-top:1px solid var(--border);}
 .proj-acc-total strong{color:var(--text);}
 /* Dark achievements surface overrides for the new controls */
