@@ -33,6 +33,8 @@ export default function FoodSearch({ onSelectFood, onClose, onOpenModal, savedMe
   const [mode, setMode] = useState(savedMeals.length ? 'meals' : 'search');
   const debounceRef = useRef(null);
   const inputRef = useRef(null);
+  const cameraRef = useRef(null);
+  const [identifying, setIdentifying] = useState(false);
 
   useEffect(() => {
     if (mode !== 'camera' && mode !== 'meals') inputRef.current?.focus();
@@ -157,13 +159,22 @@ export default function FoodSearch({ onSelectFood, onClose, onOpenModal, savedMe
         {mode === 'camera' && canUseCamera && (
           <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', gap: '10px' }}>
             <CameraScanner
+              ref={cameraRef}
               onBarcode={handleCameraBarcode}
               onAIResult={handleAIResult}
               onError={handleCameraError}
             />
             <p style={{ fontFamily: 'var(--mono)', fontSize: '11px', color: 'var(--text-muted)', textAlign: 'center', margin: 0 }}>
-              Point at a barcode or product QR to auto-scan, or tap <strong style={{ color: 'var(--text-mid)' }}>Identify with AI</strong> to detect what's in frame.
+              Point at a barcode or product QR to auto-scan, or use AI to detect a plate / packaging in frame.
             </p>
+            {/* Always-visible AI identify — lives outside the camera box
+                so it can never be hidden by camera state. */}
+            <button
+              onClick={async () => { setIdentifying(true); await cameraRef.current?.identify(); setIdentifying(false); }}
+              disabled={identifying}
+              style={{ padding: '12px', borderRadius: 'var(--radius-md)', border: 'none', background: identifying ? 'rgba(26,122,74,.6)' : 'var(--em)', color: '#fff', cursor: identifying ? 'default' : 'pointer', fontFamily: 'var(--sans)', fontSize: 'var(--text-sm)', fontWeight: 600 }}>
+              {identifying ? 'Identifying…' : 'Identify with AI'}
+            </button>
             {error && (
               <div style={{ padding: '10px 14px', background: 'rgba(220,38,38,.08)', borderRadius: 'var(--radius-md)', color: '#e05252', fontSize: 'var(--text-sm)', fontFamily: 'var(--mono)' }}>
                 {error}

@@ -1,4 +1,4 @@
-import { useRef, useEffect, useState } from 'react';
+import { useRef, useEffect, useState, forwardRef, useImperativeHandle } from 'react';
 
 /**
  * CameraScanner — camera viewfinder for product-code scanning.
@@ -50,7 +50,7 @@ const DECODE_WIDTH = 1024; // downscale target for canvas decode — 1D
                            // barcodes need line-level detail, so err
                            // toward resolution over CPU at ~3 fps
 
-export default function CameraScanner({ onBarcode, onAIResult, onError }) {
+const CameraScanner = forwardRef(function CameraScanner({ onBarcode, onAIResult, onError }, ref) {
   const videoRef = useRef(null);
   const canvasRef = useRef(null);      // AI capture canvas
   const decodeCanvasRef = useRef(null); // ZXing decode canvas
@@ -331,6 +331,11 @@ export default function CameraScanner({ onBarcode, onAIResult, onError }) {
     return true;
   }
 
+  // Let the parent trigger AI identify from a button that lives OUTSIDE
+  // the camera box (so it can't be hidden by camera state). No deps
+  // array → the handle always points at the latest closure.
+  useImperativeHandle(ref, () => ({ identify: handleIdentify }));
+
   async function handleIdentify() {
     const video = videoRef.current;
     if (!video) return;
@@ -452,24 +457,15 @@ export default function CameraScanner({ onBarcode, onAIResult, onError }) {
         </div>
       )}
 
-      {/* AI identify button */}
-      {(status === 'scanning' || status === 'identifying') && !needsTap && (
-        <button
-          onClick={handleIdentify}
-          disabled={status === 'identifying'}
-          style={{
-            position: 'absolute', bottom: msg ? '44px' : '14px', left: '50%', transform: 'translateX(-50%)',
-            padding: '9px 20px', borderRadius: 'var(--radius-full)',
-            background: status === 'identifying' ? 'rgba(26,122,74,.7)' : 'var(--em)',
-            color: '#fff', border: 'none', cursor: status === 'identifying' ? 'default' : 'pointer',
-            fontFamily: 'var(--sans)', fontSize: '13px', fontWeight: 600,
-            boxShadow: '0 2px 12px rgba(0,0,0,.45)', whiteSpace: 'nowrap',
-            opacity: status === 'identifying' ? 0.8 : 1,
-          }}
-        >
-          {status === 'identifying' ? 'Identifying…' : 'Identify with AI'}
-        </button>
+      {/* Identifying overlay — the trigger button now lives in
+          FoodSearch (always visible), so we just show progress here. */}
+      {status === 'identifying' && (
+        <div style={{ position: 'absolute', bottom: msg ? '44px' : '14px', left: '50%', transform: 'translateX(-50%)', padding: '8px 18px', borderRadius: 'var(--radius-full)', background: 'rgba(26,122,74,.85)', color: '#fff', fontFamily: 'var(--sans)', fontSize: '13px', fontWeight: 600, boxShadow: '0 2px 12px rgba(0,0,0,.45)' }}>
+          Identifying…
+        </div>
       )}
     </div>
   );
-}
+});
+
+export default CameraScanner;
