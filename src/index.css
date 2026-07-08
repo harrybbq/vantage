@@ -1153,6 +1153,41 @@ html[data-theme="dark"] {
 
 /* ── Savings projections planner ── */
 .proj-card{padding:22px;margin-top:18px;max-width:760px;}
+/* 3-column dashboard (desktop) — Projections · Cash flow · Accounts.
+   Stacks to one column on mobile so the mobile layout is unchanged. */
+.proj-dash{display:grid;grid-template-columns:1fr;gap:16px;margin-top:18px;width:100%;}
+@media (min-width:1101px){.proj-dash{grid-template-columns:1.05fr 1.1fr .85fr;align-items:start;}}
+.proj-col{padding:20px;min-width:0;display:flex;flex-direction:column;}
+.proj-legend{display:flex;gap:14px;margin-bottom:8px;}
+.proj-leg{display:flex;align-items:center;gap:6px;font-family:var(--mono);font-size:10px;letter-spacing:.5px;color:var(--text-muted);text-transform:uppercase;}
+.proj-leg i{width:12px;height:3px;border-radius:2px;}
+.proj-line-savings{fill:none;stroke:#d4a017;stroke-width:2;stroke-dasharray:1 0;}
+.proj-dot-savings{fill:#d4a017;}
+/* Expense folders */
+.proj-folder{border:1px solid var(--border);border-radius:11px;overflow:hidden;}
+.proj-folder-head{display:flex;align-items:center;gap:7px;padding:8px 10px;background:rgba(0,0,0,.03);}
+.proj-folder-toggle{background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:11px;padding:2px 4px;flex-shrink:0;}
+.proj-folder-name{flex:1;min-width:0;background:none;border:none;color:var(--text);font-family:var(--sans);font-size:13px;font-weight:600;outline:none;}
+.proj-folder-sub{font-family:var(--mono);font-size:11px;font-weight:700;flex-shrink:0;}
+.proj-folder-body{padding:10px;display:flex;flex-direction:column;gap:10px;}
+.proj-add-infolder{flex:none;align-self:flex-start;padding:6px 12px;}
+.proj-add-folder{color:var(--text-mid);}
+/* Savings accounts */
+.proj-accounts{display:flex;flex-direction:column;gap:10px;}
+.proj-acc-empty{font-family:var(--mono);font-size:11px;color:var(--text-muted);line-height:1.7;}
+.proj-acc-row{display:flex;flex-direction:column;gap:6px;border:1px solid var(--border);border-radius:10px;padding:10px;}
+.proj-acc-name{background:var(--bg-base,#fffefa);border:1px solid var(--border);border-radius:8px;padding:8px 10px;color:var(--text);font-family:var(--body);font-size:13px;outline:none;}
+.proj-acc-fields{display:flex;align-items:center;gap:7px;}
+.proj-acc-apy{display:flex;align-items:center;gap:5px;flex-shrink:0;}
+.proj-acc-apy input{width:52px;background:var(--bg-base,#fffefa);border:1px solid var(--border);border-radius:8px;padding:8px 6px;color:var(--text);font-family:var(--mono);font-size:13px;outline:none;text-align:right;}
+.proj-acc-apy span{font-family:var(--mono);font-size:9px;color:var(--text-muted);}
+.proj-add-account{align-self:flex-start;color:var(--em);}
+.proj-acc-total{display:flex;flex-direction:column;gap:3px;font-family:var(--mono);font-size:11px;color:var(--text-muted);padding-top:8px;border-top:1px solid var(--border);}
+.proj-acc-total strong{color:var(--text);}
+/* Dark achievements surface overrides for the new controls */
+#achievements .proj-acc-name,#achievements .proj-acc-apy input{background:rgba(255,255,255,.06);}
+#achievements .proj-folder-head{background:rgba(255,255,255,.04);}
+#achievements .proj-folder-name{color:#f0f7f4;}
 .proj-head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:16px;flex-wrap:wrap;}
 .proj-sub{font-family:var(--mono);font-size:11px;color:var(--text-muted);margin:0;line-height:1.6;}
 .proj-viewtoggle,.proj-horizon{display:inline-flex;border:1px solid var(--border);border-radius:9px;overflow:hidden;flex-shrink:0;}
