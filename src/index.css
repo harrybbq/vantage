@@ -5077,19 +5077,22 @@ button:active:not(:disabled),
 
 /* ── Savings widgets (pots + projection) — shared mobile/desktop ── */
 .sw-pots { position: relative; display: flex; flex-direction: column; gap: 8px; min-height: 0; }
-.sw-pots-single { cursor: pointer; }
 .sw-empty { font-family: var(--mono); font-size: 11px; color: var(--text-muted); line-height: 1.6; padding: 6px 0; }
-.sw-count { position: absolute; top: -2px; right: 0; display: inline-flex; border: 1px solid var(--border); border-radius: 7px; overflow: hidden; z-index: 2; }
-.sw-count-btn { padding: 2px 8px; background: none; border: none; border-right: 1px solid var(--border); cursor: pointer; font-family: var(--mono); font-size: 10px; color: var(--text-muted); }
-.sw-count-btn:last-child { border-right: none; }
-.sw-count-btn.on { background: rgba(var(--em-rgb), .14); color: var(--em); font-weight: 700; }
-.sw-single-top { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; padding-right: 46px; }
-.sw-single-name { font-family: var(--sans); font-size: 13px; font-weight: 600; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.sw-single-pct { font-family: var(--mono); font-size: 13px; font-weight: 700; color: var(--em); flex-shrink: 0; }
-.sw-single-bar { height: 14px; border-radius: 8px; background: rgba(128,128,128,.18); overflow: hidden; }
-.sw-single-fill { height: 100%; border-radius: 8px; transition: width .4s var(--ease-out, ease); }
-.sw-single-nums { display: flex; justify-content: space-between; font-family: var(--mono); font-size: 10.5px; color: var(--text-muted); }
+/* Count stepper — sits top-right; content below is padded clear of it. */
+.sw-count { position: absolute; top: 0; right: 0; display: inline-flex; align-items: center; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; z-index: 3; background: var(--card, rgba(20,20,20,.6)); backdrop-filter: blur(2px); }
+.sw-count-step { width: 22px; height: 22px; background: none; border: none; cursor: pointer; font-family: var(--mono); font-size: 13px; color: var(--em); line-height: 1; }
+.sw-count-step:disabled { color: var(--text-muted); opacity: .5; cursor: default; }
+.sw-count-n { min-width: 16px; text-align: center; font-family: var(--mono); font-size: 11px; font-weight: 700; color: var(--text); }
+/* Multi (donuts) — clear the stepper. */
+.sw-pots-multi { padding-top: 26px; }
 .sw-donuts { display: grid; grid-template-columns: repeat(auto-fit, minmax(64px, 1fr)); gap: 10px; }
+/* Single pot — fills the whole widget bottom→top. */
+.sw-pot-fill { position: relative; width: 100%; height: 100%; min-height: 150px; border-radius: 10px; overflow: hidden; background: rgba(128,128,128,.16); cursor: pointer; }
+.sw-pot-fill-bar { position: absolute; left: 0; right: 0; bottom: 0; opacity: .9; transition: height .5s var(--ease-out, ease); }
+.sw-pot-fill-overlay { position: absolute; inset: 0; display: flex; flex-direction: column; justify-content: flex-end; gap: 2px; padding: 12px; background: linear-gradient(to top, rgba(0,0,0,.55), rgba(0,0,0,0) 55%); }
+.sw-pot-fill-name { font-family: var(--sans); font-size: 14px; font-weight: 600; color: #fff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-shadow: 0 1px 3px rgba(0,0,0,.5); }
+.sw-pot-fill-pct { font-family: var(--mono); font-size: 30px; font-weight: 700; color: #fff; line-height: 1; text-shadow: 0 1px 4px rgba(0,0,0,.5); }
+.sw-pot-fill-nums { font-family: var(--mono); font-size: 11px; color: rgba(255,255,255,.85); text-shadow: 0 1px 3px rgba(0,0,0,.5); }
 .sw-donut { position: relative; display: flex; flex-direction: column; align-items: center; gap: 2px; }
 .sw-donut-pct { position: absolute; top: 24px; font-family: var(--mono); font-size: 11px; font-weight: 700; color: var(--text); }
 .sw-donut-label { font-family: var(--mono); font-size: 9px; letter-spacing: .3px; color: var(--text-muted); max-width: 72px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-align: center; }
