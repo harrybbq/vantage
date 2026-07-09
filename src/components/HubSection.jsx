@@ -2,6 +2,7 @@ import { useEffect, useRef, useCallback } from 'react';
 import { createRoot } from 'react-dom/client';
 import { motion } from 'framer-motion';
 import { VitalsBody, BurnBody, MacrosBody } from './mobile/MobileWidget';
+import { SavingsPotsBody, SavingsProjectionBody } from './savings/SavingsWidgets';
 import { timeAgo } from '../utils/helpers';
 import AiCoachWidget from './AiCoachWidget';
 import CoachBriefPanel from './CoachBriefPanel';
@@ -287,11 +288,16 @@ export default function HubSection({ S, update, active, onOpenModal, onOpenWaitl
   // renderCanvas, re-rendered with fresh props by the effect below,
   // unmounted before every canvas rebuild.
   const reactRootsRef = useRef(new Map());
-  function reactWidgetEl(type) {
-    switch (type) {
+  function setHubWidgetCount(id, n) {
+    update(prev => ({ ...prev, hubWidgets: (prev.hubWidgets || []).map(w => w.id === id ? { ...w, count: n } : w) }));
+  }
+  function reactWidgetEl(hw) {
+    switch (hw.type) {
       case 'vitals':   return <VitalsBody S={S} update={update} />;
       case 'macros':   return <MacrosBody S={S} userId={userId} navigate={onNavigate} />;
       case 'calories': return <BurnBody S={S} update={update} userId={userId} />;
+      case 'savings-pots': return <SavingsPotsBody S={S} count={hw.count || 1} onSetCount={n => setHubWidgetCount(hw.id, n)} navigate={onNavigate} />;
+      case 'savings-projection': return <SavingsProjectionBody S={S} navigate={onNavigate} />;
       default:         return null;
     }
   }
@@ -302,8 +308,9 @@ export default function HubSection({ S, update, active, onOpenModal, onOpenWaitl
   // on structural changes (widget list, positions), not on every S
   // mutation (e.g. logging a vital), so re-render the roots directly.
   useEffect(() => {
-    for (const [, { root, type }] of reactRootsRef.current) {
-      root.render(reactWidgetElRef.current(type));
+    for (const [id, { root }] of reactRootsRef.current) {
+      const hw = (S.hubWidgets || []).find(w => w.id === id) || { id, type: reactRootsRef.current.get(id).type };
+      root.render(reactWidgetElRef.current(hw));
     }
   }, [S, userId]);
 
@@ -692,6 +699,8 @@ export default function HubSection({ S, update, active, onOpenModal, onOpenWaitl
         vitals:      { eyebrow: 'WIDGET · VITALS',      icon: '◐', title: 'Vitals',      sub: 'Weight · sleep · HR', body: () => `<div data-react-widget="vitals"></div>` },
         macros:      { eyebrow: 'WIDGET · MACROS',      icon: '◑', title: 'Macros',      sub: 'Today · net kcal',    body: () => `<div data-react-widget="macros"></div>` },
         calories:    { eyebrow: 'WIDGET · BURN',        icon: '◔', title: 'Calories Burned', sub: 'Activity · net',  body: () => `<div data-react-widget="calories"></div>` },
+        'savings-pots':       { eyebrow: 'WIDGET · SAVINGS',    icon: '◒', title: 'Savings pots', sub: 'Progress',      body: () => `<div data-react-widget="savings-pots"></div>` },
+        'savings-projection': { eyebrow: 'WIDGET · PROJECTION', icon: '⌁', title: 'Projection',   sub: 'Net · balance', body: () => `<div data-react-widget="savings-projection"></div>` },
       };
       const meta = META[hw.type] || META.habits;
       const { eyebrow, icon, title, sub } = meta;
@@ -735,7 +744,7 @@ export default function HubSection({ S, update, active, onOpenModal, onOpenWaitl
       const host = island.querySelector('[data-react-widget]');
       if (host) {
         const root = createRoot(host);
-        root.render(reactWidgetElRef.current(hw.type));
+        root.render(reactWidgetElRef.current(hw));
         reactRootsRef.current.set(hw.id, { root, type: hw.type });
       }
     });

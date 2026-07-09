@@ -19,6 +19,7 @@ import { currentWeightKg, dayBurn, ACTIVITIES, activityKcal, stepsKcal } from '.
 import { APP_PRESETS, getAppPreset } from '../../data/appPresets';
 import { fetchAppPreview } from '../../lib/appPreview';
 import { strikeState } from '../../lib/habits/strikes';
+import { SavingsPotsBody, SavingsProjectionBody } from '../savings/SavingsWidgets';
 
 // App presets (FloorplanStudio / TubeLube / …) become mobile widget
 // types too — generated from the shared config so adding an app in one
@@ -105,6 +106,16 @@ const BASE_WIDGET_META = {
     label: 'Macros',
     eyebrow: 'MACROS',
     icon: '◑',
+  },
+  'savings-pots': {
+    label: 'Savings Pots',
+    eyebrow: 'SAVINGS',
+    icon: '◒',
+  },
+  'savings-projection': {
+    label: 'Projection',
+    eyebrow: 'PROJECTION',
+    icon: '⌁',
   },
   'mail': {
     label: 'Recent Mail',
@@ -314,6 +325,9 @@ function renderBody(widget, meta, S, update, navigate, userId) {
     case 'vitals':      return <VitalsBody S={S} update={update} />;
     case 'calories':    return <BurnBody S={S} update={update} userId={userId} />;
     case 'macros':      return <MacrosBody S={S} userId={userId} navigate={navigate} />;
+    case 'savings-pots': return <SavingsPotsBody S={S} count={widget.count || 1} navigate={navigate}
+      onSetCount={n => update(prev => ({ ...prev, mobileWidgets: (prev.mobileWidgets || []).map(w => w.id === widget.id ? { ...w, count: n } : w) }))} />;
+    case 'savings-projection': return <SavingsProjectionBody S={S} navigate={navigate} />;
     default:            return <div className="m-widget-stub-label">Unknown widget type.</div>;
   }
 }
