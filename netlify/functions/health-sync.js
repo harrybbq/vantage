@@ -37,6 +37,10 @@ function checkRate(key, max = 60) {
 }
 
 const num = (v, lo, hi) => {
+  // Tolerate what Shortcuts tends to send: arrays (take first), and
+  // strings with commas/units ("8,234 steps", "72.4 kg").
+  if (Array.isArray(v)) v = v[0];
+  if (typeof v === 'string') v = v.replace(/[^0-9.\-]/g, '');
   const n = parseFloat(v);
   return Number.isFinite(n) && n >= lo && n <= hi ? n : null;
 };
