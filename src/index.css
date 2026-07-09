@@ -5075,6 +5075,37 @@ button:active:not(:disabled),
 .vitals-table td { font-size: 12.5px; color: var(--text-mid); padding: 6px 8px; border-bottom: 1px solid var(--border-lt, var(--border)); }
 .vitals-table tr:last-child td { border-bottom: none; }
 
+/* ── Savings widgets (pots + projection) — shared mobile/desktop ── */
+.sw-pots { position: relative; display: flex; flex-direction: column; gap: 8px; min-height: 0; }
+.sw-pots-single { cursor: pointer; }
+.sw-empty { font-family: var(--mono); font-size: 11px; color: var(--text-muted); line-height: 1.6; padding: 6px 0; }
+.sw-count { position: absolute; top: -2px; right: 0; display: inline-flex; border: 1px solid var(--border); border-radius: 7px; overflow: hidden; z-index: 2; }
+.sw-count-btn { padding: 2px 8px; background: none; border: none; border-right: 1px solid var(--border); cursor: pointer; font-family: var(--mono); font-size: 10px; color: var(--text-muted); }
+.sw-count-btn:last-child { border-right: none; }
+.sw-count-btn.on { background: rgba(var(--em-rgb), .14); color: var(--em); font-weight: 700; }
+.sw-single-top { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; padding-right: 46px; }
+.sw-single-name { font-family: var(--sans); font-size: 13px; font-weight: 600; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sw-single-pct { font-family: var(--mono); font-size: 13px; font-weight: 700; color: var(--em); flex-shrink: 0; }
+.sw-single-bar { height: 14px; border-radius: 8px; background: rgba(128,128,128,.18); overflow: hidden; }
+.sw-single-fill { height: 100%; border-radius: 8px; transition: width .4s var(--ease-out, ease); }
+.sw-single-nums { display: flex; justify-content: space-between; font-family: var(--mono); font-size: 10.5px; color: var(--text-muted); }
+.sw-donuts { display: grid; grid-template-columns: repeat(auto-fit, minmax(64px, 1fr)); gap: 10px; }
+.sw-donut { position: relative; display: flex; flex-direction: column; align-items: center; gap: 2px; }
+.sw-donut-pct { position: absolute; top: 24px; font-family: var(--mono); font-size: 11px; font-weight: 700; color: var(--text); }
+.sw-donut-label { font-family: var(--mono); font-size: 9px; letter-spacing: .3px; color: var(--text-muted); max-width: 72px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-align: center; }
+.sw-proj { cursor: pointer; display: flex; flex-direction: column; gap: 8px; }
+.sw-proj-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; }
+.sw-proj-net-label { font-family: var(--mono); font-size: 8px; letter-spacing: 1.2px; color: var(--text-muted); }
+.sw-proj-net { font-family: var(--mono); font-size: 20px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.sw-proj-net.up { color: var(--em); } .sw-proj-net.down { color: #d0596a; }
+.sw-proj-end { text-align: right; }
+.sw-proj-endval { font-family: var(--mono); font-size: 14px; font-weight: 700; color: var(--text); }
+.sw-proj-spark { width: 100%; height: 44px; display: block; }
+.sw-proj-line.up { fill: none; stroke: var(--em); stroke-width: 2; stroke-linejoin: round; }
+.sw-proj-line.down { fill: none; stroke: #d0596a; stroke-width: 2; stroke-linejoin: round; }
+.sw-proj-area.up { fill: rgba(var(--em-rgb), .10); stroke: none; }
+.sw-proj-area.down { fill: rgba(208,89,106,.10); stroke: none; }
+
 /* ── Calories Burned widget (Phase 1) ── */
 .m-burn { display: flex; flex-direction: column; gap: 10px; }
 .m-burn-hero { display: flex; align-items: baseline; gap: 8px; }

@@ -40,6 +40,8 @@ export default function AddMobileWidgetModal({ openId, onClose, existingTypes, o
     'vitals',
     'macros',
     'calories',
+    'savings-pots',
+    'savings-projection',
     'mail',
   ];
 
