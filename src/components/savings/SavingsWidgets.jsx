@@ -42,46 +42,45 @@ function Donut({ pct, color, label, sub }) {
 
 export function SavingsPotsBody({ S, count = 1, onSetCount, navigate }) {
   const goals = (S.savings || []).filter(g => (g.target || 0) > 0);
-  const shown = goals.slice(0, count === 1 ? 1 : 4);
+  const max = Math.max(1, goals.length);
+  const n = Math.min(Math.max(1, count || 1), max);
+  const shown = goals.slice(0, n);
 
-  const toggle = onSetCount ? (
+  // Stepper — any count from 1 up to how many goals exist.
+  const stepper = onSetCount && max > 1 ? (
     <div className="sw-count" onClick={e => e.stopPropagation()}>
-      {[1, 4].map(n => (
-        <button key={n} type="button" className={`sw-count-btn${count === n ? ' on' : ''}`} onClick={() => onSetCount(n)}>{n}</button>
-      ))}
+      <button type="button" className="sw-count-step" disabled={n <= 1} onClick={() => onSetCount(n - 1)} aria-label="Fewer pots">−</button>
+      <span className="sw-count-n">{n}</span>
+      <button type="button" className="sw-count-step" disabled={n >= max} onClick={() => onSetCount(n + 1)} aria-label="More pots">+</button>
     </div>
   ) : null;
 
-  if (!shown.length) {
-    return (
-      <div className="sw-pots">
-        {toggle}
-        <div className="sw-empty">No savings goals yet — add one in Savings.</div>
-      </div>
-    );
-  }
-
   const go = () => navigate && navigate('achievements');
 
-  if (count === 1) {
+  if (!shown.length) {
+    return <div className="sw-pots">{stepper}<div className="sw-empty">No savings goals yet — add one in Savings.</div></div>;
+  }
+
+  // Single pot → a full-widget bar that fills bottom-to-top.
+  if (n === 1) {
     const g = shown[0];
     const pct = Math.max(0, Math.min(1, (g.current || 0) / (g.target || 1)));
     return (
-      <div className="sw-pots sw-pots-single" onClick={go} role={navigate ? 'link' : undefined} tabIndex={navigate ? 0 : undefined}>
-        {toggle}
-        <div className="sw-single-top">
-          <span className="sw-single-name">{g.icon || '💰'} {g.name}</span>
-          <span className="sw-single-pct">{Math.round(pct * 100)}%</span>
+      <div className="sw-pot-fill" onClick={go} role={navigate ? 'link' : undefined} tabIndex={navigate ? 0 : undefined}>
+        <div className="sw-pot-fill-bar" style={{ height: `${Math.max(2, pct * 100)}%`, background: pct >= 1 ? 'var(--gold, #d4a017)' : (g.color || 'var(--em)') }} />
+        {stepper}
+        <div className="sw-pot-fill-overlay">
+          <span className="sw-pot-fill-name">{g.icon || '💰'} {g.name}</span>
+          <span className="sw-pot-fill-pct">{Math.round(pct * 100)}%</span>
+          <span className="sw-pot-fill-nums">{money(g.current || 0)} / {money(g.target || 0)}</span>
         </div>
-        <div className="sw-single-bar"><div className="sw-single-fill" style={{ width: `${Math.max(2, pct * 100)}%`, background: pct >= 1 ? 'var(--gold, #d4a017)' : (g.color || 'var(--em)') }} /></div>
-        <div className="sw-single-nums"><span>{money(g.current || 0)}</span><span>{money(g.target || 0)}</span></div>
       </div>
     );
   }
 
   return (
-    <div className="sw-pots" onClick={go} role={navigate ? 'link' : undefined} tabIndex={navigate ? 0 : undefined}>
-      {toggle}
+    <div className="sw-pots sw-pots-multi" onClick={go} role={navigate ? 'link' : undefined} tabIndex={navigate ? 0 : undefined}>
+      {stepper}
       <div className="sw-donuts">
         {shown.map(g => (
           <Donut key={g.id} pct={(g.current || 0) / (g.target || 1)} color={g.color || 'var(--em)'} label={g.name} />
