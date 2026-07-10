@@ -9,13 +9,18 @@
  * reachable without hovering. Line/marks wear the theme accent
  * (var(--em)); all text wears text tokens.
  */
-import { useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { supabase } from '../lib/supabase';
 import { parseHealthExport, applyHealthImport } from '../lib/appleHealth';
 
 const METRICS = [
   { key: 'weight', label: 'Weight',  unit: 'kg',  src: 'vitals' },
   { key: 'sleep',  label: 'Sleep',   unit: 'h',   src: 'vitals' },
   { key: 'rhr',    label: 'Rest HR', unit: 'bpm', src: 'vitals' },
+  // WHOOP-fed metrics (whoop-sync writes them into vitalsLog).
+  { key: 'hrv',      label: 'HRV',      unit: 'ms', src: 'vitals' },
+  { key: 'recovery', label: 'Recovery', unit: '%',  src: 'vitals' },
+  { key: 'strain',   label: 'Strain',   unit: '',   src: 'vitals' },
   // Macro % history — written by NutritionSection into S.macroHistory
   // as "% of goal hit" per day (survives later goal changes).
   { key: 'cal',  label: 'Cal %',     unit: '%', src: 'macro' },
@@ -118,6 +123,111 @@ function AppleHealthImport({ S, update }) {
   );
 }
 
+// Owner-only WHOOP panel — OAuth connect + pull-based sync. The
+// function returns mapped data and WE merge it via update(), so every
+// write flows through the normal save pipeline + anti-wipe guards.
+function WhoopPanel({ S, update }) {
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState('');
+  const connected = !!S.whoopConnected;
+
+  async function syncNow(days = 7, silent = false) {
+    setBusy(true);
+    if (!silent) setMsg('');
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const res = await fetch('/.netlify/functions/whoop-sync', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session?.access_token}` },
+        body: JSON.stringify({ days }),
+      });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(body.error || 'sync failed');
+      update(prev => {
+        const vitalsLog = { ...(prev.vitalsLog || {}) };
+        for (const [d, v] of Object.entries(body.vitals || {})) vitalsLog[d] = { ...(vitalsLog[d] || {}), ...v };
+        const burnLog = { ...(prev.burnLog || {}) };
+        for (const [d, entries] of Object.entries(body.burn || {})) {
+          const others = (burnLog[d] || []).filter(a => !String(a.id || '').startsWith('whoop-'));
+          burnLog[d] = [...others, ...entries];
+        }
+        return { ...prev, vitalsLog, burnLog, whoopConnected: true };
+      });
+      const vDays = Object.keys(body.vitals || {}).length;
+      const bDays = Object.keys(body.burn || {}).length;
+      setMsg(`Synced ${vDays} day${vDays === 1 ? '' : 's'} of vitals · ${bDays} workout day${bDays === 1 ? '' : 's'}.`);
+    } catch (e) {
+      setMsg(e.message || 'WHOOP sync failed.');
+    }
+    setBusy(false);
+  }
+
+  // Handle the OAuth redirect (?whoop=connected) and auto-sync once
+  // per session when already connected.
+  useEffect(() => {
+    const p = new URLSearchParams(window.location.search);
+    const r = p.get('whoop');
+    if (r) {
+      p.delete('whoop');
+      const qs = p.toString();
+      window.history.replaceState({}, '', window.location.pathname + (qs ? '?' + qs : ''));
+      if (r === 'connected') {
+        update(prev => (prev.whoopConnected ? prev : { ...prev, whoopConnected: true }));
+        syncNow(7);
+        return;
+      }
+      setMsg(`WHOOP connect failed (${r}).`);
+      return;
+    }
+    if (connected && !sessionStorage.getItem('vb_whoop_synced')) {
+      sessionStorage.setItem('vb_whoop_synced', '1');
+      syncNow(7, true);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  async function connect() {
+    setBusy(true); setMsg('');
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const res = await fetch('/.netlify/functions/whoop-connect', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${session?.access_token}` },
+      });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok || !body.url) throw new Error(body.error || 'connect failed');
+      window.location.href = body.url;
+    } catch (e) {
+      setMsg(e.message || 'Could not start WHOOP connect.');
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="vitals-ah vitals-whoop">
+      <div className="vitals-ah-row">
+        {!connected ? (
+          <button type="button" className="vitals-ah-btn" disabled={busy} onClick={connect}>
+            {busy ? 'Opening WHOOP…' : 'Connect WHOOP'}
+          </button>
+        ) : (
+          <>
+            <button type="button" className="vitals-ah-btn" disabled={busy} onClick={() => syncNow(7)}>
+              {busy ? 'Syncing…' : 'Sync WHOOP'}
+            </button>
+            <button type="button" className="vitals-ah-btn vitals-ah-btn-alt" disabled={busy} onClick={() => syncNow(30)}>30d</button>
+          </>
+        )}
+        <span className="vitals-ah-hint">
+          {msg || (connected
+            ? 'Pulls recovery, sleep, HRV, strain and workout burn. Auto-syncs when you open the app.'
+            : 'Link your WHOOP — recovery, sleep, HRV, strain and measured workout burn.')}
+        </span>
+      </div>
+    </div>
+  );
+}
+
 export default function VitalsHistoryCard({ S, update }) {
   const isOwner = typeof window !== 'undefined' && !!window.__vantageOwner;
   const [metricKey, setMetricKey] = useState('weight');
@@ -183,7 +293,7 @@ export default function VitalsHistoryCard({ S, update }) {
         <p className="vitals-sub">
           No history yet. Log weight/sleep/HR from the hub Vitals widget, or log food in Daily Macros — each day banks a “% of goal hit” snapshot here.
         </p>
-        {isOwner && update && <AppleHealthImport S={S} update={update} />}
+        {isOwner && update && <><WhoopPanel S={S} update={update} /><AppleHealthImport S={S} update={update} /></>}
       </div>
     );
   }
@@ -196,7 +306,7 @@ export default function VitalsHistoryCard({ S, update }) {
       <h3 style={{ margin: '0 0 4px' }}>Vitals &amp; Macros</h3>
       <p className="vitals-sub">Vitals from the hub widget; macro days saved as % of each goal hit. Hover the chart for exact values.</p>
 
-      {isOwner && update && <AppleHealthImport S={S} update={update} />}
+      {isOwner && update && <><WhoopPanel S={S} update={update} /><AppleHealthImport S={S} update={update} /></>}
 
       {/* Filter row — metric first (it names the chart), then range. */}
       <div className="vitals-controls">

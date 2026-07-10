@@ -1231,6 +1231,9 @@ html[data-theme="dark"] {
 .proj-link-del:hover{color:#c84040;}
 .proj-add-pot{align-self:flex-start;margin-left:35px;background:none;border:1px dashed var(--border);border-radius:7px;color:var(--text-muted);font-family:var(--mono);font-size:10px;letter-spacing:.5px;padding:4px 10px;cursor:pointer;transition:color .15s,border-color .15s;}
 .proj-add-pot:hover{color:var(--em);border-color:rgba(var(--em-rgb),.4);}
+.proj-payday{display:flex;align-items:center;gap:5px;font-family:var(--mono);font-size:10px;color:var(--text-muted);flex-shrink:0;}
+.proj-payday select{background:var(--bg-base,#fffefa);border:1px solid var(--border);border-radius:7px;padding:5px 6px;color:var(--text);font-family:var(--mono);font-size:11px;outline:none;}
+#achievements .proj-payday select{background:rgba(255,255,255,.06);}
 .proj-sub-controls{display:flex;flex-direction:column;gap:5px;}
 .proj-dates-row{display:flex;align-items:center;gap:8px;padding-left:35px;flex-wrap:wrap;}
 .proj-date-field{display:flex;align-items:center;gap:5px;font-family:var(--mono);font-size:10px;color:var(--text-muted);}
@@ -5086,8 +5089,15 @@ button:active:not(:disabled),
 /* Multi (donuts) — clear the stepper. */
 .sw-pots-multi { padding-top: 26px; }
 .sw-donuts { display: grid; grid-template-columns: repeat(auto-fit, minmax(64px, 1fr)); gap: 10px; }
-/* Single pot — fills the whole widget bottom→top. */
+/* Single pot — fills the whole widget bottom→top. The flex chain
+   below makes the island body stretch with the user's resize, so the
+   fill is always measured against the widget frame. */
 .sw-pot-fill { position: relative; width: 100%; height: 100%; min-height: 150px; border-radius: 10px; overflow: hidden; background: rgba(128,128,128,.16); cursor: pointer; }
+#widgetCanvas .widget-wrapper:has([data-react-widget]) > .link-island { height: 100%; box-sizing: border-box; display: flex; flex-direction: column; }
+#widgetCanvas .link-island:has([data-react-widget]) .hub-widget-body { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+#widgetCanvas [data-react-widget] { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+#widgetCanvas [data-react-widget] > .sw-pot-fill,
+#widgetCanvas [data-react-widget] > .sw-pots { flex: 1; min-height: 0; }
 .sw-pot-fill-bar { position: absolute; left: 0; right: 0; bottom: 0; opacity: .9; transition: height .5s var(--ease-out, ease); }
 .sw-pot-fill-overlay { position: absolute; inset: 0; display: flex; flex-direction: column; justify-content: flex-end; gap: 2px; padding: 12px; background: linear-gradient(to top, rgba(0,0,0,.55), rgba(0,0,0,0) 55%); }
 .sw-pot-fill-name { font-family: var(--sans); font-size: 14px; font-weight: 600; color: #fff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-shadow: 0 1px 3px rgba(0,0,0,.5); }
