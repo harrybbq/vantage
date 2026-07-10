@@ -5,6 +5,7 @@ import { adjustColour } from '../utils/helpers';
 import MacroGoalsPanel from './MacroGoalsPanel';
 import NotificationsPanel from './NotificationsPanel';
 import SubscriptionPanel from './SubscriptionPanel';
+import { AppleHealthImport } from './VitalsHistoryCard';
 import { useSubscriptionContext } from '../context/SubscriptionContext';
 import { getOwnProfile, updateOwnProfile } from '../lib/friends/queries';
 
@@ -831,6 +832,19 @@ export default function SettingsSection({ S, update, active, userId, onOpenLegal
                 </button>
               )}
             </div>
+          </div>
+        )}
+
+        {/* Health & sync — owner-only Apple Health import + live-sync
+            URL. Moved here from the Vitals & Macros card (Track) so the
+            card stays focused on the log itself. Same owner gate. */}
+        {typeof window !== 'undefined' && window.__vantageOwner && (
+          <div className="card" style={{ padding: '22px' }}>
+            <h3 style={{ margin: '0 0 4px' }}>Health &amp; sync</h3>
+            <p style={{ fontFamily: 'var(--mono)', fontSize: '11px', color: 'var(--text-muted)', margin: '0 0 16px', lineHeight: '1.7' }}>
+              Import your Apple Health export, or enable live daily sync via an iOS Shortcut. Vitals flow into your Vitals &amp; Macros history.
+            </p>
+            <AppleHealthImport S={S} update={update} />
           </div>
         )}
 

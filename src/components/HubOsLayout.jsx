@@ -226,7 +226,7 @@ export function OsRatingsPanel({ S, update }) {
 }
 
 // ── Panel: Quick Actions ──────────────────────────────────────────────────
-export function OsActionsPanel({ onAddWidget, onSort, onSnapFill, onNavigateSettings }) {
+export function OsActionsPanel({ onAddWidget, onSort, onSnapFill, onNavigateSettings, snapOn, onToggleSnap }) {
   return (
     <OsPanel label="Actions" innerPadding={false}>
       <div className="os-actions">
@@ -242,6 +242,13 @@ export function OsActionsPanel({ onAddWidget, onSort, onSnapFill, onNavigateSett
           <motion.button className="os-action-btn" onClick={onSnapFill}
             whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
             ▦ Snap to fill
+          </motion.button>
+        )}
+        {onToggleSnap && (
+          <motion.button className={`os-action-btn os-action-toggle${snapOn ? ' is-on' : ''}`} onClick={onToggleSnap}
+            whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }} aria-pressed={snapOn}>
+            <span>⌗ Snap drag</span>
+            <span className={`os-toggle-pip${snapOn ? ' is-on' : ''}`}>{snapOn ? 'ON' : 'OFF'}</span>
           </motion.button>
         )}
         <motion.button className="os-action-btn" onClick={onNavigateSettings}
@@ -297,37 +304,6 @@ export const OsWidgetsPanel = ({ canvasRef }) => (
     <div id="widgetCanvas" className="os-widgets-body hub-links-col" ref={canvasRef}></div>
   </div>
 );
-
-// ── Panel: Habits Mini ────────────────────────────────────────────────────
-export function OsHabitsPanel({ habits }) {
-  const safe = habits || [];
-
-  const DAY = 86_400_000;
-
-  const summaries = safe.slice(0, 5).map(h => {
-    const days = Math.floor((Date.now() - (h.startTime || Date.now())) / DAY);
-    const relapses = h.relapseCount || 0;
-    const avgBetween = relapses > 0 ? days / (relapses + 1) : Infinity;
-    const danger = relapses > 0 && avgBetween < 7;
-    return { h, days, danger };
-  });
-
-  return (
-    <OsPanel label="Habits" right={safe.length ? `${safe.length} tracked` : ''}>
-      <div className="os-habits-mini">
-        {summaries.length === 0 ? (
-          <div className="os-habits-empty">No habits yet.</div>
-        ) : summaries.map(({ h, days, danger }) => (
-          <div key={h.id} className="os-habit-row">
-            <span className={`os-habit-dot ${danger ? 'danger' : ''}`} />
-            <span className="os-habit-name">{h.name}</span>
-            <span className="os-habit-streak">{days}d</span>
-          </div>
-        ))}
-      </div>
-    </OsPanel>
-  );
-}
 
 // ── Panel: QuickLog wrapper ───────────────────────────────────────────────
 export function OsQuickLogPanel({ S, update, onNavigateTrack, onShowCoinToast }) {
@@ -543,7 +519,7 @@ export default function HubOsLayout({
   S, update, canvasRef,
   onAddWidget, onSort, onSnapFill, onNavigateSettings, onNavigateTrack,
   onShowCoinToast, onOpenWaitlist, onCoachAct,
-  onUploadPhoto,
+  onUploadPhoto, onToggleSnap,
   userId, onUpgrade,
 }) {
   const profile = S.profile || {};
@@ -585,6 +561,8 @@ export default function HubOsLayout({
             onSort={onSort}
             onSnapFill={onSnapFill}
             onNavigateSettings={onNavigateSettings}
+            snapOn={!!S.hubSnap}
+            onToggleSnap={onToggleSnap}
           />
           <OsRatingsPanel S={S} update={update} />
           {/* Trackers moved into the Session panel as completion nodes
@@ -598,9 +576,8 @@ export default function HubOsLayout({
         {/* Middle: imperative widgets canvas */}
         <OsWidgetsPanel canvasRef={canvasRef} />
 
-        {/* Right col: habits mini, quicklog, ai coach, optional cardio */}
+        {/* Right col: quicklog, ai coach, optional cardio */}
         <div className="os-col">
-          <OsHabitsPanel habits={S.habits} />
           <OsQuickLogPanel S={S} update={update}
             onNavigateTrack={onNavigateTrack}
             onShowCoinToast={onShowCoinToast} />

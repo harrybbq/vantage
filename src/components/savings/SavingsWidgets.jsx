@@ -152,6 +152,7 @@ export function SavingsProjectionBody({ S, navigate }) {
 
   // Which lines are plotted — never lets the last one be switched off.
   const [lines, setLines] = useState({ cash: true, savings: true });
+  const [hover, setHover] = useState(null); // month index | null
   const showCash = lines.cash;
   const showSavings = hasAccounts && lines.savings;
   function toggleLine(key) {
@@ -206,6 +207,8 @@ export function SavingsProjectionBody({ S, navigate }) {
     return <div className="sw-empty" onClick={() => navigate && navigate('achievements')}>Set up a projection in Savings to see it here.</div>;
   }
 
+  // Clamp a stale hover if the horizon shrank between renders.
+  const hv = hover != null ? Math.min(hover, horizon) : null;
   const cashEnd = cashSeries[cashSeries.length - 1];
   const savingsEnd = savingsSeries ? savingsSeries[savingsSeries.length - 1] : 0;
   const end = (showCash ? cashEnd : 0) + (showSavings ? savingsEnd : 0);
@@ -252,7 +255,17 @@ export function SavingsProjectionBody({ S, navigate }) {
         )}
       </div>
       <div className="sw-proj-chartwrap" ref={chartRef}>
-        <svg className="sw-proj-chart" viewBox={`0 0 ${W} ${Hh}`} aria-hidden="true">
+        <svg
+          className="sw-proj-chart"
+          viewBox={`0 0 ${W} ${Hh}`}
+          aria-hidden="true"
+          onPointerMove={e => {
+            const rect = e.currentTarget.getBoundingClientRect();
+            const px = e.clientX - rect.left;
+            setHover(Math.max(0, Math.min(horizon, Math.round(((px - PAD_L) / (W - PAD_L - PAD_R)) * horizon))));
+          }}
+          onPointerLeave={() => setHover(null)}
+        >
           {yticks.map(t => (
             <g key={t}>
               <line x1={PAD_L} x2={W - PAD_R} y1={sy(t)} y2={sy(t)} className="sw-proj-grid" />
@@ -270,7 +283,23 @@ export function SavingsProjectionBody({ S, navigate }) {
               {monthLabel(m, step >= 12)}
             </text>
           ))}
+          {/* Hover crosshair + point markers */}
+          {hv != null && (
+            <g>
+              <line x1={sx(hv)} x2={sx(hv)} y1={PAD_T} y2={Hh - PAD_B} className="sw-proj-cross" />
+              {showCash && <circle cx={sx(hv)} cy={sy(cashSeries[hv])} r="3.5" fill={up ? 'var(--em)' : '#d0596a'} />}
+              {showSavings && <circle cx={sx(hv)} cy={sy(savingsSeries[hv])} r="3.5" fill={SAVINGS_COLOR} />}
+            </g>
+          )}
         </svg>
+        {/* Balance pop-up at the hovered point */}
+        {hv != null && (
+          <div className="sw-proj-tt" style={{ left: `${(sx(hv) / W) * 100}%` }}>
+            <div className="sw-proj-tt-m">{hv === 0 ? 'Now' : monthLabel(hv, true)}</div>
+            {showCash && <div className="sw-proj-tt-v" style={{ color: up ? 'var(--em)' : '#d0596a' }}>Cash {money(cashSeries[hv])}</div>}
+            {showSavings && <div className="sw-proj-tt-v" style={{ color: SAVINGS_COLOR }}>Savings {money(savingsSeries[hv])}</div>}
+          </div>
+        )}
       </div>
     </div>
   );

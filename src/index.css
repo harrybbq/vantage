@@ -641,6 +641,24 @@ nav:hover .nav-tab-label{opacity:1;}
   box-shadow:0 1px 0 rgba(255,255,255,.6) inset, 0 8px 22px rgba(28,26,23,.09);
 }
 .link-island.dragging-active{opacity:.88;box-shadow:0 18px 48px rgba(0,0,0,.18);transform:scale(1.02);}
+/* Snap-drag: neighbours glide to their pushed-down slot. */
+.widget-wrapper.snap-push{transition:top .16s cubic-bezier(.22,1,.36,1);}
+/* Left-edge resize grip — mirror of the native bottom-right corner. */
+.widget-wrapper .widget-resize-l{
+  position:absolute;left:0;top:0;bottom:0;width:9px;
+  cursor:ew-resize;z-index:5;touch-action:none;
+}
+.widget-wrapper .widget-resize-l::after{
+  content:"";position:absolute;left:2px;top:50%;transform:translateY(-50%);
+  width:3px;height:26px;border-radius:3px;background:var(--accent-line,rgba(0,0,0,.14));
+  opacity:0;transition:opacity .15s;
+}
+.widget-wrapper:hover .widget-resize-l::after{opacity:.7;}
+/* Snap-drag toggle pips (cream ProfileCard + OS Actions) */
+.hub-snap-toggle,.os-action-toggle{display:inline-flex;align-items:center;justify-content:center;gap:8px;}
+.hub-snap-pip,.os-toggle-pip{font-family:var(--mono);font-size:8.5px;font-weight:700;letter-spacing:1px;padding:1px 6px;border-radius:999px;background:rgba(128,128,128,.18);color:var(--text-muted);}
+.hub-snap-pip.is-on,.os-toggle-pip.is-on{background:rgba(var(--em-rgb),.18);color:var(--em);}
+.hub-snap-toggle.is-on,.os-action-toggle.is-on{border-color:rgba(var(--em-rgb),.5);color:var(--em);}
 
 /* Drag handle — quiet pill across the top, hairline divider below. */
 .widget-drag-handle{
@@ -962,7 +980,12 @@ html[data-theme="dark"] {
   background-size:24px 24px;
   background-position:0 0;
   box-shadow:0 1px 0 rgba(255,255,255,.7) inset, 0 4px 18px rgba(28,26,23,.04);
+  cursor:grab;
 }
+/* Grab-to-pan: empty board follows the pointer so scrollbars aren't
+   needed. Nodes/buttons keep their own cursor (set on .ach-node etc.). */
+.ach-canvas-wrap.is-panning{cursor:grabbing;}
+.ach-canvas-wrap.is-panning .ach-canvas-inner{pointer-events:none;}
 /* Right-click board toggles (per-section, not the whole theme). */
 .ach-canvas-wrap.is-dark{
   --ach-canvas-bg:#15141a;
@@ -5070,6 +5093,9 @@ button:active:not(:disabled),
 .vitals-tooltip-date { font-family: var(--mono); font-size: 9.5px; letter-spacing: .5px; color: var(--text-muted); }
 .vitals-tooltip-val { font-size: 14px; font-weight: 700; color: var(--text); font-variant-numeric: tabular-nums; }
 .vitals-tooltip-val span { font-size: 10px; font-weight: 500; color: var(--text-muted); }
+.vitals-card-title { display: inline-flex; align-items: center; gap: 10px; }
+.vitals-whoop-badge { display: inline-flex; align-items: center; gap: 4px; font-family: var(--mono); font-size: 9.5px; font-weight: 700; letter-spacing: 1.4px; color: #16a34a; border: 1px solid rgba(22,163,74,.4); background: rgba(22,163,74,.10); border-radius: 999px; padding: 2px 8px; line-height: 1; }
+.vitals-whoop-badge svg { color: #16a34a; }
 .vitals-table { width: 100%; border-collapse: collapse; margin-top: 14px; font-variant-numeric: tabular-nums; }
 .vitals-table th {
   font-family: var(--mono); font-size: 9.5px; letter-spacing: 1.2px; text-transform: uppercase;
@@ -5134,6 +5160,10 @@ button:active:not(:disabled),
 .sw-proj-chart { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
 .sw-proj-grid { stroke: rgba(128,128,128,.16); stroke-width: 1; }
 .sw-proj-tick { font-family: var(--mono); font-size: 8.5px; fill: var(--text-muted); }
+.sw-proj-cross { stroke: var(--text-muted); stroke-width: 1; opacity: .5; }
+.sw-proj-tt { position: absolute; top: 0; transform: translateX(-50%); background: var(--surface, #fffdf5); border: 1px solid var(--border); border-radius: 8px; padding: 4px 8px; pointer-events: none; box-shadow: 0 4px 14px rgba(0,0,0,.14); white-space: nowrap; z-index: 4; }
+.sw-proj-tt-m { font-family: var(--mono); font-size: 8.5px; color: var(--text-muted); }
+.sw-proj-tt-v { font-family: var(--mono); font-size: 11.5px; font-weight: 700; font-variant-numeric: tabular-nums; }
 .sw-proj-line.up { fill: none; stroke: var(--em); stroke-width: 2; stroke-linejoin: round; }
 .sw-proj-line.down { fill: none; stroke: #d0596a; stroke-width: 2; stroke-linejoin: round; }
 .sw-proj-line-savings { fill: none; stroke: #d4a017; stroke-width: 2; stroke-linejoin: round; }

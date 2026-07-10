@@ -109,7 +109,12 @@ function holidaysWidgetHtml(S) {
 }
 
 // ── Widget canvas (DOM-based dragging) ──
-function useWidgetDrag(canvasRef, S, update) {
+const SNAP_GAP = 12;
+function rectsIntersect(a, b) {
+  return a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y;
+}
+
+function useWidgetDrag(canvasRef, S, update, snapRef) {
   const makeDraggable = useCallback((wrapper, linkId) => {
     const handle = wrapper.querySelector('[data-drag]');
     if (!handle) return;
@@ -153,6 +158,7 @@ function useWidgetDrag(canvasRef, S, update) {
       // Cache layout values up-front — onMove ran getBoundingClientRect /
       // offsetWidth every frame before, forcing a relayout on each move.
       const wrapperW = wrapper.offsetWidth;
+      const wrapperH = wrapper.offsetHeight;
       const canvasW  = canvas.offsetWidth;
       const maxX     = canvasW - wrapperW;
       const startX   = e.clientX - wrapper.offsetLeft;
@@ -160,6 +166,39 @@ function useWidgetDrag(canvasRef, S, update) {
       const island   = wrapper.querySelector('.link-island');
       if (island) island.classList.add('dragging-active');
       try { handle.setPointerCapture(e.pointerId); } catch { /* ignore */ }
+
+      // ── Snap mode (toggle in the Actions module) ──
+      // ON: while dragging, widgets in the way are pushed DOWN (live)
+      // to make room, springing back if the dragged widget moves away
+      // — everything is re-derived from original positions each frame.
+      // OFF: classic free drag, allowed to overlap.
+      let snapOthers = null;
+      if (snapRef?.current) {
+        snapOthers = [];
+        canvas.querySelectorAll('.widget-wrapper').forEach(w2 => {
+          if (w2 === wrapper) return;
+          w2.classList.add('snap-push'); // smooth top transitions while pushed
+          snapOthers.push({ el: w2, x: w2.offsetLeft, y: w2.offsetTop, w: w2.offsetWidth, h: w2.offsetHeight, cur: w2.offsetTop });
+        });
+        snapOthers.sort((a, b) => a.y - b.y || a.x - b.x);
+      }
+      function resolveSnap(dx, dy) {
+        // Place the dragged rect first, then re-place every other widget
+        // top-to-bottom from its ORIGINAL spot, pushing down past any
+        // already-placed rect it collides with. Deterministic, no loops.
+        const placed = [{ x: dx, y: dy, w: wrapperW, h: wrapperH }];
+        for (const o of snapOthers) {
+          const r = { x: o.x, y: o.y, w: o.w, h: o.h };
+          let hit = placed.find(p => rectsIntersect(p, r));
+          let guard = 0;
+          while (hit && guard++ < 30) {
+            r.y = hit.y + hit.h + SNAP_GAP;
+            hit = placed.find(p => rectsIntersect(p, r));
+          }
+          placed.push(r);
+          if (o.cur !== r.y) { o.el.style.top = r.y + 'px'; o.cur = r.y; }
+        }
+      }
 
       // rAF-coalesce moves so we never write style more than once per frame.
       let rafId = 0;
@@ -169,6 +208,7 @@ function useWidgetDrag(canvasRef, S, update) {
         if (!pending) return;
         wrapper.style.left = pending.x + 'px';
         wrapper.style.top  = pending.y + 'px';
+        if (snapOthers) resolveSnap(pending.x, pending.y);
         pending = null;
       }
       function onMove(ev) {
@@ -180,7 +220,18 @@ function useWidgetDrag(canvasRef, S, update) {
       function onUp() {
         if (rafId) { cancelAnimationFrame(rafId); flush(); }
         if (island) island.classList.remove('dragging-active');
-        update(prev => ({ ...prev, widgetPositions: { ...prev.widgetPositions, [linkId]: { x: wrapper.offsetLeft, y: wrapper.offsetTop } } }));
+        update(prev => {
+          const wp = { ...prev.widgetPositions, [linkId]: { x: wrapper.offsetLeft, y: wrapper.offsetTop } };
+          // Snap mode moved neighbours too — commit them in the same write.
+          if (snapOthers) {
+            for (const o of snapOthers) {
+              const id = o.el.dataset.linkId;
+              if (id) wp[id] = { x: o.el.offsetLeft, y: o.el.offsetTop };
+            }
+          }
+          return { ...prev, widgetPositions: wp };
+        });
+        if (snapOthers) snapOthers.forEach(o => o.el.classList.remove('snap-push'));
         document.removeEventListener('pointermove', onMove);
         document.removeEventListener('pointerup', onUp);
         document.removeEventListener('pointercancel', onUp);
@@ -189,7 +240,7 @@ function useWidgetDrag(canvasRef, S, update) {
       document.addEventListener('pointerup', onUp);
       document.addEventListener('pointercancel', onUp);
     });
-  }, [canvasRef, update]);
+  }, [canvasRef, update, snapRef]);
 
   return makeDraggable;
 }
@@ -199,7 +250,7 @@ function useWidgetDrag(canvasRef, S, update) {
 // after the action buttons — used by the cream layout to slot the
 // QuickLog trackers under "Sort". The `--with-rail` modifier widens
 // the column so the trackers stack vertically without being clipped.
-function ProfileCard({ profile, S, update, onSaveName, onSaveTagline, onUploadPhoto, onAddWidget, onSortWidgets, onSnapFill, onNavigateSettings, visionState, children }) {
+function ProfileCard({ profile, S, update, onSaveName, onSaveTagline, onUploadPhoto, onAddWidget, onSortWidgets, onSnapFill, onToggleSnap, onNavigateSettings, visionState, children }) {
   // OVR replaces the old Lvl badge (F5 Sprint 3). Read from S.ratings
   // — which is refreshed by useRatings on a 1.5s debounce. Falls back
   // to 1 if no rating computed yet (fresh user) so the chip never
@@ -268,6 +319,13 @@ function ProfileCard({ profile, S, update, onSaveName, onSaveTagline, onUploadPh
           whileHover={{ scale: 1.04 }} whileTap={{ scale: 0.96 }}
           transition={{ type: 'spring', stiffness: 400, damping: 17 }}>▦ Snap to fill</motion.button>
       )}
+      {onToggleSnap && (
+        <motion.button className={`hub-action-btn sort-widgets hub-snap-toggle${S.hubSnap ? ' is-on' : ''}`} onClick={onToggleSnap}
+          whileHover={{ scale: 1.04 }} whileTap={{ scale: 0.96 }} aria-pressed={!!S.hubSnap}
+          transition={{ type: 'spring', stiffness: 400, damping: 17 }}>
+          ⌗ Snap drag <span className={`hub-snap-pip${S.hubSnap ? ' is-on' : ''}`}>{S.hubSnap ? 'ON' : 'OFF'}</span>
+        </motion.button>
+      )}
       <motion.button className="hub-action-btn settings-mobile-btn" onClick={onNavigateSettings}
         whileHover={{ scale: 1.04 }} whileTap={{ scale: 0.96 }}
         transition={{ type: 'spring', stiffness: 400, damping: 17 }}>⚙ Settings</motion.button>
@@ -279,7 +337,11 @@ function ProfileCard({ profile, S, update, onSaveName, onSaveTagline, onUploadPh
 // ── Widget Canvas (imperative DOM approach) ──
 export default function HubSection({ S, update, active, onOpenModal, onOpenWaitlist, onNavigateSettings, onNavigateTrack, onShowCoinToast, onCoachAct, visionState, userId, onUpgrade, onNavigate }) {
   const canvasRef = useRef(null);
-  const makeDraggable = useWidgetDrag(canvasRef, S, update);
+  // Snap toggle lives in the Actions module; the drag engine reads the
+  // live value through a ref so mid-drag state is never stale.
+  const snapRef = useRef(false);
+  snapRef.current = !!S.hubSnap;
+  const makeDraggable = useWidgetDrag(canvasRef, S, update, snapRef);
   const { hasPro } = useSubscriptionContext();
 
   // React islands inside the imperative canvas — Vitals / Macros /
@@ -288,6 +350,9 @@ export default function HubSection({ S, update, active, onOpenModal, onOpenWaitl
   // renderCanvas, re-rendered with fresh props by the effect below,
   // unmounted before every canvas rebuild.
   const reactRootsRef = useRef(new Map());
+  // Running top of the widget z-stack — click-to-front bumps this and
+  // stamps the widget with the new value (persisted in S.widgetZ).
+  const topZRef = useRef(10);
   function setHubWidgetCount(id, n) {
     update(prev => ({ ...prev, hubWidgets: (prev.hubWidgets || []).map(w => w.id === id ? { ...w, count: n } : w) }));
   }
@@ -396,6 +461,10 @@ export default function HubSection({ S, update, active, onOpenModal, onOpenWaitl
     update(prev => ({ ...prev, widgetPositions: {}, widgetSizes: {}, notepadPos: null }));
   }
 
+  function handleToggleSnap() {
+    update(prev => ({ ...prev, hubSnap: !prev.hubSnap }));
+  }
+
   // Snap-to-fill: pack every widget into a balanced weighted-row grid
   // that uses the full canvas area. Heavier widgets (notepad, GitHub,
   // YouTube) take proportionally more horizontal space; row heights are
@@ -498,6 +567,11 @@ export default function HubSection({ S, update, active, onOpenModal, onOpenWaitl
       if (saved.w) wrapper.style.width = saved.w + 'px';
       if (saved.h) wrapper.style.height = saved.h + 'px';
     }
+    // Apply any saved stacking order + track the running top so a fresh
+    // click always lands above every sibling (see click-to-front below).
+    const savedZ = (S.widgetZ || {})[id];
+    if (savedZ) { wrapper.style.zIndex = savedZ; topZRef.current = Math.max(topZRef.current, savedZ); }
+
     wrapper.style.resize = 'both';
     wrapper.style.overflow = 'hidden';
     // The default link wrapper is clamped 280–360px wide; lift the cap
@@ -506,6 +580,20 @@ export default function HubSection({ S, update, active, onOpenModal, onOpenWaitl
     wrapper.style.minWidth = '220px';
     wrapper.style.minHeight = '90px';
 
+    // ── Click-to-front ──
+    // A pointerdown anywhere on the widget raises it above overlapping
+    // siblings. Instant in the DOM; the new order persists to S.widgetZ
+    // (debounced by the save pipeline, so rapid clicks coalesce).
+    wrapper.addEventListener('pointerdown', () => {
+      const next = ++topZRef.current;
+      wrapper.style.zIndex = next;
+      update(prev => {
+        if ((prev.widgetZ || {})[id] === next) return prev;
+        return { ...prev, widgetZ: { ...(prev.widgetZ || {}), [id]: next } };
+      });
+    });
+
+    // ── Bottom-right resize (native grip) ──
     wrapper.addEventListener('pointerdown', e => {
       const r = wrapper.getBoundingClientRect();
       const inGrip = (r.right - e.clientX) < 24 && (r.bottom - e.clientY) < 24;
@@ -521,7 +609,42 @@ export default function HubSection({ S, update, active, onOpenModal, onOpenWaitl
       };
       window.addEventListener('pointerup', onUp, { once: true });
     });
-  }, [S.widgetSizes, update]);
+
+    // ── Left-edge resize (custom grip) ──
+    // Mirror of the native corner: dragging the left rail changes width
+    // while pinning the RIGHT edge, so the widget grows/shrinks leftward.
+    // Only meaningful once a widget is absolutely placed.
+    if (wrapper.style.position === 'absolute' && !wrapper.querySelector('.widget-resize-l')) {
+      const grip = document.createElement('div');
+      grip.className = 'widget-resize-l';
+      wrapper.appendChild(grip);
+      grip.addEventListener('pointerdown', e => {
+        if (e.button !== undefined && e.button !== 0) return;
+        e.preventDefault(); e.stopPropagation();
+        const startLeft = wrapper.offsetLeft;
+        const right = startLeft + wrapper.offsetWidth; // fixed anchor
+        const minW = 220;
+        try { grip.setPointerCapture(e.pointerId); } catch { /* ignore */ }
+        function mv(ev) {
+          const newLeft = Math.max(0, Math.min(ev.clientX - canvasRef.current.getBoundingClientRect().left, right - minW));
+          wrapper.style.left = newLeft + 'px';
+          wrapper.style.width = (right - newLeft) + 'px';
+        }
+        function up() {
+          document.removeEventListener('pointermove', mv);
+          document.removeEventListener('pointerup', up);
+          const w = wrapper.offsetWidth, h = wrapper.offsetHeight;
+          update(prev => ({
+            ...prev,
+            widgetSizes: { ...(prev.widgetSizes || {}), [id]: { w, h } },
+            widgetPositions: { ...(prev.widgetPositions || {}), [id]: { x: wrapper.offsetLeft, y: wrapper.offsetTop } },
+          }));
+        }
+        document.addEventListener('pointermove', mv);
+        document.addEventListener('pointerup', up);
+      });
+    }
+  }, [S.widgetSizes, S.widgetZ, update]);
 
   // Render all widgets imperatively into the canvas
   const renderCanvas = useCallback(() => {
@@ -786,6 +909,7 @@ export default function HubSection({ S, update, active, onOpenModal, onOpenWaitl
           onOpenWaitlist={onOpenWaitlist}
           onCoachAct={onCoachAct}
           onUploadPhoto={handleUploadPhoto}
+          onToggleSnap={handleToggleSnap}
           userId={userId}
           onUpgrade={onUpgrade}
         />
@@ -812,6 +936,7 @@ export default function HubSection({ S, update, active, onOpenModal, onOpenWaitl
           onAddWidget={() => onOpenModal('addLinkModal')}
           onSortWidgets={handleSortWidgets}
           onSnapFill={handleSnapToFill}
+          onToggleSnap={handleToggleSnap}
           onNavigateSettings={onNavigateSettings}
           visionState={visionState}
         >
