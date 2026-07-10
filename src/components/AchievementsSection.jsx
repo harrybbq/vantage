@@ -470,6 +470,36 @@ export default function AchievementsSection({ S, update, active, onOpenModal, on
   // we use this hint to keep connection endpoints visually attached.
   const [dragHint, setDragHint] = useState(null); // { id, x, y } | null
 
+  // ── Board panning ──
+  // Grab any empty part of the board and drag to pan — the scroll
+  // container's scrollLeft/Top follow the pointer, so users never need
+  // the scrollbars. Ignored when the pointerdown lands on a node, a
+  // connection line, or any interactive control (those keep their own
+  // drag/click behaviour).
+  const panRef = useRef(null);
+  function handleBoardPointerDown(e) {
+    if (e.button !== undefined && e.button !== 0) return;
+    if (e.target.closest('.ach-node, .ach-conn-hit, button, a, input, .ach-connect-toast')) return;
+    const wrap = canvasWrapRef.current;
+    if (!wrap) return;
+    panRef.current = { x: e.clientX, y: e.clientY, sl: wrap.scrollLeft, st: wrap.scrollTop };
+    wrap.classList.add('is-panning');
+    function mv(ev) {
+      const p = panRef.current;
+      if (!p) return;
+      wrap.scrollLeft = p.sl - (ev.clientX - p.x);
+      wrap.scrollTop = p.st - (ev.clientY - p.y);
+    }
+    function up() {
+      panRef.current = null;
+      wrap.classList.remove('is-panning');
+      document.removeEventListener('pointermove', mv);
+      document.removeEventListener('pointerup', up);
+    }
+    document.addEventListener('pointermove', mv);
+    document.addEventListener('pointerup', up);
+  }
+
   // ── handlers ────────────────────────────────────────────────────
 
   function handleDragMove(id, x, y) {
@@ -666,6 +696,7 @@ export default function AchievementsSection({ S, update, active, onOpenModal, on
         ref={canvasWrapRef}
         style={{ touchAction: 'pan-x pan-y' }}
         onContextMenu={handleBoardContextMenu}
+        onPointerDown={handleBoardPointerDown}
       >
         <div
           className="ach-canvas-inner"

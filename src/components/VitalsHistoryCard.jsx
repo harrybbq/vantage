@@ -56,7 +56,7 @@ function fmtDay(ts) {
 // on the web; this parses the manual Health export and fills the
 // vitals/burn stores. Gated on the same window.__vantageOwner flag as
 // other owner tools.
-function AppleHealthImport({ S, update }) {
+export function AppleHealthImport({ S, update }) {
   const inputRef = useRef(null);
   const [status, setStatus] = useState('idle'); // idle | parsing | done | error
   const [pct, setPct] = useState(0);
@@ -228,6 +228,30 @@ function WhoopPanel({ S, update }) {
   );
 }
 
+// Small WHOOP wordmark shown beside the card title once the account is
+// linked — a live "connected" indicator that disappears on disconnect.
+function WhoopBadge({ connected }) {
+  if (!connected) return null;
+  return (
+    <span className="vitals-whoop-badge" title="Connected to WHOOP — syncing recovery, sleep, HRV & strain">
+      <svg viewBox="0 0 24 24" width="12" height="12" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M3 5l4.5 14L12 8l4.5 11L21 5" />
+      </svg>
+      WHOOP
+    </span>
+  );
+}
+
+// Card heading + optional WHOOP indicator, shared by both card states.
+function VitalsHeading({ connected }) {
+  return (
+    <h3 className="vitals-card-title" style={{ margin: '0 0 4px' }}>
+      Vitals &amp; Macros
+      <WhoopBadge connected={connected} />
+    </h3>
+  );
+}
+
 // Tap-to-edit limits for the history table (same bounds as the hub
 // Vitals widget uses for today's entry).
 const EDIT_LIMITS = {
@@ -375,12 +399,12 @@ export default function VitalsHistoryCard({ S, update }) {
   if (!tableRows.length && !hasMacroHistory) {
     return (
       <div className="card vitals-card">
-        <h3 style={{ margin: '0 0 4px' }}>Vitals &amp; Macros</h3>
+        <VitalsHeading connected={!!S.whoopConnected} />
         <p className="vitals-sub">
           No history yet. Log weight/sleep/HR from the hub Vitals widget, or log food in Daily Macros — each day banks a “% of goal hit” snapshot here.
         </p>
         {addDayPicker}
-        {isOwner && update && <><WhoopPanel S={S} update={update} /><AppleHealthImport S={S} update={update} /></>}
+        {isOwner && update && <WhoopPanel S={S} update={update} />}
       </div>
     );
   }
@@ -390,10 +414,10 @@ export default function VitalsHistoryCard({ S, update }) {
 
   return (
     <div className="card vitals-card">
-      <h3 style={{ margin: '0 0 4px' }}>Vitals &amp; Macros</h3>
+      <VitalsHeading connected={!!S.whoopConnected} />
       <p className="vitals-sub">Vitals from the hub widget; macro days saved as % of each goal hit. Hover the chart for exact values.</p>
 
-      {isOwner && update && <><WhoopPanel S={S} update={update} /><AppleHealthImport S={S} update={update} /></>}
+      {isOwner && update && <WhoopPanel S={S} update={update} />}
 
       {/* Filter row — metric first (it names the chart), then range. */}
       <div className="vitals-controls">
