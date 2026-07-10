@@ -11,6 +11,11 @@ function money(n) {
   const neg = n < 0;
   return (neg ? '−£' : '£') + Math.abs(Math.round(n)).toLocaleString('en-GB');
 }
+
+// Savings goals don't carry a colour of their own, so each pot gets a
+// stable palette colour by its position in the goals list.
+const POT_PALETTE = ['#2fbf83', '#5b8cff', '#d0498f', '#12a5a5', '#d99114', '#7a4fd0', '#e05252', '#4dc485'];
+const potColor = (g, i) => g.color || POT_PALETTE[i % POT_PALETTE.length];
 function toMonthly(amount, freq) {
   const v = parseFloat(amount) || 0;
   if (freq === 'year') return v / 12;
@@ -67,7 +72,7 @@ export function SavingsPotsBody({ S, count = 1, onSetCount, navigate }) {
     const pct = Math.max(0, Math.min(1, (g.current || 0) / (g.target || 1)));
     return (
       <div className="sw-pot-fill" onClick={go} role={navigate ? 'link' : undefined} tabIndex={navigate ? 0 : undefined}>
-        <div className="sw-pot-fill-bar" style={{ height: `${Math.max(2, pct * 100)}%`, background: pct >= 1 ? 'var(--gold, #d4a017)' : (g.color || 'var(--em)') }} />
+        <div className="sw-pot-fill-bar" style={{ height: `${Math.max(2, pct * 100)}%`, background: pct >= 1 ? 'var(--gold, #d4a017)' : potColor(g, goals.indexOf(g)) }} />
         {stepper}
         <div className="sw-pot-fill-overlay">
           <span className="sw-pot-fill-name">{g.icon || '💰'} {g.name}</span>
@@ -82,8 +87,8 @@ export function SavingsPotsBody({ S, count = 1, onSetCount, navigate }) {
     <div className="sw-pots sw-pots-multi" onClick={go} role={navigate ? 'link' : undefined} tabIndex={navigate ? 0 : undefined}>
       {stepper}
       <div className="sw-donuts">
-        {shown.map(g => (
-          <Donut key={g.id} pct={(g.current || 0) / (g.target || 1)} color={g.color || 'var(--em)'} label={g.name} />
+        {shown.map((g, i) => (
+          <Donut key={g.id} pct={(g.current || 0) / (g.target || 1)} color={potColor(g, i)} label={g.name} />
         ))}
       </div>
     </div>

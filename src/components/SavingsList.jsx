@@ -203,7 +203,7 @@ function GoalCard({ goal, achievement, contribMonthly = 0, onAddContribution, on
 function potContributions(projection) {
   const map = {};
   for (const it of (projection?.items || [])) {
-    if (it.kind !== 'expense' || !it.goalId) continue;
+    if (!it.goalId) continue; // expenses AND routed income both feed pots
     const v = parseFloat(it.amount) || 0;
     const monthly = it.freq === 'year' ? v / 12 : it.freq === 'week' ? v * 52 / 12 : v;
     map[it.goalId] = (map[it.goalId] || 0) + monthly;
