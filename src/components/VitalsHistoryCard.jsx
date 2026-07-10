@@ -228,11 +228,22 @@ function WhoopPanel({ S, update }) {
   );
 }
 
+// Tap-to-edit limits for the history table (same bounds as the hub
+// Vitals widget uses for today's entry).
+const EDIT_LIMITS = {
+  weight: { max: 400, step: '0.1', unit: 'kg'  },
+  sleep:  { max: 24,  step: '0.5', unit: 'h'   },
+  rhr:    { max: 250, step: '1',   unit: 'bpm' },
+};
+
 export default function VitalsHistoryCard({ S, update }) {
   const isOwner = typeof window !== 'undefined' && !!window.__vantageOwner;
   const [metricKey, setMetricKey] = useState('weight');
   const [rangeKey, setRangeKey] = useState('30d');
   const [hover, setHover] = useState(null); // index into points
+  const [edit, setEdit] = useState(null); // { date, key } | null
+  const [editDraft, setEditDraft] = useState('');
+  const [extraDate, setExtraDate] = useState(null); // day pulled into the table via the date picker
   const svgRef = useRef(null);
 
   const metric = METRICS.find(m => m.key === metricKey);
@@ -280,10 +291,85 @@ export default function VitalsHistoryCard({ S, update }) {
   // Table always shows the vitals log (not the chart's metric source —
   // macro history reads as a chart, the table is the vitals record).
   const vitalsLog = S.vitalsLog || {};
-  const tableRows = useMemo(() =>
-    Object.keys(vitalsLog).sort().reverse().slice(0, 10)
-      .map(date => ({ date, ...vitalsLog[date] })),
-  [vitalsLog]);
+  const tableRows = useMemo(() => {
+    const dates = new Set(Object.keys(vitalsLog).sort().reverse().slice(0, 10));
+    if (extraDate) dates.add(extraDate);
+    return [...dates].sort().reverse().map(date => ({ date, ...(vitalsLog[date] || {}) }));
+  }, [vitalsLog, extraDate]);
+
+  // ── Editing previous days ──
+  // Any weight/sleep/rhr cell is tap-to-edit; committing writes the
+  // value into S.vitalsLog[date]. Clearing a cell removes that value
+  // (and drops the day entirely once it holds nothing).
+  function beginEdit(date, key) {
+    if (!update) return;
+    const cur = vitalsLog[date]?.[key];
+    setEditDraft(cur != null ? String(cur) : '');
+    setEdit({ date, key });
+  }
+  function commitEdit() {
+    if (!edit) return;
+    const { date, key } = edit;
+    const raw = editDraft.trim();
+    setEdit(null);
+    if (raw === '') {
+      update(prev => {
+        const log = { ...(prev.vitalsLog || {}) };
+        if (!log[date] || log[date][key] == null) return prev;
+        const day = { ...log[date] };
+        delete day[key];
+        if (Object.keys(day).length) log[date] = day; else delete log[date];
+        return { ...prev, vitalsLog: log };
+      });
+      return;
+    }
+    const num = parseFloat(raw);
+    if (!Number.isFinite(num) || num <= 0 || num > EDIT_LIMITS[key].max) return;
+    update(prev => ({
+      ...prev,
+      vitalsLog: {
+        ...(prev.vitalsLog || {}),
+        [date]: { ...((prev.vitalsLog || {})[date] || {}), [key]: num },
+      },
+    }));
+  }
+  function editableCell(r, key) {
+    const lim = EDIT_LIMITS[key];
+    if (edit && edit.date === r.date && edit.key === key) {
+      return (
+        <input
+          className="vitals-edit-input"
+          type="number" inputMode="decimal" step={lim.step} autoFocus
+          value={editDraft}
+          onChange={e => setEditDraft(e.target.value)}
+          onKeyDown={e => { if (e.key === 'Enter') commitEdit(); if (e.key === 'Escape') setEdit(null); }}
+          onBlur={commitEdit}
+          aria-label={`${key} on ${r.date}`}
+        />
+      );
+    }
+    const shown = r[key] != null ? `${r[key]} ${lim.unit}` : '–';
+    if (!update) return shown;
+    return (
+      <button type="button" className="vitals-edit-cell" onClick={() => beginEdit(r.date, key)} title="Tap to edit">
+        {shown}
+      </button>
+    );
+  }
+  const today = new Date();
+  const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+  const addDayPicker = update ? (
+    <div className="vitals-addday">
+      <label className="vitals-addday-label">
+        Edit another day
+        <input
+          type="date" max={todayStr}
+          onChange={e => { if (e.target.value) setExtraDate(e.target.value); }}
+        />
+      </label>
+      <span className="vitals-addday-hint">Tap any value to edit or backfill that day.</span>
+    </div>
+  ) : null;
 
   const hasMacroHistory = Object.keys(S.macroHistory || {}).length > 0;
   if (!tableRows.length && !hasMacroHistory) {
@@ -293,6 +379,7 @@ export default function VitalsHistoryCard({ S, update }) {
         <p className="vitals-sub">
           No history yet. Log weight/sleep/HR from the hub Vitals widget, or log food in Daily Macros — each day banks a “% of goal hit” snapshot here.
         </p>
+        {addDayPicker}
         {isOwner && update && <><WhoopPanel S={S} update={update} /><AppleHealthImport S={S} update={update} /></>}
       </div>
     );
@@ -421,14 +508,15 @@ export default function VitalsHistoryCard({ S, update }) {
           {tableRows.map(r => (
             <tr key={r.date}>
               <td>{fmtDay(new Date(r.date + 'T00:00:00').getTime())}</td>
-              <td>{r.weight != null ? `${r.weight} kg` : '–'}</td>
-              <td>{r.sleep != null ? `${r.sleep} h` : '–'}</td>
-              <td>{r.rhr != null ? `${r.rhr} bpm` : '–'}</td>
+              <td>{editableCell(r, 'weight')}</td>
+              <td>{editableCell(r, 'sleep')}</td>
+              <td>{editableCell(r, 'rhr')}</td>
             </tr>
           ))}
         </tbody>
       </table>
       )}
+      {addDayPicker}
     </div>
   );
 }

@@ -672,6 +672,17 @@ function MacrosBody({ S, userId, navigate }) {
       <div className="m-macros-rings">
         {rings.map(r => <MacroRing key={r.label} {...r} />)}
       </div>
+      {/* Quick log — jumps straight into the food search on Track.
+          NutritionSection reads the flag on mount and opens the sheet. */}
+      <button
+        type="button"
+        className="m-macros-quicklog"
+        onClick={e => {
+          e.stopPropagation();
+          try { sessionStorage.setItem('vb_quicklog_food', '1'); } catch { /* ignore */ }
+          navigate && navigate('track');
+        }}
+      >＋ Log food</button>
     </div>
   );
 }

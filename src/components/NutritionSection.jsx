@@ -244,6 +244,17 @@ export default function NutritionSection({ userId, S, selectedDate, calYear, cal
   const [foodPrefill, setFoodPrefill] = useState(null);
   const goalHitRef = useRef({});
 
+  // Quick log from the hub Macros widget — it sets a one-shot flag and
+  // navigates here; consume it and open the food search immediately.
+  useEffect(() => {
+    try {
+      if (sessionStorage.getItem('vb_quicklog_food')) {
+        sessionStorage.removeItem('vb_quicklog_food');
+        setShowFoodSearch(true);
+      }
+    } catch { /* ignore */ }
+  }, []);
+
   // Load month summary when calendar month changes, and notify parent
   useEffect(() => {
     if (!userId) return;
