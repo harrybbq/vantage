@@ -353,6 +353,10 @@ export default function HubSection({ S, update, active, onOpenModal, onOpenWaitl
   // Running top of the widget z-stack — click-to-front bumps this and
   // stamps the widget with the new value (persisted in S.widgetZ).
   const topZRef = useRef(10);
+  // Which widget the user is actively resizing (grip held). Only that
+  // widget's ResizeObserver reflows neighbours in snap mode — so the
+  // neighbour width writes we make don't cascade into their observers.
+  const activeResizeRef = useRef(null);
   function setHubWidgetCount(id, n) {
     update(prev => ({ ...prev, hubWidgets: (prev.hubWidgets || []).map(w => w.id === id ? { ...w, count: n } : w) }));
   }
@@ -594,21 +598,72 @@ export default function HubSection({ S, update, active, onOpenModal, onOpenWaitl
     });
 
     // ── Bottom-right resize (native grip) ──
+    // Per-gesture neighbour snapshot, used by the snap-resize reflow so
+    // shrinking is measured from each neighbour's ORIGINAL rect (and
+    // springs back cleanly when the widget is pulled small again).
+    let resizeNeighbours = null;
     wrapper.addEventListener('pointerdown', e => {
       const r = wrapper.getBoundingClientRect();
       const inGrip = (r.right - e.clientX) < 24 && (r.bottom - e.clientY) < 24;
       if (!inGrip) return; // not the resize grip — leave drag/clicks alone
+      // Snap ON → snapshot neighbours and arm the reflow observer.
+      if (snapRef?.current) {
+        resizeNeighbours = [];
+        canvasRef.current?.querySelectorAll('.widget-wrapper').forEach(w2 => {
+          if (w2 === wrapper) return;
+          w2.classList.add('snap-push');
+          resizeNeighbours.push({ el: w2, x0: w2.offsetLeft, y0: w2.offsetTop, w0: w2.offsetWidth, h0: w2.offsetHeight });
+        });
+        activeResizeRef.current = id;
+      }
       const onUp = () => {
         const w = wrapper.offsetWidth;
         const h = wrapper.offsetHeight;
+        activeResizeRef.current = null;
+        const nbs = resizeNeighbours;
+        resizeNeighbours = null;
         update(prev => {
+          const sizes = { ...(prev.widgetSizes || {}) };
+          const pos = { ...(prev.widgetPositions || {}) };
+          sizes[id] = { w, h };
+          if (nbs) {
+            for (const nb of nbs) {
+              nb.el.classList.remove('snap-push');
+              const nid = nb.el.dataset.linkId;
+              if (!nid) continue;
+              pos[nid] = { x: nb.el.offsetLeft, y: nb.el.offsetTop };
+              sizes[nid] = { w: nb.el.offsetWidth, h: nb.el.offsetHeight };
+            }
+          }
           const cur = (prev.widgetSizes || {})[id];
-          if (cur && cur.w === w && cur.h === h) return prev;
-          return { ...prev, widgetSizes: { ...(prev.widgetSizes || {}), [id]: { w, h } } };
+          if (!nbs && cur && cur.w === w && cur.h === h) return prev;
+          return { ...prev, widgetSizes: sizes, widgetPositions: pos };
         });
       };
       window.addEventListener('pointerup', onUp, { once: true });
     });
+
+    // ── Snap-resize reflow ──
+    // While the grip is held with snap ON, expanding the widget to the
+    // right compresses same-row neighbours that sit to its right: each
+    // keeps its RIGHT edge fixed and gives up width from the left, so
+    // the row stays perfectly aligned. Fires continuously because a
+    // native resize mutates the box every frame.
+    const ro = new ResizeObserver(() => {
+      if (activeResizeRef.current !== id || !resizeNeighbours) return;
+      const cx = wrapper.offsetLeft, cy = wrapper.offsetTop, cw = wrapper.offsetWidth, ch = wrapper.offsetHeight;
+      const grownRight = cx + cw;
+      for (const nb of resizeNeighbours) {
+        const sameRow = cy < nb.y0 + nb.h0 && cy + ch > nb.y0;
+        if (!sameRow || nb.x0 < cx) continue; // only right-side, same-row
+        const rightEdge = nb.x0 + nb.w0;
+        const newLeft = Math.max(nb.x0, grownRight + SNAP_GAP);
+        const newW = Math.max(220, rightEdge - newLeft);
+        nb.el.style.left = newLeft + 'px';
+        nb.el.style.width = newW + 'px';
+      }
+    });
+    ro.observe(wrapper);
 
     // ── Left-edge resize (custom grip) ──
     // Mirror of the native corner: dragging the left rail changes width
@@ -644,7 +699,7 @@ export default function HubSection({ S, update, active, onOpenModal, onOpenWaitl
         document.addEventListener('pointerup', up);
       });
     }
-  }, [S.widgetSizes, S.widgetZ, update]);
+  }, [S.widgetSizes, S.widgetZ, update, snapRef]);
 
   // Render all widgets imperatively into the canvas
   const renderCanvas = useCallback(() => {

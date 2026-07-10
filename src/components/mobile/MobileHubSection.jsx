@@ -197,14 +197,24 @@ export default function MobileHubSection({ S, update, visionState, hasPro, navig
       {/* Widget stack — vertical list of user-added widgets, each
           removable via the × in its head. New widgets append below
           the last. + button below opens the picker modal. */}
-      {(S.mobileWidgets || []).map(w => (
+      {(S.mobileWidgets || []).map((w, i) => (
         <MobileWidget
           key={w.id}
           widget={w}
+          index={i}
           S={S}
           update={update}
           navigate={navigate}
           userId={userId}
+          onReorder={(from, to) => update(prev => {
+            const arr = [...(prev.mobileWidgets || [])];
+            if (from < 0 || from >= arr.length || from === to) return prev;
+            // `to` already counts only OTHER cards above the drop point,
+            // so it's the insertion index in the post-removal array.
+            const [moved] = arr.splice(from, 1);
+            arr.splice(to, 0, moved);
+            return { ...prev, mobileWidgets: arr };
+          })}
           onRemove={id => update(prev => ({
             ...prev,
             mobileWidgets: (prev.mobileWidgets || []).filter(x => x.id !== id),

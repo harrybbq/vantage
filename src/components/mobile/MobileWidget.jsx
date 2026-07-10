@@ -128,7 +128,7 @@ const BASE_WIDGET_META = {
 // App presets slot in alongside the built-in widget types.
 const WIDGET_META = { ...BASE_WIDGET_META, ...APP_WIDGET_META };
 
-export default function MobileWidget({ widget, S, update, onRemove, navigate, userId }) {
+export default function MobileWidget({ widget, S, update, onRemove, navigate, userId, index, onReorder }) {
   const meta = WIDGET_META[widget.type] || { label: widget.type, eyebrow: '?', icon: '·' };
 
   // Brand-tinted icon chip when the type carries an `accent` (the new
@@ -141,18 +141,24 @@ export default function MobileWidget({ widget, S, update, onRemove, navigate, us
   } : undefined;
 
   // ── Gestures ──
-  // Swipe left → reveal a red Delete button. Long-press → a small menu
-  // (transparency toggle + delete), matching the desktop right-click
-  // module menu. A single touchstart decides which: horizontal drag =
-  // swipe, holding still = menu, vertical = native scroll.
+  // Swipe left → reveal a red Delete button. Hold (long-press) → the
+  // card lifts: drag it up/down to reorder the stack (the mobile analog
+  // of the desktop click-and-drag), or release in place for the small
+  // menu (transparency toggle + delete). A single touchstart decides:
+  // horizontal drag = swipe, vertical drag = native scroll, hold-still
+  // = lift into reorder.
   const REVEAL = 84;
   const [offset, setOffset] = useState(0);
   const [menu, setMenu] = useState(null); // { x, y } | null
+  const [lifted, setLifted] = useState(false);
   const startX = useRef(0);
   const startY = useRef(0);
   const startOff = useRef(0);
-  const mode = useRef(null); // null | 'swipe' | 'scroll' | 'menu'
+  const mode = useRef(null); // null | 'swipe' | 'scroll' | 'drag'
   const lpTimer = useRef(0);
+  const rootRef = useRef(null);
+  const cardRef = useRef(null);
+  const dragCtx = useRef(null); // { allRoots, myIdx, myRect, rects, lastDy, to }
 
   const transparent = !!widget.transparent;
 
@@ -164,6 +170,66 @@ export default function MobileWidget({ widget, S, update, onRemove, navigate, us
     }));
   }
 
+  // ── Hold-and-drag reorder ──
+  // Fires when the long-press timer completes without a swipe/scroll.
+  // We take over touch handling with document-level non-passive
+  // listeners so we can preventDefault the page scroll while dragging.
+  function enterDrag() {
+    if (!rootRef.current) return;
+    mode.current = 'drag';
+    setOffset(0);
+    setLifted(true);
+    if (navigator.vibrate) { try { navigator.vibrate(18); } catch { /* ignore */ } }
+    const allRoots = Array.from(document.querySelectorAll('.m-widget-swipe'));
+    const myIdx = allRoots.indexOf(rootRef.current);
+    dragCtx.current = {
+      allRoots, myIdx,
+      myRect: rootRef.current.getBoundingClientRect(),
+      rects: allRoots.map(el => el.getBoundingClientRect()),
+      lastDy: 0, to: myIdx,
+    };
+    document.addEventListener('touchmove', dragMove, { passive: false });
+    document.addEventListener('touchend', dragEnd);
+    document.addEventListener('touchcancel', dragEnd);
+  }
+  function dragMove(e) {
+    const t = e.touches[0];
+    const ctx = dragCtx.current;
+    if (!t || !ctx) return;
+    e.preventDefault();
+    const dy = t.clientY - startY.current;
+    ctx.lastDy = dy;
+    if (cardRef.current) cardRef.current.style.transform = `translateY(${dy}px) scale(1.03)`;
+    // Insertion index = how many OTHER cards have their midpoint above
+    // the dragged card's live centre.
+    const center = ctx.myRect.top + ctx.myRect.height / 2 + dy;
+    let to = 0;
+    for (let i = 0; i < ctx.allRoots.length; i++) {
+      if (i === ctx.myIdx) continue;
+      const rc = ctx.rects[i];
+      if (rc.top + rc.height / 2 < center) to++;
+    }
+    ctx.to = to;
+  }
+  function dragEnd() {
+    document.removeEventListener('touchmove', dragMove);
+    document.removeEventListener('touchend', dragEnd);
+    document.removeEventListener('touchcancel', dragEnd);
+    const ctx = dragCtx.current;
+    dragCtx.current = null;
+    if (cardRef.current) cardRef.current.style.transform = '';
+    setLifted(false);
+    mode.current = null;
+    if (!ctx) return;
+    // A hold that never moved → open the menu (transparency / delete),
+    // preserving the old long-press affordance.
+    if (Math.abs(ctx.lastDy) < 6) {
+      setMenu({ x: startX.current, y: startY.current });
+    } else if (ctx.to !== ctx.myIdx && onReorder) {
+      onReorder(ctx.myIdx, ctx.to);
+    }
+  }
+
   function onTouchStart(e) {
     if (e.touches.length !== 1) return;
     startX.current = e.touches[0].clientX;
@@ -171,14 +237,10 @@ export default function MobileWidget({ widget, S, update, onRemove, navigate, us
     startOff.current = offset;
     mode.current = null;
     clearLP();
-    lpTimer.current = setTimeout(() => {
-      mode.current = 'menu';
-      setOffset(0);
-      setMenu({ x: startX.current, y: startY.current });
-      if (navigator.vibrate) { try { navigator.vibrate(15); } catch { /* ignore */ } }
-    }, 450);
+    lpTimer.current = setTimeout(enterDrag, 450);
   }
   function onTouchMove(e) {
+    if (mode.current === 'drag') return; // handled by document listeners
     const t = e.touches[0];
     if (!t) return;
     const dx = t.clientX - startX.current;
@@ -193,9 +255,20 @@ export default function MobileWidget({ widget, S, update, onRemove, navigate, us
   }
   function onTouchEnd() {
     clearLP();
+    if (mode.current === 'drag') return; // dragEnd (document listener) owns cleanup
     if (mode.current === 'swipe') setOffset(o => (o < -REVEAL / 2 ? -REVEAL : 0));
     mode.current = null;
   }
+
+  // Safety: if this widget unmounts mid-drag, drop the document
+  // listeners so they can't fire against a dead node.
+  useEffect(() => () => {
+    document.removeEventListener('touchmove', dragMove);
+    document.removeEventListener('touchend', dragEnd);
+    document.removeEventListener('touchcancel', dragEnd);
+    clearLP();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Dismiss the long-press menu on any outside tap / scroll.
   useEffect(() => {
@@ -216,7 +289,11 @@ export default function MobileWidget({ widget, S, update, onRemove, navigate, us
 
   return (
     <>
-      <div className="m-widget-swipe" style={{ position: 'relative', overflow: 'hidden', borderRadius: 12 }}>
+      <div
+        ref={rootRef}
+        className={`m-widget-swipe${lifted ? ' is-lifted' : ''}`}
+        style={{ position: 'relative', overflow: lifted ? 'visible' : 'hidden', borderRadius: 12, zIndex: lifted ? 40 : undefined }}
+      >
         {/* Red delete action — only mounted while swiping, so it never
             shows through a transparent widget when closed. */}
         {open && (
@@ -243,10 +320,11 @@ export default function MobileWidget({ widget, S, update, onRemove, navigate, us
 
         {/* Foreground card */}
         <div
-          className={`m-widget${transparent ? ' is-transparent' : ''}`}
+          ref={cardRef}
+          className={`m-widget${transparent ? ' is-transparent' : ''}${lifted ? ' is-lifted' : ''}`}
           style={{
             transform: `translateX(${offset}px)`,
-            transition: mode.current === 'swipe' ? 'none' : 'transform .2s ease',
+            transition: (mode.current === 'swipe' || lifted) ? 'none' : 'transform .2s ease',
             touchAction: 'pan-y',
             position: 'relative',
           }}
