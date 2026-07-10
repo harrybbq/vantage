@@ -4830,6 +4830,14 @@ button:active:not(:disabled),
 .m-widget.is-transparent .m-widget-head {
   background: transparent !important;
 }
+/* Hold-and-drag lift — the picked-up card floats above the stack with
+   a deeper shadow + accent ring while being reordered. */
+.m-widget.is-lifted {
+  box-shadow: 0 14px 34px rgba(0,0,0,.28);
+  border-color: rgba(var(--em-rgb), .55);
+  opacity: .97;
+}
+.m-widget-swipe.is-lifted { overflow: visible; }
 .m-widget-head {
   display: flex;
   align-items: center;
