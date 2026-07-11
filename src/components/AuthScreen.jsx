@@ -270,9 +270,18 @@ export default function AuthScreen({ onOpenLegal }) {
               <label htmlFor="auth-email" style={S.label}>Email</label>
               <input
                 id="auth-email"
+                name="email"
                 className="auth-input"
                 style={S.input}
                 type="email"
+                inputMode="email"
+                autoCapitalize="none"
+                autoCorrect="off"
+                spellCheck={false}
+                // `username` (not `email`) is the token password managers
+                // pair with the password field, so Keychain / Chrome
+                // offer to save the pair after a successful login.
+                autoComplete="username"
                 placeholder="you@example.com"
                 value={email}
                 onChange={e => setEmail(e.target.value)}
@@ -286,9 +295,14 @@ export default function AuthScreen({ onOpenLegal }) {
                 <label htmlFor="auth-pw" style={S.label}>Password</label>
                 <input
                   id="auth-pw"
+                  name="password"
                   className="auth-input"
                   style={S.input}
                   type="password"
+                  // current-password on login → offers to save/fill the
+                  // existing credential; new-password on signup → offers
+                  // a strong-password suggestion and saves the new pair.
+                  autoComplete={mode === 'signup' ? 'new-password' : 'current-password'}
                   placeholder="••••••••"
                   value={password}
                   onChange={e => setPassword(e.target.value)}
