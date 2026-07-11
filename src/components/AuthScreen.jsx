@@ -1,6 +1,7 @@
 import { useState, useCallback } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { supabase } from '../lib/supabase';
+import { withTimeout, friendlyAuthError } from '../utils/withTimeout';
 import Logo from './Logo';
 import { useIsMobile } from '../hooks/useIsMobile';
 
@@ -200,7 +201,11 @@ export default function AuthScreen({ onOpenLegal }) {
 
     try {
       if (mode === 'login') {
-        const { error } = await supabase.auth.signInWithPassword({ email, password });
+        // Bound the call so an unhealthy backend surfaces a clear,
+        // retryable message instead of hanging ~20s then "Load failed".
+        const { error } = await withTimeout(
+          supabase.auth.signInWithPassword({ email, password }), 20000,
+        );
         if (error) throw error;
         localStorage.setItem('vb4_remember', rememberMe ? '1' : '0');
       } else if (mode === 'signup') {
@@ -209,18 +214,18 @@ export default function AuthScreen({ onOpenLegal }) {
           setLoading(false);
           return;
         }
-        const { error } = await supabase.auth.signUp({ email, password });
+        const { error } = await withTimeout(supabase.auth.signUp({ email, password }), 20000);
         if (error) throw error;
         setInfo('Check your email to confirm your account, then log in.');
         setMode('login');
       } else if (mode === 'reset') {
-        const { error } = await supabase.auth.resetPasswordForEmail(email);
+        const { error } = await withTimeout(supabase.auth.resetPasswordForEmail(email), 20000);
         if (error) throw error;
         setInfo('Password reset email sent. Check your inbox.');
         setMode('login');
       }
     } catch (err) {
-      setError(err.message || 'Something went wrong.');
+      setError(friendlyAuthError(err));
     } finally {
       setLoading(false);
     }

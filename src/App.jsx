@@ -820,16 +820,32 @@ export default function App() {
   const [legalPage, setLegalPage] = useState(null);
 
   useEffect(() => {
+    let settled = false;
+    const finish = (s) => { settled = true; setSession(s); };
+
     supabase.auth.getSession().then(async ({ data: { session } }) => {
       // If user logged in without "remember me", sign out on next page load
       if (session && localStorage.getItem('vb4_remember') === '0') {
         await supabase.auth.signOut();
-        setSession(null);
+        finish(null);
       } else {
-        setSession(session);
+        finish(session);
       }
-    });
+    }).catch(() => finish(null));
+
+    // Don't hang on the bare loader if auth is unreachable/slow (e.g. a
+    // stuck token refresh against an unhealthy backend — the exact
+    // failure that stranded the login screen for ~1 min). After a short
+    // grace we drop to the sign-in screen; onAuthStateChange still fires
+    // INITIAL_SESSION when auth eventually resolves and flips us back
+    // into the app if a valid session exists, so this can't strand a
+    // genuinely signed-in user.
+    const authFallback = setTimeout(() => {
+      if (!settled) setSession(cur => (cur === undefined ? null : cur));
+    }, 8000);
+
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      settled = true;
       setSession(session);
       // When the session goes away (sign-out, expiry, other tab) drop the
       // dark-os attribute on <html> so the AuthScreen always renders against
@@ -837,7 +853,7 @@ export default function App() {
       // will re-apply the user's saved theme via Board's applyTheme effect.
       if (!session) document.documentElement.removeAttribute('data-theme');
     });
-    return () => subscription.unsubscribe();
+    return () => { clearTimeout(authFallback); subscription.unsubscribe(); };
   }, []);
 
   async function handleSignOut() {
