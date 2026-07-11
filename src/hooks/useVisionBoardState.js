@@ -349,6 +349,26 @@ export function useVisionBoardState(userId) {
       loadingRef.current = true;
       setLoadError(null);
 
+      // ── Optimistic boot from the local backup ───────────────────────
+      // Returning users have a last-known-good snapshot in localStorage
+      // (written on every successful load/save). Render it immediately so
+      // the app is interactive without waiting on the network round-trip
+      // — the single biggest chunk of the initial "LOADING…" wait.
+      //
+      // Safety: `loadingRef` stays TRUE, so the debounced saver is still
+      // blocked until the authoritative cloud copy arrives and reconciles
+      // below. The optimistic state can therefore never be written back,
+      // and every anomalous cloud outcome (no_row / empty_state / error)
+      // still falls through to the exact same guarded handling — it just
+      // has a board on screen behind it instead of a blank loader.
+      const backup = readBackup(userId);
+      if (backup && backup.state) {
+        const optimistic = addTransient({ ...DEFAULT_STATE, ...backup.state });
+        if (hasMeaningfulData(optimistic)) lastGoodMeaningfulRef.current = true;
+        setS(optimistic);
+        setLoading(false); // interactive now; cloud reconciles in the background
+      }
+
       let result;
       try {
         result = await loadFromCloud(userId);
