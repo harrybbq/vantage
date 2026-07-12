@@ -865,12 +865,35 @@ function MultiLogModal({ openId, onClose, trackers, multiSelectedDays, onSave })
   );
 }
 
+// Pull an integer coin value out of a free-text price ("£149.99",
+// "$1,299", "10") at £1 = 1 coin, rounded. Returns null if there's no
+// number to read.
+function priceToCoins(str) {
+  if (!str) return null;
+  const m = String(str).replace(/[,\s]/g, '').match(/\d+(?:\.\d+)?/);
+  if (!m) return null;
+  const n = parseFloat(m[0]);
+  return Number.isFinite(n) ? Math.round(n) : null;
+}
+
 // ── Add Shop Item ──
 function AddShopModal({ openId, onClose, onAdd, categories = [] }) {
   const [form, setForm] = useState({ name: '', price: '', url: '', imageUrl: '', priority: 'med', notes: '', coinCost: '', categoryId: '' });
   const [status, setStatus] = useState('');
   const [fetching, setFetching] = useState(false);
+  // Until the user edits the coin field themselves, it tracks the price
+  // (£1 = 1 coin). Once they touch it, we stop mirroring so their value
+  // is respected.
+  const [coinTouched, setCoinTouched] = useState(false);
   const timerRef = useRef(null);
+
+  // Apply a new price and, unless the coin field has been hand-edited,
+  // mirror it into coinCost.
+  function applyPrice(f, price) {
+    if (coinTouched) return { ...f, price };
+    const coins = priceToCoins(price);
+    return { ...f, price, coinCost: coins != null ? String(coins) : '' };
+  }
 
   async function runAutofill(url) {
     if (!url || !url.startsWith('http')) return;
@@ -888,13 +911,17 @@ function AddShopModal({ openId, onClose, onAdd, categories = [] }) {
       });
       const data = await resp.json();
       if (data && data.ok && (data.name || data.imageUrl)) {
-        setForm(f => ({
-          ...f,
-          name:     f.name     || data.name     || '',
-          price:    f.price    || data.price    || '',
-          imageUrl: data.imageUrl || f.imageUrl || '',
-          notes:    f.notes    || data.notes    || '',
-        }));
+        setForm(f => {
+          const price = f.price || data.price || '';
+          const base = {
+            ...f,
+            name:     f.name     || data.name     || '',
+            imageUrl: data.imageUrl || f.imageUrl || '',
+            notes:    f.notes    || data.notes    || '',
+          };
+          // Mirror the auto-filled price into coins too (unless hand-edited).
+          return applyPrice(base, price);
+        });
         setStatus('✓ Auto-filled from URL');
       } else {
         setStatus('Could not extract info — fill in manually');
@@ -927,6 +954,7 @@ function AddShopModal({ openId, onClose, onAdd, categories = [] }) {
     });
     setForm({ name: '', price: '', url: '', imageUrl: '', priority: 'med', notes: '', coinCost: '', categoryId: '' });
     setStatus('');
+    setCoinTouched(false);
     onClose('addShopModal');
   }
 
@@ -942,7 +970,7 @@ function AddShopModal({ openId, onClose, onAdd, categories = [] }) {
         <div style={{ fontFamily: 'var(--mono)', fontSize: '10px', color: status.startsWith('✓') ? 'var(--em)' : 'var(--text-muted)', marginTop: '5px', minHeight: '14px' }}>{status}</div>
       </div>
       <div className="fg"><label>Item Name</label><input type="text" placeholder="e.g. AirPods Pro" value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} /></div>
-      <div className="fg"><label>Price (optional)</label><input type="text" placeholder="£149.99" value={form.price} onChange={e => setForm(f => ({ ...f, price: e.target.value }))} /></div>
+      <div className="fg"><label>Price (optional)</label><input type="text" placeholder="£149.99" value={form.price} onChange={e => setForm(f => applyPrice(f, e.target.value))} /></div>
       <ImageField label="Image (optional)" placeholder="Auto-filled from link, or paste directly" max={600} value={form.imageUrl} onChange={v => setForm(f => ({ ...f, imageUrl: v }))} />
       <div className="fg">
         <label>Priority</label>
@@ -960,7 +988,14 @@ function AddShopModal({ openId, onClose, onAdd, categories = [] }) {
         </select>
       </div>
       <div className="fg"><label>Notes</label><input type="text" placeholder="Why you want it, alternatives..." value={form.notes} onChange={e => setForm(f => ({ ...f, notes: e.target.value }))} /></div>
-      <div className="fg"><label>⬡ Coin Cost (optional)</label><input type="number" placeholder="e.g. 100" min="0" value={form.coinCost} onChange={e => setForm(f => ({ ...f, coinCost: e.target.value }))} /></div>
+      <div className="fg">
+        <label>⬡ Coin Cost (optional)</label>
+        <input type="number" placeholder="e.g. 100" min="0" value={form.coinCost}
+          onChange={e => { setCoinTouched(true); setForm(f => ({ ...f, coinCost: e.target.value })); }} />
+        <div style={{ fontFamily: 'var(--mono)', fontSize: '10px', color: 'var(--text-muted)', marginTop: '5px' }}>
+          {coinTouched ? 'Custom coin cost.' : 'Auto-matches the price (£1 = 1 ⬡). Edit to override.'}
+        </div>
+      </div>
       <div className="modal-actions">
         <button className="btn btn-ghost" onClick={() => onClose('addShopModal')}>Cancel</button>
         <button className="btn btn-primary" onClick={submit}>Add Item</button>
