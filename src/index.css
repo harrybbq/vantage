@@ -4704,6 +4704,23 @@ button:active:not(:disabled),
   font-size:22px; line-height:1; min-width:36px; text-align:right;
   font-variant-numeric:tabular-nums; flex-shrink:0;
 }
+/* Row wrapper so the Add control sits beside the clickable row. */
+.lb-li{ display:flex; align-items:center; gap:6px; }
+.lb-li .lb-row{ flex:1; min-width:0; }
+.lb-add{
+  flex-shrink:0; border:1px solid var(--em); background:var(--em); color:#fff;
+  border-radius:999px; padding:5px 11px; font-family:var(--mono); font-size:10px;
+  font-weight:700; letter-spacing:.5px; cursor:pointer; white-space:nowrap;
+  transition:filter .14s ease;
+}
+.lb-add:hover:not(:disabled){ filter:brightness(1.08); }
+.lb-add:disabled{ opacity:.55; cursor:default; }
+/* Non-actionable states read as quiet chips, not buttons. */
+.lb-add.is-friend, .lb-add.is-sent{
+  background:transparent; color:var(--text-muted); border-color:var(--border);
+  cursor:default;
+}
+.lb-add.is-friend{ color:var(--em); border-color:rgba(var(--em-rgb),.4); }
 .lb-footer{
   text-align:center; padding-top:6px;
   font-family:var(--mono); font-size:10px; letter-spacing:.6px; color:var(--text-muted);

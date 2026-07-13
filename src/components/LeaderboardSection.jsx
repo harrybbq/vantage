@@ -11,6 +11,7 @@ import LeaderboardPanel from './LeaderboardPanel';
 
 export default function LeaderboardSection({
   active,
+  userId,
   onOpenSelfBreakdown,
   onAddFriends,
   onOpenSettings,
@@ -23,6 +24,7 @@ export default function LeaderboardSection({
           <div className="sec-title">Leaderboard</div>
         </div>
         <LeaderboardPanel
+          userId={userId}
           onOpenSelfBreakdown={onOpenSelfBreakdown}
           onAddFriends={onAddFriends}
           onOpenSettings={onOpenSettings}

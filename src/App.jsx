@@ -685,6 +685,7 @@ function Board({ userId, userEmail, onSignOut }) {
           <motion.div key="leaderboard" {...pageMotion}>
             <LeaderboardSection
               active
+              userId={userId}
               onOpenSelfBreakdown={() => navigate('hub')}
               onAddFriends={() => navigate('hub')}
               onOpenSettings={() => navigate('settings')}
