@@ -16,6 +16,7 @@ import { useHubModuleMenu } from './HubModuleMenu';
 import { APP_PRESETS } from '../data/appPresets';
 import { fetchAppPreview } from '../lib/appPreview';
 import { strikeState } from '../lib/habits/strikes';
+import Icon from './Icon';
 
 // ── GitHub helpers ──
 async function fetchGitHub(username, cache) {
@@ -310,25 +311,25 @@ function ProfileCard({ profile, S, update, onSaveName, onSaveTagline, onUploadPh
 
       <motion.button className="hub-action-btn add-widget" onClick={onAddWidget}
         whileHover={{ scale: 1.04 }} whileTap={{ scale: 0.96 }}
-        transition={{ type: 'spring', stiffness: 400, damping: 17 }}>＋ Add widget</motion.button>
+        transition={{ type: 'spring', stiffness: 400, damping: 17 }}><Icon name="plus" size={14} /> Add widget</motion.button>
       <motion.button className="hub-action-btn sort-widgets" onClick={onSortWidgets}
         whileHover={{ scale: 1.04 }} whileTap={{ scale: 0.96 }}
-        transition={{ type: 'spring', stiffness: 400, damping: 17 }}>⊞ Sort</motion.button>
+        transition={{ type: 'spring', stiffness: 400, damping: 17 }}><Icon name="layout-grid" size={13} /> Sort</motion.button>
       {onSnapFill && (
         <motion.button className="hub-action-btn sort-widgets" onClick={onSnapFill}
           whileHover={{ scale: 1.04 }} whileTap={{ scale: 0.96 }}
-          transition={{ type: 'spring', stiffness: 400, damping: 17 }}>▦ Snap to fill</motion.button>
+          transition={{ type: 'spring', stiffness: 400, damping: 17 }}><Icon name="layout-dashboard" size={13} /> Snap to fill</motion.button>
       )}
       {onToggleSnap && (
         <motion.button className={`hub-action-btn sort-widgets hub-snap-toggle${S.hubSnap ? ' is-on' : ''}`} onClick={onToggleSnap}
           whileHover={{ scale: 1.04 }} whileTap={{ scale: 0.96 }} aria-pressed={!!S.hubSnap}
           transition={{ type: 'spring', stiffness: 400, damping: 17 }}>
-          ⌗ Snap drag <span className={`hub-snap-pip${S.hubSnap ? ' is-on' : ''}`}>{S.hubSnap ? 'ON' : 'OFF'}</span>
+          <Icon name="move" size={13} /> Snap drag <span className={`hub-snap-pip${S.hubSnap ? ' is-on' : ''}`}>{S.hubSnap ? 'ON' : 'OFF'}</span>
         </motion.button>
       )}
       <motion.button className="hub-action-btn settings-mobile-btn" onClick={onNavigateSettings}
         whileHover={{ scale: 1.04 }} whileTap={{ scale: 0.96 }}
-        transition={{ type: 'spring', stiffness: 400, damping: 17 }}>⚙ Settings</motion.button>
+        transition={{ type: 'spring', stiffness: 400, damping: 17 }}><Icon name="settings" size={13} /> Settings</motion.button>
       {children}
     </div>
   );

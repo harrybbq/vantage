@@ -17,6 +17,7 @@ import QuickLog from './QuickLog';
 import FriendsRail from './friends/FriendsRail';
 import RatingsPanel from './RatingsPanel';
 import { useHubModuleMenu, moduleIdFromLabel } from './HubModuleMenu';
+import Icon from './Icon';
 
 // ── Panel primitive ──────────────────────────────────────────────────────
 // Each panel tags itself with data-hub-module (derived from its label)
@@ -232,28 +233,28 @@ export function OsActionsPanel({ onAddWidget, onSort, onSnapFill, onNavigateSett
       <div className="os-actions">
         <motion.button className="os-action-btn primary" onClick={onAddWidget}
           whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
-          ＋ Add widget
+          <Icon name="plus" size={14} /> Add widget
         </motion.button>
         <motion.button className="os-action-btn" onClick={onSort}
           whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
-          ⊞ Sort
+          <Icon name="layout-grid" size={13} /> Sort
         </motion.button>
         {onSnapFill && (
           <motion.button className="os-action-btn" onClick={onSnapFill}
             whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
-            ▦ Snap to fill
+            <Icon name="layout-dashboard" size={13} /> Snap to fill
           </motion.button>
         )}
         {onToggleSnap && (
           <motion.button className={`os-action-btn os-action-toggle${snapOn ? ' is-on' : ''}`} onClick={onToggleSnap}
             whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }} aria-pressed={snapOn}>
-            <span>⌗ Snap drag</span>
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}><Icon name="move" size={13} /> Snap drag</span>
             <span className={`os-toggle-pip${snapOn ? ' is-on' : ''}`}>{snapOn ? 'ON' : 'OFF'}</span>
           </motion.button>
         )}
         <motion.button className="os-action-btn" onClick={onNavigateSettings}
           whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
-          ⚙ Settings
+          <Icon name="settings" size={13} /> Settings
         </motion.button>
       </div>
     </OsPanel>
