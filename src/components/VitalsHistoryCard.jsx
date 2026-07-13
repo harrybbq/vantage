@@ -18,9 +18,10 @@ const METRICS = [
   { key: 'sleep',  label: 'Sleep',   unit: 'h',   src: 'vitals' },
   { key: 'rhr',    label: 'Rest HR', unit: 'bpm', src: 'vitals' },
   // WHOOP-fed metrics (whoop-sync writes them into vitalsLog).
-  { key: 'hrv',      label: 'HRV',      unit: 'ms', src: 'vitals' },
-  { key: 'recovery', label: 'Recovery', unit: '%',  src: 'vitals' },
-  { key: 'strain',   label: 'Strain',   unit: '',   src: 'vitals' },
+  { key: 'hrv',      label: 'HRV',      unit: 'ms',   src: 'vitals' },
+  { key: 'recovery', label: 'Recovery', unit: '%',    src: 'vitals' },
+  { key: 'strain',   label: 'Strain',   unit: '',     src: 'vitals' },
+  { key: 'burnKcal', label: 'Burn',     unit: 'kcal', src: 'vitals' },
   // Macro % history — written by NutritionSection into S.macroHistory
   // as "% of goal hit" per day (survives later goal changes).
   { key: 'cal',  label: 'Cal %',     unit: '%', src: 'macro' },

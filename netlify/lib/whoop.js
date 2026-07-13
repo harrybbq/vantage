@@ -110,7 +110,13 @@ function mapWhoop({ recoveries = [], sleeps = [], workouts = [], cycles = [] }) 
   for (const c of cycles) {
     const d = dayOf(c.start);
     if (!d) continue;
-    if (c.score?.strain != null) at(d).strain = Math.round(c.score.strain * 10) / 10;
+    const sc = c.score || {};
+    if (sc.strain != null) at(d).strain = Math.round(sc.strain * 10) / 10;
+    // WHOOP's measured all-day energy expenditure (kJ → kcal). This is
+    // the whole-day burn (includes resting), stored on the vitals row
+    // so the Calories Burned widget can show it and the macros donut
+    // can derive active energy from it.
+    if (sc.kilojoule != null) at(d).burnKcal = Math.round(sc.kilojoule * KJ_TO_KCAL);
   }
 
   const burn = {};

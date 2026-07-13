@@ -596,12 +596,15 @@ function BurnBody({ S, update, userId }) {
     );
   }
 
-  // Net maths uses ACTIVITY burn only (exercise + steps) — resting
-  // burn is shown as an estimate line but never subtracted, else the
-  // donut reads negative all day (owner call).
-  const { bmr, activity } = dayBurn(S, today);
+  // When WHOOP has synced a measured all-day burn we show that as the
+  // headline (matching the WHOOP app), and net = eaten − all-day burn.
+  // Otherwise it's the activity-only estimate (exercise + steps), with
+  // resting shown as an info line only (owner call).
+  const { bmr, activity, whoopTotal } = dayBurn(S, today);
+  const burned = whoopTotal != null ? whoopTotal : activity;
+  const fromWhoop = whoopTotal != null;
   const eaten = summary?.calories ?? null;
-  const net = eaten != null ? Math.round(eaten - activity) : null;
+  const net = eaten != null ? Math.round(eaten - burned) : null;
   const acts = S.burnLog?.[today] || [];
 
   function addActivity() {
@@ -630,8 +633,8 @@ function BurnBody({ S, update, userId }) {
   return (
     <div className="m-burn">
       <div className="m-burn-hero">
-        <span className="m-burn-total">{activity.toLocaleString()}</span>
-        <span className="m-burn-unit">kcal burned today</span>
+        <span className="m-burn-total">{burned.toLocaleString()}</span>
+        <span className="m-burn-unit">kcal burned today{fromWhoop && <span className="m-burn-whoop"> · WHOOP</span>}</span>
       </div>
       <div className="m-burn-split">
         {net != null && (
@@ -639,7 +642,7 @@ function BurnBody({ S, update, userId }) {
             {`net ${net.toLocaleString()} kcal`}
           </span>
         )}
-        <span>Resting est. {bmr?.toLocaleString() ?? '–'} (info only)</span>
+        <span>{fromWhoop ? 'Measured all-day (incl. resting)' : `Resting est. ${bmr?.toLocaleString() ?? '–'} (info only)`}</span>
       </div>
       {acts.length > 0 && (
         <ul className="m-burn-acts">
