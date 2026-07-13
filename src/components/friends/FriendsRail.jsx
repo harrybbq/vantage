@@ -5,8 +5,10 @@ import PendingRequestsList from './PendingRequestsList';
 import HandleClaimModal from './HandleClaimModal';
 import AddFriendModal from './AddFriendModal';
 import ReportFriendModal from './ReportFriendModal';
+import MessagesModal from './MessagesModal';
 import { useFriends } from '../../lib/friends/useFriends';
 import { getFriendPublicStats } from '../../lib/friends/queries';
+import { getUnreadCounts } from '../../lib/friends/messages';
 import { useSubscriptionContext } from '../../context/SubscriptionContext';
 
 /**
@@ -34,6 +36,20 @@ export default function FriendsRail({ userId, onUpgrade }) {
   // Report flow holds the friend being reported in state so the modal
   // doesn't have to re-look-up by id when opened.
   const [reportTarget, setReportTarget] = useState(null);
+  // Chat overlay target + per-friend unread counts (for the badge).
+  const [messageTarget, setMessageTarget] = useState(null);
+  const [unread, setUnread] = useState({});
+
+  // Poll unread counts so the badge stays live without opening a chat.
+  // Cheap (one indexed query); fails soft if messaging isn't migrated.
+  useEffect(() => {
+    if (!userId) return undefined;
+    let cancelled = false;
+    const pull = () => getUnreadCounts(userId).then(c => { if (!cancelled) setUnread(c); }).catch(() => {});
+    pull();
+    const id = setInterval(pull, 15000);
+    return () => { cancelled = true; clearInterval(id); };
+  }, [userId, messageTarget]);
 
   // ── derived sets (used by AddFriendModal to suppress duplicates) ──
   const friendIds = useMemo(() => new Set(friends.friends.map(f => f.id)), [friends.friends]);
@@ -96,12 +112,13 @@ export default function FriendsRail({ userId, onUpgrade }) {
       streak: 0,           // not in list view; row shows handle / last-seen instead
       streakHabit: null,
       lastSeenDays: f.lastSeenDays,
+      unread: unread[f.id] || 0,
     }));
     return mapped.sort((a, b) => {
       if (a.online !== b.online) return a.online ? -1 : 1;
       return (b.ovr || 0) - (a.ovr || 0);
     });
-  }, [friends.friends]);
+  }, [friends.friends, unread]);
 
   // ── handle claim gating ──
   // If the user has no handle yet, the rail itself is locked behind a
@@ -200,6 +217,8 @@ export default function FriendsRail({ userId, onUpgrade }) {
           friend={selectedFriend}
           loading={statsLoading}
           statsMissing={!selectedStats && !statsLoading}
+          unread={unread[selectedFriend.id] || 0}
+          onMessage={(f) => setMessageTarget(f)}
           onReport={(f) => setReportTarget(f)}
           onBlock={async (f) => {
             // Block is destructive — confirm via native dialog. The
@@ -248,6 +267,13 @@ export default function FriendsRail({ userId, onUpgrade }) {
           await friends.report(reportTarget.id, reason, context);
         }}
         onClose={() => setReportTarget(null)}
+      />
+
+      <MessagesModal
+        open={!!messageTarget}
+        userId={userId}
+        friend={messageTarget}
+        onClose={() => setMessageTarget(null)}
       />
     </>
   );

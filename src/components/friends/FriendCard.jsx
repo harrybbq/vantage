@@ -42,6 +42,8 @@ export default function FriendCard({
   friend,
   loading = false,
   statsMissing = false,
+  unread = 0,
+  onMessage,
   onReport,
   onBlock,
   onUnfriend,
@@ -144,6 +146,18 @@ export default function FriendCard({
           </div>
         )}
       </div>
+
+      {/* Primary action — message this friend. Sits right under the
+          header so it reads as the main thing you'd do on a friend. */}
+      {onMessage && (
+        <div className="fc-actions">
+          <button type="button" className="fc-message-btn" onClick={() => onMessage(friend)}>
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z" /></svg>
+            Message
+            {unread > 0 && <span className="fc-message-badge">{unread > 9 ? '9+' : unread}</span>}
+          </button>
+        </div>
+      )}
 
       <div className="fc-divider" />
 
