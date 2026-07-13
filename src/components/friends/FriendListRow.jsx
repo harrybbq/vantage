@@ -60,6 +60,11 @@ export default function FriendListRow({ friend, selected, onClick }) {
         <div className="fc-row-name">{friend.name}</div>
         <div className="fc-row-status">{statusLine(friend)}</div>
       </div>
+      {friend.unread > 0 && (
+        <span className="fc-row-unread" title={`${friend.unread} unread message${friend.unread === 1 ? '' : 's'}`}>
+          {friend.unread > 9 ? '9+' : friend.unread}
+        </span>
+      )}
       <div className={`fc-row-level ovr-chip ovr-tier-${prestige.key}`} title={`OVR ${ovr} · ${prestige.label}`}>{ovr}</div>
     </button>
   );
