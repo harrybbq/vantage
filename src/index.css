@@ -5183,6 +5183,7 @@ button:active:not(:disabled),
 .m-burn-hero { display: flex; align-items: baseline; gap: 8px; }
 .m-burn-total { font-family: var(--mono); font-size: 26px; font-weight: 700; color: var(--text); font-variant-numeric: tabular-nums; line-height: 1; }
 .m-burn-unit { font-family: var(--mono); font-size: 10px; letter-spacing: 1px; text-transform: uppercase; color: var(--text-muted); }
+.m-burn-whoop { color: #16a34a; font-weight: 700; }
 .m-burn-split { display: flex; gap: 12px; flex-wrap: wrap; font-family: var(--mono); font-size: 10px; color: var(--text-muted); }
 .m-burn-split .is-deficit { color: var(--em); font-weight: 700; }
 .m-burn-split .is-surplus { color: #d99114; font-weight: 700; }

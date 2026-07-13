@@ -55,14 +55,33 @@ export function stepsKcal(steps, weightKg) {
   return Math.round(steps * weightKg * 0.0005);
 }
 
-/** Today's burn breakdown: { bmr, activity, total } (kcal).
+/** Today's burn breakdown: { bmr, activity, manual, whoopTotal, total } (kcal).
+ *
  *  IMPORTANT: net-intake maths (deficit/surplus, the macros ring's
- *  burned arc) uses `activity` ONLY — exercise + steps. Resting burn
- *  (bmr) is informational; counting it made the calorie donut read
- *  negative all day (owner call, 2026-07-05). bmr may be null when
- *  the profile isn't set up. */
+ *  burned arc) uses `activity` ONLY — resting burn (bmr) is deliberately
+ *  excluded because counting it made the calorie donut read negative all
+ *  day (owner call, 2026-07-05). bmr may be null when the profile isn't
+ *  set up.
+ *
+ *  WHOOP integration: when WHOOP has synced a measured all-day burn for
+ *  the date (vitalsLog[date].burnKcal, whole-day incl. resting), we
+ *  derive `whoopActive = whoopTotal − bmr` and let it SUPERSEDE the
+ *  manual/step log as the day's activity — it's a full-body measurement,
+ *  so it's both more accurate and avoids double-counting WHOOP workouts
+ *  that were also written into burnLog. `whoopTotal` is exposed so the
+ *  Calories Burned widget can show WHOOP's headline all-day number. */
 export function dayBurn(S, date) {
   const bmr = bmrKcal(S);
-  const activity = (S.burnLog?.[date] || []).reduce((sum, a) => sum + (a.kcal || 0), 0);
-  return { bmr, activity, total: (bmr || 0) + activity };
+  const manual = (S.burnLog?.[date] || []).reduce((sum, a) => sum + (a.kcal || 0), 0);
+  const whoopTotal = S.vitalsLog?.[date]?.burnKcal ?? null;
+  const whoopActive = (whoopTotal != null && bmr != null) ? Math.max(0, Math.round(whoopTotal - bmr)) : null;
+  const activity = whoopActive != null ? whoopActive : manual;
+  return {
+    bmr,
+    activity,
+    manual,
+    whoopTotal,
+    whoopActive,
+    total: whoopTotal != null ? whoopTotal : (bmr || 0) + activity,
+  };
 }
