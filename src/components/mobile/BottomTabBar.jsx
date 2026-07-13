@@ -18,12 +18,13 @@
  * tab is "active" (the underlying screen, not the drawer).
  */
 import { haptic } from '../../hooks/useCapacitor';
+import Icon from '../Icon';
 
 const PRIMARY_TABS = [
-  { id: 'hub',     icon: '⌂', label: 'Hub'     },
-  { id: 'track',   icon: '☑', label: 'Track'   },
-  { id: 'holiday', icon: '✈', label: 'Holiday' },
-  { id: 'habits',  icon: '◷', label: 'Habits'  },
+  { id: 'hub',     icon: 'house',            label: 'Hub'     },
+  { id: 'track',   icon: 'square-check-big', label: 'Track'   },
+  { id: 'holiday', icon: 'plane',            label: 'Holiday' },
+  { id: 'habits',  icon: 'flame',            label: 'Habits'  },
 ];
 
 // Sections that live behind the More drawer. Used so we can highlight
@@ -63,7 +64,7 @@ export default function BottomTabBar({ activeSection, onNavigate, onOpenMore, mo
             className={`m-tab${isActive ? ' m-tab-active' : ''}`}
             onClick={() => handlePrimaryClick(tab.id)}
           >
-            <span className="m-tab-icon" aria-hidden="true">{tab.icon}</span>
+            <span className="m-tab-icon" aria-hidden="true"><Icon name={tab.icon} size={22} strokeWidth={1.9} /></span>
             <span className="m-tab-label">{tab.label}</span>
           </button>
         );
@@ -77,7 +78,7 @@ export default function BottomTabBar({ activeSection, onNavigate, onOpenMore, mo
         className={`m-tab${moreActive ? ' m-tab-active' : ''}`}
         onClick={handleMoreClick}
       >
-        <span className="m-tab-icon" aria-hidden="true">⊞</span>
+        <span className="m-tab-icon" aria-hidden="true"><Icon name="menu" size={22} strokeWidth={1.9} /></span>
         <span className="m-tab-label">More</span>
       </button>
     </nav>

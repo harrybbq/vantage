@@ -68,3 +68,9 @@
 # 03:00 UTC = low-traffic window.
 [functions."snapshot-ratings"]
   schedule = "0 3 * * *"
+
+# whoop-cron passively syncs each connected account's WHOOP data into
+# their state. 06:00 UTC = overnight recovery/sleep are finalised and
+# the app is closed, so the server-side merge can't race a client save.
+[functions."whoop-cron"]
+  schedule = "0 6 * * *"
