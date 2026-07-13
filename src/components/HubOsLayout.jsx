@@ -555,7 +555,7 @@ export default function HubOsLayout({
 
       {/* ── MAIN ROW ── */}
       <div className="hub-os-main">
-        {/* Left col: actions + trackers mini + friends rail */}
+        {/* Left col: actions + friends rail + ratings ledger */}
         <div className="os-col">
           <OsActionsPanel
             onAddWidget={onAddWidget}
@@ -565,13 +565,13 @@ export default function HubOsLayout({
             snapOn={!!S.hubSnap}
             onToggleSnap={onToggleSnap}
           />
-          <OsRatingsPanel S={S} update={update} />
-          {/* Trackers moved into the Session panel as completion nodes
-              under the date (see OsSessionPanel). The interactive
-              QuickLog panel in the right column remains for toggling. */}
-          {/* Friends rail — same component as cream hub, retinted via
-              dark-os overrides on the .fc-* classes in hub-dark.css. */}
+          {/* Friends rail sits above the (tall) Ratings ledger so incoming
+              friend requests — which render at the top of the rail — are
+              visible without scrolling the column past the ledger. Same
+              component as the cream hub, retinted via dark-os overrides
+              on the .fc-* classes in hub-dark.css. */}
           <FriendsRail userId={userId} onUpgrade={onUpgrade} />
+          <OsRatingsPanel S={S} update={update} />
         </div>
 
         {/* Middle: imperative widgets canvas */}

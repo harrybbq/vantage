@@ -197,6 +197,28 @@ export async function listAcceptedFriends(userId) {
   }));
 }
 
+/** Lightweight relationship state for the current user — used to render
+ *  the right action on leaderboard rows (Add / Requested / Friends)
+ *  without a full useFriends instance. Returns three Sets of other-user
+ *  ids. Fails soft (empty sets) so the leaderboard never breaks. */
+export async function listRelationshipIds(userId) {
+  const empty = { friends: new Set(), outgoing: new Set(), incoming: new Set() };
+  if (!userId) return empty;
+  const { data, error } = await supabase
+    .from('friendships')
+    .select('requester_id, addressee_id, status')
+    .or(`requester_id.eq.${userId},addressee_id.eq.${userId}`);
+  if (error) return empty;
+  const out = { friends: new Set(), outgoing: new Set(), incoming: new Set() };
+  for (const e of data || []) {
+    const other = e.requester_id === userId ? e.addressee_id : e.requester_id;
+    if (e.status === 'accepted') out.friends.add(other);
+    else if (e.requester_id === userId) out.outgoing.add(other);
+    else out.incoming.add(other);
+  }
+  return out;
+}
+
 /** Incoming pending requests (someone asked YOU). */
 export async function listPendingRequests(userId) {
   const { data: edges, error } = await supabase

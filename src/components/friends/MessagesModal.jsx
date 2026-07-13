@@ -44,13 +44,25 @@ export default function MessagesModal({ open, userId, friend, onClose }) {
   const [errMsg, setErrMsg] = useState('');
   const [sending, setSending] = useState(false);
   const scrollRef = useRef(null);
+  // Only auto-scroll to the newest message when the user is already at
+  // the bottom. Once they scroll up to read history, the 4s poll must
+  // NOT yank them back down. `sigRef` also skips redundant state updates
+  // when a poll returns an unchanged thread (no re-render, no scroll).
+  const stickRef = useRef(true);
+  const sigRef = useRef('');
   const friendId = friend?.id;
+
+  function onScroll(e) {
+    const el = e.currentTarget;
+    stickRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
+  }
 
   const refresh = useCallback(async (markRead = true) => {
     if (!userId || !friendId) return;
     try {
       const rows = await listThread(userId, friendId);
-      setMessages(rows);
+      const sig = `${rows.length}:${rows[rows.length - 1]?.id ?? ''}`;
+      if (sig !== sigRef.current) { sigRef.current = sig; setMessages(rows); }
       setStatus('ready');
       if (markRead) markThreadRead(userId, friendId).catch(() => {});
     } catch (e) {
@@ -63,6 +75,7 @@ export default function MessagesModal({ open, userId, friend, onClose }) {
   useEffect(() => {
     if (!open || !friendId) return undefined;
     setStatus('loading'); setMessages([]); setDraft('');
+    sigRef.current = ''; stickRef.current = true;
     refresh(true);
     const id = setInterval(() => refresh(true), 4000);
     return () => clearInterval(id);
@@ -76,10 +89,11 @@ export default function MessagesModal({ open, userId, friend, onClose }) {
     return () => document.removeEventListener('keydown', onKey);
   }, [open, onClose]);
 
-  // Keep pinned to the newest message.
+  // Keep pinned to the newest message ONLY when the user is at the
+  // bottom — never interrupt them while they're scrolled up reading.
   useEffect(() => {
     const el = scrollRef.current;
-    if (el) el.scrollTop = el.scrollHeight;
+    if (el && stickRef.current) el.scrollTop = el.scrollHeight;
   }, [messages, status]);
 
   async function handleSend() {
@@ -87,8 +101,11 @@ export default function MessagesModal({ open, userId, friend, onClose }) {
     if (!text || sending) return;
     setSending(true);
     setDraft('');
+    // Sending always jumps you to the newest message.
+    stickRef.current = true;
     // Optimistic bubble.
     const temp = { id: `tmp-${Date.now()}`, sender_id: userId, recipient_id: friendId, body: text, created_at: new Date().toISOString(), _pending: true };
+    sigRef.current = ''; // force the next poll to reconcile
     setMessages(m => [...m, temp]);
     try {
       const saved = await sendMessage(userId, friendId, text);
@@ -124,7 +141,7 @@ export default function MessagesModal({ open, userId, friend, onClose }) {
           <button type="button" className="msg-close" onClick={() => onClose?.()} aria-label="Close">✕</button>
         </div>
 
-        <div className="msg-scroll" ref={scrollRef}>
+        <div className="msg-scroll" ref={scrollRef} onScroll={onScroll}>
           {status === 'loading' && <div className="msg-empty">Loading…</div>}
           {status === 'error' && <div className="msg-empty msg-error">{errMsg}</div>}
           {status === 'ready' && messages.length === 0 && (

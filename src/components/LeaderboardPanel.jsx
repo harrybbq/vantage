@@ -9,9 +9,10 @@
  * no source-of-points). Tap self → opens own RatingsPanel via the
  * onOpenSelfBreakdown callback the parent passes.
  */
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useLeaderboard } from '../hooks/useLeaderboard';
 import { ovrTier } from '../lib/ratings/tiers';
+import { listRelationshipIds, sendFriendRequest } from '../lib/friends/queries';
 import PrestigeBadge from './PrestigeBadge';
 import FriendRatingsModal from './FriendRatingsModal';
 
@@ -43,6 +44,7 @@ function medalColor(rank) {
 }
 
 export default function LeaderboardPanel({
+  userId,
   onOpenSelfBreakdown,
   onAddFriends,
   onOpenSettings,
@@ -51,6 +53,42 @@ export default function LeaderboardPanel({
   const [timeframe, setTimeframe] = useState('alltime');   // 'alltime' | 'weekly'
   const [selectedRow, setSelectedRow] = useState(null);
   const { data, loading, error, refresh } = useLeaderboard({ scope, timeframe });
+
+  // Relationship state so each row shows the right action (Add /
+  // Requested / Friends). Fetched once; updated optimistically on send.
+  const [rel, setRel] = useState({ friends: new Set(), outgoing: new Set(), incoming: new Set() });
+  const [sending, setSending] = useState(null); // userId currently being added
+  useEffect(() => {
+    let cancelled = false;
+    listRelationshipIds(userId).then(r => { if (!cancelled) setRel(r); });
+    return () => { cancelled = true; };
+  }, [userId, scope]);
+
+  async function addFriend(targetId) {
+    if (!userId || !targetId || sending) return;
+    setSending(targetId);
+    try {
+      await sendFriendRequest(userId, targetId);
+      setRel(r => ({ ...r, outgoing: new Set(r.outgoing).add(targetId) }));
+    } catch (e) {
+      window.alert(e.message || 'Could not send request.');
+    }
+    setSending(null);
+  }
+
+  // The action shown at the right of a non-self row.
+  function AddControl({ row }) {
+    const id = row.userId;
+    if (rel.friends.has(id)) return <span className="lb-add is-friend" title="Already friends">✓ Friends</span>;
+    if (rel.outgoing.has(id)) return <span className="lb-add is-sent" title="Request sent">Requested</span>;
+    if (rel.incoming.has(id)) return <span className="lb-add is-sent" title="They asked to add you — accept in Friends">Pending</span>;
+    return (
+      <button type="button" className="lb-add" disabled={sending === id}
+        onClick={() => addFriend(id)} title={`Add ${row.username}`}>
+        {sending === id ? '…' : '+ Add'}
+      </button>
+    );
+  }
 
   const stale = data?.computedAt && (Date.now() - new Date(data.computedAt).getTime()) > 24 * 60 * 60 * 1000;
   const optedOut = scope === 'global' && data && data.callerRank == null && (data.rows || []).every(r => !r.isSelf);
@@ -141,7 +179,7 @@ export default function LeaderboardPanel({
                 : (row.climb == null ? '—' : `${row.climb >= 0 ? '+' : ''}${row.climb} 7d`);
               const isMedal = row.rank <= 3;
               return (
-                <li key={row.userId}>
+                <li key={row.userId} className="lb-li">
                   <button
                     type="button"
                     className={`lb-row${row.isSelf ? ' is-self' : ''}`}
@@ -163,6 +201,7 @@ export default function LeaderboardPanel({
                       {timeframe === 'weekly' && primary != null && primary >= 0 ? '+' : ''}{primary == null ? '—' : primary}
                     </span>
                   </button>
+                  {!row.isSelf && <AddControl row={row} />}
                 </li>
               );
             })}
