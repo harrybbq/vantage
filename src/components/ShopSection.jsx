@@ -180,8 +180,8 @@ export default function ShopSection({ S, update, active, onOpenModal, onShowCoin
         priority: 'med',
         categoryId: null,
         notes: '',
-        imageUrl: '',
-        url: '',
+        imageUrl: item.imageUrl || '',
+        url: item.url || '',
         bought: false,
       }],
     }));
