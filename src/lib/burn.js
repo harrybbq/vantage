@@ -75,7 +75,13 @@ export function dayBurn(S, date) {
   const manual = (S.burnLog?.[date] || []).reduce((sum, a) => sum + (a.kcal || 0), 0);
   const whoopTotal = S.vitalsLog?.[date]?.burnKcal ?? null;
   const whoopActive = (whoopTotal != null && bmr != null) ? Math.max(0, Math.round(whoopTotal - bmr)) : null;
-  const activity = whoopActive != null ? whoopActive : manual;
+  // Translate WHOOP burn to the macros net even without a burn profile:
+  // prefer active energy (total − resting), fall back to the measured
+  // all-day total when we can't derive resting, and only then to the
+  // manual activity log.
+  const activity = whoopActive != null ? whoopActive
+    : whoopTotal != null ? whoopTotal
+    : manual;
   return {
     bmr,
     activity,

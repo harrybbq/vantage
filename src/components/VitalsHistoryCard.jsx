@@ -12,6 +12,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { supabase } from '../lib/supabase';
 import { parseHealthExport, applyHealthImport } from '../lib/appleHealth';
+import { syncWhoop } from '../lib/whoopClient';
 
 const METRICS = [
   { key: 'weight', label: 'Weight',  unit: 'kg',  src: 'vitals' },
@@ -136,26 +137,7 @@ function WhoopPanel({ S, update }) {
     setBusy(true);
     if (!silent) setMsg('');
     try {
-      const { data: { session } } = await supabase.auth.getSession();
-      const res = await fetch('/.netlify/functions/whoop-sync', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session?.access_token}` },
-        body: JSON.stringify({ days }),
-      });
-      const body = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(body.error || 'sync failed');
-      update(prev => {
-        const vitalsLog = { ...(prev.vitalsLog || {}) };
-        for (const [d, v] of Object.entries(body.vitals || {})) vitalsLog[d] = { ...(vitalsLog[d] || {}), ...v };
-        const burnLog = { ...(prev.burnLog || {}) };
-        for (const [d, entries] of Object.entries(body.burn || {})) {
-          const others = (burnLog[d] || []).filter(a => !String(a.id || '').startsWith('whoop-'));
-          burnLog[d] = [...others, ...entries];
-        }
-        return { ...prev, vitalsLog, burnLog, whoopConnected: true };
-      });
-      const vDays = Object.keys(body.vitals || {}).length;
-      const bDays = Object.keys(body.burn || {}).length;
+      const { vDays, bDays } = await syncWhoop(update, days);
       setMsg(`Synced ${vDays} day${vDays === 1 ? '' : 's'} of vitals · ${bDays} workout day${bDays === 1 ? '' : 's'}.`);
     } catch (e) {
       setMsg(e.message || 'WHOOP sync failed.');
@@ -163,26 +145,21 @@ function WhoopPanel({ S, update }) {
     setBusy(false);
   }
 
-  // Handle the OAuth redirect (?whoop=connected) and auto-sync once
-  // per session when already connected.
+  // Handle the OAuth redirect (?whoop=connected). Routine freshness is
+  // now driven by the app-level auto-sync (useWhoopAutoSync) on open/
+  // focus, so this only needs to catch the just-connected case.
   useEffect(() => {
     const p = new URLSearchParams(window.location.search);
     const r = p.get('whoop');
-    if (r) {
-      p.delete('whoop');
-      const qs = p.toString();
-      window.history.replaceState({}, '', window.location.pathname + (qs ? '?' + qs : ''));
-      if (r === 'connected') {
-        update(prev => (prev.whoopConnected ? prev : { ...prev, whoopConnected: true }));
-        syncNow(7);
-        return;
-      }
+    if (!r) return;
+    p.delete('whoop');
+    const qs = p.toString();
+    window.history.replaceState({}, '', window.location.pathname + (qs ? '?' + qs : ''));
+    if (r === 'connected') {
+      update(prev => (prev.whoopConnected ? prev : { ...prev, whoopConnected: true }));
+      syncNow(7);
+    } else {
       setMsg(`WHOOP connect failed (${r}).`);
-      return;
-    }
-    if (connected && !sessionStorage.getItem('vb_whoop_synced')) {
-      sessionStorage.setItem('vb_whoop_synced', '1');
-      syncNow(7, true);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
