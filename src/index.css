@@ -380,6 +380,9 @@ nav:hover .nav-tab-label{opacity:1;}
 .shop-trending-head{padding:12px 14px 10px;border-bottom:1px solid var(--border);display:flex;align-items:baseline;gap:8px;}
 .shop-trending-title{font-family:var(--mono);font-size:11px;letter-spacing:2px;text-transform:uppercase;color:var(--em);font-weight:700;}
 .shop-trending-sub{font-family:var(--mono);font-size:9.5px;color:var(--text-muted);letter-spacing:.5px;}
+.shop-trending-toggle{margin-left:auto;display:inline-flex;gap:2px;background:var(--card,rgba(128,128,128,.12));border-radius:999px;padding:2px;}
+.shop-trending-tab{border:none;background:none;border-radius:999px;padding:3px 9px;font-family:var(--mono);font-size:9px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;color:var(--text-muted);cursor:pointer;}
+.shop-trending-tab.on{background:var(--em);color:#fff;}
 /* Rolling viewport — fixed height, content marquees vertically. */
 .shop-trending-viewport{position:relative;height:min(70vh,560px);overflow:hidden;
   -webkit-mask-image:linear-gradient(180deg,transparent,#000 22px,#000 calc(100% - 22px),transparent);
@@ -2052,51 +2055,39 @@ html[data-theme="dark"] {
    product name never bleeds under the image (the bug in the screenshot
    that prompted this redesign — a 2-column 150px-min grid was
    squashing each card from elsewhere; that rule is now removed). */
+/* Compact single-row card on phones: 52px thumb · body (name + price) ·
+   a tight row of icon actions. ~62px tall so ~9 fit a screen instead of
+   ~4. Selectors are #shop-scoped to beat the responsive base overrides
+   further down the file. */
 @media(max-width:600px){
-  .shop-grid{grid-template-columns:1fr !important;gap:10px;}
-  .shop-item-card{
-    display:grid;
-    grid-template-columns:88px minmax(0, 1fr);
-    grid-template-areas:'img body' 'img footer';
-    border-radius:12px;
-    backdrop-filter:none;
-    box-shadow:0 1px 0 rgba(255,255,255,.35) inset, 0 4px 14px rgba(28,26,23,.06);
+  #shop .shop-grid{grid-template-columns:1fr !important;gap:8px;}
+  #shop .shop-item-card{
+    display:grid;grid-template-columns:52px minmax(0,1fr) auto;
+    grid-template-areas:'img body actions';align-items:center;
+    border-radius:12px;backdrop-filter:none;
+    box-shadow:0 1px 0 rgba(255,255,255,.3) inset, 0 3px 10px rgba(28,26,23,.06);
   }
-  .shop-item-card:hover{transform:none;box-shadow:0 1px 0 rgba(255,255,255,.35) inset, 0 4px 14px rgba(28,26,23,.06);}
-  .shop-item-img{
-    grid-area:img;
-    width:88px;height:100%;min-height:118px;
-    border-radius:12px 0 0 12px;
-    font-size:28px;
+  #shop .shop-item-card:hover{transform:none;box-shadow:0 1px 0 rgba(255,255,255,.3) inset, 0 3px 10px rgba(28,26,23,.06);}
+  #shop .shop-item-img{grid-area:img;width:52px;height:52px;min-height:0;margin:8px;border-radius:9px;font-size:20px;}
+  #shop .shop-item-body{grid-area:body;padding:8px 6px;gap:1px;min-width:0;overflow:hidden;}
+  #shop .shop-item-body > div:first-child{ gap:6px !important; }
+  #shop .shop-item-name{
+    font-size:13px;line-height:1.2;font-weight:700;
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0;
   }
-  .shop-item-body{
-    grid-area:body;
-    padding:10px 12px 4px;gap:3px;
-    min-width:0;            /* lets the name ellipsis instead of overflowing */
-    overflow:hidden;
-  }
-  .shop-item-body > div:first-child{ gap:6px !important; }
-  .shop-item-name{
-    font-size:13.5px;line-height:1.25;font-weight:700;
-    white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
-    min-width:0;
-  }
-  .shop-item-name.is-expanded{white-space:normal;}
-  .shop-item-price{font-size:13px;}
-  .shop-item-notes{
-    font-size:11px;line-height:1.35;
-    display:-webkit-box;-webkit-line-clamp:1;-webkit-box-orient:vertical;
-    overflow:hidden;
-  }
-  .shop-coin-cost{font-size:9.5px;padding:1px 7px;}
-  .shop-item-priority{font-size:8.5px;padding:1px 6px;flex-shrink:0;}
-  .shop-item-footer{
-    grid-area:footer;
-    padding:6px 12px 10px;border-top:none;
-    gap:6px;
-  }
-  .shop-link-btn{height:30px;font-size:11.5px;padding:0 10px;}
-  .shop-icon-btn{flex:0 0 30px;width:30px;height:30px;font-size:12.5px;}
+  #shop .shop-item-name.is-expanded{white-space:normal;}
+  #shop .shop-item-price{font-size:12.5px;margin:0;}
+  /* Coin chip + notes are noise in the tight list — hidden on phones. */
+  #shop .shop-coin-cost{display:none;}
+  #shop .shop-item-notes{display:none;}
+  #shop .shop-item-priority{font-size:8px;padding:1px 6px;flex-shrink:0;}
+  /* Actions: compact icons; "View Online" collapses to a ↗ icon. */
+  #shop .shop-item-footer{grid-area:actions;display:flex;flex-direction:row;gap:5px;padding:8px;border-top:none;}
+  #shop .shop-link-btn{flex:0 0 30px;width:30px;height:30px;min-width:0;padding:0;border-radius:8px;font-size:0;overflow:visible;}
+  #shop .shop-link-btn::after{content:'\2197';font-size:15px;font-weight:700;}
+  #shop .shop-link-btn.no-link{background:transparent;color:var(--text-muted);border:1px solid var(--border);}
+  #shop .shop-link-btn.no-link::after{content:'\2013';}
+  #shop .shop-icon-btn{flex:0 0 30px;width:30px;height:30px;font-size:14px;}
 }
 
 /* ── SPOTIFY BAR ── */
