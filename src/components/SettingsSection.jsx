@@ -8,6 +8,7 @@ import SubscriptionPanel from './SubscriptionPanel';
 import { AppleHealthImport } from './VitalsHistoryCard';
 import { useSubscriptionContext } from '../context/SubscriptionContext';
 import { getOwnProfile, updateOwnProfile } from '../lib/friends/queries';
+import { VISIONS_BY_ID } from '../lib/visions/definitions';
 
 // Pastel app-gradient derived from a dark accent by lightening it.
 function pastelGrad(em) {
@@ -29,15 +30,19 @@ export function schemeFromHex(hex) {
   };
 }
 
-// First 6 are free; the rest (pro: true) and the custom-colour picker
-// are gated behind Pro.
+// Availability tiers:
+//   • no flag        → free for everyone (green / blue / slate)
+//   • unlockVision   → earned free by achieving that vision (or Pro)
+//   • pro: true      → Pro only
+// Plus the custom-colour picker (Pro only).
 export const SCHEMES = [
   { id: 'green',  name: 'Forest Green', em: '#1a7a4a', mid: '#2a9e62', light: '#4dc485', grad: 'linear-gradient(145deg,#f0f7f3 0%,#d8eee5 40%,#b0d9c5 70%,#7ec8a8 100%)' },
   { id: 'blue',   name: 'Ocean Blue',   em: '#1a4a7a', mid: '#2a629e', light: '#4d9ec4', grad: 'linear-gradient(145deg,#f0f3f7 0%,#d8e5ee 40%,#b0c5d9 70%,#7ea8c8 100%)' },
-  { id: 'purple', name: 'Purple',       em: '#5a1a7a', mid: '#7a2a9e', light: '#a44dc4', grad: 'linear-gradient(145deg,#f4f0f7 0%,#e5d8ee 40%,#d0b0d9 70%,#b87ec8 100%)' },
-  { id: 'orange', name: 'Sunset',       em: '#7a3a1a', mid: '#9e5a2a', light: '#c47a4d', grad: 'linear-gradient(145deg,#f7f3f0 0%,#eee0d8 40%,#d9c0b0 70%,#c8977e 100%)' },
-  { id: 'pink',   name: 'Rose',         em: '#7a1a4a', mid: '#9e2a62', light: '#c44d85', grad: 'linear-gradient(145deg,#f7f0f3 0%,#eed8e5 40%,#d9b0c5 70%,#c87ea8 100%)' },
   { id: 'slate',  name: 'Slate',        em: '#1a3a5a', mid: '#2a5a8e', light: '#4d8ab0', grad: 'linear-gradient(145deg,#f0f2f7 0%,#d8dfe8 40%,#b0bece 70%,#7ea0be 100%)' },
+  // ── Earned accents — unlocked by achieving a vision (free) ──
+  { id: 'purple', name: 'Purple',       em: '#5a1a7a', mid: '#7a2a9e', light: '#a44dc4', grad: 'linear-gradient(145deg,#f4f0f7 0%,#e5d8ee 40%,#d0b0d9 70%,#b87ec8 100%)', unlockVision: 'ach-3' },
+  { id: 'orange', name: 'Sunset',       em: '#7a3a1a', mid: '#9e5a2a', light: '#c47a4d', grad: 'linear-gradient(145deg,#f7f3f0 0%,#eee0d8 40%,#d9c0b0 70%,#c8977e 100%)', unlockVision: 'streak-7' },
+  { id: 'pink',   name: 'Rose',         em: '#7a1a4a', mid: '#9e2a62', light: '#c44d85', grad: 'linear-gradient(145deg,#f7f0f3 0%,#eed8e5 40%,#d9b0c5 70%,#c87ea8 100%)', unlockVision: 'log-7' },
   // ── Pro accents ──
   { id: 'teal',    name: 'Teal',    em: '#0f5e5a', mid: '#1a8c84', light: '#4dc4ba', grad: pastelGrad('#0f5e5a'), pro: true },
   { id: 'crimson', name: 'Crimson', em: '#7a1a1a', mid: '#9e2a2a', light: '#c44d4d', grad: pastelGrad('#7a1a1a'), pro: true },
@@ -52,6 +57,13 @@ function hexToRgb(hex) {
   const g = parseInt(hex.slice(3, 5), 16);
   const b = parseInt(hex.slice(5, 7), 16);
   return `${r},${g},${b}`;
+}
+
+// The user's live accent hex (custom picker or the active scheme's em).
+export function currentAccentHex(S) {
+  if (S?.colorScheme === 'custom' && S?.customColor) return S.customColor;
+  const sc = SCHEMES.find(s => s.id === (S?.colorScheme || 'green'));
+  return sc?.em || '#1a7a4a';
 }
 
 // ── Theme modes (4 themes — light/dark axis × free/Pro tier) ─────────────
@@ -167,12 +179,15 @@ const SHARE_TOGGLES = [
 ];
 
 function FriendsPrivacyCard({ userId, S, update }) {
+  const { hasPro } = useSubscriptionContext();
   const [searchable, setSearchable] = useState(null);
   const [leaderboardOptin, setLeaderboardOptin] = useState(null);
+  const [nameColorOn, setNameColorOn] = useState(false);
   const [handle, setHandle] = useState(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
   const [available, setAvailable] = useState(null); // null = checking; false = schema missing
+  const accent = currentAccentHex(S);
 
   useEffect(() => {
     if (!userId) return;
@@ -189,6 +204,11 @@ function FriendsPrivacyCard({ userId, S, update }) {
         const optRes = await supabase.from('profiles')
           .select('leaderboard_optin').eq('id', userId).maybeSingle();
         if (!cancelled) setLeaderboardOptin(optRes.data?.leaderboard_optin ?? true);
+        // leaderboard_color is a separate, best-effort read so a missing
+        // column (migration not applied) doesn't break the card.
+        const colRes = await supabase.from('profiles')
+          .select('leaderboard_color').eq('id', userId).maybeSingle();
+        if (!cancelled) setNameColorOn(!!colRes.data?.leaderboard_color);
         setAvailable(true);
       } catch {
         if (!cancelled) setAvailable(false);
@@ -196,6 +216,25 @@ function FriendsPrivacyCard({ userId, S, update }) {
     })();
     return () => { cancelled = true; };
   }, [userId]);
+
+  // Keep the published colour in sync with the live accent while the
+  // toggle is on (so changing your scheme recolours your name too).
+  useEffect(() => {
+    if (!nameColorOn || !userId) return;
+    updateOwnProfile(userId, { leaderboard_color: accent }).catch(() => {});
+  }, [nameColorOn, accent, userId]);
+
+  async function handleToggleNameColor() {
+    const next = !nameColorOn;
+    setNameColorOn(next); // optimistic; the effect above publishes when on
+    setError(null);
+    try {
+      if (!next) await updateOwnProfile(userId, { leaderboard_color: null });
+    } catch (e) {
+      setNameColorOn(!next);
+      setError(e.message || 'Could not update name colour.');
+    }
+  }
 
   async function handleToggleLeaderboard() {
     const next = !leaderboardOptin;
@@ -301,6 +340,50 @@ function FriendsPrivacyCard({ userId, S, update }) {
           textTransform: 'uppercase', color: leaderboardOptin ? 'var(--em)' : 'var(--text-muted)',
         }}>
           {leaderboardOptin ? 'On' : 'Off'}
+        </span>
+      </label>
+
+      {/* Pro: colour your name on the leaderboard with your accent, so
+          you stand out without having to make your display name match. */}
+      <label
+        style={{
+          marginTop: '10px',
+          display: 'flex', alignItems: 'center', gap: '14px',
+          padding: '12px 14px', borderRadius: '10px',
+          border: (nameColorOn && hasPro) ? `2px solid ${accent}` : '2px solid var(--border)',
+          background: (nameColorOn && hasPro) ? `rgba(${hexToRgb(accent)},0.08)` : 'var(--card, rgba(255,255,255,0.04))',
+          cursor: hasPro ? 'pointer' : 'not-allowed', transition: 'all .18s',
+          opacity: hasPro ? 1 : 0.6,
+        }}
+        title={hasPro ? '' : 'Upgrade to Pro to colour your leaderboard name.'}
+      >
+        <input
+          type="checkbox"
+          checked={!!nameColorOn && hasPro}
+          disabled={!hasPro}
+          onChange={handleToggleNameColor}
+          style={{ width: '18px', height: '18px', accentColor: accent, cursor: hasPro ? 'pointer' : 'not-allowed' }}
+        />
+        <div style={{ flex: 1 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontFamily: 'var(--sans)', fontSize: '13px', fontWeight: 600, color: 'var(--text)' }}>
+            Colour my leaderboard name
+            <span style={{
+              fontFamily: 'var(--mono)', fontSize: '8px', letterSpacing: '1.4px', textTransform: 'uppercase',
+              padding: '2px 6px', borderRadius: '3px',
+              background: hasPro ? 'rgba(var(--em-rgb),0.14)' : 'rgba(200,151,10,0.12)',
+              color: hasPro ? 'var(--em)' : 'var(--gold)',
+              border: `1px solid ${hasPro ? 'rgba(var(--em-rgb),0.28)' : 'rgba(200,151,10,0.28)'}`,
+            }}>{hasPro ? 'Pro' : '🔒 Pro'}</span>
+          </div>
+          <div style={{ fontFamily: 'var(--mono)', fontSize: '10px', color: 'var(--text-muted)', letterSpacing: '0.5px', marginTop: '2px' }}>
+            Your name shows in <span style={{ color: accent, fontWeight: 700 }}>your accent colour</span> on the leaderboard.
+          </div>
+        </div>
+        <span style={{
+          fontFamily: 'var(--mono)', fontSize: '9px', letterSpacing: '1.4px',
+          textTransform: 'uppercase', color: (nameColorOn && hasPro) ? accent : 'var(--text-muted)',
+        }}>
+          {(nameColorOn && hasPro) ? 'On' : 'Off'}
         </span>
       </label>
 
@@ -486,19 +569,30 @@ export default function SettingsSection({ S, update, active, userId, onOpenLegal
         {/* Colour Scheme */}
         <div className="card" style={{ padding: '22px' }}>
           <h3 style={{ margin: '0 0 4px' }}>Colour Scheme</h3>
-          <p style={{ fontFamily: 'var(--mono)', fontSize: '11px', color: 'var(--text-muted)', margin: '0 0 18px', letterSpacing: '0.5px' }}>
-            Choose an accent colour applied across the whole app.
+          <p style={{ fontFamily: 'var(--mono)', fontSize: '11px', color: 'var(--text-muted)', margin: '0 0 18px', letterSpacing: '0.5px', lineHeight: 1.6 }}>
+            An accent colour applied across the whole app. ✦ accents unlock by achieving visions; 🔒 accents are Pro.
           </p>
           <div className="scheme-grid">
             {SCHEMES.map(scheme => {
               const isActive = currentScheme === scheme.id;
-              const locked = scheme.pro && !hasPro;
+              // Availability: Pro users get everything; vision-locked
+              // accents unlock when the vision is achieved; the active
+              // scheme is always allowed (never strand an existing pick).
+              const visionMet = scheme.unlockVision && !!(S.visions || {})[scheme.unlockVision];
+              const proLocked = scheme.pro && !hasPro;
+              const visionLocked = scheme.unlockVision && !visionMet && !hasPro;
+              const locked = (proLocked || visionLocked) && !isActive;
+              const lockHint = proLocked
+                ? 'Upgrade to Pro to unlock this accent'
+                : visionLocked
+                  ? `Unlock by achieving: ${VISIONS_BY_ID[scheme.unlockVision]?.title || 'a vision'}`
+                  : '';
               return (
                 <button
                   key={scheme.id}
                   onClick={() => handleSchemeChange(scheme)}
                   disabled={locked}
-                  title={locked ? 'Upgrade to Pro to unlock this accent' : ''}
+                  title={lockHint}
                   style={{
                     position: 'relative',
                     display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px',
@@ -511,7 +605,8 @@ export default function SettingsSection({ S, update, active, userId, onOpenLegal
                   }}
                 >
                   {locked && (
-                    <span style={{ position: 'absolute', top: 6, right: 8, fontSize: 10, color: 'var(--gold)' }}>🔒</span>
+                    <span style={{ position: 'absolute', top: 6, right: 8, fontSize: 10, color: 'var(--gold)' }}
+                      title={lockHint}>{visionLocked ? '✦' : '🔒'}</span>
                   )}
                   <div style={{
                     width: '36px', height: '36px', borderRadius: '10px',
