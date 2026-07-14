@@ -334,6 +334,13 @@ function CoinHistoryModal({ openId, onClose, coins, coinHistory }) {
 }
 
 // ── Add Achievement ──
+// Cap on the coins a single achievement can award. Stops a runaway
+// reward (typo or deliberate) from minting a meaningless coin balance.
+const MAX_ACH_COINS = 10000;
+function clampCoins(v) {
+  return Math.min(MAX_ACH_COINS, Math.max(0, parseInt(v) || 0));
+}
+
 const PRESET_EMOJIS = [
   '🏆','⭐','💰','🏠','🏃','🎯','📚','💪','🎓','🚗',
   '✈️','🏅','🎮','💻','🎸','🏋️','🌟','💎','🔑','🧘',
@@ -397,7 +404,7 @@ function AddAchievementModal({ openId, onClose, onAdd }) {
       x: 40 + Math.random() * 360,
       y: 40 + Math.random() * 260,
       completed: false,
-      coins: parseInt(form.coins) || 0,
+      coins: clampCoins(form.coins),
       category: form.category || 'general',
       createdAt: Date.now(),
     });
@@ -428,7 +435,7 @@ function AddAchievementModal({ openId, onClose, onAdd }) {
         </div>
         <input type="text" placeholder="Or type a custom emoji…" maxLength={2} value={form.icon} onChange={e => setForm(f => ({ ...f, icon: e.target.value }))} />
       </div>
-      <div className="fg"><label>⬡ Coin Reward on Completion</label><input type="number" placeholder="e.g. 50" min="0" value={form.coins} onChange={e => setForm(f => ({ ...f, coins: e.target.value }))} /></div>
+      <div className="fg"><label>⬡ Coin Reward on Completion</label><input type="number" placeholder="e.g. 50" min="0" max={MAX_ACH_COINS} value={form.coins} onChange={e => setForm(f => ({ ...f, coins: e.target.value }))} /><span style={{ fontFamily: 'var(--mono)', fontSize: '10px', color: 'var(--text-muted)', marginTop: '4px', display: 'block' }}>Max {MAX_ACH_COINS.toLocaleString()} ⬡ per achievement.</span></div>
       <CategoryPicker value={form.category} onChange={v => setForm(f => ({ ...f, category: v }))} />
       <div className="modal-actions">
         <button className="btn btn-ghost" onClick={() => onClose('addAchievementModal')}>Cancel</button>
@@ -470,7 +477,7 @@ function EditAchievementModal({ openId, onClose, achievements, onEdit, onDelete 
       name: form.name.trim(),
       desc: form.desc.trim(),
       icon: form.icon || ach.icon || '🏆',
-      coins: parseInt(form.coins) || 0,
+      coins: clampCoins(form.coins),
       category: form.category || 'general',
     });
     onClose(openId);
@@ -506,7 +513,7 @@ function EditAchievementModal({ openId, onClose, achievements, onEdit, onDelete 
         </div>
         <input type="text" placeholder="Or type a custom emoji…" maxLength={2} value={form.icon} onChange={e => setForm(f => ({ ...f, icon: e.target.value }))} />
       </div>
-      <div className="fg"><label>⬡ Coin Reward on Completion</label><input type="number" min="0" value={form.coins} onChange={e => setForm(f => ({ ...f, coins: e.target.value }))} /></div>
+      <div className="fg"><label>⬡ Coin Reward on Completion</label><input type="number" min="0" max={MAX_ACH_COINS} value={form.coins} onChange={e => setForm(f => ({ ...f, coins: e.target.value }))} /><span style={{ fontFamily: 'var(--mono)', fontSize: '10px', color: 'var(--text-muted)', marginTop: '4px', display: 'block' }}>Max {MAX_ACH_COINS.toLocaleString()} ⬡ per achievement.</span></div>
       <CategoryPicker value={form.category} onChange={v => setForm(f => ({ ...f, category: v }))} />
       {ach.completed && (
         <div style={{

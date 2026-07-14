@@ -194,7 +194,7 @@ export default function LeaderboardPanel({
                           {initials(row.username)}
                         </span>
                     }
-                    <span className="lb-name">{row.username}</span>
+                    <span className="lb-name" style={row.nameColor ? { color: row.nameColor } : undefined}>{row.username}</span>
                     <PrestigeBadge prestige={row.prestige} size="sm" />
                     <span className="lb-secondary">{secondary}</span>
                     <span className={`lb-primary ovr-num ovr-tier-${prestige.key}`}>

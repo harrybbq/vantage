@@ -96,7 +96,29 @@ function rowFromProfile(p, snapshotOvr, callerId) {
     prestige: p.prestige || 0,
     ratingsComputedAt: p.ratings_computed_at || null,
     isSelf: p.id === callerId,
+    nameColor: null, // filled by attachNameColors (best-effort)
   };
+}
+
+// Best-effort: colour each row's name with the user's chosen accent
+// (profiles.leaderboard_color, opt-in via Settings). Kept as a separate
+// query so a missing column (migration not yet applied) can't break the
+// board — a 400 just means no colours this run.
+async function attachNameColors(supabaseUrl, serviceKey, rows) {
+  const ids = Array.from(new Set(rows.map(r => r.userId).filter(Boolean)));
+  if (!ids.length) return;
+  try {
+    const res = await sb(supabaseUrl, serviceKey,
+      `/rest/v1/profiles?id=in.(${ids.join(',')})&select=id,leaderboard_color`
+    );
+    if (!res.ok) return;
+    const data = await res.json();
+    const byId = new Map(data.map(d => [d.id, d.leaderboard_color]));
+    for (const r of rows) {
+      const c = byId.get(r.userId);
+      if (c && /^#[0-9a-fA-F]{6}$/.test(c)) r.nameColor = c;
+    }
+  } catch { /* best effort */ }
 }
 
 // Lifetime sort key: prestige × 100 + OVR (mirrors the generated
@@ -255,6 +277,7 @@ exports.handler = async (event) => {
     const board = scope === 'global'
       ? await buildGlobalBoard({ supabaseUrl, serviceKey, callerId, timeframe })
       : await buildFriendsBoard({ supabaseUrl, serviceKey, callerId, timeframe });
+    await attachNameColors(supabaseUrl, serviceKey, board.rows);
 
     return {
       statusCode: 200, headers: CORS,
