@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { motion } from 'framer-motion';
 import { firePurchase } from '../utils/confetti';
 import SectionHelp from './SectionHelp';
+import TrendingBoard from './shop/TrendingBoard';
 
 const PRIORITY_LABEL = { high: '🔴 High', med: '🟡 Medium', low: '🟢 Low' };
 const PRIORITY_CLASS = { high: 'priority-high', med: 'priority-med', low: 'priority-low' };
@@ -167,6 +168,26 @@ export default function ShopSection({ S, update, active, onOpenModal, onShowCoin
     update(prev => ({ ...prev, shopFilter: f }));
   }
 
+  // Add a Trending pick straight to the user's own wishlist.
+  function handleAddTrending(item) {
+    update(prev => ({
+      ...prev,
+      shopItems: [...(prev.shopItems || []), {
+        id: 's' + Date.now(),
+        name: item.name,
+        price: item.price || '',
+        coinCost: item.coins || 0,
+        priority: 'med',
+        categoryId: null,
+        notes: '',
+        imageUrl: '',
+        url: '',
+        bought: false,
+      }],
+    }));
+    onShowCoinToast?.(`Added ${item.name} to your wishlist`, false);
+  }
+
   function handleToggleBought(id) {
     update(prev => {
       const item = prev.shopItems.find(s => s.id === id);
@@ -233,6 +254,7 @@ export default function ShopSection({ S, update, active, onOpenModal, onShowCoin
 
   return (
     <section id="shop" className={`section${active ? ' active' : ''}`}>
+      <div className="shop-page">
       <div className="shop-layout">
         <div className="shop-toolbar">
           <motion.div
@@ -370,6 +392,8 @@ export default function ShopSection({ S, update, active, onOpenModal, onShowCoin
               )
           )}
         </div>
+      </div>
+      <TrendingBoard onAdd={handleAddTrending} />
       </div>
     </section>
   );
