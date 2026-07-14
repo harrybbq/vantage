@@ -164,7 +164,7 @@ exports.handler = async (event) => {
         'content-type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'claude-3-5-haiku-latest',
+        model: 'claude-haiku-4-5-20251001',
         max_tokens: 900,
         // Slightly raised temperature so similar snapshots two days in
         // a row don't produce identical wording. Coach voice should
@@ -196,7 +196,7 @@ exports.handler = async (event) => {
       weekly_review: typeof brief.weekly_review === 'string' ? brief.weekly_review : '',
       verbs: Array.isArray(brief.verbs) ? brief.verbs.slice(0, 2) : [],
       generated_at: new Date().toISOString(),
-      model: 'claude-3-5-haiku-latest',
+      model: 'claude-haiku-4-5-20251001',
     };
 
     return { statusCode: 200, headers: CORS, body: JSON.stringify(safe) };

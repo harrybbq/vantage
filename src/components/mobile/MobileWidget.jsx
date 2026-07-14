@@ -701,9 +701,11 @@ function MacrosBody({ S, userId, navigate }) {
   const byName = n => macros.find(m => m.name === n);
   const calGoal = byName('Calories')?.daily_goal || 2000;
   const eaten = summary?.calories || 0;
-  // Activity burn only — resting/BMR is deliberately excluded from
-  // net so the donut doesn't sit negative all day (owner call).
-  const { activity: burned } = dayBurn(S, today);
+  // Use the SAME burn figure the Calories Burned widget shows so the two
+  // never disagree: WHOOP's measured all-day total when present, else the
+  // activity-only estimate (exercise + steps). net = eaten − burned.
+  const { activity, whoopTotal } = dayBurn(S, today);
+  const burned = whoopTotal != null ? whoopTotal : activity;
   const net = Math.round(eaten - burned);
 
   // Calorie ring: eaten arc in the accent; the leading portion that

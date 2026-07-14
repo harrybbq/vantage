@@ -1,5 +1,6 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { buildSnapshot } from '../lib/coach/snapshot';
+import { heuristicBrief } from '../lib/coach/heuristicBrief';
 
 /**
  * Fetch the AI Coach daily brief once per UTC day per user, with the
@@ -27,7 +28,17 @@ export function useDailyBrief({ S, update, isPro }) {
   const today = new Date().toISOString().slice(0, 10);
   const cached = S?.coachBrief;
   const cacheValid = cached && cached.date === today;
-  const brief = cacheValid ? cached : null;
+  const llmBrief = cacheValid ? cached : null;
+
+  // Local rules-based brief — shown instantly and whenever the LLM
+  // isn't available (no API key / offline). The LLM output, once it
+  // arrives, supersedes it. Recomputes cheaply as state changes.
+  const heuristic = useMemo(
+    () => (isPro && S?.profile ? heuristicBrief(S) : null),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [isPro, S?.profile?.name, S?.habits, S?.logs, S?.macroHistory, S?.vitalsLog, S?.savings]
+  );
+  const brief = llmBrief || heuristic;
 
   async function fetchBrief(force = false) {
     if (!isPro) return;
@@ -104,5 +115,8 @@ export function useDailyBrief({ S, update, isPro }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isPro, today, S?.profile?.name]);
 
-  return { brief, loading, error, refresh: () => fetchBrief(true) };
+  // Suppress the error surface while a heuristic brief is available —
+  // the panel still shows useful content, so an error banner would be
+  // noise. The error is only meaningful if we have nothing to show.
+  return { brief, loading, error: llmBrief || !heuristic ? error : null, refresh: () => fetchBrief(true) };
 }
