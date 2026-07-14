@@ -447,6 +447,9 @@ nav:hover .nav-tab-label{opacity:1;}
 .profile-name-row{display:flex;align-items:center;gap:4px;min-width:0;}
 .profile-name-input{background:transparent;border:none;font-family:var(--display);font-size:9px;font-weight:700;color:var(--text);outline:none;flex:1;min-width:0;padding:0;text-overflow:ellipsis;}
 .profile-name-input::placeholder{color:var(--text-muted);opacity:.65;}
+.profile-handle{font-family:var(--mono);font-size:11px;color:var(--text-muted);letter-spacing:.2px;flex-shrink:0;white-space:nowrap;max-width:110px;overflow:hidden;text-overflow:ellipsis;}
+.os-profile-handle{font-family:var(--mono);font-size:10px;color:var(--text-muted);letter-spacing:.3px;margin-left:8px;}
+.m-profile-handle{font-family:var(--mono);font-size:11px;color:var(--em);letter-spacing:.2px;font-weight:400;text-transform:none;}
 /* Mirrors the prototype's .fc-level chip (mono, em-tinted). Sized for
    the 144px rail — tight but legible at "Lvl 12". */
 .profile-level-badge{
@@ -5147,6 +5150,14 @@ button:active:not(:disabled),
 .sw-count-n { min-width: 16px; text-align: center; font-family: var(--mono); font-size: 11px; font-weight: 700; color: var(--text); }
 /* Multi (donuts) — clear the stepper. */
 .sw-pots-multi { padding-top: 26px; }
+/* Multi (fill bars) — a row of equal-width fills, one per pot. */
+.sw-pots-fills { padding-top: 26px; }
+.sw-fill-row { flex: 1; min-height: 0; display: flex; gap: 6px; }
+.sw-pot-fill.is-multi { flex: 1 1 0; width: auto; min-width: 0; min-height: 120px; }
+.sw-pot-fill.is-multi .sw-pot-fill-overlay { padding: 8px 7px; }
+.sw-pot-fill.is-multi .sw-pot-fill-name { font-size: 11px; }
+.sw-pot-fill.is-multi .sw-pot-fill-pct { font-size: 18px; }
+.sw-pot-fill.is-multi .sw-pot-fill-nums { font-size: 9.5px; }
 .sw-donuts { display: grid; grid-template-columns: repeat(auto-fit, minmax(64px, 1fr)); gap: 10px; }
 /* Single pot — fills the whole widget bottom→top. The flex chain
    below makes the island body stretch with the user's resize, so the

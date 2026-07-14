@@ -84,6 +84,33 @@ function hadPerfectTrackerWeek(S) {
   });
 }
 
+function savingsGoalsCompleted(S) {
+  return (S.savings || []).filter(g => (g.target || 0) > 0 && (g.current || 0) >= g.target).length;
+}
+function activeSavingsGoals(S) {
+  return (S.savings || []).filter(g => (g.target || 0) > 0).length;
+}
+function totalSaved(S) {
+  return (S.savings || []).reduce((sum, g) => sum + (g.current || 0), 0);
+}
+// Lifetime coins earned (positive coin-history entries only) — survives
+// spending, unlike the current balance.
+function coinsEarned(S) {
+  return (S.coinHistory || []).reduce((sum, h) => sum + (h.amount > 0 ? h.amount : 0), 0);
+}
+function activeHabitCount(S) {
+  return (S.habits || []).filter(h => h.startTime).length;
+}
+function macroLogDays(S) {
+  return Object.keys(S.macroHistory || {}).length;
+}
+function vitalsLogDays(S) {
+  return Object.keys(S.vitalsLog || {}).length;
+}
+function holidaysCompleted(S) {
+  return (S.holidays || []).filter(h => h.status === 'completed').length;
+}
+
 // ── definitions ───────────────────────────────────────────────────────
 export const VISIONS = [
   // Habit streaks — held a tracked habit clean for N days
@@ -156,6 +183,128 @@ export const VISIONS = [
     icon: '🏆',
     xp: 300,
     check: S => completedAchievementCount(S) >= 10,
+  },
+  {
+    id: 'ach-25',
+    title: 'Prolific',
+    desc: 'Completed twenty-five of your own achievements.',
+    icon: '👑',
+    xp: 600,
+    check: S => completedAchievementCount(S) >= 25,
+  },
+
+  // Long-haul consistency
+  {
+    id: 'log-100',
+    title: 'Centurion',
+    desc: 'Logged something a hundred days in a row.',
+    icon: '🗓️',
+    xp: 500,
+    check: S => consecutiveLogDays(S) >= 100,
+  },
+  {
+    id: 'streak-365',
+    title: 'A Year Clean',
+    desc: 'Held a habit clean for a full year.',
+    icon: '🏅',
+    xp: 1000,
+    check: S => maxHabitDaysClean(S) >= 365,
+  },
+  {
+    id: 'habits-3',
+    title: 'Habit Stacker',
+    desc: 'Tracking three habits at once.',
+    icon: '🧱',
+    xp: 50,
+    check: S => activeHabitCount(S) >= 3,
+  },
+
+  // Savings milestones
+  {
+    id: 'savings-first',
+    title: 'First Pot',
+    desc: 'Completed your first savings goal.',
+    icon: '🫙',
+    xp: 150,
+    check: S => savingsGoalsCompleted(S) >= 1,
+  },
+  {
+    id: 'savings-goals-3',
+    title: 'Diversified',
+    desc: 'Running three savings pots at once.',
+    icon: '🗂️',
+    xp: 75,
+    check: S => activeSavingsGoals(S) >= 3,
+  },
+  {
+    id: 'savings-1k',
+    title: 'Four Figures',
+    desc: 'Saved £1,000 across your pots.',
+    icon: '💷',
+    xp: 100,
+    check: S => totalSaved(S) >= 1000,
+  },
+  {
+    id: 'savings-10k',
+    title: 'Five Figures',
+    desc: 'Saved £10,000 across your pots.',
+    icon: '💰',
+    xp: 400,
+    check: S => totalSaved(S) >= 10000,
+  },
+
+  // Coins earned (lifetime)
+  {
+    id: 'coins-1k',
+    title: 'Coin Collector',
+    desc: 'Earned 1,000 coins in total.',
+    icon: '🪙',
+    xp: 100,
+    check: S => coinsEarned(S) >= 1000,
+  },
+  {
+    id: 'coins-5k',
+    title: 'Coin Baron',
+    desc: 'Earned 5,000 coins in total.',
+    icon: '⬡',
+    xp: 300,
+    check: S => coinsEarned(S) >= 5000,
+  },
+
+  // Tracking breadth — vitals & macros
+  {
+    id: 'vitals-7',
+    title: 'Body Aware',
+    desc: 'Logged your vitals on seven days.',
+    icon: '❤️',
+    xp: 75,
+    check: S => vitalsLogDays(S) >= 7,
+  },
+  {
+    id: 'macros-7',
+    title: 'Macro Minded',
+    desc: 'Logged your macros on seven days.',
+    icon: '🥗',
+    xp: 75,
+    check: S => macroLogDays(S) >= 7,
+  },
+
+  // Holidays
+  {
+    id: 'holiday-planned',
+    title: 'Wanderlust',
+    desc: 'Planned your first trip.',
+    icon: '🧳',
+    xp: 50,
+    check: S => (S.holidays || []).length >= 1,
+  },
+  {
+    id: 'holiday-done',
+    title: 'Bon Voyage',
+    desc: 'Completed a planned trip.',
+    icon: '✈️',
+    xp: 150,
+    check: S => holidaysCompleted(S) >= 1,
   },
 ];
 

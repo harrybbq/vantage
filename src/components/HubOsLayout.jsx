@@ -18,6 +18,7 @@ import FriendsRail from './friends/FriendsRail';
 import RatingsPanel from './RatingsPanel';
 import { useHubModuleMenu, moduleIdFromLabel } from './HubModuleMenu';
 import Icon from './Icon';
+import { useOwnHandle } from '../hooks/useOwnHandle';
 
 // ── Panel primitive ──────────────────────────────────────────────────────
 // Each panel tags itself with data-hub-module (derived from its label)
@@ -64,7 +65,7 @@ function dayOfYear(d = new Date()) {
 }
 
 // ── Panel: Profile ────────────────────────────────────────────────────────
-export function OsProfilePanel({ profile, onSaveName, onSaveTagline, onUploadPhoto }) {
+export function OsProfilePanel({ profile, handle, onSaveName, onSaveTagline, onUploadPhoto }) {
   const tier = 'Focus'; // TODO: wire to a real status/DND toggle later
   return (
     <OsPanel label="Operator" right="Online" innerPadding={false}>
@@ -98,6 +99,7 @@ export function OsProfilePanel({ profile, onSaveName, onSaveTagline, onUploadPho
           />
           <div className="os-profile-status">
             <span className="os-status-badge">{tier}</span>
+            {handle && <span className="os-profile-handle">@{handle}</span>}
           </div>
         </div>
       </div>
@@ -527,6 +529,7 @@ export default function HubOsLayout({
   const coins = S.coins || 0;
   const streak = S.currentStreak || 0;
   const level = Math.max(1, Math.floor(coins / 500) + 1);
+  const ownHandle = useOwnHandle(userId);
 
   // Right-click any panel → toggle its background transparency.
   const moduleMenu = useHubModuleMenu({
@@ -540,6 +543,7 @@ export default function HubOsLayout({
       <div className="hub-os-top">
         <OsProfilePanel
           profile={profile}
+          handle={ownHandle}
           onSaveName={name => update(prev => ({ ...prev, profile: { ...prev.profile, name } }))}
           onSaveTagline={tagline => update(prev => ({ ...prev, profile: { ...prev.profile, tagline } }))}
           onUploadPhoto={onUploadPhoto}

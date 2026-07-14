@@ -17,6 +17,7 @@ import { APP_PRESETS } from '../data/appPresets';
 import { fetchAppPreview } from '../lib/appPreview';
 import { strikeState } from '../lib/habits/strikes';
 import Icon from './Icon';
+import { useOwnHandle } from '../hooks/useOwnHandle';
 
 // ── GitHub helpers ──
 async function fetchGitHub(username, cache) {
@@ -251,7 +252,7 @@ function useWidgetDrag(canvasRef, S, update, snapRef) {
 // after the action buttons — used by the cream layout to slot the
 // QuickLog trackers under "Sort". The `--with-rail` modifier widens
 // the column so the trackers stack vertically without being clipped.
-function ProfileCard({ profile, S, update, onSaveName, onSaveTagline, onUploadPhoto, onAddWidget, onSortWidgets, onSnapFill, onToggleSnap, onNavigateSettings, visionState, children }) {
+function ProfileCard({ profile, S, update, handle, onSaveName, onSaveTagline, onUploadPhoto, onAddWidget, onSortWidgets, onSnapFill, onToggleSnap, onNavigateSettings, visionState, children }) {
   // OVR replaces the old Lvl badge (F5 Sprint 3). Read from S.ratings
   // — which is refreshed by useRatings on a 1.5s debounce. Falls back
   // to 1 if no rating computed yet (fresh user) so the chip never
@@ -286,6 +287,7 @@ function ProfileCard({ profile, S, update, onSaveName, onSaveTagline, onUploadPh
               defaultValue={profile.name}
               onChange={e => onSaveName(e.target.value)}
             />
+            {handle && <span className="profile-handle" title={`@${handle}`}>@{handle}</span>}
             <span
               className={`profile-level-badge ovr-chip ovr-tier-${prestige.key}`}
               title={visionState
@@ -344,6 +346,7 @@ export default function HubSection({ S, update, active, onOpenModal, onOpenWaitl
   snapRef.current = !!S.hubSnap;
   const makeDraggable = useWidgetDrag(canvasRef, S, update, snapRef);
   const { hasPro } = useSubscriptionContext();
+  const ownHandle = useOwnHandle(userId);
 
   // React islands inside the imperative canvas — Vitals / Macros /
   // Calories reuse the mobile widget bodies rather than duplicating
@@ -986,6 +989,7 @@ export default function HubSection({ S, update, active, onOpenModal, onOpenWaitl
           profile={S.profile}
           S={S}
           update={update}
+          handle={ownHandle}
           onSaveName={name => update(prev => ({ ...prev, profile: { ...prev.profile, name } }))}
           onSaveTagline={tagline => update(prev => ({ ...prev, profile: { ...prev.profile, tagline } }))}
           onUploadPhoto={handleUploadPhoto}

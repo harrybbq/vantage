@@ -725,6 +725,7 @@ function Board({ userId, userEmail, onSignOut }) {
             <MobileProfileSection
               S={S}
               update={update}
+              userId={userId}
               userEmail={userEmail}
               onSignOut={onSignOut}
             />

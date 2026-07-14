@@ -85,13 +85,26 @@ export function SavingsPotsBody({ S, count = 1, onSetCount, navigate }) {
     );
   }
 
+  // More than one pot → a row of fill bars, one per pot, each taking an
+  // equal share of the widget width (same bottom-to-top fill as a single
+  // pot, just narrower). No donuts.
   return (
-    <div className="sw-pots sw-pots-multi" onClick={go} role={navigate ? 'link' : undefined} tabIndex={navigate ? 0 : undefined}>
+    <div className="sw-pots sw-pots-fills" onClick={go} role={navigate ? 'link' : undefined} tabIndex={navigate ? 0 : undefined}>
       {stepper}
-      <div className="sw-donuts">
-        {shown.map((g, i) => (
-          <Donut key={g.id} pct={(g.current || 0) / (g.target || 1)} color={potColor(g, i)} label={g.name} />
-        ))}
+      <div className="sw-fill-row">
+        {shown.map(g => {
+          const pct = Math.max(0, Math.min(1, (g.current || 0) / (g.target || 1)));
+          return (
+            <div key={g.id} className="sw-pot-fill is-multi">
+              <div className="sw-pot-fill-bar" style={{ height: `${Math.max(2, pct * 100)}%`, background: pct >= 1 ? 'var(--gold, #d4a017)' : potColor(g, goals.indexOf(g)) }} />
+              <div className="sw-pot-fill-overlay">
+                <span className="sw-pot-fill-name">{g.icon || '💰'} {g.name}</span>
+                <span className="sw-pot-fill-pct">{Math.round(pct * 100)}%</span>
+                <span className="sw-pot-fill-nums">{money(g.current || 0)}</span>
+              </div>
+            </div>
+          );
+        })}
       </div>
     </div>
   );
