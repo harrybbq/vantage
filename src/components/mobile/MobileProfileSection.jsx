@@ -20,9 +20,11 @@
  */
 import { useState, useRef } from 'react';
 import { supabase } from '../../lib/supabase';
+import { useOwnHandle } from '../../hooks/useOwnHandle';
 
-export default function MobileProfileSection({ S, update, userEmail, onSignOut }) {
+export default function MobileProfileSection({ S, update, userId, userEmail, onSignOut }) {
   const profile = S.profile || {};
+  const handle = useOwnHandle(userId);
   const fileInputRef = useRef(null);
   const [emailDraft, setEmailDraft] = useState(userEmail || '');
   const [emailMsg, setEmailMsg] = useState(null);
@@ -142,7 +144,10 @@ export default function MobileProfileSection({ S, update, userEmail, onSignOut }
           </div>
 
           <label className="m-profile-field">
-            <span className="m-profile-label">Display name</span>
+            <span className="m-profile-label" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              Display name
+              {handle && <span className="m-profile-handle">@{handle}</span>}
+            </span>
             <input
               type="text"
               className="m-profile-input"
