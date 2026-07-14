@@ -387,6 +387,7 @@ nav:hover .nav-tab-label{opacity:1;}
 .shop-trending-track{display:flex;flex-direction:column;gap:10px;padding:12px;animation:shopRoll linear infinite;box-sizing:border-box;width:100%;}
 .shop-trending-viewport:hover .shop-trending-track{animation-play-state:paused;}
 @keyframes shopRoll{from{transform:translateY(-50%);}to{transform:translateY(0);}}
+@keyframes shopRollX{from{transform:translateX(0);}to{transform:translateX(-50%);}}
 .shop-trend-card{display:flex;align-items:center;gap:10px;padding:10px;border-radius:11px;min-width:0;box-sizing:border-box;
   background:var(--card,rgba(128,128,128,.08));border:1px solid var(--border-lt,var(--border));}
 .shop-trend-emoji{font-size:22px;flex-shrink:0;width:34px;height:34px;display:flex;align-items:center;justify-content:center;
@@ -402,8 +403,38 @@ nav:hover .nav-tab-label{opacity:1;}
 .shop-trend-add:hover{background:var(--em);color:#fff;}
 @media (max-width:900px){
   .shop-page{flex-direction:column;}
-  .shop-trending{flex-basis:auto;width:100%;position:static;margin-top:8px;}
-  .shop-trending-viewport{height:220px;}
+  /* Trending becomes a horizontal ticker along the bottom on mobile. */
+  .shop-trending{flex-basis:auto;max-width:none;width:100%;position:static;margin-top:10px;order:2;}
+  .shop-trending-head{padding:10px 14px;}
+  .shop-trending-viewport{height:auto;
+    -webkit-mask-image:linear-gradient(90deg,transparent,#000 20px,#000 calc(100% - 20px),transparent);
+    mask-image:linear-gradient(90deg,transparent,#000 20px,#000 calc(100% - 20px),transparent);}
+  .shop-trending-track{flex-direction:row;width:max-content;gap:10px;animation-name:shopRollX;}
+  .shop-trend-card{width:230px;flex:0 0 230px;}
+  .shop-trend-blurb{display:none;}
+}
+
+/* ── Mobile shopping — neater, thumb-friendly ── */
+@media (max-width:768px){
+  #shop .shop-layout{max-width:none;}
+  .shop-toolbar{flex-direction:column;align-items:stretch;gap:12px;margin-bottom:16px;}
+  .shop-toolbar-actions{width:100%;}
+  .shop-toolbar-actions .btn{flex:1;min-height:44px;}
+  /* Stats as a tidy 2×2 grid instead of a wrapping row. */
+  .shop-summary{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px;}
+  .shop-summary-stat{padding:12px 14px;}
+  /* Priority filters + category tabs scroll sideways as big pills. */
+  .shop-filters,.shop-tabs{flex-wrap:nowrap;overflow-x:auto;-webkit-overflow-scrolling:touch;
+    scrollbar-width:none;padding-bottom:2px;margin-left:-2px;padding-left:2px;}
+  .shop-filters::-webkit-scrollbar,.shop-tabs::-webkit-scrollbar{display:none;}
+  .shop-filter-btn,.shop-tab{flex:0 0 auto;white-space:nowrap;min-height:38px;padding:8px 15px;}
+  /* One roomy card per row; shorter image so cards aren't giant. */
+  .shop-grid{grid-template-columns:1fr !important;gap:12px;}
+  .shop-item-img{height:130px;}
+  /* Bigger tap targets in the card footer. */
+  .shop-item-footer{gap:10px;padding:12px;}
+  .shop-link-btn{height:44px;font-size:13px;}
+  .shop-icon-btn{flex:0 0 44px;width:44px;height:44px;font-size:16px;}
 }
 
 #hub .hub-layout{position:relative;z-index:1;}
