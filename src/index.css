@@ -409,8 +409,13 @@ nav:hover .nav-tab-label{opacity:1;}
 .shop-trend-add:hover{background:var(--em);color:#fff;}
 @media (max-width:900px){
   /* Hard-clip horizontal overflow so the wide marquee can never make the
-     page zoom-out / scroll sideways on phones. */
-  .shop-page{flex-direction:column;overflow-x:hidden;max-width:100%;}
+     page zoom-out / scroll sideways on phones. align-items:stretch is
+     load-bearing: the base rule's flex-start would make children
+     shrink-to-fit their content in column mode, letting one long nowrap
+     product name blow .shop-layout out to ~2x the screen (the zoom-out /
+     clipped-page bug) instead of ellipsising. */
+  .shop-page{flex-direction:column;align-items:stretch;overflow-x:hidden;max-width:100%;}
+  .shop-page > .shop-layout{width:100%;max-width:100%;}
   .shop-trending{flex-basis:auto;max-width:100%;width:100%;position:static;margin-top:10px;order:2;}
   .shop-trending-head{padding:10px 14px;}
   .shop-trending-viewport{height:auto;
