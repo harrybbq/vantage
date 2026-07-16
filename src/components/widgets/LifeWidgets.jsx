@@ -91,7 +91,11 @@ function logTodayWeight(update, value) {
   }));
 }
 
-export function BodyBody({ S, update, navigate }) {
+// showLog: the weight quick-log input. OFF in the hub widget — the
+// Vitals widget already prompts for weight and both write the same
+// store, so the widget surface stays read-only (trend + goal). The
+// Track page's BodyCard turns it on.
+export function BodyBody({ S, update, navigate, showLog = false }) {
   const [draft, setDraft] = useState('');
   const stats = bodyStats(S);
   const today = getTodayStr();
@@ -123,26 +127,27 @@ export function BodyBody({ S, update, navigate }) {
         </>
       ) : (
         <div style={{ ...mono, fontSize: 11, color: 'var(--text-muted)', lineHeight: 1.6 }}>
-          No weight logged yet. Log today's below — your trend, weekly rate and goal progress appear here.
+          No weight logged yet — log it via the Vitals widget or the Body card on Track, and your trend, weekly rate and goal progress appear here.
         </div>
       )}
-      {/* Quick log — same store the Vitals widget writes. */}
-      <div style={{ display: 'flex', gap: 6 }}>
-        <input
-          type="number" inputMode="decimal" step="0.1" min="0"
-          placeholder={loggedToday ? `today: ${(S.vitalsLog || {})[today].weight} kg` : 'weight today (kg)'}
-          value={draft}
-          onChange={e => setDraft(e.target.value)}
-          onKeyDown={e => { if (e.key === 'Enter') { logTodayWeight(update, draft); setDraft(''); } }}
-          style={{ flex: 1, minWidth: 0, padding: '7px 10px', border: '1px solid var(--border)', borderRadius: 8, background: 'var(--bg-base, transparent)', color: 'var(--text)', fontFamily: 'var(--sans)', fontSize: 12.5, outline: 'none' }}
-        />
-        <button
-          type="button"
-          onClick={() => { logTodayWeight(update, draft); setDraft(''); }}
-          disabled={!parseFloat(draft)}
-          style={{ padding: '7px 12px', border: 'none', borderRadius: 8, background: parseFloat(draft) ? 'var(--em)' : 'var(--border)', color: '#fff', fontFamily: 'var(--sans)', fontSize: 12, fontWeight: 600, cursor: parseFloat(draft) ? 'pointer' : 'default' }}
-        >Log</button>
-      </div>
+      {showLog && (
+        <div style={{ display: 'flex', gap: 6 }}>
+          <input
+            type="number" inputMode="decimal" step="0.1" min="0"
+            placeholder={loggedToday ? `today: ${(S.vitalsLog || {})[today].weight} kg` : 'weight today (kg)'}
+            value={draft}
+            onChange={e => setDraft(e.target.value)}
+            onKeyDown={e => { if (e.key === 'Enter') { logTodayWeight(update, draft); setDraft(''); } }}
+            style={{ flex: 1, minWidth: 0, padding: '7px 10px', border: '1px solid var(--border)', borderRadius: 8, background: 'var(--bg-base, transparent)', color: 'var(--text)', fontFamily: 'var(--sans)', fontSize: 12.5, outline: 'none' }}
+          />
+          <button
+            type="button"
+            onClick={() => { logTodayWeight(update, draft); setDraft(''); }}
+            disabled={!parseFloat(draft)}
+            style={{ padding: '7px 12px', border: 'none', borderRadius: 8, background: parseFloat(draft) ? 'var(--em)' : 'var(--border)', color: '#fff', fontFamily: 'var(--sans)', fontSize: 12, fontWeight: 600, cursor: parseFloat(draft) ? 'pointer' : 'default' }}
+          >Log</button>
+        </div>
+      )}
       {navigate && (
         <button type="button" onClick={() => navigate('track')}
           style={{ ...mono, alignSelf: 'flex-start', background: 'none', border: 'none', padding: 0, fontSize: 10, letterSpacing: 0.8, color: 'var(--text-muted)', cursor: 'pointer', textDecoration: 'underline' }}>
@@ -190,7 +195,7 @@ export function BodyCard({ S, update }) {
         <h3 style={{ margin: 0, fontSize: 'var(--text-md)' }}>Body</h3>
         {stats?.goal != null && <span style={{ ...mono, fontSize: 10, color: 'var(--text-muted)' }}>goal {stats.goal} kg</span>}
       </div>
-      <BodyBody S={S} update={update} />
+      <BodyBody S={S} update={update} showLog />
       {/* Goal + today's measurements */}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, marginTop: 12 }}>
         <div>

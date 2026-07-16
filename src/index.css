@@ -324,7 +324,11 @@ nav:hover .nav-tab-label{opacity:1;}
 /* MODALS */
 .modal-overlay{position:fixed;inset:0;background:rgba(28,26,23,.42);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);z-index:500;display:none;align-items:center;justify-content:center;}
 .modal-overlay.open{display:flex;}
-.modal{background:linear-gradient(180deg,#fdfbf5 0%,#f7f1e4 100%);border:var(--border-modal);border-radius:var(--radius-xl);padding:30px;width:460px;max-width:93vw;animation:modalIn .32s var(--ease-spring);box-shadow:0 1px 0 rgba(255,255,255,.7) inset,0 28px 70px rgba(28,26,23,.22),0 0 0 1px rgba(var(--em-rgb),.04);}
+/* max-height + internal scroll: a tall modal (e.g. the Add Widget
+   picker) must never grow past the viewport — otherwise its top edge
+   (and title/close) becomes unreachable. Mobile has its own cap in the
+   bottom-sheet media query below. */
+.modal{background:linear-gradient(180deg,#fdfbf5 0%,#f7f1e4 100%);border:var(--border-modal);border-radius:var(--radius-xl);padding:30px;width:460px;max-width:93vw;max-height:85dvh;overflow-y:auto;animation:modalIn .32s var(--ease-spring);box-shadow:0 1px 0 rgba(255,255,255,.7) inset,0 28px 70px rgba(28,26,23,.22),0 0 0 1px rgba(var(--em-rgb),.04);}
 @keyframes modalIn{from{opacity:0;transform:scale(.92) translateY(18px)}to{opacity:1;transform:scale(1) translateY(0)}}
 .modal h3{font-family:var(--display);font-size:23px;font-weight:700;color:var(--em);margin-bottom:22px;letter-spacing:-.3px;}
 .fg{margin-bottom:14px;}
