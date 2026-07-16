@@ -53,6 +53,20 @@ function fetchJson(url, timeoutMs = 8000) {
     .finally(() => clearTimeout(t));
 }
 
+// Liquids should default to ml, not g. Three signals, best first:
+// OFF's serving unit field, the package quantity string ("330 ml"),
+// then a name/category keyword fallback.
+const LIQUID_WORDS = /\b(milk|juice|water|cola|soda|lemonade|drink|smoothie|shake|coffee|latte|tea|beer|lager|cider|wine|spirits?|vodka|gin|rum|whisky|kombucha|squash|cordial|broth|beverage)\b/i;
+function servingUnit(p) {
+  const u = String(p.serving_quantity_unit || '').toLowerCase();
+  if (u === 'ml' || u === 'l' || u === 'cl') return 'ml';
+  if (u === 'g' || u === 'kg' || u === 'mg') return 'g';
+  if (/\b\d+(\.\d+)?\s*(ml|cl|l|litre|liter)s?\b/i.test(p.quantity || '')) return 'ml';
+  const hay = `${p.product_name || ''} ${p.categories || ''} ${p.pnns_groups_2 || ''}`;
+  if (LIQUID_WORDS.test(hay) || /beverage|drinks?/i.test(p.categories || '')) return 'ml';
+  return 'g';
+}
+
 function mapProduct(p) {
   const n = p.nutriments || {};
   const per100 = k => parseFloat(n[k + '_100g'] ?? n[k] ?? 0) || 0;
@@ -61,6 +75,7 @@ function mapProduct(p) {
     brand:     p.brands || '',
     barcode:   p.code || p._id || '',
     serving_g: parseFloat(p.serving_quantity) || 100,
+    serving_unit: servingUnit(p),
     calories:  per100('energy-kcal'),
     protein_g: per100('proteins'),
     carbs_g:   per100('carbohydrates'),

@@ -32,8 +32,22 @@ const EMPTY_FORM = {
 
 const NUTRIENT_KEYS = ['calories', 'protein_g', 'carbs_g', 'fat_g', 'fibre_g', 'sugar_g', 'sodium_mg'];
 
+// Fallback liquid detection for prefills that don't carry a serving_unit
+// (older saved meals, older API responses). Search results and AI scans
+// now send serving_unit themselves, which always wins.
+const LIQUID_WORDS = /\b(milk|juice|water|cola|soda|lemonade|drink|smoothie|shake|coffee|latte|tea|beer|lager|cider|wine|vodka|gin|rum|whisky|kombucha|squash|cordial|broth|beverage)\b/i;
+function withLiquidDefault(prefill) {
+  if (!prefill) return null;
+  if (prefill.serving_unit) return prefill;
+  if (LIQUID_WORDS.test(prefill.food_name || '')) return { ...prefill, serving_unit: 'ml' };
+  return prefill;
+}
+
 export default function FoodLogSheet({ userId, logDate, onClose, onSaved, prefill, onSaveMeal }) {
-  const [form, setForm] = useState(prefill ? { ...EMPTY_FORM, ...prefill } : { ...EMPTY_FORM });
+  const [form, setForm] = useState(() => {
+    const p = withLiquidDefault(prefill);
+    return p ? { ...EMPTY_FORM, ...p } : { ...EMPTY_FORM };
+  });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
 
