@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import CameraScanner from './CameraScanner';
 import { backdropClose } from '../utils/backdropClose';
+import { useSubscriptionContext } from '../context/SubscriptionContext';
 
 async function searchByBarcode(barcode) {
   const res = await fetch(`/.netlify/functions/food-search?mode=barcode&q=${encodeURIComponent(barcode)}`);
@@ -17,11 +18,12 @@ async function searchByName(query) {
 }
 
 export default function FoodSearch({ onSelectFood, onClose, onOpenModal, savedMeals = [], onDeleteMeal }) {
-  // Camera scanning is OWNER-ONLY for now (per owner call, 2026-07) —
-  // the tab simply doesn't exist for other accounts. ZXing fallback
-  // means it works on iOS Safari and desktop webcams too, so no
-  // mobile restriction. Widen to Pro later by loosening this flag.
-  const canUseCamera = typeof window !== 'undefined' && !!window.__vantageOwner;
+  // Camera scanning (barcode + AI identify) is a Pro feature — matches
+  // the privacy policy's "AI food scanner (Pro)" disclosure. The owner
+  // flag keeps it testable on the owner account regardless of tier.
+  // ZXing fallback means it works on iOS Safari and desktop webcams.
+  const { hasPro } = useSubscriptionContext();
+  const canUseCamera = hasPro || (typeof window !== 'undefined' && !!window.__vantageOwner);
 
   const [query, setQuery] = useState('');
   const [results, setResults] = useState([]);
@@ -127,7 +129,11 @@ export default function FoodSearch({ onSelectFood, onClose, onOpenModal, savedMe
       style={{ position: 'fixed', inset: 0, zIndex: 510, background: 'rgba(0,0,0,.45)', display: 'flex', alignItems: 'flex-end' }}
       {...backdropClose(() => onClose())}
     >
-      <div style={{ width: '100%', background: 'var(--bg-base)', borderRadius: '20px 20px 0 0', padding: '24px 20px 40px', animation: 'sheet-up 300ms cubic-bezier(0.34,1.56,0.64,1) both', maxHeight: '88dvh', display: 'flex', flexDirection: 'column' }}>
+      {/* maxHeight 72dvh (was 88): with many results the sheet used to
+          swallow nearly the whole screen, leaving almost no backdrop to
+          tap to dismiss. Results scroll internally; the top ~28% of the
+          screen always stays tappable to close. */}
+      <div style={{ width: '100%', background: 'var(--bg-base)', borderRadius: '20px 20px 0 0', padding: '24px 20px 40px', animation: 'sheet-up 300ms cubic-bezier(0.34,1.56,0.64,1) both', maxHeight: '72dvh', display: 'flex', flexDirection: 'column' }}>
         {/* Handle */}
         <div style={{ width: '40px', height: '4px', background: 'var(--border)', borderRadius: '2px', margin: '0 auto 18px', flexShrink: 0 }} />
 

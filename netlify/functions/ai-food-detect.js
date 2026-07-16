@@ -2,8 +2,13 @@
  * Netlify serverless function: ai-food-detect
  *
  * Accepts a base64 JPEG image from the camera scanner, sends it to
- * Claude (claude-3-haiku) via the Anthropic API, and returns identified
+ * Claude (Haiku 4.5) via the Anthropic API, and returns identified
  * food with estimated nutritional values per 100g.
+ *
+ * NOTE: this previously used claude-3-haiku-20240307, which was RETIRED
+ * on 2026-04-19 — every request 404'd at the API, which is why
+ * "Identify with AI" silently stopped working. Keep this model id
+ * current when Anthropic deprecates models.
  *
  * Required Netlify env var:
  *   ANTHROPIC_API_KEY — from console.anthropic.com
@@ -102,7 +107,7 @@ exports.handler = async (event) => {
         'content-type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'claude-3-haiku-20240307',
+        model: 'claude-haiku-4-5-20251001',
         max_tokens: 512,
         system: SYSTEM_PROMPT,
         messages: [{
