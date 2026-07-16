@@ -6,6 +6,7 @@ import { recalcStreaks } from '../utils/streaks';
 import SectionHelp from './SectionHelp';
 import NutritionSection from './NutritionSection';
 import VitalsHistoryCard from './VitalsHistoryCard';
+import { BodyCard, MoodCard } from './widgets/LifeWidgets';
 
 function getWeekProgress(logs, trackerId, weeklyTarget) {
   const dateStr = getTodayStr();
@@ -442,7 +443,7 @@ export default function TrackSection({ S, update, active, onOpenModal, onShowCoi
         transition={{ duration: 0.4, ease: 'easeOut' }}
       >
         <div className="eyebrow">Daily Habits</div>
-        <div className="sec-title">Track <SectionHelp text="Log daily habits and numbers against weekly targets. Click any day on the calendar to log, or multi-select to batch-log multiple days at once." /></div>
+        <div className="sec-title">Track <SectionHelp text="Everything you log daily lives here. Trackers: tick habits or numbers against weekly targets (multi-select calendar days to batch-log). Nutrition: search foods, scan a barcode, or identify a plate with AI — liquids preset to ml. Vitals sync from WHOOP or Apple Health. Body tracks your weight trend against a goal, and Mood & Journal is a one-tap daily check-in." /></div>
       </motion.div>
       {/* Desktop: trackers strip on top, then a 3-column dashboard
           (Calendar · Vitals & Macros · Daily Macros). Collapses to a
@@ -463,6 +464,11 @@ export default function TrackSection({ S, update, active, onOpenModal, onShowCoi
           <div className="track-col">
             {/* Vitals + macro-% history chart. */}
             <VitalsHistoryCard S={S} update={update} />
+            {/* Body — weight trend/goal + waist/body-fat measurements.
+                Shares S.vitalsLog.weight with the vitals history above. */}
+            <BodyCard S={S} update={update} />
+            {/* Mood & Journal — one-tap mood + optional daily note. */}
+            <MoodCard S={S} update={update} />
           </div>
           <div className="track-col">
             {userId

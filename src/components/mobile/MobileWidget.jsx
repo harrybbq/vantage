@@ -20,6 +20,7 @@ import { APP_PRESETS, getAppPreset } from '../../data/appPresets';
 import { fetchAppPreview } from '../../lib/appPreview';
 import { strikeState } from '../../lib/habits/strikes';
 import { SavingsPotsBody, SavingsProjectionBody } from '../savings/SavingsWidgets';
+import { BodyBody, SubscriptionsBody, MoodBody } from '../widgets/LifeWidgets';
 
 // App presets (FloorplanStudio / TubeLube / …) become mobile widget
 // types too — generated from the shared config so adding an app in one
@@ -107,10 +108,30 @@ const BASE_WIDGET_META = {
     eyebrow: 'MACROS',
     icon: '◑',
   },
+  // Body — weight trend + goal, built on the same S.vitalsLog store as
+  // Vitals so WHOOP / Apple Health / manual entries all feed the trend.
+  'body': {
+    label: 'Body',
+    eyebrow: 'BODY',
+    icon: '◍',
+  },
+  // Mood — one-tap daily mood + 8-week heatmap; journal on Track.
+  'mood': {
+    label: 'Mood',
+    eyebrow: 'MOOD',
+    icon: '☺',
+  },
   'savings-pots': {
     label: 'Savings Pots',
     eyebrow: 'SAVINGS',
     icon: '◒',
+  },
+  // Subscriptions — monthly burn + upcoming renewals; manage on the
+  // Achievements → Savings tab.
+  'subscriptions': {
+    label: 'Subscriptions',
+    eyebrow: 'BILLS',
+    icon: '↻',
   },
   'savings-projection': {
     label: 'Projection',
@@ -403,6 +424,9 @@ function renderBody(widget, meta, S, update, navigate, userId) {
     case 'vitals':      return <VitalsBody S={S} update={update} />;
     case 'calories':    return <BurnBody S={S} update={update} userId={userId} />;
     case 'macros':      return <MacrosBody S={S} userId={userId} navigate={navigate} />;
+    case 'body':        return <BodyBody S={S} update={update} navigate={navigate} />;
+    case 'mood':        return <MoodBody S={S} update={update} navigate={navigate} />;
+    case 'subscriptions': return <SubscriptionsBody S={S} navigate={navigate} />;
     case 'savings-pots': return <SavingsPotsBody S={S} count={widget.count || 1} navigate={navigate}
       onSetCount={n => update(prev => ({ ...prev, mobileWidgets: (prev.mobileWidgets || []).map(w => w.id === widget.id ? { ...w, count: n } : w) }))} />;
     case 'savings-projection': return <SavingsProjectionBody S={S} navigate={navigate} />;
