@@ -823,7 +823,22 @@ function Board({ userId, userEmail, onSignOut }) {
 
 export default function App() {
   const [session, setSession] = useState(undefined);
-  const [legalPage, setLegalPage] = useState(null);
+  // Deep-linkable legal pages: /privacy and /terms (or #privacy/#terms)
+  // open the doc directly, pre-auth. App-store listings require a public
+  // privacy-policy URL that works without signing in — this is it.
+  const [legalPage, setLegalPage] = useState(() => {
+    const path = window.location.pathname.replace(/\/+$/, '');
+    const hash = window.location.hash.replace('#', '');
+    if (path === '/privacy' || hash === 'privacy') return 'privacy';
+    if (path === '/terms' || hash === 'terms') return 'terms';
+    return null;
+  });
+
+  function closeLegal() {
+    setLegalPage(null);
+    // Drop the /privacy or /terms path so the app boots normally.
+    try { window.history.replaceState(null, '', '/'); } catch { /* no-op */ }
+  }
 
   useEffect(() => {
     let settled = false;
@@ -868,7 +883,7 @@ export default function App() {
 
   // Legal page overlay — accessible before login
   if (legalPage) {
-    return <LegalPage page={legalPage} onClose={() => setLegalPage(null)} />;
+    return <LegalPage page={legalPage} onClose={closeLegal} />;
   }
 
   if (session === undefined) {
