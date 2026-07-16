@@ -45,6 +45,7 @@ Schema:
   "food_name": "descriptive name of the food",
   "brand": "",
   "serving_g": 100,
+  "serving_unit": "g",
   "calories": 0,
   "protein_g": 0,
   "carbs_g": 0,
@@ -57,7 +58,8 @@ Schema:
 }
 
 Rules:
-- All numeric values are per 100g unless the image clearly shows a specific serving size
+- serving_unit is "ml" if the food is a liquid or beverage (milk, juice, soft drinks, coffee, soup you'd drink, alcohol), otherwise "g"
+- All numeric values are per 100g (or per 100ml for liquids) unless the image clearly shows a specific serving size
 - Use typical average nutritional values for the identified food
 - If you can read nutritional info from packaging in the image, use those values
 - If you cannot identify any food, return food_name as empty string and confidence as "low"
@@ -152,6 +154,8 @@ exports.handler = async (event) => {
     // Ensure all numeric fields are numbers
     const numFields = ['serving_g', 'calories', 'protein_g', 'carbs_g', 'fat_g', 'fibre_g', 'sugar_g', 'sodium_mg'];
     numFields.forEach(f => { food[f] = parseFloat(food[f]) || 0; });
+    // Normalise the unit — anything that isn't explicitly ml is grams.
+    food.serving_unit = food.serving_unit === 'ml' ? 'ml' : 'g';
 
     return {
       statusCode: 200,
