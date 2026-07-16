@@ -110,8 +110,21 @@ export default function FoodLogSheet({ userId, logDate, onClose, onSaved, prefil
       additional_nutrients: form.serving_unit === 'ml' ? { serving_unit: 'ml' } : {},
       source: 'manual',
     };
-    const { error: err } = await supabase.from('nutrition_log').insert(row);
-    if (err) { setError('Failed to save. Please try again.'); setSaving(false); return; }
+    // Race the insert against a timeout. Without this, a stalled request
+    // (auth-token refresh hanging, DB briefly unresponsive, flaky mobile
+    // connection) leaves the button pinned on "Saving…" forever with no
+    // error and no way to retry.
+    let err;
+    try {
+      const insert = supabase.from('nutrition_log').insert(row);
+      const timeout = new Promise((_, reject) =>
+        setTimeout(() => reject(new Error('timeout')), 12000));
+      const res = await Promise.race([insert, timeout]);
+      err = res?.error;
+    } catch {
+      err = { message: 'timeout' };
+    }
+    if (err) { setError('Couldn’t save — check your connection and try again.'); setSaving(false); return; }
     setSaving(false);
     onSaved?.();
     onClose();
