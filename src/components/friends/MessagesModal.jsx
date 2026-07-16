@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { listThread, sendMessage, markThreadRead } from '../../lib/friends/messages';
+import { reportUser, blockUser } from '../../lib/friends/queries';
+import ReportFriendModal from './ReportFriendModal';
 
 /**
  * MessagesModal — a 1:1 chat overlay with a single friend.
@@ -37,12 +39,17 @@ function fmtDay(iso) {
   } catch { return ''; }
 }
 
-export default function MessagesModal({ open, userId, friend, onClose }) {
+export default function MessagesModal({ open, userId, friend, onClose, onBlocked }) {
   const [messages, setMessages] = useState([]);
   const [draft, setDraft] = useState('');
   const [status, setStatus] = useState('loading'); // loading | ready | error
   const [errMsg, setErrMsg] = useState('');
   const [sending, setSending] = useState(false);
+  // Moderation — report & block straight from the conversation (Apple
+  // Guideline 1.2 requires abuse reporting where the UGC is consumed).
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [reporting, setReporting] = useState(false);
+  const menuRef = useRef(null);
   const scrollRef = useRef(null);
   // Only auto-scroll to the newest message when the user is already at
   // the bottom. Once they scroll up to read history, the 4s poll must
@@ -121,9 +128,44 @@ export default function MessagesModal({ open, userId, friend, onClose }) {
     setSending(false);
   }
 
+  // Close the ⋯ menu on any outside click.
+  useEffect(() => {
+    if (!menuOpen) return undefined;
+    const onDown = e => { if (!menuRef.current?.contains(e.target)) setMenuOpen(false); };
+    document.addEventListener('mousedown', onDown);
+    return () => document.removeEventListener('mousedown', onDown);
+  }, [menuOpen]);
+
+  async function handleBlock() {
+    setMenuOpen(false);
+    const ok = window.confirm(
+      `Block ${friend?.name || 'this user'}? They'll be removed from your friends, won't be able to message you, and won't be able to find you again.`
+    );
+    if (!ok) return;
+    try {
+      await blockUser(userId, friendId);
+      onBlocked?.(friend);
+      onClose?.();
+    } catch (e) {
+      setErrMsg(e.message || 'Could not block.');
+      window.setTimeout(() => setErrMsg(''), 4000);
+    }
+  }
+
   if (!open || !friend) return null;
 
   const name = friend.name || `@${friend.handle}`;
+
+  // Recent messages FROM the reported user, attached to the report as
+  // evidence for triage (capped well under the context column's limits).
+  function reportEvidence() {
+    return messages
+      .filter(m => m.sender_id === friendId)
+      .slice(-5)
+      .map(m => `"${String(m.body).slice(0, 70)}"`)
+      .join(' · ')
+      .slice(0, 400);
+  }
 
   return (
     <div className="msg-overlay" onMouseDown={e => { if (e.target === e.currentTarget) onClose?.(); }}>
@@ -138,7 +180,39 @@ export default function MessagesModal({ open, userId, friend, onClose }) {
               <div className="msg-head-handle">@{friend.handle}</div>
             </div>
           </div>
-          <button type="button" className="msg-close" onClick={() => onClose?.()} aria-label="Close">✕</button>
+          <div className="fc-menu-wrap" ref={menuRef} style={{ marginLeft: 'auto' }}>
+            <button
+              type="button"
+              className="msg-close"
+              style={{ marginLeft: 0 }}
+              onClick={() => setMenuOpen(o => !o)}
+              aria-label="Conversation actions"
+              aria-expanded={menuOpen}
+              aria-haspopup="menu"
+              title="More"
+            >⋯</button>
+            {menuOpen && (
+              <div className="fc-menu" role="menu">
+                <button
+                  type="button"
+                  role="menuitem"
+                  className="fc-menu-item"
+                  onClick={() => { setMenuOpen(false); setReporting(true); }}
+                >
+                  Report abuse
+                </button>
+                <button
+                  type="button"
+                  role="menuitem"
+                  className="fc-menu-item fc-menu-item-warn"
+                  onClick={handleBlock}
+                >
+                  Block user
+                </button>
+              </div>
+            )}
+          </div>
+          <button type="button" className="msg-close" style={{ marginLeft: 0 }} onClick={() => onClose?.()} aria-label="Close">✕</button>
         </div>
 
         <div className="msg-scroll" ref={scrollRef} onScroll={onScroll}>
@@ -184,6 +258,16 @@ export default function MessagesModal({ open, userId, friend, onClose }) {
           </button>
         </div>
       </div>
+
+      {/* Report flow — reuses the friend-card modal; recent messages
+          from the other user ride along as evidence for triage. */}
+      <ReportFriendModal
+        open={reporting}
+        friend={friend}
+        onSubmit={(reason, context) =>
+          reportUser(userId, friendId, reason, [context, reportEvidence()].filter(Boolean).join(' — recent messages: '))}
+        onClose={() => setReporting(false)}
+      />
     </div>
   );
 }

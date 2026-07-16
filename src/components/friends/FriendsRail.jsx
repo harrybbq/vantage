@@ -274,6 +274,12 @@ export default function FriendsRail({ userId, onUpgrade }) {
         userId={userId}
         friend={messageTarget}
         onClose={() => setMessageTarget(null)}
+        onBlocked={() => {
+          // Blocked from inside the conversation — the friendship row is
+          // gone, so drop the card and refresh the list.
+          setSelectedId(null);
+          friends.refresh().catch(() => {});
+        }}
       />
     </>
   );
