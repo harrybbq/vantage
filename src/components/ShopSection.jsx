@@ -264,7 +264,7 @@ export default function ShopSection({ S, update, active, onOpenModal, onShowCoin
             transition={{ duration: 0.4, ease: 'easeOut' }}
           >
             <div className="eyebrow">Wishlist</div>
-            <div className="sec-title">Shopping List <SectionHelp text="Build a wishlist with priorities and coin costs. Paste a product URL to auto-fill the name and price. Drag items between categories." /></div>
+            <div className="sec-title">Shopping List <SectionHelp text="Build a wishlist with priorities and coin costs — paste a product URL to auto-fill the name and price, then unlock items with the coins you earn. The Trending board surfaces what your friends and the wider community are saving for (anonymous counts only; opt out in Settings → Privacy)." /></div>
           </motion.div>
           <div className="shop-toolbar-actions" style={{ display: 'flex', gap: '10px' }}>
             <motion.button className="btn btn-ghost" onClick={() => onOpenModal('addCategoryModal')}

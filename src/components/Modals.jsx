@@ -154,6 +154,24 @@ function AddLinkModal({ openId, onClose, onSwitchModal, onAddNotepad, onAddApp, 
           <span style={{ fontWeight: 700, fontSize: '13px', color: 'var(--text)' }}>Projection</span>
           <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Net · balance trend</span>
         </button>
+        <button className="btn btn-ghost" style={{ padding: '16px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px', borderRadius: '12px', height: 'auto' }}
+          onClick={() => { onClose('addLinkModal'); onAddHubWidget('body'); }}>
+          <span style={{ fontSize: '22px' }}>◍</span>
+          <span style={{ fontWeight: 700, fontSize: '13px', color: 'var(--text)' }}>Body</span>
+          <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Weight trend · goal</span>
+        </button>
+        <button className="btn btn-ghost" style={{ padding: '16px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px', borderRadius: '12px', height: 'auto' }}
+          onClick={() => { onClose('addLinkModal'); onAddHubWidget('mood'); }}>
+          <span style={{ fontSize: '22px' }}>☺</span>
+          <span style={{ fontWeight: 700, fontSize: '13px', color: 'var(--text)' }}>Mood</span>
+          <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Daily check-in · heatmap</span>
+        </button>
+        <button className="btn btn-ghost" style={{ padding: '16px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px', borderRadius: '12px', height: 'auto' }}
+          onClick={() => { onClose('addLinkModal'); onAddHubWidget('subscriptions'); }}>
+          <span style={{ fontSize: '22px' }}>↻</span>
+          <span style={{ fontWeight: 700, fontSize: '13px', color: 'var(--text)' }}>Subscriptions</span>
+          <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Monthly burn · renewals</span>
+        </button>
       </div>
 
       {/* Our Apps — one-click presets for our own apps, a Pro bonus.

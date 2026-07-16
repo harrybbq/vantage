@@ -8,6 +8,7 @@
  * via an action that lives one layer up.
  */
 import LeaderboardPanel from './LeaderboardPanel';
+import SectionHelp from './SectionHelp';
 
 export default function LeaderboardSection({
   active,
@@ -21,7 +22,7 @@ export default function LeaderboardSection({
       <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
         <div>
           <div className="eyebrow">Standings</div>
-          <div className="sec-title">Leaderboard</div>
+          <div className="sec-title">Leaderboard <SectionHelp text="Your OVR rating (Brain, Finance, Fitness, Social — each 0–99) ranked against friends or everyone, by all-time or weekly climb. Add people straight from the board with the + button. At OVR 99 you can Prestige for a colour-band badge. Hide yourself from the global board any time in Settings → Privacy." /></div>
         </div>
         <LeaderboardPanel
           userId={userId}

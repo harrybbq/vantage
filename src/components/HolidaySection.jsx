@@ -50,7 +50,7 @@ export default function HolidaySection({ S, update, active, onOpenModal }) {
             transition={{ duration: 0.4, ease: 'easeOut' }}
           >
             <div className="eyebrow">Adventures</div>
-            <div className="sec-title">Holiday Planner <SectionHelp text="Plan upcoming trips — add dates, flights, accommodation, budget, and a cover photo. Status badges track each trip from planning to completed." /></div>
+            <div className="sec-title">Holiday Planner <SectionHelp text="Plan upcoming trips — dates, flights, accommodation, budget, and a cover photo, with a live countdown to departure. Status badges track each trip from planning to completed, and the Holidays hub widget keeps your next trips a glance away." /></div>
           </motion.div>
           <motion.button className="btn btn-primary" onClick={() => onOpenModal('addHolidayModal')}
             whileHover={{ scale: 1.04 }} whileTap={{ scale: 0.96 }}

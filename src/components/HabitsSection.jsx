@@ -145,7 +145,7 @@ export default function HabitsSection({ S, update, active, onOpenModal, onShowCo
         transition={{ duration: 0.4, ease: 'easeOut' }}
       >
         <div className="eyebrow">Break the Cycle</div>
-        <div className="sec-title">Habits <SectionHelp text="Track long-term habits with a live streak timer. Set milestones at intervals (e.g. 1 week, 1 month) and earn coin rewards when you hit them." /></div>
+        <div className="sec-title">Habits <SectionHelp text="Break bad habits with a live timer counting up from your last relapse. Milestones (1 week → 1 month → 1 year) pay coin rewards as you pass them, and a strikes-per-week allowance means one slip doesn't have to reset the whole streak. Add the Habits widget to your hub to keep streaks in view." /></div>
       </motion.div>
 
       <div style={{ marginBottom: '28px' }}>

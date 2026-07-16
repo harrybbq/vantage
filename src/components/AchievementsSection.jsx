@@ -3,6 +3,7 @@ import { motion } from 'framer-motion';
 import { fireAchievement } from '../utils/confetti';
 import SectionHelp from './SectionHelp';
 import SavingsList from './SavingsList';
+import { SubscriptionsManager } from './widgets/LifeWidgets';
 
 /**
  * Achievement Board — React-rendered canvas of goal nodes connected by
@@ -645,7 +646,7 @@ export default function AchievementsSection({ S, update, active, onOpenModal, on
           <div className="eyebrow">Progress Map</div>
           <div className="sec-title">
             Achievement Board
-            <SectionHelp text="Place goals on a canvas and draw connections between them to map your path. Complete a parent goal to unlock its children." />
+            <SectionHelp text="Goals tab: place goals on the canvas, draw connections to map your path, and complete them for coin rewards (max 10,000 per goal) — a parent unlocks its children. Savings tab: money goals with target dates and monthly guidance, plus Subscriptions & Bills to track recurring outgoings and see your monthly burn." />
           </div>
         </motion.div>
         <div className="ach-toolbar-hints">
@@ -685,7 +686,12 @@ export default function AchievementsSection({ S, update, active, onOpenModal, on
       </div>
 
       {activeTab === 'savings' ? (
-        <SavingsList S={S} update={update} onOpenModal={onOpenModal} />
+        <>
+          <SavingsList S={S} update={update} onOpenModal={onOpenModal} />
+          {/* Recurring outgoings — the spending counterpart to the
+              savings goals above; feeds the Subscriptions hub widget. */}
+          <SubscriptionsManager S={S} update={update} />
+        </>
       ) : (<>
 
       {/* Canvas — dot grid background, draggable nodes, SVG connections.
