@@ -50,12 +50,16 @@ exports.handler = async (event) => {
     const friendIds = edges.map(e => (e.requester_id === callerId ? e.addressee_id : e.requester_id));
     if (!friendIds.length) return { statusCode: 200, headers: CORS, body: JSON.stringify({ items: [] }) };
 
-    // JSON-path projection keeps this to just each friend's shopItems.
-    const uRes = await sb(`user_data?id=in.(${friendIds.join(',')})&select=id,items:state->shopItems`, env);
+    // JSON-path projection keeps this to just each friend's shopItems
+    // plus their trending opt-in flag (state->privacy->shareTrending).
+    const uRes = await sb(`user_data?id=in.(${friendIds.join(',')})&select=id,items:state->shopItems,trending:state->privacy->shareTrending`, env);
     const rows = uRes.ok ? await uRes.json() : [];
 
     const map = new Map(); // normalized name → aggregate
     for (const row of rows) {
+      // Respect the per-user opt-in: only `false` opts out (default on —
+      // friendship is the consent, matching the rest of the model).
+      if (row.trending === false) continue;
       const items = Array.isArray(row.items) ? row.items : [];
       const seen = new Set(); // one vote per friend per item
       for (const it of items) {

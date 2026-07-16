@@ -343,6 +343,51 @@ function FriendsPrivacyCard({ userId, S, update }) {
         </span>
       </label>
 
+      {/* Shopping Trending opt-in. Lives in S.privacy (no migration);
+          friends-trending reads state->privacy->shareTrending and skips
+          you when off. Defaults on — friendship is the consent, matching
+          the rest of the friends model — but this lets you keep your
+          wishlist out of friends' Trending board. */}
+      {(() => {
+        const trendingOn = S?.privacy?.shareTrending !== false;
+        return (
+          <label
+            style={{
+              marginTop: '10px',
+              display: 'flex', alignItems: 'center', gap: '14px',
+              padding: '12px 14px', borderRadius: '10px',
+              border: trendingOn ? '2px solid var(--em)' : '2px solid var(--border)',
+              background: trendingOn ? 'rgba(var(--em-rgb),0.08)' : 'var(--card, rgba(255,255,255,0.04))',
+              cursor: 'pointer', transition: 'all .18s',
+            }}
+          >
+            <input
+              type="checkbox"
+              checked={trendingOn}
+              onChange={() => update(prev => ({
+                ...prev,
+                privacy: { ...(prev.privacy || {}), shareTrending: !trendingOn },
+              }))}
+              style={{ width: '18px', height: '18px', accentColor: 'var(--em)', cursor: 'pointer' }}
+            />
+            <div style={{ flex: 1 }}>
+              <div style={{ fontFamily: 'var(--sans)', fontSize: '13px', fontWeight: 600, color: 'var(--text)' }}>
+                Share my wishlist in friends' Trending
+              </div>
+              <div style={{ fontFamily: 'var(--mono)', fontSize: '10px', color: 'var(--text-muted)', letterSpacing: '0.5px', marginTop: '2px' }}>
+                When on, items you're saving for can appear (anonymously, as a count) in your friends' Trending tab on Shopping. Off keeps your wishlist out of it entirely.
+              </div>
+            </div>
+            <span style={{
+              fontFamily: 'var(--mono)', fontSize: '9px', letterSpacing: '1.4px',
+              textTransform: 'uppercase', color: trendingOn ? 'var(--em)' : 'var(--text-muted)',
+            }}>
+              {trendingOn ? 'On' : 'Off'}
+            </span>
+          </label>
+        );
+      })()}
+
       {/* Pro: colour your name on the leaderboard with your accent, so
           you stand out without having to make your display name match. */}
       <label
