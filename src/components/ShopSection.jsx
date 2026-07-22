@@ -63,6 +63,11 @@ function ShopCard({ item, coins, onToggleBought, onDelete, onEdit, revealDelay }
           <span className={`shop-item-priority ${PRIORITY_CLASS[item.priority]}`}>{PRIORITY_LABEL[item.priority]}</span>
         </div>
         {item.price && <div className="shop-item-price">{item.price}</div>}
+        {item.bought && item.boughtAt && (
+          <div className="shop-item-notes" style={{ fontFamily: 'var(--mono)', fontSize: 10 }}>
+            Bought {new Date(item.boughtAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
+          </div>
+        )}
         {item.coinCost > 0 && (
           <div className={`shop-coin-cost${!canAfford && !item.bought ? ' cant-afford' : ''}`}>
             ⬡ {item.coinCost} coins{item.bought ? ' · spent' : !canAfford ? ' · need more' : ' to unlock'}
@@ -208,7 +213,11 @@ export default function ShopSection({ S, update, active, onOpenModal, onShowCoin
       if (!item.bought) firePurchase();
       return {
         ...prev,
-        shopItems: prev.shopItems.map(s => s.id === id ? { ...s, bought: !s.bought } : s),
+        // boughtAt drives the Archive view (sorted newest-first there);
+        // un-buying clears it and returns the item to the active list.
+        shopItems: prev.shopItems.map(s => s.id === id
+          ? { ...s, bought: !s.bought, boughtAt: !s.bought ? Date.now() : undefined }
+          : s),
         coins: newCoins,
         coinHistory: newHistory,
       };
@@ -243,14 +252,22 @@ export default function ShopSection({ S, update, active, onOpenModal, onShowCoin
     { key: 'high', label: '🔴 High' },
     { key: 'med', label: '🟡 Medium' },
     { key: 'low', label: '🟢 Low' },
-    { key: 'bought', label: '✓ Bought' },
+    { key: 'bought', label: '🗂 Archive' },
   ];
 
+  // Bought items are ARCHIVED: they leave every active view the moment
+  // they're purchased (no clutter) and live only under the Archive
+  // filter, newest purchase first. Un-buying restores them.
   let filtered = shopItems;
-  if (shopFilter === 'bought') filtered = filtered.filter(s => s.bought);
+  if (shopFilter === 'bought') {
+    filtered = filtered.filter(s => s.bought)
+      .slice()
+      .sort((a, b) => (b.boughtAt || 0) - (a.boughtAt || 0));
+  }
   else if (shopFilter === 'high') filtered = filtered.filter(s => s.priority === 'high' && !s.bought);
   else if (shopFilter === 'med') filtered = filtered.filter(s => s.priority === 'med' && !s.bought);
   else if (shopFilter === 'low') filtered = filtered.filter(s => s.priority === 'low' && !s.bought);
+  else filtered = filtered.filter(s => !s.bought);
 
   return (
     <section id="shop" className={`section${active ? ' active' : ''}`}>
@@ -264,7 +281,7 @@ export default function ShopSection({ S, update, active, onOpenModal, onShowCoin
             transition={{ duration: 0.4, ease: 'easeOut' }}
           >
             <div className="eyebrow">Wishlist</div>
-            <div className="sec-title">Shopping List <SectionHelp text="Build a wishlist with priorities and coin costs — paste a product URL to auto-fill the name and price, then unlock items with the coins you earn. The Trending board surfaces what your friends and the wider community are saving for (anonymous counts only; opt out in Settings → Privacy)." /></div>
+            <div className="sec-title">Shopping List <SectionHelp text="Build a wishlist with priorities and coin costs — paste a product URL to auto-fill the name and price, then unlock items with the coins you earn — bought items move to the Archive filter to keep the list tidy. The Trending board surfaces what your friends and the wider community are saving for (anonymous counts only; opt out in Settings → Privacy)." /></div>
           </motion.div>
           <div className="shop-toolbar-actions" style={{ display: 'flex', gap: '10px' }}>
             <motion.button className="btn btn-ghost" onClick={() => onOpenModal('addCategoryModal')}
@@ -375,7 +392,7 @@ export default function ShopSection({ S, update, active, onOpenModal, onShowCoin
             </>
           ) : (
             filtered.length === 0
-              ? <div className="shop-empty"><div className="shop-empty-icon">🛍</div><div>Nothing here.</div></div>
+              ? <div className="shop-empty"><div className="shop-empty-icon">{shopFilter === 'bought' ? '🗂' : '🛍'}</div><div>{shopFilter === 'bought' ? 'Archive is empty — items you mark as bought land here.' : 'Nothing here.'}</div></div>
               : (
                 <div className="shop-grid" style={{ display: 'grid' }}>
                   {filtered.map((item, index) => (
