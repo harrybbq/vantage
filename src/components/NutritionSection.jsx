@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import Icon from './Icon';
 import { motion, AnimatePresence } from 'framer-motion';
 import { supabase } from '../lib/supabase';
 import { useNutrition } from '../hooks/useNutrition';
@@ -66,7 +67,7 @@ function MacroBar({ macro, consumed, isCal, index, onMenuClick }) {
           onClick={() => onMenuClick(macro)}
           style={{ background: 'none', border: 'none', color: 'var(--text-mid)', cursor: 'pointer', fontSize: '14px', padding: '2px 4px', borderRadius: 'var(--radius-sm)', lineHeight: 1 }}
           title="Macro options"
-        >···</button>
+        aria-label="Options"><Icon name="ellipsis" size={16} /></button>
       </div>
       <div style={{ height: isCal ? '12px' : '8px', background: 'rgba(128,128,128,.18)', borderRadius: 'var(--radius-full)', overflow: 'hidden' }}>
         <motion.div
@@ -97,8 +98,8 @@ function MacroMenu({ macro, onClose, onEdit, onMoveUp, onMoveDown, onDelete, isF
   return (
     <div ref={ref} style={{ position: 'absolute', right: 0, top: '100%', zIndex: 200, background: 'var(--card, #fff)', border: '1px solid var(--border)', borderRadius: 'var(--radius-md)', boxShadow: '0 8px 24px rgba(0,0,0,.12)', minWidth: '160px', padding: '4px' }}>
       <button style={menuStyle} onMouseEnter={e => e.currentTarget.style.background = 'rgba(0,0,0,.05)'} onMouseLeave={e => e.currentTarget.style.background = 'none'} onClick={onEdit}>Edit goal</button>
-      {!isFirst && <button style={menuStyle} onMouseEnter={e => e.currentTarget.style.background = 'rgba(0,0,0,.05)'} onMouseLeave={e => e.currentTarget.style.background = 'none'} onClick={onMoveUp}>↑ Move up</button>}
-      {!isLast && <button style={menuStyle} onMouseEnter={e => e.currentTarget.style.background = 'rgba(0,0,0,.05)'} onMouseLeave={e => e.currentTarget.style.background = 'none'} onClick={onMoveDown}>↓ Move down</button>}
+      {!isFirst && <button style={menuStyle} onMouseEnter={e => e.currentTarget.style.background = 'rgba(0,0,0,.05)'} onMouseLeave={e => e.currentTarget.style.background = 'none'} onClick={onMoveUp}><span style={{display:'inline-flex',alignItems:'center',gap:6}}><Icon name="arrow-up" size={13} /> Move up</span></button>}
+      {!isLast && <button style={menuStyle} onMouseEnter={e => e.currentTarget.style.background = 'rgba(0,0,0,.05)'} onMouseLeave={e => e.currentTarget.style.background = 'none'} onClick={onMoveDown}><span style={{display:'inline-flex',alignItems:'center',gap:6}}><Icon name="arrow-down" size={13} /> Move down</span></button>}
       {!macro.is_default && (
         <button style={{ ...menuStyle, color: '#e05252' }} onMouseEnter={e => e.currentTarget.style.background = 'rgba(220,38,38,.06)'} onMouseLeave={e => e.currentTarget.style.background = 'none'} onClick={onDelete}>Delete</button>
       )}
@@ -128,8 +129,8 @@ function InlineEdit({ macro, onSave, onCancel }) {
       <input type="number" value={goal} onChange={e => setGoal(Number(e.target.value))} style={{ ...inputStyle, width: '70px' }} placeholder="Goal" />
       <input value={unit} onChange={e => setUnit(e.target.value)} style={{ ...inputStyle, width: '50px' }} placeholder="Unit" />
       <input type="color" value={color} onChange={e => setColor(e.target.value)} style={{ width: '32px', height: '32px', padding: 0, border: '1px solid var(--border)', borderRadius: 'var(--radius-sm)', cursor: 'pointer', background: 'none' }} />
-      <button onClick={() => onSave({ name, daily_goal: goal, unit, color })} style={{ background: 'var(--em)', color: '#fff', border: 'none', borderRadius: 'var(--radius-sm)', padding: '5px 10px', cursor: 'pointer', fontFamily: 'var(--sans)', fontSize: 'var(--text-xs)' }}>✓</button>
-      <button onClick={onCancel} style={{ background: 'rgba(0,0,0,.06)', color: 'var(--text-muted)', border: 'none', borderRadius: 'var(--radius-sm)', padding: '5px 10px', cursor: 'pointer', fontFamily: 'var(--sans)', fontSize: 'var(--text-xs)' }}>✗</button>
+      <button onClick={() => onSave({ name, daily_goal: goal, unit, color })} style={{ background: 'var(--em)', color: '#fff', border: 'none', borderRadius: 'var(--radius-sm)', padding: '5px 10px', cursor: 'pointer', fontFamily: 'var(--sans)', fontSize: 'var(--text-xs)', display:'inline-flex' }} aria-label="Save"><Icon name="check" size={13} /></button>
+      <button onClick={onCancel} style={{ background: 'rgba(0,0,0,.06)', color: 'var(--text-muted)', border: 'none', borderRadius: 'var(--radius-sm)', padding: '5px 10px', cursor: 'pointer', fontFamily: 'var(--sans)', fontSize: 'var(--text-xs)', display:'inline-flex' }} aria-label="Cancel"><Icon name="x" size={13} /></button>
     </div>
   );
 }

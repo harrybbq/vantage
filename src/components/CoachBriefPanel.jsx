@@ -1,4 +1,5 @@
 import { useSubscriptionContext } from '../context/SubscriptionContext';
+import Icon from './Icon';
 import { useDailyBrief } from '../hooks/useDailyBrief';
 import CoachNudges from './CoachNudges';
 
@@ -66,7 +67,7 @@ export default function CoachBriefPanel({ S, update, onCoachAct, userId }) {
           title="Regenerate"
           aria-label="Regenerate brief"
         >
-          ↻
+          <Icon name="refresh-cw" size={15} />
         </button>
       </div>
 

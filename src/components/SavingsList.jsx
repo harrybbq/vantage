@@ -21,6 +21,7 @@
  * savings as count + names only.
  */
 import { useState } from 'react';
+import Icon from './Icon';
 import SavingsProjections from './SavingsProjections';
 
 function formatGBP(n) {
@@ -220,7 +221,7 @@ export default function SavingsList({ S, update, onOpenModal }) {
     return (
       <>
         <div className="savings-empty">
-          <div className="savings-empty-icon">💰</div>
+          <div className="savings-empty-icon"><Icon name="piggy-bank" size={30} strokeWidth={1.5} /></div>
           <div className="savings-empty-title">No savings goals yet</div>
           <p className="savings-empty-body">
             Track named goals (First Home, Wedding, Emergency Fund). Add a photo,

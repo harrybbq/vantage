@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react';
 import Logo from './Logo';
+import Icon from './Icon';
 
 const SECTION_LABELS = {
   hub: 'Hub',
@@ -63,7 +64,7 @@ export default function PageHeader({ activeSection, coins, onOpenCoinHistory, pr
           useKeyboardShortcuts so power users keep their muscle memory. */}
 
       {/* Sign out — mobile only */}
-      <button className="mobile-signout-btn" onClick={onSignOut} title="Sign out">→</button>
+      <button className="mobile-signout-btn" onClick={onSignOut} title="Sign out" style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}><Icon name="log-out" size={16} /></button>
 
       {/* Background controls — sits just left of coin wallet */}
       <div style={{ display: 'flex', alignItems: 'center', gap: '5px', marginRight: '8px' }}>
@@ -83,7 +84,7 @@ export default function PageHeader({ activeSection, coins, onOpenCoinHistory, pr
           }}
           onMouseEnter={e => { e.currentTarget.style.background = 'rgba(0,0,0,0.55)'; e.currentTarget.style.borderColor = 'rgba(255,255,255,0.6)'; }}
           onMouseLeave={e => { e.currentTarget.style.background = 'rgba(0,0,0,0.35)'; e.currentTarget.style.borderColor = 'rgba(255,255,255,0.35)'; }}
-        >🖼</button>
+        ><Icon name="image" size={15} /></button>
         {onRemoveBg && (
           <button
             onClick={onRemoveBg}
@@ -101,7 +102,7 @@ export default function PageHeader({ activeSection, coins, onOpenCoinHistory, pr
             }}
             onMouseEnter={e => { e.currentTarget.style.background = 'rgba(180,40,40,0.5)'; }}
             onMouseLeave={e => { e.currentTarget.style.background = 'rgba(180,40,40,0.3)'; }}
-          >✕ bg</button>
+          ><span style={{ display: 'inline-flex', alignItems: 'center', gap: 3 }}><Icon name="x" size={12} /> bg</span></button>
         )}
       </div>
 

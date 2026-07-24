@@ -17,6 +17,7 @@
  * drive this through the shared useHubModuleMenu() hook below.
  */
 import { useEffect, useRef, useState } from 'react';
+import Icon from './Icon';
 
 // Cream-hub + shared modules, matched by class name (no markup change
 // needed in the child components).
@@ -199,7 +200,7 @@ export default function HubModuleMenu({ menu, transparency, onToggle, onClose, a
               role="menuitem"
             >
               <span className="hub-module-menu-label">{a.label}</span>
-              <span aria-hidden="true" style={{ color: 'var(--text-muted)' }}>›</span>
+              <span aria-hidden="true" style={{ color: 'var(--text-muted)', display: 'inline-flex' }}><Icon name="chevron-right" size={15} /></span>
             </button>
           ))}
         </>

@@ -1,4 +1,5 @@
 import { useState, useRef } from 'react';
+import Icon from './Icon';
 import { motion, AnimatePresence } from 'framer-motion';
 import { getTodayStr, getWeekKey, countWeekLogs } from '../utils/helpers';
 import { recalcStreaks } from '../utils/streaks';
@@ -132,12 +133,12 @@ function TrackerCard({ tracker, value, streak, onChange }) {
           // Stop the parent button click from firing when stepping
           onClick={e => e.stopPropagation()}
         >
-          <button type="button" className="step-btn" {...decProps}>−</button>
+          <button type="button" className="step-btn" {...decProps} aria-label="Decrease"><Icon name="minus" size={14} /></button>
           <span className="step-val">
             <span className="step-num">{numVal}</span>
             {tracker.unit && <span className="step-unit">{tracker.unit}</span>}
           </span>
-          <button type="button" className="step-btn" {...incProps}>+</button>
+          <button type="button" className="step-btn" {...incProps} aria-label="Increase"><Icon name="plus" size={14} /></button>
         </span>
       )}
       <SavedBadge visible={savedVisible} />
@@ -153,7 +154,7 @@ function StreakBrokenBanner({ broken, onDismiss }) {
       {broken.map(b => (
         <div key={b.trackerId} className="streak-broken-row">
           <span>⚠ Your <strong>{b.trackerName}</strong> streak ended at {b.oldStreak} days. Start a new one today.</span>
-          <button onClick={() => onDismiss(b.trackerId)} className="streak-broken-dismiss">✕</button>
+          <button onClick={() => onDismiss(b.trackerId)} className="streak-broken-dismiss" aria-label="Dismiss"><Icon name="x" size={13} /></button>
         </div>
       ))}
     </div>

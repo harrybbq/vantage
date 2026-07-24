@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef } from 'react';
+import Icon from './Icon';
 import ProGate from './ProGate';
 import {
   pickInsight,
@@ -104,7 +105,7 @@ function AiCoachFull({ insight, onAct, onDismiss }) {
           title="Dismiss"
           aria-label="Dismiss insight"
         >
-          ×
+          <Icon name="x" size={14} />
         </button>
       )}
     </div>

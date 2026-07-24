@@ -6,6 +6,7 @@ import { periodStart } from '../lib/habits/strikes';
 import { useSubscriptionContext } from '../context/SubscriptionContext';
 import { backdropClose } from '../utils/backdropClose';
 import { useIsMobile } from '../hooks/useIsMobile';
+import Icon from './Icon';
 
 /**
  * ImageField — URL input plus, on mobile, a photo-library picker.
@@ -56,8 +57,8 @@ function ImageField({ label, value, onChange, max = 900, placeholder }) {
           {isMobile && (
             <>
               <input ref={inputRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={onFile} />
-              <button type="button" className="btn btn-ghost btn-sm" style={{ marginTop: '8px', fontSize: '12px' }} onClick={() => inputRef.current?.click()}>
-                📷 Add from your photos
+              <button type="button" className="btn btn-ghost btn-sm" style={{ marginTop: '8px', fontSize: '12px', display: 'inline-flex', alignItems: 'center', gap: 6 }} onClick={() => inputRef.current?.click()}>
+                <Icon name="camera" size={14} /> Add from your photos
               </button>
             </>
           )}
@@ -96,79 +97,79 @@ function AddLinkModal({ openId, onClose, onSwitchModal, onAddNotepad, onAddApp, 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '6px' }}>
         <button className="btn btn-ghost" style={{ padding: '16px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px', borderRadius: '12px', height: 'auto' }}
           onClick={() => onSwitchModal('addLinkOnlyModal')}>
-          <span style={{ fontSize: '22px' }}>🔗</span>
+          <Icon name="link" size={22} strokeWidth={1.75} />
           <span style={{ fontWeight: 700, fontSize: '13px', color: 'var(--text)' }}>Default Link</span>
           <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>URL bookmark or GitHub profile</span>
         </button>
         <button className="btn btn-ghost" style={{ padding: '16px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px', borderRadius: '12px', height: 'auto' }}
           onClick={() => { onClose('addLinkModal'); onAddNotepad(); }}>
-          <span style={{ fontSize: '22px' }}>📝</span>
+          <Icon name="notebook-pen" size={22} strokeWidth={1.75} />
           <span style={{ fontWeight: 700, fontSize: '13px', color: 'var(--text)' }}>Notepad</span>
           <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Quick notes & tasks for today</span>
         </button>
         <button className="btn btn-ghost" style={{ padding: '16px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px', borderRadius: '12px', height: 'auto' }}
           onClick={() => { onClose('addLinkModal'); onAddHubWidget('habits'); }}>
-          <span style={{ fontSize: '22px' }}>◷</span>
+          <Icon name="flame" size={22} strokeWidth={1.75} />
           <span style={{ fontWeight: 700, fontSize: '13px', color: 'var(--text)' }}>Habits</span>
           <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Longest streaks · live timers</span>
         </button>
         <button className="btn btn-ghost" style={{ padding: '16px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px', borderRadius: '12px', height: 'auto' }}
           onClick={() => { onClose('addLinkModal'); onAddHubWidget('holidays'); }}>
-          <span style={{ fontSize: '22px' }}>✈</span>
+          <Icon name="plane" size={22} strokeWidth={1.75} />
           <span style={{ fontWeight: 700, fontSize: '13px', color: 'var(--text)' }}>Holidays</span>
           <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Closest upcoming trips</span>
         </button>
         <button className="btn btn-ghost" style={{ padding: '16px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px', borderRadius: '12px', height: 'auto' }}
           onClick={() => { onClose('addLinkModal'); onAddHubWidget('leaderboard'); }}>
-          <span style={{ fontSize: '22px' }}>⊿</span>
+          <Icon name="trophy" size={22} strokeWidth={1.75} />
           <span style={{ fontWeight: 700, fontSize: '13px', color: 'var(--text)' }}>Leaderboard</span>
           <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Top friends, at a glance</span>
         </button>
         <button className="btn btn-ghost" style={{ padding: '16px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px', borderRadius: '12px', height: 'auto' }}
           onClick={() => { onClose('addLinkModal'); onAddHubWidget('vitals'); }}>
-          <span style={{ fontSize: '22px' }}>◐</span>
+          <Icon name="activity" size={22} strokeWidth={1.75} />
           <span style={{ fontWeight: 700, fontSize: '13px', color: 'var(--text)' }}>Vitals</span>
           <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Weight · sleep · resting HR</span>
         </button>
         <button className="btn btn-ghost" style={{ padding: '16px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px', borderRadius: '12px', height: 'auto' }}
           onClick={() => { onClose('addLinkModal'); onAddHubWidget('macros'); }}>
-          <span style={{ fontSize: '22px' }}>◑</span>
+          <Icon name="pie-chart" size={22} strokeWidth={1.75} />
           <span style={{ fontWeight: 700, fontSize: '13px', color: 'var(--text)' }}>Macros</span>
           <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>% rings · net calories</span>
         </button>
         <button className="btn btn-ghost" style={{ padding: '16px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px', borderRadius: '12px', height: 'auto' }}
           onClick={() => { onClose('addLinkModal'); onAddHubWidget('calories'); }}>
-          <span style={{ fontSize: '22px' }}>◔</span>
+          <Icon name="zap" size={22} strokeWidth={1.75} />
           <span style={{ fontWeight: 700, fontSize: '13px', color: 'var(--text)' }}>Calories Burned</span>
           <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Activity burn · net intake</span>
         </button>
         <button className="btn btn-ghost" style={{ padding: '16px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px', borderRadius: '12px', height: 'auto' }}
           onClick={() => { onClose('addLinkModal'); onAddHubWidget('savings-pots'); }}>
-          <span style={{ fontSize: '22px' }}>◒</span>
+          <Icon name="piggy-bank" size={22} strokeWidth={1.75} />
           <span style={{ fontWeight: 700, fontSize: '13px', color: 'var(--text)' }}>Savings Pots</span>
           <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>1 bar or 4 donuts</span>
         </button>
         <button className="btn btn-ghost" style={{ padding: '16px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px', borderRadius: '12px', height: 'auto' }}
           onClick={() => { onClose('addLinkModal'); onAddHubWidget('savings-projection'); }}>
-          <span style={{ fontSize: '22px' }}>⌁</span>
+          <Icon name="trending-up" size={22} strokeWidth={1.75} />
           <span style={{ fontWeight: 700, fontSize: '13px', color: 'var(--text)' }}>Projection</span>
           <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Net · balance trend</span>
         </button>
         <button className="btn btn-ghost" style={{ padding: '16px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px', borderRadius: '12px', height: 'auto' }}
           onClick={() => { onClose('addLinkModal'); onAddHubWidget('body'); }}>
-          <span style={{ fontSize: '22px' }}>◍</span>
+          <Icon name="scale" size={22} strokeWidth={1.75} />
           <span style={{ fontWeight: 700, fontSize: '13px', color: 'var(--text)' }}>Body</span>
           <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Weight trend · goal</span>
         </button>
         <button className="btn btn-ghost" style={{ padding: '16px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px', borderRadius: '12px', height: 'auto' }}
           onClick={() => { onClose('addLinkModal'); onAddHubWidget('mood'); }}>
-          <span style={{ fontSize: '22px' }}>☺</span>
+          <Icon name="smile" size={22} strokeWidth={1.75} />
           <span style={{ fontWeight: 700, fontSize: '13px', color: 'var(--text)' }}>Mood</span>
           <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Daily check-in · heatmap</span>
         </button>
         <button className="btn btn-ghost" style={{ padding: '16px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px', borderRadius: '12px', height: 'auto' }}
           onClick={() => { onClose('addLinkModal'); onAddHubWidget('subscriptions'); }}>
-          <span style={{ fontSize: '22px' }}>↻</span>
+          <Icon name="repeat" size={22} strokeWidth={1.75} />
           <span style={{ fontWeight: 700, fontSize: '13px', color: 'var(--text)' }}>Subscriptions</span>
           <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Monthly burn · renewals</span>
         </button>
@@ -675,7 +676,7 @@ function SavingsImagePicker({ image, onChange }) {
             fontSize: 22, color: 'var(--em)', overflow: 'hidden',
           }}
           title="Click to choose a photo"
-        >{!image && '🖼'}</div>
+        >{!image && <Icon name="image" size={26} strokeWidth={1.5} style={{ opacity: 0.5 }} />}</div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
           <button type="button" className="btn btn-ghost" onClick={pick} style={{ padding: '6px 12px' }}>
             {image ? 'Change photo' : 'Choose photo'}
@@ -990,7 +991,7 @@ function AddShopModal({ openId, onClose, onAdd, categories = [] }) {
         <label>Link (optional — paste to auto-fill)</label>
         <div style={{ display: 'flex', gap: '8px' }}>
           <input type="url" placeholder="https://amazon.co.uk/..." style={{ flex: 1 }} value={form.url} onChange={e => handleUrlChange(e.target.value)} />
-          <button className="btn btn-ghost btn-sm" disabled={fetching} onClick={() => runAutofill(form.url)} style={{ whiteSpace: 'nowrap', flexShrink: 0 }}>Fill ↓</button>
+          <button className="btn btn-ghost btn-sm" disabled={fetching} onClick={() => runAutofill(form.url)} style={{ whiteSpace: 'nowrap', flexShrink: 0, display: 'inline-flex', alignItems: 'center', gap: 5 }}>Fill <Icon name="arrow-down" size={13} /></button>
         </div>
         <div style={{ fontFamily: 'var(--mono)', fontSize: '10px', color: status.startsWith('✓') ? 'var(--em)' : 'var(--text-muted)', marginTop: '5px', minHeight: '14px' }}>{status}</div>
       </div>
@@ -1353,7 +1354,7 @@ function AddHabitModal({ openId, onClose, onAdd }) {
             style={HABIT_SWATCHES.includes(form.color) ? undefined : { background: form.color }}
             onClick={() => customColorRef.current?.click()}
             aria-label="Custom colour"
-          >{HABIT_SWATCHES.includes(form.color) ? '+' : ''}</button>
+          >{HABIT_SWATCHES.includes(form.color) ? <Icon name="plus" size={14} /> : ''}</button>
           <input ref={customColorRef} type="color" value={form.color} onChange={e => setForm(f => ({ ...f, color: e.target.value }))} style={{ position: 'absolute', width: 0, height: 0, opacity: 0, pointerEvents: 'none' }} />
         </div>
       </div>
@@ -1366,7 +1367,7 @@ function AddHabitModal({ openId, onClose, onAdd }) {
             <div className="habit-opt-sub">Earn coins for staying clean</div>
           </div>
           <span className="habit-opt-sum">{rewardsSummary}</span>
-          <span className={`habit-opt-chev${open.rewards ? ' open' : ''}`}>▾</span>
+          <span className={`habit-opt-chev${open.rewards ? ' open' : ''}`}><Icon name="chevron-down" size={14} /></span>
         </button>
         {open.rewards && (
           <div className="habit-opt-body">
@@ -1382,7 +1383,7 @@ function AddHabitModal({ openId, onClose, onAdd }) {
                 </select>
                 <span className="habit-ms-word">earn ⬡</span>
                 <input type="number" min="1" placeholder="20" value={m.coins} onChange={e => updateMs(m._id, 'coins', e.target.value)} className="habit-ms-num" />
-                <button type="button" className="habit-ms-del" onClick={() => removeMs(m._id)} aria-label="Remove milestone">✕</button>
+                <button type="button" className="habit-ms-del" onClick={() => removeMs(m._id)} aria-label="Remove milestone"><Icon name="x" size={13} /></button>
               </div>
             ))}
             <button className="btn btn-ghost btn-sm" onClick={() => setForm(f => ({ ...f, milestones: [...f.milestones, emptyMs()] }))} style={{ fontSize: '12px' }}>
@@ -1404,7 +1405,7 @@ function AddHabitModal({ openId, onClose, onAdd }) {
             <div className="habit-opt-sub">Allow the odd slip-up, e.g. 1 night a week</div>
           </div>
           <span className="habit-opt-sum">{allowanceSummary}</span>
-          <span className={`habit-opt-chev${open.allowance ? ' open' : ''}`}>▾</span>
+          <span className={`habit-opt-chev${open.allowance ? ' open' : ''}`}><Icon name="chevron-down" size={14} /></span>
         </button>
         {open.allowance && (
           <div className="habit-opt-body">
@@ -1555,8 +1556,9 @@ function EditHabitModal({ openId, onClose, habits, onEdit, onDelete }) {
             </div>
             <button
               onClick={() => removeMs(m._id)}
-              style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', fontSize: '13px', padding: '8px 4px', flexShrink: 0, lineHeight: 1, marginBottom: '1px' }}
-            >✕</button>
+              style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', padding: '8px 4px', flexShrink: 0, lineHeight: 1, marginBottom: '1px', display: 'inline-flex' }}
+              aria-label="Remove milestone"
+            ><Icon name="x" size={13} /></button>
           </div>
         ))}
         <button className="btn btn-ghost btn-sm" onClick={() => setForm(f => ({ ...f, milestones: [...f.milestones, emptyMs()] }))} style={{ marginBottom: '14px', fontSize: '12px' }}>

@@ -22,6 +22,7 @@
  *   S.savingsAccounts = [{id,name,balance,apy}]
  */
 import { useMemo, useRef, useState } from 'react';
+import Icon from './Icon';
 
 const HORIZONS = [{ m: 12, label: '1y' }, { m: 24, label: '2y' }, { m: 60, label: '5y' }];
 const SAVINGS_COLOR = '#d4a017';
@@ -237,12 +238,12 @@ export default function SavingsProjections({ S, update }) {
               if (row) e.dataTransfer.setDragImage(row, 24, 18);
             }}
             onDragEnd={() => { dragId.current = null; setDropHint(null); }}
-          >⠿</span>
-          <button type="button" className="proj-kind" onClick={() => updateItem(it.id, 'kind', it.kind === 'income' ? 'expense' : 'income')} title="Toggle income / expense">{it.kind === 'income' ? '+' : '−'}</button>
+          ><Icon name="grip-vertical" size={14} /></span>
+          <button type="button" className="proj-kind" onClick={() => updateItem(it.id, 'kind', it.kind === 'income' ? 'expense' : 'income')} title="Toggle income / expense"><Icon name={it.kind === 'income' ? 'plus' : 'minus'} size={13} /></button>
           <input className="proj-label" placeholder={it.kind === 'income' ? 'e.g. Salary' : 'e.g. Rent'} value={it.label} onChange={e => updateItem(it.id, 'label', e.target.value)} />
           <div className="proj-amt-wrap"><span className="proj-amt-cur">£</span><input className="proj-amt" type="number" inputMode="decimal" placeholder="0" value={it.amount} onChange={e => updateItem(it.id, 'amount', e.target.value)} /></div>
           <select className="proj-freq" value={it.freq} onChange={e => updateItem(it.id, 'freq', e.target.value)}><option value="week">/wk</option><option value="month">/mo</option><option value="year">/yr</option></select>
-          <button type="button" className="proj-del" onClick={() => removeItem(it.id)} aria-label="Remove">✕</button>
+          <button type="button" className="proj-del" onClick={() => removeItem(it.id)} aria-label="Remove"><Icon name="x" size={13} /></button>
         </div>
 
         {/* Optional sub-controls: time frame + save-into links */}
@@ -253,7 +254,7 @@ export default function SavingsProjections({ S, update }) {
               <span className="proj-link-arrow">⏱</span>
               <label className="proj-date-field">from<input type="month" value={it.from || ''} onChange={e => updateItem(it.id, 'from', e.target.value || null)} /></label>
               <label className="proj-date-field">until<input type="month" value={it.until || ''} onChange={e => updateItem(it.id, 'until', e.target.value || null)} /></label>
-              <button type="button" className="proj-link-del" onClick={() => { updateItem(it.id, 'from', null); setProj({ items: items.map(x => x.id === it.id ? { ...x, from: null, until: null } : x) }); setOpenDates(prev => { const n = new Set(prev); n.delete(it.id); return n; }); }} aria-label="Clear dates">✕</button>
+              <button type="button" className="proj-link-del" onClick={() => { updateItem(it.id, 'from', null); setProj({ items: items.map(x => x.id === it.id ? { ...x, from: null, until: null } : x) }); setOpenDates(prev => { const n = new Set(prev); n.delete(it.id); return n; }); }} aria-label="Clear dates"><Icon name="x" size={12} /></button>
             </div>
           ) : (
             <button type="button" className="proj-add-pot" onClick={() => setOpenDates(prev => new Set(prev).add(it.id))}>+ dates</button>
@@ -283,7 +284,7 @@ export default function SavingsProjections({ S, update }) {
                     </select>
                   </label>
                 )}
-                <button type="button" className="proj-link-del" onClick={() => { setProj({ items: items.map(x => x.id === it.id ? { ...x, goalId: null, accountId: null } : x) }); setOpenPots(prev => { const n = new Set(prev); n.delete(it.id); return n; }); }} aria-label="Remove link">✕</button>
+                <button type="button" className="proj-link-del" onClick={() => { setProj({ items: items.map(x => x.id === it.id ? { ...x, goalId: null, accountId: null } : x) }); setOpenPots(prev => { const n = new Set(prev); n.delete(it.id); return n; }); }} aria-label="Remove link"><Icon name="x" size={12} /></button>
               </div>
             ) : (
               <button type="button" className="proj-add-pot" onClick={() => setOpenPots(prev => new Set(prev).add(it.id))}>+ save into</button>
@@ -329,7 +330,7 @@ export default function SavingsProjections({ S, update }) {
         </div>
 
         <div className="proj-chart-foot">
-          <div className="proj-start"><label>Start £</label><input type="number" inputMode="decimal" value={proj.startBalance ?? ''} placeholder={String(Math.round(savedTotal))} onChange={e => setProj({ startBalance: e.target.value })} />{hasCustomStart ? <button type="button" className="proj-start-reset" onClick={() => setProj({ startBalance: '' })}>↺</button> : <span className="proj-start-hint">saved</span>}</div>
+          <div className="proj-start"><label>Start £</label><input type="number" inputMode="decimal" value={proj.startBalance ?? ''} placeholder={String(Math.round(savedTotal))} onChange={e => setProj({ startBalance: e.target.value })} />{hasCustomStart ? <button type="button" className="proj-start-reset" onClick={() => setProj({ startBalance: '' })} aria-label="Reset to saved"><Icon name="rotate-ccw" size={12} /></button> : <span className="proj-start-hint">saved</span>}</div>
           <span className="proj-end">In {Math.round(horizon / 12 * 10) / 10}y: <strong>{money(cashEnd + (hasAccounts ? savingsEnd : 0))}</strong></span>
         </div>
       </div>
@@ -368,10 +369,10 @@ export default function SavingsProjections({ S, update }) {
                 onDrop={e => { if (dragId.current) { e.preventDefault(); e.stopPropagation(); moveToGroup(dragId.current, g.id); } setDropHint(null); dragId.current = null; }}
               >
                 <div className="proj-folder-head">
-                  <button type="button" className="proj-folder-toggle" onClick={() => toggleCollapse(g.id)} aria-label="Collapse folder">{isOpen ? '▾' : '▸'}</button>
+                  <button type="button" className="proj-folder-toggle" onClick={() => toggleCollapse(g.id)} aria-label="Collapse folder"><Icon name={isOpen ? 'chevron-down' : 'chevron-right'} size={14} /></button>
                   <input className="proj-folder-name" value={g.name} onChange={e => renameGroup(g.id, e.target.value)} />
                   <span className="proj-folder-sub proj-neg">{money(subtotal)}</span>
-                  <button type="button" className="proj-del" onClick={() => removeGroup(g.id)} aria-label="Delete folder" title="Delete folder (items move out)">✕</button>
+                  <button type="button" className="proj-del" onClick={() => removeGroup(g.id)} aria-label="Delete folder" title="Delete folder (items move out)"><Icon name="x" size={13} /></button>
                 </div>
                 {isOpen && (
                   <div className="proj-folder-body">
@@ -402,7 +403,7 @@ export default function SavingsProjections({ S, update }) {
               <div className="proj-acc-fields">
                 <div className="proj-amt-wrap"><span className="proj-amt-cur">£</span><input className="proj-amt" type="number" inputMode="decimal" placeholder="0" value={a.balance} onChange={e => updateAccount(a.id, 'balance', e.target.value)} /></div>
                 <div className="proj-acc-apy"><input type="number" inputMode="decimal" placeholder="0" value={a.apy} onChange={e => updateAccount(a.id, 'apy', e.target.value)} /><span>% APY</span></div>
-                <button type="button" className="proj-del" onClick={() => removeAccount(a.id)} aria-label="Remove account">✕</button>
+                <button type="button" className="proj-del" onClick={() => removeAccount(a.id)} aria-label="Remove account"><Icon name="x" size={13} /></button>
               </div>
               {acctContribM[a.id] > 0 && <div className="proj-acc-in">+{money(acctContribM[a.id])}/mo from cash flow</div>}
             </div>

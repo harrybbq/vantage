@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, useMemo } from 'react';
+import Icon from './Icon';
 import { motion } from 'framer-motion';
 import { fireAchievement } from '../utils/confetti';
 import SectionHelp from './SectionHelp';
@@ -359,25 +360,25 @@ function AchNode({
             className="ach-btn ach-btn-complete"
             title={ach.completed ? 'Mark as not completed' : 'Mark complete'}
             onClick={e => { e.stopPropagation(); onComplete(ach.id); }}
-          >★</button>
+          ><Icon name="star" size={14} /></button>
           <button
             type="button"
             className="ach-btn ach-btn-connect"
             title="Connect to another achievement"
             onClick={e => { e.stopPropagation(); onConnect(ach.id); }}
-          >✦</button>
+          ><Icon name="waypoints" size={14} /></button>
           <button
             type="button"
             className="ach-btn ach-btn-edit"
             title="Edit"
             onClick={e => { e.stopPropagation(); onEdit(ach.id); }}
-          >✎</button>
+          ><Icon name="pencil" size={13} /></button>
           <button
             type="button"
             className="ach-btn ach-btn-delete"
             title="Delete"
             onClick={e => { e.stopPropagation(); onDelete(ach.id); }}
-          >✕</button>
+          ><Icon name="trash-2" size={13} /></button>
         </div>
       </div>
     </div>
@@ -759,7 +760,7 @@ export default function AchievementsSection({ S, update, active, onOpenModal, on
 
           {achievements.length === 0 && (
             <div className="ach-canvas-empty">
-              <div className="ach-canvas-empty-icon">★</div>
+              <div className="ach-canvas-empty-icon"><Icon name="star" size={30} strokeWidth={1.5} /></div>
               <div className="ach-canvas-empty-label">No achievements yet</div>
               <div className="ach-canvas-empty-sub">Click + New to add your first goal</div>
             </div>
@@ -804,20 +805,20 @@ export default function AchievementsSection({ S, update, active, onOpenModal, on
               className="ach-zoom-btn"
               onClick={() => setZoom(z => Math.max(0.4, +(z - 0.1).toFixed(2)))}
               title="Zoom out"
-            >−</button>
+            ><Icon name="minus" size={15} /></button>
             <span className="ach-zoom-val">{Math.round(zoom * 100)}%</span>
             <button
               type="button"
               className="ach-zoom-btn"
               onClick={() => setZoom(z => Math.min(2, +(z + 0.1).toFixed(2)))}
               title="Zoom in"
-            >+</button>
+            ><Icon name="plus" size={15} /></button>
             <button
               type="button"
               className="ach-zoom-btn ach-zoom-reset"
               onClick={() => setZoom(1)}
               title="Reset zoom"
-            >⊙</button>
+            ><Icon name="locate-fixed" size={14} /></button>
           </div>
         </div>
       </div>
