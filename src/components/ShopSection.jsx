@@ -3,9 +3,17 @@ import { motion } from 'framer-motion';
 import { firePurchase } from '../utils/confetti';
 import SectionHelp from './SectionHelp';
 import TrendingBoard from './shop/TrendingBoard';
+import Icon from './Icon';
 
-const PRIORITY_LABEL = { high: '🔴 High', med: '🟡 Medium', low: '🟢 Low' };
+const PRIORITY_LABEL = { high: 'High', med: 'Medium', low: 'Low' };
 const PRIORITY_CLASS = { high: 'priority-high', med: 'priority-med', low: 'priority-low' };
+const PRIORITY_COLOR = { high: '#e05252', med: '#d99114', low: '#2fbf83' };
+
+// Small coloured dot replacing the old 🔴🟡🟢 emoji — matches the
+// SVG-icon language used everywhere else in the app.
+function PrioDot({ p, size = 7 }) {
+  return <span aria-hidden="true" style={{ display: 'inline-block', width: size, height: size, borderRadius: '50%', background: PRIORITY_COLOR[p] || 'var(--text-muted)', flexShrink: 0 }} />;
+}
 
 let _dragItemId = null;
 
@@ -45,11 +53,15 @@ function ShopCard({ item, coins, onToggleBought, onDelete, onEdit, revealDelay }
         });
       }}
     >
-      <div className="shop-item-img">
-        {item.imageUrl
-          ? <img src={item.imageUrl} alt={item.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} onError={e => { e.target.parentElement.innerHTML = '🛒'; }} />
-          : '🛒'
-        }
+      <div className="shop-item-img" style={{ position: 'relative' }}>
+        {/* Cart icon sits underneath; a loaded image covers it, and a
+            broken image simply hides itself to reveal the icon again. */}
+        <Icon name="shopping-cart" size={22} strokeWidth={1.75} style={{ opacity: 0.45 }} />
+        {item.imageUrl && (
+          <img src={item.imageUrl} alt={item.name}
+            style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }}
+            onError={e => { e.target.style.display = 'none'; }} />
+        )}
       </div>
       <div className="shop-item-body">
         <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '8px' }}>
@@ -60,7 +72,9 @@ function ShopCard({ item, coins, onToggleBought, onDelete, onEdit, revealDelay }
             tabIndex={longName ? 0 : undefined}
             title={longName && !nameExpanded ? 'Tap to show full name' : undefined}
           >{shownName}</div>
-          <span className={`shop-item-priority ${PRIORITY_CLASS[item.priority]}`}>{PRIORITY_LABEL[item.priority]}</span>
+          <span className={`shop-item-priority ${PRIORITY_CLASS[item.priority]}`} style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}>
+            <PrioDot p={item.priority} size={6} />{PRIORITY_LABEL[item.priority]}
+          </span>
         </div>
         {item.price && <div className="shop-item-price">{item.price}</div>}
         {item.bought && item.boughtAt && (
@@ -86,10 +100,10 @@ function ShopCard({ item, coins, onToggleBought, onDelete, onEdit, revealDelay }
           onClick={() => onToggleBought(item.id)}
           title={item.bought ? 'Mark as not bought' : 'Mark as bought'}
         >
-          {item.bought ? '✓' : '⬡'}
+          {item.bought ? <Icon name="check" size={14} /> : '⬡'}
         </motion.button>
-        <button className="shop-icon-btn shop-edit-btn" title="Edit item" onClick={() => onEdit(item.id)}>✎</button>
-        <button className="shop-icon-btn shop-del-btn" onClick={() => onDelete(item.id)}>✕</button>
+        <button className="shop-icon-btn shop-edit-btn" title="Edit item" onClick={() => onEdit(item.id)}><Icon name="pencil" size={13} /></button>
+        <button className="shop-icon-btn shop-del-btn" title="Delete item" onClick={() => onDelete(item.id)}><Icon name="x" size={14} /></button>
       </div>
     </motion.div>
   );
@@ -247,12 +261,13 @@ export default function ShopSection({ S, update, active, onOpenModal, onShowCoin
     }));
   }
 
+  // Labels are JSX now — coloured dots + SVG icons instead of emoji.
   const filters = [
     { key: 'all', label: 'All' },
-    { key: 'high', label: '🔴 High' },
-    { key: 'med', label: '🟡 Medium' },
-    { key: 'low', label: '🟢 Low' },
-    { key: 'bought', label: '🗂 Archive' },
+    { key: 'high', label: <><PrioDot p="high" /> High</> },
+    { key: 'med', label: <><PrioDot p="med" /> Medium</> },
+    { key: 'low', label: <><PrioDot p="low" /> Low</> },
+    { key: 'bought', label: <><Icon name="archive" size={12} /> Archive</> },
   ];
 
   // Bought items are ARCHIVED: they leave every active view the moment
@@ -305,6 +320,7 @@ export default function ShopSection({ S, update, active, onOpenModal, onShowCoin
             <button
               key={f.key}
               className={`shop-filter-btn${shopFilter === f.key ? ' active' : ''}`}
+              style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}
               onClick={() => setFilter(f.key)}
             >{f.label}</button>
           ))}
@@ -383,7 +399,7 @@ export default function ShopSection({ S, update, active, onOpenModal, onShowCoin
               ))}
               {!shopItems.length && (
                 <div className="section-empty">
-                  <div className="section-empty-icon">🛍</div>
+                  <div className="section-empty-icon"><Icon name="shopping-bag" size={34} strokeWidth={1.5} /></div>
                   <div className="section-empty-title">Nothing here yet</div>
                   <div className="section-empty-body">Add things you want to save up for. Earn coins by hitting your tracker goals.</div>
                   <button className="btn btn-primary btn-sm section-empty-cta" onClick={() => onOpenModal('addShopModal')}>Add first item</button>
@@ -392,7 +408,7 @@ export default function ShopSection({ S, update, active, onOpenModal, onShowCoin
             </>
           ) : (
             filtered.length === 0
-              ? <div className="shop-empty"><div className="shop-empty-icon">{shopFilter === 'bought' ? '🗂' : '🛍'}</div><div>{shopFilter === 'bought' ? 'Archive is empty — items you mark as bought land here.' : 'Nothing here.'}</div></div>
+              ? <div className="shop-empty"><div className="shop-empty-icon"><Icon name={shopFilter === 'bought' ? 'archive' : 'shopping-bag'} size={30} strokeWidth={1.5} /></div><div>{shopFilter === 'bought' ? 'Archive is empty — items you mark as bought land here.' : 'Nothing here.'}</div></div>
               : (
                 <div className="shop-grid" style={{ display: 'grid' }}>
                   {filtered.map((item, index) => (
