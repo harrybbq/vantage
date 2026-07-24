@@ -10,11 +10,59 @@ import { useSubscriptionContext } from '../context/SubscriptionContext';
 import { getOwnProfile, updateOwnProfile } from '../lib/friends/queries';
 import { VISIONS_BY_ID } from '../lib/visions/definitions';
 import Icon from './Icon';
+import { bankingStatus, beginConnect } from '../lib/banking/enableBanking';
 
 // Small helper: inline icon + label for the Tools/Data action buttons.
 const IconLabel = ({ name, children, size = 15 }) => (
   <span style={{ display: 'inline-flex', alignItems: 'center', gap: 7 }}><Icon name={name} size={size} />{children}</span>
 );
+
+// Open Banking — foundation card. Fail-soft: while the backend isn't
+// configured it shows a coming-soon state. It never touches the manual
+// Subscriptions/Savings features; when live it will only *augment* them.
+function BankingCard() {
+  const [status, setStatus] = useState(null); // null=loading
+  const [note, setNote] = useState('');
+  useEffect(() => { let c = false; bankingStatus().then(s => { if (!c) setStatus(s); }); return () => { c = true; }; }, []);
+  const configured = status?.configured;
+  const connected = status?.connected;
+
+  async function onConnect() {
+    setNote('');
+    const r = await beginConnect();
+    if (!r.ok) setNote('Bank connections aren’t switched on yet — coming soon. Your subscriptions and savings stay fully manual until then.');
+  }
+
+  return (
+    <div className="card" style={{ padding: '22px' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+        <Icon name="link" size={16} />
+        <h3 style={{ margin: 0 }}>Connected accounts</h3>
+        {!connected && (
+          <span style={{ fontFamily: 'var(--mono)', fontSize: 8.5, fontWeight: 700, letterSpacing: 1, padding: '2px 6px', borderRadius: 4, background: 'rgba(128,128,128,.16)', color: 'var(--text-muted)', border: '1px solid var(--border)' }}>
+            {configured ? 'BETA' : 'SOON'}
+          </span>
+        )}
+      </div>
+      <p style={{ fontFamily: 'var(--mono)', fontSize: '11px', color: 'var(--text-muted)', margin: '0 0 16px', lineHeight: '1.7' }}>
+        Securely connect a bank (Open Banking) to auto-detect recurring subscriptions and keep savings balances up to date. Read-only, and it only ever <em>adds</em> to what you already track manually — nothing you’ve entered is replaced or removed.
+      </p>
+      <button
+        onClick={onConnect}
+        disabled={status === null}
+        style={{
+          background: 'rgba(255,255,255,.07)', border: '1px solid var(--border)',
+          borderRadius: '10px', color: 'var(--text)', padding: '10px 18px',
+          fontSize: '13px', fontWeight: 600, cursor: status === null ? 'default' : 'pointer',
+          fontFamily: 'var(--sans)', transition: 'all .18s', opacity: status === null ? 0.6 : 1,
+        }}
+      >
+        {connected ? 'Manage connection' : configured ? 'Connect a bank' : 'Connect a bank'}
+      </button>
+      {note && <div style={{ marginTop: 10, fontFamily: 'var(--mono)', fontSize: 10.5, color: 'var(--text-muted)', lineHeight: 1.6 }}>{note}</div>}
+    </div>
+  );
+}
 
 // Pastel app-gradient derived from a dark accent by lightening it.
 function pastelGrad(em) {
@@ -860,6 +908,9 @@ export default function SettingsSection({ S, update, active, userId, onOpenLegal
         {/* ─── DATA TAB ─── */}
         {activeTab === 'data' && (
         <>
+        {/* Open Banking — foundation card (fail-soft; augments, never
+            replaces, the manual Subscriptions & Savings features). */}
+        <BankingCard />
         {/* Data & Privacy */}
         <div className="card" style={{ padding: '22px' }}>
           <h3 style={{ margin: '0 0 4px' }}>Your Data</h3>

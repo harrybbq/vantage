@@ -7,6 +7,7 @@ Develop on the designated `claude/*` branch — direct pushes to `master` are bl
 Build → verify → commit → push → create PR (`harrybbq/visionboardreal`, base `master`) via GitHub MCP → merge it. Netlify auto-deploys master. Bump `CACHE_VERSION` in `public/sw.js` when a deploy should force clients onto the new build.
 
 ## Hard rules
+- **DATA SAFETY IS PRIORITY #1.** All existing user data — the `user_data.state` JSON, `nutrition_log`, uploaded backgrounds, and profile pictures (Supabase Storage `avatars`/backgrounds buckets) — must be preserved and kept safe above all else. Before EVERY Netlify deploy, verify the change cannot lose or corrupt user data: state writes must be **additive** (new keys only, never overwrite/replace whole `state`), never run destructive migrations/Storage deletes/`user_data` rewrites, and never let a new client build wipe or reset state on load. The 2026-05-03 stale-SW incident (git `f6a7a50`) wiped data — treat that class of bug as unacceptable. When unsure whether a change is data-safe, stop and confirm before deploying.
 - Commit trailers: `Co-Authored-By: Claude <model name> <noreply@anthropic.com>` — never put raw model IDs in commits/PRs/code.
 - Supabase migrations can't be applied by tools (approval-gated). Write SQL to `supabase/*.sql` for the owner to run in the SQL editor; make client code fail soft until applied.
 - Supabase compute is Micro — keep DB load minimal (JSON-path projections, module-scope caches in functions, no full-state transfers).

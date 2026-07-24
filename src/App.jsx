@@ -635,6 +635,7 @@ function Board({ userId, userEmail, onSignOut }) {
         onRemoveBg={currentBg ? handleRemoveBg : null}
         onSignOut={onSignOut}
         onCoinContextMenu={isOwner ? () => setAdminEdit('coins') : null}
+        weatherEnabled={S.weatherEnabled !== false}
       />
 
       {/* Main sections */}
