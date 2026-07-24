@@ -10,6 +10,7 @@
  * "Coming soon" stub from MobileWidget.
  */
 import { WIDGET_META } from './MobileWidget';
+import Icon from '../Icon';
 import { APP_PRESETS, visibleAppPresets } from '../../data/appPresets';
 import { useSubscriptionContext } from '../../context/SubscriptionContext';
 import { backdropClose } from '../../utils/backdropClose';
@@ -110,7 +111,7 @@ export default function AddMobileWidgetModal({ openId, onClose, existingTypes, o
                     color: meta.accent || 'var(--em)',
                   }}
                 >
-                  {meta.icon}
+                  {meta.svg ? <Icon name={meta.svg} size={16} /> : meta.icon}
                 </span>
                 <span style={{ flex: 1, minWidth: 0 }}>
                   <span style={{

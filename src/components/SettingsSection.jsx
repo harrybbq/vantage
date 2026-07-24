@@ -9,6 +9,12 @@ import { AppleHealthImport } from './VitalsHistoryCard';
 import { useSubscriptionContext } from '../context/SubscriptionContext';
 import { getOwnProfile, updateOwnProfile } from '../lib/friends/queries';
 import { VISIONS_BY_ID } from '../lib/visions/definitions';
+import Icon from './Icon';
+
+// Small helper: inline icon + label for the Tools/Data action buttons.
+const IconLabel = ({ name, children, size = 15 }) => (
+  <span style={{ display: 'inline-flex', alignItems: 'center', gap: 7 }}><Icon name={name} size={size} />{children}</span>
+);
 
 // Pastel app-gradient derived from a dark accent by lightening it.
 function pastelGrad(em) {
@@ -869,7 +875,7 @@ export default function SettingsSection({ S, update, active, userId, onOpenLegal
               fontFamily: 'var(--sans)', transition: 'all .18s',
             }}
           >
-            ⬇ Export My Data
+            <IconLabel name="download">Export My Data</IconLabel>
           </button>
           {onOpenLegal && (
             <div style={{ marginTop: '16px', display: 'flex', gap: '14px' }}>
@@ -901,7 +907,7 @@ export default function SettingsSection({ S, update, active, userId, onOpenLegal
               fontFamily: 'var(--sans)', opacity: deleting ? 0.6 : 1, transition: 'all .18s',
             }}
           >
-            {deleting ? 'Deleting…' : '🗑 Delete All Data'}
+            {deleting ? 'Deleting…' : <IconLabel name="trash-2">Delete All Data</IconLabel>}
           </button>
         </div>
 
@@ -944,7 +950,7 @@ export default function SettingsSection({ S, update, active, userId, onOpenLegal
                     transition: 'all .18s',
                   }}
                 >
-                  <span aria-hidden="true">⌕</span>
+                  <span aria-hidden="true" style={{display:'inline-flex'}}><Icon name="search" size={16} /></span>
                   Command palette
                   <span style={{ fontFamily: 'var(--mono)', fontSize: '10px', opacity: 0.6, marginLeft: '4px' }}>
                     ⌃K
@@ -964,7 +970,7 @@ export default function SettingsSection({ S, update, active, userId, onOpenLegal
                     transition: 'all .18s',
                   }}
                 >
-                  <span aria-hidden="true">⌨</span>
+                  <span aria-hidden="true" style={{display:'inline-flex'}}><Icon name="keyboard" size={16} /></span>
                   Keyboard shortcuts
                   <span style={{ fontFamily: 'var(--mono)', fontSize: '10px', opacity: 0.6, marginLeft: '4px' }}>
                     ?
@@ -1011,7 +1017,7 @@ export default function SettingsSection({ S, update, active, userId, onOpenLegal
             className="tut-replay-btn"
             onClick={onOpenVisions}
           >
-            <span aria-hidden="true">✦</span> Open visions catalogue
+            <span aria-hidden="true" style={{display:'inline-flex',marginRight:6}}><Icon name="sparkles" size={15} /></span>Open visions catalogue
           </button>
         </div>
 
@@ -1030,7 +1036,7 @@ export default function SettingsSection({ S, update, active, userId, onOpenLegal
               className="tut-replay-btn"
               onClick={onOpenSchedule}
             >
-              <span aria-hidden="true">⟳</span> Open rotation calendar
+              <span aria-hidden="true" style={{display:'inline-flex',marginRight:6}}><Icon name="calendar-days" size={15} /></span>Open rotation calendar
             </button>
           </div>
         )}
@@ -1046,7 +1052,7 @@ export default function SettingsSection({ S, update, active, userId, onOpenLegal
             className="tut-replay-btn"
             onClick={() => update(prev => ({ ...prev, tutorialCompleted: false }))}
           >
-            <span aria-hidden="true">↺</span> Replay tutorial
+            <span aria-hidden="true" style={{display:'inline-flex',marginRight:6}}><Icon name="rotate-ccw" size={15} /></span>Replay tutorial
           </button>
         </div>
         </>

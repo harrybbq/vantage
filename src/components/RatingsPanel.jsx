@@ -1,4 +1,5 @@
 /**
+import Icon from './Icon';
  * RatingsPanel — F5 Sprint 3 surface (Ledger design, 2026-05-12),
  * extended in Sprint 5 with self-checks for all four categories.
  *
@@ -225,7 +226,7 @@ export default function RatingsPanel({ S, update, compact = false }) {
             onClick={handlePrestigeUp}
             disabled={prestiging}
           >
-            {prestiging ? 'Prestiging…' : `★ Prestige up — earn P${prestigeLevel + 1}`}
+            {prestiging ? 'Prestiging…' : <span style={{display:'inline-flex',alignItems:'center',gap:6}}><Icon name="star" size={14} /> Prestige up — earn P{prestigeLevel + 1}</span>}
           </button>
         )}
         {prestigeError && (

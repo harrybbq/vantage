@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import Icon from './Icon';
 import { supabase } from '../lib/supabase';
 
 const UNIT_OPTIONS = ['g', 'mg', 'µg', 'kcal', 'ml', 'IU'];
@@ -33,7 +34,7 @@ function MacroRow({ macro, isFirst, isLast, onSave, onDelete, onMove }) {
         <button
           onClick={() => { onSave(macro.id, { ...form, daily_goal: Number(form.daily_goal) }); setEditing(false); }}
           style={{ background: 'var(--em)', color: '#fff', border: 'none', borderRadius: 'var(--radius-sm)', padding: '5px 10px', cursor: 'pointer', fontSize: 'var(--text-xs)', fontFamily: 'var(--sans)' }}>
-          ✓ Save
+          <span style={{display:'inline-flex',alignItems:'center',gap:5}}><Icon name="check" size={13} /> Save</span>
         </button>
         <button onClick={() => setEditing(false)} style={{ background: 'rgba(0,0,0,.06)', color: 'var(--text-muted)', border: 'none', borderRadius: 'var(--radius-sm)', padding: '5px 10px', cursor: 'pointer', fontSize: 'var(--text-xs)', fontFamily: 'var(--sans)' }}>
           ✗
@@ -51,14 +52,14 @@ function MacroRow({ macro, isFirst, isLast, onSave, onDelete, onMove }) {
       </div>
       <div style={{ display: 'flex', gap: '4px', flexShrink: 0 }}>
         {!isFirst && (
-          <button onClick={() => onMove(macro, -1)} style={{ background: 'none', border: '1px solid var(--border)', color: 'var(--text-muted)', cursor: 'pointer', borderRadius: 'var(--radius-sm)', padding: '3px 7px', fontSize: '11px' }}>↑</button>
+          <button onClick={() => onMove(macro, -1)} style={{ background: 'none', border: '1px solid var(--border)', color: 'var(--text-muted)', cursor: 'pointer', borderRadius: 'var(--radius-sm)', padding: '3px 7px', fontSize: '11px', display:'inline-flex' }} aria-label="Move up"><Icon name="arrow-up" size={12} /></button>
         )}
         {!isLast && (
-          <button onClick={() => onMove(macro, 1)} style={{ background: 'none', border: '1px solid var(--border)', color: 'var(--text-muted)', cursor: 'pointer', borderRadius: 'var(--radius-sm)', padding: '3px 7px', fontSize: '11px' }}>↓</button>
+          <button onClick={() => onMove(macro, 1)} style={{ background: 'none', border: '1px solid var(--border)', color: 'var(--text-muted)', cursor: 'pointer', borderRadius: 'var(--radius-sm)', padding: '3px 7px', fontSize: '11px', display:'inline-flex' }} aria-label="Move down"><Icon name="arrow-down" size={12} /></button>
         )}
         <button onClick={() => setEditing(true)} style={{ background: 'none', border: '1px solid var(--border)', color: 'var(--text-mid)', cursor: 'pointer', borderRadius: 'var(--radius-sm)', padding: '3px 8px', fontSize: 'var(--text-xs)', fontFamily: 'var(--sans)' }}>Edit</button>
         {!macro.is_default && (
-          <button onClick={() => onDelete(macro)} style={{ background: 'none', border: '1px solid rgba(220,38,38,.3)', color: '#e05252', cursor: 'pointer', borderRadius: 'var(--radius-sm)', padding: '3px 7px', fontSize: '11px' }}>✕</button>
+          <button onClick={() => onDelete(macro)} style={{ background: 'none', border: '1px solid rgba(220,38,38,.3)', color: '#e05252', cursor: 'pointer', borderRadius: 'var(--radius-sm)', padding: '3px 7px', fontSize: '11px', display:'inline-flex' }} aria-label="Delete"><Icon name="x" size={12} /></button>
         )}
       </div>
     </div>

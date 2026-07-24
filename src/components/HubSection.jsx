@@ -268,7 +268,7 @@ function ProfileCard({ profile, S, update, handle, onSaveName, onSaveTagline, on
             ? <img className="profile-photo" src={profile.photo} alt="Profile" style={{ display: 'block' }} />
             : (
               <div className="profile-photo-placeholder" id="profilePlaceholder" style={{ display: 'flex' }}>
-                <span>🖼</span><p>photo</p>
+                <span><Icon name="image" size={20} strokeWidth={1.5} /></span><p>photo</p>
               </div>
             )
           }

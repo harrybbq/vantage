@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import Icon from './Icon';
 import { motion } from 'framer-motion';
 import { fireGoal } from '../utils/confetti';
 import SectionHelp from './SectionHelp';
@@ -87,7 +88,7 @@ function HabitCard({ habit, update, onShowCoinToast, onOpenModal }) {
           <div className="habit-name">{habit.name}</div>
           {habit.endless && <span className="habit-endless-badge">∞</span>}
         </div>
-        <button className="habit-edit-btn" onClick={handleEdit} title="Edit habit">✎</button>
+        <button className="habit-edit-btn" onClick={handleEdit} title="Edit habit"><Icon name="pencil" size={13} /></button>
       </div>
 
       <div className="habit-bar-area">
@@ -126,7 +127,7 @@ function HabitCard({ habit, update, onShowCoinToast, onOpenModal }) {
       )}
 
       <button className="habit-relapse-btn" onClick={handleRelapse}>
-        ↺ Relapse
+        <span style={{display:'inline-flex',alignItems:'center',gap:5}}><Icon name="rotate-ccw" size={13} /> Relapse</span>
       </button>
     </div>
   );
@@ -162,7 +163,7 @@ export default function HabitsSection({ S, update, active, onOpenModal, onShowCo
 
       {!habits.length ? (
         <div className="habits-empty">
-          <div className="habits-empty-icon">🎯</div>
+          <div className="habits-empty-icon"><Icon name="target" size={32} strokeWidth={1.5} /></div>
           <div>No habits tracked yet</div>
           <div style={{ fontSize: '12px', marginTop: '6px', opacity: 0.6 }}>
             Add a bad habit to break — your streak timer starts immediately

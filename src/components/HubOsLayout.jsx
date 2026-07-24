@@ -73,7 +73,7 @@ export function OsProfilePanel({ profile, handle, onSaveName, onSaveTagline, onU
         <div className="os-profile-photo" onClick={() => document.getElementById('osPhotoInput').click()}>
           {profile.photo
             ? <img src={profile.photo} alt="Profile" />
-            : <div className="os-profile-photo-placeholder">🖼</div>}
+            : <div className="os-profile-photo-placeholder"><Icon name="image" size={20} strokeWidth={1.5} /></div>}
         </div>
         <input
           id="osPhotoInput"
@@ -466,7 +466,7 @@ export function OsCardioPanel({ profile = {}, onSaveWeight, onLogBurn }) {
             onClick={handleLog}
             disabled={!kcal || justLogged}
           >
-            {justLogged ? '✓ Logged' : '＋ Log burn'}
+            {justLogged ? <span style={{display:'inline-flex',alignItems:'center',gap:5}}><Icon name="check" size={13} /> Logged</span> : <span style={{display:'inline-flex',alignItems:'center',gap:5}}><Icon name="plus" size={13} /> Log burn</span>}
           </button>
         </div>
       </div>

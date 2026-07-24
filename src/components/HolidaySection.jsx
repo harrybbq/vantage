@@ -1,4 +1,5 @@
 import { motion } from 'framer-motion';
+import Icon from './Icon';
 import SectionHelp from './SectionHelp';
 
 const STATUS_ORDER = ['planning', 'booked', 'completed'];
@@ -59,7 +60,7 @@ export default function HolidaySection({ S, update, active, onOpenModal }) {
         <div className="holiday-grid" id="holidayGrid">
           {(!holidays || holidays.length === 0) ? (
             <div className="holiday-empty">
-              <div className="holiday-empty-icon">✈</div>
+              <div className="holiday-empty-icon"><Icon name="plane" size={30} strokeWidth={1.5} /></div>
               No trips planned yet.<br />Hit <strong>+ Plan Trip</strong> to add your first holiday!
             </div>
           ) : (
@@ -90,7 +91,7 @@ export default function HolidaySection({ S, update, active, onOpenModal }) {
                       className="holiday-edit-btn"
                       onClick={() => onOpenModal('editHolidayModal:' + h.id)}
                       title="Edit trip"
-                    >✏</button>
+                    ><Icon name="pencil" size={13} /></button>
                     <div className="holiday-card-hero-info">
                       {countdown && (
                         <div className={`holiday-countdown holiday-countdown-${countdown.style}`}>

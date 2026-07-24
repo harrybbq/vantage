@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { haptic } from '../../hooks/useCapacitor';
 import { useSubscriptionContext } from '../../context/SubscriptionContext';
+import Icon from '../Icon';
 
 const PRO_CHIP_DISMISSED_KEY = 'vb4_more_pro_chip_dismissed';
 
@@ -23,17 +24,17 @@ const PRO_CHIP_DISMISSED_KEY = 'vb4_more_pro_chip_dismissed';
  *   - Esc → close (keyboard accessibility)
  */
 const MORE_ITEMS = [
-  { id: 'profile',      icon: '◐', label: 'Profile',      desc: 'Photo, name, email, password' },
-  { id: 'achievements', icon: '★', label: 'Achievements', desc: 'Your goal map' },
-  { id: 'shop',         icon: '◈', label: 'Shopping',     desc: 'Things to buy with coins' },
-  { id: 'friends',      icon: '◌', label: 'Friends',      desc: 'See your friends\' progress' },
-  { id: 'settings',     icon: '⚙', label: 'Settings',     desc: 'Theme, privacy, tools' },
+  { id: 'profile',      icon: 'circle-user', label: 'Profile',      desc: 'Photo, name, email, password' },
+  { id: 'achievements', icon: 'star',        label: 'Achievements', desc: 'Your goal map' },
+  { id: 'shop',         icon: 'shopping-bag', label: 'Shopping',     desc: 'Things to buy with coins' },
+  { id: 'friends',      icon: 'users',       label: 'Friends',      desc: 'See your friends\' progress' },
+  { id: 'settings',     icon: 'settings',    label: 'Settings',     desc: 'Theme, privacy, tools' },
 ];
 
 // Owner-only: shift rotation calendar. Slotted above Settings and
 // simply absent for everyone else (mirrors the desktop sidebar tab).
 const OWNER_ITEMS = [
-  { id: 'schedule', icon: '⟳', label: 'Rotation', desc: 'Shift rotation + training calendar' },
+  { id: 'schedule', icon: 'calendar-days', label: 'Rotation', desc: 'Shift rotation + training calendar' },
 ];
 
 export default function MoreDrawer({ open, onClose, onNavigate, activeSection, onUpgrade, isOwner }) {
@@ -149,12 +150,12 @@ export default function MoreDrawer({ open, onClose, onNavigate, activeSection, o
                     className={`m-drawer-item${isActive ? ' m-drawer-item-active' : ''}`}
                     onClick={() => handleSelect(item)}
                   >
-                    <span className="m-drawer-item-icon" aria-hidden="true">{item.icon}</span>
+                    <span className="m-drawer-item-icon" aria-hidden="true"><Icon name={item.icon} size={19} /></span>
                     <span className="m-drawer-item-text">
                       <span className="m-drawer-item-label">{item.label}</span>
                       <span className="m-drawer-item-desc">{item.desc}</span>
                     </span>
-                    <span className="m-drawer-item-chev" aria-hidden="true">›</span>
+                    <span className="m-drawer-item-chev" aria-hidden="true"><Icon name="chevron-right" size={16} /></span>
                   </button>
                 </li>
               );
@@ -170,12 +171,12 @@ export default function MoreDrawer({ open, onClose, onNavigate, activeSection, o
               onClick={handleChipClick}
               aria-label="Go Pro — see what's included"
             >
-              <span className="m-drawer-pro-chip-icon" aria-hidden="true">◐</span>
+              <span className="m-drawer-pro-chip-icon" aria-hidden="true"><Icon name="sparkles" size={17} /></span>
               <span className="m-drawer-pro-chip-text">
                 <span className="m-drawer-pro-chip-label">Go Pro</span>
                 <span className="m-drawer-pro-chip-sub">Unlimited everything · from £3.99/mo</span>
               </span>
-              <span className="m-drawer-pro-chip-chev" aria-hidden="true">›</span>
+              <span className="m-drawer-pro-chip-chev" aria-hidden="true"><Icon name="chevron-right" size={15} /></span>
               <span
                 role="button"
                 tabIndex={0}
@@ -183,7 +184,7 @@ export default function MoreDrawer({ open, onClose, onNavigate, activeSection, o
                 className="m-drawer-pro-chip-dismiss"
                 onClick={dismissChip}
                 onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') dismissChip(e); }}
-              >×</span>
+              ><Icon name="x" size={14} /></span>
             </button>
           )}
         </div>

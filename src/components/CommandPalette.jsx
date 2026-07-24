@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { Command } from 'cmdk';
 import { motion, AnimatePresence } from 'framer-motion';
 import { backdropClose } from '../utils/backdropClose';
+import Icon from './Icon';
 
 function KbdHint({ keys }) {
   return (
@@ -84,7 +85,7 @@ export default function CommandPalette({ open, onClose, navigate, openModal, S }
               }}
             >
               <div style={{ display: 'flex', alignItems: 'center', padding: '12px 16px', borderBottom: '1px solid rgba(255,255,255,.08)', gap: '10px' }}>
-                <span style={{ color: 'rgba(255,255,255,.4)', fontSize: '14px' }}>⌕</span>
+                <span style={{ color: 'rgba(255,255,255,.4)', display: 'inline-flex' }}><Icon name="search" size={15} /></span>
                 <Command.Input
                   value={search}
                   onValueChange={setSearch}

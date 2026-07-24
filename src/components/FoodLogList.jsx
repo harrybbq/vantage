@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import Icon from './Icon';
 import { supabase } from '../lib/supabase';
 
 const MEAL_ORDER = ['breakfast', 'lunch', 'dinner', 'snack'];
@@ -45,7 +46,7 @@ function EntryRow({ entry, onDelete, onEdit }) {
           style={{ background: confirming ? 'rgba(220,38,38,.12)' : 'none', border: 'none', color: confirming ? '#e05252' : 'var(--text-muted)', cursor: 'pointer', fontSize: '12px', padding: '4px 7px', borderRadius: 'var(--radius-sm)', transition: 'all .15s' }}
           title={confirming ? 'Tap again to confirm delete' : 'Delete entry'}
         >
-          {confirming ? '✕ sure?' : '✕'}
+          {confirming ? <span style={{display:'inline-flex',alignItems:'center',gap:4}}><Icon name="x" size={12} /> sure?</span> : <Icon name="x" size={13} />}
         </button>
       </div>
     </div>
@@ -65,7 +66,7 @@ function MealGroup({ mealType, entries, onDeleteEntry }) {
         <span style={{ width: 20, height: 20, borderRadius: 6, background: 'rgba(var(--em-rgb),.12)', border: '1px solid rgba(var(--em-rgb),.3)', color: 'var(--em)', fontFamily: 'var(--mono)', fontSize: '10px', fontWeight: 700, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>{MEAL_ICONS[mealType] || 'M'}</span>
         <span style={{ fontWeight: 600, fontSize: 'var(--text-sm)', color: 'var(--text)', textTransform: 'capitalize', flex: 1 }}>{mealType}</span>
         <span style={{ fontFamily: 'var(--mono)', fontSize: 'var(--text-xs)', color: 'var(--text-muted)' }}>{Math.round(total)} kcal</span>
-        <span style={{ fontSize: '10px', color: 'var(--text-muted)', marginLeft: '4px' }}>{expanded ? '▲' : '▼'}</span>
+        <span style={{ fontSize: '10px', color: 'var(--text-muted)', marginLeft: '4px' }}><Icon name={expanded ? 'chevron-up' : 'chevron-down'} size={12} /></span>
       </button>
       {expanded && entries.map(entry => (
         <EntryRow key={entry.id} entry={entry} onDelete={onDeleteEntry} />

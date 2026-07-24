@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import Icon from './Icon';
 import { motion } from 'framer-motion';
 import { getWeekKey, countWeekLogs, getTodayStr } from '../utils/helpers';
 import { fireGoal, fireStreak7, fireStreak30 } from '../utils/confetti';
@@ -87,7 +88,7 @@ function TrackersList({ trackers, logs, streaks, onDelete, onOpenModal, update }
       <div id="trackersList">
         {!trackers.length && (
           <div className="section-empty">
-            <div className="section-empty-icon">📊</div>
+            <div className="section-empty-icon"><Icon name="chart-column" size={30} strokeWidth={1.5} /></div>
             <div className="section-empty-title">No trackers yet</div>
             <div className="section-empty-body">Track habits, workouts, water — anything you want to build consistency around.</div>
             <button className="btn btn-primary btn-sm section-empty-cta" onClick={() => onOpenModal('addTrackerModal')}>Add first tracker</button>
@@ -139,7 +140,7 @@ function TrackersList({ trackers, logs, streaks, onDelete, onOpenModal, update }
                 className="tracker-row-del"
                 onClick={e => { e.stopPropagation(); onDelete(t.id); }}
                 aria-label={`Delete ${t.name}`}
-              >✕</button>
+              ><Icon name="x" size={13} /></button>
             </motion.div>
           );
         })}
@@ -318,10 +319,10 @@ function CalendarView({ S, update, onShowCoinToast, nutritionMonthData }) {
           <button
             className={`multi-toggle-btn${multiSelectMode ? ' active' : ''}`}
             onClick={toggleMultiSelect}
-          >{multiSelectMode ? '☑ Multi-select' : '☐ Multi-select'}</button>
+          ><span style={{display:'inline-flex',alignItems:'center',gap:6}}><Icon name={multiSelectMode ? 'square-check-big' : 'square'} size={14} /> Multi-select</span></button>
           <div className="cal-nav">
-            <button className="cal-nav-btn" onClick={() => changeMonth(-1)}>‹</button>
-            <button className="cal-nav-btn" onClick={() => changeMonth(1)}>›</button>
+            <button className="cal-nav-btn" onClick={() => changeMonth(-1)} aria-label="Previous month"><Icon name="chevron-left" size={16} /></button>
+            <button className="cal-nav-btn" onClick={() => changeMonth(1)} aria-label="Next month"><Icon name="chevron-right" size={16} /></button>
           </div>
         </div>
       </div>
@@ -422,7 +423,7 @@ function CalendarView({ S, update, onShowCoinToast, nutritionMonthData }) {
               onClick={clearDay}
               style={{ padding: '7px 14px', borderRadius: '8px', border: '1px solid var(--border)', background: 'none', color: 'var(--text-muted)', cursor: 'pointer', fontSize: '12px', fontFamily: 'var(--mono)' }}
               title="Remove all markers for this day"
-            >🗑 Clear Day</button>
+            ><span style={{display:'inline-flex',alignItems:'center',gap:6}}><Icon name="trash-2" size={13} /> Clear Day</span></button>
           </div>
         </div>
       )}

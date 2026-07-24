@@ -24,6 +24,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { fireGoal } from '../../utils/confetti';
 import { strikeState, replenishLabel } from '../../lib/habits/strikes';
+import Icon from '../Icon';
 function formatElapsedShort(ms) {
   if (ms < 0) ms = 0;
   const secs = Math.floor(ms / 1000);
@@ -108,7 +109,7 @@ function MobileHabitCard({ habit, update, onShowCoinToast, onOpenModal }) {
           className="m-habit-kebab"
           onClick={() => onOpenModal('editHabitModal:' + habit.id)}
           aria-label="Habit options"
-        >⋯</button>
+        ><Icon name="ellipsis" size={16} /></button>
       </div>
 
       {/* Meta row — next milestone + coins */}
@@ -148,7 +149,7 @@ function MobileHabitCard({ habit, update, onShowCoinToast, onOpenModal }) {
         <button
           className="m-habit-relapse-btn"
           onClick={() => onOpenModal('relapseModal:' + habit.id)}
-        >↺ Relapse</button>
+        ><span style={{display:'inline-flex',alignItems:'center',gap:5}}><Icon name="rotate-ccw" size={13} /> Relapse</span></button>
       </div>
     </div>
   );

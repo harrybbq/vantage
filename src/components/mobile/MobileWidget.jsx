@@ -21,6 +21,7 @@ import { fetchAppPreview } from '../../lib/appPreview';
 import { strikeState } from '../../lib/habits/strikes';
 import { SavingsPotsBody, SavingsProjectionBody } from '../savings/SavingsWidgets';
 import { BodyBody, SubscriptionsBody, MoodBody } from '../widgets/LifeWidgets';
+import Icon from '../Icon';
 
 // App presets (FloorplanStudio / TubeLube / …) become mobile widget
 // types too — generated from the shared config so adding an app in one
@@ -40,12 +41,12 @@ const BASE_WIDGET_META = {
   'notepad': {
     label: 'Notepad',
     eyebrow: 'NOTES',
-    icon: '✎',
+    icon: '✎', svg: 'notebook-pen',
   },
   'recent-wins': {
     label: 'Recent Wins',
     eyebrow: 'WINS',
-    icon: '★',
+    icon: '★', svg: 'star',
   },
   'coin-history': {
     label: 'Coin Activity',
@@ -55,12 +56,12 @@ const BASE_WIDGET_META = {
   'habits': {
     label: 'Habits',
     eyebrow: 'STREAKS',
-    icon: '◷',
+    icon: '◷', svg: 'flame',
   },
   'holidays': {
     label: 'Holidays',
     eyebrow: 'TRIPS',
-    icon: '✈',
+    icon: '✈', svg: 'plane',
   },
   // F4 Sprint 4 — mobile parity for the desktop hub widgets.
   // These are read-only summaries of what the user has configured on
@@ -91,7 +92,7 @@ const BASE_WIDGET_META = {
   'vitals': {
     label: 'Vitals',
     eyebrow: 'HEALTH',
-    icon: '◐',
+    icon: '◐', svg: 'activity',
   },
   // Calories Burned — Phase 1 (docs/FEATURES.md): BMR estimate from
   // the burn profile + manual MET activity log. Health Connect /
@@ -99,44 +100,44 @@ const BASE_WIDGET_META = {
   'calories': {
     label: 'Calories Burned',
     eyebrow: 'BURN',
-    icon: '◔',
+    icon: '◔', svg: 'zap',
   },
   // Macros — % of each macro consumed today as rings; the calorie
   // ring shows eaten with the burned portion in a second colour.
   'macros': {
     label: 'Macros',
     eyebrow: 'MACROS',
-    icon: '◑',
+    icon: '◑', svg: 'pie-chart',
   },
   // Body — weight trend + goal, built on the same S.vitalsLog store as
   // Vitals so WHOOP / Apple Health / manual entries all feed the trend.
   'body': {
     label: 'Body',
     eyebrow: 'BODY',
-    icon: '◍',
+    icon: '◍', svg: 'scale',
   },
   // Mood — one-tap daily mood + 8-week heatmap; journal on Track.
   'mood': {
     label: 'Mood',
     eyebrow: 'MOOD',
-    icon: '☺',
+    icon: '☺', svg: 'smile',
   },
   'savings-pots': {
     label: 'Savings Pots',
     eyebrow: 'SAVINGS',
-    icon: '◒',
+    icon: '◒', svg: 'piggy-bank',
   },
   // Subscriptions — monthly burn + upcoming renewals; manage on the
   // Achievements → Savings tab.
   'subscriptions': {
     label: 'Subscriptions',
     eyebrow: 'BILLS',
-    icon: '↻',
+    icon: '↻', svg: 'repeat',
   },
   'savings-projection': {
     label: 'Projection',
     eyebrow: 'PROJECTION',
-    icon: '⌁',
+    icon: '⌁', svg: 'trending-up',
   },
   'mail': {
     label: 'Recent Mail',
@@ -356,7 +357,7 @@ export default function MobileWidget({ widget, S, update, onRemove, navigate, us
           onClickCapture={e => { if (open) { e.preventDefault(); e.stopPropagation(); setOffset(0); } }}
         >
           <div className="m-widget-head">
-            <span className="m-widget-icon m-widget-chip" style={chipStyle}>{meta.icon}</span>
+            <span className="m-widget-icon m-widget-chip" style={chipStyle}>{meta.svg ? <Icon name={meta.svg} size={16} /> : meta.icon}</span>
             <span className="m-widget-eyebrow">// {meta.eyebrow}</span>
           </div>
           <div className="m-widget-body">
