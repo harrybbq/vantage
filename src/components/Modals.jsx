@@ -1000,9 +1000,9 @@ function AddShopModal({ openId, onClose, onAdd, categories = [] }) {
       <div className="fg">
         <label>Priority</label>
         <select value={form.priority} onChange={e => setForm(f => ({ ...f, priority: e.target.value }))}>
-          <option value="high">🔴 High — want soon</option>
-          <option value="med">🟡 Medium</option>
-          <option value="low">🟢 Low — nice to have</option>
+          <option value="high">High — want soon</option>
+          <option value="med">Medium</option>
+          <option value="low">Low — nice to have</option>
         </select>
       </div>
       <div className="fg">
@@ -1077,9 +1077,9 @@ function EditShopModal({ openId, onClose, shopItems, categories = [], onEdit, on
       <div className="fg">
         <label>Priority</label>
         <select value={form.priority} onChange={e => setForm(f => ({ ...f, priority: e.target.value }))}>
-          <option value="high">🔴 High — want soon</option>
-          <option value="med">🟡 Medium</option>
-          <option value="low">🟢 Low — nice to have</option>
+          <option value="high">High — want soon</option>
+          <option value="med">Medium</option>
+          <option value="low">Low — nice to have</option>
         </select>
       </div>
       <div className="fg">
