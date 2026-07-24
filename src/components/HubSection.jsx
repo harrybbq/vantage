@@ -584,7 +584,9 @@ export default function HubSection({ S, update, active, onOpenModal, onOpenWaitl
     const savedZ = (S.widgetZ || {})[id];
     if (savedZ) { wrapper.style.zIndex = savedZ; topZRef.current = Math.max(topZRef.current, savedZ); }
 
-    wrapper.style.resize = 'both';
+    // Custom grips on all edges (below) replace the native corner grip,
+    // so the resize affordance matches on left / right / bottom.
+    wrapper.style.resize = 'none';
     wrapper.style.overflow = 'hidden';
     // The default link wrapper is clamped 280–360px wide; lift the cap
     // and set floors so resize can grow/shrink freely.
@@ -605,51 +607,45 @@ export default function HubSection({ S, update, active, onOpenModal, onOpenWaitl
       });
     });
 
-    // ── Bottom-right resize (native grip) ──
     // Per-gesture neighbour snapshot, used by the snap-resize reflow so
     // shrinking is measured from each neighbour's ORIGINAL rect (and
     // springs back cleanly when the widget is pulled small again).
+    // Shared by all three custom edge grips below.
     let resizeNeighbours = null;
-    wrapper.addEventListener('pointerdown', e => {
-      const r = wrapper.getBoundingClientRect();
-      const inGrip = (r.right - e.clientX) < 24 && (r.bottom - e.clientY) < 24;
-      if (!inGrip) return; // not the resize grip — leave drag/clicks alone
-      // Snap ON → snapshot neighbours and arm the reflow observer.
-      if (snapRef?.current) {
-        resizeNeighbours = [];
-        canvasRef.current?.querySelectorAll('.widget-wrapper').forEach(w2 => {
-          if (w2 === wrapper) return;
-          w2.classList.add('snap-push');
-          resizeNeighbours.push({ el: w2, x0: w2.offsetLeft, y0: w2.offsetTop, w0: w2.offsetWidth, h0: w2.offsetHeight });
-        });
-        activeResizeRef.current = id;
-      }
-      const onUp = () => {
-        const w = wrapper.offsetWidth;
-        const h = wrapper.offsetHeight;
-        activeResizeRef.current = null;
-        const nbs = resizeNeighbours;
-        resizeNeighbours = null;
-        update(prev => {
-          const sizes = { ...(prev.widgetSizes || {}) };
-          const pos = { ...(prev.widgetPositions || {}) };
-          sizes[id] = { w, h };
-          if (nbs) {
-            for (const nb of nbs) {
-              nb.el.classList.remove('snap-push');
-              const nid = nb.el.dataset.linkId;
-              if (!nid) continue;
-              pos[nid] = { x: nb.el.offsetLeft, y: nb.el.offsetTop };
-              sizes[nid] = { w: nb.el.offsetWidth, h: nb.el.offsetHeight };
-            }
+    // Snap ON → snapshot neighbours and arm the reflow observer. Only the
+    // rightward-growth grip ('r') arms this — left/bottom never reflow.
+    function armSnap() {
+      if (!snapRef?.current) return;
+      resizeNeighbours = [];
+      canvasRef.current?.querySelectorAll('.widget-wrapper').forEach(w2 => {
+        if (w2 === wrapper) return;
+        w2.classList.add('snap-push');
+        resizeNeighbours.push({ el: w2, x0: w2.offsetLeft, y0: w2.offsetTop, w0: w2.offsetWidth, h0: w2.offsetHeight });
+      });
+      activeResizeRef.current = id;
+    }
+    function commitResize() {
+      const w = wrapper.offsetWidth, h = wrapper.offsetHeight;
+      activeResizeRef.current = null;
+      const nbs = resizeNeighbours;
+      resizeNeighbours = null;
+      update(prev => {
+        const sizes = { ...(prev.widgetSizes || {}) };
+        const pos = { ...(prev.widgetPositions || {}) };
+        sizes[id] = { w, h };
+        pos[id] = { x: wrapper.offsetLeft, y: wrapper.offsetTop };
+        if (nbs) {
+          for (const nb of nbs) {
+            nb.el.classList.remove('snap-push');
+            const nid = nb.el.dataset.linkId;
+            if (!nid) continue;
+            pos[nid] = { x: nb.el.offsetLeft, y: nb.el.offsetTop };
+            sizes[nid] = { w: nb.el.offsetWidth, h: nb.el.offsetHeight };
           }
-          const cur = (prev.widgetSizes || {})[id];
-          if (!nbs && cur && cur.w === w && cur.h === h) return prev;
-          return { ...prev, widgetSizes: sizes, widgetPositions: pos };
-        });
-      };
-      window.addEventListener('pointerup', onUp, { once: true });
-    });
+        }
+        return { ...prev, widgetSizes: sizes, widgetPositions: pos };
+      });
+    }
 
     // ── Snap-resize reflow ──
     // While the grip is held with snap ON, expanding the widget to the
@@ -673,39 +669,48 @@ export default function HubSection({ S, update, active, onOpenModal, onOpenWaitl
     });
     ro.observe(wrapper);
 
-    // ── Left-edge resize (custom grip) ──
-    // Mirror of the native corner: dragging the left rail changes width
-    // while pinning the RIGHT edge, so the widget grows/shrinks leftward.
-    // Only meaningful once a widget is absolutely placed.
-    if (wrapper.style.position === 'absolute' && !wrapper.querySelector('.widget-resize-l')) {
-      const grip = document.createElement('div');
-      grip.className = 'widget-resize-l';
-      wrapper.appendChild(grip);
-      grip.addEventListener('pointerdown', e => {
-        if (e.button !== undefined && e.button !== 0) return;
-        e.preventDefault(); e.stopPropagation();
-        const startLeft = wrapper.offsetLeft;
-        const right = startLeft + wrapper.offsetWidth; // fixed anchor
-        const minW = 220;
-        try { grip.setPointerCapture(e.pointerId); } catch { /* ignore */ }
-        function mv(ev) {
-          const newLeft = Math.max(0, Math.min(ev.clientX - canvasRef.current.getBoundingClientRect().left, right - minW));
-          wrapper.style.left = newLeft + 'px';
-          wrapper.style.width = (right - newLeft) + 'px';
-        }
-        function up() {
-          document.removeEventListener('pointermove', mv);
-          document.removeEventListener('pointerup', up);
-          const w = wrapper.offsetWidth, h = wrapper.offsetHeight;
-          update(prev => ({
-            ...prev,
-            widgetSizes: { ...(prev.widgetSizes || {}), [id]: { w, h } },
-            widgetPositions: { ...(prev.widgetPositions || {}), [id]: { x: wrapper.offsetLeft, y: wrapper.offsetTop } },
-          }));
-        }
-        document.addEventListener('pointermove', mv);
-        document.addEventListener('pointerup', up);
-      });
+    // ── Edge resize grips (custom, matching design on all three sides) ──
+    // Only meaningful once a widget is absolutely placed. Each grip is a
+    // thin rail with a centred pill (see .widget-resize-* in index.css):
+    //   left  → pins the RIGHT edge, grows/shrinks leftward
+    //   right → pins the LEFT edge, grows/shrinks rightward (snap reflow)
+    //   bottom→ pins the TOP edge, grows/shrinks downward
+    if (wrapper.style.position === 'absolute') {
+      const minW = 220, minH = 90;
+      const canvasRect = () => canvasRef.current.getBoundingClientRect();
+      const addGrip = (side) => {
+        if (wrapper.querySelector('.widget-resize-' + side)) return;
+        const grip = document.createElement('div');
+        grip.className = 'widget-resize widget-resize-' + side;
+        wrapper.appendChild(grip);
+        grip.addEventListener('pointerdown', e => {
+          if (e.button !== undefined && e.button !== 0) return;
+          e.preventDefault(); e.stopPropagation();
+          const startLeft = wrapper.offsetLeft, startTop = wrapper.offsetTop;
+          const rightAnchor = startLeft + wrapper.offsetWidth; // for 'l'
+          try { grip.setPointerCapture(e.pointerId); } catch { /* ignore */ }
+          if (side === 'r') armSnap(); // only rightward growth reflows
+          function mv(ev) {
+            if (side === 'l') {
+              const newLeft = Math.max(0, Math.min(ev.clientX - canvasRect().left, rightAnchor - minW));
+              wrapper.style.left = newLeft + 'px';
+              wrapper.style.width = (rightAnchor - newLeft) + 'px';
+            } else if (side === 'r') {
+              wrapper.style.width = Math.max(minW, ev.clientX - canvasRect().left - startLeft) + 'px';
+            } else { // 'b'
+              wrapper.style.height = Math.max(minH, ev.clientY - canvasRect().top - startTop) + 'px';
+            }
+          }
+          function up() {
+            document.removeEventListener('pointermove', mv);
+            document.removeEventListener('pointerup', up);
+            commitResize();
+          }
+          document.addEventListener('pointermove', mv);
+          document.addEventListener('pointerup', up);
+        });
+      };
+      addGrip('l'); addGrip('r'); addGrip('b');
     }
   }, [S.widgetSizes, S.widgetZ, update, snapRef]);
 

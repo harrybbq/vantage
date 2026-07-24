@@ -17,7 +17,7 @@ async function searchByName(query) {
   return json.products || [];
 }
 
-export default function FoodSearch({ onSelectFood, onClose, onOpenModal, savedMeals = [], onDeleteMeal }) {
+export default function FoodSearch({ onSelectFood, onClose, onOpenModal, savedMeals = [], onDeleteMeal, userId }) {
   // Camera scanning (barcode + AI identify) is a Pro feature — matches
   // the privacy policy's "AI food scanner (Pro)" disclosure. The owner
   // flag keeps it testable on the owner account regardless of tier.
@@ -29,17 +29,57 @@ export default function FoodSearch({ onSelectFood, onClose, onOpenModal, savedMe
   const [results, setResults] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  // mode: 'search' | 'barcode' | 'camera' | 'meals'
+  const [recent, setRecent] = useState([]);
+  // mode: 'search' | 'barcode' | 'camera' | 'meals' | 'recent'
   // Default to Meals when the user has saved some — that's usually the
-  // fastest path for a repeat log.
+  // fastest path for a repeat log; otherwise Recent if we have history,
+  // else the name search.
   const [mode, setMode] = useState(savedMeals.length ? 'meals' : 'search');
   const debounceRef = useRef(null);
   const inputRef = useRef(null);
   const cameraRef = useRef(null);
   const [identifying, setIdentifying] = useState(false);
 
+  // Recent foods — the user's own last-logged items, deduped by name so
+  // repeat meals are one tap to re-log (the biggest daily friction point).
+  // RLS scopes nutrition_log to this user; we still filter for perf.
   useEffect(() => {
-    if (mode !== 'camera' && mode !== 'meals') inputRef.current?.focus();
+    if (!userId) return;
+    let cancelled = false;
+    (async () => {
+      const { data } = await supabase
+        .from('nutrition_log')
+        .select('food_name,brand,serving_g,calories,protein_g,carbs_g,fat_g,fibre_g,sugar_g,sodium_mg,additional_nutrients,log_date,id')
+        .eq('user_id', userId)
+        .order('log_date', { ascending: false })
+        .order('id', { ascending: false })
+        .limit(80);
+      if (cancelled || !Array.isArray(data)) return;
+      const seen = new Set();
+      const out = [];
+      for (const r of data) {
+        const key = String(r.food_name || '').toLowerCase().trim();
+        if (!key || seen.has(key)) continue;
+        seen.add(key);
+        out.push({
+          food_name: r.food_name, brand: r.brand || '',
+          serving_g: r.serving_g, serving_unit: r.additional_nutrients?.serving_unit === 'ml' ? 'ml' : 'g',
+          calories: r.calories, protein_g: r.protein_g, carbs_g: r.carbs_g, fat_g: r.fat_g,
+          fibre_g: r.fibre_g, sugar_g: r.sugar_g, sodium_mg: r.sodium_mg,
+        });
+        if (out.length >= 15) break;
+      }
+      setRecent(out);
+      // If the user has no saved meals but does have history, open on
+      // Recent — it's the fastest repeat-log path.
+      if (!savedMeals.length && out.length) setMode(m => (m === 'search' ? 'recent' : m));
+    })();
+    return () => { cancelled = true; };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [userId]);
+
+  useEffect(() => {
+    if (mode !== 'camera' && mode !== 'meals' && mode !== 'recent') inputRef.current?.focus();
   }, [mode]);
 
   function handleQueryChange(val) {
@@ -119,6 +159,7 @@ export default function FoodSearch({ onSelectFood, onClose, onOpenModal, savedMe
 
   const tabs = [
     ...(savedMeals.length ? [['meals', 'Meals']] : []),
+    ...(recent.length ? [['recent', 'Recent']] : []),
     ['search', 'Name'],
     ['barcode', 'Barcode'],
     ...(canUseCamera ? [['camera', 'Scan']] : []),
@@ -226,8 +267,35 @@ export default function FoodSearch({ onSelectFood, onClose, onOpenModal, savedMe
           </div>
         )}
 
+        {/* Recent foods — one-tap re-log of the user's own history */}
+        {mode === 'recent' && (
+          <div style={{ flex: 1, overflowY: 'auto', minHeight: 0 }}>
+            {!recent.length ? (
+              <div style={{ textAlign: 'center', padding: '30px 16px', color: 'var(--text-muted)', fontFamily: 'var(--mono)', fontSize: 'var(--text-sm)', lineHeight: 1.7 }}>
+                Nothing logged yet — foods you log will show here for one-tap re-logging.
+              </div>
+            ) : recent.map((item, i) => (
+              <button key={i} onClick={() => onSelectFood(item)}
+                style={{ width: '100%', display: 'flex', alignItems: 'center', gap: '10px', padding: '12px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border)', background: 'transparent', cursor: 'pointer', textAlign: 'left', marginBottom: '8px', fontFamily: 'var(--sans)' }}>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontWeight: 600, fontSize: 'var(--text-sm)', color: 'var(--text)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{item.food_name}</div>
+                  {item.brand && <div style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)', marginTop: '1px' }}>{item.brand}</div>}
+                  <div style={{ display: 'flex', gap: '8px', marginTop: '4px', flexWrap: 'wrap' }}>
+                    <span style={{ fontFamily: 'var(--mono)', fontSize: '10px', color: 'var(--text-mid)' }}>{Math.round(parseFloat(item.calories) || 0)} kcal</span>
+                    <span style={{ fontFamily: 'var(--mono)', fontSize: '10px', color: 'var(--text-muted)' }}>P {Math.round(parseFloat(item.protein_g) || 0)}g</span>
+                    <span style={{ fontFamily: 'var(--mono)', fontSize: '10px', color: 'var(--text-muted)' }}>C {Math.round(parseFloat(item.carbs_g) || 0)}g</span>
+                    <span style={{ fontFamily: 'var(--mono)', fontSize: '10px', color: 'var(--text-muted)' }}>F {Math.round(parseFloat(item.fat_g) || 0)}g</span>
+                    <span style={{ fontFamily: 'var(--mono)', fontSize: '10px', color: 'var(--text-muted)' }}>{Math.round(parseFloat(item.serving_g) || 0)}{item.serving_unit || 'g'}</span>
+                  </div>
+                </div>
+                <span style={{ color: 'var(--em)', fontSize: '18px', flexShrink: 0 }}>+</span>
+              </button>
+            ))}
+          </div>
+        )}
+
         {/* Text / barcode search UI */}
-        {mode !== 'camera' && mode !== 'meals' && (
+        {mode !== 'camera' && mode !== 'meals' && mode !== 'recent' && (
           <>
             {/* Search row */}
             <div style={{ display: 'flex', gap: '8px', marginBottom: '14px', flexShrink: 0 }}>

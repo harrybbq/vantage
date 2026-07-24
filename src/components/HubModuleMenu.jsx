@@ -103,6 +103,16 @@ export function useHubModuleMenu({ S, update, syncKey, adminActions }) {
     setMenu(null);
   }
 
+  // Global weather toggle — the greeting-header chip is a hub-wide
+  // element, so its on/off lives here beneath the per-module transparency
+  // toggle (default on). Kept in the module menu so it's discoverable via
+  // the same right-click gesture.
+  const weatherOn = S.weatherEnabled !== false;
+  function onToggleWeather() {
+    update(prev => ({ ...prev, weatherEnabled: prev.weatherEnabled === false }));
+    setMenu(null);
+  }
+
   // Resolve the admin actions list for the currently-targeted module.
   // Owner-only; rows dispatch CustomEvents on document so App can route
   // them without prop-threading owner state through HubSection.
@@ -124,6 +134,8 @@ export function useHubModuleMenu({ S, update, syncKey, adminActions }) {
       menu={menu}
       transparency={transparency}
       onToggle={onToggle}
+      weatherOn={weatherOn}
+      onToggleWeather={onToggleWeather}
       onClose={() => setMenu(null)}
       adminActions={moduleAdmin}
     />
@@ -137,7 +149,7 @@ export function moduleIdFromLabel(label) {
   return String(label || 'panel').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
 }
 
-export default function HubModuleMenu({ menu, transparency, onToggle, onClose, adminActions = [] }) {
+export default function HubModuleMenu({ menu, transparency, onToggle, weatherOn = true, onToggleWeather, onClose, adminActions = [] }) {
   // Dismiss on any outside pointerdown, scroll, or Escape.
   useEffect(() => {
     if (!menu) return;
@@ -161,7 +173,7 @@ export default function HubModuleMenu({ menu, transparency, onToggle, onClose, a
   const on = !!(transparency || {})[menu.id];
 
   // Clamp so the menu never spills off the right/bottom edge.
-  const W = 220, H = 92;
+  const W = 220, H = 132;
   const left = Math.min(menu.x, window.innerWidth - W - 8);
   const top = Math.min(menu.y, window.innerHeight - H - 8);
 
@@ -185,6 +197,20 @@ export default function HubModuleMenu({ menu, transparency, onToggle, onClose, a
           <span className="hub-switch-knob" />
         </span>
       </button>
+      {onToggleWeather && (
+        <button
+          type="button"
+          className="hub-module-menu-row"
+          onClick={onToggleWeather}
+          role="menuitemcheckbox"
+          aria-checked={weatherOn}
+        >
+          <span className="hub-module-menu-label">Show weather</span>
+          <span className={`hub-switch${weatherOn ? ' is-on' : ''}`} aria-hidden="true">
+            <span className="hub-switch-knob" />
+          </span>
+        </button>
+      )}
       {adminActions.length > 0 && (
         <>
           <div className="hub-module-menu-sep" />

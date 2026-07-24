@@ -1,6 +1,22 @@
 import { useEffect, useRef } from 'react';
 import Logo from './Logo';
 import Icon from './Icon';
+import { useWeather, weatherGlyph } from '../hooks/useWeather';
+
+// Weather chip — sits to the right of the greeting on the desktop hub.
+// Its own solid styling means module-transparency never hides it. Hidden
+// on mobile via CSS (.header-weather) and when disabled / not yet loaded.
+function WeatherChip({ enabled }) {
+  const weather = useWeather(enabled);
+  if (!enabled || !weather || weather.tempC == null) return null;
+  const g = weatherGlyph(weather.code, weather.isDay);
+  return (
+    <span className="header-weather" title={`${g.label}${weather.city ? ' · ' + weather.city : ''}`}>
+      <Icon name={g.icon} size={15} />
+      <span className="header-weather-temp">{weather.tempC}°</span>
+    </span>
+  );
+}
 
 const SECTION_LABELS = {
   hub: 'Hub',
@@ -27,7 +43,7 @@ function getDynamicGreeting(name) {
   return `Still up${n}? 🌙`;
 }
 
-export default function PageHeader({ activeSection, coins, onOpenCoinHistory, profileName, onChangeBg, onRemoveBg, onSignOut, onCoinContextMenu }) {
+export default function PageHeader({ activeSection, coins, onOpenCoinHistory, profileName, onChangeBg, onRemoveBg, onSignOut, onCoinContextMenu, weatherEnabled = true }) {
   const greeting = getDynamicGreeting(profileName);
   const labelRef = useRef(null);
   const prevSection = useRef(activeSection);
@@ -52,7 +68,12 @@ export default function PageHeader({ activeSection, coins, onOpenCoinHistory, pr
       </span>
 
       {activeSection === 'hub'
-        ? <span ref={labelRef} id="pageHeader-section" key="greeting" style={{ fontSize: '13px', fontStyle: 'italic', opacity: 0.9 }}>{greeting}</span>
+        ? (
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: '10px' }}>
+            <span ref={labelRef} id="pageHeader-section" key="greeting" style={{ fontSize: '13px', fontStyle: 'italic', opacity: 0.9 }}>{greeting}</span>
+            <WeatherChip enabled={weatherEnabled} />
+          </span>
+        )
         : <span ref={labelRef} id="pageHeader-section" key="section">{SECTION_LABELS[activeSection] || ''}</span>
       }
 

@@ -506,6 +506,7 @@ export default function NutritionSection({ userId, S, selectedDate, calYear, cal
         <FoodSearch
           onClose={() => setShowFoodSearch(false)}
           onOpenModal={onOpenModal}
+          userId={userId}
           savedMeals={S?.savedMeals || []}
           onDeleteMeal={(id) => update?.(prev => ({ ...prev, savedMeals: (prev.savedMeals || []).filter(m => m.id !== id) }))}
           onSelectFood={(prefill) => {

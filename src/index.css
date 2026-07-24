@@ -223,6 +223,16 @@ nav:hover ~ #pageHeader{ left:200px; }
   text-transform:uppercase;
   color:var(--text-muted);
 }
+/* Weather chip beside the hub greeting. Own solid pill so it stays
+   readable regardless of module transparency; desktop-only. */
+.header-weather{
+  display:inline-flex;align-items:center;gap:5px;
+  padding:3px 9px;border-radius:999px;
+  background:rgba(0,0,0,.30);border:1px solid rgba(255,255,255,.20);
+  color:rgba(255,255,255,.94);line-height:1;
+}
+.header-weather-temp{font-family:var(--mono);font-size:12px;font-weight:600;}
+@media (max-width:900px){ .header-weather{display:none;} }
 nav{
   position:fixed;
   top:0;left:0;bottom:0;
@@ -728,17 +738,35 @@ nav:hover .nav-tab-label{opacity:1;}
 .link-island.dragging-active{opacity:.88;box-shadow:0 18px 48px rgba(0,0,0,.18);transform:scale(1.02);}
 /* Snap-drag: neighbours glide to their pushed-down slot. */
 .widget-wrapper.snap-push{transition:top .16s cubic-bezier(.22,1,.36,1);}
-/* Left-edge resize grip — mirror of the native bottom-right corner. */
-.widget-wrapper .widget-resize-l{
-  position:absolute;left:0;top:0;bottom:0;width:9px;
+/* Edge resize grips — one shared design on left / right / bottom. Each
+   is a thin rail with a centred pill that fades in on hover. */
+.widget-wrapper .widget-resize-l,
+.widget-wrapper .widget-resize-r{
+  position:absolute;top:0;bottom:0;width:9px;
   cursor:ew-resize;z-index:5;touch-action:none;
 }
-.widget-wrapper .widget-resize-l::after{
-  content:"";position:absolute;left:2px;top:50%;transform:translateY(-50%);
+.widget-wrapper .widget-resize-l{left:0;}
+.widget-wrapper .widget-resize-r{right:0;}
+.widget-wrapper .widget-resize-b{
+  position:absolute;left:0;right:0;bottom:0;height:9px;
+  cursor:ns-resize;z-index:5;touch-action:none;
+}
+.widget-wrapper .widget-resize-l::after,
+.widget-wrapper .widget-resize-r::after{
+  content:"";position:absolute;top:50%;transform:translateY(-50%);
   width:3px;height:26px;border-radius:3px;background:var(--accent-line,rgba(0,0,0,.14));
   opacity:0;transition:opacity .15s;
 }
-.widget-wrapper:hover .widget-resize-l::after{opacity:.7;}
+.widget-wrapper .widget-resize-l::after{left:2px;}
+.widget-wrapper .widget-resize-r::after{right:2px;}
+.widget-wrapper .widget-resize-b::after{
+  content:"";position:absolute;left:50%;bottom:2px;transform:translateX(-50%);
+  height:3px;width:26px;border-radius:3px;background:var(--accent-line,rgba(0,0,0,.14));
+  opacity:0;transition:opacity .15s;
+}
+.widget-wrapper:hover .widget-resize-l::after,
+.widget-wrapper:hover .widget-resize-r::after,
+.widget-wrapper:hover .widget-resize-b::after{opacity:.7;}
 /* Snap-drag toggle pips (cream ProfileCard + OS Actions) */
 .hub-snap-toggle,.os-action-toggle{display:inline-flex;align-items:center;justify-content:center;gap:8px;}
 .hub-snap-pip,.os-toggle-pip{font-family:var(--mono);font-size:8.5px;font-weight:700;letter-spacing:1px;padding:1px 6px;border-radius:999px;background:rgba(128,128,128,.18);color:var(--text-muted);}
