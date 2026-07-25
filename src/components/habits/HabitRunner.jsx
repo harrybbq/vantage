@@ -4,35 +4,34 @@ import { useEffect, useRef } from 'react';
  * HabitRunner — the runner lane that sits above a habit's horizontal
  * progress bar (desktop Habits page only).
  *
- * A stick figure runs at the streak's position along the track. The
- * longer the streak, the harder it works: it speeds up, then starts
- * clearing obstacles — rocks, low walls, high walls, clotheslines.
- * The obstacle course IS the progress indicator, so a glance tells you
- * roughly how deep into a streak you are before you read any number.
+ * A stick figure travels the streak as a course. The longer the streak,
+ * the harder it works: walk → brisk walk → jog → run, then obstacles —
+ * rocks, low walls, high walls, clotheslines — escalate while the pace
+ * holds. The course IS the progress indicator.
  *
- * Rendering notes:
- *   - One shared rAF loop drives every lane on the page (see TICKER).
- *     A lane that scrolls out of view or a hidden tab stops drawing.
- *   - Canvas (not SVG) because it's per-frame limb maths, and the whole
- *     thing is a few strokes per frame.
- *   - prefers-reduced-motion freezes a static stride and stops the
- *     ground/obstacles: the bar underneath always carries the real
- *     value, so nothing is conveyed by motion alone.
+ * Motion model:
+ *   - Stage parameters (speed / cadence / stride / gait) interpolate
+ *     CONTINUOUSLY with days-clean, not in steps: day 4-of-7 moves like
+ *     "57% of the way to running", so every day visibly upgrades the
+ *     figure. Within the obstacle stages the same fraction densifies the
+ *     course instead (spawn gap shrinks as the next stage approaches).
+ *   - `gait` (0 = walk, 1 = run) drives the whole body together — knee
+ *     fold, arm swing, elbow bend, bounce, lean — so posture and pace
+ *     can never disagree.
+ *
+ * Quality layer: ground shadow that detaches when airborne, footfall
+ * dust at running gaits, spark bursts on cleared obstacles, landing
+ * absorb after aerial moves, a tumbling stumble on relapse, eased
+ * action curves.
+ *
+ * Rendering: one shared rAF drives every lane; a lane stops drawing
+ * when offscreen or the tab is hidden. prefers-reduced-motion freezes a
+ * static stance and disables obstacles/particles — the bar underneath
+ * always carries the real value, so nothing is conveyed by motion alone.
  */
 
 // ── Stage ladder ────────────────────────────────────────────────────
-// Keyed off days clean. `kinds` is what can spawn at that stage.
-// Pace ramps over the first week and then STOPS. Days 7+ all run at the
-// same full speed — what escalates after that is the course, not the legs.
-//
-// `gait` blends the whole body between a WALK (0) and a RUN (1) — they
-// aren't the same motion at different speeds. A walk keeps a foot down
-// at all times: short stride, near-straight legs, small arm swing, almost
-// no bounce, upright torso. A run adds knee lift, a real bounce, big
-// counter-swinging arms and a forward lean. Everything below is derived
-// from `gait` in drawRunner, so pace and posture can never disagree.
-//
-// `cadence` is rad/s of the stride phase; one cycle = 2 steps, so
+// `cadence` is rad/s of stride phase; one cycle = 2 steps, so
 // steps/sec = cadence / π. Walk ≈ 1.7/s, run ≈ 2.9/s (~175 spm).
 const RUN = { speed: 78, cadence: 9.2, amp: 0.85, gait: 1 };
 const STAGES = [
@@ -50,6 +49,34 @@ export function stageForDays(days) {
   return s;
 }
 
+const lerp = (a, b, u) => a + (b - a) * u;
+const clamp01 = v => Math.max(0, Math.min(1, v));
+const smooth = t => t * t * (3 - 2 * t); // smoothstep ease
+
+/** Continuous motion parameters for a given streak length. `frac` is the
+ *  progress through the CURRENT stage toward the next — the "day 4/7"
+ *  multiplier: it blends speed/cadence/stride/gait toward the next
+ *  stage's values, and densifies the obstacle course within a stage. */
+export function paramsForDays(days) {
+  let i = 0;
+  for (let k = 0; k < STAGES.length; k++) if (days >= STAGES[k].at) i = k;
+  const cur = STAGES[i];
+  const next = STAGES[i + 1] || null;
+  const frac = next
+    ? clamp01((days - cur.at) / (next.at - cur.at))
+    : clamp01((days - cur.at) / 30); // past the last stage: intensity keeps creeping
+  const to = next || cur;
+  return {
+    label: cur.label,
+    kinds: cur.kinds,
+    frac,
+    speed:   lerp(cur.speed,   to.speed,   frac),
+    cadence: lerp(cur.cadence, to.cadence, frac),
+    amp:     lerp(cur.amp,     to.amp,     frac),
+    gait:    lerp(cur.gait,    to.gait,    frac),
+  };
+}
+
 // Obstacle geometry + the move each one demands.
 const KINDS = {
   rock:     { w: 10, h: 7,  action: 'jump',  dur: 0.62, lead: 0.30 },
@@ -57,11 +84,12 @@ const KINDS = {
   wallHigh: { w: 9,  h: 27, action: 'climb', dur: 1.05, lead: 0.34 },
   line:     { w: 22, h: 24, action: 'duck',  dur: 0.55, lead: 0.22 },
 };
+// Aerial moves get a landing absorb when they finish.
+const AERIAL = new Set(['jump', 'vault', 'climb']);
 
 // ── Shared ticker ───────────────────────────────────────────────────
-// Drives every lane from one rAF. Note that stride phase and ground
-// scroll are deliberately PER-LANE (see stateRef) — they advance at each
-// habit's own cadence, so they can't live on the shared ticker.
+// One rAF for the page. Stride phase / scroll / particles are PER-LANE
+// (each habit has its own cadence) — see stateRef.
 const TICKER = { lanes: new Set(), raf: 0, last: 0 };
 
 function startTicker() {
@@ -71,7 +99,7 @@ function startTicker() {
     const dt = Math.min(0.05, (now - TICKER.last) / 1000);
     TICKER.last = now;
     for (const lane of TICKER.lanes) {
-      if (lane.visible) lane.step(dt);
+      if (lane.visible) lane.step(dt, now);
     }
     TICKER.raf = requestAnimationFrame(frame);
   };
@@ -84,12 +112,10 @@ function stopTicker() {
 }
 
 // ── Figure ──────────────────────────────────────────────────────────
-// Angles are measured from straight-down, positive = forward (+x).
-// The knee only ever folds BACKWARD: shin = thigh − flexion, flexion ≥ 0.
-// Flexion peaks during recovery (heel toward the backside) and falls to
-// zero at mid-stance so the supporting leg is straight — getting that
-// timing the wrong way round is what makes a runner's knees look
-// hinged backwards.
+// Angles measured from straight-down, positive = forward (+x). The knee
+// only folds BACKWARD (shin = thigh − flexion, flexion ≥ 0), and flexion
+// peaks during recovery — never on the forward reach — which is what
+// keeps the joint reading as a human knee.
 function limb(ctx, oy, a1, a2, l1, l2, groundY) {
   const kx = Math.sin(a1) * l1, ky = Math.cos(a1) * l1;
   let fx = kx + Math.sin(a2) * l2, fy = oy + ky + Math.cos(a2) * l2;
@@ -101,29 +127,44 @@ function limb(ctx, oy, a1, a2, l1, l2, groundY) {
   ctx.stroke();
 }
 
-const lerp = (a, b, u) => a + (b - a) * u;
-
 function drawRunner(ctx, x, groundY, colour, pose) {
-  const { mode, p, t, amp = 0.85, gait = 1 } = pose;
-  let yOff = 0, crouch = 0;
+  const { mode, p, t: tRaw, amp = 0.85, gait = 1, land = 0, shadow } = pose;
+  const t = smooth(clamp01(tRaw)); // eased action curve
+  let yOff = 0, crouch = 0, rot = 0;
 
-  if (mode === 'jump')  yOff = -30 * 4 * t * (1 - t);
+  if (mode === 'jump')  yOff = -26 * 4 * t * (1 - t);
   if (mode === 'vault') yOff = -20 * Math.sin(Math.PI * t);
   if (mode === 'climb') {
     const top = -(KINDS.wallHigh.h + 5);
-    if (t < 0.4)      yOff = top * (t / 0.4);              // spring for the top
-    else if (t < 0.7) yOff = top;                          // mantle, hanging on
-    else              yOff = top * (1 - (t - 0.7) / 0.3);  // drop down the far side
+    if (t < 0.4)      yOff = top * smooth(t / 0.4);            // spring for the top
+    else if (t < 0.7) yOff = top;                              // mantle, hanging on
+    else              yOff = top * (1 - smooth((t - 0.7) / 0.3)); // drop the far side
   }
   if (mode === 'duck') crouch = 9 * Math.sin(Math.PI * t);
+  if (mode === 'stumble') {
+    rot = 0.7 * smooth(tRaw);          // pitch forward into the trip
+    crouch = 5 * smooth(tRaw);         // and collapse a little
+  }
+  if (mode === 'celebrate') yOff = -3.5 * Math.max(0, Math.sin(p * 0.55)); // happy hops
+  crouch += land * 3.5;                // landing absorb after aerial moves
 
-  // A walk's hips dip twice per cycle (once per step) and barely move;
-  // a run lifts clear of the ground on each stride.
+  // Walk hips dip twice per cycle and barely move; a run lifts clear.
   const bob = mode === 'run'
     ? lerp(-0.35 * (1 - Math.cos(2 * p)) / 2, -1.6 * Math.abs(Math.sin(p)), gait)
     : 0;
-  // Forward lean, run only.
-  const lean = mode === 'run' ? lerp(0, 2.0, gait) : 0;
+  const lean = mode === 'run' ? lerp(0, 2.0, gait) : mode === 'stumble' ? 3 * smooth(tRaw) : 0;
+
+  // Ground shadow — anchors the figure; detaches and shrinks when airborne.
+  if (shadow) {
+    const air = clamp01(-yOff / 30);
+    ctx.save();
+    ctx.fillStyle = shadow;
+    ctx.globalAlpha = 0.22 * (1 - air * 0.7);
+    ctx.beginPath();
+    ctx.ellipse(x + lean * 0.5, groundY - 0.5, 8 * (1 - air * 0.45), 1.7, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+  }
 
   const hipY = groundY - 14 + yOff + bob + crouch;
   const shoulderY = hipY - 9 + crouch * 0.35;
@@ -131,6 +172,7 @@ function drawRunner(ctx, x, groundY, colour, pose) {
 
   ctx.save();
   ctx.translate(x, 0);
+  if (rot) { ctx.translate(0, hipY); ctx.rotate(rot); ctx.translate(0, -hipY); }
   ctx.strokeStyle = colour;
   ctx.fillStyle = colour;
   ctx.lineWidth = 1.9;
@@ -180,15 +222,11 @@ function drawRunner(ctx, x, groundY, colour, pose) {
     limb(ctx, hipY, -0.95, -0.35, L1, L2, groundY);
     limb(ctx, hipY,  0.7,   1.35, L1, L2, groundY);
   } else {
-    // run / idle
+    // run / idle — gait blends every joint together
     const ph = mode === 'run' ? p : 0.9;
-    // Knee: a walk barely folds (and only through mid-swing); a run folds
-    // hard through recovery. Both peak on recovery, never on the forward
-    // reach — that's what keeps the joint reading as a human knee.
-    const flexAmt = lerp(0.42, 1.35, gait);
-    // Arms: a walk swings from a near-straight elbow; a run drives a bent one.
-    const armAmp = lerp(0.20, 0.62, gait);
-    const elbow  = lerp(0.10, 0.50, gait);
+    const flexAmt = lerp(0.42, 1.35, gait); // walk barely folds; run drives the heel up
+    const armAmp  = lerp(0.20, 0.62, gait);
+    const elbow   = lerp(0.10, 0.50, gait);
 
     for (const off of [0, Math.PI]) {
       const th = amp * Math.sin(ph + off);
@@ -206,11 +244,13 @@ function drawRunner(ctx, x, groundY, colour, pose) {
   ctx.restore();
 }
 
-function drawObstacle(ctx, o, groundY, colour) {
+// Obstacles draw in the RED danger tone so they read at a glance —
+// they're the things the streak has to clear.
+function drawObstacle(ctx, o, groundY, red) {
   const k = KINDS[o.kind];
   ctx.save();
-  ctx.strokeStyle = colour;
-  ctx.fillStyle = colour;
+  ctx.strokeStyle = red;
+  ctx.fillStyle = red;
   ctx.lineWidth = 1.6;
   ctx.lineJoin = 'round';
   if (o.kind === 'rock') {
@@ -220,7 +260,7 @@ function drawObstacle(ctx, o, groundY, colour) {
     ctx.lineTo(o.x + k.w * 0.28, groundY - k.h * 0.72);
     ctx.lineTo(o.x + k.w / 2, groundY);
     ctx.closePath();
-    ctx.globalAlpha = 0.28; ctx.fill();
+    ctx.globalAlpha = 0.22; ctx.fill();
     ctx.globalAlpha = 1;    ctx.stroke();
   } else if (o.kind === 'line') {
     // clothesline: a bar at head height on a single post
@@ -228,13 +268,13 @@ function drawObstacle(ctx, o, groundY, colour) {
     ctx.moveTo(o.x - k.w / 2, groundY - k.h);
     ctx.lineTo(o.x + k.w / 2, groundY - k.h);
     ctx.stroke();
-    ctx.globalAlpha = 0.45;
+    ctx.globalAlpha = 0.5;
     ctx.beginPath();
     ctx.moveTo(o.x + k.w / 2, groundY - k.h);
     ctx.lineTo(o.x + k.w / 2, groundY);
     ctx.stroke();
   } else {
-    ctx.globalAlpha = 0.28;
+    ctx.globalAlpha = 0.22;
     ctx.fillRect(o.x - k.w / 2, groundY - k.h, k.w, k.h);
     ctx.globalAlpha = 1;
     ctx.strokeRect(o.x - k.w / 2, groundY - k.h, k.w, k.h);
@@ -245,16 +285,21 @@ function drawObstacle(ctx, o, groundY, colour) {
 // ── Component ───────────────────────────────────────────────────────
 export default function HabitRunner({ progress, days, colour, done, stumbleKey }) {
   const canvasRef = useRef(null);
-  const stateRef = useRef({ obstacles: [], action: null, spawnGap: 170, stumbleUntil: 0, phase: 0, scroll: 0 });
+  const stateRef = useRef({
+    obstacles: [], action: null, spawnGap: 170,
+    stumbleStart: 0, phase: 0, scroll: 0,
+    particles: [], stepCount: 0, land: 0,
+  });
   // Live props without restarting the loop on every tick.
   const propsRef = useRef({ progress, days, colour, done });
   propsRef.current = { progress, days, colour, done };
 
-  // A relapse bumps stumbleKey — play the trip, then the streak is 0 anyway.
+  // A relapse bumps stumbleKey — play the tumble, then the streak is 0.
   useEffect(() => {
     if (stumbleKey) {
-      stateRef.current.stumbleUntil = performance.now() + 700;
+      stateRef.current.stumbleStart = performance.now();
       stateRef.current.obstacles = [];
+      stateRef.current.action = null;
     }
   }, [stumbleKey]);
 
@@ -277,47 +322,76 @@ export default function HabitRunner({ progress, days, colour, done, stumbleKey }
     const ro = new ResizeObserver(resize);
     ro.observe(canvas);
 
-    // Read themed colours lazily — they change with the scheme picker.
+    // Themed colours, re-read when the scheme/theme changes. The danger
+    // red is fixed per theme (there's no --danger token): deeper on
+    // cream, lifted on dark so it doesn't vanish into the ground.
     let palette = null;
     const readPalette = () => {
       const s = getComputedStyle(document.documentElement);
+      const theme = document.documentElement.getAttribute('data-theme') || '';
+      const dark = theme.includes('dark') ||
+        (!theme && window.matchMedia('(prefers-color-scheme: dark)').matches);
       palette = {
         line: s.getPropertyValue('--border').trim() || '#ddd',
         gold: s.getPropertyValue('--gold').trim() || '#c8970a',
+        red:  dark ? '#e2685c' : '#c0392b',
+        ink:  s.getPropertyValue('--text-muted').trim() || '#8a8175',
       };
     };
     readPalette();
     const mo = new MutationObserver(readPalette);
     mo.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme', 'style'] });
 
+    const spawnParticles = (st, x, y, n, colour, up) => {
+      for (let i = 0; i < n; i++) {
+        st.particles.push({
+          x: x + (Math.random() - 0.5) * 4,
+          y,
+          vx: (Math.random() - 0.5) * (up ? 26 : 18) - (up ? 0 : 10),
+          vy: up ? -(14 + Math.random() * 26) : -(4 + Math.random() * 8),
+          life: 0.45 + Math.random() * 0.25,
+          age: 0,
+          colour,
+        });
+      }
+    };
+
     const lane = {
       visible: true,
-      step(dt) {
+      step(dt, now) {
         const st = stateRef.current;
         const { progress: pr, days: dy, colour: col, done: dn } = propsRef.current;
-        const stage = stageForDays(dy);
+        const prm = paramsForDays(dy);
         const still = reduced.matches;
 
-        if (!still) st.phase += dt * stage.cadence;
+        const stumbleT = st.stumbleStart ? (now - st.stumbleStart) / 700 : 2;
+        const stumbling = stumbleT < 1;
+
+        if (!still && !stumbling) {
+          st.phase += dt * prm.cadence;
+          st.scroll = (st.scroll + prm.speed * dt) % 12;
+        }
         const runnerX = Math.max(10, Math.min(w - 10, pr * w));
 
         // ── obstacles ──
-        if (!still && stage.kinds.length && !dn) {
-          for (const o of st.obstacles) o.x -= stage.speed * dt;
+        // Spawn gap shrinks as the stage fraction climbs — the "day 4/7"
+        // multiplier applied to course density.
+        if (!still && prm.kinds.length && !dn && !stumbling) {
+          for (const o of st.obstacles) o.x -= prm.speed * dt;
           st.obstacles = st.obstacles.filter(o => o.x > -40);
-          const last = st.obstacles[st.obstacles.length - 1];
-          if (!last || last.x < w - st.spawnGap) {
-            const kind = stage.kinds[Math.floor(Math.random() * stage.kinds.length)];
+          const lastOb = st.obstacles[st.obstacles.length - 1];
+          if (!lastOb || lastOb.x < w - st.spawnGap) {
+            const kind = prm.kinds[Math.floor(Math.random() * prm.kinds.length)];
             st.obstacles.push({ kind, x: w + 24, acted: false });
-            st.spawnGap = 130 + Math.random() * 130;
+            const density = 1 - 0.35 * prm.frac;
+            st.spawnGap = (130 + Math.random() * 130) * density;
           }
-          // trigger the move that clears whatever is arriving
           if (!st.action) {
             for (const o of st.obstacles) {
               if (o.acted) continue;
               const k = KINDS[o.kind];
               const d = o.x - runnerX;
-              if (d <= stage.speed * k.lead && d > -14) {
+              if (d <= prm.speed * k.lead && d > -14) {
                 o.acted = true;
                 st.action = { mode: k.action, t: 0, dur: k.dur };
                 break;
@@ -330,23 +404,47 @@ export default function HabitRunner({ progress, days, colour, done, stumbleKey }
 
         if (st.action) {
           st.action.t += dt / st.action.dur;
-          if (st.action.t >= 1) st.action = null;
+          if (st.action.t >= 1) {
+            // Cleared: spark burst + landing absorb for aerial moves.
+            if (!still) {
+              spawnParticles(st, runnerX, h - 3, 5, palette.gold, true);
+              if (AERIAL.has(st.action.mode)) st.land = 1;
+            }
+            st.action = null;
+          }
         }
-        if (!still) st.scroll = (st.scroll + stage.speed * dt) % 12;
+        st.land = Math.max(0, st.land - dt * 6);
+
+        // Footfall dust — twice per stride cycle, only at running gaits.
+        if (!still && !dn && !stumbling && !st.action && prm.gait > 0.45) {
+          const stepIdx = Math.floor(st.phase / Math.PI);
+          if (stepIdx !== st.stepCount) {
+            st.stepCount = stepIdx;
+            spawnParticles(st, runnerX - 4, h - 2, 2, palette.ink, false);
+          }
+        }
+
+        // ── particles ──
+        for (const q of st.particles) {
+          q.age += dt;
+          q.x += q.vx * dt;
+          q.y += q.vy * dt;
+          q.vy += 90 * dt; // gravity
+        }
+        st.particles = st.particles.filter(q => q.age < q.life);
 
         // ── draw ──
         const groundY = h - 1;
         ctx.clearRect(0, 0, w, h);
 
-        const stumbling = performance.now() < st.stumbleUntil;
         const mode = stumbling ? 'stumble'
           : dn ? 'celebrate'
           : st.action ? st.action.mode
           : still ? 'idle'
           : 'run';
 
-        // ground dashes give the sense of speed — the runner's x encodes
-        // progress, so it barely moves day to day
+        // Ground dashes give the sense of speed — the runner's x encodes
+        // progress, so it barely moves day to day.
         if (!still && !dn && !stumbling) {
           ctx.save();
           ctx.strokeStyle = palette.line;
@@ -364,14 +462,27 @@ export default function HabitRunner({ progress, days, colour, done, stumbleKey }
           ctx.restore();
         }
 
-        for (const o of st.obstacles) drawObstacle(ctx, o, groundY, palette.line);
+        for (const o of st.obstacles) drawObstacle(ctx, o, groundY, palette.red);
+
+        for (const q of st.particles) {
+          const a = 1 - q.age / q.life;
+          ctx.save();
+          ctx.fillStyle = q.colour;
+          ctx.globalAlpha = 0.7 * a;
+          ctx.beginPath();
+          ctx.arc(q.x, q.y, 1.1 + 0.6 * a, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.restore();
+        }
 
         drawRunner(ctx, runnerX, groundY, dn ? palette.gold : col, {
           mode,
           p: st.phase,
-          t: st.action ? Math.min(1, st.action.t) : 0,
-          amp: stage.amp,
-          gait: stage.gait,
+          t: mode === 'stumble' ? clamp01(stumbleT) : (st.action ? Math.min(1, st.action.t) : 0),
+          amp: prm.amp,
+          gait: prm.gait,
+          land: st.land,
+          shadow: still ? null : palette.ink,
         });
       },
     };
