@@ -92,7 +92,9 @@ function HabitCard({ habit, update, onShowCoinToast, onOpenModal }) {
     return (cleared + Math.max(0, Math.min(1, frac))) / n;
   })();
 
-  const stageLabel = allDone ? 'All milestones cleared' : stageForDays(elapsed / 86400000).label;
+  const stageLabel = allDone
+    ? (habit.endless ? 'All milestones cleared — still running' : 'All milestones cleared')
+    : stageForDays(elapsed / 86400000).label;
 
   function handleRelapse() {
     onOpenModal('relapseModal:' + habit.id);
@@ -123,6 +125,7 @@ function HabitCard({ habit, update, onShowCoinToast, onOpenModal }) {
           days={elapsed / 86400000}
           colour={fillColor}
           done={allDone}
+          endless={!!habit.endless}
           stumbleKey={habit.startTime}
         />
       </div>
