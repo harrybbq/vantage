@@ -23,19 +23,25 @@ import { useEffect, useRef } from 'react';
 // ── Stage ladder ────────────────────────────────────────────────────
 // Keyed off days clean. `kinds` is what can spawn at that stage.
 // Pace ramps over the first week and then STOPS. Days 7+ all run at the
-// same full speed — what escalates after that is the course, not the
-// legs. (Compounding cadence past full speed just looked frantic.)
-// `cadence` is rad/s of the stride phase: one cycle = 2 steps, so full
-// speed ≈ 5.0 rad/s ≈ 1.6 steps/s. `amp` is stride length in radians —
-// a slow warm-up is a short shuffle, not slow-motion sprinting.
-const FULL = { speed: 66, cadence: 5.0, amp: 0.8 };
+// same full speed — what escalates after that is the course, not the legs.
+//
+// `gait` blends the whole body between a WALK (0) and a RUN (1) — they
+// aren't the same motion at different speeds. A walk keeps a foot down
+// at all times: short stride, near-straight legs, small arm swing, almost
+// no bounce, upright torso. A run adds knee lift, a real bounce, big
+// counter-swinging arms and a forward lean. Everything below is derived
+// from `gait` in drawRunner, so pace and posture can never disagree.
+//
+// `cadence` is rad/s of the stride phase; one cycle = 2 steps, so
+// steps/sec = cadence / π. Walk ≈ 1.7/s, run ≈ 2.9/s (~175 spm).
+const RUN = { speed: 78, cadence: 9.2, amp: 0.85, gait: 1 };
 const STAGES = [
-  { at: 0,  label: 'Warming up',   speed: 18, cadence: 1.7, amp: 0.42, kinds: [] },
-  { at: 1,  label: 'Jogging',      speed: 32, cadence: 2.7, amp: 0.56, kinds: [] },
-  { at: 4,  label: 'Picking up',   speed: 48, cadence: 3.8, amp: 0.68, kinds: [] },
-  { at: 7,  label: 'Running',      ...FULL, kinds: ['rock'] },
-  { at: 14, label: 'Vaulting',     ...FULL, kinds: ['rock', 'wallLow'] },
-  { at: 30, label: 'Full parkour', ...FULL, kinds: ['rock', 'wallLow', 'wallHigh', 'line'] },
+  { at: 0,  label: 'Walking',      speed: 22, cadence: 5.4, amp: 0.38, gait: 0,    kinds: [] },
+  { at: 1,  label: 'Brisk walk',   speed: 34, cadence: 6.4, amp: 0.52, gait: 0.3,  kinds: [] },
+  { at: 4,  label: 'Jogging',      speed: 55, cadence: 7.8, amp: 0.68, gait: 0.65, kinds: [] },
+  { at: 7,  label: 'Running',      ...RUN, kinds: ['rock'] },
+  { at: 14, label: 'Vaulting',     ...RUN, kinds: ['rock', 'wallLow'] },
+  { at: 30, label: 'Full parkour', ...RUN, kinds: ['rock', 'wallLow', 'wallHigh', 'line'] },
 ];
 
 export function stageForDays(days) {
@@ -95,8 +101,10 @@ function limb(ctx, oy, a1, a2, l1, l2, groundY) {
   ctx.stroke();
 }
 
+const lerp = (a, b, u) => a + (b - a) * u;
+
 function drawRunner(ctx, x, groundY, colour, pose) {
-  const { mode, p, t, amp = 0.8 } = pose;
+  const { mode, p, t, amp = 0.85, gait = 1 } = pose;
   let yOff = 0, crouch = 0;
 
   if (mode === 'jump')  yOff = -30 * 4 * t * (1 - t);
@@ -108,8 +116,14 @@ function drawRunner(ctx, x, groundY, colour, pose) {
     else              yOff = top * (1 - (t - 0.7) / 0.3);  // drop down the far side
   }
   if (mode === 'duck') crouch = 9 * Math.sin(Math.PI * t);
-  // Bounce scales with stride — a shuffle barely leaves the ground.
-  const bob = mode === 'run' ? -Math.abs(Math.sin(p)) * 1.5 * (amp / 0.8) : 0;
+
+  // A walk's hips dip twice per cycle (once per step) and barely move;
+  // a run lifts clear of the ground on each stride.
+  const bob = mode === 'run'
+    ? lerp(-0.35 * (1 - Math.cos(2 * p)) / 2, -1.6 * Math.abs(Math.sin(p)), gait)
+    : 0;
+  // Forward lean, run only.
+  const lean = mode === 'run' ? lerp(0, 2.0, gait) : 0;
 
   const hipY = groundY - 14 + yOff + bob + crouch;
   const shoulderY = hipY - 9 + crouch * 0.35;
@@ -124,10 +138,10 @@ function drawRunner(ctx, x, groundY, colour, pose) {
   ctx.lineJoin = 'round';
 
   ctx.beginPath();
-  ctx.arc(0, headY, 3.5, 0, Math.PI * 2);
+  ctx.arc(lean, headY, 3.5, 0, Math.PI * 2);
   ctx.fill();
   ctx.beginPath();
-  ctx.moveTo(0, shoulderY - 2);
+  ctx.moveTo(lean, shoulderY - 2);
   ctx.lineTo(0, hipY);
   ctx.stroke();
 
@@ -168,16 +182,26 @@ function drawRunner(ctx, x, groundY, colour, pose) {
   } else {
     // run / idle
     const ph = mode === 'run' ? p : 0.9;
-    const k = amp / 0.8; // 0..1 — scales knee lift and arm swing with pace
+    // Knee: a walk barely folds (and only through mid-swing); a run folds
+    // hard through recovery. Both peak on recovery, never on the forward
+    // reach — that's what keeps the joint reading as a human knee.
+    const flexAmt = lerp(0.42, 1.35, gait);
+    // Arms: a walk swings from a near-straight elbow; a run drives a bent one.
+    const armAmp = lerp(0.20, 0.62, gait);
+    const elbow  = lerp(0.10, 0.50, gait);
+
     for (const off of [0, Math.PI]) {
       const th = amp * Math.sin(ph + off);
-      const flex = 1.35 * k * (1 + Math.cos(ph + off)) / 2;
+      const flex = flexAmt * (1 + Math.cos(ph + off)) / 2;
       limb(ctx, hipY, th, th - flex, L1, L2, groundY);
     }
+    ctx.save();
+    ctx.translate(lean, 0);
     for (const off of [0, Math.PI]) {
-      const a = -0.62 * k * Math.sin(ph + off);
-      limb(ctx, shoulderY, a, a - 0.5 * k, A1, A2);
+      const a = -armAmp * Math.sin(ph + off);
+      limb(ctx, shoulderY, a, a - elbow, A1, A2);
     }
+    ctx.restore();
   }
   ctx.restore();
 }
@@ -347,6 +371,7 @@ export default function HabitRunner({ progress, days, colour, done, stumbleKey }
           p: st.phase,
           t: st.action ? Math.min(1, st.action.t) : 0,
           amp: stage.amp,
+          gait: stage.gait,
         });
       },
     };
