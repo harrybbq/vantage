@@ -22,13 +22,20 @@ import { useEffect, useRef } from 'react';
 
 // ── Stage ladder ────────────────────────────────────────────────────
 // Keyed off days clean. `kinds` is what can spawn at that stage.
+// Pace ramps over the first week and then STOPS. Days 7+ all run at the
+// same full speed — what escalates after that is the course, not the
+// legs. (Compounding cadence past full speed just looked frantic.)
+// `cadence` is rad/s of the stride phase: one cycle = 2 steps, so full
+// speed ≈ 5.0 rad/s ≈ 1.6 steps/s. `amp` is stride length in radians —
+// a slow warm-up is a short shuffle, not slow-motion sprinting.
+const FULL = { speed: 66, cadence: 5.0, amp: 0.8 };
 const STAGES = [
-  { at: 0,  label: 'Warming up',   speed: 34,  cadence: 4.6,  kinds: [] },
-  { at: 1,  label: 'Jogging',      speed: 50,  cadence: 6.2,  kinds: [] },
-  { at: 4,  label: 'Picking up',   speed: 66,  cadence: 7.6,  kinds: [] },
-  { at: 7,  label: 'Running',      speed: 84,  cadence: 8.8,  kinds: ['rock'] },
-  { at: 14, label: 'Vaulting',     speed: 100, cadence: 9.8,  kinds: ['rock', 'wallLow'] },
-  { at: 30, label: 'Full parkour', speed: 118, cadence: 10.8, kinds: ['rock', 'wallLow', 'wallHigh', 'line'] },
+  { at: 0,  label: 'Warming up',   speed: 18, cadence: 1.7, amp: 0.42, kinds: [] },
+  { at: 1,  label: 'Jogging',      speed: 32, cadence: 2.7, amp: 0.56, kinds: [] },
+  { at: 4,  label: 'Picking up',   speed: 48, cadence: 3.8, amp: 0.68, kinds: [] },
+  { at: 7,  label: 'Running',      ...FULL, kinds: ['rock'] },
+  { at: 14, label: 'Vaulting',     ...FULL, kinds: ['rock', 'wallLow'] },
+  { at: 30, label: 'Full parkour', ...FULL, kinds: ['rock', 'wallLow', 'wallHigh', 'line'] },
 ];
 
 export function stageForDays(days) {
@@ -46,7 +53,10 @@ const KINDS = {
 };
 
 // ── Shared ticker ───────────────────────────────────────────────────
-const TICKER = { lanes: new Set(), raf: 0, last: 0, phase: 0, scroll: 0 };
+// Drives every lane from one rAF. Note that stride phase and ground
+// scroll are deliberately PER-LANE (see stateRef) — they advance at each
+// habit's own cadence, so they can't live on the shared ticker.
+const TICKER = { lanes: new Set(), raf: 0, last: 0 };
 
 function startTicker() {
   if (TICKER.raf) return;
@@ -86,7 +96,7 @@ function limb(ctx, oy, a1, a2, l1, l2, groundY) {
 }
 
 function drawRunner(ctx, x, groundY, colour, pose) {
-  const { mode, p, t } = pose;
+  const { mode, p, t, amp = 0.8 } = pose;
   let yOff = 0, crouch = 0;
 
   if (mode === 'jump')  yOff = -30 * 4 * t * (1 - t);
@@ -98,7 +108,8 @@ function drawRunner(ctx, x, groundY, colour, pose) {
     else              yOff = top * (1 - (t - 0.7) / 0.3);  // drop down the far side
   }
   if (mode === 'duck') crouch = 9 * Math.sin(Math.PI * t);
-  const bob = mode === 'run' ? -Math.abs(Math.sin(p)) * 1.5 : 0;
+  // Bounce scales with stride — a shuffle barely leaves the ground.
+  const bob = mode === 'run' ? -Math.abs(Math.sin(p)) * 1.5 * (amp / 0.8) : 0;
 
   const hipY = groundY - 14 + yOff + bob + crouch;
   const shoulderY = hipY - 9 + crouch * 0.35;
@@ -157,14 +168,15 @@ function drawRunner(ctx, x, groundY, colour, pose) {
   } else {
     // run / idle
     const ph = mode === 'run' ? p : 0.9;
+    const k = amp / 0.8; // 0..1 — scales knee lift and arm swing with pace
     for (const off of [0, Math.PI]) {
-      const th = 0.8 * Math.sin(ph + off);
-      const flex = 1.35 * (1 + Math.cos(ph + off)) / 2;
+      const th = amp * Math.sin(ph + off);
+      const flex = 1.35 * k * (1 + Math.cos(ph + off)) / 2;
       limb(ctx, hipY, th, th - flex, L1, L2, groundY);
     }
     for (const off of [0, Math.PI]) {
-      const a = -0.62 * Math.sin(ph + off);
-      limb(ctx, shoulderY, a, a - 0.5, A1, A2);
+      const a = -0.62 * k * Math.sin(ph + off);
+      limb(ctx, shoulderY, a, a - 0.5 * k, A1, A2);
     }
   }
   ctx.restore();
@@ -209,7 +221,7 @@ function drawObstacle(ctx, o, groundY, colour) {
 // ── Component ───────────────────────────────────────────────────────
 export default function HabitRunner({ progress, days, colour, done, stumbleKey }) {
   const canvasRef = useRef(null);
-  const stateRef = useRef({ obstacles: [], action: null, spawnGap: 170, stumbleUntil: 0 });
+  const stateRef = useRef({ obstacles: [], action: null, spawnGap: 170, stumbleUntil: 0, phase: 0, scroll: 0 });
   // Live props without restarting the loop on every tick.
   const propsRef = useRef({ progress, days, colour, done });
   propsRef.current = { progress, days, colour, done };
@@ -262,7 +274,7 @@ export default function HabitRunner({ progress, days, colour, done, stumbleKey }
         const stage = stageForDays(dy);
         const still = reduced.matches;
 
-        if (!still) TICKER.phase += dt * stage.cadence;
+        if (!still) st.phase += dt * stage.cadence;
         const runnerX = Math.max(10, Math.min(w - 10, pr * w));
 
         // ── obstacles ──
@@ -296,7 +308,7 @@ export default function HabitRunner({ progress, days, colour, done, stumbleKey }
           st.action.t += dt / st.action.dur;
           if (st.action.t >= 1) st.action = null;
         }
-        if (!still) TICKER.scroll = (TICKER.scroll + stage.speed * dt) % 12;
+        if (!still) st.scroll = (st.scroll + stage.speed * dt) % 12;
 
         // ── draw ──
         const groundY = h - 1;
@@ -318,7 +330,7 @@ export default function HabitRunner({ progress, days, colour, done, stumbleKey }
           ctx.lineWidth = 1.4;
           ctx.lineCap = 'round';
           for (let d = -12; d < w; d += 12) {
-            const dx = d - TICKER.scroll;
+            const dx = d - st.scroll;
             if (dx < runnerX - 48 || dx > runnerX + 34) continue;
             ctx.beginPath();
             ctx.moveTo(dx, groundY - 1.5);
@@ -332,8 +344,9 @@ export default function HabitRunner({ progress, days, colour, done, stumbleKey }
 
         drawRunner(ctx, runnerX, groundY, dn ? palette.gold : col, {
           mode,
-          p: TICKER.phase,
+          p: st.phase,
           t: st.action ? Math.min(1, st.action.t) : 0,
+          amp: stage.amp,
         });
       },
     };
