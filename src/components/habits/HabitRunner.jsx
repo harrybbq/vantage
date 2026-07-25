@@ -358,16 +358,24 @@ function drawRunner(ctx, x, groundY, colour, pose) {
     // run / idle — gait blends every joint together
     const ph = mode === 'run' ? p : 0.9;
     const flexAmt = lerp(0.42, 1.35, gait);
-    const armAmp  = lerp(0.20, 0.62, gait);
-    // Arms hang almost straight at a walk and carry near 90° at a run.
-    const elbow   = lerp(0.12, 1.05, gait);
+    // Arms: the FOREARM sweeps a far bigger arc than the upper arm — the
+    // hand travels hip-to-chest while the elbow stays pinned near the ribs.
+    // A constant elbow angle makes the arm one rigid bent stick, which
+    // throws both forearms straight out front like a sleepwalker.
+    const armAmp   = lerp(0.20, 0.42, gait);   // upper-arm swing
+    const armBias  = lerp(0,   -0.25, gait);   // elbow rides behind the ribs, not under them
+    const elbowMid = lerp(0.22, 1.45, gait);   // near-straight walking, ~90° running
+    const elbowAmp = lerp(0.08, 0.62, gait);   // tightens forward, opens on the backswing
     for (const off of [0, Math.PI]) {
       const th = amp * Math.sin(ph + off);
       leg(th, flexAmt * (1 + Math.cos(ph + off)) / 2, groundY);
     }
-    for (const off of [0, Math.PI]) {
-      arm(-armAmp * Math.sin(ph + off), elbow);
-    }
+    // The far arm lags a touch so the pair never lands perfectly on top of
+    // each other at mid-swing — twinned limbs read as one stub in silhouette.
+    [0, Math.PI].forEach((off, i) => {
+      const s = -Math.sin(ph + off + (i ? 0.17 : 0)); // +1 = arm at the front of its swing
+      arm(armBias + armAmp * s, elbowMid + elbowAmp * s);
+    });
   }
   ctx.restore();
 }
