@@ -11,6 +11,7 @@
  * no signal. The daily brief carries the user's attention slot.
  */
 import { useEffect } from 'react';
+import Icon from './Icon';
 import { useCoachNudges } from '../hooks/useCoachNudges';
 
 export default function CoachNudges({ S, userId, onCoachAct }) {
@@ -31,7 +32,7 @@ export default function CoachNudges({ S, userId, onCoachAct }) {
   return (
     <div className="coach-nudges">
       <div className="coach-nudges-header">
-        <span className="coach-nudges-icon" aria-hidden="true">◐</span>
+        <span className="coach-nudges-icon" aria-hidden="true" style={{display:'inline-flex'}}><Icon name="sparkles" size={14} /></span>
         <span className="coach-nudges-title">Patterns worth a look</span>
         <span className="coach-nudges-count">{nudges.length}</span>
       </div>
@@ -68,7 +69,7 @@ export default function CoachNudges({ S, userId, onCoachAct }) {
                 onClick={() => dismiss(nudge.id)}
                 aria-label="Dismiss this nudge"
                 title="Dismiss"
-              >×</button>
+              ><Icon name="x" size={13} /></button>
             </div>
           </li>
         ))}

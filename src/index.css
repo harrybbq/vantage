@@ -2721,7 +2721,6 @@ html[data-theme="dark"] {
    ══════════════════════════════════════════════════════════════════════════ */
 *{-webkit-tap-highlight-color:transparent;}
 input,select,textarea,button{touch-action:manipulation;}
-.mobile-signout-btn{display:none;}
 
 @media(max-width:768px){
   body{min-height:100dvh;}
@@ -2810,13 +2809,6 @@ input,select,textarea,button{touch-action:manipulation;}
   nav:hover~#pageHeader{left:0!important;}
   #pageHeader-title{font-size:14px;}
   #pageHeader-sub{display:none;}
-  .mobile-signout-btn{
-    display:flex;align-items:center;justify-content:center;
-    background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.2);
-    border-radius:8px;color:rgba(255,255,255,.7);
-    font-size:14px;padding:5px 10px;cursor:pointer;
-    margin-left:6px;order:99;
-  }
 
   /* ── Sections ── */
   .section{

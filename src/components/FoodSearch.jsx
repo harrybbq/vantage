@@ -1,5 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
+import Icon from './Icon';
 import CameraScanner from './CameraScanner';
+import { supabase } from '../lib/supabase';
 import { backdropClose } from '../utils/backdropClose';
 import { useSubscriptionContext } from '../context/SubscriptionContext';
 
@@ -47,13 +49,16 @@ export default function FoodSearch({ onSelectFood, onClose, onOpenModal, savedMe
     if (!userId) return;
     let cancelled = false;
     (async () => {
-      const { data } = await supabase
-        .from('nutrition_log')
-        .select('food_name,brand,serving_g,calories,protein_g,carbs_g,fat_g,fibre_g,sugar_g,sodium_mg,additional_nutrients,log_date,id')
-        .eq('user_id', userId)
-        .order('log_date', { ascending: false })
-        .order('id', { ascending: false })
-        .limit(80);
+      let data;
+      try {
+        ({ data } = await supabase
+          .from('nutrition_log')
+          .select('food_name,brand,serving_g,calories,protein_g,carbs_g,fat_g,fibre_g,sugar_g,sodium_mg,additional_nutrients,log_date,id')
+          .eq('user_id', userId)
+          .order('log_date', { ascending: false })
+          .order('id', { ascending: false })
+          .limit(80));
+      } catch { return; } // fail soft — the Recent tab just won't appear
       if (cancelled || !Array.isArray(data)) return;
       const seen = new Set();
       const out = [];
@@ -181,7 +186,7 @@ export default function FoodSearch({ onSelectFood, onClose, onOpenModal, savedMe
         {/* Title + close */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '14px', flexShrink: 0 }}>
           <h3 style={{ margin: 0, fontSize: 'var(--text-md)', color: 'var(--text)', fontFamily: 'var(--serif)' }}>Search Foods</h3>
-          <button onClick={onClose} style={{ background: 'none', border: 'none', fontSize: '18px', color: 'var(--text-muted)', cursor: 'pointer', padding: '4px 8px' }}>✕</button>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', fontSize: '18px', color: 'var(--text-muted)', cursor: 'pointer', padding: '4px 8px', display: 'inline-flex' }} aria-label="Close"><Icon name="x" size={16} /></button>
         </div>
 
         {/* Mode tabs — segmented control, mono caps, no glyphs */}
@@ -256,11 +261,11 @@ export default function FoodSearch({ onSelectFood, onClose, onOpenModal, savedMe
                       <span style={{ fontFamily: 'var(--mono)', fontSize: '10px', color: 'var(--text-muted)' }}>{Math.round(parseFloat(meal.serving_g) || 0)}g serving</span>
                     </div>
                   </div>
-                  <span style={{ color: 'var(--em)', fontSize: '18px', flexShrink: 0 }}>+</span>
+                  <span style={{ color: 'var(--em)', flexShrink: 0, display: 'inline-flex' }}><Icon name="plus" size={16} /></span>
                 </button>
                 <button onClick={() => onDeleteMeal?.(meal.id)} aria-label={`Delete ${meal.name}`}
-                  style={{ flexShrink: 0, width: '40px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border)', background: 'transparent', color: 'var(--text-muted)', cursor: 'pointer', fontSize: '13px' }}>
-                  ✕
+                  style={{ flexShrink: 0, width: '40px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border)', background: 'transparent', color: 'var(--text-muted)', cursor: 'pointer', fontSize: '13px', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <Icon name="trash-2" size={13} />
                 </button>
               </div>
             ))}
@@ -288,7 +293,7 @@ export default function FoodSearch({ onSelectFood, onClose, onOpenModal, savedMe
                     <span style={{ fontFamily: 'var(--mono)', fontSize: '10px', color: 'var(--text-muted)' }}>{Math.round(parseFloat(item.serving_g) || 0)}{item.serving_unit || 'g'}</span>
                   </div>
                 </div>
-                <span style={{ color: 'var(--em)', fontSize: '18px', flexShrink: 0 }}>+</span>
+                <span style={{ color: 'var(--em)', flexShrink: 0, display: 'inline-flex' }}><Icon name="plus" size={16} /></span>
               </button>
             ))}
           </div>
@@ -342,7 +347,7 @@ export default function FoodSearch({ onSelectFood, onClose, onOpenModal, savedMe
                       <span style={{ fontFamily: 'var(--mono)', fontSize: '10px', color: 'var(--text-muted)' }}>per 100g</span>
                     </div>
                   </div>
-                  <span style={{ color: 'var(--em)', fontSize: '18px', flexShrink: 0, alignSelf: 'center' }}>+</span>
+                  <span style={{ color: 'var(--em)', flexShrink: 0, alignSelf: 'center', display: 'inline-flex' }}><Icon name="plus" size={16} /></span>
                 </button>
               ))}
               {!loading && !error && !results.length && query.trim().length >= 2 && mode === 'search' && (

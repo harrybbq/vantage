@@ -633,7 +633,6 @@ function Board({ userId, userEmail, onSignOut }) {
         profileName={S.profile?.name || ''}
         onChangeBg={handleChangeBgClick}
         onRemoveBg={currentBg ? handleRemoveBg : null}
-        onSignOut={onSignOut}
         onCoinContextMenu={isOwner ? () => setAdminEdit('coins') : null}
         weatherEnabled={S.weatherEnabled !== false}
       />

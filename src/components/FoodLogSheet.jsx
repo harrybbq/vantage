@@ -1,4 +1,5 @@
 import { useState, useRef } from 'react';
+import Icon from './Icon';
 import { supabase } from '../lib/supabase';
 import { backdropClose } from '../utils/backdropClose';
 
@@ -189,7 +190,7 @@ export default function FoodLogSheet({ userId, logDate, onClose, onSaved, prefil
         {/* Title row */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px' }}>
           <h3 style={{ margin: 0, fontSize: 'var(--text-md)', color: 'var(--text)', fontFamily: 'var(--serif)' }}>Log Food</h3>
-          <button onClick={onClose} style={{ background: 'none', border: 'none', fontSize: '18px', color: 'var(--text-muted)', cursor: 'pointer', padding: '4px 8px' }}>✕</button>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', fontSize: '18px', color: 'var(--text-muted)', cursor: 'pointer', padding: '4px 8px', display: 'inline-flex' }} aria-label="Close"><Icon name="x" size={16} /></button>
         </div>
 
         {/* Meal type chips */}

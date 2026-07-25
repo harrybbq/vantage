@@ -19,6 +19,7 @@
  * having to chase a toast.
  */
 import { useState, useRef } from 'react';
+import Icon from '../Icon';
 import { supabase } from '../../lib/supabase';
 import { useOwnHandle } from '../../hooks/useOwnHandle';
 
@@ -124,7 +125,7 @@ export default function MobileProfileSection({ S, update, userId, userEmail, onS
             >
               {profile.photo
                 ? <img src={profile.photo} alt="Profile" />
-                : <span className="m-profile-photo-placeholder">＋</span>}
+                : <span className="m-profile-photo-placeholder"><Icon name="camera" size={20} strokeWidth={1.6} /></span>}
               <span className="m-profile-photo-edit">Edit</span>
             </button>
             <input

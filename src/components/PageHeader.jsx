@@ -43,7 +43,7 @@ function getDynamicGreeting(name) {
   return `Still up${n}? 🌙`;
 }
 
-export default function PageHeader({ activeSection, coins, onOpenCoinHistory, profileName, onChangeBg, onRemoveBg, onSignOut, onCoinContextMenu, weatherEnabled = true }) {
+export default function PageHeader({ activeSection, coins, onOpenCoinHistory, profileName, onChangeBg, onRemoveBg, onCoinContextMenu, weatherEnabled = true }) {
   const greeting = getDynamicGreeting(profileName);
   const labelRef = useRef(null);
   const prevSection = useRef(activeSection);
@@ -84,8 +84,10 @@ export default function PageHeader({ activeSection, coins, onOpenCoinHistory, pr
           The Ctrl+K / Cmd+K hotkey is still bound globally via
           useKeyboardShortcuts so power users keep their muscle memory. */}
 
-      {/* Sign out — mobile only */}
-      <button className="mobile-signout-btn" onClick={onSignOut} title="Sign out" style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}><Icon name="log-out" size={16} /></button>
+      {/* No sign-out here. Desktop signs out from the side nav's bottom
+          row; mobile from Profile → Sign out. A header button duplicated
+          those (and an inline display style was overriding the
+          mobile-only CSS, leaking it onto desktop). */}
 
       {/* Background controls — sits just left of coin wallet */}
       <div style={{ display: 'flex', alignItems: 'center', gap: '5px', marginRight: '8px' }}>

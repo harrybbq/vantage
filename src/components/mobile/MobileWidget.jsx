@@ -142,7 +142,7 @@ const BASE_WIDGET_META = {
   'mail': {
     label: 'Recent Mail',
     eyebrow: 'INBOX',
-    icon: '✉',
+    icon: '✉', svg: 'mail',
     requires: 'Gmail / Outlook OAuth — deferred (separate vertical)',
   },
 };
@@ -517,7 +517,7 @@ function VitalsBody({ S, update }) {
               <span className="m-vitals-label">{f.label}</span>
               {f.key === 'weight' && delta != null && todayVal != null && (
                 <span className={`m-vitals-delta${delta > 0 ? ' up' : delta < 0 ? ' down' : ''}`}>
-                  {delta > 0 ? '▲' : delta < 0 ? '▼' : '•'} {Math.abs(delta).toFixed(1)}
+                  <Icon name={delta > 0 ? 'arrow-up' : delta < 0 ? 'arrow-down' : 'minus'} size={10} /> {Math.abs(delta).toFixed(1)}
                 </span>
               )}
             </button>
@@ -675,7 +675,7 @@ function BurnBody({ S, update, userId }) {
             <li key={a.id}>
               <span>{a.label}</span>
               <span className="m-burn-act-kcal">{a.kcal} kcal</span>
-              <button type="button" onClick={() => removeActivity(a.id)} aria-label={`Remove ${a.label}`}>✕</button>
+              <button type="button" onClick={() => removeActivity(a.id)} aria-label={`Remove ${a.label}`}><Icon name="x" size={12} /></button>
             </li>
           ))}
         </ul>
@@ -689,7 +689,7 @@ function BurnBody({ S, update, userId }) {
           <button type="button" className="m-burn-btn" onClick={addActivity}>Add</button>
         </div>
       ) : (
-        <button type="button" className="m-burn-add" onClick={() => setAdding(true)}>＋ Add activity</button>
+        <button type="button" className="m-burn-add" onClick={() => setAdding(true)}><span style={{display:'inline-flex',alignItems:'center',gap:5}}><Icon name="plus" size={13} /> Add activity</span></button>
       )}
     </div>
   );
@@ -790,7 +790,7 @@ function MacrosBody({ S, userId, navigate }) {
           try { sessionStorage.setItem('vb_quicklog_food', '1'); } catch { /* ignore */ }
           navigate && navigate('track');
         }}
-      >＋ Log food</button>
+      ><span style={{display:'inline-flex',alignItems:'center',gap:5}}><Icon name="plus" size={13} /> Log food</span></button>
     </div>
   );
 }
@@ -994,7 +994,7 @@ function BrandCard({ title, host, openHref, accent, info }) {
           target="_blank"
           rel="noreferrer"
           style={accent ? { color: accent, borderColor: accent + '55' } : undefined}
-        >Open ↗</a>
+        ><span style={{display:'inline-flex',alignItems:'center',gap:4}}>Open <Icon name="external-link" size={11} /></span></a>
       )}
     </div>
   );
@@ -1049,7 +1049,7 @@ function AppPresetBody({ preset }) {
         target="_blank"
         rel="noreferrer"
         style={preset.color ? { color: preset.color, borderColor: preset.color + '55' } : undefined}
-      >Open ↗</a>
+      ><span style={{display:'inline-flex',alignItems:'center',gap:4}}>Open <Icon name="external-link" size={11} /></span></a>
     </div>
   );
 }

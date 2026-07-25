@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import Icon from './Icon';
 
 const DISMISSED_KEY = 'vb4_install_dismissed';
 
@@ -107,7 +108,7 @@ export default function InstallPrompt() {
           }}
           aria-label="Dismiss install prompt"
         >
-          ×
+          <Icon name="x" size={14} />
         </button>
       </div>
 

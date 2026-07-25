@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import Icon from '../Icon';
 import FriendsPanelList from './FriendsPanelList';
 import FriendCard from './FriendCard';
 import PendingRequestsList from './PendingRequestsList';
@@ -209,7 +210,7 @@ export default function FriendsRail({ userId, onUpgrade }) {
         className="btn btn-ghost fc-add-btn"
         onClick={() => setShowAddModal(true)}
       >
-        + Add a friend
+        <span style={{display:'inline-flex',alignItems:'center',gap:6}}><Icon name="plus" size={14} /> Add a friend</span>
       </button>
 
       {selectedFriend && (

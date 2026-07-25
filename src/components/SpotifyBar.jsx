@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import Icon from './Icon';
 import { useQuery } from '@tanstack/react-query';
 
 async function fetchLastFmTrack(username) {
@@ -40,8 +41,8 @@ export default function SpotifyBar({ visible, username, onSetUsername }) {
     <div id="spotifyBar" className={visible ? 'visible' : ''}>
       <div className="sp-art" id="spArt">
         {info?.artUrl
-          ? <img src={info.artUrl} style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '4px' }} alt="" onError={e => { e.target.parentElement.innerHTML = '♫'; }} />
-          : '♫'}
+          ? <img src={info.artUrl} style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '4px' }} alt="" onError={e => { e.target.style.display = 'none'; }} />
+          : <Icon name="music" size={16} strokeWidth={1.6} />}
       </div>
       <div className="sp-track">
         <div className="sp-track-name">
@@ -79,7 +80,7 @@ export default function SpotifyBar({ visible, username, onSetUsername }) {
             target="_blank"
             rel="noreferrer"
           >
-            Open on Last.fm ↗
+            <span style={{display:'inline-flex',alignItems:'center',gap:4}}>Open on Last.fm <Icon name="external-link" size={11} /></span>
           </a>
         )}
         <span className="sp-spotify-logo" title="Powered by Last.fm" style={{ fontSize: '11px', fontFamily: 'var(--mono)', color: '#d62828', opacity: '.8', letterSpacing: '.5px' }}>last.fm</span>

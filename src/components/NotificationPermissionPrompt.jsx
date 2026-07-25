@@ -20,6 +20,7 @@
  * never fires twice. Manual button always works.
  */
 import { useEffect, useState } from 'react';
+import Icon from './Icon';
 import { motion, AnimatePresence } from 'framer-motion';
 import { requestPushPermission, getPushPermissionState } from '../hooks/useCapacitor';
 
@@ -101,7 +102,7 @@ export default function NotificationPermissionPrompt({
               background: 'var(--card, #fff)',
             }}
           >
-            <div style={{ fontSize: '32px', marginBottom: '8px' }}>◌</div>
+            <div style={{ marginBottom: '8px', display: 'flex', justifyContent: 'center', color: 'var(--em)' }}><Icon name="bell" size={30} strokeWidth={1.6} /></div>
             <h3 style={{ margin: '0 0 8px', fontSize: '18px', fontWeight: 700 }}>
               {headline || 'Want a ping when something good happens?'}
             </h3>
