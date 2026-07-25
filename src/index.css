@@ -1933,7 +1933,7 @@ html[data-theme="dark"] {
 #track .card:not(.trackers-panel){padding:16px !important;}
 
 /* ── HABITS ── */
-.habits-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,240px));gap:20px;}
+.habits-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:18px;}
 .habit-card{background:var(--surface);border:var(--border-card);border-radius:var(--radius-lg);padding:18px 16px 16px;display:flex;flex-direction:column;align-items:stretch;gap:12px;box-shadow:var(--accent-glow);backdrop-filter:blur(14px);transition:border-color .25s var(--ease-out),box-shadow .25s var(--ease-out);}
 .habit-card:hover{border-color:var(--accent-line);box-shadow:var(--accent-glow-hi);}
 .habit-card-top{display:flex;align-items:center;justify-content:space-between;}
@@ -1945,6 +1945,21 @@ html[data-theme="dark"] {
 .habit-endless-badge{font-family:var(--mono);font-size:11px;font-weight:700;color:var(--em);background:var(--em-ghost);border:1px solid var(--em-pale);padding:1px 6px;border-radius:100px;flex-shrink:0;line-height:1.4;}
 /* Bar area: track on left, milestone labels on right */
 .habit-bar-area{position:relative;height:200px;}
+/* ── Runner lane + horizontal milestone track (desktop Habits) ──
+   Replaces the old 200px vertical bar: the streak now reads left→right
+   with a stick figure running the course above it. */
+.habit-lane{position:relative;height:72px;margin-bottom:2px;}
+.habit-lane-canvas{position:absolute;inset:0;width:100%;height:100%;display:block;}
+.habit-track{position:relative;height:10px;border-radius:6px;background:rgba(128,128,128,.16);}
+.habit-track-fill{position:absolute;left:0;top:0;bottom:0;border-radius:6px;transition:width .6s cubic-bezier(.22,1,.36,1);}
+.habit-pip{position:absolute;top:50%;width:3px;height:16px;margin-left:-1.5px;transform:translateY(-50%);border-radius:2px;background:var(--border);transition:background .3s;}
+.habit-pip.awarded{background:var(--gold);}
+.habit-ladder{display:flex;margin-top:8px;font-family:var(--mono);font-size:8.5px;letter-spacing:1px;text-transform:uppercase;color:var(--text-muted);gap:4px;}
+.habit-ladder span{flex:1;text-align:right;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.habit-ladder span.is-clear{color:var(--gold);}
+.habit-ladder span.is-next{color:var(--em);font-weight:700;}
+.habit-stage{font-family:var(--mono);font-size:8.5px;letter-spacing:1.4px;text-transform:uppercase;color:var(--text-muted);opacity:.75;margin-top:2px;}
+@media(prefers-reduced-motion:reduce){.habit-track-fill{transition:none;}}
 .habit-bar-track{position:absolute;left:0;top:0;bottom:0;width:38px;background:rgba(0,0,0,.07);border-radius:19px;overflow:hidden;}
 .habit-bar-fill{position:absolute;bottom:0;left:0;right:0;border-radius:19px;transition:height .9s ease;}
 /* Milestone marker row — positioned bottom:X% from bar base */
@@ -1975,7 +1990,7 @@ html[data-theme="dark"] {
 /* Empty state */
 .habits-empty{text-align:center;padding:80px 20px;color:var(--text-muted);font-family:var(--mono);font-size:13px;}
 .habits-empty-icon{font-size:44px;margin-bottom:16px;}
-@media(max-width:900px){.habits-grid{grid-template-columns:repeat(auto-fill,minmax(160px,1fr));}}
+@media(max-width:900px){.habits-grid{grid-template-columns:1fr;}}
 
 /* ── SHOPPING LIST ── */
 .shop-layout{max-width:1000px;margin:0 auto;} .shop-layout .eyebrow{color:var(--text-muted);} .shop-layout .sec-title{color:var(--text);}
