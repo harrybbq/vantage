@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import Icon from './Icon';
+import HabitRunner, { stageForDays } from './habits/HabitRunner';
 import { motion } from 'framer-motion';
 import { fireGoal } from '../utils/confetti';
 import SectionHelp from './SectionHelp';
@@ -69,9 +70,29 @@ function HabitCard({ habit, update, onShowCoinToast, onOpenModal }) {
   const maxDuration = habit.milestones.length > 0
     ? Math.max(...habit.milestones.map(m => m.duration))
     : 7 * 24 * 3600 * 1000; // default 1-week reference if no milestones
-  const progress = Math.min(1, elapsed / maxDuration);
   const allDone = habit.milestones.length > 0 && habit.milestones.every(m => m.awarded);
   const fillColor = allDone ? 'var(--gold)' : habit.color;
+
+  // Milestones ascending — the ladder the runner works along.
+  const sortedMs = [...habit.milestones].sort((a, b) => a.duration - b.duration);
+  const nextMsIdx = sortedMs.findIndex(m => elapsed < m.duration);
+
+  // Even-interval progress: each milestone owns an equal slice of the
+  // bar, and we interpolate within the current slice. Falls back to a
+  // plain 1-week ratio when a habit has no milestones at all.
+  const ladderProgress = (() => {
+    const n = sortedMs.length;
+    if (!n) return Math.min(1, elapsed / maxDuration);
+    let cleared = 0;
+    while (cleared < n && elapsed >= sortedMs[cleared].duration) cleared++;
+    if (cleared >= n) return 1;
+    const prev = cleared === 0 ? 0 : sortedMs[cleared - 1].duration;
+    const span = sortedMs[cleared].duration - prev;
+    const frac = span > 0 ? (elapsed - prev) / span : 0;
+    return (cleared + Math.max(0, Math.min(1, frac))) / n;
+  })();
+
+  const stageLabel = allDone ? 'All milestones cleared' : stageForDays(elapsed / 86400000).label;
 
   function handleRelapse() {
     onOpenModal('relapseModal:' + habit.id);
@@ -91,27 +112,44 @@ function HabitCard({ habit, update, onShowCoinToast, onOpenModal }) {
         <button className="habit-edit-btn" onClick={handleEdit} title="Edit habit"><Icon name="pencil" size={13} /></button>
       </div>
 
-      <div className="habit-bar-area">
-        <div className="habit-bar-track">
-          <div
-            className="habit-bar-fill"
-            style={{ height: `${progress * 100}%`, background: fillColor }}
-          />
-        </div>
-        {habit.milestones.map(m => {
-          const pct = Math.min(94, Math.max(4, (m.duration / maxDuration) * 100));
-          return (
-            <div
-              key={m.id}
-              className={`habit-ms${m.awarded ? ' awarded' : ''}`}
-              style={{ bottom: `${pct}%` }}
-            >
-              <span className="habit-ms-label">{m.label}</span>
-              <span className="habit-ms-coins">⬡ {m.coins}</span>
-            </div>
-          );
-        })}
+      {/* Runner lane + horizontal track. Milestones are spaced EVENLY
+          rather than by true duration: on a real ladder (1 week → 1 year)
+          a time-linear bar leaves the runner pinned near zero for months,
+          so early days — when the streak is most fragile — would show no
+          movement at all. */}
+      <div className="habit-lane">
+        <HabitRunner
+          progress={ladderProgress}
+          days={elapsed / 86400000}
+          colour={fillColor}
+          done={allDone}
+          stumbleKey={habit.startTime}
+        />
       </div>
+      <div className="habit-track">
+        <div
+          className="habit-track-fill"
+          style={{ width: `${ladderProgress * 100}%`, background: fillColor }}
+        />
+        {sortedMs.map((m, i) => (
+          <div
+            key={m.id}
+            className={`habit-pip${m.awarded ? ' awarded' : ''}`}
+            style={{ left: `${((i + 1) / sortedMs.length) * 100}%` }}
+            title={`${m.label} · ⬡ ${m.coins}`}
+          />
+        ))}
+      </div>
+      {sortedMs.length > 0 && (
+        <div className="habit-ladder">
+          {sortedMs.map((m, i) => (
+            <span key={m.id} className={m.awarded ? 'is-clear' : (i === nextMsIdx ? 'is-next' : '')}>
+              {m.label}
+            </span>
+          ))}
+        </div>
+      )}
+      <div className="habit-stage">{stageLabel}</div>
 
       <div className={`habit-elapsed${strikes.state === 'struck' ? ' is-struck' : ''}${strikes.state === 'maxed' ? ' is-maxed' : ''}`}>{formatElapsed(elapsed)}</div>
 
