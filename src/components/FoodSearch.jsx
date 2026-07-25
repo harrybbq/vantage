@@ -32,7 +32,9 @@ export default function FoodSearch({ onSelectFood, onClose, onOpenModal, savedMe
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [recent, setRecent] = useState([]);
-  // mode: 'search' | 'barcode' | 'camera' | 'meals' | 'recent'
+  // mode: 'search' | 'camera' | 'meals' | 'recent'
+  // Barcodes are scan-only now — searchByBarcode is still used, but only
+  // by the camera scanner's detection callback, never a typed-in number.
   // Default to Meals when the user has saved some — that's usually the
   // fastest path for a repeat log; otherwise Recent if we have history,
   // else the name search.
@@ -98,25 +100,11 @@ export default function FoodSearch({ onSelectFood, onClose, onOpenModal, savedMe
   async function doSearch(q) {
     setLoading(true);
     try {
-      const res = mode === 'barcode' ? await searchByBarcode(q) : await searchByName(q);
+      const res = await searchByName(q);
       if (res.length === 0) setError('No results found. Try a different search or add manually.');
       setResults(res);
     } catch {
       setError('Search failed — check your connection.');
-    }
-    setLoading(false);
-  }
-
-  async function handleBarcodeSearch() {
-    if (!query.trim()) return;
-    setLoading(true);
-    setError('');
-    try {
-      const res = await searchByBarcode(query.trim());
-      if (res.length === 0) setError('Barcode not found in Open Food Facts. Add manually instead.');
-      setResults(res);
-    } catch {
-      setError('Lookup failed — check your connection.');
     }
     setLoading(false);
   }
@@ -166,7 +154,6 @@ export default function FoodSearch({ onSelectFood, onClose, onOpenModal, savedMe
     ...(savedMeals.length ? [['meals', 'Meals']] : []),
     ...(recent.length ? [['recent', 'Recent']] : []),
     ['search', 'Name'],
-    ['barcode', 'Barcode'],
     ...(canUseCamera ? [['camera', 'Scan']] : []),
   ];
 
@@ -299,7 +286,7 @@ export default function FoodSearch({ onSelectFood, onClose, onOpenModal, savedMe
           </div>
         )}
 
-        {/* Text / barcode search UI */}
+        {/* Name search UI */}
         {mode !== 'camera' && mode !== 'meals' && mode !== 'recent' && (
           <>
             {/* Search row */}
@@ -307,17 +294,11 @@ export default function FoodSearch({ onSelectFood, onClose, onOpenModal, savedMe
               <input
                 ref={inputRef}
                 value={query}
-                onChange={e => mode === 'search' ? handleQueryChange(e.target.value) : setQuery(e.target.value)}
-                onKeyDown={e => e.key === 'Enter' && mode === 'barcode' && handleBarcodeSearch()}
+                onChange={e => handleQueryChange(e.target.value)}
                 style={inputStyle}
-                placeholder={mode === 'search' ? 'e.g. chicken breast, oat milk…' : 'Enter barcode number…'}
-                type={mode === 'barcode' ? 'number' : 'text'}
+                placeholder="e.g. chicken breast, oat milk…"
+                type="text"
               />
-              {mode === 'barcode' && (
-                <button onClick={handleBarcodeSearch} style={{ padding: '10px 16px', borderRadius: 'var(--radius-md)', border: 'none', background: 'var(--em)', color: '#fff', cursor: 'pointer', fontFamily: 'var(--sans)', fontSize: 'var(--text-sm)', fontWeight: 600, whiteSpace: 'nowrap' }}>
-                  Look up
-                </button>
-              )}
             </div>
 
             {/* Attribution */}

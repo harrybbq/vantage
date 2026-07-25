@@ -670,20 +670,68 @@ export default function AchievementsSection({ S, update, active, onOpenModal, on
         )}
       </div>
 
-      {/* Tab toggle — Goals (achievement board) vs Savings (monetary goals) */}
-      <div className="ach-tabs" role="tablist">
-        <button
-          role="tab"
-          aria-selected={activeTab === 'goals'}
-          className={`ach-tab${activeTab === 'goals' ? ' is-active' : ''}`}
-          onClick={() => setActiveTab('goals')}
-        >Goals</button>
-        <button
-          role="tab"
-          aria-selected={activeTab === 'savings'}
-          className={`ach-tab${activeTab === 'savings' ? ' is-active' : ''}`}
-          onClick={() => setActiveTab('savings')}
-        >Savings</button>
+      {/* Tab toggle + stats. The stats strip used to sit UNDER the canvas,
+          which capped how far the board could extend south. Moving it up
+          here (right of the tabs) frees the board's bottom edge entirely. */}
+      <div className="ach-tabs-row">
+        <div className="ach-tabs" role="tablist">
+          <button
+            role="tab"
+            aria-selected={activeTab === 'goals'}
+            className={`ach-tab${activeTab === 'goals' ? ' is-active' : ''}`}
+            onClick={() => setActiveTab('goals')}
+          >Goals</button>
+          <button
+            role="tab"
+            aria-selected={activeTab === 'savings'}
+            className={`ach-tab${activeTab === 'savings' ? ' is-active' : ''}`}
+            onClick={() => setActiveTab('savings')}
+          >Savings</button>
+        </div>
+        {activeTab === 'goals' && (
+          <div className="ach-stats">
+            <div className="ach-stats-item">
+              <span className="ach-stats-val ach-stats-val-em">{completedCount}</span>
+              <span className="ach-stats-lbl">Done</span>
+            </div>
+            <div className="ach-stats-item">
+              <span className="ach-stats-val">{totalCount}</span>
+              <span className="ach-stats-lbl">Total</span>
+            </div>
+            <div className="ach-stats-item">
+              <span className="ach-stats-val ach-stats-val-gold">{progressPct}%</span>
+              <span className="ach-stats-lbl">Progress</span>
+            </div>
+            <div className="ach-stats-item">
+              <span className="ach-stats-val">{lockedCount}</span>
+              <span className="ach-stats-lbl">Locked</span>
+            </div>
+            <div className="ach-stats-divider" />
+            <div className="ach-stats-item">
+              <div className="ach-zoom">
+                <button
+                  type="button"
+                  className="ach-zoom-btn"
+                  onClick={() => setZoom(z => Math.max(0.4, +(z - 0.1).toFixed(2)))}
+                  title="Zoom out"
+                ><Icon name="minus" size={15} /></button>
+                <span className="ach-zoom-val">{Math.round(zoom * 100)}%</span>
+                <button
+                  type="button"
+                  className="ach-zoom-btn"
+                  onClick={() => setZoom(z => Math.min(2, +(z + 0.1).toFixed(2)))}
+                  title="Zoom in"
+                ><Icon name="plus" size={15} /></button>
+                <button
+                  type="button"
+                  className="ach-zoom-btn ach-zoom-reset"
+                  onClick={() => setZoom(1)}
+                  title="Reset zoom"
+                ><Icon name="locate-fixed" size={14} /></button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
       {activeTab === 'savings' ? (
@@ -777,50 +825,6 @@ export default function AchievementsSection({ S, update, active, onOpenModal, on
             >Cancel</button>
           </div>
         )}
-      </div>
-
-      {/* Stats strip */}
-      <div className="ach-stats">
-        <div className="ach-stats-item">
-          <span className="ach-stats-val ach-stats-val-em">{completedCount}</span>
-          <span className="ach-stats-lbl">Done</span>
-        </div>
-        <div className="ach-stats-item">
-          <span className="ach-stats-val">{totalCount}</span>
-          <span className="ach-stats-lbl">Total</span>
-        </div>
-        <div className="ach-stats-item">
-          <span className="ach-stats-val ach-stats-val-gold">{progressPct}%</span>
-          <span className="ach-stats-lbl">Progress</span>
-        </div>
-        <div className="ach-stats-item">
-          <span className="ach-stats-val">{lockedCount}</span>
-          <span className="ach-stats-lbl">Locked</span>
-        </div>
-        <div className="ach-stats-divider" />
-        <div className="ach-stats-item">
-          <div className="ach-zoom">
-            <button
-              type="button"
-              className="ach-zoom-btn"
-              onClick={() => setZoom(z => Math.max(0.4, +(z - 0.1).toFixed(2)))}
-              title="Zoom out"
-            ><Icon name="minus" size={15} /></button>
-            <span className="ach-zoom-val">{Math.round(zoom * 100)}%</span>
-            <button
-              type="button"
-              className="ach-zoom-btn"
-              onClick={() => setZoom(z => Math.min(2, +(z + 0.1).toFixed(2)))}
-              title="Zoom in"
-            ><Icon name="plus" size={15} /></button>
-            <button
-              type="button"
-              className="ach-zoom-btn ach-zoom-reset"
-              onClick={() => setZoom(1)}
-              title="Reset zoom"
-            ><Icon name="locate-fixed" size={14} /></button>
-          </div>
-        </div>
       </div>
 
       {boardMenu && (

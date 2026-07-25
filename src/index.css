@@ -1273,7 +1273,13 @@ html[data-theme="dark"] {
 .ach-btn-edit{ background:var(--text-muted); color:#fff; }
 
 /* ── Achievements section tabs (F4 Sprint 2) ── */
-.ach-tabs{display:flex;gap:0;border-bottom:1px solid var(--border);margin:14px 0 16px;}
+.ach-tabs-row{
+  display:flex;align-items:flex-end;gap:16px;flex-wrap:wrap;
+  border-bottom:1px solid var(--border);
+  margin:14px 0 16px;
+}
+.ach-tabs{display:flex;gap:0;}
+.ach-tabs-row > .ach-stats{margin-left:auto;}
 .ach-tab{
   appearance:none;background:transparent;border:none;border-bottom:2px solid transparent;
   color:var(--text-muted);font-family:var(--mono);font-size:11px;
@@ -1688,17 +1694,18 @@ html[data-theme="dark"] {
 
 /* Stats strip — Done / Total / Progress / Locked + zoom */
 .ach-stats{
-  height:36px;
-  margin-top:14px;
+  height:32px;
+  margin:0 0 6px;
   display:flex;align-items:center;
   background:var(--bg-raised);
   border:1px solid var(--border);
-  border-radius:10px;
+  border-radius:9px;
   overflow:hidden;
+  flex-shrink:0;
 }
 .ach-stats-item{
-  display:flex;align-items:center;gap:7px;
-  padding:0 18px;height:100%;
+  display:flex;align-items:center;gap:6px;
+  padding:0 12px;height:100%;
   border-right:1px solid var(--border-lt);
 }
 .ach-stats-item:last-child{ border-right:none; }
@@ -1712,7 +1719,7 @@ html[data-theme="dark"] {
   font-family:var(--mono);font-size:8.5px;letter-spacing:1.5px;text-transform:uppercase;
   color:var(--text-muted);
 }
-.ach-stats-divider{ flex:1; }
+.ach-stats-divider{ width:0; }
 
 .ach-zoom{
   display:flex;align-items:center;gap:2px;
@@ -5176,6 +5183,11 @@ button:active:not(:disabled),
 .vitals-card { padding: 22px; margin-top: 20px; max-width: 720px; }
 .vitals-sub { font-family: var(--mono); font-size: 11px; color: var(--text-muted); margin: 0 0 14px; line-height: 1.7; }
 .vitals-controls { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 14px; }
+/* WHOOP metrics get their own segmented row (only rendered when WHOOP is
+   connected / has history) — a tinted left rail marks the group so it
+   reads as sensor data rather than another manual metric. */
+.vitals-seg-whoop { border-color: rgba(var(--em-rgb), .38); }
+.vitals-seg-whoop .vitals-seg-btn { color: var(--text-mid); }
 .vitals-seg { display: inline-flex; border: 1px solid var(--border); border-radius: 9px; overflow: hidden; }
 .vitals-seg-btn {
   padding: 6px 12px; background: none; border: none; cursor: pointer;
