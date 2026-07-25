@@ -41,7 +41,7 @@ function SavedBadge({ visible }) {
             fontFamily: 'var(--mono)', fontSize: '9px', color: 'var(--em)',
             letterSpacing: '.5px', marginLeft: '6px',
           }}
-        >✓ saved</motion.span>
+        ><span style={{display:'inline-flex',alignItems:'center',gap:4}}><Icon name="check" size={11} /> saved</span></motion.span>
       )}
     </AnimatePresence>
   );
@@ -125,7 +125,7 @@ function TrackerCard({ tracker, value, streak, onChange }) {
       <FlameBadge streak={streak} />
       {isBool ? (
         <span className={`quick-log-row-pill${checked ? ' is-done' : ''}`}>
-          {checked ? <>&#10003; Done</> : '–'}
+          {checked ? <span style={{display:'inline-flex',alignItems:'center',gap:4}}><Icon name="check" size={11} /> Done</span> : '–'}
         </span>
       ) : (
         <span
@@ -153,7 +153,7 @@ function StreakBrokenBanner({ broken, onDismiss }) {
     <div className="streak-broken-banner">
       {broken.map(b => (
         <div key={b.trackerId} className="streak-broken-row">
-          <span>⚠ Your <strong>{b.trackerName}</strong> streak ended at {b.oldStreak} days. Start a new one today.</span>
+          <span style={{display:'inline-flex',alignItems:'center',gap:6}}><Icon name="triangle-alert" size={13} /> <span>Your <strong>{b.trackerName}</strong> streak ended at {b.oldStreak} days. Start a new one today.</span></span>
           <button onClick={() => onDismiss(b.trackerId)} className="streak-broken-dismiss" aria-label="Dismiss"><Icon name="x" size={13} /></button>
         </div>
       ))}
@@ -300,7 +300,7 @@ export default function QuickLog({ S, update, onNavigateTrack, onShowCoinToast }
             style={{ marginLeft: '10px' }}
             onClick={onNavigateTrack}
             whileHover={{ scale: 1.06 }} whileTap={{ scale: 0.94 }}
-          >Go to Track →</motion.button>
+          ><span style={{display:'inline-flex',alignItems:'center',gap:5}}>Go to Track <Icon name="arrow-right" size={13} /></span></motion.button>
         </div>
       ) : (
         <div className="quick-log-rows">

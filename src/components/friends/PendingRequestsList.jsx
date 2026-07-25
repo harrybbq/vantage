@@ -17,6 +17,8 @@ function avatarColor(seed) {
   return COLORS[h % COLORS.length];
 }
 
+import Icon from '../Icon';
+
 function initials(name) {
   return (name || '').split(' ').map(p => p[0]).join('').slice(0, 2).toUpperCase() || '?';
 }
@@ -52,7 +54,7 @@ export default function PendingRequestsList({ pending, onAccept, onDecline, busy
                   disabled={busy}
                   aria-label={`Accept request from @${p.handle}`}
                   title="Accept"
-                >✓</button>
+                ><Icon name="check" size={14} /></button>
                 <button
                   type="button"
                   className="fc-request-btn fc-request-btn-decline"
@@ -60,7 +62,7 @@ export default function PendingRequestsList({ pending, onAccept, onDecline, busy
                   disabled={busy}
                   aria-label={`Decline request from @${p.handle}`}
                   title="Decline"
-                >✕</button>
+                ><Icon name="x" size={14} /></button>
               </div>
             </div>
           );

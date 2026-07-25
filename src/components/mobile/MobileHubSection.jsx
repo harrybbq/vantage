@@ -22,6 +22,7 @@
  */
 
 import { useState, useEffect } from 'react';
+import Icon from '../Icon';
 import { getTodayStr } from '../../utils/helpers';
 import { recalcStreaks } from '../../utils/streaks';
 import MobileWidget from './MobileWidget';
@@ -228,7 +229,7 @@ export default function MobileHubSection({ S, update, visionState, hasPro, navig
         onClick={() => onOpenModal?.('addMobileWidgetModal')}
         aria-label="Add a widget below AI Coach"
       >
-        <span className="m-widget-add-icon">＋</span>
+        <span className="m-widget-add-icon"><Icon name="plus" size={16} /></span>
         <span className="m-widget-add-label">Add widget</span>
       </button>
     </div>

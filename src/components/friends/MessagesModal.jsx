@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
+import Icon from '../Icon';
 import { listThread, sendMessage, markThreadRead } from '../../lib/friends/messages';
 import { reportUser, blockUser } from '../../lib/friends/queries';
 import ReportFriendModal from './ReportFriendModal';
@@ -190,7 +191,7 @@ export default function MessagesModal({ open, userId, friend, onClose, onBlocked
               aria-expanded={menuOpen}
               aria-haspopup="menu"
               title="More"
-            >⋯</button>
+            ><Icon name="ellipsis" size={16} /></button>
             {menuOpen && (
               <div className="fc-menu" role="menu">
                 <button
@@ -212,7 +213,7 @@ export default function MessagesModal({ open, userId, friend, onClose, onBlocked
               </div>
             )}
           </div>
-          <button type="button" className="msg-close" style={{ marginLeft: 0 }} onClick={() => onClose?.()} aria-label="Close">✕</button>
+          <button type="button" className="msg-close" style={{ marginLeft: 0 }} onClick={() => onClose?.()} aria-label="Close"><Icon name="x" size={15} /></button>
         </div>
 
         <div className="msg-scroll" ref={scrollRef} onScroll={onScroll}>

@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import Icon from '../Icon';
 import FriendsHeatmap from './FriendsHeatmap';
 import { ovrTier } from '../../lib/ratings/tiers';
 
@@ -118,7 +119,7 @@ export default function FriendCard({
               aria-expanded={menuOpen}
               aria-haspopup="menu"
               title="More"
-            >⋯</button>
+            ><Icon name="ellipsis" size={16} /></button>
             {menuOpen && (
               <div className="fc-menu" role="menu">
                 {onReport && (

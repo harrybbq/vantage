@@ -20,6 +20,7 @@
  * still reads "You've reached your free limit of N habits".
  */
 import { useEffect, useState } from 'react';
+import Icon from './Icon';
 import { motion, AnimatePresence } from 'framer-motion';
 import { FREE_CAPS } from '../hooks/useTierLimits';
 import { useSubscriptionContext } from '../context/SubscriptionContext';
@@ -124,7 +125,7 @@ export default function PaywallModal({ openId, onClose, onUpgrade, onShowToast }
             onClick={e => e.stopPropagation()}
           >
             <div className="paywall-hero">
-              <div className="paywall-hero-icon">◐</div>
+              <div className="paywall-hero-icon"><Icon name="sparkles" size={26} /></div>
               <div className="paywall-hero-eyebrow">Vantage Pro</div>
               <h3 className="paywall-hero-title">
                 {hasPro
@@ -178,10 +179,10 @@ export default function PaywallModal({ openId, onClose, onUpgrade, onShowToast }
             )}
 
             <div className="paywall-features">
-              <PaywallFeature icon="◐" title="Proactive nudges" sub="Coach spots patterns in your week and nudges before you slip." />
-              <PaywallFeature icon="✦" title="Daily brief + weekly review" sub="3-line focus / watch / micro action every morning. Sundays: a deep look back." />
-              <PaywallFeature icon="∞" title="Unlimited everything" sub="Habits, achievements, widgets, holidays — no caps." />
-              <PaywallFeature icon="◇" title="Custom themes + full history" sub="Dark OS, custom colours, your entire year of data." />
+              <PaywallFeature icon={<Icon name="zap" size={15} />} title="Proactive nudges" sub="Coach spots patterns in your week and nudges before you slip." />
+              <PaywallFeature icon={<Icon name="sparkles" size={15} />} title="Daily brief + weekly review" sub="3-line focus / watch / micro action every morning. Sundays: a deep look back." />
+              <PaywallFeature icon={<Icon name="infinity" size={15} />} title="Unlimited everything" sub="Habits, achievements, widgets, holidays — no caps." />
+              <PaywallFeature icon={<Icon name="palette" size={15} />} title="Custom themes + full history" sub="Dark OS, custom colours, your entire year of data." />
             </div>
 
             {/* Storefront — three package cards. Replaces the single
