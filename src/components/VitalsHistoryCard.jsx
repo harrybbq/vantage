@@ -18,11 +18,14 @@ const METRICS = [
   { key: 'weight', label: 'Weight',  unit: 'kg',  src: 'vitals' },
   { key: 'sleep',  label: 'Sleep',   unit: 'h',   src: 'vitals' },
   { key: 'rhr',    label: 'Rest HR', unit: 'bpm', src: 'vitals' },
-  // WHOOP-fed metrics (whoop-sync writes them into vitalsLog).
-  { key: 'hrv',      label: 'HRV',      unit: 'ms',   src: 'vitals' },
-  { key: 'recovery', label: 'Recovery', unit: '%',    src: 'vitals' },
-  { key: 'strain',   label: 'Strain',   unit: '',     src: 'vitals' },
-  { key: 'burnKcal', label: 'Burn',     unit: 'kcal', src: 'vitals' },
+  // WHOOP-fed metrics (whoop-sync writes them into vitalsLog). These get
+  // their OWN row, shown only to users with WHOOP connected (or with
+  // historical WHOOP data) — otherwise seven chips crush together in the
+  // Track column and Strain/Burn become unreadable and hard to tap.
+  { key: 'hrv',      label: 'HRV',      unit: 'ms',   src: 'whoop' },
+  { key: 'recovery', label: 'Recovery', unit: '%',    src: 'whoop' },
+  { key: 'strain',   label: 'Strain',   unit: '',     src: 'whoop' },
+  { key: 'burnKcal', label: 'Burn',     unit: 'kcal', src: 'whoop' },
   // Macro % history — written by NutritionSection into S.macroHistory
   // as "% of goal hit" per day (survives later goal changes).
   { key: 'cal',  label: 'Cal %',     unit: '%', src: 'macro' },
@@ -248,6 +251,23 @@ export default function VitalsHistoryCard({ S, update }) {
   const [extraDate, setExtraDate] = useState(null); // day pulled into the table via the date picker
   const svgRef = useRef(null);
 
+  // Show the WHOOP row when WHOOP is connected OR any historical WHOOP
+  // value exists — disconnecting must never hide data the user already
+  // has. (WHOOP metrics live in vitalsLog alongside the manual ones.)
+  const showWhoopRow = useMemo(() => {
+    if (S.whoopConnected) return true;
+    const log = S.vitalsLog || {};
+    const whoopKeys = METRICS.filter(m => m.src === 'whoop').map(m => m.key);
+    return Object.values(log).some(day => day && whoopKeys.some(k => day[k] != null));
+  }, [S.whoopConnected, S.vitalsLog]);
+
+  // If the selected metric belongs to a row that isn't shown, fall back
+  // to Weight so the chart never renders an unreachable selection.
+  useEffect(() => {
+    const m = METRICS.find(x => x.key === metricKey);
+    if (m && m.src === 'whoop' && !showWhoopRow) setMetricKey('weight');
+  }, [metricKey, showWhoopRow]);
+
   const metric = METRICS.find(m => m.key === metricKey);
   const range = RANGES.find(r => r.key === rangeKey);
   const log = metric.src === 'macro' ? (S.macroHistory || {}) : (S.vitalsLog || {});
@@ -408,6 +428,17 @@ export default function VitalsHistoryCard({ S, update }) {
             </button>
           ))}
         </div>
+        {showWhoopRow && (
+          <div className="vitals-seg vitals-seg-whoop" role="tablist" aria-label="WHOOP metric">
+            {METRICS.filter(m => m.src === 'whoop').map(m => (
+              <button key={m.key} type="button" role="tab" aria-selected={metricKey === m.key}
+                className={`vitals-seg-btn${metricKey === m.key ? ' on' : ''}`}
+                onClick={() => { setMetricKey(m.key); setHover(null); }}>
+                {m.label}
+              </button>
+            ))}
+          </div>
+        )}
         <div className="vitals-seg" role="tablist" aria-label="Macro metric">
           {METRICS.filter(m => m.src === 'macro').map(m => (
             <button key={m.key} type="button" role="tab" aria-selected={metricKey === m.key}
