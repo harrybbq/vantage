@@ -113,9 +113,14 @@ function stopTicker() {
 }
 
 // ── Figure ──────────────────────────────────────────────────────────
-// FK limb: angles from straight-down, positive = forward (+x). The knee
-// only folds BACKWARD (shin = thigh − flexion, flexion ≥ 0); flexion
-// peaks during recovery, never on the forward reach.
+// FK limb: angles from straight-down, positive = forward (+x).
+//
+// Elbows and knees hinge in OPPOSITE directions, and mixing them up is
+// the classic stick-figure tell. Callers never pass a raw second angle —
+// they go through the leg()/arm() helpers below, which apply:
+//   knee:  shin    = thigh − flex   (heel folds back toward the seat)
+//   elbow: forearm = upper  + flex  (hand folds forward across the body)
+// Knee flexion peaks during recovery, never on the forward reach.
 function limb(ctx, oy, a1, a2, l1, l2, groundY) {
   const kx = Math.sin(a1) * l1, ky = Math.cos(a1) * l1;
   let fx = kx + Math.sin(a2) * l2, fy = oy + ky + Math.cos(a2) * l2;
@@ -242,13 +247,15 @@ function drawRunner(ctx, x, groundY, colour, pose) {
   ctx.lineTo(0, hipY);
   ctx.stroke();
 
-  const arm = (a1, a2) => {
+  // Both take (segment angle, JOINT FLEXION) — never a raw second angle,
+  // so an elbow can't accidentally be given a knee's hinge direction.
+  const arm = (upper, flex) => {
     ctx.save();
     ctx.translate(shX, 0);
-    limb(ctx, shoulderY, a1, a2, A1, A2);
+    limb(ctx, shoulderY, upper, upper + flex, A1, A2);
     ctx.restore();
   };
-  const leg = (a1, a2, gnd) => limb(ctx, hipY, a1, a2, L1, L2, gnd);
+  const leg = (thigh, flex, gnd) => limb(ctx, hipY, thigh, thigh - flex, L1, L2, gnd);
 
   // Anchored contact points, in figure-local coords. `rel` is where the
   // obstacle is RIGHT NOW relative to the runner — it drifts left through
@@ -264,28 +271,27 @@ function drawRunner(ctx, x, groundY, colour, pose) {
   if (mode === 'jump') {
     if (t < 0.2) {
       // loading: both legs flexed under, arms swung back
-      leg( 0.35,  0.35 - 1.0, groundY);
-      leg(-0.25, -0.25 - 0.8, groundY);
-      arm(-0.9, -1.3);
-      arm(-0.7, -1.1);
+      leg( 0.35, 1.0, groundY);
+      leg(-0.25, 0.8, groundY);
+      arm(-0.9, 0.45);
+      arm(-0.7, 0.45);
     } else if (t < 0.8) {
       // airborne: tuck peaks mid-flight, then the lead leg reaches for
       // the landing while the trail leg stays folded
       const u = (t - 0.2) / 0.6;
       const tuck = Math.sin(Math.PI * u);
       const reach = phase(u, 0.55, 1);
-      const lead = lerp(0.9, 0.45, reach);
-      leg(lead, lead - lerp(0.6, 1.5, tuck) * (1 - reach * 0.8));
-      leg(-0.5, -0.5 - lerp(0.5, 1.8, tuck));
+      leg(lerp(0.9, 0.45, reach), lerp(0.6, 1.5, tuck) * (1 - reach * 0.8));
+      leg(-0.5, lerp(0.5, 1.8, tuck));
       // arms: drive up on takeoff, spread for balance
-      arm(lerp(-1.6, 0.6, u), lerp(-2.2, 1.0, u));
-      arm(lerp(0.8, -0.9, u), lerp(1.3, -1.3, u));
+      arm(lerp(-1.6, 0.6, u), lerp(0.6, 0.35, u));
+      arm(lerp(0.8, -0.9, u), lerp(0.5, 0.4, u));
     } else {
       // landing: legs forward under the body, arms settling
-      leg(0.4, 0.4 - 0.5, groundY);
-      leg(0.1, 0.1 - 0.3, groundY);
-      arm( 0.5,  0.8);
-      arm(-0.4, -0.7);
+      leg(0.4, 0.5, groundY);
+      leg(0.1, 0.3, groundY);
+      arm( 0.5, 0.35);
+      arm(-0.4, 0.35);
     }
   } else if (mode === 'vault') {
     // Speed vault: the near hand plants on the wall top (IK to the live
@@ -296,23 +302,23 @@ function drawRunner(ctx, x, groundY, colour, pose) {
     const thigh = lerp(0.55, 1.1, swing) + 0.35 * tuck;
     const flex = lerp(0.9, 1.0, swing) + 1.5 * tuck;
     const gnd = (t < 0.12 || t > 0.93) ? groundY : null;
-    leg(thigh, thigh - flex, gnd);
-    leg(thigh - 0.4, thigh - 0.4 - flex * 0.82, gnd);
+    leg(thigh, flex, gnd);
+    leg(thigh - 0.4, flex * 0.82, gnd);
     if (canPlant) ikLimb(ctx, shX, shoulderY, rel, handTy, A1, A2, +1);
-    else arm(lerp(0.5, -0.6, swing), lerp(0.8, -1.0, swing));
-    arm(lerp(-1.1, -2.0, swing), lerp(-1.6, -2.5, swing)); // free arm flung up-back
+    else arm(lerp(0.5, -0.6, swing), 0.4);
+    arm(lerp(-1.1, -2.0, swing), 0.5); // free arm flung up-back
   } else if (mode === 'climb') {
     // Wall climb: reach, grip the top with both hands (anchored), walk
     // the feet up the face, mantle onto the top, drop the far side.
     if (t < 0.08) {
-      arm(-1.95, -2.45);
-      arm(-1.65, -2.15);
+      arm(2.35, 0.3);  // both arms thrown up-FORWARD at the wall top
+      arm(2.1,  0.3);
     } else if (canPlant && t < 0.86) {
       ikLimb(ctx, shX, shoulderY, rel - 2, handTy, A1, A2, +1);
       ikLimb(ctx, shX, shoulderY, rel + 2, handTy, A1, A2, -1);
     } else {
-      arm( 0.4,  0.7);
-      arm(-0.4, -0.7);
+      arm( 0.4, 0.35);
+      arm(-0.4, 0.35);
     }
     if (t < 0.62) {
       // feet stepping up the wall face as the body pulls up
@@ -327,41 +333,40 @@ function drawRunner(ctx, x, groundY, colour, pose) {
       ikLimb(ctx, 0, hipY, fx - 3, handTy, L1, L2, -1);
     } else {
       // dropping: legs under for the landing
-      leg( 0.3,  0.3 - 0.4, groundY);
-      leg(-0.1, -0.1 - 0.3, groundY);
+      leg( 0.3, 0.4, groundY);
+      leg(-0.1, 0.3, groundY);
     }
   } else if (mode === 'duck') {
     // slide under: front leg spears forward flat, back leg folds deep,
     // near arm sweeps the line overhead, far arm trails for balance
     const u = Math.sin(Math.PI * t);
-    leg(lerp(0.8, 1.35, u), lerp(0.8, 1.35, u) - lerp(0.9, 0.25, u), groundY);
-    leg(-0.6, -0.6 - lerp(0.9, 1.6, u), groundY);
-    arm(lerp(0.9, 1.5, u), lerp(1.2, 1.8, u));
-    arm(-1.1 - 0.4 * u, -1.5 - 0.5 * u);
+    leg(lerp(0.8, 1.35, u), lerp(0.9, 0.25, u), groundY);
+    leg(-0.6, lerp(0.9, 1.6, u), groundY);
+    arm(lerp(0.9, 1.5, u), 0.3);
+    arm(-1.1 - 0.4 * u, 0.45);
   } else if (mode === 'celebrate') {
-    arm(-2.5, -2.95);
-    arm( 2.5,  2.95);
-    leg(-0.32, -0.2, groundY);
-    leg( 0.32,  0.2, groundY);
+    arm(-2.5, 0.45);
+    arm( 2.5,  0.45);
+    leg(-0.32, 0, groundY);
+    leg( 0.32,  0.12, groundY);
   } else if (mode === 'stumble') {
-    arm(-1.9, -2.45);
-    arm( 1.2,  1.9);
-    leg(-0.95, -0.35, groundY);
-    leg( 0.7,   1.35, groundY);
+    arm(-1.9, 0.55);
+    arm( 1.2,  0.7);
+    leg(-0.95, 0.6, groundY);
+    leg( 0.7,  -0.65, groundY);   // front leg thrown out, knee locked
   } else {
     // run / idle — gait blends every joint together
     const ph = mode === 'run' ? p : 0.9;
     const flexAmt = lerp(0.42, 1.35, gait);
     const armAmp  = lerp(0.20, 0.62, gait);
-    const elbow   = lerp(0.10, 0.50, gait);
+    // Arms hang almost straight at a walk and carry near 90° at a run.
+    const elbow   = lerp(0.12, 1.05, gait);
     for (const off of [0, Math.PI]) {
       const th = amp * Math.sin(ph + off);
-      const flex = flexAmt * (1 + Math.cos(ph + off)) / 2;
-      leg(th, th - flex, groundY);
+      leg(th, flexAmt * (1 + Math.cos(ph + off)) / 2, groundY);
     }
     for (const off of [0, Math.PI]) {
-      const a = -armAmp * Math.sin(ph + off);
-      arm(a, a - elbow);
+      arm(-armAmp * Math.sin(ph + off), elbow);
     }
   }
   ctx.restore();
