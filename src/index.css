@@ -1869,7 +1869,7 @@ html[data-theme="dark"] {
 #track.section{
   background-image:
     linear-gradient(rgba(4,10,7,0.52),rgba(4,10,7,0.52)),
-    url('/track-bg.jpg');
+    url('/track-bg.webp');
   background-size:cover;
   background-position:center;
   background-attachment:fixed;
