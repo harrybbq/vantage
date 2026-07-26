@@ -6,6 +6,7 @@ import './hub-dark.css'
 import './theme-dark-basic.css'
 import './theme-cream-pro.css'
 import './tutorial.css'
+import './holiday.css'
 import App from './App.jsx'
 
 const queryClient = new QueryClient({
