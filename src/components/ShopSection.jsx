@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { firePurchase } from '../utils/confetti';
 import SectionHelp from './SectionHelp';
@@ -174,7 +174,57 @@ export default function ShopSection({ S, update, active, onOpenModal, onShowCoin
   // other. 'all' = show every category stacked. Sticky to component
   // state so a refresh resets to all (intentional — same on every
   // viewport so behavior is predictable across desktop/mobile).
+  // Which category tab reads as current. This used to FILTER the list
+  // down to one category; it now just tracks where you are, because the
+  // tabs scroll to a section instead of replacing the page. Kept in sync
+  // by the scroll-spy below so it follows manual scrolling too.
   const [activeCategory, setActiveCategory] = useState('all');
+  const gridRef = useRef(null);
+
+  const prefersReducedMotion = () =>
+    typeof window !== 'undefined'
+    && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+
+  /** Scroll a category's heading to the top of the viewport. The offset
+   *  that stops it hiding under the header is `scroll-margin-top` in CSS,
+   *  so it can differ per breakpoint without any JS measuring. */
+  function goToCategory(key) {
+    setActiveCategory(key);
+    const behavior = prefersReducedMotion() ? 'auto' : 'smooth';
+    if (key === 'all') {
+      window.scrollTo({ top: 0, behavior });
+      return;
+    }
+    const el = gridRef.current?.querySelector(`[data-shop-cat="${CSS.escape(key)}"]`);
+    if (el) el.scrollIntoView({ behavior, block: 'start' });
+  }
+
+  // Scroll-spy: whichever section is nearest the top of the viewport owns
+  // the active tab. rootMargin pulls the trigger line down from the very
+  // top so a section counts as "current" once its heading is near the top,
+  // matching where goToCategory lands you.
+  useEffect(() => {
+    const root = gridRef.current;
+    if (!root || shopFilter !== 'all') return;
+    const sections = [...root.querySelectorAll('[data-shop-cat]')];
+    if (!sections.length) return;
+
+    const io = new IntersectionObserver(
+      entries => {
+        const visible = entries
+          .filter(e => e.isIntersecting)
+          .sort((a, b) => a.boundingClientRect.top - b.boundingClientRect.top);
+        if (!visible.length) return;
+        // At the very top of the page, "All" is the honest answer.
+        if (window.scrollY < 40) { setActiveCategory('all'); return; }
+        setActiveCategory(visible[0].target.dataset.shopCat);
+      },
+      { rootMargin: '-96px 0px -60% 0px', threshold: 0 }
+    );
+    sections.forEach(s => io.observe(s));
+    return () => io.disconnect();
+    // Re-observe when the set of sections changes.
+  }, [shopFilter, shopCategories.length, shopItems.length]);
 
   const total = shopItems.length;
   const bought = shopItems.filter(s => s.bought).length;
@@ -335,13 +385,13 @@ export default function ShopSection({ S, update, active, onOpenModal, onShowCoin
               role="tab"
               aria-selected={activeCategory === 'all'}
               className={`shop-tab${activeCategory === 'all' ? ' is-active' : ''}`}
-              onClick={() => setActiveCategory('all')}
+              onClick={() => goToCategory('all')}
             >All ({filtered.length})</button>
             <button
               role="tab"
               aria-selected={activeCategory === 'uncategorised'}
               className={`shop-tab${activeCategory === 'uncategorised' ? ' is-active' : ''}`}
-              onClick={() => setActiveCategory('uncategorised')}
+              onClick={() => goToCategory('uncategorised')}
             >Uncategorised ({filtered.filter(s => !s.categoryId).length})</button>
             {shopCategories.map(cat => (
               <button
@@ -349,17 +399,16 @@ export default function ShopSection({ S, update, active, onOpenModal, onShowCoin
                 role="tab"
                 aria-selected={activeCategory === cat.id}
                 className={`shop-tab${activeCategory === cat.id ? ' is-active' : ''}`}
-                onClick={() => setActiveCategory(cat.id)}
+                onClick={() => goToCategory(cat.id)}
               >{cat.name} ({filtered.filter(s => s.categoryId === cat.id).length})</button>
             ))}
           </div>
         )}
 
-        <div className="shop-grid" id="shopGrid" style={{ marginTop: '16px', display: 'block' }}>
+        <div className="shop-grid" id="shopGrid" ref={gridRef} style={{ marginTop: '16px', display: 'block' }}>
           {shopFilter === 'all' ? (
             <>
-              {(activeCategory === 'all' || activeCategory === 'uncategorised') && (
-                <div className="shop-category-section">
+              <div className="shop-category-section" data-shop-cat="uncategorised">
                   <div className="shop-category-header">
                     <div className="shop-category-label">Uncategorised</div>
                     <div className="shop-category-line"></div>
@@ -374,12 +423,9 @@ export default function ShopSection({ S, update, active, onOpenModal, onShowCoin
                     onEditItem={handleEditItem}
                     onDrop={handleDrop}
                   />
-                </div>
-              )}
-              {shopCategories
-                .filter(cat => activeCategory === 'all' || activeCategory === cat.id)
-                .map(cat => (
-                <div key={cat.id} className="shop-category-section">
+              </div>
+              {shopCategories.map(cat => (
+                <div key={cat.id} className="shop-category-section" data-shop-cat={cat.id}>
                   <div className="shop-category-header">
                     <div className="shop-category-label">{cat.name}</div>
                     <div className="shop-category-line"></div>
