@@ -4,6 +4,8 @@ import { firePurchase } from '../utils/confetti';
 import SectionHelp from './SectionHelp';
 import TrendingBoard from './shop/TrendingBoard';
 import Icon from './Icon';
+import { SORTS, sortItems, searchItems, totalFor, fmtMoney } from '../lib/shop/list';
+import { sweepPrices, priceMovement } from '../lib/shop/priceWatch';
 
 const PRIORITY_LABEL = { high: 'High', med: 'Medium', low: 'Low' };
 const PRIORITY_CLASS = { high: 'priority-high', med: 'priority-med', low: 'priority-low' };
@@ -17,7 +19,21 @@ function PrioDot({ p, size = 7 }) {
 
 let _dragItemId = null;
 
-function ShopCard({ item, coins, onToggleBought, onDelete, onEdit, revealDelay }) {
+function CategoryTotal({ items }) {
+  const { sum, counted, unknown } = totalFor(items);
+  if (!counted) return null;
+  return (
+    <div
+      className="shop-category-total"
+      title={unknown ? `${unknown} item${unknown > 1 ? 's have' : ' has'} no readable price` : undefined}
+    >
+      {fmtMoney(sum)}{unknown ? <span className="shop-category-total-partial">+{unknown}</span> : null}
+    </div>
+  );
+}
+
+function ShopCard({ item, coins, onToggleBought, onDelete, onEdit, revealDelay, bulkMode, selected, onToggleSelect }) {
+  const move = priceMovement(item);
   const hasLink = !!item.url;
   const canAfford = (coins || 0) >= item.coinCost || item.bought;
   // Names > 50 chars truncate with an ellipsis the user can tap to
@@ -31,8 +47,9 @@ function ShopCard({ item, coins, onToggleBought, onDelete, onEdit, revealDelay }
 
   return (
     <motion.div
-      className={`shop-item-card${item.bought ? ' bought' : ''}`}
-      draggable
+      className={`shop-item-card${item.bought ? ' bought' : ''}${bulkMode ? ' is-selectable' : ''}${selected ? ' is-selected' : ''}`}
+      onClick={bulkMode ? () => onToggleSelect?.(item.id) : undefined}
+      draggable={!bulkMode}
       initial={{ opacity: 0, y: 16 }}
       whileInView={{ opacity: 1, y: 0 }}
       whileHover={{ y: -3, boxShadow: '0 12px 36px rgba(0,0,0,0.18)' }}
@@ -53,6 +70,17 @@ function ShopCard({ item, coins, onToggleBought, onDelete, onEdit, revealDelay }
         });
       }}
     >
+      {bulkMode && (
+        <span className={`shop-select-dot${selected ? ' is-on' : ''}`} aria-hidden="true">
+          {selected ? <Icon name="check" size={12} /> : null}
+        </span>
+      )}
+      {move && (
+        <span className={`shop-pricemove shop-pricemove-${move.direction}`}
+          title={`${fmtMoney(move.from)} → ${fmtMoney(move.to)} since you added it`}>
+          {move.direction === 'down' ? '▼' : '▲'} {Math.abs(move.pct).toFixed(0)}%
+        </span>
+      )}
       <div className="shop-item-img" style={{ position: 'relative' }}>
         {/* Cart icon sits underneath; a loaded image covers it, and a
             broken image simply hides itself to reveal the icon again. */}
@@ -109,7 +137,7 @@ function ShopCard({ item, coins, onToggleBought, onDelete, onEdit, revealDelay }
   );
 }
 
-function DropZone({ categoryId, items, coins, onToggleBought, onDeleteItem, onEditItem, onDrop }) {
+function DropZone({ categoryId, items, coins, onToggleBought, onDeleteItem, onEditItem, onDrop, bulkMode, selected, onToggleSelect }) {
   const handleDragEnter = e => {
     e.preventDefault();
     e.currentTarget._enterCount = (e.currentTarget._enterCount || 0) + 1;
@@ -160,6 +188,9 @@ function DropZone({ categoryId, items, coins, onToggleBought, onDeleteItem, onEd
             onDelete={onDeleteItem}
             onEdit={onEditItem}
             revealDelay={index * 0.06}
+            bulkMode={bulkMode}
+            selected={selected?.has(item.id)}
+            onToggleSelect={onToggleSelect}
           />
         ))}
       </div>
@@ -169,17 +200,90 @@ function DropZone({ categoryId, items, coins, onToggleBought, onDeleteItem, onEd
 
 export default function ShopSection({ S, update, active, onOpenModal, onShowCoinToast }) {
   const { shopItems, shopCategories, shopFilter, coins } = S;
-  // Category tab — independent of priority filter so the user can
-  // stack "Tech category" + "High priority" without one fighting the
-  // other. 'all' = show every category stacked. Sticky to component
-  // state so a refresh resets to all (intentional — same on every
-  // viewport so behavior is predictable across desktop/mobile).
   // Which category tab reads as current. This used to FILTER the list
   // down to one category; it now just tracks where you are, because the
   // tabs scroll to a section instead of replacing the page. Kept in sync
   // by the scroll-spy below so it follows manual scrolling too.
   const [activeCategory, setActiveCategory] = useState('all');
   const gridRef = useRef(null);
+
+  // View state, deliberately NOT persisted to S — a way of looking at
+  // the list for a minute, not a setting, and every stored key is paid
+  // for on every load and save.
+  const [query, setQuery] = useState('');
+  const [sortKey, setSortKey] = useState('added');
+  const [selected, setSelected] = useState(() => new Set());
+  const [bulkMode, setBulkMode] = useState(false);
+  const [moveTo, setMoveTo] = useState('');
+
+  // One price sweep per mount, for items with a URL that haven't been
+  // checked lately. Fails soft and writes only if something moved.
+  const swept = useRef(false);
+  useEffect(() => {
+    if (swept.current || !active) return;
+    swept.current = true;
+    let alive = true;
+    (async () => {
+      const next = await sweepPrices(shopItems || []);
+      if (!alive || next === shopItems) return;   // identity = nothing changed
+      update(prev => {
+        // Re-map onto the LATEST items so a concurrent edit isn't lost.
+        const byId = new Map(next.map(i => [i.id, i]));
+        return {
+          ...prev,
+          shopItems: (prev.shopItems || []).map(it => {
+            const fresh = byId.get(it.id);
+            if (!fresh) return it;
+            return {
+              ...it,
+              price: fresh.price ?? it.price,
+              priceCheckedAt: fresh.priceCheckedAt,
+              ...(fresh.priceHistory ? { priceHistory: fresh.priceHistory } : {}),
+            };
+          }),
+        };
+      });
+    })();
+    return () => { alive = false; };
+    // Runs once per mount; shopItems intentionally not a dependency.
+  }, [active]);
+
+  const toggleSelect = id => setSelected(prev => {
+    const next = new Set(prev);
+    if (next.has(id)) next.delete(id); else next.add(id);
+    return next;
+  });
+  function exitBulk() { setBulkMode(false); setSelected(new Set()); setMoveTo(''); }
+
+  function bulkMove(categoryId) {
+    if (!selected.size) return;
+    update(prev => ({
+      ...prev,
+      shopItems: (prev.shopItems || []).map(i =>
+        selected.has(i.id) ? { ...i, categoryId: categoryId || null } : i),
+    }));
+    exitBulk();
+  }
+  function bulkBought(value) {
+    if (!selected.size) return;
+    update(prev => ({
+      ...prev,
+      shopItems: (prev.shopItems || []).map(i => selected.has(i.id)
+        ? { ...i, bought: value, boughtAt: value ? Date.now() : undefined }
+        : i),
+    }));
+    exitBulk();
+  }
+  function bulkDelete() {
+    if (!selected.size) return;
+    const n = selected.size;
+    if (!window.confirm(`Delete ${n} item${n > 1 ? 's' : ''}? This cannot be undone.`)) return;
+    update(prev => ({
+      ...prev,
+      shopItems: (prev.shopItems || []).filter(i => !selected.has(i.id)),
+    }));
+    exitBulk();
+  }
 
   const prefersReducedMotion = () =>
     typeof window !== 'undefined'
@@ -334,6 +438,12 @@ export default function ShopSection({ S, update, active, onOpenModal, onShowCoin
   else if (shopFilter === 'low') filtered = filtered.filter(s => s.priority === 'low' && !s.bought);
   else filtered = filtered.filter(s => !s.bought);
 
+  // Search then sort, on top of whatever the priority filter left.
+  // `shopItems` is passed as the ordering reference so "Recently added"
+  // still means insertion order after filtering.
+  filtered = sortItems(searchItems(filtered, query), sortKey, shopItems);
+  const matching = filtered.length;
+
   return (
     <section id="shop" className={`section${active ? ' active' : ''}`}>
       <div className="shop-page">
@@ -376,6 +486,66 @@ export default function ShopSection({ S, update, active, onOpenModal, onShowCoin
           ))}
         </div>
 
+        <div className="shop-controls">
+          <div className="shop-search">
+            <Icon name="search" size={14} />
+            <input
+              type="search"
+              value={query}
+              onChange={e => setQuery(e.target.value)}
+              placeholder="Search your list…"
+              aria-label="Search wishlist"
+            />
+            {query && (
+              <button type="button" className="shop-search-clear" onClick={() => setQuery('')} aria-label="Clear search">
+                <Icon name="x" size={13} />
+              </button>
+            )}
+          </div>
+          <label className="shop-sort">
+            <span>Sort</span>
+            <select value={sortKey} onChange={e => setSortKey(e.target.value)} aria-label="Sort items">
+              {SORTS.map(o => <option key={o.key} value={o.key}>{o.label}</option>)}
+            </select>
+          </label>
+          <button
+            type="button"
+            className={`shop-select-toggle${bulkMode ? ' is-on' : ''}`}
+            onClick={() => (bulkMode ? exitBulk() : setBulkMode(true))}
+          >{bulkMode ? 'Done' : 'Select'}</button>
+        </div>
+
+        {query && (
+          <div className="shop-search-note">
+            {matching === 0
+              ? <>No items match <strong>{query}</strong>.</>
+              : <>{matching} item{matching > 1 ? 's' : ''} matching <strong>{query}</strong>.</>}
+          </div>
+        )}
+
+        {bulkMode && (
+          <div className="shop-bulkbar">
+            <span className="shop-bulkbar-count">{selected.size} selected</span>
+            <button type="button" onClick={() => setSelected(new Set(filtered.map(i => i.id)))}>
+              Select all{query || shopFilter !== 'all' ? ' shown' : ''}
+            </button>
+            <button type="button" onClick={() => setSelected(new Set())} disabled={!selected.size}>Clear</button>
+            <select
+              value={moveTo}
+              disabled={!selected.size}
+              onChange={e => { setMoveTo(e.target.value); if (e.target.value) bulkMove(e.target.value === '__none' ? null : e.target.value); }}
+              aria-label="Move selected to category"
+            >
+              <option value="">Move to…</option>
+              <option value="__none">Uncategorised</option>
+              {shopCategories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+            </select>
+            <button type="button" onClick={() => bulkBought(true)} disabled={!selected.size}>Mark bought</button>
+            <button type="button" onClick={() => bulkBought(false)} disabled={!selected.size}>Mark unbought</button>
+            <button type="button" className="shop-bulkbar-del" onClick={bulkDelete} disabled={!selected.size}>Delete</button>
+          </div>
+        )}
+
         {/* Category tabs — pivots between categories one tap at a
             time. "All" stacks every category (legacy desktop view).
             Lives at every viewport so behavior is predictable. */}
@@ -412,6 +582,7 @@ export default function ShopSection({ S, update, active, onOpenModal, onShowCoin
                   <div className="shop-category-header">
                     <div className="shop-category-label">Uncategorised</div>
                     <div className="shop-category-line"></div>
+                    <CategoryTotal items={filtered.filter(s => !s.categoryId)} />
                     <div className="shop-category-count">{filtered.filter(s => !s.categoryId).length}</div>
                   </div>
                   <DropZone
@@ -422,6 +593,9 @@ export default function ShopSection({ S, update, active, onOpenModal, onShowCoin
                     onDeleteItem={handleDeleteItem}
                     onEditItem={handleEditItem}
                     onDrop={handleDrop}
+                    bulkMode={bulkMode}
+                    selected={selected}
+                    onToggleSelect={toggleSelect}
                   />
               </div>
               {shopCategories.map(cat => (
@@ -429,6 +603,7 @@ export default function ShopSection({ S, update, active, onOpenModal, onShowCoin
                   <div className="shop-category-header">
                     <div className="shop-category-label">{cat.name}</div>
                     <div className="shop-category-line"></div>
+                    <CategoryTotal items={filtered.filter(s => s.categoryId === cat.id)} />
                     <div className="shop-category-count">{filtered.filter(s => s.categoryId === cat.id).length}</div>
                     <button className="shop-category-del-btn" onClick={() => handleDeleteCategory(cat.id)} title="Delete category">✕</button>
                   </div>
@@ -440,6 +615,9 @@ export default function ShopSection({ S, update, active, onOpenModal, onShowCoin
                     onDeleteItem={handleDeleteItem}
                     onEditItem={handleEditItem}
                     onDrop={handleDrop}
+                    bulkMode={bulkMode}
+                    selected={selected}
+                    onToggleSelect={toggleSelect}
                   />
                 </div>
               ))}
@@ -464,7 +642,11 @@ export default function ShopSection({ S, update, active, onOpenModal, onShowCoin
                       coins={coins}
                       onToggleBought={handleToggleBought}
                       onDelete={handleDeleteItem}
+                      onEdit={handleEditItem}
                       revealDelay={index * 0.06}
+                      bulkMode={bulkMode}
+                      selected={selected.has(item.id)}
+                      onToggleSelect={toggleSelect}
                     />
                   ))}
                 </div>
