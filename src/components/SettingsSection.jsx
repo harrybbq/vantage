@@ -10,6 +10,7 @@ import { useSubscriptionContext } from '../context/SubscriptionContext';
 import { getOwnProfile, updateOwnProfile } from '../lib/friends/queries';
 import { VISIONS_BY_ID } from '../lib/visions/definitions';
 import Icon from './Icon';
+import TravelPolicyCard from './holiday/TravelPolicyCard';
 import { bankingStatus, beginConnect } from '../lib/banking/enableBanking';
 
 // Small helper: inline icon + label for the Tools/Data action buttons.
@@ -902,6 +903,9 @@ export default function SettingsSection({ S, update, active, userId, onOpenLegal
         {userId
           ? <FriendsPrivacyCard userId={userId} S={S} update={update} />
           : <div className="settings-empty">Sign in to manage privacy.</div>}
+        {/* Travel policy — private country clearance lists used by the
+            Holiday map overlay and trip-card warnings. */}
+        <TravelPolicyCard S={S} update={update} />
         </>
         )}
 

@@ -7,6 +7,9 @@ import { useSubscriptionContext } from '../context/SubscriptionContext';
 import { backdropClose } from '../utils/backdropClose';
 import { useIsMobile } from '../hooks/useIsMobile';
 import Icon from './Icon';
+import {
+  emptyHolidayForm, HolidayTabBar, BasicsFields, ItineraryFields, BudgetFields,
+} from './holiday/HolidayFormTabs';
 
 /**
  * ImageField — URL input plus, on mobile, a photo-library picker.
@@ -1125,37 +1128,26 @@ function AddCategoryModal({ openId, onClose, onAdd }) {
 }
 
 // ── Add Holiday ──
-function AddHolidayModal({ openId, onClose, onAdd }) {
-  const [form, setForm] = useState({ dest: '', from: '', to: '', accom: '', flight: '', budget: '', status: 'planning', notes: '', imageUrl: '' });
+function AddHolidayModal({ openId, onClose, onAdd, S }) {
+  const [form, setForm] = useState(emptyHolidayForm);
+  const [tab, setTab] = useState('basics');
+
   function submit() {
     if (!form.dest.trim()) return;
     onAdd({ id: 'h' + Date.now(), ...form });
-    setForm({ dest: '', from: '', to: '', accom: '', flight: '', budget: '', status: 'planning', notes: '', imageUrl: '' });
+    setForm(emptyHolidayForm());
+    setTab('basics');
     onClose('addHolidayModal');
   }
   return (
     <Modal id="addHolidayModal" openId={openId} onClose={onClose} style={{ maxWidth: '480px' }}>
       <h3>Plan a Holiday</h3>
-      <div className="fg"><label>Destination</label><input type="text" placeholder="e.g. Lisbon, Portugal" value={form.dest} onChange={e => setForm(f => ({ ...f, dest: e.target.value }))} /></div>
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-        <div className="fg"><label>Departure</label><input type="date" value={form.from} onChange={e => setForm(f => ({ ...f, from: e.target.value }))} /></div>
-        <div className="fg"><label>Return</label><input type="date" value={form.to} onChange={e => setForm(f => ({ ...f, to: e.target.value }))} /></div>
+      <HolidayTabBar tab={tab} setTab={setTab} counts={{ itinerary: (form.items || []).length }} />
+      <div className="hol-modal-body">
+        {tab === 'basics' && <BasicsFields form={form} setForm={setForm} ImageField={ImageField} />}
+        {tab === 'itinerary' && <ItineraryFields form={form} setForm={setForm} />}
+        {tab === 'budget' && <BudgetFields form={form} setForm={setForm} S={S} />}
       </div>
-      <div className="fg"><label>Accommodation</label><input type="text" placeholder="e.g. Hotel Lisboa, Airbnb..." value={form.accom} onChange={e => setForm(f => ({ ...f, accom: e.target.value }))} /></div>
-      <div className="fg"><label>Flight Info</label><input type="text" placeholder="e.g. EasyJet EZY1234, 06:30 LGW→LIS" value={form.flight} onChange={e => setForm(f => ({ ...f, flight: e.target.value }))} /></div>
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-        <div className="fg"><label>Total Budget</label><input type="text" placeholder="£1,200" value={form.budget} onChange={e => setForm(f => ({ ...f, budget: e.target.value }))} /></div>
-        <div className="fg">
-          <label>Status</label>
-          <select value={form.status} onChange={e => setForm(f => ({ ...f, status: e.target.value }))}>
-            <option value="planning">🟡 Planning</option>
-            <option value="booked">🟢 Booked</option>
-            <option value="completed">✓ Completed</option>
-          </select>
-        </div>
-      </div>
-      <ImageField label="Cover Image (optional)" placeholder="https://… paste any photo URL" value={form.imageUrl} onChange={v => setForm(f => ({ ...f, imageUrl: v }))} />
-      <div className="fg"><label>Notes</label><input type="text" placeholder="Things to do, pack list, ideas..." value={form.notes} onChange={e => setForm(f => ({ ...f, notes: e.target.value }))} /></div>
       <div className="modal-actions">
         <button className="btn btn-ghost" onClick={() => onClose('addHolidayModal')}>Cancel</button>
         <button className="btn btn-primary" onClick={submit}>Add Trip</button>
@@ -1165,15 +1157,18 @@ function AddHolidayModal({ openId, onClose, onAdd }) {
 }
 
 // ── Edit Holiday ──
-function EditHolidayModal({ openId, onClose, holidays, onEdit, onDelete }) {
+function EditHolidayModal({ openId, onClose, holidays, onEdit, onDelete, S }) {
   // openId format: 'editHolidayModal:${id}'
   const isOpen = typeof openId === 'string' && openId.startsWith('editHolidayModal:');
   const holidayId = isOpen ? openId.split(':')[1] : null;
   const holiday = holidayId ? (holidays || []).find(h => h.id === holidayId) : null;
 
-  const [form, setForm] = useState({ dest: '', from: '', to: '', accom: '', flight: '', budget: '', status: 'planning', notes: '', imageUrl: '' });
+  const [form, setForm] = useState(emptyHolidayForm);
+  const [tab, setTab] = useState('basics');
 
-  // Sync form when holiday changes
+  // Sync form when holiday changes. Every optional extra is seeded from
+  // the saved trip — the submit path spreads `form` over the existing
+  // record, so a field missing HERE would be written back as empty.
   useEffect(() => {
     if (holiday) {
       setForm({
@@ -1186,7 +1181,10 @@ function EditHolidayModal({ openId, onClose, holidays, onEdit, onDelete }) {
         status: holiday.status || 'planning',
         notes: holiday.notes || '',
         imageUrl: holiday.imageUrl || '',
+        items: Array.isArray(holiday.items) ? holiday.items : [],
+        savingsGoalId: holiday.savingsGoalId || '',
       });
+      setTab('basics');
     }
   }, [holidayId]);
 
@@ -1210,26 +1208,12 @@ function EditHolidayModal({ openId, onClose, holidays, onEdit, onDelete }) {
     >
       <div className="modal" style={{ maxWidth: '480px' }}>
         <h3>Edit Trip</h3>
-        <div className="fg"><label>Destination</label><input type="text" placeholder="e.g. Lisbon, Portugal" value={form.dest} onChange={e => setForm(f => ({ ...f, dest: e.target.value }))} /></div>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-          <div className="fg"><label>Departure</label><input type="date" value={form.from} onChange={e => setForm(f => ({ ...f, from: e.target.value }))} /></div>
-          <div className="fg"><label>Return</label><input type="date" value={form.to} onChange={e => setForm(f => ({ ...f, to: e.target.value }))} /></div>
+        <HolidayTabBar tab={tab} setTab={setTab} counts={{ itinerary: (form.items || []).length }} />
+        <div className="hol-modal-body">
+          {tab === 'basics' && <BasicsFields form={form} setForm={setForm} ImageField={ImageField} />}
+          {tab === 'itinerary' && <ItineraryFields form={form} setForm={setForm} />}
+          {tab === 'budget' && <BudgetFields form={form} setForm={setForm} S={S} />}
         </div>
-        <div className="fg"><label>Accommodation</label><input type="text" placeholder="e.g. Hotel Lisboa, Airbnb..." value={form.accom} onChange={e => setForm(f => ({ ...f, accom: e.target.value }))} /></div>
-        <div className="fg"><label>Flight Info</label><input type="text" placeholder="e.g. EasyJet EZY1234, 06:30 LGW→LIS" value={form.flight} onChange={e => setForm(f => ({ ...f, flight: e.target.value }))} /></div>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-          <div className="fg"><label>Total Budget</label><input type="text" placeholder="£1,200" value={form.budget} onChange={e => setForm(f => ({ ...f, budget: e.target.value }))} /></div>
-          <div className="fg">
-            <label>Status</label>
-            <select value={form.status} onChange={e => setForm(f => ({ ...f, status: e.target.value }))}>
-              <option value="planning">🟡 Planning</option>
-              <option value="booked">🟢 Booked</option>
-              <option value="completed">✓ Completed</option>
-            </select>
-          </div>
-        </div>
-        <ImageField label="Cover Image (optional)" placeholder="https://… paste any photo URL" value={form.imageUrl} onChange={v => setForm(f => ({ ...f, imageUrl: v }))} />
-        <div className="fg"><label>Notes</label><input type="text" placeholder="Things to do, pack list, ideas..." value={form.notes} onChange={e => setForm(f => ({ ...f, notes: e.target.value }))} /></div>
         <div className="modal-actions" style={{ justifyContent: 'space-between' }}>
           <button
             className="btn btn-danger btn-sm"
@@ -2003,8 +1987,8 @@ export default function Modals({ openModal, S, update, onClose, onOpen, onShowCo
       <AddShopModal openId={effectiveOpen} onClose={onClose} onAdd={handleAddShopItem} categories={S.shopCategories} />
       <EditShopModal openId={effectiveOpen} onClose={onClose} shopItems={S.shopItems} categories={S.shopCategories} onEdit={handleEditShopItem} onDelete={handleDeleteShopItem} />
       <AddCategoryModal openId={effectiveOpen} onClose={onClose} onAdd={handleAddCategory} />
-      <AddHolidayModal openId={effectiveOpen} onClose={onClose} onAdd={handleAddHoliday} />
-      <EditHolidayModal openId={effectiveOpen} onClose={onClose} holidays={S.holidays} onEdit={handleEditHoliday} onDelete={handleDeleteHoliday} />
+      <AddHolidayModal openId={effectiveOpen} onClose={onClose} onAdd={handleAddHoliday} S={S} />
+      <EditHolidayModal openId={effectiveOpen} onClose={onClose} holidays={S.holidays} onEdit={handleEditHoliday} onDelete={handleDeleteHoliday} S={S} />
       <AddHabitModal openId={effectiveOpen} onClose={onClose} onAdd={handleAddHabit} />
       <EditHabitModal openId={effectiveOpen} onClose={onClose} habits={S.habits} onEdit={handleEditHabit} onDelete={handleDeleteHabit} />
       <RelapseModal openId={effectiveOpen} onClose={onClose} habits={S.habits} onRelapse={handleRelapseHabit} />
