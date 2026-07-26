@@ -279,3 +279,40 @@
   .holiday-tabs{gap:4px;}
   .holiday-tab{padding:8px 12px;}
 }
+
+/* ── Shopping: scroll-to-category + sticky trending ─────────────────
+   The category tabs scroll to a section rather than filtering the page
+   down to it. The landing offset lives here as scroll-margin-top so
+   scrollIntoView needs no JS measuring and each breakpoint can differ.
+   96px clears the .section top padding (68px) plus breathing room. */
+.shop-category-section{scroll-margin-top:96px;}
+
+@media (max-width:900px){
+  /* Clear the fixed mobile app bar and the notch. */
+  .shop-category-section{
+    scroll-margin-top:calc(var(--m-appbar-h,56px) + var(--m-safe-top,0px) + 14px);
+  }
+
+  /* Sticky trending on mobile.
+     This could not work before: .shop-page set overflow-x:hidden, and a
+     box with overflow-x:hidden and overflow-y:visible computes
+     overflow-y to auto — making .shop-page a scroll container, which
+     stops a descendant sticking to the VIEWPORT. The horizontal clip it
+     was there for is already handled by .shop-trending-viewport's own
+     overflow:hidden, so dropping it here costs nothing.
+
+     Pinned to the bottom rather than the top: the wishlist is the point
+     of the page and shouldn't get pushed down the screen by an ad rail. */
+  .shop-page{overflow-x:visible;}
+  .shop-trending{
+    position:sticky;
+    bottom:calc(var(--m-tabs-h,64px) + var(--m-safe-bottom,0px) + 8px);
+    z-index:5;
+  }
+}
+
+/* Someone who asked for less motion gets the jump, not the glide —
+   scroll-behavior is set globally on <html>, so it needs unsetting. */
+@media (prefers-reduced-motion: reduce){
+  html{scroll-behavior:auto;}
+}
