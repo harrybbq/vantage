@@ -258,7 +258,20 @@ exports.handler = async (event) => {
       body: JSON.stringify({ products, page: pageNum, hasMore: mode !== 'barcode' && products.length >= PAGE_SIZE }),
     };
   } catch (err) {
-    console.error('food-search error:', err.message);
-    return { statusCode: 502, headers: CORS, body: JSON.stringify({ error: 'Food search failed' }) };
+    // Every upstream failure is already swallowed into an empty list by
+    // the fan-out, so reaching here means a genuine bug in our own code
+    // — exactly the case where a generic message costs a whole
+    // round-trip to diagnose. Send the real reason back.
+    //
+    // Redacted: a fetch error can carry the full URL, and the USDA one
+    // has the API key in its query string.
+    const detail = String(err && err.message || err || 'unknown')
+      .replace(/api_key=[^&\s]+/gi, 'api_key=REDACTED')
+      .slice(0, 200);
+    console.error('food-search error:', detail, err && err.stack);
+    return {
+      statusCode: 502, headers: CORS,
+      body: JSON.stringify({ error: `Food search failed: ${detail}` }),
+    };
   }
 };
