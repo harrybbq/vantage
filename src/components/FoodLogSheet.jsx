@@ -37,6 +37,24 @@ const NUTRIENT_KEYS = ['calories', 'protein_g', 'carbs_g', 'fat_g', 'fibre_g', '
 // (older saved meals, older API responses). Search results and AI scans
 // now send serving_unit themselves, which always wins.
 const LIQUID_WORDS = /\b(milk|juice|water|cola|soda|lemonade|drink|smoothie|shake|coffee|latte|tea|beer|lager|cider|wine|vodka|gin|rum|whisky|kombucha|squash|cordial|broth|beverage)\b/i;
+// A prefill can carry nulls: recent-foods re-log passes a nutrition_log
+// row straight through, and `brand` is stored as null when it's blank.
+// Spreading that over EMPTY_FORM replaces the '' default WITH null, and
+// the first .trim() then throws. Coerce every string field back.
+const STRING_FIELDS = [
+  'food_name', 'brand', 'serving_g', 'serving_unit',
+  ...NUTRIENT_KEYS,
+];
+function sanitisePrefill(prefill) {
+  if (!prefill) return null;
+  const out = { ...prefill };
+  for (const k of STRING_FIELDS) {
+    if (out[k] == null) delete out[k];        // let EMPTY_FORM's default win
+    else if (typeof out[k] !== 'string') out[k] = String(out[k]);
+  }
+  return out;
+}
+
 function withLiquidDefault(prefill) {
   if (!prefill) return null;
   if (prefill.serving_unit) return prefill;
@@ -46,7 +64,7 @@ function withLiquidDefault(prefill) {
 
 export default function FoodLogSheet({ userId, logDate, onClose, onSaved, prefill, onSaveMeal }) {
   const [form, setForm] = useState(() => {
-    const p = withLiquidDefault(prefill);
+    const p = withLiquidDefault(sanitisePrefill(prefill));
     return p ? { ...EMPTY_FORM, ...p } : { ...EMPTY_FORM };
   });
   const [saving, setSaving] = useState(false);
@@ -59,7 +77,7 @@ export default function FoodLogSheet({ userId, logDate, onClose, onSaved, prefil
   // density at the current serving, so hand-tuned numbers keep
   // scaling correctly afterwards.
   const perGramRef = useRef((() => {
-    const initial = prefill ? { ...EMPTY_FORM, ...prefill } : EMPTY_FORM;
+    const initial = prefill ? { ...EMPTY_FORM, ...sanitisePrefill(prefill) } : EMPTY_FORM;
     const serving = parseFloat(initial.serving_g) || 100;
     const map = {};
     for (const k of NUTRIENT_KEYS) {
@@ -103,15 +121,21 @@ export default function FoodLogSheet({ userId, logDate, onClose, onSaved, prefil
   }
 
   async function handleSave() {
-    if (!form.food_name.trim()) { setError('Food name is required.'); return; }
+    // `?? ''` throughout: the guard above used to be the only thing
+    // standing between a null field and a TypeError thrown AFTER
+    // setSaving(true) — which left the button pinned on "Saving…"
+    // forever with no error and no way to retry. The try/finally below
+    // is the real fix; this just stops it throwing in the first place.
+    if (!(form.food_name ?? '').trim()) { setError('Food name is required.'); return; }
     setSaving(true);
     setError('');
+    try {
     const row = {
       user_id: userId,
       log_date: logDate,
       meal_type: form.meal_type,
-      food_name: form.food_name.trim(),
-      brand: form.brand.trim() || null,
+      food_name: (form.food_name ?? '').trim(),
+      brand: (form.brand ?? '').trim() || null,
       serving_g: parseFloat(form.serving_g) || 100,
       calories:  parseFloat(form.calories)  || 0,
       protein_g: parseFloat(form.protein_g) || 0,
@@ -139,10 +163,18 @@ export default function FoodLogSheet({ userId, logDate, onClose, onSaved, prefil
     } catch {
       err = { message: 'timeout' };
     }
-    if (err) { setError('Couldn’t save — check your connection and try again.'); setSaving(false); return; }
-    setSaving(false);
+    if (err) { setError('Couldn’t save — check your connection and try again.'); return; }
     onSaved?.();
     onClose();
+    } catch (e) {
+      // Anything unexpected surfaces as a retryable error instead of a
+      // silent hang.
+      setError('Couldn’t save — ' + (e?.message || 'something went wrong') + '.');
+    } finally {
+      // ALWAYS runs. No future edit to the body above can strand the
+      // button on "Saving…" again.
+      setSaving(false);
+    }
   }
 
   const [savedMeal, setSavedMeal] = useState(false);
@@ -151,7 +183,7 @@ export default function FoodLogSheet({ userId, logDate, onClose, onSaved, prefil
     onSaveMeal?.({
       id: 'meal' + Date.now(),
       name: form.food_name.trim(),
-      food_name: form.food_name.trim(),
+      food_name: (form.food_name ?? '').trim(),
       brand: form.brand.trim(),
       meal_type: form.meal_type,
       serving_g: form.serving_g,

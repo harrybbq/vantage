@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import Icon from './Icon';
+import { BrandMark } from './food/BrandMark';
 import CameraScanner from './CameraScanner';
 import { supabase } from '../lib/supabase';
 import { backdropClose } from '../utils/backdropClose';
@@ -329,6 +330,7 @@ export default function FoodSearch({ onSelectFood, onClose, onOpenModal, savedMe
                       <span style={{ fontFamily: 'var(--mono)', fontSize: '10px', color: 'var(--text-muted)' }}>per 100g</span>
                     </div>
                   </div>
+                  <BrandMark brand={item.brand} name={item.food_name} image={item.image} />
                   <span style={{ color: 'var(--em)', flexShrink: 0, alignSelf: 'center', display: 'inline-flex' }}><Icon name="plus" size={16} /></span>
                 </button>
               ))}
