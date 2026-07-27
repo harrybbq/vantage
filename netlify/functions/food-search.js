@@ -60,7 +60,7 @@ function checkRate(ip) {
   return e.count <= 30;
 }
 
-function fetchJson(url, timeoutMs = 8000) {
+function fetchJson(url, timeoutMs = 4500) {
   const ctrl = new AbortController();
   const t = setTimeout(() => ctrl.abort(), timeoutMs);
   return fetch(url, { headers: { 'User-Agent': UA }, signal: ctrl.signal })
@@ -194,8 +194,24 @@ async function searchByName(q, page = 1) {
   const usda = searchUSDA(q, page, env).catch(() => []);
   const fatsecret = searchFatSecret(q, page, env).catch(() => []);
 
-  const settled = await Promise.allSettled([relevance, popularity, usda, fatsecret]);
-  const lists = settled.filter(r => r.status === 'fulfilled').map(r => r.value);
+  // Return whatever has arrived by the deadline rather than waiting for
+  // the slowest source. Netlify's synchronous function limit is 10s, and
+  // blowing it returns a 502 that the client can only report as a
+  // connection failure — so a slow upstream must degrade to fewer
+  // results, never to a failed search.
+  const BUDGET_MS = 6000;
+  const settle = pr => pr.then(v => ({ ok: true, v })).catch(() => ({ ok: false }));
+  const deadline = new Promise(resolve =>
+    setTimeout(() => resolve('deadline'), BUDGET_MS));
+
+  const tracked = [relevance, popularity, usda, fatsecret].map(settle);
+  const done = [];
+  await Promise.race([
+    Promise.all(tracked.map(async (p, i) => { done[i] = await p; })),
+    deadline,
+  ]);
+
+  const lists = done.filter(r => r && r.ok).map(r => r.v);
   return mergeResults(lists, q);
 }
 

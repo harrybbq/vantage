@@ -26,7 +26,9 @@
  */
 
 const UA = 'Vantage/1.0 (https://vantagevision.netlify.app)';
-const TIMEOUT_MS = 7000;
+// Must fit inside food-search's 6s fan-out budget, which itself has to
+// fit inside Netlify's 10s function limit.
+const TIMEOUT_MS = 4500;
 
 function fetchJson(url, opts = {}) {
   const ctrl = new AbortController();
