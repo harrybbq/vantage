@@ -26,6 +26,22 @@ const OFF_SEARCH = 'https://search.openfoodfacts.org';
 const UA = 'Vantage/1.0 (https://soft-phoenix-b512b8.netlify.app)';
 
 const { requireUser, underLimit, tooMany } = require('../lib/requireUser');
+const { searchUSDA, searchFatSecret } = require('../lib/foodSources');
+
+// Warm-instance cache. Repeat searches (typing, back-and-forth) hit
+// memory instead of three upstreams. Short TTL — food data barely
+// moves, but a stale-feeling search is worse than one extra call.
+const SEARCH_CACHE = new Map();
+const CACHE_TTL_MS = 10 * 60 * 1000;
+function cacheGet(k) {
+  const hit = SEARCH_CACHE.get(k);
+  if (!hit || Date.now() - hit.at > CACHE_TTL_MS) return null;
+  return hit.v;
+}
+function cacheSet(k, v) {
+  if (SEARCH_CACHE.size > 300) SEARCH_CACHE.clear();   // crude, bounded
+  SEARCH_CACHE.set(k, { at: Date.now(), v });
+}
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
@@ -112,17 +128,32 @@ function mergeResults(lists, q) {
       out.push(p);
     }
   }
-  const term = (q || '').toLowerCase();
-  return out.sort((a, b) => {
-    // Exact-ish name matches first, then anything with calories, then
-    // the rest. Stable enough to feel predictable while typing.
-    const aExact = a.food_name.toLowerCase().startsWith(term) ? 0 : 1;
-    const bExact = b.food_name.toLowerCase().startsWith(term) ? 0 : 1;
-    if (aExact !== bExact) return aExact - bExact;
-    const aHas = a.calories > 0 ? 0 : 1;
-    const bHas = b.calories > 0 ? 0 : 1;
-    return aHas - bHas;
-  });
+  const term = (q || '').toLowerCase().trim();
+  const words = term.split(/\s+/).filter(Boolean);
+
+  // Score rather than sort on one key: with several sources merged, a
+  // single tiebreak leaves obviously-right answers buried.
+  const score = p => {
+    const name = (p.food_name || '').toLowerCase();
+    const brand = (p.brand || '').toLowerCase();
+    const hay = `${name} ${brand}`;
+    let s = 0;
+    if (name === term) s -= 100;                       // exact title
+    else if (name.startsWith(term)) s -= 60;           // prefix
+    else if (hay.includes(term)) s -= 30;              // phrase anywhere
+    const hits = words.filter(w => hay.includes(w)).length;
+    s -= hits * 8;                                     // per-word overlap
+    // When the query clearly names the dish, prefer the actual menu
+    // item over a lookalike supermarket product. Gated on a strong NAME
+    // match rather than the brand — searching "big mac" shouldn't have
+    // to also say "McDonald's", but searching "milk" shouldn't drag
+    // every restaurant item to the top either.
+    if (p.isRestaurant && (name === term || name.startsWith(term) || name.includes(term))) s -= 20;
+    if (p.calories <= 0) s += 40;                      // sink empties
+    if (!p.brand) s += 4;                              // brandless is vaguer
+    return s;
+  };
+  return out.sort((a, b) => score(a) - score(b));
 }
 
 // image_small_url gives the packaging shot, which is the closest thing
@@ -157,7 +188,13 @@ async function searchByName(q, page = 1) {
     return (json.products || []).map(mapProduct).filter(usable);
   })();
 
-  const settled = await Promise.allSettled([relevance, popularity]);
+  // Every other source is optional and keyed by env — an unconfigured
+  // one contributes an empty list rather than failing the search.
+  const env = process.env;
+  const usda = searchUSDA(q, page, env).catch(() => []);
+  const fatsecret = searchFatSecret(q, page, env).catch(() => []);
+
+  const settled = await Promise.allSettled([relevance, popularity, usda, fatsecret]);
   const lists = settled.filter(r => r.status === 'fulfilled').map(r => r.value);
   return mergeResults(lists, q);
 }
@@ -191,9 +228,14 @@ exports.handler = async (event) => {
   }
 
   try {
-    const products = mode === 'barcode'
-      ? await searchByBarcode(q.trim())
-      : await searchByName(q.trim(), pageNum);
+    const key = `${mode}:${q.trim().toLowerCase()}:${pageNum}`;
+    let products = cacheGet(key);
+    if (!products) {
+      products = mode === 'barcode'
+        ? await searchByBarcode(q.trim())
+        : await searchByName(q.trim(), pageNum);
+      cacheSet(key, products);
+    }
     // `hasMore` lets the client offer "Load more" without guessing.
     return {
       statusCode: 200, headers: CORS,

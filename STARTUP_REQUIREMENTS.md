@@ -119,6 +119,23 @@ action outside the repo.
 
 ---
 
+## Food search — keys that unlock coverage
+
+Search federates several sources; each is optional and keyed by env, so
+an unconfigured one contributes nothing and the app keeps working.
+Adding a key needs no code change.
+
+- `[ ]` [A] **FatSecret** (`FATSECRET_CLIENT_ID`, `FATSECRET_CLIENT_SECRET`)
+  — **the important one.** ~1.9M items across 56 countries including
+  RESTAURANT menus, which is the gap for fast food. Free tier is 5,000
+  calls/day. Open Food Facts and USDA are both weak on menu items, so
+  this is what makes "Big Mac Meal" findable.
+- `[ ]` [A] **USDA FoodData Central** (`FDC_API_KEY`) — free key from
+  data.gov, ~600k foods including ~380k branded. 1,000 requests/hour.
+  Public domain data.
+- `[x]` **Open Food Facts** — no key, already live. ~3M barcoded
+  products, Europe-strong.
+
 ## Standing operational notes
 
 - **Lifetime is a grant, never a purchase.** It's filtered out of the
