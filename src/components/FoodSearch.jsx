@@ -4,16 +4,17 @@ import CameraScanner from './CameraScanner';
 import { supabase } from '../lib/supabase';
 import { backdropClose } from '../utils/backdropClose';
 import { useSubscriptionContext } from '../context/SubscriptionContext';
+import { authFetch } from '../lib/authFetch';
 
 async function searchByBarcode(barcode) {
-  const res = await fetch(`/.netlify/functions/food-search?mode=barcode&q=${encodeURIComponent(barcode)}`);
+  const res = await authFetch(`/.netlify/functions/food-search?mode=barcode&q=${encodeURIComponent(barcode)}`);
   const json = await res.json();
   if (!res.ok) throw new Error(json.error || 'Lookup failed');
   return json.products || [];
 }
 
 async function searchByName(query) {
-  const res = await fetch(`/.netlify/functions/food-search?mode=name&q=${encodeURIComponent(query)}`);
+  const res = await authFetch(`/.netlify/functions/food-search?mode=name&q=${encodeURIComponent(query)}`);
   const json = await res.json();
   if (!res.ok) throw new Error(json.error || 'Search failed');
   return json.products || [];

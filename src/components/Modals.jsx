@@ -7,6 +7,7 @@ import { useSubscriptionContext } from '../context/SubscriptionContext';
 import { backdropClose } from '../utils/backdropClose';
 import { useIsMobile } from '../hooks/useIsMobile';
 import Icon from './Icon';
+import { authFetch } from '../lib/authFetch';
 import {
   emptyHolidayForm, HolidayTabBar, BasicsFields, ItineraryFields, BudgetFields,
 } from './holiday/HolidayFormTabs';
@@ -278,78 +279,6 @@ function AddLinkOnlyModal({ openId, onClose, onAdd }) {
       <div className="modal-actions">
         <button className="btn btn-ghost" onClick={() => onClose('addLinkOnlyModal')}>Cancel</button>
         <button className="btn btn-primary" onClick={submit}>Add</button>
-      </div>
-    </Modal>
-  );
-}
-
-// ── Add YouTube Widget ──
-function AddYouTubeModal({ openId, onClose, onAdd }) {
-  const [apiKey, setApiKey] = useState('');
-  const [channelList, setChannelList] = useState('');
-  function submit() {
-    if (!apiKey || !channelList.trim()) return;
-    const channels = channelList.split('\n').map(s => s.trim()).filter(Boolean);
-    if (!channels.length) return;
-    onAdd({ id: 'yt' + Date.now(), apiKey, channels });
-    setApiKey(''); setChannelList('');
-    onClose('addYouTubeModal');
-  }
-  return (
-    <Modal id="addYouTubeModal" openId={openId} onClose={onClose} style={{ maxWidth: '500px' }}>
-      <h3>▶ YouTube Subscriptions Feed</h3>
-      <p style={{ fontSize: '12px', color: 'var(--text-muted)', marginBottom: '16px', lineHeight: '1.6' }}>
-        Shows the 5 newest uploads from each of your subscribed channels. Requires a free <strong style={{ color: 'var(--text)' }}>YouTube Data API v3</strong> key from <a href="https://console.cloud.google.com/" target="_blank" rel="noreferrer" style={{ color: 'var(--em)' }}>Google Cloud Console</a>.
-      </p>
-      <div className="fg"><label>YouTube Data API v3 Key</label><input type="text" placeholder="AIzaSy..." value={apiKey} onChange={e => setApiKey(e.target.value)} /></div>
-      <div className="fg">
-        <label>Channel IDs or Handles (one per line)</label>
-        <textarea
-          placeholder={"@mkbhd\nUCBcRF18a7Qf58cCRy5xuWwQ\n@veritasium"}
-          value={channelList}
-          onChange={e => setChannelList(e.target.value)}
-          style={{ height: '110px', resize: 'vertical', width: '100%', background: '#fff', border: '1px solid var(--border)', borderRadius: '9px', padding: '10px 13px', color: 'var(--text)', fontFamily: 'var(--mono)', fontSize: '12px', outline: 'none' }}
-        />
-      </div>
-      <div className="modal-actions">
-        <button className="btn btn-ghost" onClick={() => onClose('addYouTubeModal')}>Cancel</button>
-        <button className="btn btn-primary" onClick={submit}>Add Feed Widget</button>
-      </div>
-    </Modal>
-  );
-}
-
-// ── Coin History ──
-function CoinHistoryModal({ openId, onClose, coins, coinHistory }) {
-  return (
-    <Modal id="coinHistoryModal" openId={openId} onClose={onClose} style={{ maxWidth: '420px' }}>
-      <h3>⬡ Coin Wallet</h3>
-      <div style={{ textAlign: 'center', padding: '16px 0 8px' }}>
-        <div style={{ fontFamily: 'var(--mono)', fontSize: '42px', fontWeight: 700, color: 'var(--gold)' }}>{coins}</div>
-        <div style={{ fontFamily: 'var(--mono)', fontSize: '11px', color: 'var(--text-muted)', letterSpacing: '2px', textTransform: 'uppercase', marginTop: '4px' }}>Available Coins</div>
-      </div>
-      <div style={{ fontFamily: 'var(--mono)', fontSize: '10px', color: 'var(--text-muted)', letterSpacing: '1.5px', textTransform: 'uppercase', marginTop: '8px' }}>History</div>
-      <div className="coin-history-list">
-        {(!coinHistory || coinHistory.length === 0)
-          ? <div style={{ textAlign: 'center', fontFamily: 'var(--mono)', fontSize: '12px', color: 'var(--text-muted)', padding: '20px' }}>No transactions yet — complete achievements to earn coins!</div>
-          : coinHistory.slice(0, 30).map((h, i) => {
-            const pos = h.amount > 0;
-            const label = h.type === 'earn' ? '⬡ Earned — ' : h.type === 'spend' ? '⬡ Spent on ' : '⬡ Refund — ';
-            const ts = new Date(h.ts).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
-            return (
-              <div key={i} className="coin-hist-row">
-                <div>
-                  <div className="coin-hist-label">{label}{h.label}</div>
-                  <div style={{ fontFamily: 'var(--mono)', fontSize: '10px', color: 'var(--text-muted)' }}>{ts}</div>
-                </div>
-                <div className={`coin-hist-amount ${pos ? 'pos' : 'neg'}`}>{pos ? '+' : ''}{h.amount}</div>
-              </div>
-            );
-          })
-        }
-      </div>
-      <div className="modal-actions" style={{ marginTop: '16px' }}>
-        <button className="btn btn-ghost" onClick={() => onClose('coinHistoryModal')}>Close</button>
       </div>
     </Modal>
   );
@@ -933,7 +862,7 @@ function AddShopModal({ openId, onClose, onAdd, categories = [] }) {
       // arbitrary URLs from the browser is blocked by CORS and would
       // also leak the API key. The function does OG / JSON-LD / Twitter
       // Card extraction server-side. No API spend.
-      const resp = await fetch('/.netlify/functions/shop-autofill', {
+      const resp = await authFetch('/.netlify/functions/shop-autofill', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ url }),
@@ -1753,9 +1682,6 @@ export default function Modals({ openModal, S, update, onClose, onOpen, onShowCo
   function handleAddLink(link) {
     update(prev => ({ ...prev, links: [...prev.links, link] }));
   }
-  function handleAddYT(yt) {
-    update(prev => ({ ...prev, ytWidgets: [...(prev.ytWidgets || []), yt] }));
-  }
   function handleAddAchievement(ach) {
     // createdAt stamped server-time so the rating engine's time-spacing
     // rule (≥7 days created→completed) has a reliable signal.
@@ -1962,7 +1888,6 @@ export default function Modals({ openModal, S, update, onClose, onOpen, onShowCo
         onAddHubWidget={handleAddHubWidget}
       />
       <AddLinkOnlyModal openId={effectiveOpen} onClose={onClose} onAdd={handleAddLink} />
-      <AddYouTubeModal openId={effectiveOpen} onClose={onClose} onAdd={handleAddYT} />
       <CoinHistoryModal openId={effectiveOpen} onClose={onClose} coins={S.coins || 0} coinHistory={S.coinHistory || []} />
       <AddAchievementModal openId={effectiveOpen} onClose={onClose} onAdd={handleAddAchievement} />
       <EditAchievementModal openId={effectiveOpen} onClose={onClose} achievements={S.achievements} onEdit={handleEditAchievement} onDelete={handleDeleteAchievement} />

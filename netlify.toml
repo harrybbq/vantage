@@ -57,6 +57,49 @@
     Access-Control-Allow-Origin  = "*"
     Access-Control-Allow-Headers = "Content-Type"
 
+# ── Security headers ─────────────────────────────────────────────────
+# Applied to every response. These were previously absent entirely.
+[[headers]]
+  for = "/*"
+  [headers.values]
+    # Clickjacking. Matters more now the app is heading for app stores,
+    # where a webview wrapper shouldn't be frameable by anyone else.
+    X-Frame-Options = "DENY"
+    # Stop the browser second-guessing declared content types.
+    X-Content-Type-Options = "nosniff"
+    # Don't leak the page path (which can name a section) to third
+    # parties; same-origin still gets the full URL.
+    Referrer-Policy = "strict-origin-when-cross-origin"
+    # No feature in the app needs these. The camera IS used for food
+    # scanning, so it stays allowed for our own origin.
+    Permissions-Policy = "geolocation=(), microphone=(), payment=(), usb=(), camera=(self)"
+    # Two years, preload-eligible. Netlify terminates TLS and there is
+    # no plain-HTTP surface to lock ourselves out of.
+    Strict-Transport-Security = "max-age=63072000; includeSubDomains; preload"
+
+    # CSP ships in REPORT-ONLY first, deliberately.
+    #
+    # A wrong CSP is indistinguishable from an outage: the app simply
+    # stops working, for everyone, and the only clue is the console.
+    # This policy is a considered guess — inline styles are everywhere
+    # (framer-motion writes them, and the codebase uses style={{}}
+    # widely), item images come from arbitrary retailer domains, and
+    # backgrounds are data: URIs. Report-Only proves that out against
+    # real traffic without risking a white screen.
+    #
+    # Promote to Content-Security-Policy once the violation reports are
+    # quiet. It is defence-in-depth for the innerHTML rendering in the
+    # hub, which is now escaped but is still string-built HTML.
+    Content-Security-Policy-Report-Only = "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; font-src 'self' data:; connect-src 'self' https://*.supabase.co wss://*.supabase.co https://api.open-meteo.com https://archive-api.open-meteo.com https://geocoding-api.open-meteo.com https://api.frankfurter.app https://ipwho.is https://api.github.com https://ws.audioscrobbler.com; frame-ancestors 'none'; base-uri 'self'; form-action 'self'; object-src 'none'"
+
+# The service worker must never be cached, or a stale one can pin
+# clients to an old build — the failure mode behind the 2026-05-03
+# incident.
+[[headers]]
+  for = "/sw.js"
+  [headers.values]
+    Cache-Control = "no-cache, no-store, must-revalidate"
+
 # ── Scheduled Functions ──────────────────────────────────────────────
 # push-dispatch sweeps the notifications_queue every minute. Cheap —
 # the function returns immediately when the queue is empty.

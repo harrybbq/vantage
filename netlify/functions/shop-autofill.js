@@ -25,20 +25,27 @@
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'Content-Type',
+  'Access-Control-Allow-Headers': 'Content-Type, Authorization',
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
   'Content-Type': 'application/json',
 };
 
 const { fetchWithTimeout, isBlockedHost, extractProductInfo } = require('../lib/productPage');
+const { requireUser, underLimit, tooMany } = require('../lib/requireUser');
 
 exports.handler = async (event) => {
   if (event.httpMethod === 'OPTIONS') {
     return { statusCode: 204, headers: CORS, body: '' };
   }
   if (event.httpMethod !== 'POST') {
+
     return { statusCode: 405, headers: CORS, body: JSON.stringify({ error: 'method not allowed' }) };
   }
+
+  // Costs money / fetches on the user's behalf — fetches an arbitrary URL on our egress.
+  const auth = await requireUser(event, CORS);
+  if (auth.error) return auth.error;
+  if (!underLimit('autofill', auth.userId, 20)) return tooMany(CORS);
 
   let body;
   try { body = JSON.parse(event.body || '{}'); }

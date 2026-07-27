@@ -34,28 +34,17 @@ async function fetchGitHub(username, cache) {
   } catch { return null; }
 }
 
-// ── YouTube helpers ──
-async function resolveChannelId(handle, apiKey) {
-  if (/^UC[\w-]{22}$/.test(handle)) return { id: handle, resolvedName: null };
-  const h = handle.replace(/^@/, '');
-  try {
-    const r = await fetch(`https://www.googleapis.com/youtube/v3/channels?part=snippet&forHandle=${encodeURIComponent('@' + h)}&key=${apiKey}`);
-    const d = await r.json();
-    if (d.items?.[0]) return { id: d.items[0].id, resolvedName: d.items[0].snippet.title, thumb: d.items[0].snippet.thumbnails?.default?.url };
-  } catch { /* fallthrough */ }
-  const r2 = await fetch(`https://www.googleapis.com/youtube/v3/search?part=snippet&type=channel&q=${encodeURIComponent(h)}&maxResults=1&key=${apiKey}`);
-  const d2 = await r2.json();
-  if (d2.error) throw new Error(d2.error.message);
-  const item = d2.items?.[0];
-  if (!item) throw new Error(`Channel not found: ${handle}`);
-  return { id: item.id?.channelId || item.snippet?.channelId, resolvedName: item.snippet?.channelTitle, thumb: item.snippet?.thumbnails?.default?.url };
-}
-
 // ── Hub content widgets (Habits / Holidays) — imperative HTML ──
 function escapeHtml(s) {
   return String(s == null ? '' : s)
     .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+/** Only ever emit http(s) into an href — escaping can't stop a
+ *  `javascript:` URL, it just stops the attribute being broken out of. */
+function safeUrl(u) {
+  const v = String(u == null ? '' : u).trim();
+  return /^https?:\/\//i.test(v) ? escapeHtml(v) : '#';
 }
 function fmtHabitElapsed(ms) {
   if (ms < 0) ms = 0;
@@ -393,10 +382,10 @@ export default function HubSection({ S, update, active, onOpenModal, onOpenWaitl
 
   // Right-click a hub module → toggle its background transparency.
   // syncKey re-applies after the imperative widget canvas re-renders
-  // (S.links / ytWidgets change) so the attribute isn't lost.
+  // (S.links change) so the attribute isn't lost.
   const moduleMenu = useHubModuleMenu({
     S, update,
-    syncKey: `${S.links?.length || 0}:${S.ytWidgets?.length || 0}:${active}`,
+    syncKey: `${S.links?.length || 0}:${active}`,
   });
 
   // Live habit-timer ticks for Habits hub widgets — update the timer
@@ -479,11 +468,10 @@ export default function HubSection({ S, update, active, onOpenModal, onOpenWaitl
 
   // Snap-to-fill: pack every widget into a balanced weighted-row grid
   // that uses the full canvas area. Heavier widgets (notepad, GitHub,
-  // YouTube) take proportionally more horizontal space; row heights are
+  // take proportionally more horizontal space; row heights are
   // equal. Read-only over current S — writes positions + sizes once.
   const WIDGET_WEIGHT = {
     notepad: 2.6,
-    youtube: 2.4,
     github:  2.4,
     leaderboard: 1.6,
     holidays: 1.6,
@@ -501,7 +489,6 @@ export default function HubSection({ S, update, active, onOpenModal, onOpenWaitl
       const type = l.ghUser ? 'github' : 'link';
       items.push({ id: l.id, weight: WIDGET_WEIGHT[type] });
     }
-    for (const y of (S.ytWidgets || [])) items.push({ id: y.id, weight: WIDGET_WEIGHT.youtube });
     for (const h of (S.hubWidgets || [])) items.push({ id: h.id, weight: WIDGET_WEIGHT[h.type] || 1.6 });
     // Notepad lives outside hubWidgets — included only if visible.
     if (S.notepadText || S.notepadPos || S._showNotepad) {
@@ -768,22 +755,22 @@ export default function HubSection({ S, update, active, onOpenModal, onOpenWaitl
           : (link.notes ? `<div class="link-island-body"><div class="link-island-notes">${link.notes}</div></div>` : '');
 
       island.innerHTML = `
-        <div class="widget-drag-handle" data-drag="${link.id}"><span></span></div>
+        <div class="widget-drag-handle" data-drag="${escapeHtml(link.id)}"><span></span></div>
         <div class="link-island-header">
-          <div class="link-island-icon" style="background:${c}1a;border-color:${c}55;color:${c};">${link.icon}</div>
+          <div class="link-island-icon" style="background:${escapeHtml(c)}1a;border-color:${escapeHtml(c)}55;color:${escapeHtml(c)};">${escapeHtml(link.icon)}</div>
           <div class="link-island-info">
-            <span class="link-island-name">${eyebrow}</span>
-            <span class="link-island-url">${handle}</span>
+            <span class="link-island-name">${escapeHtml(eyebrow)}</span>
+            <span class="link-island-url">${escapeHtml(handle)}</span>
           </div>
         </div>
         <div class="link-island-brand">
           <div class="link-island-brand-info">
-            <div class="link-island-brand-title">${link.name}</div>
-            <div class="link-island-brand-host">${host}</div>
+            <div class="link-island-brand-title">${escapeHtml(link.name)}</div>
+            <div class="link-island-brand-host">${escapeHtml(host)}</div>
           </div>
           <div class="link-island-actions">
-            <a class="link-open-btn" href="${link.url}" target="_blank" style="color:${c};">Open ↗</a>
-            <button class="link-del-btn" data-del-link="${link.id}">✕</button>
+            <a class="link-open-btn" href="${safeUrl(link.url)}" target="_blank" rel="noreferrer" style="color:${escapeHtml(c)};">Open ↗</a>
+            <button class="link-del-btn" data-del-link="${escapeHtml(link.id)}">✕</button>
           </div>
         </div>
         ${bodyHtml}
@@ -802,63 +789,6 @@ export default function HubSection({ S, update, active, onOpenModal, onOpenWaitl
 
       if (isGH) loadGHIsland(link, S.ghCache, update);
       else if (isLivePreset) loadLivePreviewIntoLink(link.id, link.url);
-    });
-
-    // YouTube widgets
-    (S.ytWidgets || []).forEach(yt => {
-      const wrapper = document.createElement('div');
-      wrapper.className = 'widget-wrapper' + (hasPositions ? '' : ' snapping');
-      wrapper.id = 'yt-wrapper-' + yt.id;
-      wrapper.dataset.linkId = yt.id;
-
-      if (hasPositions) {
-        const pos = S.widgetPositions[yt.id];
-        wrapper.style.cssText = `position:absolute;min-width:320px;max-width:520px;width:420px;user-select:none;left:${pos ? pos.x : 60}px;top:${pos ? pos.y : 60}px;`;
-      } else {
-        wrapper.style.cssText = 'min-width:320px;max-width:520px;width:420px;';
-      }
-
-      const island = document.createElement('div');
-      island.className = 'card link-island';
-      island.id = 'yt-island-' + yt.id;
-
-      // YouTube widget uses the shared surface; brand red is demoted to
-      // the icon chip + Open ↗ pill tint rather than flooding the card.
-      const YT_BRAND = '#cf5b52';
-      const channelCount = yt.channels ? yt.channels.length : 0;
-
-      island.innerHTML = `
-        <div class="widget-drag-handle" data-drag="${yt.id}"><span></span></div>
-        <div class="link-island-header">
-          <div class="link-island-icon" style="background:${YT_BRAND}1a;border-color:${YT_BRAND}55;color:${YT_BRAND};font-size:11px;">▶</div>
-          <div class="link-island-info">
-            <span class="link-island-name">WIDGET · YOUTUBE</span>
-            <span class="link-island-url" id="yt-sub-${yt.id}">${channelCount} CH</span>
-          </div>
-        </div>
-        <div class="link-island-brand">
-          <div class="link-island-brand-info">
-            <div class="link-island-brand-title">Subscriptions</div>
-            <div class="link-island-brand-host">youtube.com/feed/subscriptions</div>
-          </div>
-          <div class="link-island-actions">
-            <a class="link-open-btn" href="https://www.youtube.com/feed/subscriptions" target="_blank" style="color:${YT_BRAND};">Open ↗</a>
-            <button class="link-del-btn" data-del-yt="${yt.id}">✕</button>
-          </div>
-        </div>
-        <div class="link-island-body" id="yt-body-${yt.id}"><div class="yt-skeleton">${[0,1,2,3].map(() => `<div class="yt-skeleton-card"><div class="sk-thumb"></div><div class="sk-info"><div class="skeleton-line" style="width:90%;height:10px;"></div><div class="skeleton-line" style="width:55%;height:9px;margin-top:4px;"></div></div></div>`).join('')}</div></div>
-      `;
-
-      island.querySelector('[data-del-yt]')?.addEventListener('click', e => {
-        e.stopPropagation();
-        update(prev => ({ ...prev, ytWidgets: (prev.ytWidgets || []).filter(y => y.id !== yt.id) }));
-      });
-
-      wrapper.appendChild(island);
-      canvas.appendChild(wrapper);
-      makeDraggable(wrapper, yt.id);
-      makeResizable(wrapper, yt.id);
-      loadYouTubeFeed(yt);
     });
 
     // Hub content widgets (Habits / Holidays) — added via the Add-Widget
@@ -901,20 +831,20 @@ export default function HubSection({ S, update, active, onOpenModal, onOpenWaitl
       const body = meta.body();
 
       island.innerHTML = `
-        <div class="widget-drag-handle" data-drag="${hw.id}"><span></span></div>
+        <div class="widget-drag-handle" data-drag="${escapeHtml(hw.id)}"><span></span></div>
         <div class="link-island-header">
-          <div class="link-island-icon" style="background:rgba(var(--em-rgb),.10);border-color:rgba(var(--em-rgb),.32);color:var(--em);">${icon}</div>
+          <div class="link-island-icon" style="background:rgba(var(--em-rgb),.10);border-color:rgba(var(--em-rgb),.32);color:var(--em);">${escapeHtml(icon)}</div>
           <div class="link-island-info">
-            <span class="link-island-name">${eyebrow}</span>
-            <span class="link-island-url">${sub}</span>
+            <span class="link-island-name">${escapeHtml(eyebrow)}</span>
+            <span class="link-island-url">${escapeHtml(sub)}</span>
           </div>
           <div class="link-island-actions">
-            <button class="link-del-btn" data-del-hw="${hw.id}">✕</button>
+            <button class="link-del-btn" data-del-hw="${escapeHtml(hw.id)}">✕</button>
           </div>
         </div>
         <div class="link-island-brand">
           <div class="link-island-brand-info">
-            <div class="link-island-brand-title">${title}</div>
+            <div class="link-island-brand-title">${escapeHtml(title)}</div>
           </div>
         </div>
         <div class="link-island-body hub-widget-body">${body}</div>
@@ -948,7 +878,7 @@ export default function HubSection({ S, update, active, onOpenModal, onOpenWaitl
       renderNotepadInCanvas(canvas, S, update, hasPositions);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [S.links, S.ytWidgets, S.hubWidgets, S.holidays, S.habits, S.widgetPositions, S.notepadText, S.notepadPos, S.notepadWidth, S._showNotepad]);
+  }, [S.links, S.hubWidgets, S.holidays, S.habits, S.widgetPositions, S.notepadText, S.notepadPos, S.notepadWidth, S._showNotepad]);
 
   useEffect(() => {
     if (active) renderCanvas();
@@ -1102,7 +1032,6 @@ async function loadGHIsland(link, cache, update) {
   update(prev => ({ ...prev, ghCache: { ...prev.ghCache, [link.ghUser]: data } }));
 }
 
-// ── YouTube feed loader ──
 // Async fetch for the Leaderboard hub widget — friends/all-time top 5,
 // patched into the placeholder host span on mount. Read-only summary;
 // detailed views live on the dedicated Leaderboard page.
@@ -1161,76 +1090,6 @@ async function loadLeaderboardIntoWidget(hwId) {
     }).join('')}</div>`;
   } catch {
     host.textContent = 'Leaderboard unavailable.';
-  }
-}
-
-async function loadYouTubeFeed(yt) {
-  const bodyEl = document.getElementById('yt-body-' + yt.id);
-  const subEl = document.getElementById('yt-sub-' + yt.id);
-  if (!bodyEl) return;
-
-  try {
-    const resolved = await Promise.all(
-      (yt.channels || []).map(async ch => {
-        try {
-          const r = await resolveChannelId(ch, yt.apiKey);
-          return { handle: ch, id: r.id, name: r.resolvedName || ch, thumb: r.thumb || '' };
-        } catch (e) {
-          return { handle: ch, id: null, name: ch, thumb: '', error: e.message };
-        }
-      })
-    );
-
-    const valid = resolved.filter(c => c.id);
-    if (subEl) subEl.textContent = `${valid.length} channel${valid.length !== 1 ? 's' : ''}`;
-    if (!valid.length) {
-      bodyEl.innerHTML = `<div class="yt-error">⚠ No channels could be resolved.</div>`;
-      return;
-    }
-
-    bodyEl.innerHTML = `<div class="yt-skeleton">${[0,1,2,3].map(() => `<div class="yt-skeleton-card"><div class="sk-thumb"></div><div class="sk-info"><div class="skeleton-line" style="width:90%;height:11px;border-radius:4px;"></div><div class="skeleton-line" style="width:60%;height:10px;margin-top:5px;border-radius:4px;"></div></div></div>`).join('')}</div>`;
-    const allVideos = [];
-    await Promise.all(valid.map(async ch => {
-      try {
-        const r = await fetch(`https://www.googleapis.com/youtube/v3/search?part=snippet&channelId=${ch.id}&type=video&order=date&maxResults=5&key=${yt.apiKey}`);
-        const d = await r.json();
-        if (d.error) return;
-        (d.items || []).forEach(v => {
-          allVideos.push({
-            videoId: v.id.videoId,
-            title: v.snippet.title,
-            channel: ch.name || v.snippet.channelTitle,
-            thumb: ch.thumb,
-            vidThumb: v.snippet.thumbnails?.medium?.url || v.snippet.thumbnails?.default?.url || '',
-            published: new Date(v.snippet.publishedAt),
-            pubRelative: timeAgo(new Date(v.snippet.publishedAt)),
-          });
-        });
-      } catch { /* skip */ }
-    }));
-
-    allVideos.sort((a, b) => b.published - a.published);
-
-    if (!allVideos.length) {
-      bodyEl.innerHTML = `<div class="yt-loading">No recent videos found.</div>`;
-      return;
-    }
-
-    const rows = allVideos.map(v => `
-      <a class="yt-video-card" href="https://www.youtube.com/watch?v=${v.videoId}" target="_blank">
-        <img class="yt-thumb" src="${v.vidThumb}" alt="" loading="lazy">
-        <div class="yt-video-info">
-          <div class="yt-video-title">${v.title}</div>
-          <div style="display:flex;align-items:center;gap:6px;">
-            ${v.thumb ? `<img src="${v.thumb}" style="width:12px;height:12px;border-radius:50%;flex-shrink:0;" alt="">` : ''}
-            <span class="yt-video-channel">${v.channel} · ${v.pubRelative}</span>
-          </div>
-        </div>
-      </a>`).join('');
-
-    bodyEl.innerHTML = `<div class="yt-video-list">${rows}</div>`;
-  } catch (err) {
-    bodyEl.innerHTML = `<div class="yt-error">⚠ ${err.message}</div>`;
   }
 }
 

@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { buildSnapshot } from '../lib/coach/snapshot';
 import { heuristicBrief } from '../lib/coach/heuristicBrief';
+import { authFetch } from '../lib/authFetch';
 
 /**
  * Fetch the AI Coach daily brief once per UTC day per user, with the
@@ -50,7 +51,7 @@ export function useDailyBrief({ S, update, isPro }) {
     setError(null);
     try {
       const snapshot = buildSnapshot(S);
-      const res = await fetch('/.netlify/functions/ai-coach-daily', {
+      const res = await authFetch('/.netlify/functions/ai-coach-daily', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ snapshot }),

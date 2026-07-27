@@ -534,7 +534,7 @@ export default function HubOsLayout({
   // Right-click any panel → toggle its background transparency.
   const moduleMenu = useHubModuleMenu({
     S, update,
-    syncKey: `${S.links?.length || 0}:${S.ytWidgets?.length || 0}`,
+    syncKey: `${S.links?.length || 0}`,
   });
 
   return (

@@ -26,6 +26,7 @@
  * and a missing price is normal rather than an error.
  */
 const { fetchWithTimeout, isBlockedHost, extractProductInfo, priceToNumber } = require('../lib/productPage');
+const { requireUser, underLimit, tooMany } = require('../lib/requireUser');
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
@@ -83,8 +84,14 @@ async function checkOne(url) {
 exports.handler = async (event) => {
   if (event.httpMethod === 'OPTIONS') return { statusCode: 204, headers: CORS, body: '' };
   if (event.httpMethod !== 'POST') {
+
     return { statusCode: 405, headers: CORS, body: JSON.stringify({ error: 'method not allowed' }) };
   }
+
+  // Costs money / fetches on the user's behalf — each call fans out to up to 8 retailer pages.
+  const auth = await requireUser(event, CORS);
+  if (auth.error) return auth.error;
+  if (!underLimit('price', auth.userId, 10)) return tooMany(CORS);
 
   const ip = (event.headers?.['x-nf-client-connection-ip']
     || (event.headers?.['x-forwarded-for'] || '').split(',')[0] || 'anon').trim();
