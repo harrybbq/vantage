@@ -105,8 +105,11 @@ export default function FoodSearch({ onSelectFood, onClose, onOpenModal, savedMe
       const res = await searchByName(q);
       if (res.length === 0) setError('No results found. Try a different search or add manually.');
       setResults(res);
-    } catch {
-      setError('Search failed — check your connection.');
+    } catch (e) {
+      // Surface what actually went wrong. The old blanket "check your
+      // connection" hid 401s, rate limits and upstream timeouts behind
+      // the one message that was almost never the real cause.
+      setError(e?.message ? `Search failed — ${e.message}` : 'Search failed — check your connection.');
     }
     setLoading(false);
   }
