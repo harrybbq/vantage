@@ -11,6 +11,7 @@ import { getOwnProfile, updateOwnProfile } from '../lib/friends/queries';
 import { VISIONS_BY_ID } from '../lib/visions/definitions';
 import Icon from './Icon';
 import TravelPolicyCard from './holiday/TravelPolicyCard';
+import { authFetch } from '../lib/authFetch';
 import { bankingStatus, beginConnect } from '../lib/banking/enableBanking';
 
 // Small helper: inline icon + label for the Tools/Data action buttons.
@@ -610,11 +611,25 @@ export default function SettingsSection({ S, update, active, userId, onOpenLegal
   }
 
   async function handleDeleteAccount() {
-    if (!window.confirm('This will permanently delete all your data and sign you out. This cannot be undone.')) return;
+    if (!window.confirm('This will permanently delete your account and everything in it. This cannot be undone.')) return;
     if (!window.confirm('Are you absolutely sure? Press OK to confirm deletion.')) return;
     setDeleting(true);
     try {
-      await supabase.from('user_data').delete().eq('id', userId);
+      // Goes through a server function because deleting the ACCOUNT (not
+      // merely its data) needs the service role. The old flow removed
+      // the user_data row and signed out, which left auth.users,
+      // profiles, friendships and push_tokens behind — the account still
+      // existed, which fails App Store 5.1.1(v) and is an incomplete
+      // erasure under UK GDPR. Deleting the auth user cascades the rest.
+      const res = await authFetch('/.netlify/functions/delete-account', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ confirm: 'DELETE' }),
+      });
+      const out = await res.json().catch(() => ({}));
+      if (!res.ok || !out.ok) throw new Error(out.error || 'Deletion failed.');
+      // Only sign out once the server confirms — otherwise the user is
+      // logged out believing they're deleted when they aren't.
       await supabase.auth.signOut();
     } catch (e) {
       alert('Error: ' + (e.message || 'Something went wrong.'));

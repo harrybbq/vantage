@@ -10,6 +10,7 @@
  * `priceCheckedAt` and `price` to an item that has a URL. Items with no
  * URL, and every other field, are returned untouched.
  */
+import { authFetch } from '../authFetch';
 
 const CHECK_INTERVAL_MS = 20 * 60 * 60 * 1000; // ~daily, but tolerant
 const MAX_PER_SWEEP = 8;                        // matches the function's cap
@@ -121,7 +122,7 @@ export async function sweepPrices(items) {
   const due = itemsDueCheck(items);
   if (!due.length) return items;
   try {
-    const res = await fetch('/.netlify/functions/shop-price-check', {
+    const res = await authFetch('/.netlify/functions/shop-price-check', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ urls: due.map(i => i.url) }),

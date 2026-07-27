@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import Icon from '../Icon';
 import { lookupCity } from '../../data/cities';
+import { authFetch } from '../../lib/authFetch';
 import { countryForText, COUNTRY_BY_ISO } from '../../lib/holiday/destinations';
 
 /**
@@ -47,7 +48,7 @@ export default function DestinationPanel({ dest, from, home = 'GBP', compact = f
     if (city) { params.set('lat', String(city.lat)); params.set('lon', String(city.lon)); params.set('cur', city.cur); }
     else if (country?.cur) params.set('cur', country.cur);
 
-    fetch(`/.netlify/functions/destination-brief?${params}`)
+    authFetch(`/.netlify/functions/destination-brief?${params}`)
       .then(r => r.json())
       .then(j => { if (alive) { setBrief(j && !j.error ? j : null); setState('done'); } })
       .catch(() => { if (alive) { setBrief(null); setState('done'); } });

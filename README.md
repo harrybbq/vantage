@@ -49,7 +49,7 @@ The `public/_headers` file configures MIME types and security headers.
 
 ### App configuration
 
-- **App ID:** `com.visionboard.app`
+- **App ID:** `com.vantage.app`
 - **App Name:** `Vantage`
 - **Config file:** `capacitor.config.ts`
 
@@ -112,7 +112,7 @@ They no-op gracefully when the app runs in a browser.
 ### Push notification setup
 
 **Android (FCM)**
-1. Create a Firebase project → add Android app with `com.visionboard.app`
+1. Create a Firebase project → add Android app with `com.vantage.app`
 2. Download `google-services.json` → place in `android/app/`
 3. Enable Firebase Cloud Messaging in the Firebase console
 

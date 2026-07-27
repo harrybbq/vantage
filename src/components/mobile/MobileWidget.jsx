@@ -65,7 +65,7 @@ const BASE_WIDGET_META = {
   },
   // F4 Sprint 4 — mobile parity for the desktop hub widgets.
   // These are read-only summaries of what the user has configured on
-  // desktop (S.links, S.ghCache, S.ytWidgets). No new API calls fire
+  // desktop (S.links, S.ghCache). No new API calls fire
   // from mobile so they can't introduce a fresh failure mode.
   'github': {
     label: 'GitHub',
@@ -78,12 +78,6 @@ const BASE_WIDGET_META = {
     eyebrow: 'LINK',
     icon: 'in',
     accent: '#4d9ec4',
-  },
-  'youtube': {
-    label: 'YouTube',
-    eyebrow: 'YOUTUBE',
-    icon: '▶',
-    accent: '#cf5b52',
   },
   // Vitals — manual daily log (weight / sleep / resting HR). Started
   // life as a HealthKit stub; reworked to manual entry so it works on
@@ -154,7 +148,7 @@ export default function MobileWidget({ widget, S, update, onRemove, navigate, us
   const meta = WIDGET_META[widget.type] || { label: widget.type, eyebrow: '?', icon: '·' };
 
   // Brand-tinted icon chip when the type carries an `accent` (the new
-  // GitHub / LinkedIn / YouTube widgets). Falls back to the default
+  // GitHub / LinkedIn widgets). Falls back to the default
   // em-accent for the original three.
   const chipStyle = meta.accent ? {
     color: meta.accent,
@@ -421,7 +415,6 @@ function renderBody(widget, meta, S, update, navigate, userId) {
     case 'holidays':    return <HolidaysBody S={S} navigate={navigate} />;
     case 'github':      return <GithubBody S={S} meta={meta} />;
     case 'linkedin':    return <LinkedinBody S={S} meta={meta} />;
-    case 'youtube':     return <YoutubeBody S={S} meta={meta} />;
     case 'vitals':      return <VitalsBody S={S} update={update} />;
     case 'calories':    return <BurnBody S={S} update={update} userId={userId} />;
     case 'macros':      return <MacrosBody S={S} userId={userId} navigate={navigate} />;
@@ -1102,32 +1095,6 @@ function LinkedinBody({ S, meta }) {
       openHref={link.url}
       accent={meta.accent}
       info={link.notes ? <div className="m-widget-brand-note">{link.notes}</div> : null}
-    />
-  );
-}
-
-function YoutubeBody({ S, meta }) {
-  const yt = (S.ytWidgets || [])[0];
-  if (!yt) {
-    return (
-      <div className="m-widget-empty">
-        Add a YouTube widget on the desktop hub to surface subscriptions here.
-      </div>
-    );
-  }
-  const channelCount = (yt.channels || []).length;
-  return (
-    <BrandCard
-      title="Subscriptions"
-      host={`${channelCount} channel${channelCount === 1 ? '' : 's'} tracked`}
-      openHref="https://www.youtube.com/feed/subscriptions"
-      accent={meta.accent}
-      info={channelCount > 0 ? (
-        <div className="m-widget-brand-note">
-          {(yt.channels || []).slice(0, 4).map(ch => '@' + String(ch).replace(/^@/, '')).join(' · ')}
-          {channelCount > 4 && ` · +${channelCount - 4}`}
-        </div>
-      ) : null}
     />
   );
 }

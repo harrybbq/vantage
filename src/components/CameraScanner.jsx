@@ -1,4 +1,5 @@
 import { useRef, useEffect, useState, forwardRef, useImperativeHandle } from 'react';
+import { authFetch } from '../lib/authFetch';
 
 /**
  * CameraScanner — camera viewfinder for product-code scanning.
@@ -353,7 +354,7 @@ const CameraScanner = forwardRef(function CameraScanner({ onBarcode, onAIResult,
       canvas.getContext('2d').drawImage(video, 0, 0);
       const base64 = canvas.toDataURL('image/jpeg', 0.6).split(',')[1];
 
-      const res = await fetch('/.netlify/functions/ai-food-detect', {
+      const res = await authFetch('/.netlify/functions/ai-food-detect', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ imageBase64: base64 }),

@@ -32,9 +32,11 @@ function checkRateLimit(ip) {
   return entry.count <= RATE_LIMIT;
 }
 
+const { requireUser, underLimit, tooMany } = require('../lib/requireUser');
+
 const CORS = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'Content-Type',
+  'Access-Control-Allow-Headers': 'Content-Type, Authorization',
   'Content-Type': 'application/json',
 };
 
@@ -70,8 +72,14 @@ exports.handler = async (event) => {
     return { statusCode: 204, headers: CORS, body: '' };
   }
   if (event.httpMethod !== 'POST') {
+
     return { statusCode: 405, headers: CORS, body: JSON.stringify({ error: 'Method not allowed' }) };
   }
+
+  // Costs money / fetches on the user's behalf — vision tokens are the priciest call in the app.
+  const auth = await requireUser(event, CORS);
+  if (auth.error) return auth.error;
+  if (!underLimit('ai-food', auth.userId, 8)) return tooMany(CORS);
 
   const ip = event.headers['x-forwarded-for'] || 'unknown';
   if (!checkRateLimit(ip)) {

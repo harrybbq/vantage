@@ -10,6 +10,8 @@
  */
 
 import { useEffect, useState } from 'react';
+import { useSubscriptionContext } from '../context/SubscriptionContext';
+import { storeSubscriptionsUrl } from '../lib/billing/manageSubscription';
 import { motion } from 'framer-motion';
 import AiCoachWidget from './AiCoachWidget';
 import CoachBriefPanel from './CoachBriefPanel';
@@ -64,8 +66,48 @@ function dayOfYear(d = new Date()) {
   return Math.floor((d - start) / 86400000);
 }
 
+/**
+ * Plan row at the foot of the Operator panel.
+ *
+ * Deliberately does NOT change the tier itself. `profiles.tier` is
+ * server-owned (see supabase/profiles_column_lockdown.sql) — the client
+ * literally cannot write it, which is what stops anyone granting
+ * themselves Pro. So this routes to the two places that legitimately
+ * change a plan: the paywall for buying, and the store's own
+ * subscription screen for changing or cancelling one.
+ *
+ * Lifetime is a grant, never a purchase, so it shows as a terminal
+ * state with nothing to manage.
+ */
+function OsPlanRow({ onUpgrade }) {
+  const { tier, isPro, isLifetime, proPlan, proIsLive, loading } = useSubscriptionContext();
+  if (loading) return null;
+
+  const label = isLifetime ? 'Lifetime' : isPro ? `Pro${proPlan ? ' · ' + proPlan : ''}` : 'Free';
+  const storeUrl = storeSubscriptionsUrl();
+
+  return (
+    <div className="os-plan-row">
+      <span className="os-plan-label">Plan</span>
+      <span className={`os-plan-tier os-plan-tier-${isLifetime ? 'lifetime' : isPro ? 'pro' : 'free'}`}>
+        {label}
+      </span>
+      {isLifetime ? (
+        // Nothing to manage — it never renews and can't lapse.
+        <span className="os-plan-note">Granted · never expires</span>
+      ) : isPro ? (
+        <a className="os-plan-action" href={storeUrl} target="_blank" rel="noreferrer">Manage ↗</a>
+      ) : proIsLive ? (
+        <button type="button" className="os-plan-action is-cta" onClick={onUpgrade}>Upgrade</button>
+      ) : (
+        <span className="os-plan-note">Pro coming soon</span>
+      )}
+    </div>
+  );
+}
+
 // ── Panel: Profile ────────────────────────────────────────────────────────
-export function OsProfilePanel({ profile, handle, onSaveName, onSaveTagline, onUploadPhoto }) {
+export function OsProfilePanel({ profile, handle, onSaveName, onSaveTagline, onUploadPhoto, onUpgrade }) {
   const tier = 'Focus'; // TODO: wire to a real status/DND toggle later
   return (
     <OsPanel label="Operator" right="Online" innerPadding={false}>
@@ -103,6 +145,7 @@ export function OsProfilePanel({ profile, handle, onSaveName, onSaveTagline, onU
           </div>
         </div>
       </div>
+      <OsPlanRow onUpgrade={onUpgrade} />
     </OsPanel>
   );
 }
@@ -534,7 +577,7 @@ export default function HubOsLayout({
   // Right-click any panel → toggle its background transparency.
   const moduleMenu = useHubModuleMenu({
     S, update,
-    syncKey: `${S.links?.length || 0}:${S.ytWidgets?.length || 0}`,
+    syncKey: `${S.links?.length || 0}`,
   });
 
   return (
@@ -547,6 +590,7 @@ export default function HubOsLayout({
           onSaveName={name => update(prev => ({ ...prev, profile: { ...prev.profile, name } }))}
           onSaveTagline={tagline => update(prev => ({ ...prev, profile: { ...prev.profile, tagline } }))}
           onUploadPhoto={onUploadPhoto}
+          onUpgrade={onUpgrade}
         />
         <OsSessionPanel name={profile.name} trackers={S.trackers} logs={S.logs} />
         <OsVitalsPanel

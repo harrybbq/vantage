@@ -26,9 +26,11 @@
  * Returns { place, lat, lon, climate: { tempC, tempMinC, rainDays }, fx: { from, to, rate } }
  * Any part that fails is simply omitted — the client renders what it gets.
  */
+const { requireUser, underLimit, tooMany } = require('../lib/requireUser');
+
 const CORS = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'Content-Type',
+  'Access-Control-Allow-Headers': 'Content-Type, Authorization',
   'Content-Type': 'application/json',
   'Cache-Control': 'public, max-age=3600',
 };
@@ -130,8 +132,14 @@ const CUR_RE = /^[A-Z]{3}$/;
 exports.handler = async (event) => {
   if (event.httpMethod === 'OPTIONS') return { statusCode: 204, headers: CORS, body: '' };
   if (event.httpMethod !== 'GET') {
+
     return { statusCode: 405, headers: CORS, body: JSON.stringify({ error: 'method not allowed' }) };
   }
+
+  // Costs money / fetches on the user's behalf — cheap, but still a proxy.
+  const auth = await requireUser(event, CORS);
+  if (auth.error) return auth.error;
+  if (!underLimit('dest', auth.userId, 30)) return tooMany(CORS);
 
   const q = event.queryStringParameters || {};
   const place = (q.place || '').slice(0, 120).trim();

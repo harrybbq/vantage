@@ -11,6 +11,7 @@
  * be undefined. Callers should render whatever's there and fall back
  * gracefully when nothing came back.
  */
+import { authFetch } from './authFetch';
 const TTL_MS = 24 * 60 * 60 * 1000;
 const STORAGE_PREFIX = 'vb4_appPreview:';
 // In-flight de-dupe — multiple widgets pointing at the same URL only
@@ -48,7 +49,7 @@ export async function fetchAppPreview(url) {
 
   const p = (async () => {
     try {
-      const res = await fetch('/.netlify/functions/shop-autofill', {
+      const res = await authFetch('/.netlify/functions/shop-autofill', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ url }),

@@ -55,9 +55,14 @@ export function useSubscription(userId) {
 
       let dbTier = 'free';
       if (!profileResult.data) {
+        // Insert the id ONLY. `tier` is server-owned — the column grant
+        // in supabase/profiles_column_lockdown.sql withholds it from
+        // the client, so naming it here would make first login fail
+        // with "permission denied for column tier". The column default
+        // is 'free', which is what we wanted anyway.
         await supabase
           .from('profiles')
-          .insert({ id: userId, tier: 'free' })
+          .insert({ id: userId })
           .single();
       } else {
         dbTier = profileResult.data.tier || 'free';

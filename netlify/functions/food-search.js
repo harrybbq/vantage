@@ -25,9 +25,11 @@ const OFF = 'https://world.openfoodfacts.org';
 const OFF_SEARCH = 'https://search.openfoodfacts.org';
 const UA = 'Vantage/1.0 (https://soft-phoenix-b512b8.netlify.app)';
 
+const { requireUser, underLimit, tooMany } = require('../lib/requireUser');
+
 const CORS = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'Content-Type',
+  'Access-Control-Allow-Headers': 'Content-Type, Authorization',
   'Content-Type': 'application/json',
 };
 
@@ -131,10 +133,13 @@ async function searchByBarcode(code) {
 exports.handler = async (event) => {
   if (event.httpMethod === 'OPTIONS') return { statusCode: 204, headers: CORS, body: '' };
 
-  const ip = event.headers['x-forwarded-for'] || 'unknown';
-  if (!checkRate(ip)) {
-    return { statusCode: 429, headers: CORS, body: JSON.stringify({ error: 'Too many requests' }) };
-  }
+  // Type-ahead against a third-party food API — gated so the quota
+  // can't be drained by anyone who finds the URL. Limit keys on the
+  // account, since an IP is the one thing an abuser can rotate freely.
+  const auth = await requireUser(event, CORS);
+  if (auth.error) return auth.error;
+  if (!underLimit('food', auth.userId, 40)) return tooMany(CORS);
+
 
   const { mode = 'name', q = '' } = event.queryStringParameters || {};
   if (!q.trim()) {
