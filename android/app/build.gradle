@@ -4,7 +4,7 @@ android {
     namespace "com.visionboard.app"
     compileSdk rootProject.ext.compileSdkVersion
     defaultConfig {
-        applicationId "com.visionboard.app"
+        applicationId "com.vantage.app"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode 1

@@ -1,7 +1,7 @@
 <?xml version='1.0' encoding='utf-8'?>
 <resources>
-    <string name="app_name">Vision Board</string>
-    <string name="title_activity_main">Vision Board</string>
-    <string name="package_name">com.visionboard.app</string>
-    <string name="custom_url_scheme">com.visionboard.app</string>
+    <string name="app_name">Vantage</string>
+    <string name="title_activity_main">Vantage</string>
+    <string name="package_name">com.vantage.app</string>
+    <string name="custom_url_scheme">com.vantage.app</string>
 </resources>

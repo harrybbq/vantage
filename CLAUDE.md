@@ -21,5 +21,12 @@ Build → verify → commit → push → create PR (`harrybbq/visionboardreal`, 
 - Social: `profiles`/`friendships`/`messages`/`blocks`/`reports` tables, RLS-gated direct queries in `src/lib/friends/`. Report+block UI exists (friend card + DM ⋯ menu).
 - Legal: `/privacy` and `/terms` deep-link pre-auth (store requirement). Tutorial: `TutorialOverlay.jsx`; per-page help: `SectionHelp`.
 
+## Startup / store readiness
+`STARTUP_REQUIREMENTS.md` is the ordered checklist for getting Vantage
+onto the App Store and Google Play — company formation, developer
+accounts, native build steps, and the security/scale work that has to
+land first. Update its status markers as things get done; it is the
+single source of truth for "what's left before launch".
+
 ## Next project: Vantage Home
 A new dashboard surface styled like a Home Assistant wall panel (owner has a reference screenshot — ask for it): dense dark tile grid, at-a-glance stats with mini graphs/gauges, header chips, right rail with day recap + forecast-style rows + media-player-style card. Reimagines the hub's widgets (vitals, macros, body, mood, savings, subscriptions, weather?, calendar?) as compact tiles. Keep it OPTIONAL alongside the existing hub, reuse existing widget bodies/stores where possible, respect the existing theme system (`SettingsSection` SCHEMES) and Pro gating conventions.

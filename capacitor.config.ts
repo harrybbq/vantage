@@ -1,7 +1,11 @@
 import type { CapacitorConfig } from '@capacitor/cli';
 
 const config: CapacitorConfig = {
-  appId: 'com.visionboard.app',
+  // PERMANENT. A bundle id cannot be changed once the app has shipped
+  // to either store — it is the app's identity there forever. Was
+  // com.visionboard.app, which predated the Vantage name; changed
+  // before first submission because after that it is immutable.
+  appId: 'com.vantage.app',
   appName: 'Vantage',
   webDir: 'dist',
 
