@@ -12,8 +12,7 @@
 -- makes this file the only way to hand out lifetime. The SQL Editor
 -- runs as service_role, which the lockdown deliberately left alone.
 --
--- ── EDIT THIS before running ─────────────────────────────────
--- Aidan's address is a placeholder; put the address he signs in with.
+-- ── Before running ───────────────────────────────────────────
 -- Both accounts must have signed in at least once, or there is no
 -- auth.users row to match and the update quietly affects 0 rows (the
 -- verification query at the bottom will show that).
@@ -21,7 +20,7 @@
 with grantees(email) as (
   values
     ('harrym3002@outlook.com'),
-    ('aidan@example.com')          -- <<< REPLACE
+    ('anotherone650@gmail.com')        
 )
 update public.profiles p
 set tier = 'lifetime',
@@ -38,7 +37,7 @@ where p.id = u.id
 select u.email, p.tier, p.tier_updated_at
 from public.profiles p
 join auth.users u on u.id = p.id
-where lower(u.email) in ('harrym3002@outlook.com', 'aidan@example.com');  -- <<< REPLACE
+where lower(u.email) in ('harrym3002@outlook.com', 'anotherone650@gmail.com');
 
 -- ── Note on RevenueCat ───────────────────────────────────────
 -- These grants live only in profiles.tier, which useSubscription
