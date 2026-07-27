@@ -31,6 +31,17 @@ import { getOfferings, purchasePackage, isAvailable as rcIsAvailable } from '../
 // preference so Lifetime is always last (one-time, biggest commitment),
 // Yearly first (best value, headline), Monthly between.
 const PACKAGE_ORDER = ['$rc_annual', '$rc_monthly', '$rc_lifetime'];
+
+// Lifetime is NOT sold. It exists only as a grant (founder / early
+// supporter), applied server-side straight to profiles.tier. If a
+// lifetime SKU is ever left enabled in the RevenueCat dashboard it
+// would otherwise show up here and be buyable, so it's filtered out of
+// the paywall explicitly rather than relying on dashboard config.
+//
+// The ENTITLEMENT mapping in lib/billing/revenuecat.js is deliberately
+// left intact: anyone already holding lifetime keeps resolving to the
+// lifetime tier.
+const UNSELLABLE = new Set(['$rc_lifetime']);
 const PACKAGE_META = {
   $rc_lifetime: { label: 'Lifetime',  sub: 'One payment. Yours forever.', accent: 'gold' },
   $rc_annual:   { label: 'Yearly',    sub: 'Best value — save vs monthly.', accent: 'em', badge: 'Best value' },
@@ -99,7 +110,7 @@ export default function PaywallModal({ openId, onClose, onUpgrade, onShowToast }
   }
 
   // Decide what to render in the actions area
-  const packages = offerings?.availablePackages || [];
+  const packages = (offerings?.availablePackages || []).filter(p => !UNSELLABLE.has(p.identifier));
   const hasPackages = packages.length > 0;
   const useStorefront = isOpen && proIsLive && hasPackages && !hasPro;
   const sortedPackages = hasPackages ? [...packages].sort((a, b) => packageWeight(a) - packageWeight(b)) : [];
