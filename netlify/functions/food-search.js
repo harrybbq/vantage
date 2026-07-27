@@ -76,6 +76,7 @@ function mapProduct(p) {
     food_name: p.product_name || p.abbreviated_product_name || '',
     brand:     p.brands || '',
     barcode:   p.code || p._id || '',
+    image:     p.image_front_small_url || p.image_small_url || '',
     serving_g: parseFloat(p.serving_quantity) || 100,
     serving_unit: servingUnit(p),
     calories:  per100('energy-kcal'),
@@ -89,34 +90,76 @@ function mapProduct(p) {
   };
 }
 
-// Drop entries with no name or no energy value — a result card that
-// reads "0 kcal P 0g C 0g F 0g" is worse than fewer results.
+// A result needs a name to be worth showing. Zero-calorie entries used
+// to be dropped entirely, which quietly made water, diet drinks and
+// black coffee unsearchable — they're real foods people log. They're
+// kept now and simply ranked last, so they never crowd out real hits.
 function usable(prod) {
-  return prod.food_name && prod.calories > 0;
+  return !!prod.food_name;
 }
 
-const FIELDS = 'product_name,brands,code,nutriments,serving_quantity';
-
-async function searchByName(q) {
-  // Primary: Search-a-licious (relevance-ranked, fast).
-  try {
-    const params = new URLSearchParams({ q, page_size: '15', fields: FIELDS });
-    const json = await fetchJson(`${OFF_SEARCH}/search?${params}`);
-    const hits = (json.hits || []).map(mapProduct).filter(usable);
-    if (hits.length) return hits;
-  } catch { /* fall through to legacy */ }
-
-  // Fallback: legacy CGI search, popularity-sorted so household brands
-  // beat obscure entries.
-  const params = new URLSearchParams({
-    action: 'process', json: '1',
-    search_terms: q,
-    page_size: '15',
-    sort_by: 'unique_scans_n',
-    fields: FIELDS,
+/** Merge sources, drop duplicates, put substantive results first. */
+function mergeResults(lists, q) {
+  const seen = new Set();
+  const out = [];
+  for (const list of lists) {
+    for (const p of list) {
+      // Barcode is the real identity; fall back to name+brand for
+      // entries that don't carry one.
+      const key = (p.barcode || `${p.food_name}|${p.brand}`).toLowerCase();
+      if (seen.has(key)) continue;
+      seen.add(key);
+      out.push(p);
+    }
+  }
+  const term = (q || '').toLowerCase();
+  return out.sort((a, b) => {
+    // Exact-ish name matches first, then anything with calories, then
+    // the rest. Stable enough to feel predictable while typing.
+    const aExact = a.food_name.toLowerCase().startsWith(term) ? 0 : 1;
+    const bExact = b.food_name.toLowerCase().startsWith(term) ? 0 : 1;
+    if (aExact !== bExact) return aExact - bExact;
+    const aHas = a.calories > 0 ? 0 : 1;
+    const bHas = b.calories > 0 ? 0 : 1;
+    return aHas - bHas;
   });
-  const json = await fetchJson(`${OFF}/cgi/search.pl?${params}`);
-  return (json.products || []).map(mapProduct).filter(usable);
+}
+
+// image_small_url gives the packaging shot, which is the closest thing
+// to a brand mark that Open Food Facts actually holds.
+const FIELDS = 'product_name,brands,code,nutriments,serving_quantity,serving_quantity_unit,quantity,categories,image_small_url,image_front_small_url';
+const PAGE_SIZE = 40;
+
+async function searchByName(q, page = 1) {
+  // Both endpoints, in parallel, merged. They rank differently —
+  // Search-a-licious by relevance, the legacy CGI by scan popularity —
+  // so running only one (the old fallback-on-failure behaviour) meant
+  // whole classes of result were never reachable. Whichever fails just
+  // contributes nothing.
+  const relevance = (async () => {
+    const params = new URLSearchParams({
+      q, page_size: String(PAGE_SIZE), page: String(page), fields: FIELDS,
+    });
+    const json = await fetchJson(`${OFF_SEARCH}/search?${params}`);
+    return (json.hits || []).map(mapProduct).filter(usable);
+  })();
+
+  const popularity = (async () => {
+    const params = new URLSearchParams({
+      action: 'process', json: '1',
+      search_terms: q,
+      page_size: String(PAGE_SIZE),
+      page: String(page),
+      sort_by: 'unique_scans_n',
+      fields: FIELDS,
+    });
+    const json = await fetchJson(`${OFF}/cgi/search.pl?${params}`);
+    return (json.products || []).map(mapProduct).filter(usable);
+  })();
+
+  const settled = await Promise.allSettled([relevance, popularity]);
+  const lists = settled.filter(r => r.status === 'fulfilled').map(r => r.value);
+  return mergeResults(lists, q);
 }
 
 async function searchByBarcode(code) {
@@ -141,7 +184,8 @@ exports.handler = async (event) => {
   if (!underLimit('food', auth.userId, 40)) return tooMany(CORS);
 
 
-  const { mode = 'name', q = '' } = event.queryStringParameters || {};
+  const { mode = 'name', q = '', page = '1' } = event.queryStringParameters || {};
+  const pageNum = Math.min(10, Math.max(1, parseInt(page, 10) || 1));
   if (!q.trim()) {
     return { statusCode: 400, headers: CORS, body: JSON.stringify({ error: 'q is required' }) };
   }
@@ -149,8 +193,12 @@ exports.handler = async (event) => {
   try {
     const products = mode === 'barcode'
       ? await searchByBarcode(q.trim())
-      : await searchByName(q.trim());
-    return { statusCode: 200, headers: CORS, body: JSON.stringify({ products }) };
+      : await searchByName(q.trim(), pageNum);
+    // `hasMore` lets the client offer "Load more" without guessing.
+    return {
+      statusCode: 200, headers: CORS,
+      body: JSON.stringify({ products, page: pageNum, hasMore: mode !== 'barcode' && products.length >= PAGE_SIZE }),
+    };
   } catch (err) {
     console.error('food-search error:', err.message);
     return { statusCode: 502, headers: CORS, body: JSON.stringify({ error: 'Food search failed' }) };
