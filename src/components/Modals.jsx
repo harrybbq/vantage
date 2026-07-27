@@ -1056,6 +1056,42 @@ function AddCategoryModal({ openId, onClose, onAdd }) {
   );
 }
 
+// ── Coin History ──
+function CoinHistoryModal({ openId, onClose, coins, coinHistory }) {
+  return (
+    <Modal id="coinHistoryModal" openId={openId} onClose={onClose} style={{ maxWidth: '420px' }}>
+      <h3>⬡ Coin Wallet</h3>
+      <div style={{ textAlign: 'center', padding: '16px 0 8px' }}>
+        <div style={{ fontFamily: 'var(--mono)', fontSize: '42px', fontWeight: 700, color: 'var(--gold)' }}>{coins}</div>
+        <div style={{ fontFamily: 'var(--mono)', fontSize: '11px', color: 'var(--text-muted)', letterSpacing: '2px', textTransform: 'uppercase', marginTop: '4px' }}>Available Coins</div>
+      </div>
+      <div style={{ fontFamily: 'var(--mono)', fontSize: '10px', color: 'var(--text-muted)', letterSpacing: '1.5px', textTransform: 'uppercase', marginTop: '8px' }}>History</div>
+      <div className="coin-history-list">
+        {(!coinHistory || coinHistory.length === 0)
+          ? <div style={{ textAlign: 'center', fontFamily: 'var(--mono)', fontSize: '12px', color: 'var(--text-muted)', padding: '20px' }}>No transactions yet — complete achievements to earn coins!</div>
+          : coinHistory.slice(0, 30).map((h, i) => {
+            const pos = h.amount > 0;
+            const label = h.type === 'earn' ? '⬡ Earned — ' : h.type === 'spend' ? '⬡ Spent on ' : '⬡ Refund — ';
+            const ts = new Date(h.ts).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
+            return (
+              <div key={i} className="coin-hist-row">
+                <div>
+                  <div className="coin-hist-label">{label}{h.label}</div>
+                  <div style={{ fontFamily: 'var(--mono)', fontSize: '10px', color: 'var(--text-muted)' }}>{ts}</div>
+                </div>
+                <div className={`coin-hist-amount ${pos ? 'pos' : 'neg'}`}>{pos ? '+' : ''}{h.amount}</div>
+              </div>
+            );
+          })
+        }
+      </div>
+      <div className="modal-actions" style={{ marginTop: '16px' }}>
+        <button className="btn btn-ghost" onClick={() => onClose('coinHistoryModal')}>Close</button>
+      </div>
+    </Modal>
+  );
+}
+
 // ── Add Holiday ──
 function AddHolidayModal({ openId, onClose, onAdd, S }) {
   const [form, setForm] = useState(emptyHolidayForm);
