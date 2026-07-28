@@ -85,12 +85,36 @@ function servingUnit(p) {
   return 'g';
 }
 
+/**
+ * Coerce an upstream field to text.
+ *
+ * Open Food Facts' two endpoints disagree on shape: the legacy CGI
+ * returns `brands` as a comma-separated STRING, Search-a-licious
+ * returns it as an ARRAY. Federating the two meant array brands reached
+ * a scorer that assumed strings, and `(p.brand || '').toLowerCase()`
+ * threw — because `||` passes a truthy array straight through untouched.
+ *
+ * Some responses also carry localised objects ({ en: "..." }), so those
+ * are handled too. Depth-limited so a self-referencing object can't spin.
+ */
+function toText(v, depth = 0) {
+  if (v == null || depth > 3) return '';
+  if (typeof v === 'string') return v;
+  if (typeof v === 'number' || typeof v === 'boolean') return String(v);
+  if (Array.isArray(v)) return v.map(x => toText(x, depth + 1)).filter(Boolean).join(', ');
+  if (typeof v === 'object') {
+    const first = v.en ?? v.text ?? v.name ?? Object.values(v)[0];
+    return first === v ? '' : toText(first, depth + 1);
+  }
+  return '';
+}
+
 function mapProduct(p) {
   const n = p.nutriments || {};
   const per100 = k => parseFloat(n[k + '_100g'] ?? n[k] ?? 0) || 0;
   return {
-    food_name: p.product_name || p.abbreviated_product_name || '',
-    brand:     p.brands || '',
+    food_name: toText(p.product_name) || toText(p.abbreviated_product_name),
+    brand:     toText(p.brands),
     barcode:   p.code || p._id || '',
     image:     p.image_front_small_url || p.image_small_url || '',
     serving_g: parseFloat(p.serving_quantity) || 100,
@@ -111,7 +135,7 @@ function mapProduct(p) {
 // black coffee unsearchable — they're real foods people log. They're
 // kept now and simply ranked last, so they never crowd out real hits.
 function usable(prod) {
-  return !!prod.food_name;
+  return !!toText(prod.food_name).trim();
 }
 
 /** Merge sources, drop duplicates, put substantive results first. */
@@ -122,7 +146,7 @@ function mergeResults(lists, q) {
     for (const p of list) {
       // Barcode is the real identity; fall back to name+brand for
       // entries that don't carry one.
-      const key = (p.barcode || `${p.food_name}|${p.brand}`).toLowerCase();
+      const key = toText(p.barcode || `${toText(p.food_name)}|${toText(p.brand)}`).toLowerCase();
       if (seen.has(key)) continue;
       seen.add(key);
       out.push(p);
@@ -134,8 +158,10 @@ function mergeResults(lists, q) {
   // Score rather than sort on one key: with several sources merged, a
   // single tiebreak leaves obviously-right answers buried.
   const score = p => {
-    const name = (p.food_name || '').toLowerCase();
-    const brand = (p.brand || '').toLowerCase();
+    // toText, not `|| ''` — a truthy non-string (an array) slips
+    // straight through `||` and then has no .toLowerCase().
+    const name = toText(p.food_name).toLowerCase();
+    const brand = toText(p.brand).toLowerCase();
     const hay = `${name} ${brand}`;
     let s = 0;
     if (name === term) s -= 100;                       // exact title
