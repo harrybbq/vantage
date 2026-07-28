@@ -440,28 +440,12 @@ nav:hover .nav-tab-label{opacity:1;}
   .shop-trend-blurb{display:none;}
 }
 
-/* ── Mobile shopping — neater, thumb-friendly ── */
-@media (max-width:768px){
-  #shop .shop-layout{max-width:none;}
-  .shop-toolbar{flex-direction:column;align-items:stretch;gap:12px;margin-bottom:16px;}
-  .shop-toolbar-actions{width:100%;}
-  .shop-toolbar-actions .btn{flex:1;min-height:44px;}
-  /* Stats as a tidy 2×2 grid instead of a wrapping row. */
-  .shop-summary{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px;}
-  .shop-summary-stat{padding:12px 14px;}
-  /* Priority filters + category tabs scroll sideways as big pills. */
-  .shop-filters,.shop-tabs{flex-wrap:nowrap;overflow-x:auto;-webkit-overflow-scrolling:touch;
-    scrollbar-width:none;padding-bottom:2px;margin-left:-2px;padding-left:2px;}
-  .shop-filters::-webkit-scrollbar,.shop-tabs::-webkit-scrollbar{display:none;}
-  .shop-filter-btn,.shop-tab{flex:0 0 auto;white-space:nowrap;min-height:38px;padding:8px 15px;}
-  /* One roomy card per row; shorter image so cards aren't giant. */
-  .shop-grid{grid-template-columns:1fr !important;gap:12px;}
-  .shop-item-img{height:130px;}
-  /* Bigger tap targets in the card footer. */
-  .shop-item-footer{gap:10px;padding:12px;}
-  .shop-link-btn{height:44px;font-size:13px;}
-  .shop-icon-btn{flex:0 0 44px;width:44px;height:44px;font-size:16px;}
-}
+/* Mobile shopping rules used to live here. They lost: this block sits
+   ABOVE the base .shop-* declarations further down the file, so at equal
+   specificity the desktop rules won and the phone layout only half
+   applied (the filter row wrapped to two lines, the stat grid went
+   ragged). They now live in ONE block at the end of holiday.css, which
+   is the last stylesheet main.jsx imports. Don't re-add them here. */
 
 #hub .hub-layout{position:relative;z-index:1;}
 #photoFileInput{display:none;}
@@ -2107,51 +2091,8 @@ html[data-theme="dark"] {
   .trackers-panel{position:static;}
   .shop-grid{grid-template-columns:1fr 1fr;}
 }
-/* ── Mobile shop card refinements ──
-   Single-column horizontal layout: image left, body + footer right.
-   The truncated name stays single-line (taps to expand), the priority
-   pill aligns to the top-right, and the footer row keeps "View Online"
-   + the three icon buttons on one tidy line. */
-/* ── Mobile shop card refinements (≤600 px) ──
-   Single-column **horizontal** cards: 88px image on the left, body +
-   footer stacked on the right. min-width:0 on the body so the long
-   product name never bleeds under the image (the bug in the screenshot
-   that prompted this redesign — a 2-column 150px-min grid was
-   squashing each card from elsewhere; that rule is now removed). */
-/* Compact single-row card on phones: 52px thumb · body (name + price) ·
-   a tight row of icon actions. ~62px tall so ~9 fit a screen instead of
-   ~4. Selectors are #shop-scoped to beat the responsive base overrides
-   further down the file. */
-@media(max-width:600px){
-  #shop .shop-grid{grid-template-columns:1fr !important;gap:8px;}
-  #shop .shop-item-card{
-    display:grid;grid-template-columns:52px minmax(0,1fr) auto;
-    grid-template-areas:'img body actions';align-items:center;
-    border-radius:12px;backdrop-filter:none;
-    box-shadow:0 1px 0 rgba(255,255,255,.3) inset, 0 3px 10px rgba(28,26,23,.06);
-  }
-  #shop .shop-item-card:hover{transform:none;box-shadow:0 1px 0 rgba(255,255,255,.3) inset, 0 3px 10px rgba(28,26,23,.06);}
-  #shop .shop-item-img{grid-area:img;width:52px;height:52px;min-height:0;margin:8px;border-radius:9px;font-size:20px;}
-  #shop .shop-item-body{grid-area:body;padding:8px 6px;gap:1px;min-width:0;overflow:hidden;}
-  #shop .shop-item-body > div:first-child{ gap:6px !important; }
-  #shop .shop-item-name{
-    font-size:13px;line-height:1.2;font-weight:700;
-    white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0;
-  }
-  #shop .shop-item-name.is-expanded{white-space:normal;}
-  #shop .shop-item-price{font-size:12.5px;margin:0;}
-  /* Coin chip + notes are noise in the tight list — hidden on phones. */
-  #shop .shop-coin-cost{display:none;}
-  #shop .shop-item-notes{display:none;}
-  #shop .shop-item-priority{font-size:8px;padding:1px 6px;flex-shrink:0;}
-  /* Actions: compact icons; "View Online" collapses to a ↗ icon. */
-  #shop .shop-item-footer{grid-area:actions;display:flex;flex-direction:row;gap:5px;padding:8px;border-top:none;}
-  #shop .shop-link-btn{flex:0 0 30px;width:30px;height:30px;min-width:0;padding:0;border-radius:8px;font-size:0;overflow:visible;}
-  #shop .shop-link-btn::after{content:'\2197';font-size:15px;font-weight:700;}
-  #shop .shop-link-btn.no-link{background:transparent;color:var(--text-muted);border:1px solid var(--border);}
-  #shop .shop-link-btn.no-link::after{content:'\2013';}
-  #shop .shop-icon-btn{flex:0 0 30px;width:30px;height:30px;font-size:14px;}
-}
+/* The phone shop-card layout also moved to the single mobile block at
+   the end of holiday.css — see the note above. */
 
 /* ── SPOTIFY BAR ── */
 #spotifyBar{

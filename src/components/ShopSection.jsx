@@ -1,4 +1,5 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useLayoutEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { motion } from 'framer-motion';
 import { firePurchase } from '../utils/confetti';
 import SectionHelp from './SectionHelp';
@@ -18,6 +19,103 @@ function PrioDot({ p, size = 7 }) {
 }
 
 let _dragItemId = null;
+
+/**
+ * Overflow menu for a shop card — phones only (CSS hides the trigger
+ * above the mobile breakpoint, where the footer shows every action as
+ * its own button).
+ *
+ * Why it exists: on a 390px screen the four footer buttons ate ~150px
+ * of the row, squeezing the product name down to ~80px — every item
+ * read "Notedfy Thi…". Link, Edit and Delete move in here; only the
+ * bought toggle stays out, because it's the one action you use often.
+ * Delete being one level down is a bonus: it's the destructive one and
+ * it was sitting a thumb-width from the name.
+ */
+function CardMenu({ item, onEdit, onDelete }) {
+  const [open, setOpen] = useState(false);
+  const [pos, setPos] = useState(null);
+  const ref = useRef(null);
+  const popRef = useRef(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const away = e => {
+      if (ref.current?.contains(e.target) || popRef.current?.contains(e.target)) return;
+      setOpen(false);
+    };
+    const esc = e => { if (e.key === 'Escape') setOpen(false); };
+    // Scrolling with a menu open would leave it floating over an item it
+    // no longer belongs to — close instead of chasing the anchor.
+    const close = () => setOpen(false);
+    document.addEventListener('pointerdown', away);
+    document.addEventListener('keydown', esc);
+    window.addEventListener('scroll', close, true);
+    window.addEventListener('resize', close);
+    return () => {
+      document.removeEventListener('pointerdown', away);
+      document.removeEventListener('keydown', esc);
+      window.removeEventListener('scroll', close, true);
+      window.removeEventListener('resize', close);
+    };
+  }, [open]);
+
+  /* The menu is portalled to <body> and positioned with fixed
+     coordinates rather than being absolutely placed inside the card.
+     It has to be: the wishlist column and the pinned Trending rail are
+     siblings with their own z-indexes, so ANY z-index set on a
+     descendant of the column is trapped below the rail — the menu came
+     out underneath it. A portal escapes that stacking context entirely.
+     Cards low on the screen open upward so the menu never lands behind
+     the tab bar. */
+  useLayoutEffect(() => {
+    if (!open || !ref.current) { setPos(null); return; }
+    const r = ref.current.getBoundingClientRect();
+    const up = window.innerHeight - r.bottom < 190;
+    setPos({
+      right: Math.max(8, window.innerWidth - r.right),
+      top: up ? undefined : Math.round(r.bottom + 6),
+      bottom: up ? Math.round(window.innerHeight - r.top + 6) : undefined,
+    });
+  }, [open]);
+
+  const close = () => setOpen(false);
+
+  return (
+    <div className="shop-card-menu" ref={ref} onClick={e => e.stopPropagation()}>
+      <button
+        type="button"
+        className="shop-icon-btn shop-menu-btn"
+        aria-haspopup="menu"
+        aria-expanded={open}
+        aria-label={`More actions for ${item.name}`}
+        onClick={() => setOpen(v => !v)}
+      ><Icon name="ellipsis" size={16} /></button>
+      {open && pos && createPortal(
+        <div
+          className="shop-card-menu-pop"
+          role="menu"
+          ref={popRef}
+          style={{ right: pos.right, top: pos.top, bottom: pos.bottom }}
+          onClick={e => e.stopPropagation()}
+        >
+          {item.url
+            ? <a role="menuitem" href={item.url} target="_blank" rel="noreferrer" onClick={close}>
+                <Icon name="external-link" size={14} />View online
+              </a>
+            : <span className="is-disabled"><Icon name="external-link" size={14} />No link added</span>}
+          <button role="menuitem" type="button" onClick={() => { close(); onEdit(item.id); }}>
+            <Icon name="pencil" size={14} />Edit item
+          </button>
+          <button role="menuitem" type="button" className="is-danger" onClick={() => { close(); onDelete(item.id); }}>
+            <Icon name="trash-2" size={14} />Delete
+          </button>
+        </div>,
+        document.body
+      )}
+    </div>
+  );
+}
 
 function CategoryTotal({ items }) {
   const { sum, counted, unknown } = totalFor(items);
@@ -47,7 +145,7 @@ function ShopCard({ item, coins, onToggleBought, onDelete, onEdit, revealDelay, 
 
   return (
     <motion.div
-      className={`shop-item-card${item.bought ? ' bought' : ''}${bulkMode ? ' is-selectable' : ''}${selected ? ' is-selected' : ''}`}
+      className={`shop-item-card prio-${item.priority || 'med'}${item.bought ? ' bought' : ''}${bulkMode ? ' is-selectable' : ''}${selected ? ' is-selected' : ''}`}
       onClick={bulkMode ? () => onToggleSelect?.(item.id) : undefined}
       draggable={!bulkMode}
       initial={{ opacity: 0, y: 16 }}
@@ -75,12 +173,6 @@ function ShopCard({ item, coins, onToggleBought, onDelete, onEdit, revealDelay, 
           {selected ? <Icon name="check" size={12} /> : null}
         </span>
       )}
-      {move && (
-        <span className={`shop-pricemove shop-pricemove-${move.direction}`}
-          title={`${fmtMoney(move.from)} → ${fmtMoney(move.to)} since you added it`}>
-          {move.direction === 'down' ? '▼' : '▲'} {Math.abs(move.pct).toFixed(0)}%
-        </span>
-      )}
       <div className="shop-item-img" style={{ position: 'relative' }}>
         {/* Cart icon sits underneath; a loaded image covers it, and a
             broken image simply hides itself to reveal the icon again. */}
@@ -92,7 +184,10 @@ function ShopCard({ item, coins, onToggleBought, onDelete, onEdit, revealDelay, 
         )}
       </div>
       <div className="shop-item-body">
-        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '8px' }}>
+        {/* Class, not an inline style: an inline style can't be beaten by
+            the mobile rules, and hiding the priority pill on phones is
+            where the product name gets its width back. */}
+        <div className="shop-item-topline">
           <div
             className={`shop-item-name${longName ? ' is-truncatable' : ''}${nameExpanded ? ' is-expanded' : ''}`}
             onClick={() => longName && setNameExpanded(v => !v)}
@@ -100,11 +195,26 @@ function ShopCard({ item, coins, onToggleBought, onDelete, onEdit, revealDelay, 
             tabIndex={longName ? 0 : undefined}
             title={longName && !nameExpanded ? 'Tap to show full name' : undefined}
           >{shownName}</div>
-          <span className={`shop-item-priority ${PRIORITY_CLASS[item.priority]}`} style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}>
+          <span className={`shop-item-priority ${PRIORITY_CLASS[item.priority]}`}>
             <PrioDot p={item.priority} size={6} />{PRIORITY_LABEL[item.priority]}
           </span>
         </div>
-        {item.price && <div className="shop-item-price">{item.price}</div>}
+        {/* Price and the drop/rise badge share a line. The badge keeps
+            its absolute top-right position on desktop (CSS) — sitting in
+            the body here only changes where it lands on phones, where the
+            card is a single row and a corner overlay would collide with
+            the buttons. */}
+        {(item.price || move) && (
+          <div className="shop-item-priceline">
+            {item.price && <span className="shop-item-price">{item.price}</span>}
+            {move && (
+              <span className={`shop-pricemove shop-pricemove-${move.direction}`}
+                title={`${fmtMoney(move.from)} → ${fmtMoney(move.to)} since you added it`}>
+                {move.direction === 'down' ? '▼' : '▲'} {Math.abs(move.pct).toFixed(0)}%
+              </span>
+            )}
+          </div>
+        )}
         {item.bought && item.boughtAt && (
           <div className="shop-item-notes" style={{ fontFamily: 'var(--mono)', fontSize: 10 }}>
             Bought {new Date(item.boughtAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
@@ -128,10 +238,11 @@ function ShopCard({ item, coins, onToggleBought, onDelete, onEdit, revealDelay, 
           onClick={() => onToggleBought(item.id)}
           title={item.bought ? 'Mark as not bought' : 'Mark as bought'}
         >
-          {item.bought ? <Icon name="check" size={14} /> : '⬡'}
+          {item.bought ? <Icon name="check" size={15} /> : <Icon name="shopping-bag" size={14} />}
         </motion.button>
         <button className="shop-icon-btn shop-edit-btn" title="Edit item" onClick={() => onEdit(item.id)}><Icon name="pencil" size={13} /></button>
-        <button className="shop-icon-btn shop-del-btn" title="Delete item" onClick={() => onDelete(item.id)}><Icon name="x" size={14} /></button>
+        <button className="shop-icon-btn shop-del-btn" title="Delete item" onClick={() => onDelete(item.id)}><Icon name="trash-2" size={13} /></button>
+        {!bulkMode && <CardMenu item={item} onEdit={onEdit} onDelete={onDelete} />}
       </div>
     </motion.div>
   );
@@ -461,10 +572,14 @@ export default function ShopSection({ S, update, active, onOpenModal, onShowCoin
           <div className="shop-toolbar-actions" style={{ display: 'flex', gap: '10px' }}>
             <motion.button className="btn btn-ghost" onClick={() => onOpenModal('addCategoryModal')}
               whileHover={{ scale: 1.04 }} whileTap={{ scale: 0.96 }}
-              transition={{ type: 'spring', stiffness: 400, damping: 17 }}>+ Add Category</motion.button>
+              transition={{ type: 'spring', stiffness: 400, damping: 17 }}>
+              <Icon name="layout-grid" size={14} /> Add Category
+            </motion.button>
             <motion.button className="btn btn-primary" onClick={() => onOpenModal('addShopModal')}
               whileHover={{ scale: 1.04 }} whileTap={{ scale: 0.96 }}
-              transition={{ type: 'spring', stiffness: 400, damping: 17 }}>+ Add Item</motion.button>
+              transition={{ type: 'spring', stiffness: 400, damping: 17 }}>
+              <Icon name="plus" size={15} /> Add Item
+            </motion.button>
           </div>
         </div>
 
@@ -503,7 +618,9 @@ export default function ShopSection({ S, update, active, onOpenModal, onShowCoin
             )}
           </div>
           <label className="shop-sort">
-            <span>Sort</span>
+            {/* The word "Sort" is redundant next to a select that reads
+                "Recently added" — it only earns its space on desktop. */}
+            <span className="shop-sort-lbl">Sort</span>
             <select value={sortKey} onChange={e => setSortKey(e.target.value)} aria-label="Sort items">
               {SORTS.map(o => <option key={o.key} value={o.key}>{o.label}</option>)}
             </select>
@@ -512,7 +629,10 @@ export default function ShopSection({ S, update, active, onOpenModal, onShowCoin
             type="button"
             className={`shop-select-toggle${bulkMode ? ' is-on' : ''}`}
             onClick={() => (bulkMode ? exitBulk() : setBulkMode(true))}
-          >{bulkMode ? 'Done' : 'Select'}</button>
+          >
+            <Icon name={bulkMode ? 'check' : 'square-check-big'} size={13} />
+            <span>{bulkMode ? 'Done' : 'Select'}</span>
+          </button>
         </div>
 
         {query && (
@@ -605,7 +725,7 @@ export default function ShopSection({ S, update, active, onOpenModal, onShowCoin
                     <div className="shop-category-line"></div>
                     <CategoryTotal items={filtered.filter(s => s.categoryId === cat.id)} />
                     <div className="shop-category-count">{filtered.filter(s => s.categoryId === cat.id).length}</div>
-                    <button className="shop-category-del-btn" onClick={() => handleDeleteCategory(cat.id)} title="Delete category">✕</button>
+                    <button className="shop-category-del-btn" onClick={() => handleDeleteCategory(cat.id)} title="Delete category" aria-label={`Delete category ${cat.name}`}><Icon name="x" size={11} /></button>
                   </div>
                   <DropZone
                     categoryId={cat.id}
