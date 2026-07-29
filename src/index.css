@@ -993,6 +993,37 @@ nav:hover .nav-tab-label{opacity:1;}
   /* Lowered floor — flex:1 grows past this on tall viewports. */
   min-height:340px;
 }
+/* The board is a surface, not a card. It runs to the bottom and right
+   edges of the window and stops on the left exactly where the side nav
+   ends, so the grid reads as space that keeps going rather than a panel
+   inset on a page.
+
+   The negative margins cancel .section's own padding (28px sides, 60px
+   bottom) precisely, so the wrap's border box ends flush with the
+   section's border box — nothing overflows and no page scrollbar
+   appears. The TOP is deliberately left alone: the toolbar, tabs and
+   stats strip keep their exact position.
+
+   Desktop only. On phones the section's padding clears the fixed app
+   bar and tab bar, so bleeding into it would slide the board under
+   them. */
+@media (min-width:769px){
+  #achievements .ach-canvas-wrap{
+    margin:0 -28px -60px -28px;
+    border-radius:0;
+    /* The left border is the seam against the nav rail; right and
+       bottom would be a frame around something that shouldn't look
+       framed. */
+    border-right:0;
+    border-bottom:0;
+  }
+}
+/* Scrollbars are the wrong metaphor for a canvas you pan, and with room
+   in every direction they'd sit on two edges permanently. Grab-and-drag
+   is the interaction (hinted as DRAG · MOVE in the toolbar) and the
+   recentre button is the way home. */
+.ach-canvas-wrap{scrollbar-width:none;-ms-overflow-style:none;}
+.ach-canvas-wrap::-webkit-scrollbar{display:none;}
 /* On mobile we need to subtract the mobile chrome (top app bar +
    bottom tabs) from the section height so the canvas flex-fills
    into the available space rather than running off the bottom
@@ -1732,6 +1763,22 @@ html[data-theme="dark"] {
   font-family:var(--mono);font-size:9px;letter-spacing:1px;
   color:var(--text-muted);
   padding:0 6px;min-width:38px;text-align:center;
+}
+
+/* Pre-existing phone bug, found while verifying the board: the stats
+   strip is flex-shrink:0 and needs ~485px, so on a 390px screen its box
+   stuck 111px past the right edge and the whole page scrolled sideways.
+   Give it the full row and let it scroll its own contents instead —
+   nothing is lost, and the page stops moving. */
+@media (max-width:768px){
+  .ach-tabs-row > .ach-stats{margin-left:0;}
+  .ach-stats{
+    flex:1 1 100%;min-width:0;
+    overflow-x:auto;overflow-y:hidden;
+    scrollbar-width:none;-ms-overflow-style:none;
+  }
+  .ach-stats::-webkit-scrollbar{display:none;}
+  .ach-stats-item{flex:0 0 auto;}
 }
 
 /* Connection animations */

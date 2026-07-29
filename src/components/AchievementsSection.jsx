@@ -611,37 +611,47 @@ export default function AchievementsSection({ S, update, active, onOpenModal, on
 
   // ── derived ─────────────────────────────────────────────────────
 
-  // Min canvas dimensions so dragging beyond doesn't clip.
-  const { canvasW, contentH } = useMemo(() => {
+  // Extent of the actual content — where the furthest node reaches.
+  const { contentW, contentH } = useMemo(() => {
     let w = 700, h = 400;
     achievements.forEach(a => {
       w = Math.max(w, a.x + NODE_W + 30);
       h = Math.max(h, a.y + 130);
     });
-    return { canvasW: w, contentH: h };
+    return { contentW: w, contentH: h };
   }, [achievements]);
 
-  // ── The board keeps going south ──
-  // There is always at least SOUTH_RUNWAY of empty grid below the
-  // lowest node, and scrolling near the bottom adds another stretch —
-  // so the board reads as open space you can keep building down into
-  // rather than a page that stops. The ceiling is a runaway guard, not
-  // a design limit; you'd have to pan a very long way to meet it.
-  const SOUTH_RUNWAY = 900;
-  const SOUTH_MAX = 60000;
-  const [southRunway, setSouthRunway] = useState(SOUTH_RUNWAY);
-  const canvasH = Math.min(SOUTH_MAX, contentH + southRunway);
+  // ── The board keeps going ──
+  // There is always at least RUNWAY of empty grid past the furthest
+  // node south and east, and panning to an edge adds another stretch —
+  // so the board reads as open space you keep building into rather than
+  // a page that stops. North and west stay pinned at the origin: the
+  // board grows away from its corner, it doesn't drift.
+  //
+  // The ceiling is a runaway guard, not a design limit; you would have
+  // to pan a very long way to meet it.
+  const RUNWAY = 900;
+  const RUNWAY_MAX = 40000;
+  const [runway, setRunway] = useState({ south: RUNWAY, east: RUNWAY });
+  const canvasW = Math.min(RUNWAY_MAX, contentW + runway.east);
+  const canvasH = Math.min(RUNWAY_MAX, contentH + runway.south);
 
   useEffect(() => {
     const wrap = canvasWrapRef.current;
     if (!wrap) return;
-    // Fires on wheel, drag-pan and scrollbar alike — they all move
-    // scrollTop, so one listener covers every way of getting there.
+    // Fires on wheel, trackpad and drag-pan alike — they all move
+    // scrollTop/Left, so one listener covers every way of getting there.
     const onScroll = () => {
-      const remaining = wrap.scrollHeight - wrap.scrollTop - wrap.clientHeight;
-      if (remaining < 320) {
-        setSouthRunway(r => Math.min(SOUTH_MAX, r + SOUTH_RUNWAY));
-      }
+      const downLeft = wrap.scrollHeight - wrap.scrollTop - wrap.clientHeight;
+      const rightLeft = wrap.scrollWidth - wrap.scrollLeft - wrap.clientWidth;
+      if (downLeft > 320 && rightLeft > 320) return;
+      setRunway(r => {
+        const south = downLeft < 320 ? Math.min(RUNWAY_MAX, r.south + RUNWAY) : r.south;
+        const east = rightLeft < 320 ? Math.min(RUNWAY_MAX, r.east + RUNWAY) : r.east;
+        // Same object when nothing moved, so parking at the cap doesn't
+        // re-render the whole board on every scroll event.
+        return south === r.south && east === r.east ? r : { south, east };
+      });
     };
     wrap.addEventListener('scroll', onScroll, { passive: true });
     return () => wrap.removeEventListener('scroll', onScroll);
