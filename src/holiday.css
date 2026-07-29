@@ -134,9 +134,37 @@
 
 /* ── Visited tab ── */
 .hol-visited-stats{display:flex;flex-wrap:wrap;align-items:center;gap:18px;margin-bottom:12px;}
-.hol-visited-regions{margin-left:auto;display:flex;flex-wrap:wrap;gap:10px;
+/* Region progress. Each row doubles as a filter — tapping a region
+   scopes the list below, tapping it again clears back to All. */
+.hol-visited-regions{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:6px;margin-bottom:12px;}
+.hol-visited-region{display:flex;align-items:center;gap:9px;padding:7px 11px;border-radius:9px;
+  border:var(--border-card);background:var(--surface);cursor:pointer;text-align:left;
   font-family:var(--mono);font-size:9px;letter-spacing:.8px;text-transform:uppercase;color:var(--text-muted);}
-.hol-visited-region b{color:var(--text);}
+.hol-visited-region:hover{border-color:var(--accent-line);}
+.hol-visited-region.is-active{border-color:var(--em);color:var(--text);}
+.hol-visited-region-name{flex:none;min-width:64px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.hol-visited-region-bar{flex:1;min-width:24px;height:4px;border-radius:999px;overflow:hidden;
+  background:var(--border-color,rgba(255,255,255,.12));}
+.hol-visited-region-bar i{display:block;height:100%;border-radius:999px;background:var(--em);}
+.hol-visited-region b{flex:none;color:var(--text);font-size:10px;}
+.hol-visited-region b em{font-style:normal;color:var(--text-muted);font-weight:400;}
+
+.hol-visited-search{display:flex;align-items:center;gap:8px;padding:8px 11px;margin-bottom:8px;
+  border-radius:10px;border:var(--border-card);background:var(--surface);color:var(--text-muted);}
+.hol-visited-search input{flex:1;min-width:0;background:transparent;border:0;outline:0;color:var(--text);
+  font-family:var(--sans);font-size:13px;}
+.hol-visited-search input::-webkit-search-cancel-button{display:none;}
+.hol-visited-search-clear{background:transparent;border:0;color:var(--text-muted);cursor:pointer;display:flex;padding:2px;}
+.hol-visited-none{padding:18px;border-radius:10px;border:1px dashed var(--border-color,rgba(255,255,255,.14));
+  font-family:var(--sans);font-size:12px;color:var(--text-muted);text-align:center;}
+/* Full-width rule marking where "been" stops and the rest begins. */
+.hol-visited-divider{grid-column:1/-1;display:flex;align-items:center;gap:9px;margin:6px 0 2px;
+  font-family:var(--mono);font-size:8.5px;letter-spacing:1.4px;text-transform:uppercase;color:var(--text-muted);}
+.hol-visited-divider::after{content:'';flex:1;height:1px;background:var(--accent-line-soft,var(--border));}
+/* Placeholder where the tick sits on visited rows, so names line up in
+   both columns instead of jittering by the width of a check. */
+.hol-visited-item-dot{width:12px;height:12px;flex:none;border-radius:50%;
+  border:1px solid var(--border-color,rgba(255,255,255,.18));}
 .hol-visited-detail{margin-top:10px;padding:9px 12px;border-radius:9px;background:var(--surface);
   border:var(--border-card);font-family:var(--sans);font-size:12px;color:var(--text);
   display:flex;flex-wrap:wrap;gap:8px;align-items:center;}
@@ -148,7 +176,11 @@
 .hol-chip.is-active{background:var(--em);border-color:var(--em);color:var(--on-em,#fff);}
 .hol-visited-list{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:6px;
   max-height:320px;overflow-y:auto;padding-right:4px;}
-.hol-visited-item{display:flex;align-items:center;gap:6px;padding:7px 10px;border-radius:8px;
+/* min-width:0 is load-bearing: a grid item defaults to min-width:auto,
+   so "United States Minor Outlying Islands" widened its track and pushed
+   the whole list past the viewport. The old inner overflow-y:auto was
+   masking it by clipping horizontally as well. */
+.hol-visited-item{display:flex;align-items:center;gap:6px;min-width:0;padding:7px 10px;border-radius:8px;
   border:var(--border-card);background:var(--surface);color:var(--text-muted);
   font-family:var(--sans);font-size:12px;text-align:left;cursor:pointer;}
 .hol-visited-item span{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
@@ -265,19 +297,88 @@
    column, the map shortens, and long lists cap with internal scroll so
    the page itself never scrolls sideways. */
 @media (max-width:860px){
-  .hol-rail{grid-template-columns:1fr;}
-  .hol-rail-main{order:-1;}
-  .hol-map-wrap{height:300px!important;}
-  .hol-rail-stats,.hol-visited-stats{gap:12px;}
-  .hol-rail-toggle{margin-left:0;}
-  .hol-visited-regions{margin-left:0;width:100%;}
+  .holiday-tabs{gap:4px;margin-bottom:12px;}
+  .holiday-tab{padding:8px 12px;}
   .hol-dest-costs{grid-template-columns:1fr;}
   .hol-itin-row{grid-template-columns:1fr 1fr;}
   .hol-itin-row > button{grid-column:2;justify-self:end;}
   .hol-modal-body{max-height:62vh;}
-  .hol-visited-list{grid-template-columns:repeat(auto-fill,minmax(130px,1fr));max-height:260px;}
-  .holiday-tabs{gap:4px;}
-  .holiday-tab{padding:8px 12px;}
+  .hol-map-wrap{height:320px!important;}
+  /* Bigger map controls — 28px is a desktop cursor target, not a thumb. */
+  .hol-map-zoom{right:8px;bottom:8px;gap:6px;}
+  .hol-map-zoom button{width:36px;height:36px;font-size:16px;}
+
+  /* ══ Interrail ══════════════════════════════════════════════════
+     The desktop layout is two columns: a builder rail on the left and
+     the map on the right. Stacking them put a 300px map above the
+     search box, so the primary action — add a stop — started below the
+     fold, and the empty state told you to tap stations that sit a few
+     pixels apart at this width.
+
+     display:contents dissolves both columns so every block becomes a
+     direct child of .hol-rail and can be ordered on its own. Search
+     first, then the stops you've picked, then the map (still tappable,
+     now a companion to the list rather than a wall in front of it),
+     then the summary, warnings and saved routes. */
+  /* align-items:stretch overrides the desktop grid's `start`, which in
+     column-flex made every block shrink to its content width. */
+  .hol-rail{display:flex;flex-direction:column;align-items:stretch;gap:10px;}
+  .hol-rail-side,.hol-rail-main{display:contents;}
+  .hol-rail-search{order:1;}
+  .hol-rail-results{order:2;}
+  .hol-rail-stops{order:3;display:flex;flex-direction:column;gap:6px;}
+  .hol-map-wrap{order:4;}
+  .hol-map-legend{order:5;margin-top:0;}
+  .hol-rail-stats{order:6;margin-bottom:0;}
+  .hol-rail-gap{order:7;}
+  .hol-rail-flags{order:8;}
+  .hol-rail-save{order:9;}
+  .hol-rail-saved{order:10;}
+  .hol-rail-disclaimer{order:11;margin-top:0;}
+
+  /* Six metrics on one line ran off the right edge. As a 3×2 card they
+     fit, stay aligned, and read as one object. */
+  .hol-rail-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:0;
+    border:var(--border-card);border-radius:12px;background:var(--surface);overflow:hidden;}
+  .hol-rail-stat{padding:9px 4px;align-items:center;text-align:center;
+    border-left:1px solid var(--border);border-top:1px solid var(--border);}
+  .hol-rail-stat:nth-child(-n+3){border-top:0;}
+  .hol-rail-stat:nth-child(3n+1){border-left:0;}
+  .hol-rail-stat b{font-size:16px;}
+  .hol-rail-stat span{font-size:7.5px;letter-spacing:.9px;}
+  /* The clearance switch becomes the card's footer row instead of
+     claiming a 50px line of its own. */
+  .hol-rail-toggle{order:0;grid-column:1/-1;margin-left:0;justify-content:center;
+    border:0;border-top:1px solid var(--border);border-radius:0;padding:9px;}
+  .hol-rail-search{min-height:44px;padding:0 12px;}
+  .hol-rail-save{flex-direction:column;gap:8px;}
+  .hol-rail-save .btn{width:100%;min-height:42px;}
+  .hol-rail-saved-load{padding:10px;}
+  .hol-rail-teaser{padding:28px 18px;}
+
+  /* ══ Visited ════════════════════════════════════════════════════ */
+  .hol-visited-stats{display:flex;gap:0;margin-bottom:10px;overflow:hidden;
+    border:var(--border-card);border-radius:12px;background:var(--surface);}
+  .hol-visited-stat{flex:1 1 0;min-width:0;padding:8px 4px;align-items:center;text-align:center;
+    border-left:1px solid var(--border);}
+  .hol-visited-stat:first-child{border-left:0;}
+  .hol-visited-stat b{font-size:16px;}
+  .hol-visited-stat span{font-size:7.5px;letter-spacing:.9px;}
+  .hol-visited-regions{grid-template-columns:1fr 1fr;gap:5px;}
+  .hol-visited-region{padding:6px 8px;gap:6px;}
+  .hol-visited-region-name{min-width:0;flex:1;}
+  .hol-visited-region-bar{flex:0 0 22px;}
+  /* Region chips scroll rather than wrapping to two rows of pills. */
+  .hol-visited-filter{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;gap:5px;
+    padding-bottom:2px;margin-bottom:8px;}
+  .hol-visited-filter::-webkit-scrollbar{display:none;}
+  .hol-chip{flex:0 0 auto;white-space:nowrap;min-height:30px;display:inline-flex;align-items:center;}
+  /* The list used to scroll INSIDE a page that also scrolls — a nested
+     trap on a touchscreen, and it cut the last row in half. Search and
+     the region filter do the shortening now, so it can just flow. */
+  .hol-visited-list{grid-template-columns:1fr 1fr;gap:5px;max-height:none;overflow:visible;padding-right:0;}
+  .hol-visited-item{padding:9px 10px;font-size:12px;min-height:38px;}
+  .hol-visited-listwrap{margin-top:12px;}
 }
 
 

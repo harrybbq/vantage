@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import Icon from './Icon';
 import { motion, AnimatePresence } from 'framer-motion';
 import { supabase } from '../lib/supabase';
@@ -158,7 +159,9 @@ function AddMacroSheet({ onClose, onSave }) {
     background: 'var(--bg-base)', color: 'var(--text)', fontSize: 'var(--text-sm)', fontFamily: 'var(--sans)',
   };
 
-  return (
+  /* Portalled: this sheet renders from inside the .card below, whose
+   * backdrop-filter makes it a containing block for position:fixed. */
+  return createPortal(
     <div style={{ position: 'fixed', inset: 0, zIndex: 500, background: 'rgba(0,0,0,.4)', display: 'flex', alignItems: 'flex-end' }} {...backdropClose(() => onClose())}>
       <div style={{ width: '100%', background: 'var(--bg-base)', borderRadius: '20px 20px 0 0', padding: '24px 20px 40px', animation: 'sheet-up 300ms cubic-bezier(0.34,1.56,0.64,1) both', maxHeight: '85dvh', overflowY: 'auto' }}>
         <div style={{ width: '40px', height: '4px', background: 'var(--border)', borderRadius: '2px', margin: '0 auto 20px' }} />
@@ -228,7 +231,8 @@ function AddMacroSheet({ onClose, onSave }) {
           </div>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
 

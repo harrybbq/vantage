@@ -611,15 +611,63 @@ export default function AchievementsSection({ S, update, active, onOpenModal, on
 
   // ── derived ─────────────────────────────────────────────────────
 
-  // Min canvas dimensions so dragging beyond doesn't clip
-  const { canvasW, canvasH } = useMemo(() => {
+  // Extent of the actual content — where the furthest node reaches.
+  const { contentW, contentH } = useMemo(() => {
     let w = 700, h = 400;
     achievements.forEach(a => {
       w = Math.max(w, a.x + NODE_W + 30);
       h = Math.max(h, a.y + 130);
     });
-    return { canvasW: w, canvasH: h };
+    return { contentW: w, contentH: h };
   }, [achievements]);
+
+  // ── The board keeps going ──
+  // There is always at least RUNWAY of empty grid past the furthest
+  // node south and east, and panning to an edge adds another stretch —
+  // so the board reads as open space you keep building into rather than
+  // a page that stops. North and west stay pinned at the origin: the
+  // board grows away from its corner, it doesn't drift.
+  //
+  // The ceiling is a runaway guard, not a design limit; you would have
+  // to pan a very long way to meet it.
+  const RUNWAY = 900;
+  const RUNWAY_MAX = 40000;
+  const [runway, setRunway] = useState({ south: RUNWAY, east: RUNWAY });
+  const canvasW = Math.min(RUNWAY_MAX, contentW + runway.east);
+  const canvasH = Math.min(RUNWAY_MAX, contentH + runway.south);
+
+  useEffect(() => {
+    const wrap = canvasWrapRef.current;
+    if (!wrap) return;
+    // Fires on wheel, trackpad and drag-pan alike — they all move
+    // scrollTop/Left, so one listener covers every way of getting there.
+    const onScroll = () => {
+      const downLeft = wrap.scrollHeight - wrap.scrollTop - wrap.clientHeight;
+      const rightLeft = wrap.scrollWidth - wrap.scrollLeft - wrap.clientWidth;
+      if (downLeft > 320 && rightLeft > 320) return;
+      setRunway(r => {
+        const south = downLeft < 320 ? Math.min(RUNWAY_MAX, r.south + RUNWAY) : r.south;
+        const east = rightLeft < 320 ? Math.min(RUNWAY_MAX, r.east + RUNWAY) : r.east;
+        // Same object when nothing moved, so parking at the cap doesn't
+        // re-render the whole board on every scroll event.
+        return south === r.south && east === r.east ? r : { south, east };
+      });
+    };
+    wrap.addEventListener('scroll', onScroll, { passive: true });
+    return () => wrap.removeEventListener('scroll', onScroll);
+  }, [activeTab]);
+
+  /** Zoom back to 1:1 and bring the nodes back into view. Panning into
+   *  open space is the point, but you need a way home from it. */
+  function recentre() {
+    setZoom(1);
+    const wrap = canvasWrapRef.current;
+    if (!wrap) return;
+    if (!achievements.length) { wrap.scrollTo({ top: 0, left: 0, behavior: 'smooth' }); return; }
+    const minX = Math.min(...achievements.map(a => a.x));
+    const minY = Math.min(...achievements.map(a => a.y));
+    wrap.scrollTo({ top: Math.max(0, minY - 40), left: Math.max(0, minX - 40), behavior: 'smooth' });
+  }
 
   const completedCount = achievements.filter(a => a.completed).length;
   const totalCount = achievements.length;
@@ -725,8 +773,8 @@ export default function AchievementsSection({ S, update, active, onOpenModal, on
                 <button
                   type="button"
                   className="ach-zoom-btn ach-zoom-reset"
-                  onClick={() => setZoom(1)}
-                  title="Reset zoom"
+                  onClick={recentre}
+                  title="Recentre on your goals"
                 ><Icon name="locate-fixed" size={14} /></button>
               </div>
             </div>
