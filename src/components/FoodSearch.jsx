@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import Icon from './Icon';
 import { BrandMark } from './food/BrandMark';
 import CameraScanner from './CameraScanner';
@@ -91,6 +92,14 @@ export default function FoodSearch({ onSelectFood, onClose, onOpenModal, savedMe
     if (mode !== 'camera' && mode !== 'meals' && mode !== 'recent') inputRef.current?.focus();
   }, [mode]);
 
+  // Escape backs out — the third way out, alongside the Cancel button
+  // and tapping the backdrop.
+  useEffect(() => {
+    const esc = e => { if (e.key === 'Escape') onClose(); };
+    document.addEventListener('keydown', esc);
+    return () => document.removeEventListener('keydown', esc);
+  }, [onClose]);
+
   function handleQueryChange(val) {
     setQuery(val);
     setError('');
@@ -162,7 +171,22 @@ export default function FoodSearch({ onSelectFood, onClose, onOpenModal, savedMe
     ...(canUseCamera ? [['camera', 'Scan']] : []),
   ];
 
-  return (
+  /* PORTALLED TO <body>, and it has to be.
+   *
+   * This sheet is rendered from inside NutritionSection, whose root is a
+   * .card — and .card carries backdrop-filter. Any backdrop-filter (like
+   * a transform) makes an element a containing block for position:fixed
+   * descendants, so `inset:0` resolved against the nutrition card rather
+   * than the viewport. On the desktop Track page that pinned the whole
+   * search to the third column and let it travel with page scroll, which
+   * is how the header — and with it the only way to cancel — ended up
+   * above the top of the screen. Measured before the fix: the overlay's
+   * own box sat at y = -428 on a 1440x900 window scrolled 600px down.
+   *
+   * A portal escapes every ancestor, so `fixed` means the viewport again
+   * no matter what the surrounding layout does.
+   */
+  return createPortal(
     <div
       style={{ position: 'fixed', inset: 0, zIndex: 510, background: 'rgba(0,0,0,.45)', display: 'flex', alignItems: 'flex-end' }}
       {...backdropClose(() => onClose())}
@@ -175,10 +199,22 @@ export default function FoodSearch({ onSelectFood, onClose, onOpenModal, savedMe
         {/* Handle */}
         <div style={{ width: '40px', height: '4px', background: 'var(--border)', borderRadius: '2px', margin: '0 auto 18px', flexShrink: 0 }} />
 
-        {/* Title + close */}
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '14px', flexShrink: 0 }}>
+        {/* Title + cancel. A labelled button, not a bare glyph: "no
+            visible way to cancel" was the complaint, and an X in a
+            corner reads as decoration next to a wall of results. */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', marginBottom: '14px', flexShrink: 0 }}>
           <h3 style={{ margin: 0, fontSize: 'var(--text-md)', color: 'var(--text)', fontFamily: 'var(--serif)' }}>Search Foods</h3>
-          <button onClick={onClose} style={{ background: 'none', border: 'none', fontSize: '18px', color: 'var(--text-muted)', cursor: 'pointer', padding: '4px 8px', display: 'inline-flex' }} aria-label="Close"><Icon name="x" size={16} /></button>
+          <button
+            onClick={onClose}
+            aria-label="Cancel and close food search"
+            style={{
+              display: 'inline-flex', alignItems: 'center', gap: '7px', flexShrink: 0,
+              padding: '8px 14px', borderRadius: '999px',
+              border: '1px solid var(--border)', background: 'transparent',
+              color: 'var(--text-mid)', cursor: 'pointer',
+              fontFamily: 'var(--mono)', fontSize: '10px', letterSpacing: '1.2px', textTransform: 'uppercase',
+            }}
+          ><Icon name="x" size={13} />Cancel</button>
         </div>
 
         {/* Mode tabs — segmented control, mono caps, no glyphs */}
@@ -306,9 +342,16 @@ export default function FoodSearch({ onSelectFood, onClose, onOpenModal, savedMe
               />
             </div>
 
-            {/* Attribution */}
-            <div style={{ fontSize: '10px', color: 'var(--text-muted)', fontFamily: 'var(--mono)', marginBottom: '10px', flexShrink: 0 }}>
-              Data: Open Food Facts (openfoodfacts.org) — CC BY-SA
+            {/* Attribution + the units note. "per 100g" used to repeat on
+                every single row; saying it once here buys back a chip's
+                width on each result. */}
+            <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: '10px', flexWrap: 'wrap', fontSize: '10px', color: 'var(--text-muted)', fontFamily: 'var(--mono)', marginBottom: '10px', flexShrink: 0 }}>
+              <span>Data: Open Food Facts (openfoodfacts.org) — CC BY-SA</span>
+              {results.length > 0 && (
+                <span style={{ flexShrink: 0, letterSpacing: '.6px' }}>
+                  {results.length} result{results.length > 1 ? 's' : ''} · per 100g
+                </span>
+              )}
             </div>
 
             {/* Results */}
@@ -319,21 +362,31 @@ export default function FoodSearch({ onSelectFood, onClose, onOpenModal, savedMe
               {!loading && error && (
                 <div style={{ padding: '12px', background: 'rgba(220,38,38,.08)', borderRadius: 'var(--radius-md)', color: '#e05252', fontSize: 'var(--text-sm)', fontFamily: 'var(--mono)' }}>{error}</div>
               )}
+              {/* Result row: mark · name + brand + macros · kcal · add.
+                  The brand mark leads (it's the fastest thing to scan
+                  down a list of near-identical names) and calories get
+                  their own column on the right, so ten "Big Mac" rows
+                  are told apart by the number that actually differs
+                  rather than by reading four chips into each line. */}
               {!loading && !error && results.map((item, i) => (
                 <button key={i} onClick={() => onSelectFood(item)}
-                  style={{ width: '100%', display: 'flex', alignItems: 'flex-start', gap: '10px', padding: '12px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border)', background: 'transparent', cursor: 'pointer', textAlign: 'left', marginBottom: '8px', fontFamily: 'var(--sans)' }}>
+                  style={{ width: '100%', display: 'flex', alignItems: 'center', gap: '11px', padding: '10px 12px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border)', background: 'transparent', cursor: 'pointer', textAlign: 'left', marginBottom: '6px', fontFamily: 'var(--sans)' }}>
+                  <BrandMark brand={item.brand} name={item.food_name} image={item.image} size={38} />
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ fontWeight: 600, fontSize: 'var(--text-sm)', color: 'var(--text)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{item.food_name || '—'}</div>
-                    {item.brand && <div style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)', marginTop: '1px' }}>{item.brand}</div>}
-                    <div style={{ display: 'flex', gap: '8px', marginTop: '4px', flexWrap: 'wrap' }}>
-                      <span style={{ fontFamily: 'var(--mono)', fontSize: '10px', color: 'var(--text-mid)' }}>{Math.round(item.calories)} kcal</span>
-                      <span style={{ fontFamily: 'var(--mono)', fontSize: '10px', color: 'var(--text-muted)' }}>P {Math.round(item.protein_g)}g</span>
-                      <span style={{ fontFamily: 'var(--mono)', fontSize: '10px', color: 'var(--text-muted)' }}>C {Math.round(item.carbs_g)}g</span>
-                      <span style={{ fontFamily: 'var(--mono)', fontSize: '10px', color: 'var(--text-muted)' }}>F {Math.round(item.fat_g)}g</span>
-                      <span style={{ fontFamily: 'var(--mono)', fontSize: '10px', color: 'var(--text-muted)' }}>per 100g</span>
+                    <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px', marginTop: '2px', minWidth: 0 }}>
+                      {item.brand && (
+                        <span style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)', flexShrink: 1, minWidth: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{item.brand}</span>
+                      )}
+                      <span style={{ fontFamily: 'var(--mono)', fontSize: '10px', color: 'var(--text-muted)', whiteSpace: 'nowrap', flexShrink: 0 }}>
+                        P {Math.round(item.protein_g)} · C {Math.round(item.carbs_g)} · F {Math.round(item.fat_g)}
+                      </span>
                     </div>
                   </div>
-                  <BrandMark brand={item.brand} name={item.food_name} image={item.image} />
+                  <div style={{ flexShrink: 0, textAlign: 'right', fontFamily: 'var(--mono)' }}>
+                    <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--text)', fontVariantNumeric: 'tabular-nums' }}>{Math.round(item.calories)}</div>
+                    <div style={{ fontSize: '8.5px', letterSpacing: '.8px', color: 'var(--text-muted)', textTransform: 'uppercase' }}>kcal</div>
+                  </div>
                   <span style={{ color: 'var(--em)', flexShrink: 0, alignSelf: 'center', display: 'inline-flex' }}><Icon name="plus" size={16} /></span>
                 </button>
               ))}
@@ -350,6 +403,7 @@ export default function FoodSearch({ onSelectFood, onClose, onOpenModal, savedMe
           </>
         )}
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }

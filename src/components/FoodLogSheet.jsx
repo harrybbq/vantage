@@ -1,4 +1,5 @@
 import { useState, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import Icon from './Icon';
 import { supabase } from '../lib/supabase';
 import { backdropClose } from '../utils/backdropClose';
@@ -210,7 +211,11 @@ export default function FoodLogSheet({ userId, logDate, onClose, onSaved, prefil
     textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '4px', display: 'block',
   };
 
-  return (
+  /* Portalled for the same reason as FoodSearch: this renders from
+   * inside NutritionSection's .card, whose backdrop-filter makes it a
+   * containing block for position:fixed, so `inset:0` meant "the
+   * nutrition card" rather than "the viewport". */
+  return createPortal(
     <div
       style={{ position: 'fixed', inset: 0, zIndex: 500, background: 'rgba(0,0,0,.45)', display: 'flex', alignItems: 'flex-end' }}
       {...backdropClose(() => onClose())}
@@ -308,6 +313,7 @@ export default function FoodLogSheet({ userId, logDate, onClose, onSaved, prefil
           </button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
