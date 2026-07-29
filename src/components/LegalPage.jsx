@@ -55,7 +55,7 @@ function PrivacyPolicyContent() {
           'User-generated content — boards, trackers, achievements, shopping wish-list items, savings pots, holiday plans, habit entries and notes you create inside the App.',
           'Direct messages — messages you exchange with accepted friends are stored in our database so they can be delivered and shown in your conversation history. They are transmitted over TLS but are not end-to-end encrypted; treat them like email, not like a sealed letter.',
           'Nutrition data — food log entries, macro targets and goals you record, stored in our database and linked to your account.',
-          'Health & fitness data (optional, with your explicit consent) — if you connect WHOOP or import Apple Health data, we store daily metrics such as sleep duration, resting heart rate, heart-rate variability, recovery score, strain, energy expenditure (calories) and workout summaries. See section 3.',
+          'Health & fitness data (optional, with your explicit consent) — if you connect WHOOP, connect an Oura Ring, or import Apple Health data, we store daily metrics such as sleep duration, resting heart rate, heart-rate variability, recovery/readiness score, strain, energy expenditure (calories) and workout summaries. See section 3.',
           'Payment & subscription data — if you purchase Vantage Pro, the purchase is processed by Apple (App Store), Google (Google Play) and/or RevenueCat. We receive your subscription status and an anonymised transaction reference. We never receive or store your card number.',
           'Device & notification data — if you enable push notifications, we store a device push token so notifications can be delivered via Apple/Google push services (Firebase Cloud Messaging).',
           'Camera images (Pro, optional) — if you use the AI food scanner, a single camera frame is sent to Anthropic\'s API to identify the food. The image is not stored by us and is not retained by Anthropic beyond the duration of the API request.',
@@ -67,11 +67,11 @@ function PrivacyPolicyContent() {
       </Section>
 
       <Section title="3. Health Data & Your Explicit Consent">
-        <P>Vitals, sleep, heart-rate and nutrition information are health data — "special category" data under UK GDPR. We only process it with your explicit consent, which you give by actively connecting WHOOP, importing Apple Health data, or logging vitals and food yourself.</P>
+        <P>Vitals, sleep, heart-rate and nutrition information are health data — "special category" data under UK GDPR. We only process it with your explicit consent, which you give by actively connecting WHOOP, connecting an Oura Ring, importing Apple Health data, or logging vitals and food yourself.</P>
         <Ul items={[
-          'You can withdraw consent at any time: disconnect WHOOP in Settings (this also deletes the stored WHOOP access tokens), stop importing Apple Health data, or delete individual entries or your whole account.',
+          'You can withdraw consent at any time: use Disconnect on the WHOOP or Oura panel in Track → Vitals & Macros (this immediately deletes that device\u2019s stored access tokens), stop importing Apple Health data, or delete individual entries or your whole account. Metrics already synced stay in your history until you delete them or your account.',
           'Health data is used solely to show you your own trends, widgets and (if you use it) the daily AI brief. It is never shown to other users, never used for advertising, and never sold.',
-          'WHOOP data is fetched from the WHOOP API under your OAuth authorisation; Apple Health data only ever reaches us when you explicitly export or sync it.',
+          'WHOOP and Oura data is fetched from their respective APIs under your OAuth authorisation; Apple Health data only ever reaches us when you explicitly export or sync it.',
         ]} />
       </Section>
 
@@ -123,6 +123,7 @@ function PrivacyPolicyContent() {
           'RevenueCat, Apple and Google — subscription billing and entitlement management for Vantage Pro. Payment details are handled by the platform you purchase through.',
           'Firebase Cloud Messaging (Google) — delivery of push notifications you enable; processes your device push token.',
           'WHOOP — if you connect it, we access your WHOOP data via their API under your authorisation. WHOOP\'s own privacy policy governs their side.',
+          'Oura Health (Oura Ring) — if you connect it, we access your sleep, heart-rate, readiness and activity data via the Oura API under your authorisation. Oura\'s own privacy policy governs their side.',
           'Open Food Facts (openfoodfacts.org) — food search results (CC BY-SA 4.0). Only your search text is sent; no personal data.',
           'Google / Apple sign-in — optional authentication only (section 9).',
         ]} />
@@ -143,7 +144,7 @@ function PrivacyPolicyContent() {
       <Section title="11. Data Retention & Deletion">
         <Ul items={[
           'Account & content — retained while your account is active. Delete your account at any time via Settings → Data → Danger Zone; all associated data is permanently erased within 30 days.',
-          'WHOOP tokens — deleted immediately when you disconnect WHOOP.',
+          'WHOOP and Oura tokens — deleted immediately when you disconnect that device.',
           'Direct messages — retained until you delete them or your account.',
           'Camera frames & AI snapshots — not stored; discarded after each request.',
           'Data export — you can export your data as a JSON file at any time in Settings.',
@@ -229,7 +230,7 @@ function TermsContent() {
         <P><strong>Vantage is not a medical device and does not provide medical advice.</strong></P>
         <Ul items={[
           'Nutrition figures (including AI food-scanner estimates and third-party food databases) are estimates and may be inaccurate.',
-          'Vitals and fitness metrics from WHOOP, Apple Health or manual entry are for general wellness information only.',
+          'Vitals and fitness metrics from WHOOP, an Oura Ring, Apple Health or manual entry are for general wellness information only.',
           'AI-generated content (the daily brief, coach suggestions, food identification) can be wrong. Never rely on it for medical, dietary or mental-health decisions.',
           'Always consult a qualified professional before changing your diet, exercise, or health regimen — and never disregard professional advice because of something shown in the App.',
           'If you may be experiencing a medical emergency, call emergency services immediately.',
@@ -253,7 +254,7 @@ function TermsContent() {
       </Section>
 
       <Section title="9. Third-Party Services">
-        <P>Optional integrations (WHOOP, Apple Health, Google / Apple sign-in, Open Food Facts) are provided by third parties under their own terms and privacy policies. We are not responsible for third-party services, and integrations may change or become unavailable if a provider changes its API.</P>
+        <P>Optional integrations (WHOOP, Oura, Apple Health, Google / Apple sign-in, Open Food Facts) are provided by third parties under their own terms and privacy policies. We are not responsible for third-party services, and integrations may change or become unavailable if a provider changes its API.</P>
       </Section>
 
       <Section title="10. App Store & Google Play">

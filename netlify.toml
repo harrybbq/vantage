@@ -133,3 +133,11 @@
 # the app is closed, so the server-side merge can't race a client save.
 [functions."whoop-cron"]
   schedule = "0 6 * * *"
+
+# oura-cron does the same for Oura rings, half an hour later. The stagger
+# is deliberate: an account with BOTH devices would otherwise have two
+# functions read-modify-writing the same state blob at once, and the
+# state save is a whole-object PATCH — overlapping writes are a lost
+# update, not a merge.
+[functions."oura-cron"]
+  schedule = "30 6 * * *"
