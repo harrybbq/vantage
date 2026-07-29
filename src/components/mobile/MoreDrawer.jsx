@@ -15,6 +15,7 @@ const PRO_CHIP_DISMISSED_KEY = 'vb4_more_pro_chip_dismissed';
  *   - Shopping
  *   - Friends   (mobile-only route → MobileFriendsSection wraps the
  *               FriendsRail orchestrator full-width)
+ *   - Leaderboard
  *   - Settings
  *
  * Interactions:
@@ -28,6 +29,11 @@ const MORE_ITEMS = [
   { id: 'achievements', icon: 'star',        label: 'Achievements', desc: 'Your goal map' },
   { id: 'shop',         icon: 'shopping-bag', label: 'Shopping',     desc: 'Things to buy with coins' },
   { id: 'friends',      icon: 'users',       label: 'Friends',      desc: 'See your friends\' progress' },
+  // Sits with Friends because it's the other social surface. It had a
+  // desktop sidebar tab and no mobile entry of any kind — not a bottom
+  // tab, not a drawer row — so on a phone the section existed and
+  // rendered fine but nothing could navigate to it.
+  { id: 'leaderboard',  icon: 'trophy',      label: 'Leaderboard',  desc: 'Where you rank overall' },
   { id: 'settings',     icon: 'settings',    label: 'Settings',     desc: 'Theme, privacy, tools' },
 ];
 
