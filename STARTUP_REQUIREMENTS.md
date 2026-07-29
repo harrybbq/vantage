@@ -136,6 +136,74 @@ Adding a key needs no code change.
 - `[x]` **Open Food Facts** — no key, already live. ~3M barcoded
   products, Europe-strong.
 
+## Auth — the email confirmation link (BROKEN IN PRODUCTION)
+
+A tester confirmed their signup email and landed on Netlify's "Site not
+found". The link pointed at `…phoenix-b512b8.netlify.app` — the
+auto-generated subdomain this site had before it was renamed to
+vantagevision. Supabase had no redirect to use, so it fell back to the
+Site URL in its dashboard, which nobody updated after the rename.
+
+The code half is fixed: `signUp` and `resetPasswordForEmail` now name
+`window.location.origin` explicitly, so the link returns to wherever the
+person actually signed up. That is not sufficient on its own — Supabase
+only honours a redirect that matches its allow list, and silently falls
+back to the Site URL when it doesn't.
+
+28. `[ ]` **Fix the Supabase auth URLs.** Dashboard → Authentication →
+    URL Configuration
+    (`supabase.com/dashboard/project/mtbloqcvkvazmehvsaqk/auth/url-configuration`):
+    - **Site URL** → `https://vantagevision.netlify.app`
+    - **Redirect URLs** → add `https://vantagevision.netlify.app/**`,
+      plus `http://localhost:5173/**` for local dev and
+      `https://deploy-preview-*--vantagevision.netlify.app/**` if you
+      want testers to be able to sign up from a PR preview.
+    - `[ ]` ⚠️ Re-check this the day a custom domain is added, and again
+      when the Capacitor build lands — a native shell's origin is not an
+      https URL, so it needs its own deep-link entry or confirmation
+      emails break for app users exactly as they did here.
+
+Until the dashboard is updated, **every new signup is stranded on a 404
+after confirming their email.** It is a one-field fix and it blocks
+onboarding anyone, including the testers.
+
+## Wearables — two things before Oura works for anyone
+
+The code shipped and is open to every signed-in account, but the Oura
+integration is inert until both of these are done. Until then the panel
+says "Oura env missing" rather than failing quietly. WHOOP needs
+neither — it is already configured.
+
+29. `[ ]` **Run `supabase/oura_schema.sql`** in the Supabase SQL editor.
+    Creates `oura_tokens` — RLS on, no policies, so only the service
+    role ever sees a refresh token. Migrations are approval-gated, so
+    tooling cannot apply this; it has to be run by hand.
+30. `[ ]` **Register the Oura app and set its keys in Netlify.** Create
+    it at `cloud.ouraring.com/oauth/applications`, then set
+    `OURA_CLIENT_ID` and `OURA_CLIENT_SECRET` as Netlify env vars.
+    Redirect URI must be exactly
+    `https://vantagevision.netlify.app/.netlify/functions/oura-callback`.
+    - `[ ]` ⚠️ **Confirm the terms for multi-user use while you're in
+      the portal.** Personal use of the Oura API has been free, but
+      distributing an app that reads *other people's* Oura data may
+      need registration or review — the way WHOOP did. This decides
+      whether Oura stays a general feature or becomes invite-only, so
+      settle it before anyone outside the team connects a ring.
+
+Standing rules for both wearables, so a third one doesn't relearn them:
+
+- **Never make the OAuth `state` deterministic.** It carries a nonce
+  matched against an HttpOnly cookie, a signed 10-minute expiry, and the
+  provider name (`netlify/lib/oauthState.js`). The original static
+  version let one account's linking flow be used to file *another*
+  user's tokens under the attacker's id — health data to the wrong
+  person. The cookie is `SameSite=Lax` on purpose: the provider's
+  redirect is a top-level GET, which Lax allows and Strict would block.
+- **Every new user-scoped table needs `on delete cascade`** to
+  `auth.users(id)`, or account deletion leaves it behind (see item 20).
+- **Disconnect must delete the tokens**, because the privacy policy says
+  it does — `wearable-disconnect` covers both providers.
+
 ## Standing operational notes
 
 - **Lifetime is a grant, never a purchase.** It's filtered out of the

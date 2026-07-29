@@ -1,14 +1,14 @@
 /**
- * Netlify function: whoop-callback
+ * Netlify function: oura-callback
  *
- * Step 2 of the WHOOP OAuth flow. WHOOP redirects here with
- * ?code&state. We verify the state HMAC (binds to a Vantage user),
- * exchange the code for access+refresh tokens, store them in
- * whoop_tokens (service-role only), and bounce back into the app.
+ * Step 2 of the Oura OAuth flow, mirroring whoop-callback. Oura
+ * redirects here with ?code&state. We verify the state HMAC (binds to a
+ * Vantage user), exchange the code for access+refresh tokens, store them
+ * in oura_tokens (service-role only), and bounce back into the app.
  */
 const { verifyState, clearCookie } = require('../lib/oauthState');
 
-const TOKEN_URL = 'https://api.prod.whoop.com/oauth/oauth2/token';
+const TOKEN_URL = 'https://api.ouraring.com/oauth/token';
 
 
 function redirect(host, result) {
@@ -16,20 +16,20 @@ function redirect(host, result) {
   // survives one attempt is a state that can be retried.
   return {
     statusCode: 302,
-    headers: { Location: `https://${host}/?whoop=${result}`, 'Set-Cookie': clearCookie },
+    headers: { Location: `https://${host}/?oura=${result}`, 'Set-Cookie': clearCookie },
     body: '',
   };
 }
 
 exports.handler = async (event) => {
-  const { SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, WHOOP_CLIENT_ID, WHOOP_CLIENT_SECRET } = process.env;
+  const { SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, OURA_CLIENT_ID, OURA_CLIENT_SECRET } = process.env;
   const host = event.headers.host;
   const q = event.queryStringParameters || {};
 
   if (q.error) return redirect(host, 'denied');
   // Authentic, unexpired, for this provider, AND accompanied by
   // the nonce cookie set when this browser began the flow.
-  const checked = verifyState(q.state, 'whoop', event, process.env);
+  const checked = verifyState(q.state, 'oura', event, process.env);
   if (checked.error) return redirect(host, checked.error);
   const userId = checked.userId;
   if (!q.code) return redirect(host, 'nocode');
@@ -41,19 +41,23 @@ exports.handler = async (event) => {
       body: new URLSearchParams({
         grant_type: 'authorization_code',
         code: q.code,
-        client_id: WHOOP_CLIENT_ID,
-        client_secret: WHOOP_CLIENT_SECRET,
-        redirect_uri: `https://${host}/.netlify/functions/whoop-callback`,
+        client_id: OURA_CLIENT_ID,
+        client_secret: OURA_CLIENT_SECRET,
+        redirect_uri: `https://${host}/.netlify/functions/oura-callback`,
       }),
     });
     if (!tokenRes.ok) {
-      console.error('whoop token exchange failed:', tokenRes.status, await tokenRes.text().catch(() => ''));
+      console.error('oura token exchange failed:', tokenRes.status, await tokenRes.text().catch(() => ''));
       return redirect(host, 'tokenfail');
     }
     const tok = await tokenRes.json();
-    const expiresAt = new Date(Date.now() + (tok.expires_in || 3600) * 1000).toISOString();
+    if (!tok.access_token || !tok.refresh_token) {
+      console.error('oura token exchange returned no tokens');
+      return redirect(host, 'tokenfail');
+    }
+    const expiresAt = new Date(Date.now() + (tok.expires_in || 86400) * 1000).toISOString();
 
-    const up = await fetch(`${SUPABASE_URL}/rest/v1/whoop_tokens`, {
+    const up = await fetch(`${SUPABASE_URL}/rest/v1/oura_tokens`, {
       method: 'POST',
       headers: {
         apikey: SUPABASE_SERVICE_ROLE_KEY,
@@ -70,12 +74,12 @@ exports.handler = async (event) => {
       }),
     });
     if (!up.ok) {
-      console.error('whoop token store failed:', up.status, await up.text().catch(() => ''));
+      console.error('oura token store failed:', up.status, await up.text().catch(() => ''));
       return redirect(host, 'storefail');
     }
     return redirect(host, 'connected');
   } catch (e) {
-    console.error('whoop callback error:', e?.message);
+    console.error('oura callback error:', e?.message);
     return redirect(host, 'error');
   }
 };

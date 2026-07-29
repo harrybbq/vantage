@@ -214,12 +214,36 @@ export default function AuthScreen({ onOpenLegal }) {
           setLoading(false);
           return;
         }
-        const { error } = await withTimeout(supabase.auth.signUp({ email, password }), 20000);
+        // emailRedirectTo is not optional in practice. Without it,
+        // Supabase sends the confirmation link to whatever the dashboard's
+        // Site URL says — and that was still pointing at the Netlify
+        // subdomain from before this site was renamed, so a tester who
+        // confirmed their email landed on Netlify's "Site not found"
+        // instead of the app. Naming the origin here means the link comes
+        // back to wherever the person actually signed up: production, a
+        // deploy preview, or localhost.
+        //
+        // The dashboard still matters — Supabase only honours a redirect
+        // that matches its allow list, and silently falls back to the
+        // Site URL otherwise. Both halves are needed; see
+        // STARTUP_REQUIREMENTS.
+        const { error } = await withTimeout(
+          supabase.auth.signUp({
+            email,
+            password,
+            options: { emailRedirectTo: window.location.origin },
+          }), 20000,
+        );
         if (error) throw error;
         setInfo('Check your email to confirm your account, then log in.');
         setMode('login');
       } else if (mode === 'reset') {
-        const { error } = await withTimeout(supabase.auth.resetPasswordForEmail(email), 20000);
+        // Same trap: a reset link with no redirectTo goes to the Site URL.
+        const { error } = await withTimeout(
+          supabase.auth.resetPasswordForEmail(email, {
+            redirectTo: window.location.origin,
+          }), 20000,
+        );
         if (error) throw error;
         setInfo('Password reset email sent. Check your inbox.');
         setMode('login');

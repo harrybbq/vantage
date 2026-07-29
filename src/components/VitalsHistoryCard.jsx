@@ -13,6 +13,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { supabase } from '../lib/supabase';
 import { parseHealthExport, applyHealthImport } from '../lib/appleHealth';
 import { syncWhoop } from '../lib/whoopClient';
+import { syncOura, disconnectWearable } from '../lib/ouraClient';
 
 const METRICS = [
   { key: 'weight', label: 'Weight',  unit: 'kg',  src: 'vitals' },
@@ -128,9 +129,14 @@ export function AppleHealthImport({ S, update }) {
   );
 }
 
-// Owner-only WHOOP panel — OAuth connect + pull-based sync. The
-// function returns mapped data and WE merge it via update(), so every
-// write flows through the normal save pipeline + anti-wipe guards.
+// WHOOP panel — OAuth connect + pull-based sync. The function returns
+// mapped data and WE merge it via update(), so every write flows through
+// the normal save pipeline + anti-wipe guards.
+//
+// Open to every signed-in account (it was owner-only during
+// development). Each account links its own device: tokens are keyed by
+// user_id in a table with RLS on and no policies, so only the Netlify
+// functions can read them and never across users.
 function WhoopPanel({ S, update }) {
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState('');
@@ -167,6 +173,18 @@ function WhoopPanel({ S, update }) {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  async function disconnect() {
+    if (!window.confirm('Disconnect WHOOP? Vitals already synced stay in your history.')) return;
+    setBusy(true); setMsg('');
+    try {
+      await disconnectWearable(update, 'whoop');
+      setMsg('WHOOP disconnected. Your synced history is unchanged.');
+    } catch (e) {
+      setMsg(e.message || 'Could not disconnect WHOOP.');
+    }
+    setBusy(false);
+  }
+
   async function connect() {
     setBusy(true); setMsg('');
     try {
@@ -197,12 +215,117 @@ function WhoopPanel({ S, update }) {
               {busy ? 'Syncing…' : 'Sync WHOOP'}
             </button>
             <button type="button" className="vitals-ah-btn vitals-ah-btn-alt" disabled={busy} onClick={() => syncNow(30)}>30d</button>
+            <button type="button" className="vitals-ah-btn vitals-ah-btn-alt" disabled={busy} onClick={disconnect}>Disconnect</button>
           </>
         )}
         <span className="vitals-ah-hint">
           {msg || (connected
             ? 'Pulls recovery, sleep, HRV, strain and workout burn. Auto-syncs when you open the app.'
             : 'Link your WHOOP — recovery, sleep, HRV, strain and measured workout burn.')}
+        </span>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Oura Ring panel — same OAuth-connect + pull-sync shape as WhoopPanel.
+ *
+ * NOT owner-gated, unlike WHOOP. That's deliberate: this exists because
+ * a real user asked to link her own ring, and a panel only the owner can
+ * see would not have answered her. Any signed-in account can connect its
+ * own Oura; tokens are stored per user and RLS-locked to the service
+ * role, so one account can never read another's.
+ *
+ * The panel hides itself entirely when the site has no Oura credentials
+ * configured — no point advertising a button that returns "env missing".
+ */
+function OuraPanel({ S, update }) {
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState('');
+  const connected = !!S.ouraConnected;
+
+  async function syncNow(days = 7) {
+    setBusy(true);
+    setMsg('');
+    try {
+      const { vDays, bDays } = await syncOura(update, days);
+      setMsg(`Synced ${vDays} day${vDays === 1 ? '' : 's'} of vitals · ${bDays} workout day${bDays === 1 ? '' : 's'}.`);
+    } catch (e) {
+      setMsg(e.message || 'Oura sync failed.');
+    }
+    setBusy(false);
+  }
+
+  // Handle the OAuth redirect (?oura=connected).
+  useEffect(() => {
+    const p = new URLSearchParams(window.location.search);
+    const r = p.get('oura');
+    if (!r) return;
+    p.delete('oura');
+    const qs = p.toString();
+    window.history.replaceState({}, '', window.location.pathname + (qs ? '?' + qs : ''));
+    if (r === 'connected') {
+      update(prev => (prev.ouraConnected ? prev : { ...prev, ouraConnected: true }));
+      syncNow(7);
+    } else {
+      setMsg(`Oura connect failed (${r}).`);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  async function disconnect() {
+    // Consent withdrawal: drops the stored tokens. Vitals already synced
+    // stay put — removing them would be a data-loss surprise, and
+    // account deletion is the route for erasing everything.
+    if (!window.confirm('Disconnect your Oura Ring? Vitals already synced stay in your history.')) return;
+    setBusy(true); setMsg('');
+    try {
+      await disconnectWearable(update, 'oura');
+      setMsg('Oura disconnected. Your synced history is unchanged.');
+    } catch (e) {
+      setMsg(e.message || 'Could not disconnect Oura.');
+    }
+    setBusy(false);
+  }
+
+  async function connect() {
+    setBusy(true); setMsg('');
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const res = await fetch('/.netlify/functions/oura-connect', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${session?.access_token}` },
+      });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok || !body.url) throw new Error(body.error || 'connect failed');
+      window.location.href = body.url;
+    } catch (e) {
+      setMsg(e.message || 'Could not start Oura connect.');
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="vitals-ah vitals-oura">
+      <div className="vitals-ah-row">
+        {!connected ? (
+          <button type="button" className="vitals-ah-btn" disabled={busy} onClick={connect}>
+            {busy ? 'Opening Oura…' : 'Connect Oura Ring'}
+          </button>
+        ) : (
+          <>
+            <button type="button" className="vitals-ah-btn" disabled={busy} onClick={() => syncNow(7)}>
+              {busy ? 'Syncing…' : 'Sync Oura'}
+            </button>
+            <button type="button" className="vitals-ah-btn vitals-ah-btn-alt" disabled={busy} onClick={() => syncNow(30)}>30d</button>
+            <button type="button" className="vitals-ah-btn vitals-ah-btn-alt" disabled={busy} onClick={disconnect}>Disconnect</button>
+          </>
+        )}
+        <span className="vitals-ah-hint">
+          {msg || (connected
+            ? 'Pulls sleep, resting HR, HRV, readiness and daily burn. Auto-syncs when you open the app.'
+            : 'Link your Oura Ring — sleep, resting HR, HRV, readiness and daily burn.')}
         </span>
       </div>
     </div>
@@ -223,12 +346,27 @@ function WhoopBadge({ connected }) {
   );
 }
 
-// Card heading + optional WHOOP indicator, shared by both card states.
-function VitalsHeading({ connected }) {
+// Small Oura mark shown beside the card title once the ring is linked,
+// the counterpart of WhoopBadge. A ring, because that's what it is.
+function OuraBadge({ connected }) {
+  if (!connected) return null;
+  return (
+    <span className="vitals-whoop-badge vitals-oura-badge" title="Connected to Oura — syncing sleep, resting HR, HRV & readiness">
+      <svg viewBox="0 0 24 24" width="12" height="12" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="2.4">
+        <circle cx="12" cy="12" r="8" />
+      </svg>
+      OURA
+    </span>
+  );
+}
+
+// Card heading + optional device indicators, shared by both card states.
+function VitalsHeading({ connected, oura }) {
   return (
     <h3 className="vitals-card-title" style={{ margin: '0 0 4px' }}>
       Vitals &amp; Macros
       <WhoopBadge connected={connected} />
+      <OuraBadge connected={oura} />
     </h3>
   );
 }
@@ -242,7 +380,6 @@ const EDIT_LIMITS = {
 };
 
 export default function VitalsHistoryCard({ S, update }) {
-  const isOwner = typeof window !== 'undefined' && !!window.__vantageOwner;
   const [metricKey, setMetricKey] = useState('weight');
   const [rangeKey, setRangeKey] = useState('30d');
   const [hover, setHover] = useState(null); // index into points
@@ -251,22 +388,34 @@ export default function VitalsHistoryCard({ S, update }) {
   const [extraDate, setExtraDate] = useState(null); // day pulled into the table via the date picker
   const svgRef = useRef(null);
 
-  // Show the WHOOP row when WHOOP is connected OR any historical WHOOP
-  // value exists — disconnecting must never hide data the user already
-  // has. (WHOOP metrics live in vitalsLog alongside the manual ones.)
-  const showWhoopRow = useMemo(() => {
-    if (S.whoopConnected) return true;
+  // Show the wearable row when EITHER device is connected, or any
+  // historical wearable value exists — disconnecting must never hide
+  // data the user already has. Oura feeds hrv/recovery/burnKcal into the
+  // same vitalsLog keys as WHOOP (it has no strain equivalent), so the
+  // row and its chips serve both.
+  // Which wearable chips to offer. A chip earns its place if the metric
+  // has any data, or if WHOOP is connected (it supplies all four, and
+  // the chips should exist before the first sync lands). Oura has no
+  // strain, so an Oura-only user doesn't get a Strain chip that opens an
+  // empty chart.
+  const wearableMetrics = useMemo(() => {
     const log = S.vitalsLog || {};
-    const whoopKeys = METRICS.filter(m => m.src === 'whoop').map(m => m.key);
-    return Object.values(log).some(day => day && whoopKeys.some(k => day[k] != null));
-  }, [S.whoopConnected, S.vitalsLog]);
+    const all = METRICS.filter(m => m.src === 'whoop');
+    if (S.whoopConnected) return all;
+    const hasData = k => Object.values(log).some(day => day && day[k] != null);
+    const withData = all.filter(m => hasData(m.key));
+    // Freshly connected Oura, nothing synced yet: show what it can fill.
+    if (!withData.length && S.ouraConnected) return all.filter(m => m.key !== 'strain');
+    return withData;
+  }, [S.whoopConnected, S.ouraConnected, S.vitalsLog]);
+  const showWhoopRow = wearableMetrics.length > 0;
 
   // If the selected metric belongs to a row that isn't shown, fall back
   // to Weight so the chart never renders an unreachable selection.
   useEffect(() => {
     const m = METRICS.find(x => x.key === metricKey);
-    if (m && m.src === 'whoop' && !showWhoopRow) setMetricKey('weight');
-  }, [metricKey, showWhoopRow]);
+    if (m && m.src === 'whoop' && !wearableMetrics.some(x => x.key === m.key)) setMetricKey('weight');
+  }, [metricKey, wearableMetrics]);
 
   const metric = METRICS.find(m => m.key === metricKey);
   const range = RANGES.find(r => r.key === rangeKey);
@@ -397,12 +546,13 @@ export default function VitalsHistoryCard({ S, update }) {
   if (!tableRows.length && !hasMacroHistory) {
     return (
       <div className="card vitals-card">
-        <VitalsHeading connected={!!S.whoopConnected} />
+        <VitalsHeading connected={!!S.whoopConnected} oura={!!S.ouraConnected} />
         <p className="vitals-sub">
           No history yet. Log weight/sleep/HR from the hub Vitals widget, or log food in Daily Macros — each day banks a “% of goal hit” snapshot here.
         </p>
         {addDayPicker}
-        {isOwner && update && <WhoopPanel S={S} update={update} />}
+        {update && <WhoopPanel S={S} update={update} />}
+        {update && <OuraPanel S={S} update={update} />}
       </div>
     );
   }
@@ -412,10 +562,11 @@ export default function VitalsHistoryCard({ S, update }) {
 
   return (
     <div className="card vitals-card">
-      <VitalsHeading connected={!!S.whoopConnected} />
+      <VitalsHeading connected={!!S.whoopConnected} oura={!!S.ouraConnected} />
       <p className="vitals-sub">Vitals from the hub widget; macro days saved as % of each goal hit. Hover the chart for exact values.</p>
 
-      {isOwner && update && <WhoopPanel S={S} update={update} />}
+      {update && <WhoopPanel S={S} update={update} />}
+      {update && <OuraPanel S={S} update={update} />}
 
       {/* Filter row — metric first (it names the chart), then range. */}
       <div className="vitals-controls">
@@ -430,7 +581,7 @@ export default function VitalsHistoryCard({ S, update }) {
         </div>
         {showWhoopRow && (
           <div className="vitals-seg vitals-seg-whoop" role="tablist" aria-label="WHOOP metric">
-            {METRICS.filter(m => m.src === 'whoop').map(m => (
+            {wearableMetrics.map(m => (
               <button key={m.key} type="button" role="tab" aria-selected={metricKey === m.key}
                 className={`vitals-seg-btn${metricKey === m.key ? ' on' : ''}`}
                 onClick={() => { setMetricKey(m.key); setHover(null); }}>

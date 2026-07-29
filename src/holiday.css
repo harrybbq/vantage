@@ -17,8 +17,20 @@
 /* ── Shared map ── */
 .hol-map-wrap{position:relative;width:100%;border-radius:var(--radius-xl);overflow:hidden;
   border:var(--border-card);background:var(--surface);}
-.hol-map{display:block;width:100%;height:100%;touch-action:none;cursor:grab;}
+/* touch-action is set by the component (pan-y normally, none mid-pinch)
+   so a one-finger swipe still scrolls the page. */
+.hol-map{display:block;width:100%;height:100%;cursor:grab;}
 .hol-map:active{cursor:grabbing;}
+/* Transient "use two fingers" nudge, the same contract as an embedded
+   Google map. Never in the way: it can't be tapped and fades itself. */
+.hol-map-hint{
+  position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);
+  padding:9px 15px;border-radius:999px;pointer-events:none;
+  background:rgba(0,0,0,.72);color:#fff;backdrop-filter:blur(3px);
+  font-family:var(--mono);font-size:10px;letter-spacing:1px;text-transform:uppercase;
+  opacity:0;transition:opacity .18s var(--ease-out);
+}
+.hol-map-hint.is-on{opacity:1;}
 .hol-map-country{fill:var(--holiday-map-land,rgba(255,255,255,.07));
   stroke:var(--holiday-map-stroke,rgba(255,255,255,.16));stroke-width:.35;
   transition:fill .18s var(--ease-out);}

@@ -42,6 +42,7 @@ import { useCapacitor, haptic } from './hooks/useCapacitor';
 import { useIsMobile } from './hooks/useIsMobile';
 import { useVisions } from './lib/visions/useVisions';
 import { useWhoopAutoSync } from './lib/whoopClient';
+import { useOuraAutoSync } from './lib/ouraClient';
 import { usePublishProfile } from './lib/friends/usePublishProfile';
 import { useRatings } from './hooks/useRatings';
 import BottomTabBar from './components/mobile/BottomTabBar';
@@ -113,6 +114,7 @@ function Board({ userId, userEmail, onSignOut }) {
   // Passive WHOOP sync — refreshes vitals/burn whenever the app opens or
   // regains focus (throttled), so data stays fresh without visiting Track.
   useWhoopAutoSync(S, update);
+  useOuraAutoSync(S, update);
   // Owner admin edit modal — opened via right-click on OVR / coin chip
   // (handlers in PageHeader + MobileAppBar + RatingsPanel).
   const [adminEdit, setAdminEdit] = useState(null); // 'rating' | 'coins' | null

@@ -23,7 +23,12 @@
 
 const OFF = 'https://world.openfoodfacts.org';
 const OFF_SEARCH = 'https://search.openfoodfacts.org';
-const UA = 'Vantage/1.0 (https://soft-phoenix-b512b8.netlify.app)';
+// Open Food Facts identifies callers by User-Agent and asks that it name
+// a working contact URL. This still pointed at soft-phoenix-b512b8 — the
+// subdomain from before the site was renamed — so we were introducing
+// ourselves to them with a dead address, and disagreeing with the UA in
+// lib/foodSources.js at that. Same string in both places now.
+const UA = 'Vantage/1.0 (https://vantagevision.netlify.app)';
 
 const { requireUser, underLimit, tooMany } = require('../lib/requireUser');
 const { searchUSDA, searchFatSecret } = require('../lib/foodSources');
