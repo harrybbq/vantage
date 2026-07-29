@@ -611,15 +611,53 @@ export default function AchievementsSection({ S, update, active, onOpenModal, on
 
   // ── derived ─────────────────────────────────────────────────────
 
-  // Min canvas dimensions so dragging beyond doesn't clip
-  const { canvasW, canvasH } = useMemo(() => {
+  // Min canvas dimensions so dragging beyond doesn't clip.
+  const { canvasW, contentH } = useMemo(() => {
     let w = 700, h = 400;
     achievements.forEach(a => {
       w = Math.max(w, a.x + NODE_W + 30);
       h = Math.max(h, a.y + 130);
     });
-    return { canvasW: w, canvasH: h };
+    return { canvasW: w, contentH: h };
   }, [achievements]);
+
+  // ── The board keeps going south ──
+  // There is always at least SOUTH_RUNWAY of empty grid below the
+  // lowest node, and scrolling near the bottom adds another stretch —
+  // so the board reads as open space you can keep building down into
+  // rather than a page that stops. The ceiling is a runaway guard, not
+  // a design limit; you'd have to pan a very long way to meet it.
+  const SOUTH_RUNWAY = 900;
+  const SOUTH_MAX = 60000;
+  const [southRunway, setSouthRunway] = useState(SOUTH_RUNWAY);
+  const canvasH = Math.min(SOUTH_MAX, contentH + southRunway);
+
+  useEffect(() => {
+    const wrap = canvasWrapRef.current;
+    if (!wrap) return;
+    // Fires on wheel, drag-pan and scrollbar alike — they all move
+    // scrollTop, so one listener covers every way of getting there.
+    const onScroll = () => {
+      const remaining = wrap.scrollHeight - wrap.scrollTop - wrap.clientHeight;
+      if (remaining < 320) {
+        setSouthRunway(r => Math.min(SOUTH_MAX, r + SOUTH_RUNWAY));
+      }
+    };
+    wrap.addEventListener('scroll', onScroll, { passive: true });
+    return () => wrap.removeEventListener('scroll', onScroll);
+  }, [activeTab]);
+
+  /** Zoom back to 1:1 and bring the nodes back into view. Panning into
+   *  open space is the point, but you need a way home from it. */
+  function recentre() {
+    setZoom(1);
+    const wrap = canvasWrapRef.current;
+    if (!wrap) return;
+    if (!achievements.length) { wrap.scrollTo({ top: 0, left: 0, behavior: 'smooth' }); return; }
+    const minX = Math.min(...achievements.map(a => a.x));
+    const minY = Math.min(...achievements.map(a => a.y));
+    wrap.scrollTo({ top: Math.max(0, minY - 40), left: Math.max(0, minX - 40), behavior: 'smooth' });
+  }
 
   const completedCount = achievements.filter(a => a.completed).length;
   const totalCount = achievements.length;
@@ -725,8 +763,8 @@ export default function AchievementsSection({ S, update, active, onOpenModal, on
                 <button
                   type="button"
                   className="ach-zoom-btn ach-zoom-reset"
-                  onClick={() => setZoom(1)}
-                  title="Reset zoom"
+                  onClick={recentre}
+                  title="Recentre on your goals"
                 ><Icon name="locate-fixed" size={14} /></button>
               </div>
             </div>

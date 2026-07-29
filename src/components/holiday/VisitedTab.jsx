@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { Fragment, useMemo, useState } from 'react';
 import Icon from '../Icon';
 import WorldMap from './WorldMap';
 import { visitedCountries, visitedPct, ALL_COUNTRIES, COUNTRY_BY_ISO } from '../../lib/holiday/destinations';
@@ -15,6 +15,10 @@ import { visitedCountries, visitedPct, ALL_COUNTRIES, COUNTRY_BY_ISO } from '../
 export default function VisitedTab({ S, update }) {
   const [region, setRegion] = useState('all');
   const [picked, setPicked] = useState(null);
+  // Region chips alone can't find one country among 195 on a phone —
+  // "Vietnam" is a long way down Asia. Not persisted: it's a way of
+  // looking at the list for a moment, not a setting.
+  const [query, setQuery] = useState('');
 
   const visited = useMemo(() => visitedCountries(S), [S]);
   const isoList = useMemo(() => Object.keys(visited), [visited]);
@@ -42,12 +46,19 @@ export default function VisitedTab({ S, update }) {
   }, [visited]);
 
   const listed = useMemo(() => {
-    const all = region === 'all' ? ALL_COUNTRIES : ALL_COUNTRIES.filter(c => c.region === region);
+    const q = query.trim().toLowerCase();
+    let all = region === 'all' ? ALL_COUNTRIES : ALL_COUNTRIES.filter(c => c.region === region);
+    if (q) all = all.filter(c => c.name.toLowerCase().includes(q) || c.iso2.toLowerCase() === q);
     return [...all].sort((a, b) => {
       const av = visited[a.iso2] ? 0 : 1, bv = visited[b.iso2] ? 0 : 1;
       return av - bv || a.name.localeCompare(b.name);
     });
-  }, [region, visited]);
+  }, [region, visited, query]);
+
+  // The list is sorted visited-first, so one divider is enough to say
+  // where "been" ends and "not been" begins — clearer than reading tick
+  // marks down a two-column grid.
+  const beenCount = useMemo(() => listed.filter(c => visited[c.iso2]).length, [listed, visited]);
 
   function toggleManual(iso2) {
     if (!COUNTRY_BY_ISO[iso2]) return;
@@ -74,11 +85,27 @@ export default function VisitedTab({ S, update }) {
         <div className="hol-visited-stat">
           <b>{Object.values(visited).reduce((s, v) => s + v.trips.length, 0)}</b><span>logged trips</span>
         </div>
-        <div className="hol-visited-regions">
-          {Object.entries(byRegion).map(([r, v]) => (
-            <span key={r} className="hol-visited-region">{r} <b>{v.been}/{v.total}</b></span>
-          ))}
-        </div>
+      </div>
+
+      {/* Region progress as bars rather than a run-on line of counts —
+          "3/59 Africa" means little until you can see it against the
+          others. */}
+      <div className="hol-visited-regions">
+        {Object.entries(byRegion).map(([r, v]) => (
+          <button
+            key={r}
+            type="button"
+            className={`hol-visited-region${region === r ? ' is-active' : ''}`}
+            onClick={() => setRegion(region === r ? 'all' : r)}
+            aria-pressed={region === r}
+          >
+            <span className="hol-visited-region-name">{r}</span>
+            <span className="hol-visited-region-bar">
+              <i style={{ width: `${v.total ? (v.been / v.total) * 100 : 0}%` }} />
+            </span>
+            <b>{v.been}<em>/{v.total}</em></b>
+          </button>
+        ))}
       </div>
 
       <WorldMap view="world" fills={fills} onPick={toggleManual} height={430} />
@@ -100,6 +127,21 @@ export default function VisitedTab({ S, update }) {
       )}
 
       <div className="hol-visited-listwrap">
+        <div className="hol-visited-search">
+          <Icon name="search" size={14} />
+          <input
+            type="search"
+            value={query}
+            onChange={e => setQuery(e.target.value)}
+            placeholder="Find a country…"
+            aria-label="Search countries"
+          />
+          {query && (
+            <button type="button" className="hol-visited-search-clear" onClick={() => setQuery('')} aria-label="Clear search">
+              <Icon name="x" size={13} />
+            </button>
+          )}
+        </div>
         <div className="hol-visited-filter">
           {regions.map(r => (
             <button
@@ -110,24 +152,32 @@ export default function VisitedTab({ S, update }) {
             >{r === 'all' ? 'All' : r}</button>
           ))}
         </div>
-        <div className="hol-visited-list">
-          {listed.map(c => {
-            const v = visited[c.iso2];
-            return (
-              <button
-                key={c.iso2}
-                type="button"
-                className={`hol-visited-item${v ? ' is-been' : ''}`}
-                onClick={() => toggleManual(c.iso2)}
-                title={v?.trips.length ? 'From a completed trip' : 'Tap to toggle'}
-              >
-                {v && <Icon name="check" size={12} />}
-                <span>{c.name}</span>
-                {v?.trips.length > 0 && <em>{v.trips.length}</em>}
-              </button>
-            );
-          })}
-        </div>
+        {listed.length === 0 ? (
+          <div className="hol-visited-none">No country matches “{query}”.</div>
+        ) : (
+          <div className="hol-visited-list">
+            {listed.map((c, i) => {
+              const v = visited[c.iso2];
+              return (
+                <Fragment key={c.iso2}>
+                  {i === beenCount && beenCount > 0 && (
+                    <div className="hol-visited-divider">Not been yet</div>
+                  )}
+                  <button
+                    type="button"
+                    className={`hol-visited-item${v ? ' is-been' : ''}`}
+                    onClick={() => toggleManual(c.iso2)}
+                    title={v?.trips.length ? 'From a completed trip' : 'Tap to toggle'}
+                  >
+                    {v ? <Icon name="check" size={12} /> : <span className="hol-visited-item-dot" aria-hidden="true" />}
+                    <span>{c.name}</span>
+                    {v?.trips.length > 0 && <em>{v.trips.length}</em>}
+                  </button>
+                </Fragment>
+              );
+            })}
+          </div>
+        )}
       </div>
 
       <div className="hol-visited-hint">

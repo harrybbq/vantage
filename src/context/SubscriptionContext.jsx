@@ -1,7 +1,10 @@
 import { createContext, useContext } from 'react';
 import { useSubscription } from '../hooks/useSubscription';
 
-const SubscriptionContext = createContext({
+// Exported so Pro-gated surfaces can be rendered under a known tier in
+// a test harness. Nothing in the app should consume it directly — use
+// useSubscriptionContext().
+export const SubscriptionContext = createContext({
   tier: 'free',
   isPro: false,
   isLifetime: false,
