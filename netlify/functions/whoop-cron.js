@@ -29,15 +29,27 @@ exports.handler = async () => {
   }
 
   // Every connected account.
-  const tokRes = await sb('whoop_tokens?select=user_id', {}, env);
+  // Least-recently-touched first, so a run that hits the time
+  // budget resumes with the accounts it did not reach rather than
+  // starving them forever behind the same head of the list.
+  const tokRes = await sb('whoop_tokens?select=user_id&order=updated_at.asc', {}, env);
   if (!tokRes.ok) {
     console.error('whoop-cron: token list failed', tokRes.status);
     return { statusCode: 502 };
   }
   const rows = await tokRes.json().catch(() => []);
-  let synced = 0, skipped = 0, failed = 0;
+  let synced = 0, skipped = 0, failed = 0, deferred = 0;
+
+  // Wall-clock budget. Each account costs four upstream calls plus
+  // a read and a write, so an unbounded serial loop stops being
+  // viable as soon as there are real users — and a function killed
+  // mid-loop is indistinguishable from one that worked. Stopping
+  // deliberately, and saying how many were left, is the difference
+  // between a backlog and a silent hole in everyone's data.
+  const DEADLINE = Date.now() + 60_000;
 
   for (const { user_id: userId } of rows) {
+    if (Date.now() > DEADLINE) { deferred++; continue; }
     try {
       const accessToken = await getFreshToken(userId, env);
       if (!accessToken) { skipped++; continue; }
@@ -65,6 +77,6 @@ exports.handler = async () => {
     }
   }
 
-  console.info(`whoop-cron: ${synced} synced, ${skipped} skipped, ${failed} failed of ${rows.length}`);
+  console.info(`whoop-cron: ${synced} synced, ${skipped} skipped, ${failed} failed, ${deferred} deferred to the next run, of ${rows.length}`);
   return { statusCode: 200 };
 };

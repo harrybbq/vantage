@@ -6,16 +6,19 @@
  * exchange the code for access+refresh tokens, store them in
  * whoop_tokens (service-role only), and bounce back into the app.
  */
-const crypto = require('crypto');
+const { verifyState, clearCookie } = require('../lib/oauthState');
 
 const TOKEN_URL = 'https://api.prod.whoop.com/oauth/oauth2/token';
 
-function sign(value, secret) {
-  return crypto.createHmac('sha256', secret).update(value).digest('hex').slice(0, 32);
-}
 
 function redirect(host, result) {
-  return { statusCode: 302, headers: { Location: `https://${host}/?whoop=${result}` }, body: '' };
+  // Always burn the nonce, success or failure — a state that
+  // survives one attempt is a state that can be retried.
+  return {
+    statusCode: 302,
+    headers: { Location: `https://${host}/?whoop=${result}`, 'Set-Cookie': clearCookie },
+    body: '',
+  };
 }
 
 exports.handler = async (event) => {
@@ -24,8 +27,11 @@ exports.handler = async (event) => {
   const q = event.queryStringParameters || {};
 
   if (q.error) return redirect(host, 'denied');
-  const [userId, sig] = String(q.state || '').split('.');
-  if (!userId || sig !== sign(userId, WHOOP_CLIENT_SECRET || '')) return redirect(host, 'badstate');
+  // Authentic, unexpired, for this provider, AND accompanied by
+  // the nonce cookie set when this browser began the flow.
+  const checked = verifyState(q.state, 'whoop', event, process.env);
+  if (checked.error) return redirect(host, checked.error);
+  const userId = checked.userId;
   if (!q.code) return redirect(host, 'nocode');
 
   try {

@@ -15,6 +15,7 @@
  *           burn:{date:[{id,label,kcal}]} }
  */
 const { getFreshToken, fetchOuraData } = require('../lib/oura');
+const { requireUser, underLimit, tooMany } = require('../lib/requireUser');
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
@@ -31,12 +32,13 @@ exports.handler = async (event) => {
     return { statusCode: 500, headers: CORS, body: JSON.stringify({ error: 'Oura env missing' }) };
   }
 
-  const jwt = (event.headers.authorization || '').replace(/^Bearer\s+/i, '');
-  if (!jwt) return { statusCode: 401, headers: CORS, body: JSON.stringify({ error: 'missing token' }) };
-  const userRes = await fetch(`${env.SUPABASE_URL}/auth/v1/user`, { headers: { apikey: env.SUPABASE_SERVICE_ROLE_KEY, Authorization: `Bearer ${jwt}` } });
-  if (!userRes.ok) return { statusCode: 401, headers: CORS, body: JSON.stringify({ error: 'invalid token' }) };
-  const userId = (await userRes.json())?.id;
-  if (!userId) return { statusCode: 401, headers: CORS, body: JSON.stringify({ error: 'no user id' }) };
+  // Identity from the verified token, plus a per-account brake:
+  // one sync fans out to four upstream calls, and the endpoint is
+  // now open to every user rather than just the owner.
+  const auth = await requireUser(event, CORS);
+  if (auth.error) return auth.error;
+  const userId = auth.userId;
+  if (!underLimit('oura-sync', userId, 6)) return tooMany(CORS);
 
   let body = {};
   try { body = JSON.parse(event.body || '{}'); } catch { /* fine */ }

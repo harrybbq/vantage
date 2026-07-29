@@ -129,9 +129,14 @@ export function AppleHealthImport({ S, update }) {
   );
 }
 
-// Owner-only WHOOP panel — OAuth connect + pull-based sync. The
-// function returns mapped data and WE merge it via update(), so every
-// write flows through the normal save pipeline + anti-wipe guards.
+// WHOOP panel — OAuth connect + pull-based sync. The function returns
+// mapped data and WE merge it via update(), so every write flows through
+// the normal save pipeline + anti-wipe guards.
+//
+// Open to every signed-in account (it was owner-only during
+// development). Each account links its own device: tokens are keyed by
+// user_id in a table with RLS on and no policies, so only the Netlify
+// functions can read them and never across users.
 function WhoopPanel({ S, update }) {
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState('');
@@ -375,7 +380,6 @@ const EDIT_LIMITS = {
 };
 
 export default function VitalsHistoryCard({ S, update }) {
-  const isOwner = typeof window !== 'undefined' && !!window.__vantageOwner;
   const [metricKey, setMetricKey] = useState('weight');
   const [rangeKey, setRangeKey] = useState('30d');
   const [hover, setHover] = useState(null); // index into points
@@ -547,7 +551,7 @@ export default function VitalsHistoryCard({ S, update }) {
           No history yet. Log weight/sleep/HR from the hub Vitals widget, or log food in Daily Macros — each day banks a “% of goal hit” snapshot here.
         </p>
         {addDayPicker}
-        {isOwner && update && <WhoopPanel S={S} update={update} />}
+        {update && <WhoopPanel S={S} update={update} />}
         {update && <OuraPanel S={S} update={update} />}
       </div>
     );
@@ -561,7 +565,7 @@ export default function VitalsHistoryCard({ S, update }) {
       <VitalsHeading connected={!!S.whoopConnected} oura={!!S.ouraConnected} />
       <p className="vitals-sub">Vitals from the hub widget; macro days saved as % of each goal hit. Hover the chart for exact values.</p>
 
-      {isOwner && update && <WhoopPanel S={S} update={update} />}
+      {update && <WhoopPanel S={S} update={update} />}
       {update && <OuraPanel S={S} update={update} />}
 
       {/* Filter row — metric first (it names the chart), then range. */}
