@@ -136,6 +136,43 @@ Adding a key needs no code change.
 - `[x]` **Open Food Facts** — no key, already live. ~3M barcoded
   products, Europe-strong.
 
+## Wearables — two things before Oura works for anyone
+
+The code shipped and is open to every signed-in account, but the Oura
+integration is inert until both of these are done. Until then the panel
+says "Oura env missing" rather than failing quietly. WHOOP needs
+neither — it is already configured.
+
+28. `[ ]` **Run `supabase/oura_schema.sql`** in the Supabase SQL editor.
+    Creates `oura_tokens` — RLS on, no policies, so only the service
+    role ever sees a refresh token. Migrations are approval-gated, so
+    tooling cannot apply this; it has to be run by hand.
+29. `[ ]` **Register the Oura app and set its keys in Netlify.** Create
+    it at `cloud.ouraring.com/oauth/applications`, then set
+    `OURA_CLIENT_ID` and `OURA_CLIENT_SECRET` as Netlify env vars.
+    Redirect URI must be exactly
+    `https://vantagevision.netlify.app/.netlify/functions/oura-callback`.
+    - `[ ]` ⚠️ **Confirm the terms for multi-user use while you're in
+      the portal.** Personal use of the Oura API has been free, but
+      distributing an app that reads *other people's* Oura data may
+      need registration or review — the way WHOOP did. This decides
+      whether Oura stays a general feature or becomes invite-only, so
+      settle it before anyone outside the team connects a ring.
+
+Standing rules for both wearables, so a third one doesn't relearn them:
+
+- **Never make the OAuth `state` deterministic.** It carries a nonce
+  matched against an HttpOnly cookie, a signed 10-minute expiry, and the
+  provider name (`netlify/lib/oauthState.js`). The original static
+  version let one account's linking flow be used to file *another*
+  user's tokens under the attacker's id — health data to the wrong
+  person. The cookie is `SameSite=Lax` on purpose: the provider's
+  redirect is a top-level GET, which Lax allows and Strict would block.
+- **Every new user-scoped table needs `on delete cascade`** to
+  `auth.users(id)`, or account deletion leaves it behind (see item 20).
+- **Disconnect must delete the tokens**, because the privacy policy says
+  it does — `wearable-disconnect` covers both providers.
+
 ## Standing operational notes
 
 - **Lifetime is a grant, never a purchase.** It's filtered out of the
