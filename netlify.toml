@@ -64,7 +64,18 @@
   [headers.values]
     # Clickjacking. Matters more now the app is heading for app stores,
     # where a webview wrapper shouldn't be frameable by anyone else.
-    X-Frame-Options = "DENY"
+    #
+    # SAMEORIGIN, not DENY. DENY blocks same-origin framing too, which
+    # broke the owner Rotation page — it renders
+    # /schedule/shift-rotation-2026.html in a same-origin iframe, and
+    # Firefox refused it outright. public/_headers already said
+    # SAMEORIGIN for this exact reason, but netlify.toml takes
+    # precedence over _headers when both set a header, so DENY won and
+    # the note in _headers had no effect. Keep the two in step.
+    #
+    # Cross-origin embedding stays blocked, which is the clickjacking
+    # protection that actually matters.
+    X-Frame-Options = "SAMEORIGIN"
     # Stop the browser second-guessing declared content types.
     X-Content-Type-Options = "nosniff"
     # Don't leak the page path (which can name a section) to third
@@ -90,7 +101,12 @@
     # Promote to Content-Security-Policy once the violation reports are
     # quiet. It is defence-in-depth for the innerHTML rendering in the
     # hub, which is now escaped but is still string-built HTML.
-    Content-Security-Policy-Report-Only = "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; font-src 'self' data:; connect-src 'self' https://*.supabase.co wss://*.supabase.co https://api.open-meteo.com https://archive-api.open-meteo.com https://geocoding-api.open-meteo.com https://api.frankfurter.app https://ipwho.is https://api.github.com https://ws.audioscrobbler.com; frame-ancestors 'none'; base-uri 'self'; form-action 'self'; object-src 'none'"
+    #
+    # frame-ancestors is 'self', matching X-Frame-Options above — it
+    # would supersede that header once this policy is enforced, so
+    # leaving it at 'none' would have re-broken the Rotation page the
+    # day the CSP was promoted.
+    Content-Security-Policy-Report-Only = "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; font-src 'self' data:; connect-src 'self' https://*.supabase.co wss://*.supabase.co https://api.open-meteo.com https://archive-api.open-meteo.com https://geocoding-api.open-meteo.com https://api.frankfurter.app https://ipwho.is https://api.github.com https://ws.audioscrobbler.com; frame-ancestors 'self'; base-uri 'self'; form-action 'self'; object-src 'none'"
 
 # The service worker must never be cached, or a stale one can pin
 # clients to an old build — the failure mode behind the 2026-05-03
