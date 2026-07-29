@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { TRENDING_ITEMS } from '../../data/trendingItems';
 import { supabase } from '../../lib/supabase';
+import Icon from '../Icon';
 
 /**
  * TrendingBoard — a single-item-wide list that slowly rolls, like an
@@ -25,6 +26,11 @@ export default function TrendingBoard({ onAdd }) {
   const [everyone, setEveryone] = useState(null); // global source; null=loading, []=none
   const [source, setSource] = useState('popular');
   const userChose = useRef(false); // set once the user taps a tab
+  // On phones the board is pinned above the tab bar, so it permanently
+  // covers a slice of the wishlist. The chevron folds it down to its
+  // header. Deliberately not persisted — it's a "get out of my way for a
+  // minute", not a setting, and every stored key costs a read and a write.
+  const [open, setOpen] = useState(true);
 
   useEffect(() => {
     let cancelled = false;
@@ -74,7 +80,7 @@ export default function TrendingBoard({ onAdd }) {
   const loop = [...items, ...items];
 
   return (
-    <aside className="shop-trending" aria-label="Trending items">
+    <aside className={`shop-trending${open ? '' : ' is-collapsed'}`} aria-label="Trending items">
       <div className="shop-trending-head">
         <span className="shop-trending-title">Trending</span>
         {(hasFriends || hasGlobal) ? (
@@ -90,6 +96,13 @@ export default function TrendingBoard({ onAdd }) {
         ) : (
           <span className="shop-trending-sub">Popular picks</span>
         )}
+        <button
+          type="button"
+          className="shop-trending-collapse"
+          aria-expanded={open}
+          aria-label={open ? 'Hide trending board' : 'Show trending board'}
+          onClick={() => setOpen(v => !v)}
+        ><Icon name={open ? 'chevron-down' : 'chevron-up'} size={15} /></button>
       </div>
       <div className="shop-trending-viewport">
         <div className="shop-trending-track" style={{ animationDuration: `${duration}s` }}>

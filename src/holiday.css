@@ -280,36 +280,6 @@
   .holiday-tab{padding:8px 12px;}
 }
 
-/* ── Shopping: scroll-to-category + sticky trending ─────────────────
-   The category tabs scroll to a section rather than filtering the page
-   down to it. The landing offset lives here as scroll-margin-top so
-   scrollIntoView needs no JS measuring and each breakpoint can differ.
-   96px clears the .section top padding (68px) plus breathing room. */
-.shop-category-section{scroll-margin-top:96px;}
-
-@media (max-width:900px){
-  /* Clear the fixed mobile app bar and the notch. */
-  .shop-category-section{
-    scroll-margin-top:calc(var(--m-appbar-h,56px) + var(--m-safe-top,0px) + 14px);
-  }
-
-  /* Sticky trending on mobile.
-     This could not work before: .shop-page set overflow-x:hidden, and a
-     box with overflow-x:hidden and overflow-y:visible computes
-     overflow-y to auto — making .shop-page a scroll container, which
-     stops a descendant sticking to the VIEWPORT. The horizontal clip it
-     was there for is already handled by .shop-trending-viewport's own
-     overflow:hidden, so dropping it here costs nothing.
-
-     Pinned to the bottom rather than the top: the wishlist is the point
-     of the page and shouldn't get pushed down the screen by an ad rail. */
-  .shop-page{overflow-x:visible;}
-  .shop-trending{
-    position:sticky;
-    bottom:calc(var(--m-tabs-h,64px) + var(--m-safe-bottom,0px) + 8px);
-    z-index:5;
-  }
-}
 
 /* Someone who asked for less motion gets the jump, not the glide —
    scroll-behavior is set globally on <html>, so it needs unsetting. */
@@ -317,68 +287,6 @@
   html{scroll-behavior:auto;}
 }
 
-/* ── Shopping: search, sort, bulk actions, totals, price movement ─── */
-.shop-controls{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin-top:10px;}
-.shop-search{flex:1;min-width:180px;display:flex;align-items:center;gap:8px;padding:8px 11px;
-  border-radius:10px;border:var(--border-card);background:var(--surface);color:var(--text-muted);}
-.shop-search input{flex:1;min-width:0;background:transparent;border:0;outline:0;color:var(--text);
-  font-family:var(--sans);font-size:13px;}
-.shop-search input::-webkit-search-cancel-button{display:none;}
-.shop-search-clear{background:transparent;border:0;color:var(--text-muted);cursor:pointer;display:flex;padding:2px;}
-.shop-search-clear:hover{color:var(--text);}
-.shop-sort{display:inline-flex;align-items:center;gap:7px;font-family:var(--mono);font-size:9px;
-  letter-spacing:1.2px;text-transform:uppercase;color:var(--text-muted);}
-.shop-sort select{padding:8px 10px;border-radius:9px;border:var(--border-card);background:var(--surface);
-  color:var(--text);font-family:var(--sans);font-size:12px;cursor:pointer;}
-.shop-select-toggle{padding:8px 15px;border-radius:999px;border:var(--border-card);background:transparent;
-  color:var(--text-muted);cursor:pointer;font-family:var(--mono);font-size:9px;letter-spacing:1.2px;
-  text-transform:uppercase;}
-.shop-select-toggle:hover{color:var(--text);border-color:var(--accent-line);}
-.shop-select-toggle.is-on{background:var(--em);border-color:var(--em);color:var(--on-em,#fff);}
-.shop-search-note{margin-top:8px;font-family:var(--mono);font-size:9px;letter-spacing:.6px;color:var(--text-muted);}
-
-.shop-bulkbar{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin-top:10px;padding:10px 12px;
-  border-radius:11px;border:1px solid var(--em);background:rgba(var(--em-rgb),.09);}
-.shop-bulkbar-count{font-family:var(--mono);font-size:10px;letter-spacing:1.2px;text-transform:uppercase;
-  color:var(--em);font-weight:700;margin-right:2px;}
-.shop-bulkbar button,.shop-bulkbar select{padding:7px 12px;border-radius:8px;border:var(--border-card);
-  background:var(--surface);color:var(--text);font-family:var(--sans);font-size:12px;cursor:pointer;}
-.shop-bulkbar button:disabled,.shop-bulkbar select:disabled{opacity:.45;cursor:not-allowed;}
-.shop-bulkbar button:not(:disabled):hover{border-color:var(--em);}
-.shop-bulkbar-del{color:var(--danger,#e5484d)!important;}
-.shop-bulkbar-del:not(:disabled):hover{border-color:var(--danger,#e5484d)!important;
-  background:rgba(229,72,77,.1)!important;}
-
-/* Selection affordance. The card is the hit target in bulk mode, so the
-   dot is a state indicator rather than a control of its own. */
-.shop-item-card.is-selectable{cursor:pointer;}
-.shop-item-card.is-selected{border-color:var(--em);box-shadow:0 0 0 2px rgba(var(--em-rgb),.35);}
-.shop-select-dot{position:absolute;top:8px;left:8px;z-index:3;width:20px;height:20px;border-radius:50%;
-  border:2px solid var(--em);background:var(--surface);display:flex;align-items:center;justify-content:center;
-  color:var(--on-em,#fff);}
-.shop-select-dot.is-on{background:var(--em);}
-
-.shop-category-total{font-family:var(--mono);font-size:10px;color:var(--text);letter-spacing:.4px;
-  padding:2px 8px;border-radius:999px;background:var(--surface);border:var(--border-card);
-  display:inline-flex;align-items:baseline;gap:3px;}
-.shop-category-total-partial{font-size:8px;color:var(--text-muted);}
-
-.shop-pricemove{position:absolute;top:8px;right:8px;z-index:3;padding:3px 7px;border-radius:999px;
-  font-family:var(--mono);font-size:9px;font-weight:700;letter-spacing:.5px;}
-.shop-pricemove-down{background:rgba(47,169,107,.16);color:#2fa96b;border:1px solid rgba(47,169,107,.45);}
-.shop-pricemove-up{background:rgba(229,72,77,.14);color:#e5484d;border:1px solid rgba(229,72,77,.4);}
-
-/* The card needs a positioning context for the badge/dot overlays. */
-.shop-item-card{position:relative;}
-
-@media (max-width:900px){
-  .shop-controls{gap:6px;}
-  .shop-search{flex:1 1 100%;}
-  .shop-sort{flex:1;}
-  .shop-sort select{flex:1;min-width:0;}
-  .shop-bulkbar{gap:6px;}
-  .shop-bulkbar button,.shop-bulkbar select{flex:1 1 auto;min-width:0;font-size:11px;padding:7px 9px;}
-}
 
 /* ── Operator panel: plan row ───────────────────────────────────────
    Sits at the foot of the Operator card. It never changes the tier —

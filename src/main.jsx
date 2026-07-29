@@ -7,6 +7,9 @@ import './theme-dark-basic.css'
 import './theme-cream-pro.css'
 import './tutorial.css'
 import './holiday.css'
+// Last on purpose: shop.css is the final word on .shop-* rules, which is
+// what the mobile shopping layout depends on. Don't reorder.
+import './shop.css'
 import App from './App.jsx'
 
 const queryClient = new QueryClient({
