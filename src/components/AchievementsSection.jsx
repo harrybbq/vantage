@@ -939,6 +939,9 @@ export default function AchievementsSection({ S, update, active, onOpenModal, on
             connections={connections}
             onComplete={handleToggleComplete}
             onEdit={handleEdit}
+            onConnect={handleConnect}
+            connectingFrom={S.connectingFrom || null}
+            onCancelConnect={handleCancelConnect}
           />
         </div>
       ) : (<>
