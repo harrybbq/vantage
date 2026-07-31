@@ -6529,3 +6529,69 @@ button:active:not(:disabled),
 }
 .report-context-input:focus{ border-color:var(--em); }
 .report-context-input::placeholder{ color:var(--text-muted); }
+
+/* ══════════════════════════════════════════════════════════════════════
+   ACHIEVEMENT TREE (mobile)
+   The graph laid out as a column. Same states and colour language as the
+   desktop canvas — only the arrangement is derived rather than dragged.
+   ══════════════════════════════════════════════════════════════════════ */
+.ach-tree{position:relative;width:362px;max-width:100%;margin:0 auto;}
+.ach-tree-lines{position:absolute;inset:0;pointer-events:none;overflow:visible;}
+/* Casing under every line: where two cross, the one on top keeps a clean
+   edge instead of the pair merging into an ambiguous blob. */
+.ach-tree-edge-casing{fill:none;stroke:var(--ach-canvas-bg,var(--bg-base));stroke-width:5;}
+.ach-tree-edge-line{fill:none;stroke-width:2;stroke-linecap:round;}
+.ach-tree-edge.is-done .ach-tree-edge-line{stroke:var(--ach-conn-done,#d4af37);opacity:.85;}
+.ach-tree-edge.is-open .ach-tree-edge-line{stroke:var(--em);opacity:.75;}
+.ach-tree-edge.is-locked .ach-tree-edge-line{stroke:var(--ach-conn-locked,var(--text-muted));
+  opacity:.4;stroke-dasharray:5 4;}
+
+.ach-tree-node{position:absolute;}
+.ach-tree-card{width:100%;height:100%;display:flex;flex-direction:column;justify-content:center;gap:3px;
+  padding:8px 28px 8px 9px;border-radius:11px;border:1px solid var(--border);background:var(--surface);
+  text-align:left;cursor:pointer;font-family:var(--sans);overflow:hidden;box-sizing:border-box;}
+.ach-tree-name{font-size:11px;font-weight:700;line-height:1.2;color:var(--text);
+  display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;}
+.ach-tree-meta{font-family:var(--mono);font-size:8.5px;letter-spacing:.4px;color:var(--text-muted);
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.ach-tree-meta em{font-style:normal;}
+/* Sits in the card's top-right corner. 30px with a padded hit area
+   rather than a full-height rail — the width it used to take was what
+   forced layers to wrap. */
+.ach-tree-tick{position:absolute;top:5px;right:5px;width:26px;height:26px;border-radius:8px;
+  border:1px solid var(--border);background:var(--surface);color:var(--text-muted);cursor:pointer;
+  display:inline-flex;align-items:center;justify-content:center;padding:0;}
+.ach-tree-tick:disabled{opacity:.4;cursor:not-allowed;}
+
+.ach-tree-node.is-active .ach-tree-card{border-color:var(--em);box-shadow:inset 3px 0 0 var(--em);}
+.ach-tree-node.is-active .ach-tree-tick{border-color:var(--em);color:var(--em);}
+.ach-tree-node.is-completed .ach-tree-card{box-shadow:inset 3px 0 0 var(--gold,#d4af37);
+  border-color:rgba(212,175,55,.45);}
+.ach-tree-node.is-completed .ach-tree-tick{border-color:var(--gold,#d4af37);color:var(--gold,#d4af37);}
+.ach-tree-node.is-completed .ach-tree-name{color:var(--text);}
+.ach-tree-node.is-locked{opacity:.62;}
+.ach-tree-node.is-locked .ach-tree-name{color:var(--text-muted);}
+
+/* AND-junction: two or more prerequisites tie together before the goal,
+   so "all of these" is drawn rather than inferred from two arrows
+   happening to land on the same card. */
+.ach-tree-junction{position:absolute;display:flex;align-items:center;gap:6px;pointer-events:none;}
+.ach-tree-junction-bar{flex:1;height:1px;background:var(--em);opacity:.5;}
+.ach-tree-junction-chip{flex:none;font-family:var(--mono);font-size:7.5px;letter-spacing:1px;
+  text-transform:uppercase;color:var(--em);border:1px solid var(--em);border-radius:999px;
+  padding:1px 7px;background:var(--bg-base);opacity:.9;}
+
+.ach-tree-empty{padding:50px 20px;text-align:center;color:var(--text-muted);}
+.ach-tree-empty-icon{color:var(--em);margin-bottom:10px;}
+.ach-tree-empty-title{font-family:var(--serif);font-size:18px;color:var(--text);margin-bottom:4px;}
+.ach-tree-empty-sub{font-family:var(--mono);font-size:10px;}
+
+/* The tree scrolls vertically inside the same flex slot the canvas used,
+   so the toolbar, tabs and stats strip stay exactly where they were. */
+.ach-tree-scroll{flex:1;min-height:0;overflow-y:auto;overflow-x:hidden;
+  -webkit-overflow-scrolling:touch;padding:4px 0 24px;}
+
+/* Connection casing — sits under every board line so crossings stay
+   legible. Width tracks the widest visible stroke (2.5) plus a margin. */
+.ach-conn-casing{stroke:var(--ach-canvas-bg);stroke-width:6;stroke-linecap:round;}
+.ach-canvas-wrap.is-transparent .ach-conn-casing{stroke:transparent;}

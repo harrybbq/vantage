@@ -136,7 +136,7 @@ Adding a key needs no code change.
 - `[x]` **Open Food Facts** — no key, already live. ~3M barcoded
   products, Europe-strong.
 
-## Auth — the email confirmation link (BROKEN IN PRODUCTION)
+## Auth — the email confirmation link (FIXED)
 
 A tester confirmed their signup email and landed on Netlify's "Site not
 found". The link pointed at `…phoenix-b512b8.netlify.app` — the
@@ -150,7 +150,9 @@ person actually signed up. That is not sufficient on its own — Supabase
 only honours a redirect that matches its allow list, and silently falls
 back to the Site URL when it doesn't.
 
-28. `[ ]` **Fix the Supabase auth URLs.** Dashboard → Authentication →
+28. `[x]` **Fix the Supabase auth URLs.** ✅ done 2026-07-29 — Site URL
+    and redirect allow list corrected; signup confirmation verified
+    working. Dashboard → Authentication →
     URL Configuration
     (`supabase.com/dashboard/project/mtbloqcvkvazmehvsaqk/auth/url-configuration`):
     - **Site URL** → `https://vantagevision.netlify.app`
@@ -163,9 +165,8 @@ back to the Site URL when it doesn't.
       https URL, so it needs its own deep-link entry or confirmation
       emails break for app users exactly as they did here.
 
-Until the dashboard is updated, **every new signup is stranded on a 404
-after confirming their email.** It is a one-field fix and it blocks
-onboarding anyone, including the testers.
+Resolved 2026-07-29. Kept here as the record of why the code names the
+origin explicitly — remove the redirect and this breaks again silently.
 
 ## Wearables — two things before Oura works for anyone
 
