@@ -6591,6 +6591,62 @@ button:active:not(:disabled),
 .ach-tree-scroll{flex:1;min-height:0;overflow-y:auto;overflow-x:hidden;
   -webkit-overflow-scrolling:touch;padding:4px 0 24px;}
 
+/* ── Path groups ──────────────────────────────────────────────────────
+   Each independent path gets its own heading and its own layout. The
+   heading is what stops two unrelated chains from reading as one tree
+   with an implied ordering between them. */
+.ach-tree-group{margin:0 0 26px;}
+.ach-tree-group + .ach-tree-group{padding-top:20px;border-top:1px solid var(--line);}
+.ach-tree-group-head{width:362px;max-width:100%;margin:0 auto 14px;}
+.ach-tree-group-eyebrow{font-family:var(--mono);font-size:8px;letter-spacing:1.6px;
+  text-transform:uppercase;color:var(--em);}
+.ach-tree-group-title{font-family:var(--serif);font-size:15px;font-weight:600;
+  color:var(--text);margin:2px 0 0;line-height:1.25;}
+.ach-tree-group-sub{font-family:var(--mono);font-size:9px;letter-spacing:.4px;
+  color:var(--text-muted);margin:3px 0 0;}
+
+/* Goals on no path: a plain two-column grid. Deliberately NOT the
+   layered layout — running them through it is what made unlinked goals
+   masquerade as roots of a tree they had nothing to do with. */
+.ach-tree-loose{width:362px;max-width:100%;margin:0 auto;
+  display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;}
+.ach-tree-loose-card{position:relative;min-height:58px;}
+.ach-tree-loose-card .ach-tree-card{height:100%;}
+.ach-tree-loose-card.is-active .ach-tree-card{border-color:var(--em);box-shadow:inset 3px 0 0 var(--em);}
+.ach-tree-loose-card.is-completed .ach-tree-card{box-shadow:inset 3px 0 0 var(--gold,#d4af37);}
+.ach-tree-loose-card.is-completed .ach-tree-tick{border-color:var(--gold,#d4af37);color:var(--gold,#d4af37);}
+
+/* ── Link mode ────────────────────────────────────────────────────────
+   Reuses the desktop connect handler, so the rules are identical: tap
+   the prerequisite, tap what it unlocks, re-tap a linked pair to
+   remove it, tap the same goal twice to cancel. */
+.ach-tree-toolbar{width:362px;max-width:100%;margin:0 auto 12px;display:flex;justify-content:flex-end;}
+.ach-tree-linkbtn{display:inline-flex;align-items:center;gap:6px;min-height:34px;padding:0 12px;
+  border:1px solid var(--line);border-radius:9px;background:var(--bg-elev);color:var(--text-muted);
+  font-family:var(--mono);font-size:9.5px;letter-spacing:1px;text-transform:uppercase;cursor:pointer;}
+.ach-tree-linkbtn.is-on{border-color:var(--em);color:var(--em);}
+.ach-tree-linkbar{width:362px;max-width:100%;margin:0 auto 16px;padding:10px 12px;
+  border:1px solid var(--em);border-radius:10px;background:color-mix(in srgb,var(--em) 8%,transparent);
+  font-size:11.5px;line-height:1.4;color:var(--text);}
+.ach-tree-linkbar strong{font-weight:700;}
+.ach-tree-linkbar-hint{display:block;margin-top:4px;font-family:var(--mono);font-size:8.5px;
+  letter-spacing:.3px;color:var(--text-muted);}
+
+/* The goal picked as the prerequisite, and the ones a second tap would
+   REMOVE a link from — distinct, because "tap again" doing two opposite
+   things with one appearance is how you delete a link by accident. */
+.ach-tree-node.is-source .ach-tree-card,
+.ach-tree-loose-card.is-source .ach-tree-card{border-color:var(--em);border-width:2px;
+  background:color-mix(in srgb,var(--em) 12%,var(--bg-elev));}
+.ach-tree-node.is-unlink .ach-tree-card,
+.ach-tree-loose-card.is-unlink .ach-tree-card{border-style:dashed;border-color:var(--danger,#c0563f);}
+.ach-tree-node.is-unlink .ach-tree-meta,
+.ach-tree-loose-card.is-unlink .ach-tree-meta{color:var(--danger,#c0563f);}
+/* Locked goals stay dimmed for reading, but while linking they are
+   ordinary targets — a dimmed card you are being asked to tap reads as
+   disabled. */
+.ach-tree-wrap.is-linking .ach-tree-node.is-locked{opacity:1;}
+
 /* Connection casing — sits under every board line so crossings stay
    legible. Width tracks the widest visible stroke (2.5) plus a margin. */
 .ach-conn-casing{stroke:var(--ach-canvas-bg);stroke-width:6;stroke-linecap:round;}

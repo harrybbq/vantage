@@ -175,10 +175,11 @@ integration is inert until both of these are done. Until then the panel
 says "Oura env missing" rather than failing quietly. WHOOP needs
 neither — it is already configured.
 
-29. `[ ]` **Run `supabase/oura_schema.sql`** in the Supabase SQL editor.
+29. `[x]` **Run `supabase/oura_schema.sql`** in the Supabase SQL editor.
     Creates `oura_tokens` — RLS on, no policies, so only the service
     role ever sees a refresh token. Migrations are approval-gated, so
     tooling cannot apply this; it has to be run by hand.
+    *Run 2026-07-31 by the owner.*
 30. `[ ]` **Register the Oura app and set its keys in Netlify.** Create
     it at `cloud.ouraring.com/oauth/applications`, then set
     `OURA_CLIENT_ID` and `OURA_CLIENT_SECRET` as Netlify env vars.
