@@ -4,6 +4,8 @@ import { motion } from 'framer-motion';
 import { fireAchievement } from '../utils/confetti';
 import SectionHelp from './SectionHelp';
 import SavingsList from './SavingsList';
+import AchievementTree from './achievements/AchievementTree';
+import { useIsMobile } from '../hooks/useIsMobile';
 import { SubscriptionsManager } from './widgets/LifeWidgets';
 
 /**
@@ -30,7 +32,12 @@ import { SubscriptionsManager } from './widgets/LifeWidgets';
 
 const FILL_DUR = 3.5; // seconds — connection fill sweep duration
 const NODE_W = 260;
-const NODE_HEAD_OFFSET = 44; // y-offset to mid-icon for connection anchor
+// Nominal card height, used only to decide WHERE on a card's border an
+// arrow should attach. Cards are content-sized so this is an
+// approximation; being a few pixels out just shifts an anchor slightly,
+// which is invisible, whereas the old fixed inner offset was visible on
+// every single line.
+const NODE_H = 90;
 
 // ── helpers ───────────────────────────────────────────────────────────
 
@@ -55,23 +62,36 @@ function recalcLocks(achievements, connections) {
 
 function ConnPath({ from, to, fromCompleted, toCompleted, locked, connKey, onRemove }) {
   if (!from || !to) return null;
-  const x1 = from.x + NODE_W / 2;
-  const y1 = from.y + NODE_HEAD_OFFSET;
-  const x2 = to.x + NODE_W / 2;
-  const y2 = to.y + NODE_HEAD_OFFSET;
-  // Direction-aware control points: horizontal tangents when the nodes
-  // are mostly side-by-side, vertical tangents when stacked. Gives a
-  // natural S-curve in both orientations (the old version always used
-  // horizontal tangents, which looked kinked for vertical links).
-  const dx = x2 - x1, dy = y2 - y1;
-  let c1x, c1y, c2x, c2y;
-  if (Math.abs(dy) > Math.abs(dx)) {
-    const my = (y1 + y2) / 2;
-    c1x = x1; c1y = my; c2x = x2; c2y = my;
+  // Attach to the card's BORDER, not to a fixed point inside it. Every
+  // line used to start and end 44px in from the top of a card, so each
+  // one emerged from the middle of one card and disappeared under
+  // another — measured: all 15 lines on a 10-goal board crossed a card.
+  // Choosing the side by direction, and meeting the edge there, is most
+  // of what made the board look tangled.
+  const fcx = from.x + NODE_W / 2, fcy = from.y + NODE_H / 2;
+  const tcx = to.x + NODE_W / 2,   tcy = to.y + NODE_H / 2;
+  const ddx = tcx - fcx, ddy = tcy - fcy;
+  // Judged against the card's aspect: a 260x90 card sitting one row down
+  // is "below", not "beside", even when dx and dy are similar.
+  const vertical = Math.abs(ddy) * (NODE_W / NODE_H) > Math.abs(ddx);
+
+  let x1, y1, x2, y2, c1x, c1y, c2x, c2y;
+  if (vertical) {
+    const down = ddy > 0;
+    x1 = fcx; y1 = from.y + (down ? NODE_H : 0);
+    x2 = tcx; y2 = to.y + (down ? 0 : NODE_H);
+    const k = Math.max(24, Math.abs(y2 - y1) * 0.42);
+    c1x = x1; c1y = y1 + (down ? k : -k);
+    c2x = x2; c2y = y2 - (down ? k : -k);
   } else {
-    const mx = (x1 + x2) / 2;
-    c1x = mx; c1y = y1; c2x = mx; c2y = y2;
+    const right = ddx > 0;
+    x1 = from.x + (right ? NODE_W : 0); y1 = fcy;
+    x2 = to.x + (right ? 0 : NODE_W);   y2 = tcy;
+    const k = Math.max(24, Math.abs(x2 - x1) * 0.42);
+    c1x = x1 + (right ? k : -k); c1y = y1;
+    c2x = x2 - (right ? k : -k); c2y = y2;
   }
+  const dx = x2 - x1, dy = y2 - y1;
   const d = `M${x1},${y1} C${c1x},${c1y} ${c2x},${c2y} ${x2},${y2}`;
 
   // approximate path length for the fill-sweep dasharray trick
@@ -120,6 +140,12 @@ function ConnPath({ from, to, fromCompleted, toCompleted, locked, connKey, onRem
     </path>
   ) : null;
 
+  // Casing: a stroke in the canvas colour laid under the line. Where two
+  // connections cross, the upper one keeps a clean edge instead of the
+  // pair fusing into an ambiguous smudge — the trick every metro map
+  // uses, and cheap here because it's one extra path.
+  const casing = <path d={d} className="ach-conn-casing" fill="none" />;
+
   let visual;
   if (locked) {
     visual = (
@@ -166,7 +192,7 @@ function ConnPath({ from, to, fromCompleted, toCompleted, locked, connKey, onRem
     );
   }
 
-  return <g className="ach-conn-group">{visual}{hitPath}</g>;
+  return <g className="ach-conn-group">{casing}{visual}{hitPath}</g>;
 }
 
 // ── Single achievement node ──────────────────────────────────────────
@@ -557,6 +583,7 @@ export default function AchievementsSection({ S, update, active, onOpenModal, on
   // Tab toggle (F4 Sprint 2) — 'goals' = the achievement board canvas,
   // 'savings' = monetary goals list. Sticky to component state so a
   // refresh resets to goals (canvas is the dominant surface).
+  const isMobile = useIsMobile();
   const [activeTab, setActiveTab] = useState('goals');
   // Tracks the live position of a node currently being dragged so the
   // SVG connections re-render without committing to global state on
@@ -797,12 +824,24 @@ export default function AchievementsSection({ S, update, active, onOpenModal, on
             <SectionHelp text="Goals tab: place goals on the canvas, draw connections to map your path, and complete them for coin rewards (max 10,000 per goal) — a parent unlocks its children. Savings tab: money goals with target dates and monthly guidance, plus Subscriptions & Bills to track recurring outgoings and see your monthly burn." />
           </div>
         </motion.div>
-        <div className="ach-toolbar-hints">
-          <span className="ach-hint-pill"><span className="ach-hint-key">Drag</span> move</span>
-          <span className="ach-hint-pill"><span className="ach-hint-key">✦</span> connect</span>
-          <span className="ach-hint-pill"><span className="ach-hint-key">Tap line</span> unlink</span>
-          <span className="ach-hint-pill"><span className="ach-hint-key">★</span> complete</span>
-        </div>
+        {/* Canvas affordances. On phones the goals tab is the derived
+            tree, where you cannot drag a node or tap a line to unlink —
+            advertising both would be instructions for a screen that
+            isn't there. The Savings tab keeps its own toolbar anyway. */}
+        {!(isMobile && activeTab === 'goals') && (
+          <div className="ach-toolbar-hints">
+            <span className="ach-hint-pill"><span className="ach-hint-key">Drag</span> move</span>
+            <span className="ach-hint-pill"><span className="ach-hint-key">✦</span> connect</span>
+            <span className="ach-hint-pill"><span className="ach-hint-key">Tap line</span> unlink</span>
+            <span className="ach-hint-pill"><span className="ach-hint-key">★</span> complete</span>
+          </div>
+        )}
+        {isMobile && activeTab === 'goals' && (
+          <div className="ach-toolbar-hints">
+            <span className="ach-hint-pill"><span className="ach-hint-key">Tap</span> edit</span>
+            <span className="ach-hint-pill"><span className="ach-hint-key">★</span> complete</span>
+          </div>
+        )}
         {activeTab === 'goals' && (
           <motion.button
             type="button"
@@ -888,6 +927,20 @@ export default function AchievementsSection({ S, update, active, onOpenModal, on
               savings goals above; feeds the Subscriptions hub widget. */}
           <SubscriptionsManager S={S} update={update} />
         </>
+      ) : isMobile ? (
+        /* Phones get the same graph as a derived vertical layout. The
+           canvas is a hand-placed 2D arrangement built on a 1440px
+           board — the one thing that cannot be read at 390px without
+           pinching around it. Completing and editing route through the
+           same handlers, so the two views can't drift. */
+        <div className="ach-tree-scroll">
+          <AchievementTree
+            achievements={liveAchievements}
+            connections={connections}
+            onComplete={handleToggleComplete}
+            onEdit={handleEdit}
+          />
+        </div>
       ) : (<>
 
       {/* Canvas — dot grid background, draggable nodes, SVG connections.
