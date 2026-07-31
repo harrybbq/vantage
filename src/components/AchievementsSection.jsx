@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, useMemo } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState, useMemo } from 'react';
 import Icon from './Icon';
 import { motion } from 'framer-motion';
 import { fireAchievement } from '../utils/confetti';
@@ -432,25 +432,105 @@ export default function AchievementsSection({ S, update, active, onOpenModal, on
   const canvasWrapRef = useRef(null);
   const zoomRef = useRef(zoom);
   zoomRef.current = zoom;
+  // Scroll offset to apply once a pinch’s new scale has been laid out.
+  const pendingAnchor = useRef(null);
+  /* ── Touch navigation ──────────────────────────────────────────────
+   * One finger drags the board, two fingers pinch to zoom about the
+   * point between them. The board owns every touch gesture, which is
+   * safe here and NOT safe on the holiday maps: this section is exactly
+   * viewport height with the canvas filling it, so there is no page
+   * scroll to steal. (On the maps the page does scroll, which is why
+   * they use pan-y and ask for two fingers.)
+   *
+   * Two things were wrong before:
+   *
+   *   Double-speed panning. touch-action was pan-x pan-y, so the browser
+   *   scrolled natively, AND the pointer handler set scrollLeft itself.
+   *   Both moved the board: a 120px finger drag travelled 211px.
+   *
+   *   Unanchored zoom. The transform-origin is 0 0, so pinching scaled
+   *   about the content's top-left corner — whatever you had your
+   *   fingers on shot off toward the bottom-right. Now the scroll offset
+   *   is corrected so the pinch midpoint stays under your fingers.
+   */
   useEffect(() => {
     const el = canvasWrapRef.current;
     if (!el) return;
-    let startDist = 0, startZoom = 1, pinching = false;
-    const dist = ts => Math.hypot(ts[0].clientX - ts[1].clientX, ts[0].clientY - ts[1].clientY);
+
+    const pts = new Map();
+    let mode = null;          // 'pan' | 'pinch'
+    let last = null;          // last pan position
+    let pinch = null;         // { dist, zoom, mid }
+    const dist = ([a, b]) => Math.hypot(a.x - b.x, a.y - b.y);
+    const mid = ([a, b]) => ({ x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 });
+
     const onStart = e => {
-      if (e.touches.length === 2) {
-        pinching = true;
-        startDist = dist(e.touches) || 1;
-        startZoom = zoomRef.current;
+      for (const t of e.changedTouches) pts.set(t.identifier, { x: t.clientX, y: t.clientY });
+      const list = [...pts.values()];
+
+      if (list.length >= 2) {
+        // Two fingers is unambiguously a pinch, wherever they landed.
+        // The node guard below deliberately does NOT apply: on a dense
+        // board at least one finger is usually resting on a card, and
+        // bailing out meant most real pinches did nothing at all.
+        mode = 'pinch';
+        pinch = { dist: dist(list) || 1, zoom: zoomRef.current, mid: mid(list) };
+        el.classList.remove('is-panning');
+        return;
+      }
+
+      // One finger on a node is a node drag — its own gesture, left alone.
+      if (e.target.closest?.('.ach-node, .ach-conn-hit, button, a, input, .ach-connect-toast')) {
+        mode = null;
+        return;
+      }
+      mode = 'pan';
+      last = { ...list[0] };
+      el.classList.add('is-panning');
+    };
+
+    const onMove = e => {
+      if (!mode) return;
+      for (const t of e.changedTouches) {
+        if (pts.has(t.identifier)) pts.set(t.identifier, { x: t.clientX, y: t.clientY });
+      }
+      const list = [...pts.values()];
+
+      if (mode === 'pan' && list.length === 1) {
+        e.preventDefault();
+        // 1:1 with the finger — the board tracks the fingertip exactly.
+        el.scrollLeft -= list[0].x - last.x;
+        el.scrollTop -= list[0].y - last.y;
+        last = { ...list[0] };
+        return;
+      }
+
+      if (mode === 'pinch' && list.length >= 2) {
+        e.preventDefault();
+        const r = el.getBoundingClientRect();
+        const m = mid(list);
+        const z0 = zoomRef.current;
+        const z1 = Math.min(2, Math.max(0.4, +(pinch.zoom * (dist(list) / pinch.dist)).toFixed(3)));
+
+        // Content coordinate currently under the pinch midpoint, then the
+        // scroll offset that keeps it there once the scale changes.
+        const cx = (el.scrollLeft + (m.x - r.left)) / z0;
+        const cy = (el.scrollTop + (m.y - r.top)) / z0;
+        pendingAnchor.current = {
+          left: cx * z1 - (m.x - r.left),
+          top: cy * z1 - (m.y - r.top),
+        };
+        setZoom(z1);
       }
     };
-    const onMove = e => {
-      if (!pinching || e.touches.length !== 2) return;
-      e.preventDefault(); // stop native page pinch-zoom
-      const ratio = dist(e.touches) / startDist;
-      setZoom(Math.min(2, Math.max(0.4, +(startZoom * ratio).toFixed(2))));
+
+    const onEnd = e => {
+      for (const t of e.changedTouches) pts.delete(t.identifier);
+      const list = [...pts.values()];
+      if (list.length === 1) { mode = 'pan'; last = { ...list[0] }; }
+      else if (list.length === 0) { mode = null; el.classList.remove('is-panning'); }
     };
-    const onEnd = e => { if (e.touches.length < 2) pinching = false; };
+
     el.addEventListener('touchstart', onStart, { passive: false });
     el.addEventListener('touchmove', onMove, { passive: false });
     el.addEventListener('touchend', onEnd);
@@ -462,6 +542,18 @@ export default function AchievementsSection({ S, update, active, onOpenModal, on
       el.removeEventListener('touchcancel', onEnd);
     };
   }, []);
+
+  /* Apply the pinch anchor AFTER the new scale has been laid out —
+   * setting scrollLeft before the transform updates would clamp against
+   * the old, smaller scroll extent and lose the anchor. */
+  useLayoutEffect(() => {
+    const a = pendingAnchor.current;
+    const el = canvasWrapRef.current;
+    if (!a || !el) return;
+    pendingAnchor.current = null;
+    el.scrollLeft = a.left;
+    el.scrollTop = a.top;
+  }, [zoom]);
   // Tab toggle (F4 Sprint 2) — 'goals' = the achievement board canvas,
   // 'savings' = monetary goals list. Sticky to component state so a
   // refresh resets to goals (canvas is the dominant surface).
@@ -484,6 +576,13 @@ export default function AchievementsSection({ S, update, active, onOpenModal, on
     if (e.target.closest('.ach-node, .ach-conn-hit, button, a, input, .ach-connect-toast')) return;
     const wrap = canvasWrapRef.current;
     if (!wrap) return;
+
+    // Touch is handled entirely by the pointer gesture layer below —
+    // letting this run too was the double-speed bug: the browser scrolled
+    // natively AND this handler set scrollLeft, so the board travelled
+    // ~1.8x the finger.
+    if (e.pointerType === 'touch') return;
+
     panRef.current = { x: e.clientX, y: e.clientY, sl: wrap.scrollLeft, st: wrap.scrollTop };
     wrap.classList.add('is-panning');
     function mv(ev) {
@@ -792,12 +891,13 @@ export default function AchievementsSection({ S, update, active, onOpenModal, on
       ) : (<>
 
       {/* Canvas — dot grid background, draggable nodes, SVG connections.
-          touchAction pan-x/pan-y lets single-finger scroll the canvas
-          while our handler owns two-finger pinch-zoom. */}
+          touchAction:none — the board owns every touch gesture (one
+          finger pans, two pinch). Safe because this section is exactly
+          viewport height, so there is no page scroll to steal. */}
       <div
         className={`ach-canvas-wrap${achTransparent ? ' is-transparent' : ''}${invertClass}`}
         ref={canvasWrapRef}
-        style={{ touchAction: 'pan-x pan-y' }}
+        style={{ touchAction: 'none' }}
         onContextMenu={handleBoardContextMenu}
         onPointerDown={handleBoardPointerDown}
       >
