@@ -74,19 +74,34 @@ export default function AdminEditModal({ open, target, userId, S, update, onClos
           ovr:     clamp(form.ovr,     1, 99),
           computedAt: new Date().toISOString(),
         };
-        // Server canonical first — profiles patch (RLS lets you write
-        // your own row). Failure surfaces; local mirror only on success.
-        const { error: pErr } = await supabase
-          .from('profiles')
-          .update({
-            prestige,
-            ratings,
-            ratings_ovr: ratings.ovr,
-            ratings_computed_at: ratings.computedAt,
-          })
-          .eq('id', userId);
-        if (pErr) throw new Error(pErr.message || 'Profile update failed.');
-        update(prev => ({ ...prev, prestige, ratings }));
+        // Routed through a function rather than PATCHed from here. The
+        // leaderboard ranks on prestige and ratings_ovr, so while those
+        // columns were client-writable this modal's owner-only gate was
+        // decoration — anyone could call PostgREST directly and write
+        // their own. The endpoint verifies the session, checks the
+        // caller is an owner, and re-clamps server-side.
+        const { data: sess } = await supabase.auth.getSession();
+        const token = sess?.session?.access_token;
+        if (!token) throw new Error('Session expired — sign in again.');
+        const res = await fetch('/.netlify/functions/admin-set-rating', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+          body: JSON.stringify({ prestige, ...ratings }),
+        });
+        if (!res.ok) {
+          const j = await res.json().catch(() => ({}));
+          throw new Error(j.error === 'forbidden'
+            ? 'Only an owner account can edit ratings.'
+            : (j.error || 'Profile update failed.'));
+        }
+        // Mirror the SERVER's clamped values, not the form's, so the UI
+        // can't show a number the database refused.
+        const saved = await res.json().catch(() => null);
+        update(prev => ({
+          ...prev,
+          prestige: saved?.prestige ?? prestige,
+          ratings: saved?.ratings ?? ratings,
+        }));
       }
       onClose();
     } catch (e) {

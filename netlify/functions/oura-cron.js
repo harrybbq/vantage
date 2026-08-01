@@ -19,10 +19,14 @@
  * when there's nothing new, keeping DB writes minimal (Micro-friendly).
  */
 const { sb, getFreshToken, fetchOuraData, mergeOuraIntoState } = require('../lib/oura');
+const { requireScheduler } = require('../lib/cronAuth');
 
 const DAYS = 3; // enough to catch anything a run or two ago missed
 
-exports.handler = async () => {
+exports.handler = async (event) => {
+  const denied = requireScheduler(event, { 'Content-Type': 'application/json' }, 'CRON_SECRET');
+  if (denied) return denied;
+
   const env = process.env;
   if (!env.OURA_CLIENT_ID || !env.OURA_CLIENT_SECRET || !env.SUPABASE_URL || !env.SUPABASE_SERVICE_ROLE_KEY) {
     // Not an error worth alerting on: the integration is simply not

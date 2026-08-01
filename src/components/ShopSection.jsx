@@ -130,10 +130,12 @@ function CategoryTotal({ items }) {
   );
 }
 
-function ShopCard({ item, coins, onToggleBought, onDelete, onEdit, revealDelay, bulkMode, selected, onToggleSelect }) {
+function ShopCard({ item, coins, requireCoins = true, onToggleBought, onDelete, onEdit, revealDelay, bulkMode, selected, onToggleSelect }) {
   const move = priceMovement(item);
   const hasLink = !!item.url;
-  const canAfford = (coins || 0) >= item.coinCost || item.bought;
+  // With the gate off nothing is unaffordable, so the card must stop
+  // saying "need more" about an item it will happily let you unlock.
+  const canAfford = !requireCoins || (coins || 0) >= item.coinCost || item.bought;
   // Names > 50 chars truncate with an ellipsis the user can tap to
   // expand. Persists per-card session-only — not worth storing.
   const NAME_LIMIT = 50;
@@ -248,7 +250,7 @@ function ShopCard({ item, coins, onToggleBought, onDelete, onEdit, revealDelay, 
   );
 }
 
-function DropZone({ categoryId, items, coins, onToggleBought, onDeleteItem, onEditItem, onDrop, bulkMode, selected, onToggleSelect }) {
+function DropZone({ categoryId, items, coins, requireCoins = true, onToggleBought, onDeleteItem, onEditItem, onDrop, bulkMode, selected, onToggleSelect }) {
   const handleDragEnter = e => {
     e.preventDefault();
     e.currentTarget._enterCount = (e.currentTarget._enterCount || 0) + 1;
@@ -295,6 +297,7 @@ function DropZone({ categoryId, items, coins, onToggleBought, onDeleteItem, onEd
             key={item.id}
             item={item}
             coins={coins}
+            requireCoins={requireCoins}
             onToggleBought={onToggleBought}
             onDelete={onDeleteItem}
             onEdit={onEditItem}
@@ -311,6 +314,9 @@ function DropZone({ categoryId, items, coins, onToggleBought, onDeleteItem, onEd
 
 export default function ShopSection({ S, update, active, onOpenModal, onShowCoinToast }) {
   const { shopItems, shopCategories, shopFilter, coins } = S;
+  // Settings → Goals → Shopping coins. Absent means required, so no
+  // existing account changes behaviour.
+  const requireCoins = S.shopRequireCoins !== false;
   // Which category tab reads as current. This used to FILTER the list
   // down to one category; it now just tracks where you are, because the
   // tabs scroll to a section instead of replacing the page. Kept in sync
@@ -476,18 +482,33 @@ export default function ShopSection({ S, update, active, onOpenModal, onShowCoin
     update(prev => {
       const item = prev.shopItems.find(s => s.id === id);
       if (!item) return prev;
+      // Opt-out of the balance gate (Settings → Goals). Default ON, so
+      // an absent key behaves exactly as before. It removes the BLOCK
+      // only — the coins are still spent and still refunded, because a
+      // purchase that costs nothing while the setting is off and
+      // refunds in full once it's back on would mint coins.
+      const requireCoins = prev.shopRequireCoins !== false;
       let newCoins = prev.coins || 0;
       let newHistory = [...(prev.coinHistory || [])];
       if (!item.bought && item.coinCost > 0) {
-        if (newCoins < item.coinCost) {
+        if (requireCoins && newCoins < item.coinCost) {
           onShowCoinToast('Need ' + item.coinCost + ' ⬡ — you have ' + newCoins, false);
           return prev;
         }
         newCoins -= item.coinCost;
         newHistory.unshift({ type: 'spend', label: item.name, amount: -item.coinCost, ts: Date.now() });
         onShowCoinToast('-' + item.coinCost + ' ⬡ spent on ' + item.name + '!', false);
-      } else if (item.bought && item.coinCost > 0) {
-        newCoins += item.coinCost;
+      } else if (item.bought) {
+        // Refund what was actually PAID, not what the item costs now.
+        // Refunding the current price minted coins: buy at 0, edit the
+        // cost up to 5000, un-buy, collect 5000 you never spent. Items
+        // bought before paidCoins existed fall back to coinCost, which
+        // is what they were charged.
+        const paid = item.paidCoins != null ? item.paidCoins : item.coinCost;
+        if (paid > 0) {
+          newCoins += paid;
+          newHistory.unshift({ type: 'refund', label: item.name, amount: paid, ts: Date.now() });
+        }
       }
       if (!item.bought) firePurchase();
       return {
@@ -495,7 +516,14 @@ export default function ShopSection({ S, update, active, onOpenModal, onShowCoin
         // boughtAt drives the Archive view (sorted newest-first there);
         // un-buying clears it and returns the item to the active list.
         shopItems: prev.shopItems.map(s => s.id === id
-          ? { ...s, bought: !s.bought, boughtAt: !s.bought ? Date.now() : undefined }
+          ? {
+              ...s,
+              bought: !s.bought,
+              boughtAt: !s.bought ? Date.now() : undefined,
+              // Price paid, pinned at purchase so a later edit to
+              // coinCost can't change what a refund is worth.
+              paidCoins: !s.bought ? (s.coinCost || 0) : undefined,
+            }
           : s),
         coins: newCoins,
         coinHistory: newHistory,
@@ -567,7 +595,7 @@ export default function ShopSection({ S, update, active, onOpenModal, onShowCoin
             transition={{ duration: 0.4, ease: 'easeOut' }}
           >
             <div className="eyebrow">Wishlist</div>
-            <div className="sec-title">Shopping List <SectionHelp text="Build a wishlist with priorities and coin costs — paste a product URL to auto-fill the name and price, then unlock items with the coins you earn — bought items move to the Archive filter to keep the list tidy. The Trending board surfaces what your friends and the wider community are saving for (anonymous counts only; opt out in Settings → Privacy)." /></div>
+            <div className="sec-title">Shopping List <SectionHelp text="Build a wishlist with priorities and coin costs — paste a product URL to auto-fill the name and price, then unlock items with the coins you earn — or turn off Settings → Goals → Shopping coins to unlock anything and use it as a plain wishlist. Bought items move to the Archive filter to keep the list tidy. The Trending board surfaces what your friends and the wider community are saving for (anonymous counts only; opt out in Settings → Privacy)." /></div>
           </motion.div>
           <div className="shop-toolbar-actions" style={{ display: 'flex', gap: '10px' }}>
             <motion.button className="btn btn-ghost" onClick={() => onOpenModal('addCategoryModal')}
@@ -709,6 +737,7 @@ export default function ShopSection({ S, update, active, onOpenModal, onShowCoin
                     categoryId={null}
                     items={filtered.filter(s => !s.categoryId)}
                     coins={coins}
+            requireCoins={requireCoins}
                     onToggleBought={handleToggleBought}
                     onDeleteItem={handleDeleteItem}
                     onEditItem={handleEditItem}
@@ -731,6 +760,7 @@ export default function ShopSection({ S, update, active, onOpenModal, onShowCoin
                     categoryId={cat.id}
                     items={filtered.filter(s => s.categoryId === cat.id)}
                     coins={coins}
+            requireCoins={requireCoins}
                     onToggleBought={handleToggleBought}
                     onDeleteItem={handleDeleteItem}
                     onEditItem={handleEditItem}
@@ -760,6 +790,7 @@ export default function ShopSection({ S, update, active, onOpenModal, onShowCoin
                       key={item.id}
                       item={item}
                       coins={coins}
+            requireCoins={requireCoins}
                       onToggleBought={handleToggleBought}
                       onDelete={handleDeleteItem}
                       onEdit={handleEditItem}
