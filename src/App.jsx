@@ -109,7 +109,7 @@ function Board({ userId, userEmail, onSignOut }) {
     loadError, retryLoad, startFresh, restoreFromBackup, hasBackup,
   } = useVisionBoardState(userId);
   const { atLimit } = useTierLimits();
-  const { hasPro } = useSubscriptionContext();
+  const { hasPro, loading: tierLoading } = useSubscriptionContext();
   const { isOwner } = useIsOwner(userEmail);
   // Passive WHOOP sync — refreshes vitals/burn whenever the app opens or
   // regains focus (throttled), so data stays fresh without visiting Track.
@@ -235,11 +235,25 @@ function Board({ userId, userEmail, onSignOut }) {
   useEffect(() => {
     const saved = S.theme || 'cream';
     const effective = applyTheme(saved, { hasPro });
-    if (effective !== saved) {
+    // Only PERSIST a downgrade once the tier is actually known.
+    //
+    // hasPro starts false and stays false until the subscription
+    // resolves, so on every cold load there was a window where a Pro
+    // theme looked unaffordable. This effect wrote the downgrade
+    // straight into saved state, and by the time hasPro flipped true
+    // the preference was already gone — dark-os silently became dark
+    // and had to be re-picked by hand. Worse after a deploy, where the
+    // cache is cold and the profile fetch takes longer, which is
+    // exactly when it was reported.
+    //
+    // The visual fallback still applies immediately (applyTheme above),
+    // so a genuinely free account never sees a Pro theme it can't have.
+    // Only the write-back waits for a definite answer.
+    if (effective !== saved && !tierLoading) {
       update(prev => ({ ...prev, theme: effective }));
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [S.theme, hasPro]);
+  }, [S.theme, hasPro, tierLoading]);
 
   function showCoinToast(msg, isEarn, duration) {
     const type = isEarn ? 'earn' : (msg.includes('Need') ? 'error' : 'spend');

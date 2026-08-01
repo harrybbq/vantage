@@ -132,8 +132,19 @@ async function loadFromCloud(userId) {
   return { kind: 'loaded', state };
 }
 
-async function saveToCloud(userId, state, { allowEmpty = false } = {}) {
+async function saveToCloud(userId, state, { allowEmpty = false, fromBackup = false } = {}) {
+  // A state descended from the local backup is missing the photo and
+  // the backgrounds. Writing one replaces the real thing with the gap.
+  // Only the explicit user-confirmed restore may do it knowingly.
+  if (state?.__slim && !fromBackup) {
+    const e = new Error('Refused to save a state derived from the slim local backup (it has no photo or backgrounds).');
+    e.code = 'SLIM_GUARD';
+    console.error('[useVisionBoardState] ' + e.message);
+    throw e;
+  }
+
   const stateToSave = stripForSave(state);
+  delete stateToSave.__slim;   // never let the marker reach the database
   const photo = state.profile?.photo || null;
 
   // ── Definitive anti-wipe guard (read-before-write) ──────────────────
@@ -159,12 +170,20 @@ async function saveToCloud(userId, state, { allowEmpty = false } = {}) {
   // identical to a successful one. We now surface failures so the
   // caller can keep the last-known-good data and retry rather than
   // assume the cloud is in sync.
-  const { error } = await supabase.from('user_data').upsert({
+  // Nothing in the app ever clears a photo — it is only ever set. So a
+  // falsy value here means "we don't have it loaded", never "the user
+  // removed it", and writing the null is always destructive. Omitting
+  // the column leaves the stored value alone (upsert only SETs the keys
+  // it is given). If a delete-photo feature is ever added it must pass
+  // an explicit flag rather than relying on a falsy value.
+  const row = {
     id: userId,
     state: stateToSave,
-    photo,
     updated_at: new Date().toISOString(),
-  });
+  };
+  if (photo) row.photo = photo;
+
+  const { error } = await supabase.from('user_data').upsert(row);
   if (error) {
     const e = new Error(error.message || 'Could not save your data.');
     e.cause = error;
@@ -242,6 +261,11 @@ function slimForBackup(state) {
   // several can't blow the ~5 MB localStorage quota (data is recovered;
   // backgrounds are re-addable, same trade-off as photos).
   if (s.backgrounds) s.backgrounds = {};
+  // Brand the copy. This state is missing the photo and every
+  // background by design, so it is safe to RENDER and never safe to
+  // PERSIST. The marker travels through object spreads, so anything
+  // derived from it stays branded and gets refused by saveToCloud.
+  s.__slim = true;
   return s;
 }
 
@@ -399,6 +423,34 @@ export function useVisionBoardState(userId) {
           writeBackup(userId, result.state);
         }
         setS(result.state);
+
+        // Discard anything queued against the OPTIMISTIC state.
+        //
+        // The optimistic paint above comes from the local backup, and
+        // slimForBackup deliberately drops the two heaviest things:
+        // profile.photo and every entry in backgrounds. That copy is
+        // fine to look at, but it must never become the basis of a
+        // write.
+        //
+        // It could. setLoading(false) makes the app interactive during
+        // the window, and any update() in that window — a user edit, or
+        // an effect like the theme resolver firing before the tier is
+        // known — set dirtyRef and parked the merged result in
+        // pendingStateRef. setS(result.state) replaced what was on
+        // SCREEN but left that ref holding a state built on the slim
+        // backup. The next debounce or pagehide flush then wrote it,
+        // nulling the photo column and saving backgrounds:{} over the
+        // real ones. Everything else survived because everything else
+        // is in the backup — which is exactly the reported symptom:
+        // profile picture and backgrounds gone, nothing else touched.
+        //
+        // Clearing here is also the honest choice for a real edit made
+        // in that window: setS has already discarded it from the
+        // screen, so keeping it queued would silently resurrect a
+        // change the user can no longer see.
+        dirtyRef.current = false;
+        pendingStateRef.current = null;
+
         loadingRef.current = false;
         setLoading(false);
         return;
@@ -696,9 +748,14 @@ export function useVisionBoardState(userId) {
     const backup = readBackup(uid);
     if (!backup || !backup.state) return false;
     const restored = addTransient({ ...DEFAULT_STATE, ...backup.state });
+    // Drop the marker: this restore is the user's explicit decision, and
+    // from here on the state is simply their live state. Leaving it set
+    // would brand everything derived from it and block every future
+    // save behind the slim guard.
+    delete restored.__slim;
     try {
       clearUserSeen(uid);
-      await saveToCloud(uid, restored);
+      await saveToCloud(uid, restored, { fromBackup: true });
       markUserSeen(uid);
       lastGoodMeaningfulRef.current = hasMeaningfulData(restored);
       setS(restored);
