@@ -30,9 +30,14 @@ single source of truth for "what's left before launch".
 
 ## Possible future: trading P/L widget (owner-only)
 Owner is building a separate "sibling" app where AI agents trade stocks
-automatically. Idea is a Vantage hub widget showing profit/loss at a
-glance. **Owner-only for the foreseeable future.** Constraints agreed
-before any build starts:
+automatically — a "digital factory" of agents. That app owns:
+allocate/withdraw funds per agent, halt/start each agent, per-agent
+stats UI. Vantage gets a **read-only** view of it.
+
+Widget spec as described: one bar per agent showing its total fund,
+profit/loss % (since start and today), and which stocks it holds.
+**Owner-only for the foreseeable future.** Constraints agreed before any
+build starts:
 - **Broker credentials never touch the client.** `VITE_*` vars are
   bundled into public JS. Keys live in Netlify function env only, and
   the function verifies the JWT + checks the owner email SERVER-side
@@ -42,6 +47,11 @@ before any build starts:
   re-downloaded on open / rewritten on save (items 25-26). Fetch live
   from the function on mount with a short cache, or give it its own
   RLS-gated table.
+- **The link is a read-only pull, one direction.** Vantage never sends
+  orders and never holds broker credentials. Sibling app exposes one
+  signed read-only endpoint; Vantage's function fetches and caches it.
+  Token: `getRandomValues`, sent as a HEADER not a query string, and
+  rotatable — the health-sync token got both of those wrong.
 - ⚠️ **Store risk, decide before building:** an app showing live
   brokerage positions draws financial-services review from Apple/Google
   (often needs to BE the institution or be authorised by it), and
