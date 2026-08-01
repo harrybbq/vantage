@@ -50,19 +50,19 @@ const STEPS_CREAM = [
   {
     id: 'achievements', label: 'Achievements',
     title: 'Goals + money',
-    body: 'Two tabs. Goals is a drag-and-connect pin-board — link milestones, complete them for ⬡ coins (rewards cap at 10,000). Savings tracks money goals with target dates and monthly guidance, plus Subscriptions & Bills — your recurring outgoings, monthly burn, and what renews next. All of it feeds your Finance rating.',
+    body: 'Two tabs. Goals maps what has to happen before what — a drag-and-connect board on desktop, and on a phone the same graph as scrollable paths, with Link goals to set prerequisites by tapping one goal then the next. Complete them for ⬡ coins (rewards cap at 10,000). Savings tracks money goals with target dates and monthly guidance, plus Subscriptions & Bills — recurring outgoings, monthly burn, and what renews next. All of it feeds your Finance rating.',
     target: 'nav-tab-achievements', placement: 'right', arrowDir: 'left',
   },
   {
     id: 'track', label: 'Track',
     title: 'Track & log',
-    body: 'Daily trackers with streaks and weekly coin goals. Nutrition logging — search foods, scan barcodes, or identify a plate with AI (Pro); liquids log in ml automatically. Vitals (sleep, heart rate, recovery) sync from WHOOP or Apple Health. New: Body (weight trend + goal) and Mood & Journal (one-tap check-in) live here too.',
+    body: 'Daily trackers with streaks and weekly coin goals. Nutrition logging — search foods, scan barcodes, or identify a plate with AI (Pro); liquids log in ml automatically. Vitals (sleep, heart rate, recovery) sync from a WHOOP band, an Oura ring, or Apple Health. New: Body (weight trend + goal) and Mood & Journal (one-tap check-in) live here too.',
     target: 'nav-tab-track', placement: 'right', arrowDir: 'left',
   },
   {
     id: 'shop', label: 'Shop',
     title: 'Reward yourself',
-    body: 'A wishlist with a point. Paste a link to autofill an item, set a ⬡ coin cost, and unlock it when you\'ve earned enough. The Trending board shows what your friends are saving for and what\'s popular across Vantage — always anonymous, opt-out in Settings.',
+    body: 'A wishlist with a point. Paste a link to autofill an item, set a ⬡ coin cost, and unlock it when you\'ve earned enough — or turn the coin requirement off in Settings → Goals and use it as a plain wishlist. The Trending board shows what your friends are saving for and what\'s popular across Vantage — always anonymous, opt-out in Settings.',
     target: 'nav-tab-shop', placement: 'right', arrowDir: 'left',
   },
   {
@@ -86,7 +86,7 @@ const STEPS_CREAM = [
   {
     id: 'settings', label: 'Settings',
     title: 'Make it yours',
-    body: 'Colour schemes — some free, some unlocked by achieving Visions, more with Pro (plus a coloured leaderboard name). Connect WHOOP or import Apple Health. Set macro goals, manage every privacy toggle (search, leaderboard, trending, what friends see), browse the Visions catalogue, export your data, and replay this tour.',
+    body: 'Colour schemes — some free, some unlocked by achieving Visions, more with Pro (plus a coloured leaderboard name). Connect a WHOOP band or Oura ring, or import Apple Health. Decide whether coins are required to buy shop items. Set macro goals, manage every privacy toggle (search, leaderboard, trending, what friends see), browse the Visions catalogue, export your data, and replay this tour.',
     target: 'nav-tab-settings', placement: 'right', arrowDir: 'left',
   },
   {
@@ -115,19 +115,19 @@ const STEPS_DARK = [
   {
     id: 'achievements', label: 'goals',
     title: 'achievements + money',
-    body: 'Drag-and-connect pin-board for goals (⬡ rewards, 10k cap). Savings tab: monetary goals + Subscriptions & Bills — monthly burn, renewal countdown, cancel candidates. Feeds Finance rating. 15 max new achievements per 24h (40 on Pro).',
+    body: 'Dependency graph for goals — drag-and-connect on desktop, scrollable paths + tap-to-link on mobile (⬡ rewards, 10k cap). Savings tab: monetary goals + Subscriptions & Bills — monthly burn, renewal countdown, cancel candidates. Feeds Finance rating. 15 max new achievements per 24h (40 on Pro).',
     target: 'nav-tab-achievements', placement: 'right', arrowDir: 'left',
   },
   {
     id: 'track', label: 'track',
     title: 'track and log',
-    body: 'Daily trackers + nutrition (search / barcode / AI identify on Pro; liquids auto-ml). Vitals sync from WHOOP or Apple Health. Body: weight trend, weekly rate, goal. Mood: one-tap check-in + journal + heatmap. Coin scams blocked: post-bonus untoggles reverse the award.',
+    body: 'Daily trackers + nutrition (search / barcode / AI identify on Pro; liquids auto-ml). Vitals sync from WHOOP, Oura, or Apple Health. Body: weight trend, weekly rate, goal. Mood: one-tap check-in + journal + heatmap. Coin scams blocked: post-bonus untoggles reverse the award.',
     target: 'nav-tab-track', placement: 'right', arrowDir: 'left',
   },
   {
     id: 'shop', label: 'shop',
     title: 'shop',
-    body: 'Wishlist items. Paste a URL → autofill. Spend ⬡ coins to unlock — personal incentive layer. Trending board: friends-scope + global-scope aggregates, fully anonymous, opt-out in settings.',
+    body: 'Wishlist items. Paste a URL → autofill. Spend ⬡ coins to unlock — personal incentive layer, and the coin gate itself is optional (settings → goals). Trending board: friends-scope + global-scope aggregates, fully anonymous, opt-out in settings.',
     target: 'nav-tab-shop', placement: 'right', arrowDir: 'left',
   },
   {
@@ -151,7 +151,7 @@ const STEPS_DARK = [
   {
     id: 'settings', label: 'settings',
     title: 'settings',
-    body: 'Colour schemes: free tier + vision-unlocked + Pro (incl. coloured leaderboard name). WHOOP / Apple Health connections. Macros, privacy toggles (search / leaderboard / trending / profile shares), Visions catalogue, data export, replay this tour.',
+    body: 'Colour schemes: free tier + vision-unlocked + Pro (incl. coloured leaderboard name). WHOOP / Oura / Apple Health connections. Shop coin gate on/off. Macros, privacy toggles (search / leaderboard / trending / profile shares), Visions catalogue, data export, replay this tour.',
     target: 'nav-tab-settings', placement: 'right', arrowDir: 'left',
   },
   {

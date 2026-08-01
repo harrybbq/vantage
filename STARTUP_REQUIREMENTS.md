@@ -95,13 +95,34 @@ action outside the repo.
     — promote it to enforcing once the violation reports are quiet.
 22. `[ ]` **Triage the dependency vulnerabilities** — 1 critical, 12 high
     in production deps, mostly the Capacitor toolchain.
-23. `[ ]` **Move `level`, `prestige` and `ratings*` writes server-side.**
-    They are still client-writable because `updateOwnProfile` and
-    `AdminEditModal` write them directly. They are leaderboard inputs, so
-    they are forgeable by anyone calling PostgREST. Do this before the
-    leaderboard means anything competitively.
-24. `[ ]` **Move the health-sync token out of the URL query string** into
-    a header, and drop its weak RNG fallback.
+23. `[~]` **`prestige` and `ratings*` writes moved server-side.**
+    The leaderboard ranks by `prestige * 100 + ratings_ovr` and both
+    were granted to `authenticated`, so any signed-in user could PATCH
+    PostgREST directly and hold first place forever. AdminEditModal now
+    writes through `netlify/functions/admin-set-rating` (session
+    verified, owner checked against `OWNER_EMAIL`, values re-clamped).
+    - `[ ]` **Run `supabase/leaderboard_column_lockdown.sql`** — deploy
+      the code first, or the owner's rating editor breaks.
+    - `[ ]` **Set `OWNER_EMAIL`** on Netlify (comma-separated). The
+      function fails closed without it.
+    - `level` is deliberately still client-writable: cosmetic on the
+      friend card, published on a debounce by `usePublishProfile`, and
+      not a leaderboard input. Moving it needs that write server-side
+      first.
+24. `[~]` **Health-sync token hardened.** It was minted with
+    `Date.now() + Math.random()` whenever `crypto.randomUUID` was
+    missing — not a CSPRNG, so the token guarding health writes was
+    guessable. Now 192 bits from `getRandomValues` with no weak
+    fallback, plus a **New URL** button that revokes the old one.
+    - `[ ]` Still travels in the query string, so it can land in logs
+      and history. `health-sync` already accepts `x-health-token`;
+      moving the Shortcut onto the header is the remaining half.
+    - ⚠️ Anyone who enabled sync **before this** has a weak token —
+      tell them to tap **New URL**.
+24b. `[ ]` **Set `CRON_SECRET`** on Netlify if you want to trigger
+    `whoop-cron`, `oura-cron`, `snapshot-ratings` or `push-dispatch` by
+    hand. Scheduled runs work without it; manual HTTP triggering is
+    refused until it exists.
 
 ## Phase 6 — Scale readiness (before real user numbers)
 

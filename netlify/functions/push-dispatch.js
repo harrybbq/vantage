@@ -42,6 +42,7 @@
  */
 
 const crypto = require('node:crypto');
+const { requireScheduler } = require('../lib/cronAuth');
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
@@ -57,22 +58,15 @@ exports.handler = async (event, context) => {
     return { statusCode: 204, headers: CORS, body: '' };
   }
 
-  // Scheduled functions don't have httpMethod=POST — Netlify invokes
-  // them via internal RPC. We treat anything that isn't a tampered
-  // POST as authorized.
-  const isScheduled = !event.httpMethod || event.httpMethod === 'GET';
-  const isManualPost = event.httpMethod === 'POST';
-
-  if (isManualPost) {
-    const provided = event.headers['x-dispatch-secret']
-      || event.headers['X-Dispatch-Secret'];
-    const expected = process.env.PUSH_DISPATCH_SECRET;
-    if (!expected || provided !== expected) {
-      return { statusCode: 401, headers: CORS, body: JSON.stringify({ error: 'unauthorized' }) };
-    }
-  } else if (!isScheduled) {
-    return { statusCode: 405, headers: CORS, body: JSON.stringify({ error: 'method not allowed' }) };
-  }
+  // Treating GET as "scheduled" meant the shared secret only ever
+  // guarded POST — the one method an attacker has no reason to pick. A
+  // bare GET to this URL skipped auth entirely and flushed the whole
+  // notification queue, spending FCM quota and delivering every pending
+  // push early. The scheduler is identified by the absence of an HTTP
+  // method (or a `next_run` body), which no HTTP client can forge;
+  // everything else now needs PUSH_DISPATCH_SECRET.
+  const denied = requireScheduler(event, CORS, 'PUSH_DISPATCH_SECRET');
+  if (denied) return denied;
 
   const supabaseUrl = process.env.SUPABASE_URL;
   const serviceKey  = process.env.SUPABASE_SERVICE_ROLE_KEY;

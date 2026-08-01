@@ -18,10 +18,16 @@
  * would be the path to intra-day passive updates.
  */
 const { sb, getFreshToken, fetchWhoopData, mergeWhoopIntoState } = require('../lib/whoop');
+const { requireScheduler } = require('../lib/cronAuth');
 
 const DAYS = 3; // enough to catch anything a run or two ago missed
 
-exports.handler = async () => {
+exports.handler = async (event) => {
+  // Service-role loop over every connected account — not something a
+  // web request should be able to start.
+  const denied = requireScheduler(event, { 'Content-Type': 'application/json' }, 'CRON_SECRET');
+  if (denied) return denied;
+
   const env = process.env;
   if (!env.WHOOP_CLIENT_ID || !env.WHOOP_CLIENT_SECRET || !env.SUPABASE_URL || !env.SUPABASE_SERVICE_ROLE_KEY) {
     console.error('whoop-cron: missing env');

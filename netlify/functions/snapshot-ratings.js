@@ -16,6 +16,8 @@
  * few hundred MB.
  */
 
+const { requireScheduler } = require('../lib/cronAuth');
+
 const CORS = {
   'Access-Control-Allow-Origin': '*',
   'Content-Type': 'application/json',
@@ -38,6 +40,9 @@ function sb(supabaseUrl, serviceKey, path, init = {}) {
 }
 
 exports.handler = async (event) => {
+  const denied = requireScheduler(event, CORS, 'CRON_SECRET');
+  if (denied) return denied;
+
   const supabaseUrl = process.env.SUPABASE_URL;
   const serviceKey  = process.env.SUPABASE_SERVICE_ROLE_KEY;
   if (!supabaseUrl || !serviceKey) {

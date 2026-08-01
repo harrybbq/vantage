@@ -752,7 +752,12 @@ export default function HubSection({ S, update, active, onOpenModal, onOpenWaitl
         ? `<div class="link-island-body"><div class="gh-skeleton" id="gh-body-${link.id}"><div class="sk-stats"><div class="sk-stat"></div><div class="sk-stat"></div><div class="sk-stat"></div></div><div class="sk-repo"></div><div class="sk-repo"></div><div class="sk-repo"></div></div></div>`
         : isLivePreset
           ? `<div class="link-island-body link-island-live" id="lp-body-${link.id}"><div class="link-island-live-hero">Loading…</div>${link.notes ? `<div class="link-island-notes">${escapeHtml(link.notes)}</div>` : ''}</div>`
-          : (link.notes ? `<div class="link-island-body"><div class="link-island-notes">${link.notes}</div></div>` : '');
+          // escapeHtml, like the live-preset branch one line up. Notes
+          // went into innerHTML raw here, so `<img src=x onerror=…>` in
+          // a link's notes executed on every hub render — and notes ride
+          // in user_data.state, which syncs across that account's
+          // devices and is read back on every load.
+          : (link.notes ? `<div class="link-island-body"><div class="link-island-notes">${escapeHtml(link.notes)}</div></div>` : '');
 
       island.innerHTML = `
         <div class="widget-drag-handle" data-drag="${escapeHtml(link.id)}"><span></span></div>
@@ -1123,7 +1128,15 @@ function renderNotepadInCanvas(canvas, S, update, hasPositions) {
         <button class="notepad-clear-btn" id="notepadClearBtn">Clear</button>
         <button class="link-del-btn" id="notepadDelBtn" style="margin-left:4px;">✕</button>
       </div>
-      <textarea class="notepad-textarea" id="notepadTextarea" placeholder="Quick notes, tasks for today, things to remember…">${S.notepadText || ''}</textarea>
+      <!-- escapeHtml: being inside a <textarea> is not protection when
+           the whole thing is built with innerHTML. Typing
+           "</textarea><img src=x onerror=…>" closed the element and ran
+           the payload on every hub render, and notepadText persists in
+           user_data.state, so it came back on each load and synced to
+           the account's other devices. The browser decodes the entities
+           back to plain text for the textarea's value, so what the user
+           sees and edits is unchanged. -->
+      <textarea class="notepad-textarea" id="notepadTextarea" placeholder="Quick notes, tasks for today, things to remember…">${escapeHtml(S.notepadText || '')}</textarea>
       <div class="notepad-footer">
         <span class="notepad-saved-indicator" id="notepadSavedIndicator">Auto-saved</span>
         <span class="notepad-char-count" id="notepadCharCount">${(S.notepadText || '').length} chars</span>

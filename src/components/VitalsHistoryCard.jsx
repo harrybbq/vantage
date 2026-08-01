@@ -73,9 +73,38 @@ export function AppleHealthImport({ S, update }) {
   const syncUrl = token && typeof window !== 'undefined'
     ? `${window.location.origin}/.netlify/functions/health-sync?token=${token}`
     : null;
+  // This token is a bearer credential: anyone holding it can POST
+  // health data into this account. The old fallback was
+  // `Date.now() + Math.random()` — Math.random is not a CSPRNG, and its
+  // state is recoverable from a few outputs, so a token minted on any
+  // browser without randomUUID was guessable rather than secret. There
+  // is no weak path now: getRandomValues is available wherever crypto
+  // is, and if crypto is missing entirely we refuse rather than hand
+  // out something that only looks random.
+  function mintToken() {
+    const c = typeof window !== 'undefined' ? window.crypto : null;
+    if (!c?.getRandomValues) return null;
+    const bytes = new Uint8Array(24);   // 192 bits
+    c.getRandomValues(bytes);
+    return Array.from(bytes, b => b.toString(16).padStart(2, '0')).join('');
+  }
+
   function enableSync() {
-    const t = (window.crypto?.randomUUID?.() || (Date.now().toString(36) + Math.random().toString(36).slice(2))).replace(/-/g, '');
+    const t = mintToken();
+    if (!t) { setMsg('This browser cannot generate a secure token.'); return; }
     update(prev => ({ ...prev, healthToken: t }));
+  }
+
+  // Rotating invalidates the old URL immediately — the server resolves
+  // the token by matching state.healthToken, so replacing the value IS
+  // the revocation. The only route back for anyone holding the old one
+  // is a token that no longer exists.
+  function rotateToken() {
+    if (!window.confirm('Generate a new sync URL? Your existing Shortcut will stop working until you paste the new one in.')) return;
+    const t = mintToken();
+    if (!t) { setMsg('This browser cannot generate a secure token.'); return; }
+    update(prev => ({ ...prev, healthToken: t }));
+    setMsg('New sync URL generated — update your Shortcut.');
   }
   function copyUrl() {
     if (!syncUrl) return;
@@ -121,7 +150,8 @@ export function AppleHealthImport({ S, update }) {
         ) : (
           <>
             <button type="button" className="vitals-ah-btn vitals-ah-btn-alt" onClick={copyUrl}>{copied ? 'Copied ✓' : 'Copy sync URL'}</button>
-            <span className="vitals-ah-hint">Paste this into your “Vantage Health Sync” Shortcut’s <strong>Get Contents of URL</strong> step (POST). Keep it secret.</span>
+            <button type="button" className="vitals-ah-btn vitals-ah-btn-alt" onClick={rotateToken}>New URL</button>
+            <span className="vitals-ah-hint">Paste this into your “Vantage Health Sync” Shortcut’s <strong>Get Contents of URL</strong> step (POST). It works like a password — anyone with the link can write health data to your account, so don’t share it. Tap <strong>New URL</strong> to revoke the old one.</span>
           </>
         )}
       </div>

@@ -38,6 +38,8 @@
  * reserved for genuine failures.
  */
 
+const { safeEqual } = require('../lib/cronAuth');
+
 const CORS = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'Content-Type, Authorization',
@@ -80,7 +82,11 @@ exports.handler = async (event) => {
       body: JSON.stringify({ error: 'REVENUECAT_WEBHOOK_AUTH not configured on this Netlify site' }),
     };
   }
-  if (provided !== expected) {
+  // Constant-time: `!==` returns as soon as two bytes differ, so the
+  // time it takes to reject leaks how much of the secret was right.
+  // This one grants entitlements, so a guessed value is a free Pro (or
+  // lifetime) upgrade for anyone who can hit the URL.
+  if (!safeEqual(provided, expected)) {
     return { statusCode: 401, headers: CORS, body: JSON.stringify({ error: 'unauthorized' }) };
   }
 
@@ -157,8 +163,19 @@ exports.handler = async (event) => {
       return { statusCode: 200, headers: CORS, body: JSON.stringify({ ok: true, action: 'unhandled', type: eventType }) };
   }
 
-  // Patch profiles.tier
-  const url = `${supabaseUrl}/rest/v1/profiles?id=eq.${encodeURIComponent(userId)}`;
+  // Patch profiles.tier.
+  //
+  // Lifetime is a GRANT, never a purchase (supabase/lifetime_grants.sql)
+  // — so a grantee has no RevenueCat entitlement backing it. An
+  // EXPIRATION for such an account (an old trial finally lapsing, a
+  // TRANSFER's donor leg) would set tier='free' and silently revoke a
+  // grant nobody meant to touch. The filter makes the demotion skip
+  // lifetime rows in the same statement rather than reading first and
+  // racing a concurrent event.
+  //
+  // Upgrades deliberately keep no such guard: those are legitimate.
+  const guard = nextTier === 'free' ? '&tier=neq.lifetime' : '';
+  const url = `${supabaseUrl}/rest/v1/profiles?id=eq.${encodeURIComponent(userId)}${guard}`;
   const res = await fetch(url, {
     method: 'PATCH',
     headers: {

@@ -991,6 +991,51 @@ export default function SettingsSection({ S, update, active, userId, onOpenLegal
         {userId
           ? <MacroGoalsPanel userId={userId} />
           : <div className="settings-empty">Sign in to set your nutrition goals.</div>}
+
+        {/* Coin gate on the shopping list. Lives at the top level of S
+            as a new key (no migration); absent means ON, so every
+            existing account keeps the behaviour it has today. */}
+        {(() => {
+          const requireCoins = S?.shopRequireCoins !== false;
+          return (
+            <div className="card" style={{ padding: '22px' }}>
+              <h3 style={{ margin: '0 0 4px' }}>Shopping coins</h3>
+              <p style={{ fontFamily: 'var(--mono)', fontSize: '11px', color: 'var(--text-muted)', margin: '0 0 16px', lineHeight: '1.7' }}>
+                Controls whether your coin balance can stop you unlocking an item on the shopping list.
+              </p>
+              <label
+                style={{
+                  display: 'flex', alignItems: 'center', gap: '14px',
+                  padding: '12px 14px', borderRadius: '10px',
+                  border: requireCoins ? '2px solid var(--em)' : '2px solid var(--border)',
+                  background: requireCoins ? 'rgba(var(--em-rgb),0.08)' : 'var(--card, rgba(255,255,255,0.04))',
+                  cursor: 'pointer', transition: 'all .18s',
+                }}
+              >
+                <input
+                  type="checkbox"
+                  checked={requireCoins}
+                  onChange={() => update(prev => ({ ...prev, shopRequireCoins: !requireCoins }))}
+                  style={{ width: '18px', height: '18px', accentColor: 'var(--em)', cursor: 'pointer' }}
+                />
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontFamily: 'var(--sans)', fontSize: '13px', fontWeight: 600, color: 'var(--text)' }}>
+                    Require enough coins to buy
+                  </div>
+                  <div style={{ fontFamily: 'var(--mono)', fontSize: '10px', color: 'var(--text-muted)', letterSpacing: '0.5px', marginTop: '2px' }}>
+                    On, an item you can't afford stays locked. Off, you can unlock anything and the list works as a plain wishlist — coins are still spent and still refunded if you un-buy, so your balance can go negative.
+                  </div>
+                </div>
+                <span style={{
+                  fontFamily: 'var(--mono)', fontSize: '9px', letterSpacing: '1.4px',
+                  textTransform: 'uppercase', color: requireCoins ? 'var(--em)' : 'var(--text-muted)',
+                }}>
+                  {requireCoins ? 'On' : 'Off'}
+                </span>
+              </label>
+            </div>
+          );
+        })()}
         </>
         )}
 
