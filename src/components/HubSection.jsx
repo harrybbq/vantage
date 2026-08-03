@@ -18,6 +18,7 @@ import FriendsRail from './friends/FriendsRail';
 import RatingsPanel from './RatingsPanel';
 import { ovrTier } from '../lib/ratings/tiers';
 import { useSubscriptionContext } from '../context/SubscriptionContext';
+import { isOsLayoutTheme } from './SettingsSection';
 import { useHubModuleMenu } from './HubModuleMenu';
 import { APP_PRESETS } from '../data/appPresets';
 import { fetchAppPreview } from '../lib/appPreview';
@@ -455,7 +456,7 @@ export default function HubSection({ S, update, active, onOpenModal, onOpenWaitl
   // never see it. The two themes share the same panel/grid structure
   // but keep their own palettes (dark for dark-os, cream for cream-pro)
   // via the data-hub-os attribute + theme-scoped token overrides.
-  const isOsLayout = hasPro && (S.theme === 'dark-os' || S.theme === 'cream-pro');
+  const isOsLayout = hasPro && isOsLayoutTheme(S.theme);
 
   function handleUploadPhoto(e) {
     const file = e.target.files[0];

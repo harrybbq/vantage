@@ -108,6 +108,20 @@ export const SCHEMES = [
   { id: 'steel',   name: 'Steel',   em: '#33414f', mid: '#4f6478', light: '#8a9caf', grad: pastelGrad('#33414f'), pro: true },
 ];
 
+/**
+ * Which theme ids use the operator-console hub layout.
+ *
+ * This condition was written out by hand in three places and one of
+ * them — the settings card that toggles the optional panels — listed
+ * only 'dark-os'. So a Cream Pro user got the layout that READS
+ * S.hubPanels with no UI anywhere to set it: the panels were
+ * permanently whatever they happened to be. Keeping the list in one
+ * place is the actual fix; correcting that one call site would just
+ * leave the next one to get it wrong.
+ */
+export const OS_LAYOUT_THEMES = ['dark-os', 'cream-pro'];
+export const isOsLayoutTheme = themeId => OS_LAYOUT_THEMES.includes(themeId);
+
 function hexToRgb(hex) {
   const r = parseInt(hex.slice(1, 3), 16);
   const g = parseInt(hex.slice(3, 5), 16);
@@ -178,7 +192,7 @@ export function applyTheme(theme, { hasPro = false } = {}) {
   const r = document.documentElement;
   if (effective === 'cream') r.removeAttribute('data-theme');
   else r.setAttribute('data-theme', effective);
-  if (effective === 'dark-os' || effective === 'cream-pro') {
+  if (isOsLayoutTheme(effective)) {
     r.setAttribute('data-hub-os', '1');
   } else {
     r.removeAttribute('data-hub-os');
@@ -563,7 +577,7 @@ export default function SettingsSection({ S, update, active, userId, onOpenLegal
   const currentTheme = S.theme || 'cream';
   const { hasPro } = useSubscriptionContext();
   const hubPanels = S.hubPanels || {};
-  const darkOsActive = currentTheme === 'dark-os' && hasPro;
+  const osLayoutActive = hasPro && isOsLayoutTheme(currentTheme);
 
   function handleThemeChange(themeId) {
     const t = THEMES.find(x => x.id === themeId);
@@ -855,15 +869,17 @@ export default function SettingsSection({ S, update, active, userId, onOpenLegal
           </div>
           {!hasPro && (
             <p style={{ fontFamily: 'var(--mono)', fontSize: '10px', color: 'var(--text-muted)', margin: '14px 0 0', letterSpacing: '0.5px' }}>
-              Dark OS is part of Pro. Upgrade to unlock the control-panel hub and colour-scheme customisation.
+              The control-panel hub layout (Dark OS and Cream Pro) is part of Pro. Upgrade to unlock it and colour-scheme customisation.
             </p>
           )}
         </div>
 
-        {/* Dark OS optional panels (visible only when Dark OS is active) */}
-        {darkOsActive && (
+        {/* Optional control-panel add-ons. Shown for EITHER Pro theme —
+            both use the operator-console layout, and Cream Pro used to
+            get the layout with no way to configure it. */}
+        {osLayoutActive && (
           <div className="card" style={{ padding: '22px' }}>
-            <h3 style={{ margin: '0 0 4px' }}>Dark OS panels</h3>
+            <h3 style={{ margin: '0 0 4px' }}>Control panel add-ons</h3>
             <p style={{ fontFamily: 'var(--mono)', fontSize: '11px', color: 'var(--text-muted)', margin: '0 0 18px', letterSpacing: '0.5px' }}>
               Optional add-ons for your control panel. Toggle on what you want to see in the hub.
             </p>
