@@ -371,8 +371,8 @@ export default function HubSection({ S, update, active, onOpenModal, onOpenWaitl
       case 'body':          return <BodyBody S={S} update={update} navigate={onNavigate} />;
       case 'mood':          return <MoodBody S={S} update={update} navigate={onNavigate} />;
       case 'subscriptions': return <SubscriptionsBody S={S} navigate={onNavigate} />;
-      case 'market':        return <MarketBody S={S} update={update} />;
-      case 'news':          return <NewsBody S={S} update={update} />;
+      case 'market':        return <MarketBody S={S} update={update} hasPro={hasPro} />;
+      case 'news':          return <NewsBody S={S} update={update} hasPro={hasPro} />;
       case 'trading':       return (TradingBody && tradingWidgetAvailable())
         ? <Suspense fallback={null}><TradingBody /></Suspense> : null;
       default:         return null;

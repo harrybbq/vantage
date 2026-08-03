@@ -74,7 +74,13 @@ exports.handler = async (event) => {
   if (!underLimit('market', auth.userId, 30)) return tooMany(CORS);
 
   const key = process.env.FINNHUB_API_KEY;
-  if (!key) return { statusCode: 200, headers: CORS, body: JSON.stringify({ configured: false }) };
+  if (!key) {
+    // Name the variable, never its value. This is the difference
+    // between "you haven't set it" and "you set it but scoped it to
+    // Builds, so the function can't see it" — indistinguishable from
+    // the outside otherwise.
+    return { statusCode: 200, headers: CORS, body: JSON.stringify({ configured: false, missing: 'FINNHUB_API_KEY' }) };
+  }
 
   const raw = (event.queryStringParameters?.symbols || '').split(',');
   const symbols = [...new Set(raw.map(clean).filter(Boolean))].slice(0, MAX_SYMBOLS);

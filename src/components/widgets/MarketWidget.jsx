@@ -42,8 +42,14 @@ function price(v) {
   return v.toFixed(2);
 }
 
-export default function MarketBody({ S, update, compact = false }) {
-  const { hasPro } = useSubscriptionContext();
+export default function MarketBody({ S, update, compact = false, hasPro: hasProProp }) {
+  // Desktop hub widgets mount in their OWN React root (createRoot per
+  // island), which does not inherit context from the app tree — so
+  // useSubscriptionContext() there silently returns the module default
+  // and every Pro user looked free. HubSection passes the real value in;
+  // the mobile stack renders inside the provider and can still use it.
+  const ctx = useSubscriptionContext();
+  const hasPro = hasProProp !== undefined ? hasProProp : ctx.hasPro;
   const limit = hasPro ? PRO_LIMIT : FREE_LIMIT;
 
   const watchlist = Array.isArray(S?.marketSymbols) && S.marketSymbols.length
@@ -66,11 +72,11 @@ export default function MarketBody({ S, update, compact = false }) {
         const res = await authFetch(`/.netlify/functions/market-quotes?symbols=${encodeURIComponent(key)}`);
         const body = await res.json().catch(() => null);
         if (!alive.current) return;
-        if (!res.ok || !body) return setState({ kind: 'error' });
-        if (body.configured === false) return setState({ kind: 'unconfigured' });
+        if (!res.ok || !body) return setState({ kind: 'error', detail: body?.error || `HTTP ${res.status}` });
+        if (body.configured === false) return setState({ kind: 'unconfigured', missing: body.missing });
         setState({ kind: 'ok', quotes: body.quotes || [], delayed: body.delayed });
       } catch {
-        if (alive.current) setState({ kind: 'error' });
+        if (alive.current) setState({ kind: 'error', detail: 'network' });
       }
     })();
     return () => { alive.current = false; };
@@ -116,7 +122,10 @@ export default function MarketBody({ S, update, compact = false }) {
     return (
       <div className="mkt-note">
         Market data isn’t switched on yet.
-        <span className="mkt-note-sub">Set FINNHUB_API_KEY in Netlify.</span>
+        <span className="mkt-note-sub">
+          The function can’t see {state.missing || 'FINNHUB_API_KEY'} — check it exists
+          and that its scope includes Functions, then redeploy.
+        </span>
       </div>
     );
   }
@@ -124,7 +133,7 @@ export default function MarketBody({ S, update, compact = false }) {
     return (
       <div className="mkt-note">
         Couldn’t load quotes.
-        <span className="mkt-note-sub">No prices shown rather than stale ones.</span>
+        <span className="mkt-note-sub">No prices shown rather than stale ones. ({state.detail})</span>
       </div>
     );
   }
