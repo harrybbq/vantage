@@ -18,6 +18,7 @@ import FriendsRail from './friends/FriendsRail';
 import RatingsPanel from './RatingsPanel';
 import { ovrTier } from '../lib/ratings/tiers';
 import { useSubscriptionContext } from '../context/SubscriptionContext';
+import { isOsLayoutTheme } from './SettingsSection';
 import { useHubModuleMenu } from './HubModuleMenu';
 import { APP_PRESETS } from '../data/appPresets';
 import { fetchAppPreview } from '../lib/appPreview';
@@ -455,7 +456,7 @@ export default function HubSection({ S, update, active, onOpenModal, onOpenWaitl
   // never see it. The two themes share the same panel/grid structure
   // but keep their own palettes (dark for dark-os, cream for cream-pro)
   // via the data-hub-os attribute + theme-scoped token overrides.
-  const isOsLayout = hasPro && (S.theme === 'dark-os' || S.theme === 'cream-pro');
+  const isOsLayout = hasPro && isOsLayoutTheme(S.theme);
 
   function handleUploadPhoto(e) {
     const file = e.target.files[0];
@@ -671,11 +672,15 @@ export default function HubSection({ S, update, active, onOpenModal, onOpenWaitl
       }));
 
       const canvasW = canvasRef.current?.clientWidth ?? null;
-      const axis = side === 'b' ? 'y' : 'x';
-      const dir  = side === 'l' ? -1 : 1;
-      // Horizontal has walls; the canvas grows downward, so vertical
-      // pushes never need to shrink anyone.
-      const limit = side === 'r' ? canvasW : side === 'l' ? 0 : null;
+      const axis = (side === 'b' || side === 't') ? 'y' : 'x';
+      const dir  = (side === 'l' || side === 't') ? -1 : 1;
+      // Three of the four directions have a wall. Downward is the
+      // exception: the canvas grows, so a push down never needs to
+      // shrink anyone and passes a null limit.
+      const limit = side === 'r' ? canvasW
+                  : side === 'l' ? 0
+                  : side === 't' ? 0
+                  : null;
 
       const { ok, moved, maxExtent } = reflow(moving, others, axis, dir, {
         limit, min: axis === 'x' ? MIN_W : MIN_H, gap: REFLOW_GAP,
@@ -690,6 +695,10 @@ export default function HubSection({ S, update, active, onOpenModal, onOpenWaitl
           const right = moving.x + moving.w;
           wrapper.style.left = maxExtent + 'px';
           wrapper.style.width = Math.max(MIN_W, right - maxExtent) + 'px';
+        } else if (side === 't') {
+          const bottom = moving.y + moving.h;
+          wrapper.style.top = maxExtent + 'px';
+          wrapper.style.height = Math.max(MIN_H, bottom - maxExtent) + 'px';
         }
         return;
       }
@@ -732,6 +741,7 @@ export default function HubSection({ S, update, active, onOpenModal, onOpenWaitl
           e.preventDefault(); e.stopPropagation();
           const startLeft = wrapper.offsetLeft, startTop = wrapper.offsetTop;
           const rightAnchor = startLeft + wrapper.offsetWidth; // for 'l'
+          const bottomAnchor = startTop + wrapper.offsetHeight; // for 't'
           try { grip.setPointerCapture(e.pointerId); } catch { /* ignore */ }
           activeSideRef.current = side;
           armSnap(); // every direction reflows now, not just rightward
@@ -742,6 +752,13 @@ export default function HubSection({ S, update, active, onOpenModal, onOpenWaitl
               wrapper.style.width = (rightAnchor - newLeft) + 'px';
             } else if (side === 'r') {
               wrapper.style.width = Math.max(minW, ev.clientX - canvasRect().left - startLeft) + 'px';
+            } else if (side === 't') {
+              // Mirror of 'l': the bottom edge is anchored and the top
+              // travels, so height is derived rather than measured from
+              // the pointer.
+              const newTop = Math.max(0, Math.min(ev.clientY - canvasRect().top, bottomAnchor - minH));
+              wrapper.style.top = newTop + 'px';
+              wrapper.style.height = (bottomAnchor - newTop) + 'px';
             } else { // 'b'
               wrapper.style.height = Math.max(minH, ev.clientY - canvasRect().top - startTop) + 'px';
             }
@@ -755,7 +772,12 @@ export default function HubSection({ S, update, active, onOpenModal, onOpenWaitl
           document.addEventListener('pointerup', up);
         });
       };
+      // Top rail only exists with snap ON. Without snap it would just
+      // be a second way to resize that also steals the top of the drag
+      // handle, for no gain.
       addGrip('l'); addGrip('r'); addGrip('b');
+      if (snapRef?.current) addGrip('t');
+      else wrapper.querySelector('.widget-resize-t')?.remove();
     }
   }, [S.widgetSizes, S.widgetZ, update, snapRef]);
 

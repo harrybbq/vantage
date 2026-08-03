@@ -59,7 +59,7 @@ export default function NewsBody({ S, update, compact = false, hasPro: hasProPro
         const body = await res.json().catch(() => null);
         if (!alive.current) return;
         if (!res.ok || !body) {
-          return setState({ kind: 'error', quota: body?.error === 'quota', detail: body?.error || `HTTP ${res.status}` });
+          return setState({ kind: 'error', rate: body?.error === 'rate-limited', status: body?.status, detail: body?.detail || body?.error || `HTTP ${res.status}` });
         }
         if (body.configured === false) return setState({ kind: 'unconfigured', missing: body.missing, nearby: body.nearby });
         setState({ kind: 'ok', items: body.items || [] });
@@ -125,8 +125,10 @@ export default function NewsBody({ S, update, compact = false, hasPro: hasProPro
 
       {state.kind === 'error' && (
         <div className="nws-note">
-          {state.quota ? 'Daily news quota used up.' : 'Couldn’t load headlines.'}
-          <span className="nws-note-sub">{state.detail ? `(${state.detail})` : 'Try again later.'}</span>
+          {state.rate ? 'Too many requests — try again shortly.' : 'Couldn’t load headlines.'}
+          <span className="nws-note-sub">
+            {state.status ? `${state.status}: ` : ''}{state.detail || 'Try again later.'}
+          </span>
         </div>
       )}
 

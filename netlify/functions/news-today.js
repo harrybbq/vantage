@@ -88,11 +88,26 @@ exports.handler = async (event) => {
   try {
     const res = await fetch(url);
     if (!res.ok) {
-      // 403/429 here usually means the daily quota is spent. Say so
-      // rather than rendering an empty, healthy-looking list.
+      // Pass through what the provider actually said. Collapsing 403 and
+      // 429 into "quota" was wrong: 403 covers a rejected key, a plan
+      // that doesn't allow the endpoint, and a spent allowance, and
+      // reporting all three as "quota used up" sent us looking at usage
+      // for a key that had never been called. The body carries GNews's
+      // own explanation — truncated, since it goes on screen.
+      let upstream = '';
+      try { upstream = (await res.text()).slice(0, 300); } catch { /* no body */ }
+      let detail = '';
+      try {
+        const j = JSON.parse(upstream);
+        detail = Array.isArray(j?.errors) ? j.errors.join('; ') : (j?.message || '');
+      } catch { detail = upstream; }
       return {
         statusCode: 502, headers: CORS,
-        body: JSON.stringify({ error: res.status === 429 || res.status === 403 ? 'quota' : 'upstream', status: res.status }),
+        body: JSON.stringify({
+          error: res.status === 429 ? 'rate-limited' : 'upstream',
+          status: res.status,
+          detail: detail || `HTTP ${res.status}`,
+        }),
       };
     }
     const data = await res.json();
