@@ -79,7 +79,17 @@ exports.handler = async (event) => {
     // between "you haven't set it" and "you set it but scoped it to
     // Builds, so the function can't see it" — indistinguishable from
     // the outside otherwise.
-    return { statusCode: 200, headers: CORS, body: JSON.stringify({ configured: false, missing: 'FINNHUB_API_KEY' }) };
+    // Report the NAMES the runtime can see that look related, never a
+    // value. This separates the three failures that look identical
+    // from outside: not created, created but scoped to Builds so the
+    // function can't read it, or created under a name with a typo.
+    const nearby = Object.keys(process.env)
+      .filter(k => /FINN|GNEWS|FINNHUB/i.test(k))
+      .sort();
+    return {
+      statusCode: 200, headers: CORS,
+      body: JSON.stringify({ configured: false, missing: 'FINNHUB_API_KEY', nearby }),
+    };
   }
 
   const raw = (event.queryStringParameters?.symbols || '').split(',');

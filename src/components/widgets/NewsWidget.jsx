@@ -61,7 +61,7 @@ export default function NewsBody({ S, update, compact = false, hasPro: hasProPro
         if (!res.ok || !body) {
           return setState({ kind: 'error', quota: body?.error === 'quota', detail: body?.error || `HTTP ${res.status}` });
         }
-        if (body.configured === false) return setState({ kind: 'unconfigured', missing: body.missing });
+        if (body.configured === false) return setState({ kind: 'unconfigured', missing: body.missing, nearby: body.nearby });
         setState({ kind: 'ok', items: body.items || [] });
       } catch {
         if (alive.current) setState({ kind: 'error' });
@@ -115,8 +115,10 @@ export default function NewsBody({ S, update, compact = false, hasPro: hasProPro
         <div className="nws-note">
           News isn’t switched on yet.
           <span className="nws-note-sub">
-            The function can’t see {state.missing || 'GNEWS_API_KEY'} — check it exists
-            and that its scope includes Functions, then redeploy.
+            The function can’t see {state.missing || 'GNEWS_API_KEY'}.
+            {state.nearby?.length
+              ? ` It CAN see: ${state.nearby.join(', ')} — so the name differs, or that one is empty.`
+              : ' It can see no similar name at all — the variable’s scope probably excludes Functions, or it’s set for a different deploy context.'}
           </span>
         </div>
       )}
