@@ -350,6 +350,20 @@ html[data-hub-os] .hub-os-main > .os-col {
   overflow-y: auto;
   overflow-x: hidden;
 }
+/* The column above says it scrolls when it holds more than fits — but
+   its children are flex items, and a flex item defaults to
+   flex-shrink:1. Combined with .os-panel's min-height:0 that let every
+   panel compress instead of overflowing, so the column never scrolled
+   and the tallest panel (the ratings ledger) took the space while
+   Actions and Friends were squeezed to a sliver. Measured on a 600px
+   column: Actions 177px -> 95px, Friends 212px -> 113px, and
+   scrollHeight never exceeded clientHeight.
+
+   Pinning shrink is what makes the existing overflow-y:auto do its job. */
+html[data-hub-os] .hub-os-main > .os-col > * {
+  flex-shrink: 0;
+}
+
 /* Thin scrollbars to match panel bodies */
 html[data-hub-os] .hub-os-main > .os-col::-webkit-scrollbar { width: 4px; }
 html[data-hub-os] .hub-os-main > .os-col::-webkit-scrollbar-thumb {
