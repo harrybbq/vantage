@@ -47,6 +47,8 @@ export default function AddMobileWidgetModal({ openId, onClose, existingTypes, o
     'savings-pots',
     'savings-projection',
     'subscriptions',
+    'market',
+    'news',
     'mail',
     // Owner-only AND web-only: absent from native builds entirely, so
     // an app-store reviewer never meets a brokerage surface.

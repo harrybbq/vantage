@@ -22,6 +22,8 @@ import { strikeState } from '../../lib/habits/strikes';
 import { SavingsPotsBody, SavingsProjectionBody } from '../savings/SavingsWidgets';
 import { BodyBody, SubscriptionsBody, MoodBody } from '../widgets/LifeWidgets';
 import { tradingWidgetAvailable, TRADING_WIDGET_BUILD_EXCLUDED } from '../../lib/trading/enabled';
+import MarketBody from '../widgets/MarketWidget';
+import NewsBody from '../widgets/NewsWidget';
 // Dead branch when the flag is set, so the chunk is never emitted.
 const TradingBody = TRADING_WIDGET_BUILD_EXCLUDED ? null : lazy(() => import('../widgets/TradingWidget'));
 import Icon from '../Icon';
@@ -48,6 +50,16 @@ const BASE_WIDGET_META = {
     eyebrow: 'TRADING',
     icon: '↗', svg: 'trending-up',
     ownerOnly: true,
+  },
+  'market': {
+    label: 'Market',
+    eyebrow: 'MARKET',
+    icon: '↗', svg: 'trending-up',
+  },
+  'news': {
+    label: 'News',
+    eyebrow: 'NEWS',
+    icon: '❑', svg: 'newspaper',
   },
   'notepad': {
     label: 'Notepad',
@@ -421,6 +433,8 @@ function renderBody(widget, meta, S, update, navigate, userId) {
   switch (widget.type) {
     case 'trading':     return (TradingBody && tradingWidgetAvailable())
       ? <Suspense fallback={null}><TradingBody compact /></Suspense> : null;
+    case 'market':      return <MarketBody S={S} update={update} compact />;
+    case 'news':        return <NewsBody S={S} update={update} compact />;
     case 'notepad':     return <NotepadBody S={S} update={update} />;
     case 'recent-wins': return <RecentWinsBody S={S} />;
     case 'coin-history':return <CoinHistoryBody S={S} />;
