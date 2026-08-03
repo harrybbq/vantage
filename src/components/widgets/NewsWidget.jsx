@@ -32,8 +32,11 @@ function timeAgo(iso) {
   return `${Math.round(hrs / 24)}d`;
 }
 
-export default function NewsBody({ S, update, compact = false }) {
-  const { hasPro } = useSubscriptionContext();
+export default function NewsBody({ S, update, compact = false, hasPro: hasProProp }) {
+  // See MarketWidget: desktop islands are detached React roots and do
+  // not inherit the subscription provider.
+  const ctx = useSubscriptionContext();
+  const hasPro = hasProProp !== undefined ? hasProProp : ctx.hasPro;
   const saved = typeof S?.newsQuery === 'string' ? S.newsQuery : '';
   // The filter is Pro. A free user with a saved query (from a lapsed
   // subscription) sees the general feed rather than an error, and the
@@ -56,9 +59,9 @@ export default function NewsBody({ S, update, compact = false }) {
         const body = await res.json().catch(() => null);
         if (!alive.current) return;
         if (!res.ok || !body) {
-          return setState({ kind: 'error', quota: body?.error === 'quota' });
+          return setState({ kind: 'error', quota: body?.error === 'quota', detail: body?.error || `HTTP ${res.status}` });
         }
-        if (body.configured === false) return setState({ kind: 'unconfigured' });
+        if (body.configured === false) return setState({ kind: 'unconfigured', missing: body.missing });
         setState({ kind: 'ok', items: body.items || [] });
       } catch {
         if (alive.current) setState({ kind: 'error' });
@@ -111,14 +114,17 @@ export default function NewsBody({ S, update, compact = false }) {
       {state.kind === 'unconfigured' && (
         <div className="nws-note">
           News isn’t switched on yet.
-          <span className="nws-note-sub">Set GNEWS_API_KEY in Netlify.</span>
+          <span className="nws-note-sub">
+            The function can’t see {state.missing || 'GNEWS_API_KEY'} — check it exists
+            and that its scope includes Functions, then redeploy.
+          </span>
         </div>
       )}
 
       {state.kind === 'error' && (
         <div className="nws-note">
           {state.quota ? 'Daily news quota used up.' : 'Couldn’t load headlines.'}
-          <span className="nws-note-sub">Try again later.</span>
+          <span className="nws-note-sub">{state.detail ? `(${state.detail})` : 'Try again later.'}</span>
         </div>
       )}
 

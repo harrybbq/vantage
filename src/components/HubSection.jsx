@@ -7,6 +7,7 @@ import { SavingsPotsBody, SavingsProjectionBody } from './savings/SavingsWidgets
 import { tradingWidgetAvailable, TRADING_WIDGET_BUILD_EXCLUDED } from '../lib/trading/enabled';
 import MarketBody from './widgets/MarketWidget';
 import NewsBody from './widgets/NewsWidget';
+import { reflow, MIN_W, MIN_H, SNAP_GAP as REFLOW_GAP } from '../lib/hub/reflow';
 const TradingBody = TRADING_WIDGET_BUILD_EXCLUDED ? null : lazy(() => import('./widgets/TradingWidget'));
 import { timeAgo } from '../utils/helpers';
 import AiCoachWidget from './AiCoachWidget';
@@ -355,6 +356,8 @@ export default function HubSection({ S, update, active, onOpenModal, onOpenWaitl
   // widget's ResizeObserver reflows neighbours in snap mode — so the
   // neighbour width writes we make don't cascade into their observers.
   const activeResizeRef = useRef(null);
+  // Which grip is held — the reflow needs the direction, not just the fact.
+  const activeSideRef = useRef(null);
   function setHubWidgetCount(id, n) {
     update(prev => ({ ...prev, hubWidgets: (prev.hubWidgets || []).map(w => w.id === id ? { ...w, count: n } : w) }));
   }
@@ -368,8 +371,8 @@ export default function HubSection({ S, update, active, onOpenModal, onOpenWaitl
       case 'body':          return <BodyBody S={S} update={update} navigate={onNavigate} />;
       case 'mood':          return <MoodBody S={S} update={update} navigate={onNavigate} />;
       case 'subscriptions': return <SubscriptionsBody S={S} navigate={onNavigate} />;
-      case 'market':        return <MarketBody S={S} update={update} />;
-      case 'news':          return <NewsBody S={S} update={update} />;
+      case 'market':        return <MarketBody S={S} update={update} hasPro={hasPro} />;
+      case 'news':          return <NewsBody S={S} update={update} hasPro={hasPro} />;
       case 'trading':       return (TradingBody && tradingWidgetAvailable())
         ? <Suspense fallback={null}><TradingBody /></Suspense> : null;
       default:         return null;
@@ -622,6 +625,7 @@ export default function HubSection({ S, update, active, onOpenModal, onOpenWaitl
     function commitResize() {
       const w = wrapper.offsetWidth, h = wrapper.offsetHeight;
       activeResizeRef.current = null;
+      activeSideRef.current = null;
       const nbs = resizeNeighbours;
       resizeNeighbours = null;
       update(prev => {
@@ -642,24 +646,69 @@ export default function HubSection({ S, update, active, onOpenModal, onOpenWaitl
       });
     }
 
-    // ── Snap-resize reflow ──
-    // While the grip is held with snap ON, expanding the widget to the
-    // right compresses same-row neighbours that sit to its right: each
-    // keeps its RIGHT edge fixed and gives up width from the left, so
-    // the row stays perfectly aligned. Fires continuously because a
-    // native resize mutates the box every frame.
+    // ── Snap reflow ──
+    // While a grip is held with snap ON, the widgets being grown into
+    // MOVE first and only give up size once they are against the
+    // perimeter. The old behaviour shrank the neighbour immediately,
+    // so a row lost total width every time you nudged one widget wider
+    // even when there was empty canvas to slide into.
+    //
+    // Direction comes from the grip, and the geometry lives in
+    // lib/hub/reflow.js so it can be asserted on without a browser.
+    // Fires continuously because resizing mutates the box every frame.
     const ro = new ResizeObserver(() => {
       if (activeResizeRef.current !== id || !resizeNeighbours) return;
-      const cx = wrapper.offsetLeft, cy = wrapper.offsetTop, cw = wrapper.offsetWidth, ch = wrapper.offsetHeight;
-      const grownRight = cx + cw;
-      for (const nb of resizeNeighbours) {
-        const sameRow = cy < nb.y0 + nb.h0 && cy + ch > nb.y0;
-        if (!sameRow || nb.x0 < cx) continue; // only right-side, same-row
-        const rightEdge = nb.x0 + nb.w0;
-        const newLeft = Math.max(nb.x0, grownRight + SNAP_GAP);
-        const newW = Math.max(220, rightEdge - newLeft);
-        nb.el.style.left = newLeft + 'px';
-        nb.el.style.width = newW + 'px';
+      const side = activeSideRef.current;
+      if (!side) return;
+
+      const moving = { id, x: wrapper.offsetLeft, y: wrapper.offsetTop,
+                       w: wrapper.offsetWidth, h: wrapper.offsetHeight };
+      // Neighbours are measured from their ORIGINAL rects so pulling the
+      // widget small again springs them back rather than ratcheting.
+      const others = resizeNeighbours.map(nb => ({
+        id: nb.el.dataset.linkId || nb.el, el: nb.el,
+        x: nb.x0, y: nb.y0, w: nb.w0, h: nb.h0,
+      }));
+
+      const canvasW = canvasRef.current?.clientWidth ?? null;
+      const axis = side === 'b' ? 'y' : 'x';
+      const dir  = side === 'l' ? -1 : 1;
+      // Horizontal has walls; the canvas grows downward, so vertical
+      // pushes never need to shrink anyone.
+      const limit = side === 'r' ? canvasW : side === 'l' ? 0 : null;
+
+      const { ok, moved, maxExtent } = reflow(moving, others, axis, dir, {
+        limit, min: axis === 'x' ? MIN_W : MIN_H, gap: REFLOW_GAP,
+      });
+
+      // Refused: a neighbour would drop below the size at which its own
+      // contents stop fitting. Clamp the drag instead of letting that
+      // happen — the promise is that a shrunken widget stays readable.
+      if (!ok && maxExtent != null) {
+        if (side === 'r') wrapper.style.width = Math.max(MIN_W, maxExtent - moving.x) + 'px';
+        else if (side === 'l') {
+          const right = moving.x + moving.w;
+          wrapper.style.left = maxExtent + 'px';
+          wrapper.style.width = Math.max(MIN_W, right - maxExtent) + 'px';
+        }
+        return;
+      }
+
+      for (const o of others) {
+        const r = moved.get(o.id);
+        if (!r) {
+          // Untouched this frame — restore its original rect so a
+          // neighbour freed by shrinking the widget doesn't stay shoved.
+          o.el.style.left = o.x + 'px';
+          o.el.style.top = o.y + 'px';
+          o.el.style.width = o.w + 'px';
+          o.el.style.height = o.h + 'px';
+          continue;
+        }
+        o.el.style.left = r.x + 'px';
+        o.el.style.top = r.y + 'px';
+        o.el.style.width = r.w + 'px';
+        o.el.style.height = r.h + 'px';
       }
     });
     ro.observe(wrapper);
@@ -684,7 +733,8 @@ export default function HubSection({ S, update, active, onOpenModal, onOpenWaitl
           const startLeft = wrapper.offsetLeft, startTop = wrapper.offsetTop;
           const rightAnchor = startLeft + wrapper.offsetWidth; // for 'l'
           try { grip.setPointerCapture(e.pointerId); } catch { /* ignore */ }
-          if (side === 'r') armSnap(); // only rightward growth reflows
+          activeSideRef.current = side;
+          armSnap(); // every direction reflows now, not just rightward
           function mv(ev) {
             if (side === 'l') {
               const newLeft = Math.max(0, Math.min(ev.clientX - canvasRect().left, rightAnchor - minW));

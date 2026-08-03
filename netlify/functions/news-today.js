@@ -46,7 +46,13 @@ exports.handler = async (event) => {
   if (!underLimit('news', auth.userId, 20)) return tooMany(CORS);
 
   const key = process.env.GNEWS_API_KEY;
-  if (!key) return { statusCode: 200, headers: CORS, body: JSON.stringify({ configured: false }) };
+  if (!key) {
+    // Name the variable, never its value. This is the difference
+    // between "you haven't set it" and "you set it but scoped it to
+    // Builds, so the function can't see it" — indistinguishable from
+    // the outside otherwise.
+    return { statusCode: 200, headers: CORS, body: JSON.stringify({ configured: false, missing: 'GNEWS_API_KEY' }) };
+  }
 
   // Trimmed and length-capped: it goes into a URL, and an unbounded
   // string from the client is how you end up proxying someone else's
