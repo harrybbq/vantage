@@ -73,7 +73,7 @@ export default function MarketBody({ S, update, compact = false, hasPro: hasProP
         const body = await res.json().catch(() => null);
         if (!alive.current) return;
         if (!res.ok || !body) return setState({ kind: 'error', detail: body?.error || `HTTP ${res.status}` });
-        if (body.configured === false) return setState({ kind: 'unconfigured', missing: body.missing });
+        if (body.configured === false) return setState({ kind: 'unconfigured', missing: body.missing, nearby: body.nearby });
         setState({ kind: 'ok', quotes: body.quotes || [], delayed: body.delayed });
       } catch {
         if (alive.current) setState({ kind: 'error', detail: 'network' });
@@ -123,8 +123,10 @@ export default function MarketBody({ S, update, compact = false, hasPro: hasProP
       <div className="mkt-note">
         Market data isn’t switched on yet.
         <span className="mkt-note-sub">
-          The function can’t see {state.missing || 'FINNHUB_API_KEY'} — check it exists
-          and that its scope includes Functions, then redeploy.
+          The function can’t see {state.missing || 'FINNHUB_API_KEY'}.
+          {state.nearby?.length
+            ? ` It CAN see: ${state.nearby.join(', ')} — so the name differs, or that one is empty.`
+            : ' It can see no similar name at all — the variable’s scope probably excludes Functions, or it’s set for a different deploy context.'}
         </span>
       </div>
     );
