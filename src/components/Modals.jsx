@@ -7,6 +7,7 @@ import { useSubscriptionContext } from '../context/SubscriptionContext';
 import { backdropClose } from '../utils/backdropClose';
 import { useIsMobile } from '../hooks/useIsMobile';
 import Icon from './Icon';
+import { tradingWidgetAvailable } from '../lib/trading/enabled';
 import { authFetch } from '../lib/authFetch';
 import {
   emptyHolidayForm, HolidayTabBar, BasicsFields, ItineraryFields, BudgetFields,
@@ -159,6 +160,28 @@ function AddLinkModal({ openId, onClose, onSwitchModal, onAddNotepad, onAddApp, 
           <span style={{ fontWeight: 700, fontSize: '13px', color: 'var(--text)' }}>Projection</span>
           <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Net · balance trend</span>
         </button>
+        {/* Owner-only AND web-only. tradingWidgetAvailable() is false in
+            native builds, so this never reaches an app-store reviewer. */}
+        <button className="btn btn-ghost" style={{ padding: '16px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px', borderRadius: '12px', height: 'auto' }}
+          onClick={() => { onClose('addLinkModal'); onAddHubWidget('market'); }}>
+          <Icon name="trending-up" size={22} strokeWidth={1.75} />
+          <span style={{ fontWeight: 700, fontSize: '13px', color: 'var(--text)' }}>Market</span>
+          <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Delayed quotes</span>
+        </button>
+        <button className="btn btn-ghost" style={{ padding: '16px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px', borderRadius: '12px', height: 'auto' }}
+          onClick={() => { onClose('addLinkModal'); onAddHubWidget('news'); }}>
+          <Icon name="newspaper" size={22} strokeWidth={1.75} />
+          <span style={{ fontWeight: 700, fontSize: '13px', color: 'var(--text)' }}>News</span>
+          <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Today’s headlines</span>
+        </button>
+        {tradingWidgetAvailable() && typeof window !== 'undefined' && window.__vantageOwner && (
+        <button className="btn btn-ghost" style={{ padding: '16px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px', borderRadius: '12px', height: 'auto' }}
+          onClick={() => { onClose('addLinkModal'); onAddHubWidget('trading'); }}>
+          <Icon name="trending-up" size={22} strokeWidth={1.75} />
+          <span style={{ fontWeight: 700, fontSize: '13px', color: 'var(--text)' }}>Trading</span>
+          <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Agents · P/L</span>
+        </button>
+        )}
         <button className="btn btn-ghost" style={{ padding: '16px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px', borderRadius: '12px', height: 'auto' }}
           onClick={() => { onClose('addLinkModal'); onAddHubWidget('body'); }}>
           <Icon name="scale" size={22} strokeWidth={1.75} />

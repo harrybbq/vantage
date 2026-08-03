@@ -28,5 +28,37 @@ accounts, native build steps, and the security/scale work that has to
 land first. Update its status markers as things get done; it is the
 single source of truth for "what's left before launch".
 
+## Possible future: trading P/L widget (owner-only)
+Owner is building a separate "sibling" app where AI agents trade stocks
+automatically — a "digital factory" of agents. That app owns:
+allocate/withdraw funds per agent, halt/start each agent, per-agent
+stats UI. Vantage gets a **read-only** view of it.
+
+Widget spec as described: one bar per agent showing its total fund,
+profit/loss % (since start and today), and which stocks it holds.
+**Owner-only for the foreseeable future.** Constraints agreed before any
+build starts:
+- **Broker credentials never touch the client.** `VITE_*` vars are
+  bundled into public JS. Keys live in Netlify function env only, and
+  the function verifies the JWT + checks the owner email SERVER-side
+  (pattern: `netlify/functions/admin-set-rating.js`). `useIsOwner` is a
+  UI gate, not an access control — the leaderboard forgery proved that.
+- **Trading data does NOT go in `S`.** State is already ~967 kB and is
+  re-downloaded on open / rewritten on save (items 25-26). Fetch live
+  from the function on mount with a short cache, or give it its own
+  RLS-gated table.
+- **The link is a read-only pull, one direction.** Vantage never sends
+  orders and never holds broker credentials. Sibling app exposes one
+  signed read-only endpoint; Vantage's function fetches and caches it.
+  Token: `getRandomValues`, sent as a HEADER not a query string, and
+  rotatable — the health-sync token got both of those wrong.
+- ⚠️ **Store risk, decide before building:** an app showing live
+  brokerage positions draws financial-services review from Apple/Google
+  (often needs to BE the institution or be authorised by it), and
+  reviewers see the whole binary regardless of owner-gating. May argue
+  for keeping this web-only and absent from the native build. UK: showing
+  your own numbers isn't FCA-regulated; arranging/advising, managing
+  anyone else's money, or selling signals IS.
+
 ## Next project: Vantage Home
 A new dashboard surface styled like a Home Assistant wall panel (owner has a reference screenshot — ask for it): dense dark tile grid, at-a-glance stats with mini graphs/gauges, header chips, right rail with day recap + forecast-style rows + media-player-style card. Reimagines the hub's widgets (vitals, macros, body, mood, savings, subscriptions, weather?, calendar?) as compact tiles. Keep it OPTIONAL alongside the existing hub, reuse existing widget bodies/stores where possible, respect the existing theme system (`SettingsSection` SCHEMES) and Pro gating conventions.

@@ -12,6 +12,7 @@
 import { WIDGET_META } from './MobileWidget';
 import Icon from '../Icon';
 import { APP_PRESETS, visibleAppPresets } from '../../data/appPresets';
+import { tradingWidgetAvailable } from '../../lib/trading/enabled';
 import { useSubscriptionContext } from '../../context/SubscriptionContext';
 import { backdropClose } from '../../utils/backdropClose';
 
@@ -46,7 +47,12 @@ export default function AddMobileWidgetModal({ openId, onClose, existingTypes, o
     'savings-pots',
     'savings-projection',
     'subscriptions',
+    'market',
+    'news',
     'mail',
+    // Owner-only AND web-only: absent from native builds entirely, so
+    // an app-store reviewer never meets a brokerage surface.
+    ...(tradingWidgetAvailable() && (typeof window !== 'undefined' && window.__vantageOwner) ? ['trading'] : []),
   ];
 
   function pick(type) {

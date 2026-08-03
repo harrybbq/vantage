@@ -12,7 +12,7 @@
  *   2. Add a case in renderBody()
  *   3. Add an option in AddMobileWidgetModal's picker
  */
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, lazy, Suspense } from 'react';
 import { getTodayStr } from '../../utils/helpers';
 import { supabase } from '../../lib/supabase';
 import { currentWeightKg, dayBurn, ACTIVITIES, activityKcal, stepsKcal } from '../../lib/burn';
@@ -21,6 +21,11 @@ import { fetchAppPreview } from '../../lib/appPreview';
 import { strikeState } from '../../lib/habits/strikes';
 import { SavingsPotsBody, SavingsProjectionBody } from '../savings/SavingsWidgets';
 import { BodyBody, SubscriptionsBody, MoodBody } from '../widgets/LifeWidgets';
+import { tradingWidgetAvailable, TRADING_WIDGET_BUILD_EXCLUDED } from '../../lib/trading/enabled';
+import MarketBody from '../widgets/MarketWidget';
+import NewsBody from '../widgets/NewsWidget';
+// Dead branch when the flag is set, so the chunk is never emitted.
+const TradingBody = TRADING_WIDGET_BUILD_EXCLUDED ? null : lazy(() => import('../widgets/TradingWidget'));
 import Icon from '../Icon';
 
 // App presets (FloorplanStudio / TubeLube / …) become mobile widget
@@ -38,6 +43,24 @@ const APP_WIDGET_META = Object.fromEntries(
 );
 
 const BASE_WIDGET_META = {
+  // Owner-only, web-only. See src/lib/trading/enabled.js for why it is
+  // absent rather than hidden in native builds.
+  'trading': {
+    label: 'Trading',
+    eyebrow: 'TRADING',
+    icon: '↗', svg: 'trending-up',
+    ownerOnly: true,
+  },
+  'market': {
+    label: 'Market',
+    eyebrow: 'MARKET',
+    icon: '↗', svg: 'trending-up',
+  },
+  'news': {
+    label: 'News',
+    eyebrow: 'NEWS',
+    icon: '❑', svg: 'newspaper',
+  },
   'notepad': {
     label: 'Notepad',
     eyebrow: 'NOTES',
@@ -408,6 +431,10 @@ function renderBody(widget, meta, S, update, navigate, userId) {
   const preset = getAppPreset(widget.type);
   if (preset) return <AppPresetBody preset={preset} />;
   switch (widget.type) {
+    case 'trading':     return (TradingBody && tradingWidgetAvailable())
+      ? <Suspense fallback={null}><TradingBody compact /></Suspense> : null;
+    case 'market':      return <MarketBody S={S} update={update} compact />;
+    case 'news':        return <NewsBody S={S} update={update} compact />;
     case 'notepad':     return <NotepadBody S={S} update={update} />;
     case 'recent-wins': return <RecentWinsBody S={S} />;
     case 'coin-history':return <CoinHistoryBody S={S} />;

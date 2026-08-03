@@ -1,0 +1,69 @@
+/* Loaded only with TradingWidget's lazy chunk, so native builds get
+   neither the component nor its styles. */
+/* ── Trading widget (owner-only, web-only) ────────────────────────────
+   Read-only glance at the sibling trading app. Uses the hub's existing
+   tokens rather than introducing a palette — this should read as part
+   of the board, not a bolted-on panel. */
+.trd{display:flex;flex-direction:column;gap:10px;}
+
+/* Reconciliation alarm. Deliberately the loudest thing in the card: if
+   the ledger has stopped agreeing with the broker, every figure below
+   it is unverified and a calm-looking widget would be a lie. */
+.trd-alarm,.trd-error{display:flex;align-items:flex-start;gap:9px;padding:9px 11px;border-radius:9px;
+  border:1px solid var(--danger,#c0563f);background:color-mix(in srgb,var(--danger,#c0563f) 10%,transparent);
+  color:var(--danger,#c0563f);}
+.trd-alarm-title,.trd-error-title{font-family:var(--sans);font-size:12px;font-weight:700;line-height:1.3;}
+.trd-alarm-sub{font-family:var(--mono);font-size:9px;letter-spacing:.3px;opacity:.85;margin-top:2px;}
+.trd-error{align-items:center;}
+.trd-error .trd-note-sub{color:inherit;opacity:.8;}
+
+.trd-head{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;}
+.trd-total{font-family:var(--mono);font-size:26px;font-weight:700;color:var(--text);line-height:1.05;
+  letter-spacing:-.5px;}
+.trd-sub{font-family:var(--mono);font-size:9.5px;letter-spacing:.4px;color:var(--text-muted);margin-top:3px;}
+
+.trd-refresh{flex:none;display:inline-flex;align-items:center;justify-content:center;gap:5px;
+  min-width:28px;height:28px;padding:0 8px;border:1px solid var(--line,var(--border));border-radius:8px;
+  background:transparent;color:var(--text-muted);cursor:pointer;font-family:var(--mono);font-size:9px;
+  letter-spacing:1px;text-transform:uppercase;transition:all .16s;}
+.trd-refresh:hover:not(:disabled){color:var(--em);border-color:var(--em);}
+.trd-refresh:disabled{opacity:.5;cursor:default;}
+
+.trd-agents{display:flex;flex-direction:column;gap:7px;}
+.trd-agent{padding:8px 10px;border-radius:9px;border:1px solid var(--line,var(--border));
+  background:color-mix(in srgb,var(--text) 3%,transparent);
+  /* Status as a left rail — same information as a pill, no horizontal cost. */
+  box-shadow:inset 3px 0 0 var(--text-muted);}
+.trd-agent.is-running{box-shadow:inset 3px 0 0 var(--em);}
+.trd-agent.is-halted{box-shadow:inset 3px 0 0 var(--gold,#d4af37);}
+.trd-agent.is-idle{box-shadow:inset 3px 0 0 var(--text-muted);opacity:.78;}
+
+.trd-agent-top{display:flex;align-items:baseline;justify-content:space-between;gap:8px;}
+.trd-agent-name{font-family:var(--sans);font-size:12.5px;font-weight:700;color:var(--text);}
+.trd-status{font-family:var(--mono);font-size:8px;letter-spacing:1.3px;text-transform:uppercase;
+  color:var(--text-muted);}
+.trd-status.is-running{color:var(--em);}
+.trd-status.is-halted{color:var(--gold,#d4af37);}
+
+.trd-agent-figs{display:flex;align-items:baseline;justify-content:space-between;gap:8px;margin-top:3px;}
+.trd-agent-equity{font-family:var(--mono);font-size:13.5px;font-weight:700;color:var(--text);}
+.trd-agent-pcts{display:inline-flex;align-items:baseline;gap:5px;font-family:var(--mono);font-size:10.5px;}
+.trd-pct-sep{color:var(--text-muted);opacity:.55;}
+.trd-pct.is-up{color:var(--em);}
+.trd-pct.is-down{color:var(--danger,#c0563f);}
+.trd-pct.is-flat{color:var(--text-muted);}
+
+/* Unknown is NOT zero. A missing price renders as a dash with a reason,
+   because a fabricated £0.00 looks like information. */
+.trd-unknown{font-family:var(--mono);color:var(--text-muted);opacity:.75;}
+.trd-unknown-note{font-size:8px;letter-spacing:.8px;text-transform:uppercase;margin-left:5px;opacity:.8;}
+
+.trd-holdings{display:flex;flex-wrap:wrap;gap:5px;margin-top:6px;}
+.trd-holding{font-family:var(--mono);font-size:9px;letter-spacing:.5px;padding:2px 6px;border-radius:5px;
+  border:1px solid var(--line,var(--border));color:var(--text-muted);}
+.trd-holding em{font-style:normal;color:var(--text);margin-left:5px;}
+
+.trd-asof{font-family:var(--mono);font-size:8.5px;letter-spacing:.6px;color:var(--text-muted);
+  text-align:right;opacity:.8;}
+.trd-note{font-family:var(--mono);font-size:10.5px;color:var(--text-muted);padding:6px 0;line-height:1.6;}
+.trd-note-sub{display:block;font-size:9px;margin-top:3px;opacity:.85;}

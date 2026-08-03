@@ -8,9 +8,9 @@
     "build": "vite build",
     "preview": "vite preview",
     "test": "vitest",
-    "cap:sync": "npm run build && npx cap sync",
-    "cap:android": "npm run build && npx cap sync android && npx cap open android",
-    "cap:ios": "npm run build && npx cap sync ios && npx cap open ios",
+    "cap:sync": "VITE_NATIVE_BUILD=true npm run build && npx cap sync",
+    "cap:android": "VITE_NATIVE_BUILD=true npm run build && npx cap sync android && npx cap open android",
+    "cap:ios": "VITE_NATIVE_BUILD=true npm run build && npx cap sync ios && npx cap open ios",
     "cap:icons": "npx capacitor-assets generate"
   },
   "dependencies": {

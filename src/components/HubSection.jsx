@@ -1,9 +1,13 @@
-import { useEffect, useRef, useCallback } from 'react';
+import { useEffect, useRef, useCallback, lazy, Suspense } from 'react';
 import { createRoot } from 'react-dom/client';
 import { motion } from 'framer-motion';
 import { VitalsBody, BurnBody, MacrosBody } from './mobile/MobileWidget';
 import { BodyBody, SubscriptionsBody, MoodBody } from './widgets/LifeWidgets';
 import { SavingsPotsBody, SavingsProjectionBody } from './savings/SavingsWidgets';
+import { tradingWidgetAvailable, TRADING_WIDGET_BUILD_EXCLUDED } from '../lib/trading/enabled';
+import MarketBody from './widgets/MarketWidget';
+import NewsBody from './widgets/NewsWidget';
+const TradingBody = TRADING_WIDGET_BUILD_EXCLUDED ? null : lazy(() => import('./widgets/TradingWidget'));
 import { timeAgo } from '../utils/helpers';
 import AiCoachWidget from './AiCoachWidget';
 import CoachBriefPanel from './CoachBriefPanel';
@@ -364,6 +368,10 @@ export default function HubSection({ S, update, active, onOpenModal, onOpenWaitl
       case 'body':          return <BodyBody S={S} update={update} navigate={onNavigate} />;
       case 'mood':          return <MoodBody S={S} update={update} navigate={onNavigate} />;
       case 'subscriptions': return <SubscriptionsBody S={S} navigate={onNavigate} />;
+      case 'market':        return <MarketBody S={S} update={update} />;
+      case 'news':          return <NewsBody S={S} update={update} />;
+      case 'trading':       return (TradingBody && tradingWidgetAvailable())
+        ? <Suspense fallback={null}><TradingBody /></Suspense> : null;
       default:         return null;
     }
   }
@@ -827,6 +835,9 @@ export default function HubSection({ S, update, active, onOpenModal, onOpenWaitl
         calories:    { eyebrow: 'WIDGET · BURN',        icon: '◔', title: 'Calories Burned', sub: 'Activity · net',  body: () => `<div data-react-widget="calories"></div>` },
         'savings-pots':       { eyebrow: 'WIDGET · SAVINGS',    icon: '◒', title: 'Savings pots', sub: 'Progress',      body: () => `<div data-react-widget="savings-pots"></div>` },
         'savings-projection': { eyebrow: 'WIDGET · PROJECTION', icon: '⌁', title: 'Projection',   sub: 'Net · balance', body: () => `<div data-react-widget="savings-projection"></div>` },
+        'trading':            { eyebrow: 'WIDGET · TRADING',    icon: '↗', title: 'Trading',      sub: 'Agents · P/L',  body: () => `<div data-react-widget="trading"></div>` },
+        'market':             { eyebrow: 'WIDGET · MARKET',     icon: '↗', title: 'Market',       sub: 'Delayed quotes', body: () => `<div data-react-widget="market"></div>` },
+        'news':               { eyebrow: 'WIDGET · NEWS',       icon: '❑', title: 'News',         sub: 'Today\u2019s headlines', body: () => `<div data-react-widget="news"></div>` },
         body:          { eyebrow: 'WIDGET · BODY', icon: '◍', title: 'Body',          sub: '7-day avg · goal',      body: () => `<div data-react-widget="body"></div>` },
         mood:          { eyebrow: 'WIDGET · MOOD', icon: '☺', title: 'Mood',          sub: 'Today · 8-week map',    body: () => `<div data-react-widget="mood"></div>` },
         subscriptions: { eyebrow: 'WIDGET · BILLS', icon: '↻', title: 'Subscriptions', sub: 'Monthly burn · renewals', body: () => `<div data-react-widget="subscriptions"></div>` },
