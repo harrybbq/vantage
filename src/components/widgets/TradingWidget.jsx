@@ -135,10 +135,25 @@ export default function TradingBody({ compact = false }) {
         <div className="trd-alarm" role="alert">
           <Icon name="triangle-alert" size={14} />
           <div>
+            {/* Three different situations, and lumping them together is
+                the same mistake as reporting every GNews 403 as an
+                exhausted quota. "Diverged" means the ledger and the
+                broker genuinely disagree. "Errored" means the check ran
+                and failed. ABSENT means the payload carried no
+                reconciliation block at all — which this widget treats as
+                untrustworthy on purpose, but is far more likely to mean
+                the endpoint just isn't sending the field yet. */}
             <div className="trd-alarm-title">
-              Ledger {r.reconciliation?.status === 'diverged' ? 'diverged from the broker' : 'check failed'}
+              {r.reconciliation?.status === 'diverged' ? 'Ledger diverged from the broker'
+                : r.reconciliation?.status ? `Ledger check ${r.reconciliation.status}`
+                : 'No ledger check reported'}
             </div>
-            <div className="trd-alarm-sub">Treat every figure below as unverified.</div>
+            <div className="trd-alarm-sub">
+              {r.reconciliation?.detail || r.reconciliation?.message
+                || (r.reconciliation?.status
+                  ? 'Treat every figure below as unverified.'
+                  : 'The report carried no `reconciliation` field, so nothing vouches for these figures.')}
+            </div>
           </div>
         </div>
       )}
