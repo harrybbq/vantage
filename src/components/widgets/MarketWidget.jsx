@@ -25,7 +25,7 @@ export const DEFAULT_SYMBOLS = ['AAPL', 'MSFT', 'NVDA', 'TSLA', 'AMZN', 'GOOGL']
 const FREE_LIMIT = 5;
 const PRO_LIMIT = 20;
 const PAGE_SIZE = 4;
-const SCROLL_MS = 2600;
+const SECS_PER_ROW = 2.4;   // marquee pace, not a step interval
 
 function pct(v) {
   if (v === null || v === undefined || !Number.isFinite(v)) return null;
@@ -61,6 +61,11 @@ export default function MarketBody({ S, update, compact = false, hasPro: hasProP
   const [state, setState] = useState({ kind: 'loading' });
   const [page, setPage] = useState(0);
   const [adding, setAdding] = useState('');
+  // Typeahead. Results appear as you type rather than after Enter,
+  // because a ticker is exactly the thing people don't know — "the one
+  // for Google" is GOOGL or GOOG and guessing wrong used to add a row
+  // that rendered as a dash with no explanation.
+  const [suggest, setSuggest] = useState({ open: false, loading: false, items: [] });
   const alive = useRef(true);
 
   const key = shown.join(',');
@@ -85,15 +90,34 @@ export default function MarketBody({ S, update, compact = false, hasPro: hasProP
   const quotes = state.kind === 'ok' ? state.quotes : [];
   const pages = Math.max(1, Math.ceil(quotes.length / PAGE_SIZE));
 
-  // Auto-advance only in scroll mode. Paused while the tab is hidden so
-  // a backgrounded hub isn't cycling a timer for nobody.
+  // Scroll mode is a continuous marquee, not a timer that jumps a page
+  // every few seconds. The old version advanced by a whole page every
+  // 2.6s with a 600ms ease — so the list sat still, lurched, and sat
+  // still again, which reads as a glitch rather than a ticker. A CSS
+  // animation moving the track at a constant rate is both smoother and
+  // cheaper: it runs on the compositor and needs no React state per
+  // frame, where the interval re-rendered the whole widget each tick.
+
+  // Debounced so a five-letter ticker is one request, not five. The
+  // function caches by query on top of this, so repeat prefixes across
+  // users are free.
   useEffect(() => {
-    if (!autoScroll || state.kind !== 'ok' || quotes.length <= PAGE_SIZE) return;
-    const id = setInterval(() => {
-      if (document.visibilityState === 'visible') setPage(p => (p + 1) % pages);
-    }, SCROLL_MS);
-    return () => clearInterval(id);
-  }, [autoScroll, state.kind, quotes.length, pages]);
+    const q = adding.trim();
+    if (q.length < 1) { setSuggest({ open: false, loading: false, items: [] }); return; }
+    let cancelled = false;
+    setSuggest(s2 => ({ ...s2, open: true, loading: true }));
+    const t = setTimeout(async () => {
+      try {
+        const res = await authFetch(`/.netlify/functions/market-quotes?mode=search&q=${encodeURIComponent(q)}`);
+        const body = await res.json().catch(() => null);
+        if (cancelled || !alive.current) return;
+        setSuggest({ open: true, loading: false, items: res.ok && body?.results ? body.results : [] });
+      } catch {
+        if (!cancelled && alive.current) setSuggest({ open: true, loading: false, items: [] });
+      }
+    }, 250);
+    return () => { cancelled = true; clearTimeout(t); };
+  }, [adding]);
 
   function setAuto(next) {
     update?.(prev => ({ ...prev, marketAutoScroll: next }));
@@ -109,6 +133,17 @@ export default function MarketBody({ S, update, compact = false, hasPro: hasProP
       return { ...prev, marketSymbols: [...list, sym] };
     });
     setAdding('');
+    setSuggest({ open: false, loading: false, items: [] });
+  }
+  function addPicked(sym) {
+    update?.(prev => {
+      const list = Array.isArray(prev.marketSymbols) && prev.marketSymbols.length
+        ? prev.marketSymbols : DEFAULT_SYMBOLS;
+      if (list.includes(sym)) return prev;
+      return { ...prev, marketSymbols: [...list, sym] };
+    });
+    setAdding('');
+    setSuggest({ open: false, loading: false, items: [] });
   }
   function removeSymbol(sym) {
     update?.(prev => {
@@ -141,9 +176,16 @@ export default function MarketBody({ S, update, compact = false, hasPro: hasProP
   }
   if (state.kind === 'loading') return <div className="mkt-note">Loading…</div>;
 
+  // Only scroll if there is genuinely more than fits — a 3-symbol list
+  // sliding around for no reason is worse than a still one.
+  const overflows = quotes.length > PAGE_SIZE;
+  const marquee = autoScroll && overflows;
   const visible = autoScroll
     ? quotes
     : quotes.slice(page * PAGE_SIZE, page * PAGE_SIZE + PAGE_SIZE);
+  // Constant rate rather than constant duration, so twenty symbols
+  // don't race past at five times the speed of four.
+  const marqueeSecs = Math.max(8, quotes.length * SECS_PER_ROW);
 
   return (
     <div className="mkt">
@@ -159,11 +201,11 @@ export default function MarketBody({ S, update, compact = false, hasPro: hasProP
 
       <div className={`mkt-list${autoScroll ? ' is-scrolling' : ''}`}>
         <div
-          className="mkt-track"
-          style={autoScroll ? { transform: `translateY(-${page * PAGE_SIZE * 34}px)` } : undefined}
+          className={`mkt-track${marquee ? ' is-marquee' : ''}`}
+          style={marquee ? { animationDuration: `${marqueeSecs}s` } : undefined}
         >
-          {visible.map(q => (
-            <div key={q.symbol} className="mkt-row">
+          {(marquee ? [...visible, ...visible] : visible).map((q, i) => (
+            <div key={`${q.symbol}-${i}`} className="mkt-row" aria-hidden={marquee && i >= visible.length}>
               <span className="mkt-sym">{q.symbol}</span>
               <span className="mkt-price">
                 {price(q.price) ?? <span className="mkt-unknown" title="No quote for this symbol">—</span>}
@@ -207,6 +249,31 @@ export default function MarketBody({ S, update, compact = false, hasPro: hasProP
             aria-label="Add a ticker"
           />
           <button type="submit" disabled={!adding.trim() || watchlist.length >= limit}>Add</button>
+          {suggest.open && watchlist.length < limit && (
+            <div className="mkt-suggest" role="listbox">
+              {suggest.loading && <div className="mkt-suggest-note">Searching…</div>}
+              {!suggest.loading && suggest.items.length === 0 && (
+                <div className="mkt-suggest-note">No match — you can still add it by hand.</div>
+              )}
+              {suggest.items.map(r => {
+                const already = watchlist.includes(r.symbol);
+                return (
+                  <button
+                    key={r.symbol}
+                    type="button"
+                    role="option"
+                    aria-selected={false}
+                    className="mkt-suggest-row"
+                    disabled={already}
+                    onClick={() => addPicked(r.symbol)}
+                  >
+                    <span className="mkt-suggest-sym">{r.symbol}</span>
+                    <span className="mkt-suggest-name">{already ? 'already added' : r.name}</span>
+                  </button>
+                );
+              })}
+            </div>
+          )}
         </form>
       )}
 
