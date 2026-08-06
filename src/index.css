@@ -1061,7 +1061,23 @@ nav:hover .nav-tab-label{opacity:1;}
   #achievements.section{
     height: calc(100vh - var(--m-appbar-h) - var(--m-tabs-h) - var(--m-safe-top) - var(--m-safe-bottom));
     min-height: 0;
+    /* .section's 60px bottom padding was still applying, so the panel
+       stopped ~60px above the tab bar with dead space beneath it — plus
+       another 24px from the scroller's own padding. The panel now runs
+       to the bottom and the breathing room moves INSIDE the scroller,
+       where it scrolls away instead of permanently costing height. */
+    /* !important because the global mobile .section rule sets its own
+       bottom padding with !important to clear the tab bar. That
+       clearance is right for a scrolling page and wrong here: this
+       section is a fixed-height panel whose own scroller already ends
+       above the tabs, so the padding only subtracted usable height. */
+    padding-bottom: 0 !important;
+    /* 100vh is the pre-toolbar viewport on iOS Safari; dvh tracks the
+       real one so the panel doesn't sit under the address bar. */
+    height: calc(100dvh - var(--m-appbar-h) - var(--m-tabs-h) - var(--m-safe-top) - var(--m-safe-bottom));
   }
+  /* Last card clears the tab bar without the container losing height. */
+  #achievements .ach-tree-scroll{ padding-bottom: 28px; }
 }
 
 /* ──────────────────────────────────────────────────────────────────
