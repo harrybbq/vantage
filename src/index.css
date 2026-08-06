@@ -735,15 +735,23 @@ nav:hover .nav-tab-label{opacity:1;}
   position:absolute;left:0;right:0;bottom:0;height:9px;
   cursor:ns-resize;z-index:5;touch-action:none;
 }
-/* Top rail. Sits OVER the first few pixels of the drag handle rather
-   than replacing it: snap mode is exactly when push-aside dragging
-   matters, so swapping the whole bar for a resize grip would remove the
-   gesture at the moment it's most useful. z-index above the handle so
-   the top 9px resize and the rest still drags. */
+/* Top rail — covers the WHOLE drag handle, not part of it.
+   It was 9px over an 18px handle, which left the bar with two invisible
+   halves: resize above, drag below. You got whichever you happened to
+   hit, and hitting the wrong one mid-resize ran both gestures at once —
+   the drag moved the widget while the resize measured height from a
+   bottom edge captured at pointerdown, so the height grew as the widget
+   travelled and ended up as tall as the canvas.
+   Full height plus pointer-events:none on the handle beneath makes that
+   combination impossible rather than unlikely. */
 .widget-wrapper .widget-resize-t{
-  position:absolute;left:0;right:0;top:0;height:9px;
+  position:absolute;left:0;right:0;top:0;height:18px;
   cursor:ns-resize;z-index:6;touch-action:none;
 }
+/* With the rail present the bar is a resize control, so the grab pips
+   would be advertising a gesture that is no longer there. */
+.widget-wrapper.has-top-grip .widget-drag-handle{ cursor:ns-resize; }
+.widget-wrapper.has-top-grip .widget-drag-handle span{ opacity:0; }
 .widget-wrapper .widget-resize-l::after,
 .widget-wrapper .widget-resize-r::after{
   content:"";position:absolute;top:50%;transform:translateY(-50%);
@@ -757,10 +765,13 @@ nav:hover .nav-tab-label{opacity:1;}
   height:3px;width:26px;border-radius:3px;background:var(--accent-line,rgba(0,0,0,.14));
   opacity:0;transition:opacity .15s;
 }
+/* Centred in the 18px bar, where the drag pips used to sit, so the bar
+   reads as one control with one purpose. Always faintly visible rather
+   than hover-only — it is replacing a visible affordance. */
 .widget-wrapper .widget-resize-t::after{
-  content:"";position:absolute;left:50%;top:2px;transform:translateX(-50%);
-  height:3px;width:26px;border-radius:3px;background:var(--em);
-  opacity:0;transition:opacity .15s;
+  content:"";position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);
+  height:3px;width:34px;border-radius:3px;background:var(--em);
+  opacity:.45;transition:opacity .15s;
 }
 .widget-wrapper:hover .widget-resize-l::after,
 .widget-wrapper:hover .widget-resize-r::after,
@@ -768,7 +779,7 @@ nav:hover .nav-tab-label{opacity:1;}
 /* Accent-coloured and slightly stronger, because it is the one grip
    that overlaps another control — it needs to read as a distinct
    affordance from the drag pips directly beneath it. */
-.widget-wrapper:hover .widget-resize-t::after{opacity:.85;}
+.widget-wrapper:hover .widget-resize-t::after{opacity:1;}
 /* Snap-drag toggle pips (cream ProfileCard + OS Actions) */
 .hub-snap-toggle,.os-action-toggle{display:inline-flex;align-items:center;justify-content:center;gap:8px;}
 .hub-snap-pip,.os-toggle-pip{font-family:var(--mono);font-size:8.5px;font-weight:700;letter-spacing:1px;padding:1px 6px;border-radius:999px;background:rgba(128,128,128,.18);color:var(--text-muted);}

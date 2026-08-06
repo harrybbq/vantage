@@ -755,10 +755,14 @@ export default function HubSection({ S, update, active, onOpenModal, onOpenWaitl
             } else if (side === 't') {
               // Mirror of 'l': the bottom edge is anchored and the top
               // travels, so height is derived rather than measured from
-              // the pointer.
+              // the pointer. bottomAnchor is captured once, so anything
+              // that moves the widget mid-gesture would inflate the
+              // height — the handle is inert while this rail exists, and
+              // the clamp is the second line of defence.
               const newTop = Math.max(0, Math.min(ev.clientY - canvasRect().top, bottomAnchor - minH));
               wrapper.style.top = newTop + 'px';
-              wrapper.style.height = (bottomAnchor - newTop) + 'px';
+              const canvasH = canvasRef.current?.clientHeight || Infinity;
+              wrapper.style.height = Math.min(bottomAnchor - newTop, canvasH) + 'px';
             } else { // 'b'
               wrapper.style.height = Math.max(minH, ev.clientY - canvasRect().top - startTop) + 'px';
             }
@@ -773,11 +777,26 @@ export default function HubSection({ S, update, active, onOpenModal, onOpenWaitl
         });
       };
       // Top rail only exists with snap ON. Without snap it would just
-      // be a second way to resize that also steals the top of the drag
-      // handle, for no gain.
+      // be a second way to resize that also steals the drag handle.
+      //
+      // When it IS present it takes the whole bar and the handle beneath
+      // stops receiving pointers. Sharing the bar meant a pointerdown in
+      // the lower half started a DRAG while a resize was live, and the
+      // resize measures height from the bottom edge captured at
+      // pointerdown — so the height grew as the drag carried the widget
+      // upward, ending as tall as the canvas. Making the two gestures
+      // mutually exclusive removes that combination entirely.
       addGrip('l'); addGrip('r'); addGrip('b');
-      if (snapRef?.current) addGrip('t');
-      else wrapper.querySelector('.widget-resize-t')?.remove();
+      const dragHandle = wrapper.querySelector('[data-drag]');
+      if (snapRef?.current) {
+        addGrip('t');
+        wrapper.classList.add('has-top-grip');
+        if (dragHandle) dragHandle.style.pointerEvents = 'none';
+      } else {
+        wrapper.querySelector('.widget-resize-t')?.remove();
+        wrapper.classList.remove('has-top-grip');
+        if (dragHandle) dragHandle.style.pointerEvents = '';
+      }
     }
   }, [S.widgetSizes, S.widgetZ, update, snapRef]);
 
