@@ -45,6 +45,7 @@ export default function NewsBody({ S, update, compact = false, hasPro: hasProPro
 
   const [draft, setDraft] = useState(saved);
   const [state, setState] = useState({ kind: 'loading' });
+  const [failed, setFailed] = useState({});
   const alive = useRef(true);
 
   useEffect(() => { setDraft(saved); }, [saved]);
@@ -146,9 +147,25 @@ export default function NewsBody({ S, update, compact = false, hasPro: hasProPro
                   third-party, and there's no reason to leak the Vantage
                   page a reader came from. */}
               <a href={a.url} target="_blank" rel="noopener noreferrer">
-                <span className="nws-title">{a.title}</span>
-                <span className="nws-meta">
-                  {a.source}{timeAgo(a.publishedAt) ? ` · ${timeAgo(a.publishedAt)}` : ''}
+                {/* Thumbnails are optional per item and the publisher's
+                    host can 404 or hotlink-block, so a failure hides the
+                    frame rather than leaving a broken-image glyph. */}
+                {a.image && !failed[a.url] && (
+                  <img
+                    className="nws-thumb"
+                    src={a.image}
+                    alt=""
+                    loading="lazy"
+                    decoding="async"
+                    referrerPolicy="no-referrer"
+                    onError={() => setFailed(f => ({ ...f, [a.url]: true }))}
+                  />
+                )}
+                <span className="nws-text">
+                  <span className="nws-title">{a.title}</span>
+                  <span className="nws-meta">
+                    {a.source}{timeAgo(a.publishedAt) ? ` · ${timeAgo(a.publishedAt)}` : ''}
+                  </span>
                 </span>
               </a>
             </li>

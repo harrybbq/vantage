@@ -13,7 +13,14 @@
 .nws-list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;}
 .nws-list li{border-bottom:1px solid color-mix(in srgb,var(--text) 6%,transparent);}
 .nws-list li:last-child{border-bottom:0;}
-.nws-list a{display:block;padding:7px 0;text-decoration:none;}
+.nws-list a{display:flex;gap:9px;align-items:flex-start;padding:7px 0;text-decoration:none;}
+.nws-text{flex:1;min-width:0;}
+/* Fixed box with object-fit so wildly different source aspect ratios
+   don't make the rows ragged. flex-none or a tall image would stretch
+   the column. */
+.nws-thumb{flex:none;width:52px;height:52px;border-radius:7px;object-fit:cover;
+  background:color-mix(in srgb,var(--text) 8%,transparent);
+  border:1px solid var(--line,var(--border));}
 .nws-title{display:block;font-family:var(--sans);font-size:12px;font-weight:600;line-height:1.35;
   color:var(--text);
   /* Two lines max: a headline that wraps to four turns the widget into
