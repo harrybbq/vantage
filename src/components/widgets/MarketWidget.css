@@ -11,7 +11,24 @@
 
 .mkt-list{overflow:hidden;}
 .mkt-list.is-scrolling{max-height:136px;}
-.mkt-track{display:flex;flex-direction:column;transition:transform .6s cubic-bezier(.22,1,.36,1);}
+.mkt-track{display:flex;flex-direction:column;}
+
+/* Continuous marquee. The rows are rendered TWICE and the track travels
+   exactly half its height, so the second copy is under the cursor at the
+   moment the first finishes and the wrap is invisible. Linear timing on
+   purpose — an eased ticker looks like it is struggling.
+   translateY on a compositor layer, so this costs no main-thread work. */
+@keyframes mkt-marquee {
+  from { transform: translateY(0); }
+  to   { transform: translateY(-50%); }
+}
+.mkt-track.is-marquee{ animation-name: mkt-marquee; animation-timing-function: linear;
+  animation-iteration-count: infinite; will-change: transform; }
+/* Stop while you're reading it, or trying to hit the × on a row. */
+.mkt-list:hover .mkt-track.is-marquee{ animation-play-state: paused; }
+@media (prefers-reduced-motion: reduce){
+  .mkt-track.is-marquee{ animation: none; }
+}
 .mkt-row{display:grid;grid-template-columns:1fr auto auto auto;align-items:center;gap:8px;height:34px;
   border-bottom:1px solid color-mix(in srgb,var(--text) 6%,transparent);}
 .mkt-row:last-child{border-bottom:0;}
@@ -47,3 +64,22 @@
 .mkt-note,.mkt-capped{font-family:var(--mono);font-size:10px;color:var(--text-muted);line-height:1.6;padding:4px 0;}
 .mkt-note-sub{display:block;font-size:9px;margin-top:3px;opacity:.85;}
 .mkt-capped{font-size:8.5px;letter-spacing:.4px;opacity:.8;}
+
+/* Typeahead results. Absolutely placed so the widget doesn't change
+   height as you type — a card that grows and shrinks under the cursor
+   makes the row you were aiming at move. */
+.mkt-add{position:relative;}
+.mkt-suggest{position:absolute;left:0;right:0;bottom:calc(100% + 6px);z-index:20;
+  max-height:168px;overflow-y:auto;border:1px solid var(--line,var(--border));border-radius:9px;
+  background:var(--bg-elev,var(--card,#fff));box-shadow:0 10px 28px rgba(0,0,0,.18);}
+.mkt-suggest-row{display:flex;align-items:baseline;gap:8px;width:100%;padding:7px 9px;
+  background:transparent;border:0;border-bottom:1px solid color-mix(in srgb,var(--text) 6%,transparent);
+  cursor:pointer;text-align:left;}
+.mkt-suggest-row:last-child{border-bottom:0;}
+.mkt-suggest-row:hover:not(:disabled){background:color-mix(in srgb,var(--em) 10%,transparent);}
+.mkt-suggest-row:disabled{opacity:.5;cursor:default;}
+.mkt-suggest-sym{font-family:var(--mono);font-size:10.5px;font-weight:700;letter-spacing:.6px;
+  color:var(--text);flex:none;}
+.mkt-suggest-name{font-family:var(--sans);font-size:10px;color:var(--text-muted);
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.mkt-suggest-note{padding:8px 9px;font-family:var(--mono);font-size:9px;color:var(--text-muted);}
