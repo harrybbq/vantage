@@ -15,8 +15,10 @@
  * about (and asserted on) without a browser.
  */
 import { useMemo, useState } from 'react';
-import { bodyGoalPlan, refusalCopy, sessionsPerWeek, trainingCadence, trainingTrackers } from '../../lib/body/goal';
+import { createPortal } from 'react-dom';
+import { bodyGoalPlan, refusalCopy, sessionsPerWeek, trainingCadence, trainingTrackers, summariseIntake } from '../../lib/body/goal';
 import { bmrKcal } from '../../lib/burn';
+import { useIntakeAverage } from '../../hooks/useIntakeAverage';
 import './GoalsWidget.css';
 
 const mono = { fontFamily: 'var(--mono)' };
@@ -120,6 +122,89 @@ export function PickList({ items, picked, onToggle, onDone, note }) {
   );
 }
 
+
+/**
+ * Accuracy explainer.
+ *
+ * Portalled to <body> because the desktop hub mounts widgets as
+ * detached React roots — rendering in place would trap the overlay
+ * inside a card that is overflow:hidden and a few hundred pixels wide.
+ *
+ * The copy is careful about one thing: the projection uses the calorie
+ * target the user TYPED, not what they ate. Saying "log your macros for
+ * a more accurate estimate" would imply the app consumes that log, and
+ * it does not. What logging actually does is tell the user whether the
+ * assumption holds — and weigh-ins are what remove the assumption
+ * altogether, because a measured rate supersedes the model entirely.
+ */
+export function AccuracyModal({ S, plan, onClose }) {
+  const goal = S.bodyGoal || {};
+  const measured = plan && plan.ok && plan.source === 'measured';
+  const rows = [
+    {
+      on: !!bmrKcal(S),
+      title: 'Your body profile',
+      detail: bmrKcal(S)
+        ? 'Height, age and sex are set, so we can estimate your daily burn.'
+        : 'Missing height, age or sex — set them up in the Calories widget.',
+    },
+    {
+      on: !!goal.dailyKcal,
+      title: 'A daily calorie target',
+      detail: goal.dailyKcal
+        ? `Set to ${goal.dailyKcal.toLocaleString()} kcal. The estimate assumes you hit it.`
+        : 'Without one there is nothing to compare your burn against.',
+    },
+    {
+      on: measured,
+      title: 'Enough weigh-ins to see a trend',
+      detail: measured
+        ? `Using your measured rate over the last ${plan.rateWindowDays} days — no assumptions left.`
+        : 'Three or more weigh-ins and the estimate switches from projected to measured.',
+    },
+  ];
+
+  return createPortal(
+    <div className="modal-overlay open" onClick={onClose} role="presentation">
+      <div className="modal gw-modal" onClick={e => e.stopPropagation()} role="dialog" aria-modal="true">
+        <h3>How accurate is this?</h3>
+        <p className="gw-modal-lede">
+          It works with what you have, and gets sharper as you give it more. Nothing here is required.
+        </p>
+
+        <div className="gw-modal-rows">
+          {rows.map(r => (
+            <div key={r.title} className={'gw-modal-row' + (r.on ? ' is-on' : '')}>
+              <span className="gw-modal-tick">{r.on ? '✓' : '○'}</span>
+              <span>
+                <b>{r.title}</b>
+                <em>{r.detail}</em>
+              </span>
+            </div>
+          ))}
+        </div>
+
+        <div className="gw-modal-note">
+          <b>Where macros come in.</b> The projection assumes you eat your target every day.
+          Logging your food is how you find out whether that is true — if you are eating
+          above it, the timeline above is optimistic and your weigh-ins will show it before
+          long. Log your meals and the two will agree.
+        </div>
+
+        <div className="gw-modal-note">
+          <b>The honest caveat.</b> The 7,700 kcal-per-kilo figure everyone uses is a
+          simplification, and real loss slows as you get lighter. That is why a measured rate
+          replaces the projection the moment there is one — a projection is a starting
+          assumption, not a promise.
+        </div>
+
+        <button type="button" className="btn btn-primary gw-modal-close" onClick={onClose}>Got it</button>
+      </div>
+    </div>,
+    document.body,
+  );
+}
+
 // ═══════════════════════════════════════════════════════════════════════
 // BODY GOAL — setup, then progress + plan
 // ═══════════════════════════════════════════════════════════════════════
@@ -146,6 +231,7 @@ function Setup({ S, update, onCancel }) {
     gymTrackerId: guessGym ? guessGym.id : '',
     cardioTrackerId: guessCardio ? guessCardio.id : '',
     dailyKcal: '',
+    useMacros: true,
     weeklyWeights: guessGym ? String(Math.round(sessionsPerWeek(S, guessGym.id) || guessGym.weeklyTarget || 3)) : '3',
     weeklyCardio: guessCardio ? String(Math.round(sessionsPerWeek(S, guessCardio.id) || guessCardio.weeklyTarget || 2)) : '2',
   });
@@ -173,6 +259,7 @@ function Setup({ S, update, onCancel }) {
         startKg: startKg || target,
         startedAt: new Date().toISOString().slice(0, 10),
         ...(parseInt(form.dailyKcal, 10) > 0 ? { dailyKcal: parseInt(form.dailyKcal, 10) } : {}),
+        useMacros: !!form.useMacros,
         weeklyWeights: Math.max(0, parseInt(form.weeklyWeights, 10) || 0),
         weeklyCardio: Math.max(0, parseInt(form.weeklyCardio, 10) || 0),
         ...(form.gymTrackerId ? { gymTrackerId: form.gymTrackerId } : {}),
@@ -249,6 +336,17 @@ function Setup({ S, update, onCancel }) {
           : 'Set up the Calories widget (height, age, sex) and we can estimate your daily burn too.'}
       </div>
 
+      <label className="gw-toggle">
+        <input type="checkbox" checked={form.useMacros}
+               onChange={e => set('useMacros', e.target.checked)} />
+        <span>
+          <b>Let my food log steer this</b>
+          <em>Uses what you actually ate instead of the target above. Days that look
+            half-logged are ignored either way. Turn off if you log some meals but not
+            reliably.</em>
+        </span>
+      </label>
+
       <div className="gw-actions">
         <button type="button" className="link-open-btn" disabled={!canSave} onClick={save}>Save goal</button>
         {onCancel && <button type="button" className="gw-textbtn" onClick={onCancel}>Cancel</button>}
@@ -260,8 +358,9 @@ function Setup({ S, update, onCancel }) {
   );
 }
 
-export function BodyGoalBody({ S, update, navigate, hasPro = false, compact = false, onUpgrade }) {
+export function BodyGoalBody({ S, update, navigate, userId, hasPro = false, compact = false, onUpgrade }) {
   const [editing, setEditing] = useState(false);
+  const [showAccuracy, setShowAccuracy] = useState(false);
   const goal = S.bodyGoal;
 
   // Pro gate. Deliberately renders a teaser rather than nothing, and
@@ -289,6 +388,15 @@ export function BodyGoalBody({ S, update, navigate, hasPro = false, compact = fa
 
   // Live session rates beat the numbers typed at setup — if the user
   // said 3 and has been doing 4, the plan should reflect 4.
+  // Only fetched when there's a goal to inform — no goal, no query.
+  const intakeRaw = useIntakeAverage(userId, 14, hasPro && !!goal);
+  // Partial-day filtering happens here, against this user's own resting
+  // burn, so a breakfast-only day never masquerades as a fast.
+  const intakeAvg = useMemo(
+    () => (intakeRaw ? summariseIntake(intakeRaw.entries, bmrKcal(S), intakeRaw.days) : null),
+    [intakeRaw, S],
+  );
+
   const plan = useMemo(() => {
     if (!goal) return { ok: false, reason: 'no-goal' };
     // What the user actually does, across every tracker that reads like
@@ -297,8 +405,9 @@ export function BodyGoalBody({ S, update, navigate, hasPro = false, compact = fa
     return bodyGoalPlan(S, {
       ...(weights > 0 ? { weightsPerWeek: weights } : {}),
       ...(cardio > 0 ? { cardioPerWeek: cardio } : {}),
+      ...(intakeAvg ? { intakeAvg } : {}),
     });
-  }, [S, goal]);
+  }, [S, goal, intakeAvg]);
 
   if (!goal || editing) {
     return <Setup S={S} update={update} onCancel={goal ? () => setEditing(false) : null} />;
@@ -315,8 +424,13 @@ export function BodyGoalBody({ S, update, navigate, hasPro = false, compact = fa
         <div className="gw-hero is-compact">
           <Gauge pct={plan.pct || 0} size={84} stroke={7}
                  label={plan.pct != null ? `${plan.pct}%` : '—'} sub="to goal" />
-          <div className="gw-refusal">{refusalCopy(plan.reason, plan)}</div>
+          <div className="gw-refusal">
+            {refusalCopy(plan.reason, plan)}
+            <button type="button" className="gw-textbtn gw-refusal-link"
+                    onClick={() => setShowAccuracy(true)}>What does this need?</button>
+          </div>
         </div>
+        {showAccuracy && <AccuracyModal S={S} plan={plan} onClose={() => setShowAccuracy(false)} />}
       </div>
     );
   }
@@ -356,6 +470,11 @@ export function BodyGoalBody({ S, update, navigate, hasPro = false, compact = fa
         <Gauge pct={plan.pct} size={compact ? 84 : 118} stroke={compact ? 7 : 9}
                label={`${plan.pct}%`} sub="sessions done" />
         <div className="gw-hero-side">
+          <button type="button" className={'gw-acc' + (plan.source === 'measured' ? ' is-measured' : '')}
+                  onClick={() => setShowAccuracy(true)}
+                  title="What this estimate is based on">
+            {plan.source === 'measured' ? 'MEASURED' : 'ESTIMATED'} ⓘ
+          </button>
           <div className="gw-sessions">
             <b>{plan.sessionsDone}</b> of <b>{plan.sessionsTotal}</b> sessions
           </div>
@@ -388,13 +507,27 @@ export function BodyGoalBody({ S, update, navigate, hasPro = false, compact = fa
         ) : (
           <>
             <div className="gw-how-row"><span>Est. daily burn</span><b>{plan.tdee?.toLocaleString()} kcal</b></div>
-            <div className="gw-how-row"><span>Your intake</span><b>{plan.intake?.toLocaleString()} kcal</b></div>
+            <div className="gw-how-row">
+              <span>{plan.intakeSource === 'logged' ? `Logged intake (${plan.intakeLoggedDays}d)` : 'Your target'}</span>
+              <b>{plan.intake?.toLocaleString()} kcal</b>
+            </div>
+            {plan.intakeSource === 'logged' && plan.targetKcal && plan.targetKcal !== plan.intake && (
+              <div className="gw-how-row">
+                <span>vs your target</span>
+                <b className={plan.intake > plan.targetKcal ? 'is-over' : 'is-under'}>
+                  {plan.intake > plan.targetKcal ? '+' : '−'}{Math.abs(plan.intake - plan.targetKcal).toLocaleString()} kcal
+                </b>
+              </div>
+            )}
             <div className="gw-how-row"><span>Daily deficit</span><b>{plan.dailyDeficit?.toLocaleString()} kcal</b></div>
           </>
         )}
         <div className="gw-how-row"><span>Weight progress</span><b>{plan.weightPct}%</b></div>
         {trackerNames.length > 0 && (
           <div className="gw-how-row"><span>Counting</span><b>{trackerNames.join(', ')}</b></div>
+        )}
+        {plan.intakePartialDays > 0 && (
+          <div className="gw-how-row"><span>Half-logged days</span><b>{plan.intakePartialDays} ignored</b></div>
         )}
         {plan.adherence && (
           <div className="gw-how-row"><span>Plan vs actual</span>
@@ -405,6 +538,15 @@ export function BodyGoalBody({ S, update, navigate, hasPro = false, compact = fa
             <b>{plan.weightsPerWeek.toFixed(1)} + {plan.cardioPerWeek.toFixed(1)} /wk</b></div>
         )}
       </div>
+
+      {plan.intakeSource === 'logged' && plan.targetKcal && plan.intake > plan.targetKcal + 100 && (
+        <div className="gw-note is-warn">
+          <span className="gw-note-icon">▲</span>
+          <span>You're averaging {plan.intake.toLocaleString()} kcal against a
+            {' '}{plan.targetKcal.toLocaleString()} target over {plan.intakeLoggedDays} logged days.
+            The timeline above uses what you actually ate, not the target.</span>
+        </div>
+      )}
 
       {plan.adherence && plan.adherence.slacking && (
         <div className="gw-note is-warn">
@@ -425,8 +567,14 @@ export function BodyGoalBody({ S, update, navigate, hasPro = false, compact = fa
 
       <div className="gw-foot">
         <button type="button" className="gw-textbtn" onClick={() => setEditing(true)}>Edit goal</button>
+        <button type="button" className="gw-textbtn" onClick={() => setShowAccuracy(true)}>How accurate?</button>
+        <button type="button" className="gw-textbtn"
+                onClick={() => update(prev => ({ ...prev, bodyGoal: { ...prev.bodyGoal, useMacros: prev.bodyGoal.useMacros === false } }))}>
+          {goal.useMacros === false ? 'Use food log' : 'Ignore food log'}
+        </button>
         {navigate && <button type="button" className="gw-textbtn" onClick={() => navigate('track')}>Log weight</button>}
       </div>
+      {showAccuracy && <AccuracyModal S={S} plan={plan} onClose={() => setShowAccuracy(false)} />}
       <div className="gw-disclaimer">
         {plan.source === 'projected'
           ? 'Projected from your calorie target and estimated daily burn (7,700 kcal ≈ 1 kg of fat). Real loss usually slows as you get lighter — this switches to your measured rate once you have a couple of weeks of weigh-ins. '

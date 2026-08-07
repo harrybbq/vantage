@@ -159,3 +159,36 @@
 #widgetCanvas [data-react-widget="body-goal"] > .gw-goal,
 #widgetCanvas [data-react-widget="body-goal"] > .gw-setup{flex:1;min-height:0;}
 #widgetCanvas [data-react-widget="goals"] .gw-list{flex:1;min-height:0;}
+
+/* ── Accuracy chip + modal ────────────────────────────────────────── */
+.gw-acc{background:transparent;border:1px solid var(--border);border-radius:5px;
+  padding:2px 6px;cursor:pointer;font-family:var(--mono);font-size:7.5px;
+  letter-spacing:1.2px;font-weight:700;color:var(--text-muted);}
+.gw-acc.is-measured{color:var(--em);border-color:rgba(var(--em-rgb),.45);}
+.gw-refusal-link{display:block;margin-top:6px;}
+
+.gw-modal{width:440px;}
+.gw-modal-lede{font-family:var(--mono);font-size:11px;color:var(--text-muted);
+  line-height:1.7;margin:0 0 18px;}
+.gw-modal-rows{display:flex;flex-direction:column;gap:8px;margin-bottom:18px;}
+.gw-modal-row{display:flex;gap:10px;padding:10px 12px;border-radius:10px;
+  border:1px solid var(--border);align-items:flex-start;}
+.gw-modal-row.is-on{border-color:rgba(var(--em-rgb),.40);background:rgba(var(--em-rgb),.05);}
+.gw-modal-tick{font-size:12px;line-height:1.4;color:var(--text-muted);flex:none;}
+.gw-modal-row.is-on .gw-modal-tick{color:var(--em);}
+.gw-modal-row b{display:block;font-family:var(--sans);font-size:12.5px;font-weight:700;
+  color:var(--text);margin-bottom:2px;}
+.gw-modal-row em{display:block;font-family:var(--mono);font-size:10px;font-style:normal;
+  color:var(--text-muted);line-height:1.6;}
+.gw-modal-note{font-family:var(--mono);font-size:10px;color:var(--text-mid);
+  line-height:1.75;margin-bottom:14px;}
+.gw-modal-note b{color:var(--text);}
+.gw-modal-close{width:100%;margin-top:4px;}
+.gw-how-row b.is-over{color:#d99114;}
+.gw-how-row b.is-under{color:var(--em);}
+.gw-toggle{display:flex;gap:9px;align-items:flex-start;cursor:pointer;padding:8px 9px;
+  border:1px solid var(--border);border-radius:9px;}
+.gw-toggle input{margin:1px 0 0;flex:none;accent-color:var(--em);}
+.gw-toggle b{display:block;font-family:var(--sans);font-size:11px;font-weight:700;color:var(--text);}
+.gw-toggle em{display:block;font-family:var(--mono);font-size:8px;font-style:normal;
+  color:var(--text-muted);line-height:1.6;margin-top:2px;}

@@ -209,15 +209,73 @@ export function tdeeKcal(S, sessionsPerWeek) {
  * calorie target to compare TDEE against. A guessed intake would make
  * the whole plan fiction, so it declines instead.
  */
-export function modelledRate(S, goal) {
+export const MIN_INTAKE_DAYS = 5;
+/**
+ * A logged day under this share of resting burn is almost certainly a
+ * PARTIAL log — breakfast entered, the rest of the day forgotten. It is
+ * not a fasting day, and treating it as one is the dangerous direction:
+ * a 400 kcal "day" implies an enormous deficit, which would speed the
+ * projection up and tell the user they are ahead of schedule for
+ * forgetting to log their dinner. Excluded from the average and
+ * reported separately.
+ */
+export const PARTIAL_DAY_BMR_FRACTION = 0.7;
+
+/**
+ * Classify logged days into complete and partial, and average only the
+ * complete ones.
+ *
+ * @param entries [{date, calories}] from nutrition_daily_summary
+ * @param bmr     resting burn, for the partial-day floor
+ */
+export function summariseIntake(entries, bmr, windowDays = 14) {
+  const list = entries || [];
+  const floor = bmr ? bmr * PARTIAL_DAY_BMR_FRACTION : 800;
+  const complete = list.filter(e => e.calories >= floor);
+  const partial = list.filter(e => e.calories < floor);
+  return {
+    days: windowDays,
+    loggedDays: complete.length,
+    partialDays: partial.length,
+    avgKcal: complete.length
+      ? Math.round(complete.reduce((s, e) => s + e.calories, 0) / complete.length)
+      : null,
+    coverage: Math.round((complete.length / windowDays) * 100),
+    floor: Math.round(floor),
+  };
+}
+
+export function modelledRate(S, goal, intakeAvg = null) {
   const cadence = (goal.weeklyWeights || 0) + (goal.weeklyCardio || 0);
   const tdee = tdeeKcal(S, cadence);
   if (!tdee) return null;
-  const intake = goal.dailyKcal || null;
+
+  // What the user ACTUALLY ate beats what they planned to, once there
+  // is enough of it to be representative. Someone logging faithfully at
+  // 2,600 against a 2,000 target has a smaller deficit and a longer
+  // timeline, and the widget should say so rather than keep quoting the
+  // plan back at them. Under MIN_INTAKE_DAYS the average is too thin to
+  // trust and the typed target stands.
+  //
+  // `useMacros: false` opts out entirely — for people who log some meals
+  // but not reliably enough to want it steering their goal. Off by
+  // choice is not the same as off by accident, so the widget says which.
+  const optedOut = goal.useMacros === false;
+  const useActual = !optedOut && intakeAvg && intakeAvg.avgKcal > 0
+    && intakeAvg.loggedDays >= MIN_INTAKE_DAYS;
+  const intake = useActual ? intakeAvg.avgKcal : (goal.dailyKcal || null);
   if (!intake) return null;
+
   const dailyDeficit = tdee - intake;              // + = losing
   if (!dailyDeficit) return null;
-  return { kgPerWeek: -(dailyDeficit * 7) / KCAL_PER_KG_FAT, tdee, intake, dailyDeficit };
+  return {
+    kgPerWeek: -(dailyDeficit * 7) / KCAL_PER_KG_FAT,
+    tdee, intake, dailyDeficit,
+    intakeSource: useActual ? 'logged' : optedOut ? 'target-opted-out' : 'target',
+    ...(intakeAvg ? { partialDays: intakeAvg.partialDays } : {}),
+    ...(useActual ? { loggedDays: intakeAvg.loggedDays, coverage: intakeAvg.coverage,
+                      targetKcal: goal.dailyKcal || null } : {}),
+  };
 }
 
 /**
@@ -402,7 +460,7 @@ export function bodyGoalPlan(S, opts = {}) {
     // No usable trend yet — this is the day-one case the model exists
     // for. Name whichever input is missing rather than shrugging; each
     // one is a different thing for the user to go and do.
-    const model = modelledRate(S, goal);
+    const model = modelledRate(S, goal, opts.intakeAvg);
     if (!model) {
       if (!bmrKcal(S)) return { ok: false, reason: 'no-profile', current, target };
       if (!goal.dailyKcal) return { ok: false, reason: 'no-intake', current, target };
@@ -416,7 +474,7 @@ export function bodyGoalPlan(S, opts = {}) {
     rate = model.kgPerWeek; source = 'projected';
   }
 
-  const model = source === 'projected' ? modelledRate(S, goal) : null;
+  const model = source === 'projected' ? modelledRate(S, goal, opts.intakeAvg) : null;
 
   const weeks = Math.max(1, Math.ceil(Math.abs(remaining / rate)));
 
@@ -470,7 +528,12 @@ export function bodyGoalPlan(S, opts = {}) {
     points: series.length,
     rateWindowDays,
     ratePoints,
-    ...(model ? { tdee: model.tdee, intake: model.intake, dailyDeficit: model.dailyDeficit } : {}),
+    ...(model ? {
+      tdee: model.tdee, intake: model.intake, dailyDeficit: model.dailyDeficit,
+      intakeSource: model.intakeSource, intakeLoggedDays: model.loggedDays,
+      intakeCoverage: model.coverage, targetKcal: model.targetKcal,
+      intakePartialDays: model.partialDays,
+    } : {}),
   };
 }
 
