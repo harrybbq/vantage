@@ -30,6 +30,17 @@ export const MIN_POINTS = 5;
  * toward an unsafe target or an unsafe speed.
  */
 export const MIN_SAFE_BMI = 18.5;
+/** Weigh-ins needed inside a window before a slope means anything. */
+export const MIN_RATE_POINTS = 3;
+/**
+ * Windows tried, in order, when fitting the rate. 28 days is the ideal
+ * — recent enough to reflect what the user is doing now. But someone
+ * weighing in fortnightly only has two points in 28 days, and refusing
+ * them entirely was wrong: a slower cadence is still a cadence. Widen
+ * until there is enough to fit, and tell the caller which window was
+ * used so the UI can say so.
+ */
+export const RATE_WINDOWS = [28, 56, 90];
 export const MAX_SAFE_LOSS_FRACTION = 0.01;  // 1% of bodyweight per week
 
 const DAY = 86400000;
@@ -68,7 +79,7 @@ export function ratePerWeek(series, days = 28) {
   const pts = series
     .map(([d, w]) => [new Date(d + 'T12:00').getTime(), w])
     .filter(([t]) => t >= cutoff);
-  if (pts.length < 3) return null;
+  if (pts.length < MIN_RATE_POINTS) return null;
   const n = pts.length;
   const mx = pts.reduce((s, [t]) => s + t, 0) / n;
   const my = pts.reduce((s, [, w]) => s + w, 0) / n;
@@ -76,6 +87,28 @@ export function ratePerWeek(series, days = 28) {
   for (const [t, w] of pts) { num += (t - mx) * (w - my); den += (t - mx) ** 2; }
   if (!den) return null;
   return (num / den) * 7 * DAY;   // kg per ms → kg per week
+}
+
+/**
+ * Fit the rate over the narrowest window that has enough weigh-ins.
+ * Returns { rate, days, points } or null when even 90 days is too thin.
+ */
+export function fitRate(series) {
+  for (const days of RATE_WINDOWS) {
+    const rate = ratePerWeek(series, days);
+    if (rate != null) {
+      const cutoff = Date.now() - days * DAY;
+      const points = series.filter(([d]) => new Date(d + 'T12:00').getTime() >= cutoff).length;
+      return { rate, days, points };
+    }
+  }
+  return null;
+}
+
+/** Weigh-ins inside the trailing `days`. Used to explain a refusal. */
+export function recentPoints(series, days = 90) {
+  const cutoff = Date.now() - days * DAY;
+  return series.filter(([d]) => new Date(d + 'T12:00').getTime() >= cutoff).length;
 }
 
 /** Sessions per week for a boolean tracker, over the trailing `weeks`. */
@@ -144,8 +177,8 @@ export function targetSafety(S, goal) {
  * The projection.
  *
  * @returns {{ok:true, ...}} or {{ok:false, reason:string}}
- *   reason ∈ 'no-goal' | 'not-enough-data' | 'no-trend' | 'wrong-way'
- *          | 'at-goal' | 'target-below-healthy-bmi'
+ *   reason ∈ 'no-goal' | 'not-enough-data' | 'no-recent-data' | 'no-trend'
+ *          | 'wrong-way' | 'at-goal' | 'target-below-healthy-bmi'
  */
 export function bodyGoalPlan(S, opts = {}) {
   const goal = S && S.bodyGoal;
@@ -173,9 +206,18 @@ export function bodyGoalPlan(S, opts = {}) {
   const remaining = target - current;                 // signed
   if (Math.abs(remaining) < 0.3) return { ok: true, atGoal: true, pct: 100, current, target, start };
 
-  const rate = ratePerWeek(series);                   // signed kg/week
-  if (rate == null || Math.abs(rate) < 0.02) {
-    return { ok: false, reason: 'no-trend', pct, current, target, rate };
+  // These were one branch, and that was a mistake: "not enough recent
+  // weigh-ins" was being reported as "your weight is holding steady",
+  // which is the app asserting something about the user's body that it
+  // has no way to know. Separate facts, separate messages.
+  const fit = fitRate(series);
+  if (!fit) {
+    return { ok: false, reason: 'no-recent-data', pct, current, target,
+             have: recentPoints(series), need: MIN_RATE_POINTS };
+  }
+  const rate = fit.rate;                             // signed kg/week
+  if (Math.abs(rate) < 0.02) {
+    return { ok: false, reason: 'no-trend', pct, current, target, rate, window: fit.days };
   }
   // Moving away from the target: an ETA here would be a negative number
   // dressed up as a plan. Say what's happening instead.
@@ -209,6 +251,11 @@ export function bodyGoalPlan(S, opts = {}) {
     tooFast,
     points: series.length,
     spanDays: Math.round(spanDays),
+    // Which window the rate was actually fitted over, and how many
+    // weigh-ins were in it — the "How" block shows this so the number
+    // is auditable rather than asserted.
+    rateWindowDays: fit.days,
+    ratePoints: fit.points,
   };
 }
 
@@ -219,8 +266,10 @@ export function refusalCopy(reason, extra = {}) {
       return 'Set a target to see how far along you are.';
     case 'not-enough-data':
       return `Needs about ${extra.need || MIN_DAYS} days of weigh-ins before an estimate means anything — ${extra.have || 0} so far.`;
+    case 'no-recent-data':
+      return `Only ${extra.have || 0} weigh-in${extra.have === 1 ? '' : 's'} in the last 90 days — needs at least ${extra.need || MIN_RATE_POINTS} to work out a rate. Log your weight a few times and this fills in.`;
     case 'no-trend':
-      return 'Your weight is holding steady, so there is no rate to project from yet.';
+      return `Your weight has held steady over the last ${extra.window || 28} days, so there is no rate to project from yet.`;
     case 'wrong-way':
       return 'Currently moving away from the target — no timeline until that turns around.';
     case 'target-below-healthy-bmi':

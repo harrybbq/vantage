@@ -302,7 +302,7 @@ export function BodyGoalBody({ S, update, navigate, hasPro = false, compact = fa
         <div className="gw-how-head">How</div>
         <div className="gw-how-row"><span>Now → target</span><b>{plan.current.toFixed(1)} → {plan.target} kg</b></div>
         <div className="gw-how-row"><span>Measured rate</span><b>{rateLabel}</b></div>
-        <div className="gw-how-row"><span>From</span><b>{plan.points} weigh-ins · {plan.spanDays}d</b></div>
+        <div className="gw-how-row"><span>Fitted over</span><b>{plan.ratePoints} weigh-ins · last {plan.rateWindowDays}d</b></div>
         {(plan.weightsPerWeek > 0 || plan.cardioPerWeek > 0) && (
           <div className="gw-how-row"><span>Your cadence</span>
             <b>{plan.weightsPerWeek.toFixed(1)} + {plan.cardioPerWeek.toFixed(1)} /wk</b></div>
