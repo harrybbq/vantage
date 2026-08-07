@@ -31,7 +31,57 @@
     <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,700;0,900;1,700&family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
   </head>
   <body>
-    <div id="root"></div>
+    <!-- Boot fallback.
+         React replaces these children on mount, so this is only ever
+         visible when the app FAILED to start. Without it, any error
+         before the first render — a module-level throw, a chunk that
+         didn't download, a parse error on an older browser — presents
+         as a completely blank screen with nothing to report and
+         nothing to tap. That is the worst possible failure mode for a
+         phone app: indistinguishable from the device being broken. -->
+    <div id="root">
+      <div id="boot-fallback" style="min-height:100dvh;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;padding:32px;text-align:center;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;color:#8a8a85;background:#141412;">
+        <div style="font-size:13px;letter-spacing:2px;">LOADING…</div>
+        <div id="boot-error" style="display:none;max-width:34em;line-height:1.7;font-size:12px;color:#c9c9c2;">
+          <p style="margin:0 0 12px;color:#d99114;">Vantage couldn't start.</p>
+          <p id="boot-error-detail" style="margin:0 0 16px;font-size:11px;color:#8a8a85;word-break:break-word;"></p>
+          <button type="button" onclick="location.reload(true)" style="font:inherit;font-size:12px;padding:9px 18px;border-radius:8px;border:1px solid #2f6b4f;background:transparent;color:#3f9a6f;cursor:pointer;">Reload</button>
+          <p style="margin:16px 0 0;font-size:10px;opacity:.75;">If this keeps happening, your saved data is safe — it lives on the server, not in the app.</p>
+        </div>
+      </div>
+    </div>
+    <script>
+      // Surfaces a boot failure. Deliberately plain ES5 in an inline
+      // script: if the failure IS a parse error in the bundle, anything
+      // fancier here would die the same way.
+      (function () {
+        var best = '';
+        function paint() {
+          var box = document.getElementById('boot-error');
+          var detail = document.getElementById('boot-error-detail');
+          if (!box) return;                       // app mounted, nothing to do
+          if (detail) {
+            detail.textContent = (window.__vantageBootError || best ||
+              'The app failed to start. This is usually a temporary connection ' +
+              'problem \u2014 reloading normally fixes it.').slice(0, 300);
+          }
+          box.style.display = 'block';
+        }
+        // NOT latched. A failed image or font fires `error` first with an
+        // empty message, and latching on that buried the real cause the
+        // module threw a moment later.
+        window.addEventListener('error', function (e) {
+          if (e && e.message && !best) best = e.message;
+          paint();
+        }, true);
+        window.addEventListener('unhandledrejection', function (e) {
+          var r = e && e.reason;
+          if (r && !best) best = r.message || String(r);
+          paint();
+        });
+        setTimeout(function () { paint(); }, 12000);
+      })();
+    </script>
     <script type="module" src="/src/main.jsx"></script>
   </body>
 </html>

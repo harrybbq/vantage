@@ -28,10 +28,16 @@ const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
 if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
-  throw new Error(
-    'Missing Supabase env vars. Set VITE_SUPABASE_URL and ' +
-    'VITE_SUPABASE_ANON_KEY in .env.local (dev) or Netlify env (prod).'
-  );
+  const msg =
+    'Missing Supabase configuration in this build. VITE_SUPABASE_URL and ' +
+    'VITE_SUPABASE_ANON_KEY have to be set in the Netlify environment at ' +
+    'BUILD time, not just at runtime.';
+  // Stamped before the throw so the boot fallback in index.html can name
+  // the cause. A module-evaluation error reaches window.onerror with an
+  // empty message in every browser worth caring about, so without this
+  // the user gets "couldn't start" and no idea why — and neither do we.
+  if (typeof window !== 'undefined') window.__vantageBootError = msg;
+  throw new Error(msg);
 }
 
 export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
