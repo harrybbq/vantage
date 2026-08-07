@@ -195,6 +195,11 @@ export function activityFactor(sessionsPerWeek) {
  * we don't guess a body.
  */
 export function tdeeKcal(S, sessionsPerWeek) {
+  // A wearable's measured all-day burn beats any multiplier we could
+  // pick. Activity factors are a coarse guess at how much someone
+  // moves, and that guess is the biggest error term in the projection.
+  const measured = measuredBurn(S);
+  if (measured) return measured.kcal;
   const bmr = bmrKcal(S);
   if (!bmr) return null;
   return Math.round(bmr * activityFactor(sessionsPerWeek || 0));
@@ -263,19 +268,77 @@ export function modelledRate(S, goal, intakeAvg = null) {
   const optedOut = goal.useMacros === false;
   const useActual = !optedOut && intakeAvg && intakeAvg.avgKcal > 0
     && intakeAvg.loggedDays >= MIN_INTAKE_DAYS;
-  const intake = useActual ? intakeAvg.avgKcal : (goal.dailyKcal || null);
+  // Target comes from the user's macro settings; goal.dailyKcal is only
+  // a fallback for goals saved before that was wired up.
+  const targetKcal = (intakeAvg && intakeAvg.targetKcal) || goal.dailyKcal || null;
+  const intake = useActual ? intakeAvg.avgKcal : targetKcal;
   if (!intake) return null;
 
   const dailyDeficit = tdee - intake;              // + = losing
   if (!dailyDeficit) return null;
+  const measured = measuredBurn(S);
   return {
     kgPerWeek: -(dailyDeficit * 7) / KCAL_PER_KG_FAT,
     tdee, intake, dailyDeficit,
+    burnSource: measured ? 'measured' : 'estimated',
+    ...(measured ? { burnDays: measured.days } : {}),
     intakeSource: useActual ? 'logged' : optedOut ? 'target-opted-out' : 'target',
     ...(intakeAvg ? { partialDays: intakeAvg.partialDays } : {}),
     ...(useActual ? { loggedDays: intakeAvg.loggedDays, coverage: intakeAvg.coverage,
-                      targetKcal: goal.dailyKcal || null } : {}),
+                      targetKcal } : {}),
   };
+}
+
+
+// ══════════════════════════════════════════════════════════════════════
+// Wearables — WHOOP / Oura make the estimate an actual measurement
+// ══════════════════════════════════════════════════════════════════════
+
+/** Days of measured burn needed before it beats the BMR estimate. */
+export const MIN_BURN_DAYS = 5;
+
+/**
+ * Average MEASURED all-day energy expenditure, from WHOOP's cycle
+ * kilojoules (vitalsLog[date].burnKcal).
+ *
+ * This is the single biggest accuracy win available to this widget.
+ * Without it, TDEE is BMR × a coarse activity multiplier — a guess
+ * about how much someone moves, and the largest error term in the whole
+ * projection. WHOOP measures it. When the data is there we stop
+ * guessing.
+ */
+export function measuredBurn(S, days = 14) {
+  const log = (S && S.vitalsLog) || {};
+  const cutoff = ymd(new Date(Date.now() - days * DAY));
+  const vals = Object.keys(log)
+    .filter(d => d >= cutoff && log[d] && log[d].burnKcal > 0)
+    .map(d => log[d].burnKcal);
+  if (vals.length < MIN_BURN_DAYS) return null;
+  return {
+    kcal: Math.round(vals.reduce((a, b) => a + b, 0) / vals.length),
+    days: vals.length,
+  };
+}
+
+/**
+ * Dates on which a connected wearable recorded a workout.
+ *
+ * WHOOP workouts land in burnLog as entries prefixed `whoop-` (see
+ * netlify/lib/whoop.js). They are used only to FILL IN days the user
+ * didn't tick a tracker on — never to add to a day they did — so a
+ * device can rescue a forgotten log without ever inflating a day that
+ * was already counted.
+ */
+export function deviceWorkoutDays(S) {
+  const burn = (S && S.burnLog) || {};
+  const out = new Set();
+  for (const d of Object.keys(burn)) {
+    const entries = burn[d] || [];
+    if (entries.some(e => /^(whoop|oura)-/.test(String(e.id || '')) && !/steps/i.test(String(e.id || '')))) {
+      out.add(d);
+    }
+  }
+  return out;
 }
 
 /**
@@ -313,12 +376,15 @@ export function trainingTrackers(S, goal = {}) {
  * progress. A morning run plus an evening lift is still two, because
  * they fall in different categories.
  */
-export function countSessions(S, ids, fromYmd, toYmd) {
+export function countSessions(S, ids, fromYmd, toYmd, deviceDays = null) {
   const logs = (S && S.logs) || {};
   const weights = new Set(ids.weights);
   const cardio = new Set(ids.cardio);
+  const dates = new Set(Object.keys(logs));
+  if (deviceDays) for (const d of deviceDays) dates.add(d);
+
   let n = 0;
-  for (const d of Object.keys(logs)) {
+  for (const d of dates) {
     if (fromYmd && d < fromYmd) continue;
     if (toYmd && d > toYmd) continue;
     const day = logs[d] || {};
@@ -328,8 +394,11 @@ export function countSessions(S, ids, fromYmd, toYmd) {
       if (weights.has(id)) didWeights = true;
       else if (cardio.has(id)) didCardio = true;
     }
-    if (didWeights) n++;
-    if (didCardio) n++;
+    const tracked = (didWeights ? 1 : 0) + (didCardio ? 1 : 0);
+    // A device only fills a day the user logged nothing on. Adding to a
+    // tracked day would double-count the same workout — the tick and
+    // the WHOOP record are usually the same session.
+    n += tracked > 0 ? tracked : (deviceDays && deviceDays.has(d) ? 1 : 0);
   }
   return n;
 }
@@ -337,7 +406,7 @@ export function countSessions(S, ids, fromYmd, toYmd) {
 /** Training sessions logged since the goal was set. */
 export function sessionsSince(S, goal) {
   if (!goal || !goal.startedAt) return 0;
-  return countSessions(S, trainingTrackers(S, goal), goal.startedAt, null);
+  return countSessions(S, trainingTrackers(S, goal), goal.startedAt, null, deviceWorkoutDays(S));
 }
 
 /**
@@ -347,9 +416,13 @@ export function sessionsSince(S, goal) {
 export function trainingCadence(S, goal, weeks = 8) {
   const ids = trainingTrackers(S, goal);
   const from = ymd(new Date(Date.now() - weeks * 7 * DAY));
+  // Device days are attributed to weights, since WHOOP's sport type is
+  // not persisted — an unknown workout is more often resistance work in
+  // this app's population, and the split only affects presentation.
+  const dev = deviceWorkoutDays(S);
   const perCat = cat => {
     const only = { weights: [], cardio: [], [cat]: ids[cat] };
-    return countSessions(S, only, from, null) / weeks;
+    return countSessions(S, only, from, null, cat === 'weights' ? dev : null) / weeks;
   };
   return { weights: perCat('weights'), cardio: perCat('cardio') };
 }
@@ -463,7 +536,9 @@ export function bodyGoalPlan(S, opts = {}) {
     const model = modelledRate(S, goal, opts.intakeAvg);
     if (!model) {
       if (!bmrKcal(S)) return { ok: false, reason: 'no-profile', current, target };
-      if (!goal.dailyKcal) return { ok: false, reason: 'no-intake', current, target };
+      if (!(opts.intakeAvg && opts.intakeAvg.targetKcal) && !goal.dailyKcal) {
+      return { ok: false, reason: 'no-intake', current, target };
+    }
       return { ok: false, reason: 'no-recent-data', current, target,
                have: recentPoints(series), need: MIN_RATE_POINTS };
     }
@@ -532,6 +607,7 @@ export function bodyGoalPlan(S, opts = {}) {
       tdee: model.tdee, intake: model.intake, dailyDeficit: model.dailyDeficit,
       intakeSource: model.intakeSource, intakeLoggedDays: model.loggedDays,
       intakeCoverage: model.coverage, targetKcal: model.targetKcal,
+      burnSource: model.burnSource, burnDays: model.burnDays,
       intakePartialDays: model.partialDays,
     } : {}),
   };
@@ -547,7 +623,7 @@ export function refusalCopy(reason, extra = {}) {
     case 'no-profile':
       return 'Needs your height, age and sex to estimate energy use — set those up in the Calories widget.';
     case 'no-intake':
-      return 'Add your daily calorie target and this can estimate how long the goal will take.';
+      return 'Set a daily Calories goal in your macro settings and this can estimate how long the goal will take.';
     case 'intake-wrong-way':
       return `At ${extra.intake} kcal a day against an estimated ${extra.tdee} burned, you would move away from this target, not toward it.`;
     case 'no-recent-data':

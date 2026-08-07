@@ -33,12 +33,20 @@ export async function fetchIntakeAverage(userId, days = 14) {
 
   const from = ymd(new Date(Date.now() - days * 86400000));
   const to = ymd(new Date());
-  const { data, error } = await supabase
-    .from('nutrition_daily_summary')
-    .select('log_date,calories')
-    .eq('user_id', userId)
-    .gte('log_date', from)
-    .lte('log_date', to);
+  // The calorie GOAL comes from the user's macro settings — asking for
+  // it again in the body-goal form would be a second place to keep the
+  // same number in sync, and they would drift.
+  const [{ data, error }, { data: goalRow }] = await Promise.all([
+    supabase
+      .from('nutrition_daily_summary')
+      .select('log_date,calories')
+      .eq('user_id', userId)
+      .gte('log_date', from)
+      .lte('log_date', to),
+    supabase
+      .from('nutrition_macros').select('daily_goal')
+      .eq('user_id', userId).eq('name', 'Calories').maybeSingle(),
+  ]);
 
   // Fail soft: a null result means "no opinion", and the caller falls
   // back to the typed target rather than showing an error in a widget
@@ -50,6 +58,7 @@ export async function fetchIntakeAverage(userId, days = 14) {
   // and testable rather than buried in a fetch.
   const value = {
     days,
+    targetKcal: Number(goalRow?.daily_goal) || null,
     entries: (data || [])
       .filter(r => r.calories > 0)
       .map(r => ({ date: r.log_date, calories: r.calories })),

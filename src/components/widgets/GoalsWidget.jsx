@@ -220,16 +220,17 @@ function boolTrackers(S) {
   return (S.trackers || []).filter(t => t.type === 'boolean');
 }
 
-function Setup({ S, update, onCancel }) {
+function Setup({ S, update, onCancel, onSaved, macroTarget }) {
   const trackers = boolTrackers(S);
   const guessGym = trackers.find(t => /gym|lift|weight|train/i.test(t.name)) || trackers[0];
   const guessCardio = trackers.find(t => /cardio|run|walk|bike|cycle|swim/i.test(t.name));
+  const existing = S.bodyGoal || null;
   const [form, setForm] = useState({
-    type: 'cut',
-    targetKg: '',
+    type: existing?.type || 'cut',
+    targetKg: existing?.targetKg != null ? String(existing.targetKg) : '',
     targetBodyFat: '',
-    gymTrackerId: guessGym ? guessGym.id : '',
-    cardioTrackerId: guessCardio ? guessCardio.id : '',
+    gymTrackerId: existing?.gymTrackerId || (guessGym ? guessGym.id : ''),
+    cardioTrackerId: existing?.cardioTrackerId || (guessCardio ? guessCardio.id : ''),
     dailyKcal: '',
     useMacros: true,
     weeklyWeights: guessGym ? String(Math.round(sessionsPerWeek(S, guessGym.id) || guessGym.weeklyTarget || 3)) : '3',
@@ -250,15 +251,18 @@ function Setup({ S, update, onCancel }) {
   const canSave = target > 0 && target < 400;
 
   function save() {
+    onSaved?.();
     update(prev => ({
       ...prev,
       bodyGoal: {
         type: form.type,
         targetKg: target,
         ...(parseFloat(form.targetBodyFat) > 0 ? { targetBodyFat: parseFloat(form.targetBodyFat) } : {}),
-        startKg: startKg || target,
-        startedAt: new Date().toISOString().slice(0, 10),
-        ...(parseInt(form.dailyKcal, 10) > 0 ? { dailyKcal: parseInt(form.dailyKcal, 10) } : {}),
+        // Both preserved on edit: resetting them would restart the
+        // journey every time someone nudged their target, wiping the
+        // sessions they have already banked.
+        startKg: existing?.startKg ?? (startKg || target),
+        startedAt: existing?.startedAt || new Date().toISOString().slice(0, 10),
         useMacros: !!form.useMacros,
         weeklyWeights: Math.max(0, parseInt(form.weeklyWeights, 10) || 0),
         weeklyCardio: Math.max(0, parseInt(form.weeklyCardio, 10) || 0),
@@ -320,20 +324,15 @@ function Setup({ S, update, onCancel }) {
         <div className="gw-hint">Pre-filled from your “{guessGym.name}” tracker.</div>
       )}
 
-      {/* The one number the model can't infer. With it we can estimate a
-          timeline on day one instead of making the user log weight for
-          a fortnight first; without it the widget still works, it just
-          waits for a measured trend. */}
-      <label className="gw-field">
-        <span className="gw-label">Daily calorie target</span>
-        <input className="gw-input" type="number" inputMode="numeric" min="800" max="6000"
-               value={form.dailyKcal} onChange={e => set('dailyKcal', e.target.value)}
-               placeholder="e.g. 2300 — optional" />
-      </label>
+      {/* No calorie input here. It lives in the user's macro settings,
+          and asking twice would give the same number two homes that
+          quietly drift apart. Shown read-only so the setup still says
+          what the plan is built on. */}
       <div className="gw-hint">
-        {bmr
-          ? `We estimate you burn about ${Math.round(bmr * 1.55).toLocaleString()} kcal a day at ${form.weeklyWeights || 0}+${form.weeklyCardio || 0} sessions a week. Eating under that is what moves the target.`
-          : 'Set up the Calories widget (height, age, sex) and we can estimate your daily burn too.'}
+        {macroTarget
+          ? `Using your ${macroTarget.toLocaleString()} kcal daily goal from macro settings.`
+          : 'Set a daily Calories goal in your macro settings and this can estimate a timeline.'}
+        {bmr ? ` Estimated burn about ${Math.round(bmr * 1.55).toLocaleString()} kcal/day.` : ''}
       </div>
 
       <label className="gw-toggle">
@@ -388,8 +387,11 @@ export function BodyGoalBody({ S, update, navigate, userId, hasPro = false, comp
 
   // Live session rates beat the numbers typed at setup — if the user
   // said 3 and has been doing 4, the plan should reflect 4.
-  // Only fetched when there's a goal to inform — no goal, no query.
-  const intakeRaw = useIntakeAverage(userId, 14, hasPro && !!goal);
+  // Runs whenever the widget is mounted for a Pro user, goal or not:
+  // the setup form needs the macro target to show what the plan will be
+  // built on, and gating it on `goal` left that blank on first run.
+  // One cached query per five minutes, shared across every widget root.
+  const intakeRaw = useIntakeAverage(userId, 14, hasPro);
   // Partial-day filtering happens here, against this user's own resting
   // burn, so a breakfast-only day never masquerades as a fast.
   const intakeAvg = useMemo(
@@ -410,7 +412,11 @@ export function BodyGoalBody({ S, update, navigate, userId, hasPro = false, comp
   }, [S, goal, intakeAvg]);
 
   if (!goal || editing) {
-    return <Setup S={S} update={update} onCancel={goal ? () => setEditing(false) : null} />;
+    return (
+      <Setup S={S} update={update} macroTarget={intakeRaw?.targetKcal || null}
+             onCancel={goal ? () => setEditing(false) : null}
+             onSaved={() => setEditing(false)} />
+    );
   }
 
   if (!plan.ok) {
@@ -506,7 +512,10 @@ export function BodyGoalBody({ S, update, navigate, userId, hasPro = false, comp
           <div className="gw-how-row"><span>Fitted over</span><b>{plan.ratePoints} weigh-ins · last {plan.rateWindowDays}d</b></div>
         ) : (
           <>
-            <div className="gw-how-row"><span>Est. daily burn</span><b>{plan.tdee?.toLocaleString()} kcal</b></div>
+            <div className="gw-how-row">
+              <span>{plan.burnSource === 'measured' ? `Measured burn (${plan.burnDays}d)` : 'Est. daily burn'}</span>
+              <b className={plan.burnSource === 'measured' ? 'is-under' : undefined}>{plan.tdee?.toLocaleString()} kcal</b>
+            </div>
             <div className="gw-how-row">
               <span>{plan.intakeSource === 'logged' ? `Logged intake (${plan.intakeLoggedDays}d)` : 'Your target'}</span>
               <b>{plan.intake?.toLocaleString()} kcal</b>
