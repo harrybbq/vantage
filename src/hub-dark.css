@@ -318,9 +318,14 @@ html[data-hub-os] .hub-os {
   flex-direction: column;
   gap: 10px;
   padding: 14px;
-  height: calc(100vh - 32px);  /* 32 = chrome bar */
   box-sizing: border-box;
-  overflow: hidden;
+  /* Grows with its contents instead of being pinned to the viewport.
+     It used to be height:100vh + overflow:hidden, which forced the
+     widgets canvas to scroll INSIDE the page — a second scrollbar for
+     the one thing people add to most. The page is now the scroller and
+     the canvas simply gets taller. min-height keeps a short board
+     filling the screen rather than floating in a strip. */
+  min-height: calc(100vh - 32px);
 }
 
 html[data-hub-os] .hub-os-top {
@@ -336,6 +341,10 @@ html[data-hub-os] .hub-os-main {
   gap: 10px;
   flex: 1;
   min-height: 0;
+  /* Columns size to their own content rather than being stretched to
+     the tallest track — otherwise a tall canvas would drag the side
+     columns down with it and sticky would have nothing to do. */
+  align-items: start;
 }
 
 html[data-hub-os] .hub-os-main > .os-col {
@@ -343,6 +352,14 @@ html[data-hub-os] .hub-os-main > .os-col {
   flex-direction: column;
   gap: 10px;
   min-height: 0;
+  /* Pinned while the page scrolls past. 14px matches the shell padding,
+     so a column sits where it started rather than jumping on first
+     scroll. Its own max-height plus overflow means a column taller than
+     the screen still scrolls internally — that is the one place a
+     nested scrollbar is the right answer. */
+  position: sticky;
+  top: 14px;
+  max-height: calc(100vh - 28px);
   /* Columns scroll internally when they hold more panels than fit.
      Without this, extra panels (e.g. an opt-in Cardio card on top of
      the standard Habits + QuickLog + Coach stack) get silently clipped
@@ -678,12 +695,12 @@ html[data-hub-os] .os-tracker-pill.hit {
 html[data-hub-os] .os-widgets {
   display: flex;
   flex-direction: column;
-  overflow: hidden;
   min-height: 0;
 }
 html[data-hub-os] .os-widgets-body {
   flex: 1;
-  overflow: auto;
+  /* visible, not auto: the canvas is what grows the page. */
+  overflow: visible;
   padding: 8px;
   min-height: 0;
   position: relative;
