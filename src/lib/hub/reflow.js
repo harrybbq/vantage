@@ -64,13 +64,21 @@ export function reflow(moving, others, axis, dir, opts = {}) {
   let frontier = dir > 0 ? moving[P] + moving[S] : moving[P];
   let ok = true;
   let maxExtent = null;
+  // Running total of the space the chain BEFORE the current widget
+  // needs — each one's own size plus the gap after it. When a widget
+  // deep in the chain refuses, the moving widget has to clear
+  // everything stacked between them, not just the refuser. Without
+  // this, maxExtent was computed as if the refuser were the only
+  // neighbour, came out far past the real wall, never fired, and the
+  // widget grew straight through the widgets in between.
+  let stack = 0;
 
   for (const o of inPath) {
     const rect = { x: o.x, y: o.y, w: o.w, h: o.h };
     const need = dir > 0 ? frontier + gap : frontier - gap;
 
     if (dir > 0) {
-      if (rect[P] >= need) { frontier = rect[P] + rect[S]; continue; }   // already clear
+      if (rect[P] >= need) { frontier = rect[P] + rect[S]; stack += rect[S] + gap; continue; }   // already clear
       const shifted = need;
       const farEdge = shifted + rect[S];
       if (limit === null || farEdge <= limit) {
@@ -85,13 +93,13 @@ export function reflow(moving, others, axis, dir, opts = {}) {
           // 3. no legible room left. Refuse, and report how far the
           //    moving widget may grow before this becomes true.
           ok = false;
-          maxExtent = limit - min - gap;
+          maxExtent = limit - min - gap - stack;
           break;
         }
       }
     } else {
       const farEdge = rect[P] + rect[S];
-      if (farEdge <= need) { frontier = rect[P]; continue; }
+      if (farEdge <= need) { frontier = rect[P]; stack += rect[S] + gap; continue; }
       const shiftedFar = need;
       const shiftedNear = shiftedFar - rect[S];
       if (limit === null || shiftedNear >= limit) {
@@ -103,13 +111,14 @@ export function reflow(moving, others, axis, dir, opts = {}) {
           rect[S] = room;
         } else {
           ok = false;
-          maxExtent = limit + min + gap;
+          maxExtent = limit + min + gap + stack;
           break;
         }
       }
     }
 
     moved.set(o.id, rect);
+    stack += rect[S] + gap;
     frontier = dir > 0 ? rect[P] + rect[S] : rect[P];
   }
 
