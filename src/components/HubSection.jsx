@@ -798,7 +798,12 @@ export default function HubSection({ S, update, active, onOpenModal, onOpenWaitl
         if (dragHandle) dragHandle.style.pointerEvents = '';
       }
     }
-  }, [S.widgetSizes, S.widgetZ, update, snapRef]);
+  // S.hubSnap, not just snapRef: the ref's identity never changes, so
+  // with only the ref in here the top grip was created (or removed)
+  // whenever some UNRELATED dependency happened to change, and not when
+  // the user actually toggled snap. That is why the top edge appeared
+  // dead until something else forced a re-render.
+  }, [S.widgetSizes, S.widgetZ, S.hubSnap, update, snapRef]);
 
   // Render all widgets imperatively into the canvas
   const renderCanvas = useCallback(() => {
@@ -816,7 +821,13 @@ export default function HubSection({ S, update, active, onOpenModal, onOpenWaitl
     if (hasPositions) {
       canvas.style.cssText = 'position:relative;flex:1;min-height:calc(100vh - 180px);display:block;';
     } else {
-      canvas.style.cssText = 'flex:1;display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:14px;align-content:start;align-items:start;';
+      // Columns deliberately NOT set here — CSS owns them (see
+      // #widgetCanvas in index.css). auto-fill with a 300px minimum only
+      // ever fitted two across in the OS layout's middle column, so a
+      // fourth widget started a new row while a third would have fitted.
+      // Leaving it to CSS also means the count reacts to the canvas
+      // being resized, which an inline style set once at render cannot.
+      canvas.style.cssText = 'flex:1;display:grid;gap:14px;align-content:start;align-items:start;';
     }
 
     // Links
@@ -985,7 +996,7 @@ export default function HubSection({ S, update, active, onOpenModal, onOpenWaitl
       renderNotepadInCanvas(canvas, S, update, hasPositions);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [S.links, S.hubWidgets, S.holidays, S.habits, S.widgetPositions, S.notepadText, S.notepadPos, S.notepadWidth, S._showNotepad]);
+  }, [S.links, S.hubWidgets, S.holidays, S.habits, S.widgetPositions, S.notepadText, S.notepadPos, S.notepadWidth, S._showNotepad, S.hubSnap]);
 
   useEffect(() => {
     if (active) renderCanvas();
