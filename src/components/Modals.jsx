@@ -154,11 +154,18 @@ function AddLinkModal({ openId, onClose, onSwitchModal, onAddNotepad, onAddApp, 
           <span style={{ fontWeight: 700, fontSize: '13px', color: 'var(--text)' }}>Goals</span>
           <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Pin any goal · progress</span>
         </button>
-        <button className="btn btn-ghost" style={{ padding: '16px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px', borderRadius: '12px', height: 'auto' }}
-          onClick={() => { onClose('addLinkModal'); onAddHubWidget('body-goal'); }}>
+        {/* Body goal is Pro. Locked tiles stay clickable and route to
+            the paywall — the same treatment the Our Apps presets get,
+            rather than a dead control that doesn't explain itself. */}
+        <button className="btn btn-ghost" title={hasPro ? 'Add Body Goal to your hub' : 'Body Goal is a Pro feature — upgrade to add it'}
+          style={{ padding: '16px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px', borderRadius: '12px', height: 'auto', position: 'relative', opacity: hasPro ? 1 : 0.6 }}
+          onClick={() => { if (!hasPro) { onClose('addLinkModal'); onSwitchModal('paywall:generic'); return; } onClose('addLinkModal'); onAddHubWidget('body-goal'); }}>
+          {!hasPro && (
+            <span style={{ position: 'absolute', top: 8, right: 8, fontSize: 11, lineHeight: 1, color: 'var(--gold, #c8970a)' }}>🔒</span>
+          )}
           <Icon name="target" size={22} strokeWidth={1.75} />
           <span style={{ fontWeight: 700, fontSize: '13px', color: 'var(--text)' }}>Body Goal</span>
-          <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Target weight · plan</span>
+          <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>{hasPro ? 'Target weight · plan' : 'Pro feature'}</span>
         </button>
         <button className="btn btn-ghost" style={{ padding: '16px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px', borderRadius: '12px', height: 'auto' }}
           onClick={() => { onClose('addLinkModal'); onAddHubWidget('savings-pots'); }}>
@@ -194,12 +201,8 @@ function AddLinkModal({ openId, onClose, onSwitchModal, onAddNotepad, onAddApp, 
           <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Agents · P/L</span>
         </button>
         )}
-        <button className="btn btn-ghost" style={{ padding: '16px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px', borderRadius: '12px', height: 'auto' }}
-          onClick={() => { onClose('addLinkModal'); onAddHubWidget('body'); }}>
-          <Icon name="scale" size={22} strokeWidth={1.75} />
-          <span style={{ fontWeight: 700, fontSize: '13px', color: 'var(--text)' }}>Body</span>
-          <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Weight trend · goal</span>
-        </button>
+        {/* Body widget retired — the Goals and Body Goal widgets both
+            cover the weight trend. Existing hubs keep theirs. */}
         <button className="btn btn-ghost" style={{ padding: '16px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px', borderRadius: '12px', height: 'auto' }}
           onClick={() => { onClose('addLinkModal'); onAddHubWidget('mood'); }}>
           <Icon name="smile" size={22} strokeWidth={1.75} />

@@ -19,6 +19,12 @@ import { backdropClose } from '../../utils/backdropClose';
 // App-preset widget types (FloorplanStudio / TubeLube / …) — a Pro
 // bonus, so they're locked for free users in the picker below.
 const APP_PRESET_TYPES = new Set(APP_PRESETS.map(p => p.id));
+// Pro-gated widgets beyond the Our Apps presets. Body goal earns it:
+// it's the projection engine, not a view of data the user can already
+// read elsewhere. Goals stays free — it only pins progress that is
+// already visible on the achievements board and the savings page.
+const PRO_WIDGET_TYPES = new Set(['body-goal']);
+const isProWidget = type => APP_PRESET_TYPES.has(type) || PRO_WIDGET_TYPES.has(type);
 
 export default function AddMobileWidgetModal({ openId, onClose, existingTypes, onAdd, onUpgrade }) {
   const { hasPro } = useSubscriptionContext();
@@ -42,7 +48,11 @@ export default function AddMobileWidgetModal({ openId, onClose, existingTypes, o
     'vitals',
     'goals',
     'body-goal',
-    'body',
+    // 'body' retired — it only showed the weight trend, which the Body
+    // Goal and Goals widgets both cover. Deliberately removed from the
+    // picker only: the META entry and render case stay so hubs that
+    // already have one keep a working widget rather than having it
+    // silently turn into something else.
     'mood',
     'macros',
     'calories',
@@ -58,8 +68,9 @@ export default function AddMobileWidgetModal({ openId, onClose, existingTypes, o
   ];
 
   function pick(type) {
-    // Our Apps presets are a Pro bonus — route free users to the paywall.
-    if (APP_PRESET_TYPES.has(type) && !hasPro) {
+    // Pro-gated widgets — route free users to the paywall rather than
+    // adding a widget they can't use.
+    if (isProWidget(type) && !hasPro) {
       onClose('addMobileWidgetModal');
       onUpgrade?.();
       return;
@@ -89,9 +100,9 @@ export default function AddMobileWidgetModal({ openId, onClose, existingTypes, o
             if (!meta) return null;
             const alreadyAdded = existing.has(type);
             const stub = !!meta.requires;
-            // Our Apps presets are a Pro bonus — locked for free users,
-            // but still tappable (routes to the paywall via pick()).
-            const proLocked = APP_PRESET_TYPES.has(type) && !hasPro;
+            // Locked for free users, but still tappable (routes to the
+            // paywall via pick()).
+            const proLocked = isProWidget(type) && !hasPro;
             return (
               <button
                 key={type}

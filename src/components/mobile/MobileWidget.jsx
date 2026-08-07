@@ -22,6 +22,7 @@ import { strikeState } from '../../lib/habits/strikes';
 import { SavingsPotsBody, SavingsProjectionBody } from '../savings/SavingsWidgets';
 import { BodyBody, SubscriptionsBody, MoodBody } from '../widgets/LifeWidgets';
 import { GoalsBody, BodyGoalBody } from '../widgets/GoalsWidget';
+import { useSubscriptionContext } from '../../context/SubscriptionContext';
 import { tradingWidgetAvailable, TRADING_WIDGET_BUILD_EXCLUDED } from '../../lib/trading/enabled';
 import MarketBody from '../widgets/MarketWidget';
 import NewsBody from '../widgets/NewsWidget';
@@ -181,6 +182,10 @@ const BASE_WIDGET_META = {
 const WIDGET_META = { ...BASE_WIDGET_META, ...APP_WIDGET_META };
 
 export default function MobileWidget({ widget, S, update, onRemove, navigate, userId, index, onReorder }) {
+  // Mobile widgets render inside the React tree, so the subscription
+  // context is reachable here (unlike the desktop hub's detached island
+  // roots, which have to be handed hasPro as a prop).
+  const { hasPro } = useSubscriptionContext();
   const meta = WIDGET_META[widget.type] || { label: widget.type, eyebrow: '?', icon: '·' };
 
   // Brand-tinted icon chip when the type carries an `accent` (the new
@@ -391,7 +396,7 @@ export default function MobileWidget({ widget, S, update, onRemove, navigate, us
             <span className="m-widget-eyebrow">// {meta.eyebrow}</span>
           </div>
           <div className="m-widget-body">
-            {renderBody(widget, meta, S, update, navigate, userId)}
+            {renderBody(widget, meta, S, update, navigate, userId, hasPro)}
           </div>
         </div>
       </div>
@@ -430,7 +435,7 @@ export default function MobileWidget({ widget, S, update, onRemove, navigate, us
   );
 }
 
-function renderBody(widget, meta, S, update, navigate, userId) {
+function renderBody(widget, meta, S, update, navigate, userId, hasPro) {
   if (meta.requires) {
     return (
       <div className="m-widget-stub">
@@ -461,9 +466,9 @@ function renderBody(widget, meta, S, update, navigate, userId) {
     case 'body':        return <BodyBody S={S} update={update} navigate={navigate} />;
     case 'mood':        return <MoodBody S={S} update={update} navigate={navigate} />;
     case 'subscriptions': return <SubscriptionsBody S={S} navigate={navigate} />;
-    case 'goals':       return <GoalsBody S={S} picks={widget.picks} compact navigate={navigate}
+    case 'goals':       return <GoalsBody S={S} picks={widget.picks} compact navigate={navigate} hasPro={hasPro}
       onSetPicks={p => update(prev => ({ ...prev, mobileWidgets: (prev.mobileWidgets || []).map(w => w.id === widget.id ? { ...w, picks: p } : w) }))} />;
-    case 'body-goal':   return <BodyGoalBody S={S} update={update} navigate={navigate} />;
+    case 'body-goal':   return <BodyGoalBody S={S} update={update} navigate={navigate} hasPro={hasPro} />;
     case 'savings-pots': return <SavingsPotsBody S={S} count={widget.count || 1} picks={widget.picks} navigate={navigate}
       onSetCount={n => update(prev => ({ ...prev, mobileWidgets: (prev.mobileWidgets || []).map(w => w.id === widget.id ? { ...w, count: n } : w) }))}
       onSetPicks={p => update(prev => ({ ...prev, mobileWidgets: (prev.mobileWidgets || []).map(w => w.id === widget.id ? { ...w, picks: p } : w) }))} />;
