@@ -750,8 +750,10 @@ nav:hover .nav-tab-label{opacity:1;}
 }
 /* With the rail present the bar is a resize control, so the grab pips
    would be advertising a gesture that is no longer there. */
-.widget-wrapper.has-top-grip .widget-drag-handle{ cursor:ns-resize; }
-.widget-wrapper.has-top-grip .widget-drag-handle span{ opacity:0; }
+/* The bar IS the resize control while snap is on, so the drag handle is
+   hidden outright rather than dimmed — visibility:hidden keeps its 18px
+   so the rail still has a bar to sit in and nothing below shifts. */
+.widget-wrapper.has-top-grip .widget-drag-handle{ cursor:ns-resize; visibility:hidden; }
 .widget-wrapper .widget-resize-l::after,
 .widget-wrapper .widget-resize-r::after{
   content:"";position:absolute;top:50%;transform:translateY(-50%);
