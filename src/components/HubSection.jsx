@@ -521,85 +521,69 @@ export default function HubSection({ S, update, active, onOpenModal, onOpenWaitl
     update(prev => ({ ...prev, hubSnap: !prev.hubSnap }));
   }
 
-  // Snap-to-fill: pack every widget into a balanced weighted-row grid
-  // that uses the full canvas area. Heavier widgets (notepad, GitHub,
-  // take proportionally more horizontal space; row heights are
-  // equal. Read-only over current S — writes positions + sizes once.
-  const WIDGET_WEIGHT = {
-    notepad: 2.6,
-    github:  2.4,
-    leaderboard: 1.6,
-    holidays: 1.6,
-    habits:   1.6,
-    link:     1.0,
-  };
+  // Snap-to-fill: pack every widget into a uniform grid, at most three
+  // per row, rows stacking downward with no limit — the canvas grows to
+  // meet them (growCanvas). The previous version distributed widgets
+  // into rows by a hand-tuned weight per widget type and capped the
+  // layout at four rows, so a big hub got squeezed into progressively
+  // shorter rows instead of simply running further down the page.
+  //
+  // Read-only over current S — writes positions + sizes once.
+  const SNAP_FILL_ROW_MIN = 260;
+  const SNAP_FILL_ROW_MAX = 420;
   function handleSnapToFill() {
     const canvas = canvasRef.current;
     if (!canvas) return;
 
-    // Gather every widget currently on the canvas. ghUser links count
-    // as 'github' (richer body), plain links as 'link'.
-    const items = [];
-    for (const l of (S.links || [])) {
-      const type = l.ghUser ? 'github' : 'link';
-      items.push({ id: l.id, weight: WIDGET_WEIGHT[type] });
-    }
-    for (const h of (S.hubWidgets || [])) items.push({ id: h.id, weight: WIDGET_WEIGHT[h.type] || 1.6 });
+    // Gather every widget currently on the canvas, in the order they
+    // render, so the result matches what the user is looking at.
+    const ids = [];
+    for (const l of (S.links || [])) ids.push(l.id);
+    for (const h of (S.hubWidgets || [])) ids.push(h.id);
     // Notepad lives outside hubWidgets — included only if visible.
-    if (S.notepadText || S.notepadPos || S._showNotepad) {
-      items.push({ id: '__notepad__', weight: WIDGET_WEIGHT.notepad });
-    }
-    if (!items.length) return;
+    if (S.notepadText || S.notepadPos || S._showNotepad) ids.push('__notepad__');
+    if (!ids.length) return;
 
     // Switch canvas to absolute-positioned mode (matches drag flow).
     canvas.style.cssText = 'position:relative;flex:1;min-height:calc(100vh - 180px);display:block;';
     const cw = canvas.clientWidth;
     const ch = Math.max(420, canvas.clientHeight);
+    const gap = AUTO_GAP;
 
-    // Pick rows so cells are roughly square (cap 4 rows for legibility).
-    const n = items.length;
-    const rowCount = Math.min(4, Math.max(1, Math.round(Math.sqrt(n * (ch / cw)))));
+    // Three across where the canvas can hold three, fewer where it
+    // genuinely can't (same breakpoints as the CSS grid). Never more
+    // columns than there are widgets, so four widgets give 3 + 1 rather
+    // than a stretched row of four.
+    const cols = Math.min(autoCols(cw), ids.length);
+    const colW = Math.floor((cw - gap * (cols - 1)) / cols);
+    const rowCount = Math.ceil(ids.length / cols);
 
-    // Greedy least-loaded-bucket distribution — gives each row a
-    // similar total weight so widths balance across rows.
-    const sorted = items.slice().sort((a, b) => b.weight - a.weight);
-    const rows = Array.from({ length: rowCount }, () => ({ items: [], total: 0 }));
-    for (const it of sorted) {
-      let target = 0;
-      for (let i = 1; i < rows.length; i++) {
-        if (rows[i].total < rows[target].total) target = i;
-      }
-      rows[target].items.push(it);
-      rows[target].total += it.weight;
-    }
-
-    const gap = 12;
-    const rowH = Math.floor((ch - gap * (rowCount - 1)) / rowCount);
+    // Fill the visible canvas when the layout fits inside it; past that
+    // keep rows a readable height and let the page carry on downward.
+    const rowH = Math.max(
+      SNAP_FILL_ROW_MIN,
+      Math.min(SNAP_FILL_ROW_MAX, Math.floor((ch - gap * (rowCount - 1)) / rowCount)),
+    );
 
     const newPositions = {};
     const newSizes = {};
-    let y = 0;
     let notepadW = null, notepadPos = null;
-    for (const row of rows) {
-      if (!row.items.length) { y += rowH + gap; continue; }
-      const totalGap = gap * (row.items.length - 1);
-      const usable = cw - totalGap;
-      let x = 0;
-      row.items.forEach((it, i) => {
-        const w = i === row.items.length - 1
-          ? (cw - x)                                              // last fills remainder (avoid sub-pixel gap)
-          : Math.max(220, Math.floor((it.weight / row.total) * usable));
-        if (it.id === '__notepad__') {
-          notepadPos = { x, y };
-          notepadW = w;
-        } else {
-          newPositions[it.id] = { x, y };
-          newSizes[it.id] = { w, h: rowH };
-        }
-        x += w + gap;
-      });
-      y += rowH + gap;
-    }
+    ids.forEach((id, i) => {
+      const col = i % cols;
+      const row = Math.floor(i / cols);
+      // Last column of a full row absorbs the rounding remainder so the
+      // grid's right edge is flush rather than a pixel or two short.
+      const w = col === cols - 1 ? cw - col * (colW + gap) : colW;
+      const x = col * (colW + gap);
+      const y = row * (rowH + gap);
+      if (id === '__notepad__') {
+        notepadPos = { x, y };
+        notepadW = w;
+      } else {
+        newPositions[id] = { x, y };
+        newSizes[id] = { w, h: rowH };
+      }
+    });
 
     update(prev => ({
       ...prev,
