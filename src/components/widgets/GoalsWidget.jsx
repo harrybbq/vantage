@@ -362,29 +362,6 @@ export function BodyGoalBody({ S, update, navigate, userId, hasPro = false, comp
   const [showAccuracy, setShowAccuracy] = useState(false);
   const goal = S.bodyGoal;
 
-  // Pro gate. Deliberately renders a teaser rather than nothing, and
-  // NEVER touches S.bodyGoal — a lapsed subscription must not delete the
-  // target the user set while they were paying. Resubscribe and it's all
-  // still there.
-  if (!hasPro) {
-    return (
-      <div className="gw-locked">
-        <div className="gw-locked-badge">PRO</div>
-        <div className="gw-locked-title">
-          {goal ? `Your ${goal.targetKg} kg target is saved` : 'Set a body target'}
-        </div>
-        <div className="gw-locked-text">
-          {goal
-            ? 'Progress, timeline and session counts come back with Pro. Nothing has been lost.'
-            : 'Track a weight target and see how far along you are, how long is left, and what that is in training sessions.'}
-        </div>
-        {onUpgrade && (
-          <button type="button" className="link-open-btn" onClick={onUpgrade}>Upgrade ↗</button>
-        )}
-      </div>
-    );
-  }
-
   // Live session rates beat the numbers typed at setup — if the user
   // said 3 and has been doing 4, the plan should reflect 4.
   // Runs whenever the widget is mounted for a Pro user, goal or not:
@@ -410,6 +387,34 @@ export function BodyGoalBody({ S, update, navigate, userId, hasPro = false, comp
       ...(intakeAvg ? { intakeAvg } : {}),
     });
   }, [S, goal, intakeAvg]);
+
+  // ── Gates go BELOW every hook, and must stay there ──
+  // This early return used to sit above useIntakeAverage and the two
+  // useMemos. useSubscription resolves asynchronously, so hasPro is
+  // false on the first render and true about a second later — which
+  // changed the hook count between renders, threw React error #310
+  // ("rendered more hooks than during the previous render"), and took
+  // down the whole app: React 18 unmounts the entire root on an
+  // uncaught error, so the user saw the hub for a second and then a
+  // dark screen. Anything conditional belongs after the last hook.
+  if (!hasPro) {
+    return (
+      <div className="gw-locked">
+        <div className="gw-locked-badge">PRO</div>
+        <div className="gw-locked-title">
+          {goal ? `Your ${goal.targetKg} kg target is saved` : 'Set a body target'}
+        </div>
+        <div className="gw-locked-text">
+          {goal
+            ? 'Progress, timeline and session counts come back with Pro. Nothing has been lost.'
+            : 'Track a weight target and see how far along you are, how long is left, and what that is in training sessions.'}
+        </div>
+        {onUpgrade && (
+          <button type="button" className="link-open-btn" onClick={onUpgrade}>Upgrade ↗</button>
+        )}
+      </div>
+    );
+  }
 
   if (!goal || editing) {
     return (
