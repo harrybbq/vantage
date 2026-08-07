@@ -48,6 +48,39 @@
 
 .gw-empty{font-family:var(--mono);font-size:10px;color:var(--text-muted);line-height:1.6;}
 
+/* ── Gauge ────────────────────────────────────────────────────────── */
+.gw-gauge{position:relative;flex:none;}
+.gw-gauge svg{display:block;}
+.gw-gauge-fill{transition:d .5s var(--ease-out,ease);}
+.gw-gauge-mid{position:absolute;inset:0;display:flex;flex-direction:column;
+  align-items:center;justify-content:center;gap:1px;pointer-events:none;}
+.gw-gauge-num{font-family:var(--sans);font-weight:700;color:var(--text);line-height:1;}
+.gw-gauge-sub{font-family:var(--mono);letter-spacing:.6px;color:var(--text-muted);
+  text-transform:uppercase;}
+
+/* Stacked at full size, side-by-side when compact. The side column
+   carries the numbers either way, so the two layouts read the same. */
+.gw-hero{display:flex;flex-direction:column;align-items:center;gap:9px;}
+.gw-hero.is-compact{flex-direction:row;align-items:center;gap:12px;}
+.gw-hero-side{display:flex;flex-direction:column;gap:5px;min-width:0;align-items:center;}
+.gw-hero.is-compact .gw-hero-side{align-items:flex-start;text-align:left;}
+.gw-hero.is-compact .gw-refusal{flex:1;min-width:0;}
+
+.gw-sessions{font-family:var(--mono);font-size:10px;letter-spacing:.4px;color:var(--text-muted);}
+.gw-sessions b{font-family:var(--sans);font-size:15px;font-weight:700;color:var(--text);}
+.gw-nums{display:flex;gap:12px;flex-wrap:wrap;justify-content:center;
+  font-family:var(--mono);font-size:9.5px;letter-spacing:.4px;color:var(--text-muted);}
+.gw-hero.is-compact .gw-nums{flex-direction:column;gap:3px;}
+.gw-nums b{font-family:var(--sans);font-size:12px;color:var(--text);font-weight:700;}
+.gw-nums b.is-rate{color:var(--em);}
+.gw-eta{font-family:var(--mono);font-size:9.5px;letter-spacing:.4px;color:var(--text-mid);
+  text-align:center;line-height:1.6;}
+.gw-hero.is-compact .gw-eta{text-align:left;}
+.gw-eta strong{color:var(--em);}
+.gw-eta-sub{font-family:var(--mono);font-size:8px;color:var(--text-muted);
+  text-align:center;line-height:1.5;opacity:.85;}
+.gw-hero.is-compact .gw-eta-sub{text-align:left;}
+
 /* ── Body goal ────────────────────────────────────────────────────── */
 .gw-goal{display:flex;flex-direction:column;gap:9px;min-height:0;overflow-y:auto;}
 .gw-goal::-webkit-scrollbar{width:4px;}
@@ -126,3 +159,36 @@
 #widgetCanvas [data-react-widget="body-goal"] > .gw-goal,
 #widgetCanvas [data-react-widget="body-goal"] > .gw-setup{flex:1;min-height:0;}
 #widgetCanvas [data-react-widget="goals"] .gw-list{flex:1;min-height:0;}
+
+/* ── Accuracy chip + modal ────────────────────────────────────────── */
+.gw-acc{background:transparent;border:1px solid var(--border);border-radius:5px;
+  padding:2px 6px;cursor:pointer;font-family:var(--mono);font-size:7.5px;
+  letter-spacing:1.2px;font-weight:700;color:var(--text-muted);}
+.gw-acc.is-measured{color:var(--em);border-color:rgba(var(--em-rgb),.45);}
+.gw-refusal-link{display:block;margin-top:6px;}
+
+.gw-modal{width:440px;}
+.gw-modal-lede{font-family:var(--mono);font-size:11px;color:var(--text-muted);
+  line-height:1.7;margin:0 0 18px;}
+.gw-modal-rows{display:flex;flex-direction:column;gap:8px;margin-bottom:18px;}
+.gw-modal-row{display:flex;gap:10px;padding:10px 12px;border-radius:10px;
+  border:1px solid var(--border);align-items:flex-start;}
+.gw-modal-row.is-on{border-color:rgba(var(--em-rgb),.40);background:rgba(var(--em-rgb),.05);}
+.gw-modal-tick{font-size:12px;line-height:1.4;color:var(--text-muted);flex:none;}
+.gw-modal-row.is-on .gw-modal-tick{color:var(--em);}
+.gw-modal-row b{display:block;font-family:var(--sans);font-size:12.5px;font-weight:700;
+  color:var(--text);margin-bottom:2px;}
+.gw-modal-row em{display:block;font-family:var(--mono);font-size:10px;font-style:normal;
+  color:var(--text-muted);line-height:1.6;}
+.gw-modal-note{font-family:var(--mono);font-size:10px;color:var(--text-mid);
+  line-height:1.75;margin-bottom:14px;}
+.gw-modal-note b{color:var(--text);}
+.gw-modal-close{width:100%;margin-top:4px;}
+.gw-how-row b.is-over{color:#d99114;}
+.gw-how-row b.is-under{color:var(--em);}
+.gw-toggle{display:flex;gap:9px;align-items:flex-start;cursor:pointer;padding:8px 9px;
+  border:1px solid var(--border);border-radius:9px;}
+.gw-toggle input{margin:1px 0 0;flex:none;accent-color:var(--em);}
+.gw-toggle b{display:block;font-family:var(--sans);font-size:11px;font-weight:700;color:var(--text);}
+.gw-toggle em{display:block;font-family:var(--mono);font-size:8px;font-style:normal;
+  color:var(--text-muted);line-height:1.6;margin-top:2px;}

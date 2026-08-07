@@ -1,3 +1,4 @@
+import { trainingAdherence } from '../body/goal.js';
 /**
  * Pattern snapshot — extended user state for proactive nudge detection.
  *
@@ -220,6 +221,11 @@ export function buildPatternSnapshot(S, opts = {}) {
   const days = opts.days || 90;
   const today = Date.now();
 
+  // Body-goal adherence, when a target is set. Null otherwise, so the
+  // pattern below simply never fires for users without one.
+  const adh = S.bodyGoal ? trainingAdherence(S, S.bodyGoal) : null;
+  const bodyGoal = adh ? { ...adh, targetKg: S.bodyGoal.targetKg } : null;
+
   const trackers = (S.trackers || []).map(t => {
     const series = dailySeries(t, S.logs || {}, days, today);
     return {
@@ -245,6 +251,7 @@ export function buildPatternSnapshot(S, opts = {}) {
   const consistency = consistencyScore(S.logs || {}, days, today);
 
   return {
+    bodyGoal,
     window: {
       days,
       from_ymd: ymd(new Date(today - (days - 1) * DAY_MS)),
@@ -311,6 +318,18 @@ export function detectPatternsHeuristic(snapshot) {
         out.push(`${t.name} streak broke ${lastHit === 0 ? 'today' : lastHit + ' days ago'} after a ${t.streaks.longest_closed}-day run.`);
       }
     }
+  }
+
+  // 2b. Body goal — training has drifted below the cadence the user
+  //     committed to when they set the target. Phrased as the cost to
+  //     the goal, not as a telling-off: the point is that the timeline
+  //     moves, which is a fact they can act on.
+  if (snapshot.bodyGoal && snapshot.bodyGoal.slacking) {
+    const g = snapshot.bodyGoal;
+    out.push(
+      `Training is down to ${g.recent} sessions a week against the ${g.planned} you set for your ${g.targetKg} kg goal` +
+      (g.shortBy > 0 ? ` — about ${g.shortBy} sessions behind over the last three weeks.` : '.')
+    );
   }
 
   // 3. Consistency drop — last 14 days vs prior 14 days

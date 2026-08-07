@@ -468,7 +468,7 @@ function renderBody(widget, meta, S, update, navigate, userId, hasPro) {
     case 'subscriptions': return <SubscriptionsBody S={S} navigate={navigate} />;
     case 'goals':       return <GoalsBody S={S} picks={widget.picks} compact navigate={navigate} hasPro={hasPro}
       onSetPicks={p => update(prev => ({ ...prev, mobileWidgets: (prev.mobileWidgets || []).map(w => w.id === widget.id ? { ...w, picks: p } : w) }))} />;
-    case 'body-goal':   return <BodyGoalBody S={S} update={update} navigate={navigate} hasPro={hasPro} />;
+    case 'body-goal':   return <BodyGoalBody S={S} update={update} navigate={navigate} userId={userId} hasPro={hasPro} />;
     case 'savings-pots': return <SavingsPotsBody S={S} count={widget.count || 1} picks={widget.picks} navigate={navigate}
       onSetCount={n => update(prev => ({ ...prev, mobileWidgets: (prev.mobileWidgets || []).map(w => w.id === widget.id ? { ...w, count: n } : w) }))}
       onSetPicks={p => update(prev => ({ ...prev, mobileWidgets: (prev.mobileWidgets || []).map(w => w.id === widget.id ? { ...w, picks: p } : w) }))} />;
