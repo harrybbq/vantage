@@ -15,7 +15,8 @@
  * about (and asserted on) without a browser.
  */
 import { useMemo, useState } from 'react';
-import { bodyGoalPlan, refusalCopy, sessionsPerWeek } from '../../lib/body/goal';
+import { bodyGoalPlan, refusalCopy, sessionsPerWeek, trainingCadence, trainingTrackers } from '../../lib/body/goal';
+import { bmrKcal } from '../../lib/burn';
 import './GoalsWidget.css';
 
 const mono = { fontFamily: 'var(--mono)' };
@@ -29,6 +30,44 @@ export function GoalBar({ pct, accent = 'var(--em)', h = 4 }) {
   return (
     <div className="gw-bar" style={{ height: h }}>
       <div className="gw-bar-fill" style={{ width: `${Math.max(0, Math.min(100, pct))}%`, background: accent }} />
+    </div>
+  );
+}
+
+
+/**
+ * Progress gauge — a 270° arc, not a full ring.
+ *
+ * The open bottom is where the caption sits, so the label costs no
+ * extra height. One component at every size: a ring's centred number
+ * stops being readable below about 60px, an arc's doesn't, so the same
+ * SVG serves the 118px hero and the 84px compact form.
+ */
+export function Gauge({ pct, size = 118, stroke = 9, label, sub, accent = 'var(--em)' }) {
+  const r = (size - stroke) / 2, cx = size / 2, SWEEP = 270, START = 135;
+  const pt = deg => {
+    const a = (deg * Math.PI) / 180;
+    return [cx + r * Math.cos(a), cx + r * Math.sin(a)];
+  };
+  const arc = (from, to) => {
+    const [x1, y1] = pt(from), [x2, y2] = pt(to);
+    return `M${x1.toFixed(2)},${y1.toFixed(2)} A${r},${r} 0 ${to - from > 180 ? 1 : 0} 1 ${x2.toFixed(2)},${y2.toFixed(2)}`;
+  };
+  const safe = Math.max(0, Math.min(100, pct || 0));
+  const end = START + (SWEEP * safe) / 100;
+  return (
+    <div className="gw-gauge" style={{ width: size, height: size }}>
+      <svg viewBox={`0 0 ${size} ${size}`} width={size} height={size} aria-hidden="true">
+        <path d={arc(START, START + SWEEP)} fill="none" stroke="var(--border)" strokeWidth={stroke} strokeLinecap="round" />
+        {safe > 0 && (
+          <path className="gw-gauge-fill" d={arc(START, end)} fill="none" stroke={accent}
+                strokeWidth={stroke} strokeLinecap="round" />
+        )}
+      </svg>
+      <div className="gw-gauge-mid">
+        <span className="gw-gauge-num" style={{ fontSize: size * 0.26 }}>{label}</span>
+        {sub && <span className="gw-gauge-sub" style={{ fontSize: Math.max(7, size * 0.085) }}>{sub}</span>}
+      </div>
     </div>
   );
 }
@@ -106,6 +145,7 @@ function Setup({ S, update, onCancel }) {
     targetBodyFat: '',
     gymTrackerId: guessGym ? guessGym.id : '',
     cardioTrackerId: guessCardio ? guessCardio.id : '',
+    dailyKcal: '',
     weeklyWeights: guessGym ? String(Math.round(sessionsPerWeek(S, guessGym.id) || guessGym.weeklyTarget || 3)) : '3',
     weeklyCardio: guessCardio ? String(Math.round(sessionsPerWeek(S, guessCardio.id) || guessCardio.weeklyTarget || 2)) : '2',
   });
@@ -119,6 +159,7 @@ function Setup({ S, update, onCancel }) {
     return days.length ? parseFloat(log[days[days.length - 1]].weight) : null;
   }, [S.vitalsLog]);
 
+  const bmr = useMemo(() => bmrKcal(S), [S]);
   const target = parseFloat(form.targetKg);
   const canSave = target > 0 && target < 400;
 
@@ -131,6 +172,7 @@ function Setup({ S, update, onCancel }) {
         ...(parseFloat(form.targetBodyFat) > 0 ? { targetBodyFat: parseFloat(form.targetBodyFat) } : {}),
         startKg: startKg || target,
         startedAt: new Date().toISOString().slice(0, 10),
+        ...(parseInt(form.dailyKcal, 10) > 0 ? { dailyKcal: parseInt(form.dailyKcal, 10) } : {}),
         weeklyWeights: Math.max(0, parseInt(form.weeklyWeights, 10) || 0),
         weeklyCardio: Math.max(0, parseInt(form.weeklyCardio, 10) || 0),
         ...(form.gymTrackerId ? { gymTrackerId: form.gymTrackerId } : {}),
@@ -191,6 +233,22 @@ function Setup({ S, update, onCancel }) {
         <div className="gw-hint">Pre-filled from your “{guessGym.name}” tracker.</div>
       )}
 
+      {/* The one number the model can't infer. With it we can estimate a
+          timeline on day one instead of making the user log weight for
+          a fortnight first; without it the widget still works, it just
+          waits for a measured trend. */}
+      <label className="gw-field">
+        <span className="gw-label">Daily calorie target</span>
+        <input className="gw-input" type="number" inputMode="numeric" min="800" max="6000"
+               value={form.dailyKcal} onChange={e => set('dailyKcal', e.target.value)}
+               placeholder="e.g. 2300 — optional" />
+      </label>
+      <div className="gw-hint">
+        {bmr
+          ? `We estimate you burn about ${Math.round(bmr * 1.55).toLocaleString()} kcal a day at ${form.weeklyWeights || 0}+${form.weeklyCardio || 0} sessions a week. Eating under that is what moves the target.`
+          : 'Set up the Calories widget (height, age, sex) and we can estimate your daily burn too.'}
+      </div>
+
       <div className="gw-actions">
         <button type="button" className="link-open-btn" disabled={!canSave} onClick={save}>Save goal</button>
         {onCancel && <button type="button" className="gw-textbtn" onClick={onCancel}>Cancel</button>}
@@ -233,11 +291,12 @@ export function BodyGoalBody({ S, update, navigate, hasPro = false, compact = fa
   // said 3 and has been doing 4, the plan should reflect 4.
   const plan = useMemo(() => {
     if (!goal) return { ok: false, reason: 'no-goal' };
-    const w = goal.gymTrackerId ? sessionsPerWeek(S, goal.gymTrackerId) : null;
-    const c = goal.cardioTrackerId ? sessionsPerWeek(S, goal.cardioTrackerId) : null;
+    // What the user actually does, across every tracker that reads like
+    // training — including ones created after the goal was set.
+    const { weights, cardio } = trainingCadence(S, goal);
     return bodyGoalPlan(S, {
-      ...(w != null && w > 0 ? { weightsPerWeek: w } : {}),
-      ...(c != null && c > 0 ? { cardioPerWeek: c } : {}),
+      ...(weights > 0 ? { weightsPerWeek: weights } : {}),
+      ...(cardio > 0 ? { cardioPerWeek: cardio } : {}),
     });
   }, [S, goal]);
 
@@ -253,8 +312,11 @@ export function BodyGoalBody({ S, update, navigate, hasPro = false, compact = fa
           <span className="gw-goal-type">{goal.type}</span>
           <button type="button" className="gw-textbtn gw-edit" onClick={() => setEditing(true)}>Edit</button>
         </div>
-        {plan.pct != null && <GoalBar pct={plan.pct} />}
-        <div className="gw-refusal">{refusalCopy(plan.reason, plan)}</div>
+        <div className="gw-hero is-compact">
+          <Gauge pct={plan.pct || 0} size={84} stroke={7}
+                 label={plan.pct != null ? `${plan.pct}%` : '—'} sub="to goal" />
+          <div className="gw-refusal">{refusalCopy(plan.reason, plan)}</div>
+        </div>
       </div>
     );
   }
@@ -266,34 +328,51 @@ export function BodyGoalBody({ S, update, navigate, hasPro = false, compact = fa
           <span className="gw-goal-pct is-gold">At goal ✦</span>
           <button type="button" className="gw-textbtn gw-edit" onClick={() => setEditing(true)}>Edit</button>
         </div>
-        <GoalBar pct={100} accent="var(--gold,#d4af37)" />
-        <div className="gw-hint">{plan.current.toFixed(1)} kg · target {plan.target} kg</div>
+        <div className="gw-hero is-compact">
+          <Gauge pct={100} size={84} stroke={7} label="100%" sub="reached" accent="var(--gold,#d4af37)" />
+          <div className="gw-hint">{plan.current.toFixed(1)} kg · target {plan.target} kg</div>
+        </div>
       </div>
     );
   }
 
   const rateLabel = `${plan.rate > 0 ? '+' : '−'}${Math.abs(plan.rate).toFixed(2)} kg/wk`;
+  // Named in the How block so auto-detection isn't magic — the user can
+  // see exactly which trackers are feeding their progress.
+  const ids = trainingTrackers(S, goal);
+  const trackerNames = [...ids.weights, ...ids.cardio]
+    .map(id => (S.trackers || []).find(t => t.id === id))
+    .filter(Boolean).map(t => t.name);
+  const sessionBits = [
+    plan.weightSessions > 0 ? `${plan.weightSessions} gym` : null,
+    plan.cardioSessions > 0 ? `${plan.cardioSessions} cardio` : null,
+  ].filter(Boolean);
 
   return (
     <div className="gw-goal">
-      <div className="gw-goal-head">
-        <span className="gw-goal-pct">{plan.pct}<span className="gw-goal-pct-sign">%</span></span>
-        <span className="gw-goal-sub">to goal</span>
-        <span className="gw-goal-weeks">≈ {plan.weeks} wk{plan.weeks === 1 ? '' : 's'}</span>
-      </div>
-      <GoalBar pct={plan.pct} />
-
-      {!compact && (
-        <div className="gw-stats">
-          {plan.weightSessions > 0 && (
-            <div className="gw-stat"><b>{plan.weightSessions}</b><i>WEIGHTS</i><em>sessions</em></div>
-          )}
-          {plan.cardioSessions > 0 && (
-            <div className="gw-stat"><b>{plan.cardioSessions}</b><i>CARDIO</i><em>sessions</em></div>
-          )}
-          <div className="gw-stat"><b>{plan.weeks}</b><i>WEEKS</i><em>to goal</em></div>
+      {/* Compact stacks the gauge beside the numbers; full size puts it
+          on top. Same component, same reading either way. */}
+      <div className={'gw-hero' + (compact ? ' is-compact' : '')}>
+        <Gauge pct={plan.pct} size={compact ? 84 : 118} stroke={compact ? 7 : 9}
+               label={`${plan.pct}%`} sub="sessions done" />
+        <div className="gw-hero-side">
+          <div className="gw-sessions">
+            <b>{plan.sessionsDone}</b> of <b>{plan.sessionsTotal}</b> sessions
+          </div>
+          <div className="gw-eta">
+            <strong>{plan.sessionsRemaining}</strong> to go
+            {sessionBits.length > 0 && <> · {sessionBits.join(' + ')}</>}
+          </div>
+          <div className="gw-nums">
+            <span><b>{plan.current.toFixed(1)}</b> now</span>
+            <span><b className="is-rate">{rateLabel.replace(' kg/wk', '')}</b> kg/wk</span>
+            <span><b>{plan.target.toFixed(1)}</b> goal</span>
+          </div>
+          <div className="gw-eta-sub">
+            ≈ {plan.weeks} week{plan.weeks === 1 ? '' : 's'} at {(plan.weightsPerWeek + plan.cardioPerWeek).toFixed(1)}/wk
+          </div>
         </div>
-      )}
+      </div>
 
       {/* The workings. Without these the counts above are a number the
           app pulled from nowhere, and the first time reality diverges
@@ -301,13 +380,40 @@ export function BodyGoalBody({ S, update, navigate, hasPro = false, compact = fa
       <div className="gw-how">
         <div className="gw-how-head">How</div>
         <div className="gw-how-row"><span>Now → target</span><b>{plan.current.toFixed(1)} → {plan.target} kg</b></div>
-        <div className="gw-how-row"><span>Measured rate</span><b>{rateLabel}</b></div>
-        <div className="gw-how-row"><span>Fitted over</span><b>{plan.ratePoints} weigh-ins · last {plan.rateWindowDays}d</b></div>
+        <div className="gw-how-row">
+          <span>{plan.source === 'measured' ? 'Measured rate' : 'Projected rate'}</span><b>{rateLabel}</b>
+        </div>
+        {plan.source === 'measured' ? (
+          <div className="gw-how-row"><span>Fitted over</span><b>{plan.ratePoints} weigh-ins · last {plan.rateWindowDays}d</b></div>
+        ) : (
+          <>
+            <div className="gw-how-row"><span>Est. daily burn</span><b>{plan.tdee?.toLocaleString()} kcal</b></div>
+            <div className="gw-how-row"><span>Your intake</span><b>{plan.intake?.toLocaleString()} kcal</b></div>
+            <div className="gw-how-row"><span>Daily deficit</span><b>{plan.dailyDeficit?.toLocaleString()} kcal</b></div>
+          </>
+        )}
+        <div className="gw-how-row"><span>Weight progress</span><b>{plan.weightPct}%</b></div>
+        {trackerNames.length > 0 && (
+          <div className="gw-how-row"><span>Counting</span><b>{trackerNames.join(', ')}</b></div>
+        )}
+        {plan.adherence && (
+          <div className="gw-how-row"><span>Plan vs actual</span>
+            <b>{plan.adherence.planned} → {plan.adherence.recent} /wk</b></div>
+        )}
         {(plan.weightsPerWeek > 0 || plan.cardioPerWeek > 0) && (
           <div className="gw-how-row"><span>Your cadence</span>
             <b>{plan.weightsPerWeek.toFixed(1)} + {plan.cardioPerWeek.toFixed(1)} /wk</b></div>
         )}
       </div>
+
+      {plan.adherence && plan.adherence.slacking && (
+        <div className="gw-note is-warn">
+          <span className="gw-note-icon">▲</span>
+          <span>Training has slipped to {plan.adherence.recent}/wk against the {plan.adherence.planned} you
+            planned{plan.adherence.shortBy > 0 ? ` — about ${plan.adherence.shortBy} sessions behind` : ''}.
+            The timeline above already reflects that.</span>
+        </div>
+      )}
 
       {plan.tooFast && (
         <div className="gw-note is-warn">
@@ -322,7 +428,9 @@ export function BodyGoalBody({ S, update, navigate, hasPro = false, compact = fa
         {navigate && <button type="button" className="gw-textbtn" onClick={() => navigate('track')}>Log weight</button>}
       </div>
       <div className="gw-disclaimer">
-        Sessions are your timeline in your own cadence, not a claim they caused the change.
+        {plan.source === 'projected'
+          ? 'Projected from your calorie target and estimated daily burn (7,700 kcal ≈ 1 kg of fat). Real loss usually slows as you get lighter — this switches to your measured rate once you have a couple of weeks of weigh-ins. '
+          : 'Measured from your own weigh-ins. '}
         An estimate from your logged data — not medical advice.
       </div>
     </div>
