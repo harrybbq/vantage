@@ -112,6 +112,36 @@ function rectsIntersect(a, b) {
   return a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y;
 }
 
+// ── Canvas height ──
+// Absolutely-positioned widgets contribute nothing to their parent's
+// height, so the plane stopped dead at its min-height and anything
+// dragged or grown past that hung over whatever followed on the page.
+// Re-measure the lowest widget whenever one moves and push the floor
+// down to meet it — the plane then extends south for as long as the
+// user keeps going, the same way the achievement board does.
+const CANVAS_PAD = 48;
+function canvasFloor() {
+  return Math.max(420, (typeof window !== 'undefined' ? window.innerHeight : 900) - 180);
+}
+function growCanvas(canvas) {
+  if (!canvas || canvas.style.display === 'grid') return;
+  let bottom = 0;
+  canvas.querySelectorAll('.widget-wrapper, .notepad-wrapper').forEach(w => {
+    const b = w.offsetTop + w.offsetHeight;
+    if (b > bottom) bottom = b;
+  });
+  canvas.style.minHeight = Math.max(canvasFloor(), bottom + CANVAS_PAD) + 'px';
+}
+
+// Column count for the free-position canvas. Deliberately the same
+// breakpoints as the `#widgetCanvas` container queries in index.css, so
+// a widget added in snap mode and one auto-placed here land in the same
+// number of columns.
+const AUTO_GAP = 14;
+function autoCols(cw) {
+  return cw > 660 ? 3 : cw > 430 ? 2 : 1;
+}
+
 function useWidgetDrag(canvasRef, S, update, snapRef) {
   const makeDraggable = useCallback((wrapper, linkId) => {
     const handle = wrapper.querySelector('[data-drag]');
@@ -201,12 +231,24 @@ function useWidgetDrag(canvasRef, S, update, snapRef) {
       // rAF-coalesce moves so we never write style more than once per frame.
       let rafId = 0;
       let pending = null;
+      // Grown monotonically during the gesture from the dragged widget's
+      // own bottom edge — cheap (no DOM query, no extra layout read) and
+      // enough to keep the plane ahead of the pointer. The full
+      // re-measure, which also accounts for neighbours pushed down by
+      // snap, runs once on drop.
+      // Seeded from the viewport floor as well as any px min-height
+      // already applied: the snapping→absolute conversion above rewrites
+      // cssText, leaving a `calc()` that parseFloat can't read, and
+      // starting from 0 would briefly shrink the plane under the pointer.
+      let liveFloor = Math.max(canvasFloor(), parseFloat(canvas.style.minHeight) || 0);
       function flush() {
         rafId = 0;
         if (!pending) return;
         wrapper.style.left = pending.x + 'px';
         wrapper.style.top  = pending.y + 'px';
         if (snapOthers) resolveSnap(pending.x, pending.y);
+        const need = pending.y + wrapperH + CANVAS_PAD;
+        if (need > liveFloor) { liveFloor = need; canvas.style.minHeight = need + 'px'; }
         pending = null;
       }
       function onMove(ev) {
@@ -230,6 +272,7 @@ function useWidgetDrag(canvasRef, S, update, snapRef) {
           return { ...prev, widgetPositions: wp };
         });
         if (snapOthers) snapOthers.forEach(o => o.el.classList.remove('snap-push'));
+        growCanvas(canvas);
         document.removeEventListener('pointermove', onMove);
         document.removeEventListener('pointerup', onUp);
         document.removeEventListener('pointercancel', onUp);
@@ -689,16 +732,29 @@ export default function HubSection({ S, update, active, onOpenModal, onOpenWaitl
       // Refused: a neighbour would drop below the size at which its own
       // contents stop fitting. Clamp the drag instead of letting that
       // happen — the promise is that a shrunken widget stays readable.
+      // Refused: a neighbour would drop below the size at which its own
+      // contents stop fitting. Clamp ONLY when the widget has actually
+      // gone past the allowed edge — applying it unconditionally yanked
+      // the widget to the limit on every frame of the gesture, including
+      // frames where the pointer was still well inside it, which read as
+      // snapping to a fixed size rather than stopping at a wall.
       if (!ok && maxExtent != null) {
-        if (side === 'r') wrapper.style.width = Math.max(MIN_W, maxExtent - moving.x) + 'px';
-        else if (side === 'l') {
-          const right = moving.x + moving.w;
-          wrapper.style.left = maxExtent + 'px';
-          wrapper.style.width = Math.max(MIN_W, right - maxExtent) + 'px';
+        if (side === 'r') {
+          if (moving.x + moving.w > maxExtent) {
+            wrapper.style.width = Math.max(MIN_W, maxExtent - moving.x) + 'px';
+          }
+        } else if (side === 'l') {
+          if (moving.x < maxExtent) {
+            const right = moving.x + moving.w;
+            wrapper.style.left = maxExtent + 'px';
+            wrapper.style.width = Math.max(MIN_W, right - maxExtent) + 'px';
+          }
         } else if (side === 't') {
-          const bottom = moving.y + moving.h;
-          wrapper.style.top = maxExtent + 'px';
-          wrapper.style.height = Math.max(MIN_H, bottom - maxExtent) + 'px';
+          if (moving.y < maxExtent) {
+            const bottom = moving.y + moving.h;
+            wrapper.style.top = maxExtent + 'px';
+            wrapper.style.height = Math.max(MIN_H, bottom - maxExtent) + 'px';
+          }
         }
         return;
       }
@@ -719,6 +775,8 @@ export default function HubSection({ S, update, active, onOpenModal, onOpenWaitl
         o.el.style.width = r.w + 'px';
         o.el.style.height = r.h + 'px';
       }
+      // Neighbours pushed down can now sit below the plane's floor.
+      growCanvas(canvasRef.current);
     });
     ro.observe(wrapper);
 
@@ -761,16 +819,29 @@ export default function HubSection({ S, update, active, onOpenModal, onOpenWaitl
               // the clamp is the second line of defence.
               const newTop = Math.max(0, Math.min(ev.clientY - canvasRect().top, bottomAnchor - minH));
               wrapper.style.top = newTop + 'px';
-              const canvasH = canvasRef.current?.clientHeight || Infinity;
-              wrapper.style.height = Math.min(bottomAnchor - newTop, canvasH) + 'px';
+              // No canvas-height cap. It was defence against the drag and
+              // resize both firing, which the inert handle now prevents —
+              // and it capped the height at a CONSTANT, so past that point
+              // the edge stopped following the pointer and looked like it
+              // had snapped to a fixed size. newTop is already clamped to
+              // [0, bottomAnchor - minH], so the height is bounded anyway.
+              wrapper.style.height = (bottomAnchor - newTop) + 'px';
             } else { // 'b'
               wrapper.style.height = Math.max(minH, ev.clientY - canvasRect().top - startTop) + 'px';
+              // Downward growth has no wall — let the plane follow, or
+              // the bottom edge runs off the end of the canvas.
+              const need = wrapper.offsetTop + wrapper.offsetHeight + CANVAS_PAD;
+              const cv = canvasRef.current;
+              if (cv && need > (parseFloat(cv.style.minHeight) || canvasFloor())) {
+                cv.style.minHeight = need + 'px';
+              }
             }
           }
           function up() {
             document.removeEventListener('pointermove', mv);
             document.removeEventListener('pointerup', up);
             commitResize();
+            growCanvas(canvasRef.current);
           }
           document.addEventListener('pointermove', mv);
           document.addEventListener('pointerup', up);
@@ -817,6 +888,12 @@ export default function HubSection({ S, update, active, onOpenModal, onOpenWaitl
     canvas.innerHTML = '';
 
     const hasPositions = Object.keys(S.widgetPositions).length > 0;
+    // Widgets added AFTER the canvas went free-position have no saved
+    // spot. They used to all land on the same default coordinate, one
+    // on top of the next — the three-across rule only ever applied to
+    // the pristine grid, which a single drag permanently leaves. These
+    // get auto-placed into the next free column below (see placeNew).
+    const unplaced = [];
 
     if (hasPositions) {
       canvas.style.cssText = 'position:relative;flex:1;min-height:calc(100vh - 180px);display:block;';
@@ -839,6 +916,7 @@ export default function HubSection({ S, update, active, onOpenModal, onOpenWaitl
       if (hasPositions) {
         const pos = S.widgetPositions[link.id];
         wrapper.style.cssText = `position:absolute;min-width:280px;max-width:360px;width:300px;user-select:none;left:${pos ? pos.x : 0}px;top:${pos ? pos.y : 0}px;`;
+        if (!pos) unplaced.push({ id: link.id, wrapper });
       }
 
       const island = document.createElement('div');
@@ -917,6 +995,7 @@ export default function HubSection({ S, update, active, onOpenModal, onOpenWaitl
       if (hasPositions) {
         const pos = S.widgetPositions[hw.id];
         wrapper.style.cssText = `position:absolute;min-width:280px;max-width:360px;width:300px;user-select:none;left:${pos ? pos.x : 40}px;top:${pos ? pos.y : 40}px;`;
+        if (!pos) unplaced.push({ id: hw.id, wrapper });
       }
 
       const island = document.createElement('div');
@@ -995,6 +1074,61 @@ export default function HubSection({ S, update, active, onOpenModal, onOpenWaitl
     if (S.notepadText || S.notepadPos || S._showNotepad) {
       renderNotepadInCanvas(canvas, S, update, hasPositions);
     }
+
+    // ── Auto-place widgets added to a free-position canvas ──
+    // Masonry into `autoCols(width)` columns: each new widget goes to
+    // whichever column currently ends highest, so three fill a row and
+    // the fourth starts the next one. Deferred a frame because the
+    // React islands mounted just above have not laid out yet and their
+    // height decides where the widget below them starts.
+    if (unplaced.length) {
+      requestAnimationFrame(() => {
+        const live = unplaced.filter(u => u.wrapper.isConnected);
+        if (!live.length) return;
+        const cw = canvas.clientWidth;
+        if (!cw) return;
+        const cols = autoCols(cw);
+        const colW = Math.floor((cw - AUTO_GAP * (cols - 1)) / cols);
+        const newIds = new Set(live.map(u => u.id));
+
+        // Where each column currently ends. A widget counts towards a
+        // column if it overlaps it horizontally at all — widgets the
+        // user has dragged do not respect column boundaries.
+        const colBottom = new Array(cols).fill(0);
+        canvas.querySelectorAll('.widget-wrapper, .notepad-wrapper').forEach(w => {
+          if (newIds.has(w.dataset.linkId)) return;
+          const x = w.offsetLeft, x2 = x + w.offsetWidth, b = w.offsetTop + w.offsetHeight + AUTO_GAP;
+          for (let c = 0; c < cols; c++) {
+            const cx = c * (colW + AUTO_GAP);
+            if (x < cx + colW && x2 > cx) colBottom[c] = Math.max(colBottom[c], b);
+          }
+        });
+
+        const newPos = {}, newSizes = {};
+        for (const u of live) {
+          let c = 0;
+          for (let i = 1; i < cols; i++) if (colBottom[i] < colBottom[c]) c = i;
+          const x = c * (colW + AUTO_GAP), y = colBottom[c];
+          u.wrapper.style.left = x + 'px';
+          u.wrapper.style.top = y + 'px';
+          u.wrapper.style.width = colW + 'px';
+          colBottom[c] = y + u.wrapper.offsetHeight + AUTO_GAP;
+          newPos[u.id] = { x, y };
+          // Width only. Pinning the height here would freeze the widget
+          // at whatever its body happened to measure one frame after
+          // mount, which for the async widgets is a loading skeleton.
+          newSizes[u.id] = { ...(S.widgetSizes || {})[u.id], w: colW };
+        }
+        growCanvas(canvas);
+        update(prev => ({
+          ...prev,
+          widgetPositions: { ...(prev.widgetPositions || {}), ...newPos },
+          widgetSizes:     { ...(prev.widgetSizes || {}),     ...newSizes },
+        }));
+      });
+    }
+
+    growCanvas(canvas);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [S.links, S.hubWidgets, S.holidays, S.habits, S.widgetPositions, S.notepadText, S.notepadPos, S.notepadWidth, S._showNotepad, S.hubSnap]);
 
