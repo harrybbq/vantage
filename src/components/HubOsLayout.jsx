@@ -517,49 +517,6 @@ export function OsCardioPanel({ profile = {}, onSaveWeight, onLogBurn }) {
   );
 }
 
-// ── Panel: Activity strip ─────────────────────────────────────────────────
-export function OsActivityPanel({ S }) {
-  const latestCoins = (S.coinHistory || []).slice(-3).reverse();
-  const habitCount = (S.habits || []).length;
-  const streak = S.currentStreak || 0;
-
-  return (
-    <OsPanel label="Activity" innerPadding={false}>
-      <div className="os-activity">
-        {streak > 0 && (
-          <div className="os-activity-item">
-            <div className="os-activity-dot live" />
-            <div className="os-activity-text"><strong>Streak</strong> · {streak} days</div>
-          </div>
-        )}
-        {(S.coins || 0) > 0 && (
-          <div className="os-activity-item">
-            <div className="os-activity-dot gold" />
-            <div className="os-activity-text"><strong>{(S.coins || 0).toLocaleString()} coins</strong> · balance</div>
-          </div>
-        )}
-        {habitCount > 0 && (
-          <div className="os-activity-item">
-            <div className="os-activity-dot" />
-            <div className="os-activity-text"><strong>{habitCount}</strong> habits tracked</div>
-          </div>
-        )}
-        {latestCoins.slice(0, 1).map((c, i) => (
-          <div key={i} className="os-activity-item">
-            <div className="os-activity-dot" />
-            <div className="os-activity-text">
-              Last reward · <strong>+{c.amount || c.coins || 0}</strong>
-            </div>
-          </div>
-        ))}
-        <div className="os-activity-meta">
-          {new Date().toLocaleDateString('en-GB', { month: 'short', day: 'numeric' }).toUpperCase()}
-        </div>
-      </div>
-    </OsPanel>
-  );
-}
-
 // ── Main OS layout ────────────────────────────────────────────────────────
 export default function HubOsLayout({
   S, update, canvasRef,
@@ -648,10 +605,6 @@ export default function HubOsLayout({
       </div>
 
       {/* ── BOTTOM ROW ── */}
-      <div className="hub-os-bottom">
-        <OsActivityPanel S={S} />
-      </div>
-
       {moduleMenu.menuNode}
     </div>
   );
