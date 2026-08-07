@@ -300,7 +300,7 @@ function AddLinkOnlyModal({ openId, onClose, onAdd }) {
   const [form, setForm] = useState({ name: '', url: '', icon: '', color: '#1a7a4a', notes: '' });
   function submit() {
     if (!form.name || !form.url) return;
-    const ghMatch = form.url.match(/github\.com\/([^\/\?#]+)/);
+    const ghMatch = form.url.match(/github\.com\/([^/?#]+)/);
     const ghUser = ghMatch ? ghMatch[1] : null;
     onAdd({ id: 'l' + Date.now(), name: form.name, url: form.url, icon: form.icon || '🔗', color: form.color, notes: form.notes, ghUser });
     setForm({ name: '', url: '', icon: '', color: '#1a7a4a', notes: '' });

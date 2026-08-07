@@ -38,7 +38,7 @@ const cache = new Map();         // symbol -> { at, quote }
 const SEARCH_CACHE_MS = 10 * 60_000;   // ticker names don't move
 const searchCache = new Map();   // 'search:<q>' -> { at, results }
 
-const clean = s => String(s || '').toUpperCase().replace(/[^A-Z0-9.\-]/g, '').slice(0, 12);
+const clean = s => String(s || '').toUpperCase().replace(/[^A-Z0-9.-]/g, '').slice(0, 12);
 
 async function quoteFor(symbol, key) {
   const hit = cache.get(symbol);

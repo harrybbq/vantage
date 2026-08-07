@@ -124,7 +124,7 @@ export default function MarketBody({ S, update, compact = false, hasPro: hasProP
   }
   function addSymbol(e) {
     e.preventDefault();
-    const sym = adding.toUpperCase().replace(/[^A-Z0-9.\-]/g, '').slice(0, 12);
+    const sym = adding.toUpperCase().replace(/[^A-Z0-9.-]/g, '').slice(0, 12);
     if (!sym) return;
     update?.(prev => {
       const list = Array.isArray(prev.marketSymbols) && prev.marketSymbols.length

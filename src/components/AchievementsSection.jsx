@@ -61,6 +61,23 @@ function recalcLocks(achievements, connections) {
 // ── SVG bezier connection ────────────────────────────────────────────
 
 function ConnPath({ from, to, fromCompleted, toCompleted, locked, connKey, onRemove }) {
+  // Hooks first, guard second. These three used to sit forty lines
+  // below `if (!from || !to) return null`, so any render where an
+  // endpoint resolved to undefined — a deleted achievement, a
+  // connection pointing at something not yet loaded — changed the hook
+  // count and threw React #310, which unmounts the entire app root.
+  // Found by rules-of-hooks on its first run.
+  //
+  // Re-trigger fill animation when parent flips false → true. Don't
+  // re-fire when un-completing, otherwise the animation re-runs on
+  // every toggle pair.
+  const prevFrom = useRef(fromCompleted);
+  const [animKey, setAnimKey] = useState(0);
+  useEffect(() => {
+    if (fromCompleted && !prevFrom.current) setAnimKey(k => k + 1);
+    prevFrom.current = fromCompleted;
+  }, [fromCompleted]);
+
   if (!from || !to) return null;
   // Attach to the card's BORDER, not to a fixed point inside it. Every
   // line used to start and end 44px in from the top of a card, so each
@@ -99,16 +116,6 @@ function ConnPath({ from, to, fromCompleted, toCompleted, locked, connKey, onRem
 
   const bothDone = fromCompleted && toCompleted;
   const parentDone = fromCompleted && !toCompleted;
-
-  // Re-trigger fill animation when parent flips false → true. Don't
-  // re-fire when un-completing, otherwise the animation re-runs on
-  // every toggle pair.
-  const prevFrom = useRef(fromCompleted);
-  const [animKey, setAnimKey] = useState(0);
-  useEffect(() => {
-    if (fromCompleted && !prevFrom.current) setAnimKey(k => k + 1);
-    prevFrom.current = fromCompleted;
-  }, [fromCompleted]);
 
   const arrowAt = (color, opacity = 0.9) => {
     // Angle from the curve's actual end tangent (P3 − C2) so the
