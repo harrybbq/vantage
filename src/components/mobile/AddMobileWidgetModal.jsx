@@ -40,6 +40,8 @@ export default function AddMobileWidgetModal({ openId, onClose, existingTypes, o
     // User app presets from shared config (owner-only ones filtered).
     ...visibleAppPresets().map(p => p.id),
     'vitals',
+    'goals',
+    'body-goal',
     'body',
     'mood',
     'macros',

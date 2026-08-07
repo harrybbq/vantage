@@ -4,6 +4,7 @@ import { motion } from 'framer-motion';
 import { VitalsBody, BurnBody, MacrosBody } from './mobile/MobileWidget';
 import { BodyBody, SubscriptionsBody, MoodBody } from './widgets/LifeWidgets';
 import { SavingsPotsBody, SavingsProjectionBody } from './savings/SavingsWidgets';
+import { GoalsBody, BodyGoalBody } from './widgets/GoalsWidget';
 import { tradingWidgetAvailable, TRADING_WIDGET_BUILD_EXCLUDED } from '../lib/trading/enabled';
 import MarketBody from './widgets/MarketWidget';
 import NewsBody from './widgets/NewsWidget';
@@ -405,12 +406,21 @@ export default function HubSection({ S, update, active, onOpenModal, onOpenWaitl
   function setHubWidgetCount(id, n) {
     update(prev => ({ ...prev, hubWidgets: (prev.hubWidgets || []).map(w => w.id === id ? { ...w, count: n } : w) }));
   }
+  // Which items a widget instance shows. Additive: widgets with no
+  // `picks` keep behaving exactly as before until the user opens the
+  // picker, so nothing changes under existing hubs.
+  function setHubWidgetPicks(id, picks) {
+    update(prev => ({ ...prev, hubWidgets: (prev.hubWidgets || []).map(w => w.id === id ? { ...w, picks } : w) }));
+  }
   function reactWidgetEl(hw) {
     switch (hw.type) {
       case 'vitals':   return <VitalsBody S={S} update={update} />;
       case 'macros':   return <MacrosBody S={S} userId={userId} navigate={onNavigate} />;
       case 'calories': return <BurnBody S={S} update={update} userId={userId} />;
-      case 'savings-pots': return <SavingsPotsBody S={S} count={hw.count || 1} onSetCount={n => setHubWidgetCount(hw.id, n)} navigate={onNavigate} />;
+      case 'savings-pots': return <SavingsPotsBody S={S} count={hw.count || 1} picks={hw.picks}
+        onSetCount={n => setHubWidgetCount(hw.id, n)} onSetPicks={p => setHubWidgetPicks(hw.id, p)} navigate={onNavigate} />;
+      case 'goals':         return <GoalsBody S={S} picks={hw.picks} onSetPicks={p => setHubWidgetPicks(hw.id, p)} navigate={onNavigate} />;
+      case 'body-goal':     return <BodyGoalBody S={S} update={update} navigate={onNavigate} />;
       case 'savings-projection': return <SavingsProjectionBody S={S} navigate={onNavigate} />;
       case 'body':          return <BodyBody S={S} update={update} navigate={onNavigate} />;
       case 'mood':          return <MoodBody S={S} update={update} navigate={onNavigate} />;
@@ -860,6 +870,17 @@ export default function HubSection({ S, update, active, onOpenModal, onOpenWaitl
   // dead until something else forced a re-render.
   }, [S.widgetSizes, S.widgetZ, S.hubSnap, update, snapRef]);
 
+  // Structural signature of the widget list: which widgets exist, of
+  // what type, in what order. Per-widget SETTINGS (count, picks) are
+  // deliberately excluded — they ride on the same array, so depending on
+  // the array itself meant ticking a box in a widget's own picker
+  // rebuilt the entire canvas, unmounted every React island, and threw
+  // away the picker's open/closed state. The user had to reopen it after
+  // every single tick. Settings changes reach the island through the
+  // sync effect above, which re-renders the mounted root with the fresh
+  // hw — no rebuild needed.
+  const hubWidgetSig = (S.hubWidgets || []).map(w => `${w.id}:${w.type}`).join(',');
+
   // Render all widgets imperatively into the canvas
   const renderCanvas = useCallback(() => {
     const canvas = canvasRef.current;
@@ -1024,6 +1045,8 @@ export default function HubSection({ S, update, active, onOpenModal, onOpenWaitl
         'savings-pots':       { eyebrow: 'WIDGET · SAVINGS',    icon: '◒', title: 'Savings pots', sub: 'Progress',      body: () => `<div data-react-widget="savings-pots"></div>` },
         'savings-projection': { eyebrow: 'WIDGET · PROJECTION', icon: '⌁', title: 'Projection',   sub: 'Net · balance', body: () => `<div data-react-widget="savings-projection"></div>` },
         'trading':            { eyebrow: 'WIDGET · TRADING',    icon: '↗', title: 'Trading',      sub: 'Agents · P/L',  body: () => `<div data-react-widget="trading"></div>` },
+        goals:                { eyebrow: 'WIDGET · GOALS',      icon: '◈', title: 'Goals',        sub: 'Pinned progress', body: () => `<div data-react-widget="goals"></div>` },
+        'body-goal':          { eyebrow: 'WIDGET · BODY GOAL',  icon: '◎', title: 'Body goal',    sub: 'Target · plan',   body: () => `<div data-react-widget="body-goal"></div>` },
         'market':             { eyebrow: 'WIDGET · MARKET',     icon: '↗', title: 'Market',       sub: 'Delayed quotes', body: () => `<div data-react-widget="market"></div>` },
         'news':               { eyebrow: 'WIDGET · NEWS',       icon: '❑', title: 'News',         sub: 'Today\u2019s headlines', body: () => `<div data-react-widget="news"></div>` },
         body:          { eyebrow: 'WIDGET · BODY', icon: '◍', title: 'Body',          sub: '7-day avg · goal',      body: () => `<div data-react-widget="body"></div>` },
@@ -1169,7 +1192,7 @@ export default function HubSection({ S, update, active, onOpenModal, onOpenWaitl
   // fresh device still makes it appear, while ordinary typing changes
   // nothing here. Width is applied to the live element by the user's own
   // resize; re-rendering to set the width it already has is pure loss.
-  }, [S.links, S.hubWidgets, S.holidays, S.habits, S.widgetPositions, !!S.notepadText, S.notepadPos, S._showNotepad, S.hubSnap]);
+  }, [S.links, hubWidgetSig, S.holidays, S.habits, S.widgetPositions, !!S.notepadText, S.notepadPos, S._showNotepad, S.hubSnap]);
 
   useEffect(() => {
     if (active) renderCanvas();
