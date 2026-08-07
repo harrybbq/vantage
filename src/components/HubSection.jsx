@@ -419,8 +419,8 @@ export default function HubSection({ S, update, active, onOpenModal, onOpenWaitl
       case 'calories': return <BurnBody S={S} update={update} userId={userId} />;
       case 'savings-pots': return <SavingsPotsBody S={S} count={hw.count || 1} picks={hw.picks}
         onSetCount={n => setHubWidgetCount(hw.id, n)} onSetPicks={p => setHubWidgetPicks(hw.id, p)} navigate={onNavigate} />;
-      case 'goals':         return <GoalsBody S={S} picks={hw.picks} onSetPicks={p => setHubWidgetPicks(hw.id, p)} navigate={onNavigate} />;
-      case 'body-goal':     return <BodyGoalBody S={S} update={update} navigate={onNavigate} />;
+      case 'goals':         return <GoalsBody S={S} picks={hw.picks} onSetPicks={p => setHubWidgetPicks(hw.id, p)} navigate={onNavigate} hasPro={hasPro} />;
+      case 'body-goal':     return <BodyGoalBody S={S} update={update} navigate={onNavigate} hasPro={hasPro} onUpgrade={onUpgrade} />;
       case 'savings-projection': return <SavingsProjectionBody S={S} navigate={onNavigate} />;
       case 'body':          return <BodyBody S={S} update={update} navigate={onNavigate} />;
       case 'mood':          return <MoodBody S={S} update={update} navigate={onNavigate} />;

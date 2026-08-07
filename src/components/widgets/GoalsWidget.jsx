@@ -202,9 +202,32 @@ function Setup({ S, update, onCancel }) {
   );
 }
 
-export function BodyGoalBody({ S, update, navigate, compact = false }) {
+export function BodyGoalBody({ S, update, navigate, hasPro = false, compact = false, onUpgrade }) {
   const [editing, setEditing] = useState(false);
   const goal = S.bodyGoal;
+
+  // Pro gate. Deliberately renders a teaser rather than nothing, and
+  // NEVER touches S.bodyGoal — a lapsed subscription must not delete the
+  // target the user set while they were paying. Resubscribe and it's all
+  // still there.
+  if (!hasPro) {
+    return (
+      <div className="gw-locked">
+        <div className="gw-locked-badge">PRO</div>
+        <div className="gw-locked-title">
+          {goal ? `Your ${goal.targetKg} kg target is saved` : 'Set a body target'}
+        </div>
+        <div className="gw-locked-text">
+          {goal
+            ? 'Progress, timeline and session counts come back with Pro. Nothing has been lost.'
+            : 'Track a weight target and see how far along you are, how long is left, and what that is in training sessions.'}
+        </div>
+        {onUpgrade && (
+          <button type="button" className="link-open-btn" onClick={onUpgrade}>Upgrade ↗</button>
+        )}
+      </div>
+    );
+  }
 
   // Live session rates beat the numbers typed at setup — if the user
   // said 3 and has been doing 4, the plan should reflect 4.
@@ -316,7 +339,7 @@ export function BodyGoalBody({ S, update, navigate, compact = false }) {
  * this app are binary and inventing a percentage for them would be a
  * number with no meaning behind it.
  */
-export function pinnableGoals(S) {
+export function pinnableGoals(S, hasPro = false) {
   const out = [];
 
   if (S.bodyGoal && S.bodyGoal.targetKg) {
@@ -327,9 +350,14 @@ export function pinnableGoals(S) {
       tag: 'Body · measurable',
       pct: plan.ok ? (plan.atGoal ? 100 : plan.pct) : (plan.pct || 0),
       accent: 'var(--em)',
+      // The distance to target is ordinary information the user can
+      // read on the Track page, so it stays free. The TIMELINE is the
+      // Pro projection — without this the free Goals widget handed out
+      // the exact number the Body Goal widget is gated on.
       meta: plan.ok
-        ? (plan.atGoal ? 'At goal ✦' : `${Math.abs(plan.current - plan.target).toFixed(1)} kg to go · ≈ ${plan.weeks} wks`)
-        : refusalCopy(plan.reason, plan),
+        ? (plan.atGoal ? 'At goal ✦'
+          : `${Math.abs(plan.current - plan.target).toFixed(1)} kg to go${hasPro ? ` · ≈ ${plan.weeks} wks` : ''}`)
+        : (hasPro ? refusalCopy(plan.reason, plan) : `${S.bodyGoal.targetKg} kg target`),
     });
   }
 
@@ -371,9 +399,9 @@ export function pinnableGoals(S) {
   return out;
 }
 
-export function GoalsBody({ S, picks, onSetPicks, navigate, compact = false }) {
+export function GoalsBody({ S, picks, onSetPicks, navigate, hasPro = false, compact = false }) {
   const [open, setOpen] = useState(false);
-  const items = useMemo(() => pinnableGoals(S), [S]);
+  const items = useMemo(() => pinnableGoals(S, hasPro), [S, hasPro]);
   // No stored picks → the first few, so a freshly added widget shows
   // something rather than an empty box asking to be configured.
   const picked = picks && picks.length ? picks : items.slice(0, compact ? 2 : 3).map(i => i.id);
