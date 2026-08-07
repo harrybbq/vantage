@@ -6696,3 +6696,25 @@ button:active:not(:disabled),
    legible. Width tracks the widest visible stroke (2.5) plus a margin. */
 .ach-conn-casing{stroke:var(--ach-canvas-bg);stroke-width:6;stroke-linecap:round;}
 .ach-canvas-wrap.is-transparent .ach-conn-casing{stroke:transparent;}
+
+/* ── Hub widget canvas: three across ──────────────────────────────────
+   Three columns, stepping down only when the canvas genuinely can't
+   hold them. A CONTAINER query, not a media query: the canvas sits in a
+   flexible middle column, so viewport width says nothing useful about
+   how wide the canvas actually is — a 1400px window still leaves it
+   ~620px once the side columns take their share. */
+.os-widgets, .hub-canvas-wrap { container-type: inline-size; }
+#widgetCanvas { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+@container (max-width: 660px) {
+  #widgetCanvas { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@container (max-width: 430px) {
+  #widgetCanvas { grid-template-columns: 1fr; }
+}
+/* No container above it (the cream hub) — fall back to viewport width. */
+@media (max-width: 1100px) {
+  .hub-links-col:not(.os-widgets-body)#widgetCanvas { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 700px) {
+  .hub-links-col:not(.os-widgets-body)#widgetCanvas { grid-template-columns: 1fr; }
+}
