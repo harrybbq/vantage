@@ -371,10 +371,6 @@ html[data-hub-os] .hub-os-main > .os-col::-webkit-scrollbar-thumb {
   border-radius: 2px;
 }
 
-html[data-hub-os] .hub-os-bottom {
-  flex-shrink: 0;
-}
-
 /* ── Profile panel ── */
 html[data-hub-os] .os-profile {
   display: flex;
@@ -780,47 +776,6 @@ html[data-hub-os] .os-coach-body > * {
 }
 
 /* ── Bottom row — Activity strip ── */
-html[data-hub-os] .os-activity {
-  display: flex;
-  align-items: center;
-  gap: 18px;
-  padding: 8px 14px;
-  flex-wrap: wrap;
-}
-html[data-hub-os] .os-activity-item {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-html[data-hub-os] .os-activity-dot {
-  width: 6px; height: 6px;
-  border-radius: 50%;
-  background: var(--os-border-hi);
-  flex-shrink: 0;
-}
-html[data-hub-os] .os-activity-dot.live {
-  background: var(--em);
-  box-shadow: 0 0 6px var(--em);
-  animation: osBlink 2s infinite;
-}
-html[data-hub-os] .os-activity-dot.gold { background: var(--gold); }
-html[data-hub-os] .os-activity-text {
-  font-family: var(--mono);
-  font-size: 9.5px;
-  color: var(--text-muted);
-  letter-spacing: 0.4px;
-}
-html[data-hub-os] .os-activity-text strong {
-  color: var(--text-mid);
-  font-weight: 500;
-}
-html[data-hub-os] .os-activity-meta {
-  margin-left: auto;
-  font-family: var(--mono);
-  font-size: 9px;
-  color: var(--text-muted);
-  letter-spacing: 1px;
-}
 
 /* Hide the old hub-layout content when OS theme is active on the hub */
 html[data-hub-os] #hub > .hub-layout,
