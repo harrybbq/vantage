@@ -11,6 +11,7 @@ import './holiday.css'
 // what the mobile shopping layout depends on. Don't reorder.
 import './shop.css'
 import App from './App.jsx'
+import RootErrorBoundary from './components/RootErrorBoundary.jsx'
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -25,7 +26,9 @@ const queryClient = new QueryClient({
 createRoot(document.getElementById('root')).render(
   <StrictMode>
     <QueryClientProvider client={queryClient}>
-      <App />
+      <RootErrorBoundary>
+        <App />
+      </RootErrorBoundary>
     </QueryClientProvider>
   </StrictMode>,
 )
@@ -47,14 +50,31 @@ if ('serviceWorker' in navigator && import.meta.env.PROD) {
       .catch(err => console.warn('SW registration failed:', err));
   });
 
+  // One reload per version, ever. Nothing previously capped this: every
+  // SW_UPDATED broadcast scheduled another reload, so any situation
+  // where the worker re-activates on each load — an eviction, a
+  // half-applied update, iOS dropping the controller between
+  // navigations — becomes an unbreakable loop of "app appears for a
+  // second, screen goes dark, repeat", with no way out from inside the
+  // app. The reload exists to stop clients pinning old code; it does
+  // not need to fire twice for the same version to achieve that.
+  const RELOADED_KEY = 'vb_sw_reloaded_for';
   let hadController = !!navigator.serviceWorker.controller;
   navigator.serviceWorker.addEventListener('message', event => {
     if (event.data?.type === 'SW_UPDATED' && hadController) {
-      // Give pending writes ~2s to land then reload. Using location.reload
-      // (no force flag) is enough — the SW we just activated will serve
-      // the new index.html on the navigation request.
-      console.info('[SW] new version active, reloading in 2s:', event.data.version);
-      setTimeout(() => window.location.reload(), 2000);
+      const version = event.data.version || 'unknown';
+      let already = null;
+      try { already = sessionStorage.getItem(RELOADED_KEY); } catch { /* private mode */ }
+      if (already === version) {
+        console.info('[SW] already reloaded for', version, '— not looping');
+      } else {
+        try { sessionStorage.setItem(RELOADED_KEY, version); } catch { /* private mode */ }
+        // Give pending writes ~2s to land then reload. Using location.reload
+        // (no force flag) is enough — the SW we just activated will serve
+        // the new index.html on the navigation request.
+        console.info('[SW] new version active, reloading in 2s:', version);
+        setTimeout(() => window.location.reload(), 2000);
+      }
     }
     hadController = true;
   });
