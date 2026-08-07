@@ -10,7 +10,24 @@
 .nws-locked{display:inline-flex;align-items:center;gap:5px;font-family:var(--mono);font-size:8.5px;
   letter-spacing:.8px;text-transform:uppercase;color:var(--text-muted);opacity:.85;}
 
-.nws-list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;}
+/* ── Scrolling headlines ──────────────────────────────────────────────
+   Twelve headlines at 52px thumbnails is ~700px of list, and every
+   ancestor up to .link-island is overflow:hidden — so the overflow was
+   simply cut off, with no way to reach the rest.
+
+   The list scrolls itself. A descendant with its own overflow-y and a
+   bounded height scrolls fine inside a hidden ancestor; what it needs is
+   the bound, which is what was missing. The max-height here is the
+   fallback for contexts with no height to inherit (mobile stack, the
+   snap grid); inside the hub canvas the flex chain below replaces it so
+   the list tracks whatever height the widget was dragged to. */
+.nws-list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;
+  max-height:min(420px,60vh);overflow-y:auto;overscroll-behavior:contain;
+  /* Room for the scrollbar so it never sits on top of the thumbnails. */
+  padding-right:2px;}
+.nws-list::-webkit-scrollbar{width:4px;}
+.nws-list::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px;}
+.nws-list::-webkit-scrollbar-track{background:transparent;}
 .nws-list li{border-bottom:1px solid color-mix(in srgb,var(--text) 6%,transparent);}
 .nws-list li:last-child{border-bottom:0;}
 .nws-list a{display:flex;gap:9px;align-items:flex-start;padding:7px 0;text-decoration:none;}
@@ -33,3 +50,13 @@
 .nws-note,.nws-capped{font-family:var(--mono);font-size:10px;color:var(--text-muted);line-height:1.6;padding:4px 0;}
 .nws-note-sub{display:block;font-size:9px;margin-top:3px;opacity:.85;}
 .nws-capped{font-size:8.5px;letter-spacing:.4px;opacity:.8;}
+
+/* Inside the hub canvas the widget has a real, user-dragged height. The
+   existing chain (#widgetCanvas .widget-wrapper > .link-island →
+   .hub-widget-body → [data-react-widget], index.css) already carries
+   flex:1;min-height:0 down to the widget root; .nws just has to keep
+   passing it on, and then the list bounds itself against the card
+   instead of a fixed number — drag the widget taller, see more news.
+   Same opt-in .sw-pots makes. */
+#widgetCanvas [data-react-widget="news"] > .nws{flex:1;min-height:0;}
+#widgetCanvas [data-react-widget="news"] .nws-list{flex:1;min-height:0;max-height:none;}

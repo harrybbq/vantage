@@ -4,6 +4,7 @@ import { motion } from 'framer-motion';
 import { VitalsBody, BurnBody, MacrosBody } from './mobile/MobileWidget';
 import { BodyBody, SubscriptionsBody, MoodBody } from './widgets/LifeWidgets';
 import { SavingsPotsBody, SavingsProjectionBody } from './savings/SavingsWidgets';
+import { GoalsBody, BodyGoalBody } from './widgets/GoalsWidget';
 import { tradingWidgetAvailable, TRADING_WIDGET_BUILD_EXCLUDED } from '../lib/trading/enabled';
 import MarketBody from './widgets/MarketWidget';
 import NewsBody from './widgets/NewsWidget';
@@ -405,12 +406,21 @@ export default function HubSection({ S, update, active, onOpenModal, onOpenWaitl
   function setHubWidgetCount(id, n) {
     update(prev => ({ ...prev, hubWidgets: (prev.hubWidgets || []).map(w => w.id === id ? { ...w, count: n } : w) }));
   }
+  // Which items a widget instance shows. Additive: widgets with no
+  // `picks` keep behaving exactly as before until the user opens the
+  // picker, so nothing changes under existing hubs.
+  function setHubWidgetPicks(id, picks) {
+    update(prev => ({ ...prev, hubWidgets: (prev.hubWidgets || []).map(w => w.id === id ? { ...w, picks } : w) }));
+  }
   function reactWidgetEl(hw) {
     switch (hw.type) {
       case 'vitals':   return <VitalsBody S={S} update={update} />;
       case 'macros':   return <MacrosBody S={S} userId={userId} navigate={onNavigate} />;
       case 'calories': return <BurnBody S={S} update={update} userId={userId} />;
-      case 'savings-pots': return <SavingsPotsBody S={S} count={hw.count || 1} onSetCount={n => setHubWidgetCount(hw.id, n)} navigate={onNavigate} />;
+      case 'savings-pots': return <SavingsPotsBody S={S} count={hw.count || 1} picks={hw.picks}
+        onSetCount={n => setHubWidgetCount(hw.id, n)} onSetPicks={p => setHubWidgetPicks(hw.id, p)} navigate={onNavigate} />;
+      case 'goals':         return <GoalsBody S={S} picks={hw.picks} onSetPicks={p => setHubWidgetPicks(hw.id, p)} navigate={onNavigate} />;
+      case 'body-goal':     return <BodyGoalBody S={S} update={update} navigate={onNavigate} />;
       case 'savings-projection': return <SavingsProjectionBody S={S} navigate={onNavigate} />;
       case 'body':          return <BodyBody S={S} update={update} navigate={onNavigate} />;
       case 'mood':          return <MoodBody S={S} update={update} navigate={onNavigate} />;
@@ -860,6 +870,17 @@ export default function HubSection({ S, update, active, onOpenModal, onOpenWaitl
   // dead until something else forced a re-render.
   }, [S.widgetSizes, S.widgetZ, S.hubSnap, update, snapRef]);
 
+  // Structural signature of the widget list: which widgets exist, of
+  // what type, in what order. Per-widget SETTINGS (count, picks) are
+  // deliberately excluded — they ride on the same array, so depending on
+  // the array itself meant ticking a box in a widget's own picker
+  // rebuilt the entire canvas, unmounted every React island, and threw
+  // away the picker's open/closed state. The user had to reopen it after
+  // every single tick. Settings changes reach the island through the
+  // sync effect above, which re-renders the mounted root with the fresh
+  // hw — no rebuild needed.
+  const hubWidgetSig = (S.hubWidgets || []).map(w => `${w.id}:${w.type}`).join(',');
+
   // Render all widgets imperatively into the canvas
   const renderCanvas = useCallback(() => {
     const canvas = canvasRef.current;
@@ -869,6 +890,29 @@ export default function HubSection({ S, update, active, onOpenModal, onOpenWaitl
       try { root.unmount(); } catch { /* already gone */ }
     }
     reactRootsRef.current.clear();
+
+    // ── Preserve the caret across the rebuild ──
+    // Everything below is destroyed and recreated, so whatever the user
+    // was typing into loses focus, caret and selection. Commit any
+    // in-flight notepad edit first (else the rebuild renders the stale
+    // text from S), remember where the caret was, and put it back after.
+    // Restoring rather than skipping the rebuild keeps the canvas honest
+    // — the widgets still redraw, the user just isn't thrown out of the
+    // box they were typing in.
+    flushNotepadSave();
+    // The flush commits to React state, but setS is asynchronous — this
+    // render still sees the OLD S, so rebuilding the textarea from
+    // S.notepadText would show stale text, and the next debounced save
+    // would then write that stale text back over the good state. Carry
+    // the live value across the wipe by hand instead of trusting the
+    // state round-trip to have landed.
+    const liveNotepad = document.getElementById('notepadTextarea')?.value ?? null;
+    const focused = document.activeElement;
+    const caret = focused && focused.id && canvas.contains(focused)
+      && (focused.tagName === 'TEXTAREA' || focused.tagName === 'INPUT')
+      ? { id: focused.id, start: focused.selectionStart, end: focused.selectionEnd, scroll: focused.scrollTop }
+      : null;
+
     canvas.innerHTML = '';
 
     const hasPositions = Object.keys(S.widgetPositions).length > 0;
@@ -1001,6 +1045,8 @@ export default function HubSection({ S, update, active, onOpenModal, onOpenWaitl
         'savings-pots':       { eyebrow: 'WIDGET · SAVINGS',    icon: '◒', title: 'Savings pots', sub: 'Progress',      body: () => `<div data-react-widget="savings-pots"></div>` },
         'savings-projection': { eyebrow: 'WIDGET · PROJECTION', icon: '⌁', title: 'Projection',   sub: 'Net · balance', body: () => `<div data-react-widget="savings-projection"></div>` },
         'trading':            { eyebrow: 'WIDGET · TRADING',    icon: '↗', title: 'Trading',      sub: 'Agents · P/L',  body: () => `<div data-react-widget="trading"></div>` },
+        goals:                { eyebrow: 'WIDGET · GOALS',      icon: '◈', title: 'Goals',        sub: 'Pinned progress', body: () => `<div data-react-widget="goals"></div>` },
+        'body-goal':          { eyebrow: 'WIDGET · BODY GOAL',  icon: '◎', title: 'Body goal',    sub: 'Target · plan',   body: () => `<div data-react-widget="body-goal"></div>` },
         'market':             { eyebrow: 'WIDGET · MARKET',     icon: '↗', title: 'Market',       sub: 'Delayed quotes', body: () => `<div data-react-widget="market"></div>` },
         'news':               { eyebrow: 'WIDGET · NEWS',       icon: '❑', title: 'News',         sub: 'Today\u2019s headlines', body: () => `<div data-react-widget="news"></div>` },
         body:          { eyebrow: 'WIDGET · BODY', icon: '◍', title: 'Body',          sub: '7-day avg · goal',      body: () => `<div data-react-widget="body"></div>` },
@@ -1059,6 +1105,27 @@ export default function HubSection({ S, update, active, onOpenModal, onOpenWaitl
       renderNotepadInCanvas(canvas, S, update, hasPositions);
     }
 
+    // Restore any edit that hadn't made the round trip through state yet.
+    if (liveNotepad != null) {
+      const ta = document.getElementById('notepadTextarea');
+      if (ta && ta.value !== liveNotepad) {
+        ta.value = liveNotepad;
+        const cc = document.getElementById('notepadCharCount');
+        if (cc) cc.textContent = liveNotepad.length + ' chars';
+      }
+    }
+
+    // Put the caret back in the element the user was typing in. Same id,
+    // same offsets — the rebuild recreates elements with stable ids.
+    if (caret) {
+      const el = document.getElementById(caret.id);
+      if (el && canvas.contains(el)) {
+        el.focus({ preventScroll: true });
+        try { el.setSelectionRange(caret.start, caret.end); } catch { /* type doesn't support it */ }
+        el.scrollTop = caret.scroll;
+      }
+    }
+
     // ── Auto-place widgets added to a free-position canvas ──
     // Masonry into `autoCols(width)` columns: each new widget goes to
     // whichever column currently ends highest, so three fill a row and
@@ -1114,7 +1181,18 @@ export default function HubSection({ S, update, active, onOpenModal, onOpenWaitl
 
     growCanvas(canvas);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [S.links, S.hubWidgets, S.holidays, S.habits, S.widgetPositions, S.notepadText, S.notepadPos, S.notepadWidth, S._showNotepad, S.hubSnap]);
+  // `!!S.notepadText`, not the text itself — and no notepadWidth at all.
+  // Both were in here as raw values, so the notepad's own debounced save
+  // (600ms after any typing pause) and its own ResizeObserver each
+  // changed a dependency, re-ran this callback, and wiped the canvas
+  // including the textarea being typed into. The notepad was kicking the
+  // user out of the notepad. What this render actually needs to know is
+  // only whether a notepad should EXIST — which is a boolean, so
+  // clearing the text still makes it disappear, and text arriving on a
+  // fresh device still makes it appear, while ordinary typing changes
+  // nothing here. Width is applied to the live element by the user's own
+  // resize; re-rendering to set the width it already has is pure loss.
+  }, [S.links, hubWidgetSig, S.holidays, S.habits, S.widgetPositions, !!S.notepadText, S.notepadPos, S._showNotepad, S.hubSnap]);
 
   useEffect(() => {
     if (active) renderCanvas();
@@ -1330,7 +1408,30 @@ async function loadLeaderboardIntoWidget(hwId) {
 }
 
 // ── Notepad in canvas ──
+// The pending debounced save, plus the textarea it belongs to. Both are
+// module-level because the canvas destroys and rebuilds the element:
+// a timer left holding the OLD textarea would fire after the rebuild and
+// write that dead element's value over whatever the user has typed into
+// the new one since. flushNotepadSave() is called before every wipe.
 let _notepadSaveTimer = null;
+let _notepadPendingSave = null;
+
+/**
+ * Commit any in-flight notepad edit immediately.
+ *
+ * Called at the top of renderCanvas, before `canvas.innerHTML = ''`.
+ * Without it the 600ms debounce can straddle a rebuild, and the loser is
+ * whatever the user typed in between — this is their note text, so the
+ * cost of getting it wrong is lost data, not a cosmetic glitch.
+ */
+function flushNotepadSave() {
+  if (!_notepadSaveTimer) return;
+  clearTimeout(_notepadSaveTimer);
+  _notepadSaveTimer = null;
+  const fn = _notepadPendingSave;
+  _notepadPendingSave = null;
+  fn?.();
+}
 
 function renderNotepadInCanvas(canvas, S, update, hasPositions) {
   if (document.getElementById('notepadWrapper')) return;
@@ -1385,9 +1486,18 @@ function renderNotepadInCanvas(canvas, S, update, hasPositions) {
     const ind = document.getElementById('notepadSavedIndicator');
     if (ind) { ind.textContent = 'Saving…'; ind.classList.remove('saved'); }
     clearTimeout(_notepadSaveTimer);
-    _notepadSaveTimer = setTimeout(() => {
-      update(prev => ({ ...prev, notepadText: ta.value }));
+    // Held so flushNotepadSave() can run it early if the canvas is about
+    // to be rebuilt out from under this textarea.
+    _notepadPendingSave = () => {
+      const text = ta.value;
+      update(prev => (prev.notepadText === text ? prev : { ...prev, notepadText: text }));
       if (ind) { ind.textContent = '✓ Saved'; ind.classList.add('saved'); setTimeout(() => { ind.textContent = 'Auto-saved'; ind.classList.remove('saved'); }, 1600); }
+    };
+    _notepadSaveTimer = setTimeout(() => {
+      _notepadSaveTimer = null;
+      const fn = _notepadPendingSave;
+      _notepadPendingSave = null;
+      fn?.();
     }, 600);
   });
 
@@ -1409,9 +1519,16 @@ function renderNotepadInCanvas(canvas, S, update, hasPositions) {
     });
   });
 
-  // Resize observer
+  // Resize observer.
+  // ResizeObserver fires once immediately on observe(), so the un-guarded
+  // version committed a width on every single render — including the
+  // first, where it took notepadWidth from undefined to 380. Bail when
+  // nothing actually changed, or the notepad schedules a cloud save (and
+  // formerly a full canvas rebuild) just by existing.
   const ro = new ResizeObserver(() => {
-    update(prev => ({ ...prev, notepadWidth: wrapper.offsetWidth }));
+    const w = wrapper.offsetWidth;
+    if (!w) return;
+    update(prev => ((prev.notepadWidth || 380) === w ? prev : { ...prev, notepadWidth: w }));
   });
   ro.observe(wrapper);
 

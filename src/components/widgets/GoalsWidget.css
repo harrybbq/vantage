@@ -1,0 +1,121 @@
+/* Goals + body-goal widgets. Mirrors the tone of the other widget
+   bodies: mono eyebrows, sans values, no colour that isn't carrying
+   meaning. */
+
+.gw-bar{border-radius:4px;background:var(--border);overflow:hidden;}
+.gw-bar-fill{height:100%;border-radius:4px;transition:width .4s var(--ease-out,ease);}
+
+/* ── Pick chip + list ─────────────────────────────────────────────── */
+.gw-chip{width:auto !important;padding:0 8px !important;display:inline-flex !important;
+  align-items:center;gap:5px;}
+.gw-chip-caret{font-size:9px;opacity:.8;display:inline-block;transition:transform .15s ease;}
+
+.gw-picklist{display:flex;flex-direction:column;gap:8px;min-height:0;}
+.gw-picklist-head{font-family:var(--mono);font-size:8.5px;letter-spacing:1.4px;
+  text-transform:uppercase;color:var(--text-muted);}
+.gw-picklist-scroll{display:flex;flex-direction:column;gap:5px;
+  max-height:min(200px,42vh);overflow-y:auto;overscroll-behavior:contain;padding-right:2px;}
+.gw-picklist-scroll::-webkit-scrollbar{width:4px;}
+.gw-picklist-scroll::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px;}
+.gw-picklist-note{font-family:var(--mono);font-size:8px;color:var(--text-muted);line-height:1.5;}
+.gw-done{align-self:flex-start;}
+
+.gw-pickrow{display:flex;align-items:center;gap:9px;padding:7px 8px;border-radius:8px;
+  border:1px solid var(--border);background:transparent;cursor:pointer;text-align:left;width:100%;}
+.gw-pickrow.is-on{border-color:var(--em);background:rgba(var(--em-rgb),.08);}
+.gw-pickbox{width:15px;height:15px;flex:none;border-radius:4px;border:1px solid var(--border);
+  color:#fff;font-size:10px;line-height:14px;text-align:center;}
+.gw-pickbox.is-on{border-color:var(--em);background:var(--em);}
+.gw-pickrow-text{display:flex;flex-direction:column;gap:1px;min-width:0;flex:1;}
+.gw-pickrow-name{font-family:var(--sans);font-size:11px;font-weight:600;color:var(--text);
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.gw-pickrow-tag{font-family:var(--mono);font-size:8px;letter-spacing:.4px;color:var(--text-muted);}
+
+/* ── Goals list ───────────────────────────────────────────────────── */
+.gw-goals{position:relative;display:flex;flex-direction:column;min-height:0;}
+.gw-list{display:flex;flex-direction:column;gap:9px;min-height:0;
+  overflow-y:auto;overscroll-behavior:contain;}
+/* Reserve the chip's row so the first item never sits under it. */
+.gw-list.has-chip{padding-top:26px;}
+.gw-list::-webkit-scrollbar{width:4px;}
+.gw-list::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px;}
+.gw-item{display:flex;flex-direction:column;gap:4px;}
+.gw-item-head{display:flex;align-items:baseline;gap:8px;}
+.gw-item-name{font-family:var(--sans);font-size:11.5px;font-weight:700;color:var(--text);
+  flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.gw-item-pct{font-family:var(--mono);font-size:10px;font-weight:700;}
+.gw-item-meta{font-family:var(--mono);font-size:8.5px;letter-spacing:.4px;color:var(--text-muted);}
+
+.gw-empty{font-family:var(--mono);font-size:10px;color:var(--text-muted);line-height:1.6;}
+
+/* ── Body goal ────────────────────────────────────────────────────── */
+.gw-goal{display:flex;flex-direction:column;gap:9px;min-height:0;overflow-y:auto;}
+.gw-goal::-webkit-scrollbar{width:4px;}
+.gw-goal::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px;}
+.gw-goal-head{display:flex;align-items:baseline;gap:8px;}
+.gw-goal-pct{font-family:var(--sans);font-size:22px;font-weight:700;color:var(--text);line-height:1;}
+.gw-goal-pct.is-gold{color:var(--gold,#d4af37);font-size:16px;}
+.gw-goal-pct-sign{font-size:12px;}
+.gw-goal-sub,.gw-goal-type{font-family:var(--mono);font-size:9px;letter-spacing:.5px;
+  color:var(--text-muted);text-transform:uppercase;}
+.gw-goal-target{font-family:var(--sans);font-size:17px;font-weight:700;color:var(--text);}
+.gw-goal-weeks{margin-left:auto;font-family:var(--mono);font-size:9.5px;font-weight:700;color:var(--em);}
+
+.gw-stats{display:flex;gap:8px;}
+.gw-stat{flex:1;min-width:0;padding:8px 6px;border-radius:9px;border:1px solid var(--border);
+  display:flex;flex-direction:column;align-items:center;gap:2px;}
+.gw-stat b{font-family:var(--sans);font-size:19px;font-weight:700;color:var(--text);line-height:1;}
+.gw-stat i{font-family:var(--mono);font-size:7.5px;letter-spacing:1px;color:var(--em);font-style:normal;}
+.gw-stat em{font-family:var(--mono);font-size:7.5px;color:var(--text-muted);font-style:normal;}
+
+.gw-how{display:flex;flex-direction:column;gap:4px;padding:8px 9px;border-radius:9px;
+  border:1px solid var(--border);background:rgba(128,128,128,.06);}
+.gw-how-head{font-family:var(--mono);font-size:8px;letter-spacing:1.2px;text-transform:uppercase;
+  color:var(--text-muted);}
+.gw-how-row{display:flex;gap:8px;font-family:var(--mono);font-size:8.5px;}
+.gw-how-row span{color:var(--text-muted);flex:1;min-width:0;}
+.gw-how-row b{color:var(--text);font-weight:700;white-space:nowrap;}
+
+.gw-refusal{font-family:var(--mono);font-size:9.5px;color:var(--text-mid);line-height:1.6;}
+
+.gw-note{display:flex;gap:7px;padding:8px 9px;border-radius:8px;
+  font-family:var(--mono);font-size:8.5px;color:var(--text-mid);line-height:1.6;}
+.gw-note.is-warn{border:1px solid rgba(217,145,20,.35);background:rgba(217,145,20,.07);}
+.gw-note-icon{color:#d99114;font-size:11px;line-height:1.3;flex:none;}
+
+.gw-foot{display:flex;gap:12px;align-items:center;}
+.gw-foot-btn{align-self:flex-start;}
+.gw-textbtn{background:none;border:0;padding:0;cursor:pointer;font-family:var(--mono);
+  font-size:9px;letter-spacing:.5px;color:var(--em);text-decoration:underline;
+  text-underline-offset:2px;}
+.gw-edit{margin-left:auto;}
+.gw-disclaimer{font-family:var(--mono);font-size:7.5px;color:var(--text-muted);line-height:1.6;
+  opacity:.85;}
+
+/* ── Setup form ───────────────────────────────────────────────────── */
+.gw-setup{display:flex;flex-direction:column;gap:10px;min-height:0;overflow-y:auto;}
+.gw-setup::-webkit-scrollbar{width:4px;}
+.gw-setup::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px;}
+.gw-row{display:flex;gap:8px;}
+.gw-field{display:flex;flex-direction:column;gap:4px;flex:1;min-width:0;}
+.gw-label{font-family:var(--mono);font-size:8px;letter-spacing:1.1px;text-transform:uppercase;
+  color:var(--text-muted);}
+.gw-input{width:100%;box-sizing:border-box;padding:7px 9px;border-radius:8px;
+  border:1px solid var(--border);background:transparent;color:var(--text);
+  font-family:var(--mono);font-size:11.5px;}
+.gw-input:focus{outline:none;border-color:var(--em);}
+.gw-seg{display:flex;gap:4px;}
+.gw-seg-btn{flex:1;padding:7px 4px;border-radius:8px;cursor:pointer;border:1px solid var(--border);
+  background:transparent;color:var(--text-mid);font-family:var(--mono);font-size:9.5px;
+  letter-spacing:.4px;font-weight:700;}
+.gw-seg-btn.is-on{border-color:var(--em);background:rgba(var(--em-rgb),.10);color:var(--em);}
+.gw-hint{font-family:var(--mono);font-size:8px;color:var(--text-muted);line-height:1.5;}
+.gw-actions{display:flex;gap:12px;align-items:center;}
+
+/* Inside the hub canvas the card has a real, user-dragged height —
+   keep passing it down so these bodies scroll against the card rather
+   than being clipped by it. Same opt-in .sw-pots and .nws make. */
+#widgetCanvas [data-react-widget="goals"] > .gw-goals,
+#widgetCanvas [data-react-widget="body-goal"] > .gw-goal,
+#widgetCanvas [data-react-widget="body-goal"] > .gw-setup{flex:1;min-height:0;}
+#widgetCanvas [data-react-widget="goals"] .gw-list{flex:1;min-height:0;}

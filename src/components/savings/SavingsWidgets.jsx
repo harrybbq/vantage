@@ -8,6 +8,7 @@
  *                           axis and Cash / Savings line toggles
  */
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { PickList } from '../widgets/GoalsWidget';
 
 function money(n) {
   const neg = n < 0;
@@ -47,20 +48,59 @@ function Donut({ pct, color, label, sub }) {
   );
 }
 
-export function SavingsPotsBody({ S, count = 1, onSetCount, navigate }) {
+export function SavingsPotsBody({ S, count = 1, picks, onSetCount, onSetPicks, navigate }) {
   const goals = (S.savings || []).filter(g => (g.target || 0) > 0);
   const max = Math.max(1, goals.length);
-  const n = Math.min(Math.max(1, count || 1), max);
-  const shown = goals.slice(0, n);
+  const [picking, setPicking] = useState(false);
 
-  // Stepper — any count from 1 up to how many goals exist.
-  const stepper = onSetCount && max > 1 ? (
+  // Which pots to show. `picks` is the user's explicit choice; without
+  // it we fall back to the old first-N behaviour so existing widgets
+  // look identical until someone opens the picker. That fallback is the
+  // bug being fixed — "the first N, whichever they happened to be" is
+  // exactly what left users unable to choose — but it has to stay as
+  // the default so nobody's hub rearranges itself on deploy.
+  const chosen = (picks || []).filter(id => goals.some(g => g.id === id));
+  const shown = chosen.length ? goals.filter(g => chosen.includes(g.id))
+                              : goals.slice(0, Math.min(Math.max(1, count || 1), max));
+  const n = shown.length;
+
+  const stepper = onSetPicks && max > 1 ? (
+    <div className="sw-count" onClick={e => e.stopPropagation()}>
+      <button type="button" className="sw-count-step sw-count-pick" onClick={e => { e.stopPropagation(); setPicking(p => !p); }}
+              aria-expanded={picking} aria-label="Choose which pots to show">
+        <span className="sw-count-n">{n}</span>
+        <span className="sw-count-caret" style={{ transform: picking ? 'rotate(180deg)' : 'none' }}>▾</span>
+      </button>
+    </div>
+  ) : onSetCount && max > 1 ? (
     <div className="sw-count" onClick={e => e.stopPropagation()}>
       <button type="button" className="sw-count-step" disabled={n <= 1} onClick={() => onSetCount(n - 1)} aria-label="Fewer pots">−</button>
       <span className="sw-count-n">{n}</span>
       <button type="button" className="sw-count-step" disabled={n >= max} onClick={() => onSetCount(n + 1)} aria-label="More pots">+</button>
     </div>
   ) : null;
+
+  // The picker replaces the body while open. The fill-column layout
+  // below is untouched — the only thing that changed is WHICH pots
+  // reach it.
+  if (picking) {
+    const current = chosen.length ? chosen : shown.map(g => g.id);
+    return (
+      <div className="sw-pots" onClick={e => e.stopPropagation()}>
+        {stepper}
+        <PickList
+          items={goals.map(g => ({ id: g.id, name: `${g.icon || '💰'} ${g.name}`, tag: `${money(g.current || 0)} of ${money(g.target)}` }))}
+          picked={current}
+          onToggle={id => {
+            const next = current.includes(id) ? current.filter(x => x !== id) : [...current, id];
+            // Never leave the widget with nothing to draw.
+            if (next.length) onSetPicks(next);
+          }}
+          onDone={() => setPicking(false)}
+        />
+      </div>
+    );
+  }
 
   const go = () => navigate && navigate('achievements');
 

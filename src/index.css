@@ -6720,3 +6720,9 @@ button:active:not(:disabled),
 @media (max-width: 700px) {
   .hub-links-col:not(.os-widgets-body)#widgetCanvas { grid-template-columns: 1fr; }
 }
+
+/* Savings pot picker chip — the −/+ stepper's shell, one button wide.
+   Choosing which pots IS choosing how many, so a separate count control
+   would be a second dial for the same fact. */
+.sw-count-pick { width: auto; padding: 0 8px; display: inline-flex; align-items: center; gap: 5px; }
+.sw-count-caret { font-size: 9px; opacity: .8; display: inline-block; transition: transform .15s ease; }

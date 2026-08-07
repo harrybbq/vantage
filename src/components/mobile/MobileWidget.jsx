@@ -21,6 +21,7 @@ import { fetchAppPreview } from '../../lib/appPreview';
 import { strikeState } from '../../lib/habits/strikes';
 import { SavingsPotsBody, SavingsProjectionBody } from '../savings/SavingsWidgets';
 import { BodyBody, SubscriptionsBody, MoodBody } from '../widgets/LifeWidgets';
+import { GoalsBody, BodyGoalBody } from '../widgets/GoalsWidget';
 import { tradingWidgetAvailable, TRADING_WIDGET_BUILD_EXCLUDED } from '../../lib/trading/enabled';
 import MarketBody from '../widgets/MarketWidget';
 import NewsBody from '../widgets/NewsWidget';
@@ -138,6 +139,18 @@ const BASE_WIDGET_META = {
     label: 'Mood',
     eyebrow: 'MOOD',
     icon: '☺', svg: 'smile',
+  },
+  // Goals — pinned progress across body / savings / achievements.
+  'goals': {
+    label: 'Goals',
+    eyebrow: 'GOALS',
+    icon: '\u25c8', svg: 'target',
+  },
+  // Body goal — one target, its progress and the plan to reach it.
+  'body-goal': {
+    label: 'Body Goal',
+    eyebrow: 'BODY GOAL',
+    icon: '\u25ce', svg: 'target',
   },
   'savings-pots': {
     label: 'Savings Pots',
@@ -448,8 +461,12 @@ function renderBody(widget, meta, S, update, navigate, userId) {
     case 'body':        return <BodyBody S={S} update={update} navigate={navigate} />;
     case 'mood':        return <MoodBody S={S} update={update} navigate={navigate} />;
     case 'subscriptions': return <SubscriptionsBody S={S} navigate={navigate} />;
-    case 'savings-pots': return <SavingsPotsBody S={S} count={widget.count || 1} navigate={navigate}
-      onSetCount={n => update(prev => ({ ...prev, mobileWidgets: (prev.mobileWidgets || []).map(w => w.id === widget.id ? { ...w, count: n } : w) }))} />;
+    case 'goals':       return <GoalsBody S={S} picks={widget.picks} compact navigate={navigate}
+      onSetPicks={p => update(prev => ({ ...prev, mobileWidgets: (prev.mobileWidgets || []).map(w => w.id === widget.id ? { ...w, picks: p } : w) }))} />;
+    case 'body-goal':   return <BodyGoalBody S={S} update={update} navigate={navigate} />;
+    case 'savings-pots': return <SavingsPotsBody S={S} count={widget.count || 1} picks={widget.picks} navigate={navigate}
+      onSetCount={n => update(prev => ({ ...prev, mobileWidgets: (prev.mobileWidgets || []).map(w => w.id === widget.id ? { ...w, count: n } : w) }))}
+      onSetPicks={p => update(prev => ({ ...prev, mobileWidgets: (prev.mobileWidgets || []).map(w => w.id === widget.id ? { ...w, picks: p } : w) }))} />;
     case 'savings-projection': return <SavingsProjectionBody S={S} navigate={navigate} />;
     default:            return <div className="m-widget-stub-label">Unknown widget type.</div>;
   }
