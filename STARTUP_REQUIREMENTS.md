@@ -189,12 +189,15 @@ back to the Site URL when it doesn't.
 Resolved 2026-07-29. Kept here as the record of why the code names the
 origin explicitly — remove the redirect and this breaks again silently.
 
-## Wearables — two things before Oura works for anyone
+## Wearables — Oura setup, and WHOOP's redirect URL
 
 The code shipped and is open to every signed-in account, but the Oura
-integration is inert until both of these are done. Until then the panel
-says "Oura env missing" rather than failing quietly. WHOOP needs
-neither — it is already configured.
+integration is inert until items 29 and 30 are done. Until then the panel
+says "Oura env missing" rather than failing quietly.
+
+WHOOP was listed here as needing nothing "because it is already
+configured". That was true right up until it wasn't, and because the
+value was never recorded, nobody could check — see item 31.
 
 29. `[x]` **Run `supabase/oura_schema.sql`** in the Supabase SQL editor.
     Creates `oura_tokens` — RLS on, no policies, so only the service
@@ -213,8 +216,38 @@ neither — it is already configured.
       whether Oura stays a general feature or becomes invite-only, so
       settle it before anyone outside the team connects a ring.
 
+31. `[ ]` **Check the WHOOP app's registered redirect URL.** WHOOP was
+    described here as "already configured", and its redirect URL was
+    never written down — which is how it drifted unnoticed. On
+    2026-08-08 a reconnect failed at WHOOP's authorize step with
+    `invalid_request` / *"The redirect_uri parameter does not match any
+    of the OAuth 2.0 Client's pre-registered redirect urls"*.
+    The code no longer derives that value from the request host
+    (`netlify/lib/redirectUri.js`), so it is now a constant — but a
+    constant still has to be the RIGHT one. In the WHOOP developer
+    dashboard, the app's redirect URLs must contain exactly:
+    `https://vantagevision.netlify.app/.netlify/functions/whoop-callback`
+    - Register **every** origin the app is reachable on, not just one.
+      The apex domain, `www.`, the `*.netlify.app` fallback and any
+      custom domain are separate entries as far as OAuth is concerned.
+    - If a custom domain has been added, Netlify's `URL` env var follows
+      it, so the sent value changes with it. Either add the new origin in
+      WHOOP, or pin `OAUTH_REDIRECT_BASE` in Netlify to whichever origin
+      is registered.
+    - The Track → Vitals → WHOOP panel prints the exact string it sent
+      after a failed connect, with a Copy button. That is the value to
+      paste into the dashboard — don't retype it.
+    - `[ ]` ⚠️ **Re-check on the day a custom domain is added**, exactly
+      as item 28 says for Supabase auth. Same failure, same cause: an
+      origin changed and a registered allow-list didn't.
+
 Standing rules for both wearables, so a third one doesn't relearn them:
 
+- **A redirect URI is registered, so it must be a constant.** Never
+  rebuild it from `event.headers.host` — one site has many hosts, and
+  only the registered one works. `netlify/lib/redirectUri.js` resolves it
+  once for both providers and both halves of the flow (the authorize call
+  and the token exchange must match byte for byte).
 - **Never make the OAuth `state` deterministic.** It carries a nonce
   matched against an HttpOnly cookie, a signed 10-minute expiry, and the
   provider name (`netlify/lib/oauthState.js`). The original static
