@@ -182,7 +182,13 @@ function WhoopPanel({ S, update }) {
   // on and no way to see the value that was rejected. Stash it on the
   // way out and show it on the way back.
   const [lastRedirect, setLastRedirect] = useState(() => {
-    try { return sessionStorage.getItem(REDIRECT_KEY) || ''; } catch { return ''; }
+    try {
+      const raw = sessionStorage.getItem(REDIRECT_KEY);
+      if (!raw) return null;
+      // Tolerate the bare-string form written by the previous build —
+      // a user mid-diagnosis must not lose the value to a deploy.
+      return raw.startsWith('{') ? JSON.parse(raw) : { redirectUri: raw, clientId: '' };
+    } catch { return null; }
   });
 
   async function syncNow(days = 7, silent = false) {
@@ -219,7 +225,7 @@ function WhoopPanel({ S, update }) {
     if (r === 'connected') {
       // It worked — the redirect URI is not in question, so stop showing it.
       try { sessionStorage.removeItem(REDIRECT_KEY); } catch { /* ignore */ }
-      setLastRedirect('');
+      setLastRedirect(null);
       update(prev => (prev.whoopConnected ? prev : { ...prev, whoopConnected: true }));
       syncNow(7);
     } else {
@@ -251,8 +257,9 @@ function WhoopPanel({ S, update }) {
       const body = await res.json().catch(() => ({}));
       if (!res.ok || !body.url) throw new Error(body.error || 'connect failed');
       if (body.redirectUri) {
-        try { sessionStorage.setItem(REDIRECT_KEY, body.redirectUri); } catch { /* private mode */ }
-        setLastRedirect(body.redirectUri);
+        const diag = { redirectUri: body.redirectUri, clientId: body.clientId || '' };
+        try { sessionStorage.setItem(REDIRECT_KEY, JSON.stringify(diag)); } catch { /* private mode */ }
+        setLastRedirect(diag);
       }
       window.location.href = body.url;
     } catch (e) {
@@ -297,16 +304,25 @@ function WhoopPanel({ S, update }) {
           and the app has no idea why. This is the string WHOOP compared
           against its list, so it is the one piece of information that
           makes "redirect_uri does not match" actionable. */}
-      {!connected && lastRedirect && (
+      {!connected && lastRedirect?.redirectUri && (
         <div className="vitals-ah-diag">
           <span className="vitals-ah-diag-label">Callback URL sent to WHOOP</span>
-          <code className="vitals-ah-diag-uri">{lastRedirect}</code>
+          <code className="vitals-ah-diag-uri">{lastRedirect.redirectUri}</code>
           <button type="button" className="vitals-ah-btn vitals-ah-btn-alt"
-                  onClick={() => navigator.clipboard?.writeText(lastRedirect).then(
-                    () => setMsg('Copied.'), () => setMsg(lastRedirect))}>Copy</button>
+                  onClick={() => navigator.clipboard?.writeText(lastRedirect.redirectUri).then(
+                    () => setMsg('Copied.'), () => setMsg(lastRedirect.redirectUri))}>Copy</button>
+          {/* Both halves, because a redirect URL is registered ON an app:
+              the right URL on the wrong app fails identically. */}
+          {lastRedirect.clientId && (
+            <>
+              <span className="vitals-ah-diag-label">Sent as WHOOP client</span>
+              <code className="vitals-ah-diag-uri">{lastRedirect.clientId}</code>
+            </>
+          )}
           <span className="vitals-ah-diag-note">
-            If WHOOP said the redirect URL doesn’t match, this exact string has to be
-            listed in your WHOOP app’s redirect URLs.
+            If WHOOP said the redirect URL doesn’t match: that exact string has to be
+            listed in the redirect URLs of the WHOOP app with the client ID above —
+            registering it on a different app of yours looks the same from here.
           </span>
         </div>
       )}
