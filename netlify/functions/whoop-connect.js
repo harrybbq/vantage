@@ -53,11 +53,17 @@ exports.handler = async (event) => {
 
   // The nonce cookie is what makes the state single-use and
   // browser-bound; the callback refuses a state without it.
-  // redirectUri is echoed back so the value that has to be registered
-  // with WHOOP is inspectable from the client rather than guessed at.
+  //
+  // redirectUri and clientId are echoed back so the two halves of a
+  // "redirect_uri does not match" failure are both inspectable. The
+  // redirect alone is not enough to diagnose it: a redirect URL is
+  // registered ON a specific WHOOP app, so a correct-looking URL
+  // registered against a DIFFERENT app than the client_id in Netlify
+  // fails in exactly the same way and looks identical from the outside.
+  // client_id is not a secret — WHOOP puts it in the authorize URL.
   return {
     statusCode: 200,
     headers: { ...CORS, 'Set-Cookie': cookie },
-    body: JSON.stringify({ ok: true, url, redirectUri }),
+    body: JSON.stringify({ ok: true, url, redirectUri, clientId: WHOOP_CLIENT_ID }),
   };
 };
