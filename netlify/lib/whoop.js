@@ -44,7 +44,33 @@ async function getFreshToken(userId, env) {
       scope: 'offline',
     }),
   });
-  if (!ref.ok) throw new Error('whoop token refresh failed — reconnect WHOOP');
+  if (!ref.ok) {
+    // WHOOP rotates refresh tokens on every use, so there is one benign
+    // reason this fails: something else refreshed between our read and
+    // our POST, leaving us holding a spent token. The daily cron and the
+    // app's on-open sync can genuinely collide. Re-read once — if the row
+    // now holds a different, still-valid token, the other side won the
+    // race and did the work for us.
+    const recheck = await sb(`whoop_tokens?user_id=eq.${userId}&select=*`, {}, env).catch(() => null);
+    if (recheck?.ok) {
+      const fresh = (await recheck.json().catch(() => []))[0];
+      if (fresh && fresh.access_token !== row.access_token &&
+          new Date(fresh.expires_at).getTime() - Date.now() > 120_000) {
+        return fresh.access_token;
+      }
+    }
+    // Otherwise the stored token really is spent or revoked, and no
+    // amount of retrying will help — say so, and carry the status.
+    const detail = await ref.text().catch(() => '');
+    const err = new Error(
+      ref.status === 400 || ref.status === 401
+        ? 'WHOOP sign-in has expired — reconnect WHOOP below.'
+        : `WHOOP refused to refresh the connection (${ref.status}).`
+    );
+    err.whoopStatus = ref.status;
+    err.whoopDetail = detail.slice(0, 200);
+    throw err;
+  }
   const tok = await ref.json();
   await sb(`whoop_tokens?user_id=eq.${userId}`, {
     method: 'PATCH',
@@ -59,21 +85,53 @@ async function getFreshToken(userId, env) {
   return tok.access_token;
 }
 
-// Paginated GET of a WHOOP collection between start/end (ISO strings).
+/**
+ * Human-readable cause for a WHOOP HTTP status. The status alone tells
+ * the user nothing, and "sync failed" tells them nothing they can act
+ * on — 401 and 429 need completely different responses from them.
+ */
+function whoopReason(status) {
+  if (status === 401) return 'WHOOP rejected our access — reconnect WHOOP below.';
+  if (status === 403) return 'WHOOP denied access to this data — reconnect and allow all permissions.';
+  if (status === 404) return 'WHOOP no longer offers this endpoint — the app needs updating.';
+  if (status === 429) return 'WHOOP is rate-limiting us — try again in a few minutes.';
+  if (status >= 500) return 'WHOOP is having problems right now — try again later.';
+  return `WHOOP returned ${status}.`;
+}
+
+/**
+ * Paginated GET of a WHOOP collection between start/end (ISO strings).
+ *
+ * Returns { records, error } rather than a bare array. It used to
+ * `break` on any non-OK response and return whatever it had, which
+ * collapsed "you didn't grant this scope" and "our token is dead" and
+ * "WHOOP is down" into the same answer as "you have no data" — an empty
+ * list. With a dead token all four collections came back empty, the
+ * sync reported success, and the only symptom anywhere in the system
+ * was that nothing ever changed. That is not a failure a user can
+ * report accurately, which is the whole problem.
+ */
 async function whoopList(path, accessToken, start, end) {
   const out = [];
   let nextToken = null;
+  let error = null;
   for (let page = 0; page < 5; page++) {
     const params = new URLSearchParams({ start, end, limit: '25' });
     if (nextToken) params.set('nextToken', nextToken);
-    const res = await fetch(`${API}${path}?${params}`, { headers: { Authorization: `Bearer ${accessToken}` } });
-    if (!res.ok) break; // tolerate partial availability (scope not granted, etc.)
+    let res;
+    try {
+      res = await fetch(`${API}${path}?${params}`, { headers: { Authorization: `Bearer ${accessToken}` } });
+    } catch (e) {
+      error = { path, status: 0, reason: `Could not reach WHOOP (${e.message || 'network error'}).` };
+      break;
+    }
+    if (!res.ok) { error = { path, status: res.status, reason: whoopReason(res.status) }; break; }
     const json = await res.json().catch(() => ({}));
     out.push(...(json.records || []));
     nextToken = json.next_token || json.nextToken || null;
     if (!nextToken) break;
   }
-  return out;
+  return { records: out, error };
 }
 
 // PURE: map raw WHOOP collections → Vantage store shapes. No I/O, so
@@ -136,7 +194,17 @@ function mapWhoop({ recoveries = [], sleeps = [], workouts = [], cycles = [] }) 
   return { vitals, burn };
 }
 
-// Fetch + map the last `days` of WHOOP data for an access token.
+/**
+ * Fetch + map the last `days` of WHOOP data for an access token.
+ *
+ * → { vitals, burn, warnings: string[] }
+ *
+ * One collection failing is survivable — a user who declined the
+ * workout scope should still get their sleep — so those become
+ * warnings. ALL of them failing is not survivable and is not a quiet
+ * empty result: it means the token, the scopes or the API itself is
+ * broken, so it throws with a cause the user can act on.
+ */
 async function fetchWhoopData(accessToken, days = 7) {
   const end = new Date().toISOString();
   const start = new Date(Date.now() - days * 86400000).toISOString();
@@ -146,7 +214,26 @@ async function fetchWhoopData(accessToken, days = 7) {
     whoopList('/v2/activity/workout', accessToken, start, end),
     whoopList('/v2/cycle', accessToken, start, end),
   ]);
-  return mapWhoop({ recoveries, sleeps, workouts, cycles });
+
+  const parts = [recoveries, sleeps, workouts, cycles];
+  const errors = parts.map(p => p.error).filter(Boolean);
+  if (errors.length === parts.length) {
+    // Every collection refused. Report the most actionable status: an
+    // auth failure is the one the user can actually fix.
+    const auth = errors.find(e => e.status === 401 || e.status === 403);
+    const lead = auth || errors[0];
+    const err = new Error(lead.reason);
+    err.whoopStatus = lead.status;
+    throw err;
+  }
+
+  const mapped = mapWhoop({
+    recoveries: recoveries.records,
+    sleeps: sleeps.records,
+    workouts: workouts.records,
+    cycles: cycles.records,
+  });
+  return { ...mapped, warnings: [...new Set(errors.map(e => e.reason))] };
 }
 
 // PURE: merge synced WHOOP data into an app state object — the exact
@@ -164,4 +251,4 @@ function mergeWhoopIntoState(state, vitals, burn) {
   return { ...state, vitalsLog, burnLog, whoopConnected: true };
 }
 
-module.exports = { sb, getFreshToken, whoopList, mapWhoop, fetchWhoopData, mergeWhoopIntoState };
+module.exports = { sb, getFreshToken, whoopList, whoopReason, mapWhoop, fetchWhoopData, mergeWhoopIntoState };

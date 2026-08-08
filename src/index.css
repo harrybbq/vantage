@@ -5299,6 +5299,10 @@ button:active:not(:disabled),
 .vitals-ah-btn:disabled { opacity: .6; cursor: default; }
 .vitals-ah-hint { font-family: var(--mono); font-size: 10.5px; color: var(--text-muted); line-height: 1.5; flex: 1; min-width: 160px; }
 #track .vitals-ah-hint { color: rgba(255,255,255,.55); }
+/* A failed sync has to look different from the idle explainer, or it
+   reads as just more small grey text nobody scans. */
+.vitals-ah-hint.is-error,
+#track .vitals-ah-hint.is-error { color: #e0796a; }
 .vitals-target { stroke: var(--gold); stroke-width: 1; opacity: .55; }
 .vitals-endlabel { font-family: var(--mono); font-size: 11px; font-weight: 700; fill: var(--text); }
 .vitals-tooltip {

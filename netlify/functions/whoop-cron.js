@@ -60,7 +60,11 @@ exports.handler = async (event) => {
       const accessToken = await getFreshToken(userId, env);
       if (!accessToken) { skipped++; continue; }
 
-      const { vitals, burn } = await fetchWhoopData(accessToken, DAYS);
+      const { vitals, burn, warnings } = await fetchWhoopData(accessToken, DAYS);
+      if (warnings?.length) console.warn('whoop-cron: partial data for', userId, warnings.join(' | '));
+      // A genuinely empty result now means WHOOP had nothing new, not
+      // that it refused us — fetchWhoopData throws in that case, so this
+      // "skipped" count finally means what it says.
       if (!Object.keys(vitals).length && !Object.keys(burn).length) { skipped++; continue; }
 
       // Read current state, merge, write back. Additive merge only.
@@ -78,7 +82,7 @@ exports.handler = async (event) => {
       if (!wr.ok) { failed++; continue; }
       synced++;
     } catch (e) {
-      console.error('whoop-cron: user sync failed', userId, e?.message);
+      console.error('whoop-cron: user sync failed', userId, e?.whoopStatus || '', e?.message, e?.whoopDetail || '');
       failed++;
     }
   }
