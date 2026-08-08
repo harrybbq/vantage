@@ -23,6 +23,7 @@ import { SavingsPotsBody, SavingsProjectionBody } from '../savings/SavingsWidget
 import { BodyBody, SubscriptionsBody, MoodBody } from '../widgets/LifeWidgets';
 import { GoalsBody, BodyGoalBody } from '../widgets/GoalsWidget';
 import { useSubscriptionContext } from '../../context/SubscriptionContext';
+import { observeShape } from '../../lib/hub/shape';
 import { tradingWidgetAvailable, TRADING_WIDGET_BUILD_EXCLUDED } from '../../lib/trading/enabled';
 import MarketBody from '../widgets/MarketWidget';
 import NewsBody from '../widgets/NewsWidget';
@@ -186,6 +187,10 @@ export default function MobileWidget({ widget, S, update, onRemove, navigate, us
   // context is reachable here (unlike the desktop hub's detached island
   // roots, which have to be handed hasPro as a prop).
   const { hasPro } = useSubscriptionContext();
+  // Same shape publishing as the desktop islands, and on the same
+  // element type (the card, not its body) so one set of CSS covers both.
+  const bodyRef = useRef(null);
+  useEffect(() => observeShape(bodyRef.current), []);
   const meta = WIDGET_META[widget.type] || { label: widget.type, eyebrow: '?', icon: '·' };
 
   // Brand-tinted icon chip when the type carries an `accent` (the new
@@ -378,6 +383,7 @@ export default function MobileWidget({ widget, S, update, onRemove, navigate, us
         {/* Foreground card */}
         <div
           ref={cardRef}
+          ref={bodyRef}
           className={`m-widget${transparent ? ' is-transparent' : ''}${lifted ? ' is-lifted' : ''}`}
           style={{
             transform: `translateX(${offset}px)`,

@@ -9,6 +9,7 @@ import { tradingWidgetAvailable, TRADING_WIDGET_BUILD_EXCLUDED } from '../lib/tr
 import MarketBody from './widgets/MarketWidget';
 import NewsBody from './widgets/NewsWidget';
 import { reflow, MIN_W, MIN_H, SNAP_GAP as REFLOW_GAP } from '../lib/hub/reflow';
+import { observeShape } from '../lib/hub/shape';
 const TradingBody = TRADING_WIDGET_BUILD_EXCLUDED ? null : lazy(() => import('./widgets/TradingWidget'));
 import { timeAgo } from '../utils/helpers';
 import AiCoachWidget from './AiCoachWidget';
@@ -1019,7 +1020,8 @@ export default function HubSection({ S, update, active, onOpenModal, onOpenWaitl
     const canvas = canvasRef.current;
     if (!canvas) return;
     // Tear down React islands before wiping their DOM.
-    for (const [, { root }] of reactRootsRef.current) {
+    for (const [, { root, stopShape }] of reactRootsRef.current) {
+      try { stopShape?.(); } catch { /* already gone */ }
       try { root.unmount(); } catch { /* already gone */ }
     }
     reactRootsRef.current.clear();
@@ -1229,7 +1231,17 @@ export default function HubSection({ S, update, active, onOpenModal, onOpenWaitl
       if (host) {
         const root = createRoot(host);
         root.render(reactWidgetElRef.current(hw));
-        reactRootsRef.current.set(hw.id, { root, type: hw.type });
+        // Measure the WRAPPER, not the body host. The host sits inside
+        // the card's header and padding, so a 300x300 card gives a
+        // 300x180 body and classified as "wide" — the attribute has to
+        // describe the shape the user actually dragged. The attribute
+        // lands on the wrapper too, and every rule is a descendant
+        // selector, so nothing else changes.
+        //
+        // Torn down with the root: renderCanvas rebuilds these wholesale,
+        // and an observer left behind would hold a detached node alive.
+        const stopShape = observeShape(wrapper);
+        reactRootsRef.current.set(hw.id, { root, type: hw.type, stopShape });
       }
     });
 
@@ -1340,7 +1352,10 @@ export default function HubSection({ S, update, active, onOpenModal, onOpenWaitl
   useEffect(() => () => {
     const roots = [...reactRootsRef.current.values()];
     reactRootsRef.current.clear();
-    setTimeout(() => roots.forEach(({ root }) => { try { root.unmount(); } catch { /* gone */ } }), 0);
+    setTimeout(() => roots.forEach(({ root, stopShape }) => {
+      try { stopShape?.(); } catch { /* gone */ }
+      try { root.unmount(); } catch { /* gone */ }
+    }), 0);
   }, []);
 
   // ── Dark OS layout (Pro only) ─────────────────────────────────────────

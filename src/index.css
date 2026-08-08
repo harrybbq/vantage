@@ -6927,3 +6927,86 @@ button:active:not(:disabled),
   .mkt-track.is-marquee { animation: none; transform: none; }
   .mkt-list.is-scrolling { max-height: none; }
 }
+
+/* ══ Per-shape widget layouts ═══════════════════════════════════════════
+   The width breakpoints above are the primary mechanism and still do
+   most of the work. These handle what width alone cannot express,
+   because these cards are inline-size containers and CSS never sees
+   their height: a 600px-wide card reads the same whether it is 200px or
+   700px tall. `data-shape` comes from lib/hub/shape.js.
+
+   Shapes: column ▯  tall ▯  square ▢  wide ▭  banner ▬          */
+
+/* ── Savings pots ─────────────────────────────────────────────────── */
+/* A thin card with four columns side by side gives four unreadable
+   slivers. Stack them into rows instead — the fill still reads as a
+   proportion, just horizontally. */
+[data-shape="column"] .sw-fill-row { flex-direction: column; }
+[data-shape="column"] .sw-pot-fill.is-multi { min-height: 0; flex: 1 1 0; }
+[data-shape="column"] .sw-pot-fill.is-multi .sw-pot-fill-bar {
+  top: 0; bottom: 0; right: auto; width: var(--sw-fill, 100%); height: auto !important;
+}
+[data-shape="column"] .sw-pot-fill.is-multi .sw-pot-fill-overlay {
+  flex-direction: row; align-items: center; justify-content: space-between; gap: 8px;
+  background: linear-gradient(to right, rgba(0,0,0,.5), rgba(0,0,0,0) 65%);
+}
+[data-shape="column"] .sw-pot-fill.is-multi .sw-pot-fill-pct { font-size: 17px; }
+
+/* A banner is one strip: keep the columns, drop the vertical padding. */
+[data-shape="banner"] .sw-pot-fill.is-multi { min-height: 0; }
+[data-shape="banner"] .sw-pot-fill.is-multi .sw-pot-fill-overlay { padding: 7px 9px; }
+[data-shape="banner"] .sw-pot-fill.is-multi .sw-pot-fill-pct { font-size: 19px; }
+
+/* ── Macros ───────────────────────────────────────────────────────── */
+/* Banner: calorie ring, legend and the three donuts all on one line. */
+[data-shape="banner"] .m-macros { flex-direction: row; align-items: center; gap: 18px; }
+[data-shape="banner"] .m-macros-cal { flex: 0 0 auto; }
+[data-shape="banner"] .m-macros-rings { flex: 1; gap: 18px; }
+[data-shape="banner"] .m-macros-quicklog { display: none; }
+/* Column: the rings go vertical rather than shrinking to nothing. */
+[data-shape="column"] .m-macros-rings { flex-direction: column; gap: 10px; }
+[data-shape="column"] .m-macro-ring { flex-direction: row; gap: 8px; justify-content: flex-start; }
+[data-shape="column"] .m-macro-ring-pct { position: static; }
+[data-shape="column"] .m-macro-ring-label { margin-left: auto; }
+
+/* ── Body goal ────────────────────────────────────────────────────── */
+/* Banner: gauge left, numbers right, workings dropped — a strip has no
+   room for the How block and the gauge is what carries the meaning. */
+[data-shape="banner"] .gw-hero { flex-direction: row; gap: 18px; align-items: center; }
+[data-shape="banner"] .gw-hero .gw-hero-side { align-items: flex-start; text-align: left; }
+[data-shape="banner"] .gw-hero .gw-nums { flex-direction: row; gap: 14px; }
+[data-shape="banner"] .gw-how,
+[data-shape="banner"] .gw-disclaimer,
+[data-shape="banner"] .gw-foot { display: none; }
+/* Column: everything stacks and centres; the workings survive because a
+   tall card has the room the banner doesn't. */
+[data-shape="column"] .gw-hero { flex-direction: column; }
+[data-shape="column"] .gw-nums { flex-direction: column; gap: 3px; align-items: center; }
+
+/* ── Goals list ───────────────────────────────────────────────────── */
+[data-shape="banner"] .gw-list { flex-direction: row; gap: 18px; align-items: center; }
+[data-shape="banner"] .gw-list .gw-item { flex: 1; min-width: 0; }
+[data-shape="banner"] .gw-list.has-chip { padding-top: 0; padding-right: 44px; }
+
+/* ── News ─────────────────────────────────────────────────────────── */
+/* Banner: a strip of headlines across, no thumbnails, one line each. */
+[data-shape="banner"] .nws-list { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; gap: 0 16px; }
+[data-shape="banner"] .nws-thumb { display: none; }
+[data-shape="banner"] .nws-title { -webkit-line-clamp: 2; }
+[data-shape="banner"] .nws-list li { border-bottom: 0; }
+
+/* ── Vitals ───────────────────────────────────────────────────────── */
+[data-shape="banner"] .m-vitals-tiles { grid-template-columns: repeat(6, 1fr); }
+[data-shape="column"] .m-vitals-tiles { grid-template-columns: 1fr; }
+
+/* ── Calories burned ──────────────────────────────────────────────── */
+[data-shape="banner"] .m-burn { flex-direction: row; align-items: center; gap: 18px; }
+[data-shape="banner"] .m-burn-acts { display: none; }
+[data-shape="banner"] .m-burn-hero { flex: 0 0 auto; }
+
+/* ── Market ───────────────────────────────────────────────────────── */
+/* A banner is too short for the marquee to travel usefully; show a
+   static row instead of an animation that mostly shows blank. */
+[data-shape="banner"] .mkt-track.is-marquee { animation: none; transform: none; }
+[data-shape="banner"] .mkt-track { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; }
+[data-shape="banner"] .mkt-list.is-scrolling { max-height: none; }
