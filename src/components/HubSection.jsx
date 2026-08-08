@@ -9,6 +9,7 @@ import { tradingWidgetAvailable, TRADING_WIDGET_BUILD_EXCLUDED } from '../lib/tr
 import MarketBody from './widgets/MarketWidget';
 import NewsBody from './widgets/NewsWidget';
 import { reflow, MIN_W, MIN_H, SNAP_GAP as REFLOW_GAP } from '../lib/hub/reflow';
+import { observeShape } from '../lib/hub/shape';
 const TradingBody = TRADING_WIDGET_BUILD_EXCLUDED ? null : lazy(() => import('./widgets/TradingWidget'));
 import { timeAgo } from '../utils/helpers';
 import AiCoachWidget from './AiCoachWidget';
@@ -143,6 +144,103 @@ function autoCols(cw) {
   return cw > 660 ? 3 : cw > 430 ? 2 : 1;
 }
 
+// ── Layout grid ───────────────────────────────────────────────────────
+// Widget geometry is stored in pixels and always has been. Rather than
+// migrate that (a rewrite of every user's widgetPositions/widgetSizes,
+// which is exactly the class of change that must not go near live data),
+// the grid is applied as a SNAP: drag or resize a widget and it lands on
+// a column boundary. Nothing is rewritten until the user moves something,
+// and a hub nobody touches keeps its pixels forever.
+//
+// Twelve columns because it divides by 2, 3, 4 and 6 — halves, thirds
+// and quarters all land on real boundaries, which is what makes a hub
+// look composed rather than merely tidy.
+export const GRID_COLS = 12;
+export const GRID_ROW_H = 78;
+
+/** Column pitch in px, gap included. */
+function colPitch(canvasW) {
+  return (canvasW + AUTO_GAP) / GRID_COLS;
+}
+const rowPitch = () => GRID_ROW_H + AUTO_GAP;
+
+/** Nearest grid rect for a pixel rect. Spans are clamped to >= 1. */
+export function snapToGrid({ x, y, w, h }, canvasW, { minW = 0, minH = 0, floorX = false, floorY = false } = {}) {
+  const cp = colPitch(canvasW);
+  const rp = rowPitch();
+  // Span first, then origin, so a widget never snaps to a width that
+  // pushes its right edge off the canvas.
+  //
+  // floorX / floorY round that axis's span DOWN instead of to the
+  // nearest. They are the fallback when the nearest snap would overlap a
+  // neighbour: a rect no larger on an axis, starting no earlier, cannot
+  // collide with anything the un-snapped one already cleared. Kept per
+  // axis so a horizontal drag never costs the widget its height.
+  const rx = floorX ? Math.floor : Math.round;
+  const ry = floorY ? Math.floor : Math.round;
+  const cols = Math.max(1, Math.min(GRID_COLS, rx((w + AUTO_GAP) / cp)));
+  const rows = Math.max(1, ry((h + AUTO_GAP) / rp));
+  const col = Math.max(0, Math.min(GRID_COLS - cols, floorX ? Math.ceil(x / cp) : Math.round(x / cp)));
+  const row = Math.max(0, floorY ? Math.ceil(y / rp) : Math.round(y / rp));
+  return {
+    x: Math.round(col * cp),
+    y: row * rp,
+    w: Math.max(minW, Math.round(cols * cp - AUTO_GAP)),
+    h: Math.max(minH, rows * rp - AUTO_GAP),
+    cols, rows,
+  };
+}
+
+/**
+ * Would this snapped rect land on top of another widget?
+ *
+ * Snapping happens after the gesture, by which point snap mode has
+ * already pushed and shrunk the neighbours into a valid arrangement.
+ * Nudging the widget up to half a column afterwards could undo that and
+ * park it on top of something — quietly breaking the one guarantee snap
+ * mode makes. When the snapped rect doesn't fit, the un-snapped
+ * geometry stands: a widget a few pixels off the grid is a cosmetic
+ * flaw, one overlapping its neighbour is a broken feature.
+ */
+function gridFits(wrapper, rect) {
+  const canvas = wrapper.parentElement;
+  if (!canvas) return true;
+  const me = { x: rect.x, y: rect.y, w: rect.w, h: rect.h };
+  for (const other of canvas.querySelectorAll('.widget-wrapper, .notepad-wrapper')) {
+    if (other === wrapper) continue;
+    const o = { x: other.offsetLeft, y: other.offsetTop, w: other.offsetWidth, h: other.offsetHeight };
+    if (rectsIntersect(me, o)) return false;
+  }
+  return true;
+}
+
+/**
+ * The grid rect to actually use: nearest if it fits, otherwise the
+ * shrink-to-fit one, otherwise none.
+ *
+ * With snap mode on, the nearest rect is often rejected — the reflow has
+ * already packed the neighbours tight, so rounding up half a column
+ * lands on one. Falling straight through to "no snap" meant alignment
+ * almost never applied for exactly the users who care about it most.
+ * The floored rect is never larger and never starts earlier, so if the
+ * gesture itself was legal, this is too.
+ */
+function bestSnap(wrapper, rect, canvasW) {
+  const opts = { minW: MIN_W, minH: MIN_H };
+  // Least disruptive first. Flooring BOTH axes when only one of them
+  // collided shrank a widget vertically for a purely horizontal drag —
+  // the user pulls the right edge and the card gets shorter, which reads
+  // as the app fighting them. Each axis is given up separately.
+  const candidates = [
+    snapToGrid(rect, canvasW, opts),
+    snapToGrid(rect, canvasW, { ...opts, floorX: true }),
+    snapToGrid(rect, canvasW, { ...opts, floorY: true }),
+    snapToGrid(rect, canvasW, { ...opts, floorX: true, floorY: true }),
+  ];
+  for (const c of candidates) if (gridFits(wrapper, c)) return c;
+  return null;
+}
+
 function useWidgetDrag(canvasRef, S, update, snapRef) {
   const makeDraggable = useCallback((wrapper, linkId) => {
     const handle = wrapper.querySelector('[data-drag]');
@@ -261,6 +359,15 @@ function useWidgetDrag(canvasRef, S, update, snapRef) {
       function onUp() {
         if (rafId) { cancelAnimationFrame(rafId); flush(); }
         if (island) island.classList.remove('dragging-active');
+        // Same snap on drop, so a dragged widget aligns with the ones it
+        // sits beside instead of landing a few pixels out.
+        const cwDrop = canvas.clientWidth || 0;
+        if (cwDrop > 0) {
+          const g = bestSnap(wrapper,
+            { x: wrapper.offsetLeft, y: wrapper.offsetTop, w: wrapper.offsetWidth, h: wrapper.offsetHeight },
+            cwDrop);
+          if (g) { wrapper.style.left = g.x + 'px'; wrapper.style.top = g.y + 'px'; }
+        }
         update(prev => {
           const wp = { ...prev.widgetPositions, [linkId]: { x: wrapper.offsetLeft, y: wrapper.offsetTop } };
           // Snap mode moved neighbours too — commit them in the same write.
@@ -414,7 +521,8 @@ export default function HubSection({ S, update, active, onOpenModal, onOpenWaitl
   }
   function reactWidgetEl(hw) {
     switch (hw.type) {
-      case 'vitals':   return <VitalsBody S={S} update={update} />;
+      case 'vitals':   return <VitalsBody S={S} update={update} picks={hw.picks}
+        onSetPicks={p => setHubWidgetPicks(hw.id, p)} />;
       case 'macros':   return <MacrosBody S={S} userId={userId} navigate={onNavigate} />;
       case 'calories': return <BurnBody S={S} update={update} userId={userId} />;
       case 'savings-pots': return <SavingsPotsBody S={S} count={hw.count || 1} picks={hw.picks}
@@ -565,15 +673,23 @@ export default function HubSection({ S, update, active, onOpenModal, onOpenWaitl
     // columns than there are widgets, so four widgets give 3 + 1 rather
     // than a stretched row of four.
     const cols = Math.min(autoCols(cw), ids.length);
-    const colW = Math.floor((cw - gap * (cols - 1)) / cols);
+    // Widths are whole numbers of grid columns, so a filled layout and a
+    // hand-dragged one share the same boundaries and line up with each
+    // other. 12 divides by 1, 2, 3 and 4, which is every column count
+    // autoCols can return.
+    const colSpan = Math.floor(GRID_COLS / cols);
+    const colW = Math.round((colSpan * (cw + gap)) / GRID_COLS) - gap;
     const rowCount = Math.ceil(ids.length / cols);
 
     // Fill the visible canvas when the layout fits inside it; past that
     // keep rows a readable height and let the page carry on downward.
-    const rowH = Math.max(
+    // Quantised to whole grid rows for the same reason the widths are.
+    const rawRowH = Math.max(
       SNAP_FILL_ROW_MIN,
       Math.min(SNAP_FILL_ROW_MAX, Math.floor((ch - gap * (rowCount - 1)) / rowCount)),
     );
+    const rowSpan = Math.max(1, Math.round((rawRowH + gap) / (GRID_ROW_H + gap)));
+    const rowH = rowSpan * (GRID_ROW_H + gap) - gap;
 
     const newPositions = {};
     const newSizes = {};
@@ -583,6 +699,8 @@ export default function HubSection({ S, update, active, onOpenModal, onOpenWaitl
       const row = Math.floor(i / cols);
       // Last column of a full row absorbs the rounding remainder so the
       // grid's right edge is flush rather than a pixel or two short.
+      // Last column absorbs the rounding remainder so the grid's right
+      // edge is flush rather than a pixel or two short.
       const w = col === cols - 1 ? cw - col * (colW + gap) : colW;
       const x = col * (colW + gap);
       const y = row * (rowH + gap);
@@ -661,16 +779,33 @@ export default function HubSection({ S, update, active, onOpenModal, onOpenWaitl
       activeResizeRef.current = id;
     }
     function commitResize() {
-      const w = wrapper.offsetWidth, h = wrapper.offsetHeight;
       activeResizeRef.current = null;
       activeSideRef.current = null;
       const nbs = resizeNeighbours;
       resizeNeighbours = null;
+
+      // Land on the grid. Snapping on COMMIT rather than during the drag
+      // keeps the gesture itself continuous — the edge tracks the pointer
+      // the whole way and settles when released, which reads as precision
+      // rather than as the widget fighting you.
+      const cw = canvasRef.current?.clientWidth || 0;
+      let w = wrapper.offsetWidth, h = wrapper.offsetHeight;
+      let x = wrapper.offsetLeft, y = wrapper.offsetTop;
+      const g = cw > 0 ? bestSnap(wrapper, { x, y, w, h }, cw) : null;
+      if (g) {
+        ({ x, y, w, h } = g);
+        wrapper.style.left = x + 'px';
+        wrapper.style.top = y + 'px';
+        wrapper.style.width = w + 'px';
+        wrapper.style.height = h + 'px';
+      }
+      growCanvas(canvasRef.current);
+
       update(prev => {
         const sizes = { ...(prev.widgetSizes || {}) };
         const pos = { ...(prev.widgetPositions || {}) };
         sizes[id] = { w, h };
-        pos[id] = { x: wrapper.offsetLeft, y: wrapper.offsetTop };
+        pos[id] = { x, y };
         if (nbs) {
           for (const nb of nbs) {
             nb.el.classList.remove('snap-push');
@@ -886,7 +1021,8 @@ export default function HubSection({ S, update, active, onOpenModal, onOpenWaitl
     const canvas = canvasRef.current;
     if (!canvas) return;
     // Tear down React islands before wiping their DOM.
-    for (const [, { root }] of reactRootsRef.current) {
+    for (const [, { root, stopShape }] of reactRootsRef.current) {
+      try { stopShape?.(); } catch { /* already gone */ }
       try { root.unmount(); } catch { /* already gone */ }
     }
     reactRootsRef.current.clear();
@@ -1096,7 +1232,17 @@ export default function HubSection({ S, update, active, onOpenModal, onOpenWaitl
       if (host) {
         const root = createRoot(host);
         root.render(reactWidgetElRef.current(hw));
-        reactRootsRef.current.set(hw.id, { root, type: hw.type });
+        // Measure the WRAPPER, not the body host. The host sits inside
+        // the card's header and padding, so a 300x300 card gives a
+        // 300x180 body and classified as "wide" — the attribute has to
+        // describe the shape the user actually dragged. The attribute
+        // lands on the wrapper too, and every rule is a descendant
+        // selector, so nothing else changes.
+        //
+        // Torn down with the root: renderCanvas rebuilds these wholesale,
+        // and an observer left behind would hold a detached node alive.
+        const stopShape = observeShape(wrapper);
+        reactRootsRef.current.set(hw.id, { root, type: hw.type, stopShape });
       }
     });
 
@@ -1139,7 +1285,10 @@ export default function HubSection({ S, update, active, onOpenModal, onOpenWaitl
         const cw = canvas.clientWidth;
         if (!cw) return;
         const cols = autoCols(cw);
-        const colW = Math.floor((cw - AUTO_GAP * (cols - 1)) / cols);
+        // Grid columns, not an arbitrary division, so a freshly added
+        // widget lines up with everything already on the canvas.
+        const colSpan = Math.floor(GRID_COLS / cols);
+        const colW = Math.round((colSpan * (cw + AUTO_GAP)) / GRID_COLS) - AUTO_GAP;
         const newIds = new Set(live.map(u => u.id));
 
         // Where each column currently ends. A widget counts towards a
@@ -1204,7 +1353,10 @@ export default function HubSection({ S, update, active, onOpenModal, onOpenWaitl
   useEffect(() => () => {
     const roots = [...reactRootsRef.current.values()];
     reactRootsRef.current.clear();
-    setTimeout(() => roots.forEach(({ root }) => { try { root.unmount(); } catch { /* gone */ } }), 0);
+    setTimeout(() => roots.forEach(({ root, stopShape }) => {
+      try { stopShape?.(); } catch { /* gone */ }
+      try { root.unmount(); } catch { /* gone */ }
+    }), 0);
   }, []);
 
   // ── Dark OS layout (Pro only) ─────────────────────────────────────────

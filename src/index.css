@@ -5451,7 +5451,11 @@ button:active:not(:disabled),
 .m-vitals-tile.is-stale .m-vitals-val { opacity: .45; }
 .m-vitals-val { font-size: 17px; font-weight: 600; color: var(--text); font-variant-numeric: tabular-nums; line-height: 1; }
 .m-vitals-unit { font-size: 9px; color: var(--text-muted); margin-left: 3px; font-weight: 500; }
-.m-vitals-label { font-size: 8.5px; letter-spacing: 1.2px; color: var(--text-muted); }
+.m-vitals-label { font-size: 8.5px; letter-spacing: 1.2px; color: var(--text-muted);
+  /* Labels used to be literal uppercase strings in the component; they
+     now come from the shared metric list in title case, so the casing
+     moves to CSS rather than changing how the tiles read. */
+  text-transform: uppercase; }
 .m-vitals-delta { position: absolute; top: 6px; right: 7px; font-size: 8.5px; color: var(--text-muted); }
 .m-vitals-delta.down { color: var(--em); }
 .m-vitals-delta.up { color: #d99114; }
@@ -6755,3 +6759,291 @@ button:active:not(:disabled),
    would be a second dial for the same fact. */
 .sw-count-pick { width: auto; padding: 0 8px; display: inline-flex; align-items: center; gap: 5px; }
 .sw-count-caret { font-size: 9px; opacity: .8; display: inline-block; transition: transform .15s ease; }
+
+/* ── Widgets adapt to their own size ───────────────────────────────────
+   Every widget body becomes a query container, so a body can lay itself
+   out from ITS OWN width rather than the viewport's. Before this the
+   only container in the app was the canvas, which chose how many columns
+   it had — a widget itself had exactly one layout at every size, so
+   making the news column tall and thin gave you the same 52px thumbnails
+   in a narrower space rather than more headlines.
+
+   inline-size, not size: `size` containment needs a definite height in
+   both axes, and in the snapping grid these cards are auto-height. Width
+   is always definite, and width is what the layouts below key off. */
+#widgetCanvas [data-react-widget],
+.m-widget-body {
+  container-type: inline-size;
+  container-name: widget;
+}
+
+/* ── Savings pots: the fill columns grow with the card ────────────────
+   The columns already stretched to fill the width, but their typography
+   didn't — a pot in a half-page widget showed the same 18px percentage
+   as one in a thumbnail, so making the widget bigger bought empty space
+   rather than legibility. Type and padding now scale in steps. */
+@container widget (min-width: 420px) {
+  .sw-pot-fill.is-multi .sw-pot-fill-pct { font-size: 24px; }
+  .sw-pot-fill.is-multi .sw-pot-fill-name { font-size: 12.5px; }
+  .sw-pot-fill.is-multi .sw-pot-fill-nums { font-size: 11px; }
+  .sw-pot-fill.is-multi .sw-pot-fill-overlay { padding: 11px 10px; }
+}
+@container widget (min-width: 620px) {
+  .sw-pot-fill.is-multi .sw-pot-fill-pct { font-size: 32px; }
+  .sw-pot-fill.is-multi .sw-pot-fill-name { font-size: 14px; }
+  .sw-pot-fill.is-multi .sw-pot-fill-nums { font-size: 12px; }
+  .sw-pot-fill.is-multi .sw-pot-fill-overlay { padding: 14px 13px; }
+  .sw-fill-row { gap: 12px; }
+}
+/* Narrow: the name is the first thing to go — a column too thin to read
+   a label in still reads a percentage and a fill height. */
+@container widget (max-width: 260px) {
+  .sw-pot-fill.is-multi .sw-pot-fill-pct { font-size: 15px; }
+  .sw-pot-fill.is-multi .sw-pot-fill-nums { display: none; }
+  .sw-pot-fill.is-multi .sw-pot-fill-overlay { padding: 6px 5px; }
+}
+
+/* ── Macros: shed the low-priority UI, never the data ─────────────────
+   Priority order, highest first: the three macro rings, the calorie
+   ring and its net figure, the legend, the Log-food button. Shrinking
+   the widget drops them from the bottom of that list up, so every
+   number the widget exists to show survives at any size — what goes is
+   the chrome around it. */
+@container widget (max-width: 300px) {
+  /* A shortcut, not data. Track is one tap away regardless. */
+  .m-macros-quicklog { display: none; }
+  .m-macros { gap: 9px; }
+}
+@container widget (max-width: 240px) {
+  /* The legend restates numbers the rings already encode; the goal line
+     is the only one it adds, so that stays and the rest goes. */
+  .m-macros-cal-legend > div:not(.m-macros-goal) { display: none; }
+  .m-macros-cal { gap: 10px; }
+}
+@container widget (max-width: 190px) {
+  /* Last resort: stack, drop the legend entirely, shrink the calorie
+     ring. The three donuts and the net figure are what remain, because
+     they carry every value in the widget. */
+  .m-macros-cal { flex-direction: column; gap: 6px; align-items: center; }
+  .m-macros-cal-legend { display: none; }
+  .m-macros-cal-ring { width: 62px; height: 62px; }
+  .m-macros-cal-ring svg { width: 62px; height: 62px; }
+  .m-macros-rings { gap: 6px; }
+  .m-macro-ring-label { font-size: 7.5px; letter-spacing: .6px; }
+}
+/* Wider: the rings get room instead of drifting apart. */
+@container widget (min-width: 420px) {
+  .m-macros-rings { gap: 22px; justify-content: center; }
+  .m-macros-cal-ring, .m-macros-cal-ring svg { width: 92px; height: 92px; }
+  .m-macros-net { font-size: 19px; }
+}
+
+/* ── Vitals: tile count follows the width ─────────────────────────── */
+@container widget (max-width: 250px) {
+  /* Three tiles across a narrow card leaves each too thin to read a
+     value in. Two rows of readable tiles beats one row of slivers. */
+  .m-vitals-tiles { grid-template-columns: repeat(2, 1fr); }
+  .m-vitals-hint { display: none; }
+}
+@container widget (min-width: 520px) {
+  .m-vitals-tiles { grid-template-columns: repeat(6, 1fr); gap: 10px; }
+}
+
+/* ── Calories burned: the total always survives ───────────────────── */
+@container widget (max-width: 260px) {
+  /* The activity list is detail; the total and the deficit are the
+     point of the widget. */
+  .m-burn-note { display: none; }
+  .m-burn-total { font-size: 22px; }
+  .m-burn-split { gap: 8px; font-size: 9px; }
+}
+@container widget (max-width: 200px) {
+  .m-burn-acts { display: none; }
+  .m-burn-total { font-size: 19px; }
+}
+@container widget (min-width: 460px) {
+  .m-burn-total { font-size: 34px; }
+  .m-burn-acts { display: grid; grid-template-columns: 1fr 1fr; gap: 5px 18px; }
+}
+
+/* ── Habits: a wider card lists two abreast rather than stretching ── */
+@container widget (min-width: 460px) {
+  .m-habits-list { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 16px; }
+}
+
+/* ── Savings projection: the chart is the widget ──────────────────── */
+@container widget (max-width: 260px) {
+  /* Legend and end-value labels crowd a small chart; the line itself
+     still carries the shape of the trend. */
+  .sw-proj-end, .sw-proj-endval { display: none; }
+}
+
+/* ── Goals: denser rows when short, roomier when tall ─────────────── */
+@container widget (min-width: 440px) {
+  .gw-list { display: grid; grid-template-columns: 1fr 1fr; gap: 10px 18px; align-content: start; }
+  .gw-item-name { font-size: 12.5px; }
+}
+@container widget (max-width: 230px) {
+  .gw-item-meta { display: none; }
+  .gw-list { gap: 7px; }
+}
+
+/* ── Body goal: the gauge and its numbers reflow, the plan survives ─ */
+@container widget (max-width: 290px) {
+  /* Side-by-side stops working; stack, and drop the workings before the
+     headline. The gauge, the sessions and the timeline stay. */
+  .gw-hero:not(.is-compact) { gap: 7px; }
+  .gw-how { display: none; }
+  .gw-disclaimer { display: none; }
+}
+@container widget (max-width: 210px) {
+  .gw-nums { flex-direction: column; gap: 2px; }
+  .gw-eta-sub { display: none; }
+}
+@container widget (min-width: 460px) {
+  /* Room to put the gauge beside the numbers instead of above them. */
+  .gw-hero:not(.is-compact) { flex-direction: row; gap: 20px; align-items: center; }
+  .gw-hero:not(.is-compact) .gw-hero-side { align-items: flex-start; text-align: left; }
+  .gw-hero:not(.is-compact) .gw-nums { flex-direction: column; gap: 3px; }
+}
+
+/* ── News: already scrolls; now it also re-shapes ─────────────────── */
+@container widget (max-width: 250px) {
+  /* A thin column is for scanning headlines, not for pictures. */
+  .nws-thumb { display: none; }
+  .nws-title { -webkit-line-clamp: 3; }
+}
+@container widget (min-width: 520px) {
+  .nws-list { display: grid; grid-template-columns: 1fr 1fr; gap: 0 18px; }
+  .nws-list li:nth-last-child(2):nth-child(odd) { border-bottom: 0; }
+}
+
+/* ── Market: the ticker tightens rather than clipping ─────────────── */
+@container widget (max-width: 240px) {
+  .mkt-delayed { display: none; }
+  .mkt-head { gap: 5px; }
+}
+@container widget (min-width: 520px) {
+  .mkt-track { display: grid; grid-template-columns: 1fr 1fr; }
+  /* The marquee animates a single column's height; two columns would
+     travel the wrong distance and tear. Static when it is wide enough
+     to show everything anyway. */
+  .mkt-track.is-marquee { animation: none; transform: none; }
+  .mkt-list.is-scrolling { max-height: none; }
+}
+
+/* ══ Per-shape widget layouts ═══════════════════════════════════════════
+   The width breakpoints above are the primary mechanism and still do
+   most of the work. These handle what width alone cannot express,
+   because these cards are inline-size containers and CSS never sees
+   their height: a 600px-wide card reads the same whether it is 200px or
+   700px tall. `data-shape` comes from lib/hub/shape.js.
+
+   Shapes: column ▯  tall ▯  square ▢  wide ▭  banner ▬          */
+
+/* ── The card chrome itself has to give way on a banner ───────────────
+   A 165px strip spends ~120px on the header row and the title before
+   the body starts, which left the pot labels clipped off the top. The
+   header is compressed rather than hidden, because it carries the ✕ —
+   a widget you cannot delete is a worse outcome than a tight one. */
+[data-shape="banner"] .link-island-header { padding-top: 4px; padding-bottom: 0; }
+[data-shape="banner"] .link-island-brand { padding-top: 2px; padding-bottom: 4px; }
+[data-shape="banner"] .link-island-brand-title { font-size: 12px; }
+[data-shape="banner"] .link-island-name { font-size: 8px; }
+[data-shape="banner"] .m-widget-head { padding: 5px 12px; }
+
+/* ── Savings pots ─────────────────────────────────────────────────── */
+/* A thin card with four columns side by side gives four unreadable
+   slivers. Stack them into rows instead — the fill still reads as a
+   proportion, just horizontally. */
+[data-shape="column"] .sw-fill-row { flex-direction: column; }
+[data-shape="column"] .sw-pot-fill.is-multi { min-height: 0; flex: 1 1 0; }
+[data-shape="column"] .sw-pot-fill.is-multi .sw-pot-fill-bar {
+  top: 0; bottom: 0; right: auto; width: var(--sw-fill, 100%); height: auto !important;
+}
+[data-shape="column"] .sw-pot-fill.is-multi .sw-pot-fill-overlay {
+  flex-direction: row; align-items: center; justify-content: space-between; gap: 8px;
+  background: linear-gradient(to right, rgba(0,0,0,.5), rgba(0,0,0,0) 65%);
+}
+[data-shape="column"] .sw-pot-fill.is-multi .sw-pot-fill-pct { font-size: 17px; }
+
+/* A banner is one strip: keep the columns, drop the vertical padding. */
+[data-shape="banner"] .sw-pot-fill.is-multi { min-height: 0; }
+[data-shape="banner"] .sw-pot-fill.is-multi .sw-pot-fill-overlay {
+  padding: 6px 9px; flex-direction: row; align-items: center; gap: 8px;
+}
+[data-shape="banner"] .sw-pot-fill.is-multi .sw-pot-fill-name { flex: 1; min-width: 0; font-size: 11px; }
+[data-shape="banner"] .sw-pot-fill.is-multi .sw-pot-fill-pct { font-size: 17px; }
+/* The £ figure is the first thing to go: the percentage and the fill
+   height both already say how far along the pot is. */
+[data-shape="banner"] .sw-pot-fill.is-multi .sw-pot-fill-nums { display: none; }
+
+/* ── Macros ───────────────────────────────────────────────────────── */
+/* Banner: calorie ring, legend and the three donuts all on one line. */
+[data-shape="banner"] .m-macros { flex-direction: row; align-items: center; gap: 18px; }
+[data-shape="banner"] .m-macros-cal { flex: 0 0 auto; }
+[data-shape="banner"] .m-macros-rings { flex: 1; gap: 18px; }
+[data-shape="banner"] .m-macros-quicklog { display: none; }
+/* Column: the rings go vertical rather than shrinking to nothing. */
+[data-shape="column"] .m-macros-rings { flex-direction: column; gap: 10px; }
+[data-shape="column"] .m-macro-ring { flex-direction: row; gap: 8px; justify-content: flex-start; }
+[data-shape="column"] .m-macro-ring-pct { position: static; }
+[data-shape="column"] .m-macro-ring-label { margin-left: auto; }
+
+/* ── Body goal ────────────────────────────────────────────────────── */
+/* Banner: gauge left, numbers right, workings dropped — a strip has no
+   room for the How block and the gauge is what carries the meaning. */
+[data-shape="banner"] .gw-hero { flex-direction: row; gap: 18px; align-items: center; }
+[data-shape="banner"] .gw-hero .gw-hero-side { align-items: flex-start; text-align: left; }
+[data-shape="banner"] .gw-hero .gw-nums { flex-direction: row; gap: 14px; }
+[data-shape="banner"] .gw-how,
+[data-shape="banner"] .gw-disclaimer,
+[data-shape="banner"] .gw-foot { display: none; }
+/* Wide is short too — 470x250 leaves ~130px of body once the header and
+   title have taken theirs, and a stacked gauge plus numbers needs more
+   than that, so the sessions and the timeline fell off the bottom. Use
+   the horizontal room the shape actually has. Less aggressive than the
+   banner: the workings stay, they just move beside the gauge. */
+[data-shape="wide"] .gw-hero { flex-direction: row; gap: 16px; align-items: center; }
+[data-shape="wide"] .gw-hero .gw-hero-side { align-items: flex-start; text-align: left; }
+[data-shape="wide"] .gw-hero .gw-nums { flex-direction: column; gap: 2px; }
+[data-shape="wide"] .gw-how { display: none; }
+
+/* Column: everything stacks and centres; the workings survive because a
+   tall card has the room the banner doesn't. */
+[data-shape="column"] .gw-hero { flex-direction: column; }
+[data-shape="column"] .gw-nums { flex-direction: column; gap: 3px; align-items: center; }
+
+/* ── Goals list ───────────────────────────────────────────────────── */
+[data-shape="banner"] .gw-list { flex-direction: row; gap: 18px; align-items: center; }
+[data-shape="banner"] .gw-list .gw-item { flex: 1; min-width: 0; }
+[data-shape="banner"] .gw-list.has-chip { padding-top: 0; padding-right: 44px; }
+
+/* ── News ─────────────────────────────────────────────────────────── */
+/* Banner: a strip of headlines across, no thumbnails, one line each. */
+[data-shape="banner"] .nws-list { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; gap: 0 16px; }
+[data-shape="banner"] .nws-thumb { display: none; }
+[data-shape="banner"] .nws-title { -webkit-line-clamp: 2; }
+[data-shape="banner"] .nws-list li { border-bottom: 0; }
+
+/* ── Vitals ───────────────────────────────────────────────────────── */
+/* repeat(6) left three tiles at a sixth of the width each with half the
+   card empty. Let the tiles take what they need and give the rest to
+   the trend line, which is the thing a wide card can actually show. */
+[data-shape="banner"] .m-vitals { flex-direction: row; align-items: center; gap: 14px; }
+[data-shape="banner"] .m-vitals-tiles { flex: 1; grid-template-columns: repeat(3, 1fr); }
+[data-shape="banner"] .m-vitals-spark { flex: 1; min-width: 0; }
+[data-shape="banner"] .m-vitals-hint { display: none; }
+[data-shape="column"] .m-vitals-tiles { grid-template-columns: 1fr; }
+
+/* ── Calories burned ──────────────────────────────────────────────── */
+[data-shape="banner"] .m-burn { flex-direction: row; align-items: center; gap: 18px; }
+[data-shape="banner"] .m-burn-acts { display: none; }
+[data-shape="banner"] .m-burn-hero { flex: 0 0 auto; }
+
+/* ── Market ───────────────────────────────────────────────────────── */
+/* A banner is too short for the marquee to travel usefully; show a
+   static row instead of an animation that mostly shows blank. */
+[data-shape="banner"] .mkt-track.is-marquee { animation: none; transform: none; }
+[data-shape="banner"] .mkt-track { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; }
+[data-shape="banner"] .mkt-list.is-scrolling { max-height: none; }

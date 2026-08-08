@@ -103,10 +103,14 @@ export function PickList({ items, picked, onToggle, onDone, note }) {
       <div className="gw-picklist-scroll">
         {items.map(it => {
           const on = picked.includes(it.id);
+          // A disabled row is shown, not hidden: "Connect WHOOP" tells
+          // the user the metric exists and what unlocks it, which a
+          // missing row cannot.
           return (
-            <button key={it.id} type="button" className={'gw-pickrow' + (on ? ' is-on' : '')}
-                    onClick={() => onToggle(it.id)} aria-pressed={on}>
-              <span className={'gw-pickbox' + (on ? ' is-on' : '')}>{on ? '✓' : ''}</span>
+            <button key={it.id} type="button" disabled={!!it.disabled}
+                    className={'gw-pickrow' + (on ? ' is-on' : '') + (it.disabled ? ' is-locked' : '')}
+                    onClick={() => !it.disabled && onToggle(it.id)} aria-pressed={on}>
+              <span className={'gw-pickbox' + (on ? ' is-on' : '')}>{it.disabled ? '🔒' : on ? '✓' : ''}</span>
               <span className="gw-pickrow-text">
                 <span className="gw-pickrow-name">{it.name}</span>
                 <span className="gw-pickrow-tag">{it.tag}</span>
