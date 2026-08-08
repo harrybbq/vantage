@@ -192,7 +192,9 @@ export default function MobileWidget({ widget, S, update, onRemove, navigate, us
   // Same shape publishing as the desktop islands, and on the same
   // element type (the card, not its body) so one set of CSS covers both.
   const bodyRef = useRef(null);
-  useEffect(() => observeShape(bodyRef.current), []);
+  // No height bands here: mobile cards are auto-height, so a short card
+  // is short because its content is, not because the user shrank it.
+  useEffect(() => observeShape(bodyRef.current, { heightBands: false }), []);
   const meta = WIDGET_META[widget.type] || { label: widget.type, eyebrow: '?', icon: '·' };
 
   // Brand-tinted icon chip when the type carries an `accent` (the new
@@ -384,8 +386,11 @@ export default function MobileWidget({ widget, S, update, onRemove, navigate, us
 
         {/* Foreground card */}
         <div
-          ref={cardRef}
-          ref={bodyRef}
+          // One element, two consumers. These were two separate `ref`
+          // attributes, which JSX resolves to the LAST one — so cardRef
+          // was never populated and the long-press lift transform below
+          // was a no-op on every mobile widget.
+          ref={el => { cardRef.current = el; bodyRef.current = el; }}
           className={`m-widget${transparent ? ' is-transparent' : ''}${lifted ? ' is-lifted' : ''}`}
           style={{
             transform: `translateX(${offset}px)`,
@@ -558,6 +563,10 @@ function VitalsBody({ S, update, picks, onSetPicks }) {
             if (next.length) onSetPicks?.(next);
           }}
           onDone={() => setPicking(false)}
+          // Empty picks is what "default" IS — resolvePicks falls back to
+          // the first three available metrics — so the reset writes [] and
+          // the chart goes back to weight / sleep / rest HR.
+          onReset={picks && picks.length ? () => onSetPicks?.([]) : null}
           note="Each line is scaled to its own range — the chart shows shape, the tiles show values."
         />
       </div>

@@ -79,17 +79,93 @@ export function nextShape(current, w, h) {
 }
 
 /**
- * Watch an element and keep `data-shape` current on it.
- * Returns a disposer. Safe to call with null.
+ * Height bands.
+ *
+ * Shape alone is not enough, and the gap it leaves is exactly what a
+ * user notices: drag a 300x300 card down to 300x200 and the aspect goes
+ * 1.0 → 1.5, which is still `square`, so NOTHING in the layout responds.
+ * The card just clips. Aspect describes proportion; it cannot describe
+ * "there are only 90 pixels left, drop something".
+ *
+ * So absolute height is published too, as a four-step band. Bands rather
+ * than raw pixels for the same reason shapes are named: a layout author
+ * needs regions they can design for, not a continuum.
+ *
+ *   xs  a strip — room for the chrome and one row of content
+ *   sm  short — secondary rows and footnotes have to go
+ *   md  comfortable
+ *   lg  everything fits
  */
-export function observeShape(el) {
+/* Boundaries sit ABOVE the height at which each layout starts to
+ * overflow, not at it. A band that triggers exactly when content stops
+ * fitting is a band that never helps: measured on the vitals widget,
+ * 240px was still `md` (full layout) and overflowed by 18px, while the
+ * `sm` reductions save about that much. Trigger early and the card is
+ * never squeezed; trigger late and the band does nothing but rename the
+ * problem. */
+export const H_BANDS = { xs: 170, sm: 280, md: 420 };
+
+const H_ORDER = ['xs', 'sm', 'md', 'lg'];
+// EDGES[i] is the boundary between H_ORDER[i] and H_ORDER[i + 1].
+const H_EDGES = [H_BANDS.xs, H_BANDS.sm, H_BANDS.md];
+
+export function heightBand(h) {
+  if (!(h > 0)) return 'lg';
+  if (h < H_BANDS.xs) return 'xs';
+  if (h < H_BANDS.sm) return 'sm';
+  if (h < H_BANDS.md) return 'md';
+  return 'lg';
+}
+
+/**
+ * Same hysteresis argument as nextShape, but in pixels — a card parked
+ * on 240px must not flip layouts on every sub-pixel of a drag.
+ */
+const H_STICK = 8;
+
+export function nextHeightBand(current, h) {
+  const fresh = heightBand(h);
+  if (!current || fresh === current) return fresh;
+  if (!(h > 0)) return current;
+  const ci = H_ORDER.indexOf(current);
+  const fi = H_ORDER.indexOf(fresh);
+  const lo = Math.min(ci, fi);
+  const hi = Math.max(ci, fi);
+  // Sitting on any boundary we would have to cross? Then stay put.
+  for (let i = lo; i < hi; i++) {
+    if (Math.abs(h - H_EDGES[i]) < H_STICK) return current;
+  }
+  return fresh;
+}
+
+/**
+ * Watch an element and keep `data-shape` (and optionally `data-h`)
+ * current on it. Returns a disposer. Safe to call with null.
+ *
+ * `heightBands` defaults to on, but MUST be off wherever height is not
+ * something the user set. The mobile stack is auto-height: a compact
+ * card is short because its content is short, not because anyone asked
+ * for a strip, and stamping `data-h="xs"` there would strip layers off
+ * widgets nobody shrank. Height bands are a response to a deliberate
+ * vertical resize, which only the desktop canvas has.
+ */
+export function observeShape(el, { heightBands = true } = {}) {
   if (!el || typeof ResizeObserver === 'undefined') return () => {};
-  let current = null;
+  let shape = null;
+  let band = null;
   const apply = () => {
-    const next = nextShape(current, el.clientWidth, el.clientHeight);
-    if (next !== current) {
-      current = next;
-      el.setAttribute('data-shape', next);
+    const w = el.clientWidth;
+    const h = el.clientHeight;
+    const nextS = nextShape(shape, w, h);
+    if (nextS !== shape) {
+      shape = nextS;
+      el.setAttribute('data-shape', nextS);
+    }
+    if (!heightBands) return;
+    const nextH = nextHeightBand(band, h);
+    if (nextH !== band) {
+      band = nextH;
+      el.setAttribute('data-h', nextH);
     }
   };
   const ro = new ResizeObserver(apply);

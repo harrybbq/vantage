@@ -745,8 +745,8 @@ export default function HubSection({ S, update, active, onOpenModal, onOpenWaitl
     // The default link wrapper is clamped 280–360px wide; lift the cap
     // and set floors so resize can grow/shrink freely.
     wrapper.style.maxWidth = 'none';
-    wrapper.style.minWidth = '220px';
-    wrapper.style.minHeight = '90px';
+    wrapper.style.minWidth = MIN_W + 'px';
+    wrapper.style.minHeight = MIN_H + 'px';
 
     // ── Click-to-front ──
     // A pointerdown anywhere on the widget raises it above overlapping
@@ -788,10 +788,17 @@ export default function HubSection({ S, update, active, onOpenModal, onOpenWaitl
       // keeps the gesture itself continuous — the edge tracks the pointer
       // the whole way and settles when released, which reads as precision
       // rather than as the widget fighting you.
+      //
+      // Only when snap is ON, though. This used to run unconditionally,
+      // which quietly made the toggle a lie for resizing: every commit
+      // rounded to the grid, so the smallest a widget could ever be was
+      // one column by one row (~78px tall) no matter what the floors
+      // said. Snap OFF now means what it says — free sizing down to
+      // MIN_W x MIN_H.
       const cw = canvasRef.current?.clientWidth || 0;
       let w = wrapper.offsetWidth, h = wrapper.offsetHeight;
       let x = wrapper.offsetLeft, y = wrapper.offsetTop;
-      const g = cw > 0 ? bestSnap(wrapper, { x, y, w, h }, cw) : null;
+      const g = (snapRef?.current && cw > 0) ? bestSnap(wrapper, { x, y, w, h }, cw) : null;
       if (g) {
         ({ x, y, w, h } = g);
         wrapper.style.left = x + 'px';
@@ -916,7 +923,9 @@ export default function HubSection({ S, update, active, onOpenModal, onOpenWaitl
     //   right → pins the LEFT edge, grows/shrinks rightward (snap reflow)
     //   bottom→ pins the TOP edge, grows/shrinks downward
     if (wrapper.style.position === 'absolute') {
-      const minW = 220, minH = 90;
+      // Same floors as the snap reflow — one decision, not two that can
+      // drift into disagreeing about how small a widget may get.
+      const minW = MIN_W, minH = MIN_H;
       const canvasRect = () => canvasRef.current.getBoundingClientRect();
       const addGrip = (side) => {
         if (wrapper.querySelector('.widget-resize-' + side)) return;

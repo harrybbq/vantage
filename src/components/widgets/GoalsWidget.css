@@ -18,7 +18,10 @@
 .gw-picklist-scroll::-webkit-scrollbar{width:4px;}
 .gw-picklist-scroll::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px;}
 .gw-picklist-note{font-family:var(--mono);font-size:8px;color:var(--text-muted);line-height:1.5;}
+.gw-picklist-foot{display:flex;align-items:center;gap:12px;flex-wrap:wrap;}
 .gw-done{align-self:flex-start;}
+.gw-reset{color:var(--text-muted);}
+.gw-reset:hover{color:var(--em);}
 
 .gw-pickrow{display:flex;align-items:center;gap:9px;padding:7px 8px;border-radius:8px;
   border:1px solid var(--border);background:transparent;cursor:pointer;text-align:left;width:100%;}

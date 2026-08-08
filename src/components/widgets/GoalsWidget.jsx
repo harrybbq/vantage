@@ -96,7 +96,7 @@ export function PickChip({ n, open, onToggle, label = 'Choose which to show' }) 
  * — both had the same problem (the widget chose for you) and the same
  * answer, so they get the same component rather than two that drift.
  */
-export function PickList({ items, picked, onToggle, onDone, note }) {
+export function PickList({ items, picked, onToggle, onDone, onReset, note }) {
   return (
     <div className="gw-picklist">
       <div className="gw-picklist-head">// show which</div>
@@ -121,7 +121,19 @@ export function PickList({ items, picked, onToggle, onDone, note }) {
         {!items.length && <div className="gw-empty">Nothing to pin yet.</div>}
       </div>
       {note && <div className="gw-picklist-note">{note}</div>}
-      <button type="button" className="link-open-btn gw-done" onClick={onDone}>Done</button>
+      {/* Once you have made a choice there has to be a way back to the
+          one the widget makes for you. Deselecting everything is the
+          obvious gesture and it is refused (an empty widget is not a
+          state worth having), so without this row "default" is a view
+          you can leave and never return to. */}
+      <div className="gw-picklist-foot">
+        {onReset && (
+          <button type="button" className="gw-textbtn gw-reset" onClick={onReset}>
+            Reset to default
+          </button>
+        )}
+        <button type="button" className="link-open-btn gw-done" onClick={onDone}>Done</button>
+      </div>
     </div>
   );
 }
@@ -691,6 +703,7 @@ export function GoalsBody({ S, picks, onSetPicks, navigate, hasPro = false, comp
       {onSetPicks && <PickChip n={picked.length} open={open} onToggle={() => setOpen(o => !o)} label="Choose which goals to show" />}
       {open ? (
         <PickList items={items} picked={picked} onToggle={toggle} onDone={() => setOpen(false)}
+                  onReset={picks && picks.length ? () => onSetPicks?.([]) : null}
                   note="Measurable goals show real progress; milestones show their unlock step." />
       ) : (
         <div className={'gw-list' + (onSetPicks ? ' has-chip' : '')}>

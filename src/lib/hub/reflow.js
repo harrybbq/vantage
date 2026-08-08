@@ -130,7 +130,21 @@ export function reflow(moving, others, axis, dir, opts = {}) {
  * header, and one shorter can't show a row of content — at which point
  * "shrunk" has quietly become "broken", which is the thing this whole
  * mechanism exists to avoid.
+ *
+ * These used to be 220x90, which was the honest floor when the card
+ * chrome was a fixed size and the bodies didn't respond to height. Both
+ * of those have since changed: `data-h` (lib/hub/shape.js) lets the
+ * chrome collapse and the bodies shed rows, so a 120x56 card is now a
+ * legible small card rather than a clipped normal one. Do not lower
+ * these further without a matching `[data-h="xs"]` layout — the floor
+ * and the layouts that make it survivable are one decision.
+ *
+ * Grid note: the snap grid is 12 columns, so on a typical ~900px canvas
+ * one column is ~62px and two are ~138px. 120 therefore lands on a real
+ * two-column cell (aligned), and on narrower canvases a single column
+ * becomes reachable. MIN_H sits below one 78px grid row for the same
+ * reason — the floor never fights the grid for what the grid can give.
  */
-export const MIN_W = 220;
-export const MIN_H = 90;
+export const MIN_W = 120;
+export const MIN_H = 56;
 export const SNAP_GAP = 12;
