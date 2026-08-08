@@ -521,7 +521,8 @@ export default function HubSection({ S, update, active, onOpenModal, onOpenWaitl
   }
   function reactWidgetEl(hw) {
     switch (hw.type) {
-      case 'vitals':   return <VitalsBody S={S} update={update} />;
+      case 'vitals':   return <VitalsBody S={S} update={update} picks={hw.picks}
+        onSetPicks={p => setHubWidgetPicks(hw.id, p)} />;
       case 'macros':   return <MacrosBody S={S} userId={userId} navigate={onNavigate} />;
       case 'calories': return <BurnBody S={S} update={update} userId={userId} />;
       case 'savings-pots': return <SavingsPotsBody S={S} count={hw.count || 1} picks={hw.picks}

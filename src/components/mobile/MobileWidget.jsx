@@ -24,6 +24,8 @@ import { BodyBody, SubscriptionsBody, MoodBody } from '../widgets/LifeWidgets';
 import { GoalsBody, BodyGoalBody } from '../widgets/GoalsWidget';
 import { useSubscriptionContext } from '../../context/SubscriptionContext';
 import { observeShape } from '../../lib/hub/shape';
+import { metricAvailability, metricSeries, resolvePicks } from '../../lib/vitals/metrics';
+import { PickChip, PickList } from '../widgets/GoalsWidget';
 import { tradingWidgetAvailable, TRADING_WIDGET_BUILD_EXCLUDED } from '../../lib/trading/enabled';
 import MarketBody from '../widgets/MarketWidget';
 import NewsBody from '../widgets/NewsWidget';
@@ -466,7 +468,8 @@ function renderBody(widget, meta, S, update, navigate, userId, hasPro) {
     case 'holidays':    return <HolidaysBody S={S} navigate={navigate} />;
     case 'github':      return <GithubBody S={S} meta={meta} />;
     case 'linkedin':    return <LinkedinBody S={S} meta={meta} />;
-    case 'vitals':      return <VitalsBody S={S} update={update} />;
+    case 'vitals':      return <VitalsBody S={S} update={update} picks={widget.picks}
+      onSetPicks={p => update(prev => ({ ...prev, mobileWidgets: (prev.mobileWidgets || []).map(w => w.id === widget.id ? { ...w, picks: p } : w) }))} />;
     case 'calories':    return <BurnBody S={S} update={update} userId={userId} />;
     case 'macros':      return <MacrosBody S={S} userId={userId} navigate={navigate} />;
     case 'body':        return <BodyBody S={S} update={update} navigate={navigate} />;
@@ -490,14 +493,9 @@ function renderBody(widget, meta, S, update, navigate, userId, hasPro) {
 // today's value; if today isn't logged yet it falls back to the most
 // recent entry, dimmed, so the widget never reads as empty once
 // you've logged anything.
-const VITAL_FIELDS = [
-  { key: 'weight', label: 'WEIGHT',  unit: 'kg',  step: '0.1', max: 400 },
-  { key: 'sleep',  label: 'SLEEP',   unit: 'h',   step: '0.5', max: 24  },
-  { key: 'rhr',    label: 'REST HR', unit: 'bpm', step: '1',   max: 250 },
-];
-
-function VitalsBody({ S, update }) {
+function VitalsBody({ S, update, picks, onSetPicks }) {
   const today = getTodayStr();
+  const [picking, setPicking] = useState(false);
   const log = S.vitalsLog || {};
   const dates = Object.keys(log).sort();
   const [editing, setEditing] = useState(null); // field key | null
@@ -528,15 +526,52 @@ function VitalsBody({ S, update }) {
     }));
   }
 
-  // Weight trend — last 14 logged weights, oldest → newest.
+  // Which metrics this widget instance shows. Filtered against what the
+  // user's connected devices can actually supply, on every read — see
+  // resolvePicks for why picks are not cleaned up on disconnect.
+  const shownMetrics = resolvePicks(S, picks);
+  const series = metricSeries(S, shownMetrics.map(m => m.key));
+
+  // Weight delta is still called out on its own tile — it is the one
+  // metric where the direction matters more than the number.
   const weights = dates.map(d => log[d]?.weight).filter(v => v != null).slice(-14);
   const prevWeight = weights.length >= 2 ? weights[weights.length - 2] : null;
   const delta = prevWeight != null ? weights[weights.length - 1] - prevWeight : null;
 
+  if (picking) {
+    const all = metricAvailability(S);
+    return (
+      <div className="m-vitals">
+        <PickList
+          items={all.map(m => ({
+            id: m.key,
+            name: m.label,
+            tag: m.available ? `${m.unit || 'index'} · ${m.src === 'whoop' ? 'wearable' : 'logged by hand'}` : m.reason,
+            disabled: !m.available,
+          }))}
+          picked={shownMetrics.map(m => m.key)}
+          onToggle={k => {
+            const meta = all.find(m => m.key === k);
+            if (!meta || !meta.available) return;
+            const cur = shownMetrics.map(m => m.key);
+            const next = cur.includes(k) ? cur.filter(x => x !== k) : [...cur, k];
+            if (next.length) onSetPicks?.(next);
+          }}
+          onDone={() => setPicking(false)}
+          note="Each line is scaled to its own range — the chart shows shape, the tiles show values."
+        />
+      </div>
+    );
+  }
+
   return (
     <div className="m-vitals">
-      <div className="m-vitals-tiles">
-        {VITAL_FIELDS.map(f => {
+      {onSetPicks && (
+        <PickChip n={shownMetrics.length} open={false} onToggle={() => setPicking(true)}
+                  label="Choose which vitals to show" />
+      )}
+      <div className={'m-vitals-tiles' + (onSetPicks ? ' has-chip' : '')}>
+        {shownMetrics.map(f => {
           const todayVal = log[today]?.[f.key];
           const fallback = todayVal == null ? latest(f.key) : null;
           const shown = todayVal ?? fallback?.v;
@@ -562,7 +597,7 @@ function VitalsBody({ S, update }) {
                 {shown != null ? shown : '–'}
                 {shown != null && <span className="m-vitals-unit">{f.unit}</span>}
               </span>
-              <span className="m-vitals-label">{f.label}</span>
+              <span className="m-vitals-label" style={{ color: f.color }}>{f.label}</span>
               {f.key === 'weight' && delta != null && todayVal != null && (
                 <span className={`m-vitals-delta${delta > 0 ? ' up' : delta < 0 ? ' down' : ''}`}>
                   <Icon name={delta > 0 ? 'arrow-up' : delta < 0 ? 'arrow-down' : 'minus'} size={10} /> {Math.abs(delta).toFixed(1)}
@@ -572,7 +607,7 @@ function VitalsBody({ S, update }) {
           );
         })}
       </div>
-      {weights.length >= 2 && <VitalsSparkline values={weights} />}
+      {series.length > 0 && <VitalsSparkline series={series} />}
       <div className="m-vitals-hint">
         {log[today] ? 'Tap a tile to update today’s entry.' : 'Tap a tile to log today.'}
       </div>
@@ -580,18 +615,42 @@ function VitalsBody({ S, update }) {
   );
 }
 
-function VitalsSparkline({ values }) {
+/**
+ * Multi-series sparkline.
+ *
+ * Every series is normalised to ITS OWN min/max, not a shared axis.
+ * Weight in kilograms and strain out of 21 have no common scale — one
+ * axis would flatten the smaller range into a straight line at the
+ * bottom and say nothing. What this chart shows is the SHAPE of each
+ * trend against a common time axis, which is the honest thing a
+ * 34px-tall sparkline can carry. The tiles above hold the real values.
+ *
+ * Time is the x axis (not sample index), so two metrics logged on
+ * different days still line up with each other.
+ */
+function VitalsSparkline({ series }) {
   const W = 260, H = 34, PAD = 3;
-  const min = Math.min(...values), max = Math.max(...values);
-  const span = max - min || 1;
-  const pts = values.map((v, i) => {
-    const x = PAD + (i / (values.length - 1)) * (W - PAD * 2);
-    const y = PAD + (1 - (v - min) / span) * (H - PAD * 2);
-    return `${x.toFixed(1)},${y.toFixed(1)}`;
-  }).join(' ');
+  const withPoints = (series || []).filter(s => s.points.length >= 2);
+  if (!withPoints.length) return null;
+
+  const allT = withPoints.flatMap(s => s.points.map(([t]) => t));
+  const t0 = Math.min(...allT), t1 = Math.max(...allT);
+  const tSpan = t1 - t0 || 1;
+
   return (
     <svg className="m-vitals-spark" viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" aria-hidden="true">
-      <polyline points={pts} fill="none" stroke="var(--em)" strokeWidth="1.6" strokeLinejoin="round" strokeLinecap="round" />
+      {withPoints.map(s => {
+        const vals = s.points.map(([, v]) => v);
+        const min = Math.min(...vals), max = Math.max(...vals);
+        const span = max - min || 1;
+        const d = s.points.map(([t, v], i) => {
+          const x = PAD + ((t - t0) / tSpan) * (W - PAD * 2);
+          const y = PAD + (1 - (v - min) / span) * (H - PAD * 2);
+          return `${i ? 'L' : 'M'}${x.toFixed(1)},${y.toFixed(1)}`;
+        }).join(' ');
+        return <path key={s.key} d={d} fill="none" stroke={s.color} strokeWidth="1.6"
+                     strokeLinejoin="round" strokeLinecap="round" vectorEffect="non-scaling-stroke" />;
+      })}
     </svg>
   );
 }

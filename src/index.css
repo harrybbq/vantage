@@ -5451,7 +5451,11 @@ button:active:not(:disabled),
 .m-vitals-tile.is-stale .m-vitals-val { opacity: .45; }
 .m-vitals-val { font-size: 17px; font-weight: 600; color: var(--text); font-variant-numeric: tabular-nums; line-height: 1; }
 .m-vitals-unit { font-size: 9px; color: var(--text-muted); margin-left: 3px; font-weight: 500; }
-.m-vitals-label { font-size: 8.5px; letter-spacing: 1.2px; color: var(--text-muted); }
+.m-vitals-label { font-size: 8.5px; letter-spacing: 1.2px; color: var(--text-muted);
+  /* Labels used to be literal uppercase strings in the component; they
+     now come from the shared metric list in title case, so the casing
+     moves to CSS rather than changing how the tiles read. */
+  text-transform: uppercase; }
 .m-vitals-delta { position: absolute; top: 6px; right: 7px; font-size: 8.5px; color: var(--text-muted); }
 .m-vitals-delta.down { color: var(--em); }
 .m-vitals-delta.up { color: #d99114; }
