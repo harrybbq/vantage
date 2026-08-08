@@ -5303,6 +5303,19 @@ button:active:not(:disabled),
    reads as just more small grey text nobody scans. */
 .vitals-ah-hint.is-error,
 #track .vitals-ah-hint.is-error { color: #e0796a; }
+
+/* Redirect-URI diagnostic. Only appears after a failed connect, so it
+   can afford to be plain and wide rather than tucked away. */
+.vitals-ah-diag { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 10px;
+  padding: 9px 11px; border: 1px solid var(--border); border-radius: 8px; }
+.vitals-ah-diag-label { font-family: var(--mono); font-size: 9px; letter-spacing: 1.2px;
+  text-transform: uppercase; color: var(--text-muted); }
+.vitals-ah-diag-uri { font-family: var(--mono); font-size: 10.5px; color: var(--em);
+  word-break: break-all; flex: 1 1 220px; min-width: 0; }
+.vitals-ah-diag-note { font-family: var(--mono); font-size: 9.5px; color: var(--text-muted);
+  line-height: 1.5; flex: 1 1 100%; }
+#track .vitals-ah-diag-label,
+#track .vitals-ah-diag-note { color: rgba(255,255,255,.55); }
 .vitals-target { stroke: var(--gold); stroke-width: 1; opacity: .55; }
 .vitals-endlabel { font-family: var(--mono); font-size: 11px; font-weight: 700; fill: var(--text); }
 .vitals-tooltip {

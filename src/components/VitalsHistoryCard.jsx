@@ -167,10 +167,23 @@ export function AppleHealthImport({ S, update }) {
 // development). Each account links its own device: tokens are keyed by
 // user_id in a table with RLS on and no policies, so only the Netlify
 // functions can read them and never across users.
+// Where the last connect attempt told WHOOP to send the user back.
+// sessionStorage, not app state: it is diagnostic, it is per-tab, and it
+// has to survive the round trip out to WHOOP and back without costing a
+// save of the state blob.
+const REDIRECT_KEY = 'vb_whoop_redirect';
+
 function WhoopPanel({ S, update }) {
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState('');
   const connected = !!S.whoopConnected;
+  // When WHOOP refuses the redirect_uri it shows ITS error page, so the
+  // app never learns anything — the user comes back with nothing to go
+  // on and no way to see the value that was rejected. Stash it on the
+  // way out and show it on the way back.
+  const [lastRedirect, setLastRedirect] = useState(() => {
+    try { return sessionStorage.getItem(REDIRECT_KEY) || ''; } catch { return ''; }
+  });
 
   async function syncNow(days = 7, silent = false) {
     setBusy(true);
@@ -204,6 +217,9 @@ function WhoopPanel({ S, update }) {
     const qs = p.toString();
     window.history.replaceState({}, '', window.location.pathname + (qs ? '?' + qs : ''));
     if (r === 'connected') {
+      // It worked — the redirect URI is not in question, so stop showing it.
+      try { sessionStorage.removeItem(REDIRECT_KEY); } catch { /* ignore */ }
+      setLastRedirect('');
       update(prev => (prev.whoopConnected ? prev : { ...prev, whoopConnected: true }));
       syncNow(7);
     } else {
@@ -234,6 +250,10 @@ function WhoopPanel({ S, update }) {
       });
       const body = await res.json().catch(() => ({}));
       if (!res.ok || !body.url) throw new Error(body.error || 'connect failed');
+      if (body.redirectUri) {
+        try { sessionStorage.setItem(REDIRECT_KEY, body.redirectUri); } catch { /* private mode */ }
+        setLastRedirect(body.redirectUri);
+      }
       window.location.href = body.url;
     } catch (e) {
       setMsg(e.message || 'Could not start WHOOP connect.');
@@ -272,6 +292,24 @@ function WhoopPanel({ S, update }) {
               : 'Link your WHOOP — recovery, sleep, HRV, strain and measured workout burn.')}
         </span>
       </div>
+      {/* Shown only after a connect attempt that did not end in success —
+          i.e. exactly when WHOOP has bounced you off its own error page
+          and the app has no idea why. This is the string WHOOP compared
+          against its list, so it is the one piece of information that
+          makes "redirect_uri does not match" actionable. */}
+      {!connected && lastRedirect && (
+        <div className="vitals-ah-diag">
+          <span className="vitals-ah-diag-label">Callback URL sent to WHOOP</span>
+          <code className="vitals-ah-diag-uri">{lastRedirect}</code>
+          <button type="button" className="vitals-ah-btn vitals-ah-btn-alt"
+                  onClick={() => navigator.clipboard?.writeText(lastRedirect).then(
+                    () => setMsg('Copied.'), () => setMsg(lastRedirect))}>Copy</button>
+          <span className="vitals-ah-diag-note">
+            If WHOOP said the redirect URL doesn’t match, this exact string has to be
+            listed in your WHOOP app’s redirect URLs.
+          </span>
+        </div>
+      )}
     </div>
   );
 }
