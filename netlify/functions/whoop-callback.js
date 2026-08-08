@@ -7,32 +7,35 @@
  * whoop_tokens (service-role only), and bounce back into the app.
  */
 const { verifyState, clearCookie } = require('../lib/oauthState');
+const { redirectUriFor, appUrl } = require('../lib/redirectUri');
 
 const TOKEN_URL = 'https://api.prod.whoop.com/oauth/oauth2/token';
 
 
-function redirect(host, result) {
+function redirect(event, result) {
   // Always burn the nonce, success or failure — a state that
   // survives one attempt is a state that can be retried.
+  // Back to the site's canonical origin, not the request host: the two
+  // can differ, and the Supabase session lives on the origin the user
+  // actually signed in on.
   return {
     statusCode: 302,
-    headers: { Location: `https://${host}/?whoop=${result}`, 'Set-Cookie': clearCookie },
+    headers: { Location: appUrl(event, `whoop=${result}`), 'Set-Cookie': clearCookie },
     body: '',
   };
 }
 
 exports.handler = async (event) => {
   const { SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, WHOOP_CLIENT_ID, WHOOP_CLIENT_SECRET } = process.env;
-  const host = event.headers.host;
   const q = event.queryStringParameters || {};
 
-  if (q.error) return redirect(host, 'denied');
+  if (q.error) return redirect(event, 'denied');
   // Authentic, unexpired, for this provider, AND accompanied by
   // the nonce cookie set when this browser began the flow.
   const checked = verifyState(q.state, 'whoop', event, process.env);
-  if (checked.error) return redirect(host, checked.error);
+  if (checked.error) return redirect(event, checked.error);
   const userId = checked.userId;
-  if (!q.code) return redirect(host, 'nocode');
+  if (!q.code) return redirect(event, 'nocode');
 
   try {
     const tokenRes = await fetch(TOKEN_URL, {
@@ -43,12 +46,14 @@ exports.handler = async (event) => {
         code: q.code,
         client_id: WHOOP_CLIENT_ID,
         client_secret: WHOOP_CLIENT_SECRET,
-        redirect_uri: `https://${host}/.netlify/functions/whoop-callback`,
+        // Byte-identical to what whoop-connect sent, or WHOOP rejects the
+        // exchange. Both come from the same helper so they cannot drift.
+        redirect_uri: redirectUriFor(event, 'whoop'),
       }),
     });
     if (!tokenRes.ok) {
       console.error('whoop token exchange failed:', tokenRes.status, await tokenRes.text().catch(() => ''));
-      return redirect(host, 'tokenfail');
+      return redirect(event, 'tokenfail');
     }
     const tok = await tokenRes.json();
     const expiresAt = new Date(Date.now() + (tok.expires_in || 3600) * 1000).toISOString();
@@ -71,11 +76,11 @@ exports.handler = async (event) => {
     });
     if (!up.ok) {
       console.error('whoop token store failed:', up.status, await up.text().catch(() => ''));
-      return redirect(host, 'storefail');
+      return redirect(event, 'storefail');
     }
-    return redirect(host, 'connected');
+    return redirect(event, 'connected');
   } catch (e) {
     console.error('whoop callback error:', e?.message);
-    return redirect(host, 'error');
+    return redirect(event, 'error');
   }
 };

@@ -10,6 +10,7 @@
  *      SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY.
  */
 const { issueState } = require('../lib/oauthState');
+const { redirectUriFor } = require('../lib/redirectUri');
 const { requireUser, underLimit, tooMany } = require('../lib/requireUser');
 
 const CORS = {
@@ -36,7 +37,11 @@ exports.handler = async (event) => {
   const userId = auth.userId;
   if (!underLimit('whoop-connect', userId, 10)) return tooMany(CORS);
 
-  const redirectUri = `https://${event.headers.host}/.netlify/functions/whoop-callback`;
+  // Constant, registrable value — NOT the request's host. See lib/redirectUri.
+  const redirectUri = redirectUriFor(event, 'whoop');
+  // Logged because when WHOOP rejects it the user sees WHOOP's error page,
+  // not ours, so this is the only place the actual value is visible.
+  console.info('whoop-connect: redirect_uri', redirectUri);
   const { state, cookie } = issueState(userId, 'whoop', process.env);
   const url = `${AUTH_URL}?` + new URLSearchParams({
     client_id: WHOOP_CLIENT_ID,
@@ -48,9 +53,11 @@ exports.handler = async (event) => {
 
   // The nonce cookie is what makes the state single-use and
   // browser-bound; the callback refuses a state without it.
+  // redirectUri is echoed back so the value that has to be registered
+  // with WHOOP is inspectable from the client rather than guessed at.
   return {
     statusCode: 200,
     headers: { ...CORS, 'Set-Cookie': cookie },
-    body: JSON.stringify({ ok: true, url }),
+    body: JSON.stringify({ ok: true, url, redirectUri }),
   };
 };

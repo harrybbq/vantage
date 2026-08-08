@@ -7,32 +7,33 @@
  * in oura_tokens (service-role only), and bounce back into the app.
  */
 const { verifyState, clearCookie } = require('../lib/oauthState');
+const { redirectUriFor, appUrl } = require('../lib/redirectUri');
 
 const TOKEN_URL = 'https://api.ouraring.com/oauth/token';
 
 
-function redirect(host, result) {
+function redirect(event, result) {
   // Always burn the nonce, success or failure — a state that
   // survives one attempt is a state that can be retried.
+  // Canonical origin, not the request host — see whoop-callback.
   return {
     statusCode: 302,
-    headers: { Location: `https://${host}/?oura=${result}`, 'Set-Cookie': clearCookie },
+    headers: { Location: appUrl(event, `oura=${result}`), 'Set-Cookie': clearCookie },
     body: '',
   };
 }
 
 exports.handler = async (event) => {
   const { SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, OURA_CLIENT_ID, OURA_CLIENT_SECRET } = process.env;
-  const host = event.headers.host;
   const q = event.queryStringParameters || {};
 
-  if (q.error) return redirect(host, 'denied');
+  if (q.error) return redirect(event, 'denied');
   // Authentic, unexpired, for this provider, AND accompanied by
   // the nonce cookie set when this browser began the flow.
   const checked = verifyState(q.state, 'oura', event, process.env);
-  if (checked.error) return redirect(host, checked.error);
+  if (checked.error) return redirect(event, checked.error);
   const userId = checked.userId;
-  if (!q.code) return redirect(host, 'nocode');
+  if (!q.code) return redirect(event, 'nocode');
 
   try {
     const tokenRes = await fetch(TOKEN_URL, {
@@ -43,17 +44,18 @@ exports.handler = async (event) => {
         code: q.code,
         client_id: OURA_CLIENT_ID,
         client_secret: OURA_CLIENT_SECRET,
-        redirect_uri: `https://${host}/.netlify/functions/oura-callback`,
+        // Byte-identical to what oura-connect sent, from the same helper.
+        redirect_uri: redirectUriFor(event, 'oura'),
       }),
     });
     if (!tokenRes.ok) {
       console.error('oura token exchange failed:', tokenRes.status, await tokenRes.text().catch(() => ''));
-      return redirect(host, 'tokenfail');
+      return redirect(event, 'tokenfail');
     }
     const tok = await tokenRes.json();
     if (!tok.access_token || !tok.refresh_token) {
       console.error('oura token exchange returned no tokens');
-      return redirect(host, 'tokenfail');
+      return redirect(event, 'tokenfail');
     }
     const expiresAt = new Date(Date.now() + (tok.expires_in || 86400) * 1000).toISOString();
 
@@ -75,11 +77,11 @@ exports.handler = async (event) => {
     });
     if (!up.ok) {
       console.error('oura token store failed:', up.status, await up.text().catch(() => ''));
-      return redirect(host, 'storefail');
+      return redirect(event, 'storefail');
     }
-    return redirect(host, 'connected');
+    return redirect(event, 'connected');
   } catch (e) {
     console.error('oura callback error:', e?.message);
-    return redirect(host, 'error');
+    return redirect(event, 'error');
   }
 };

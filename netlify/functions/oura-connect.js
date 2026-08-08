@@ -10,6 +10,7 @@
  *      SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY.
  */
 const { issueState } = require('../lib/oauthState');
+const { redirectUriFor } = require('../lib/redirectUri');
 const { requireUser, underLimit, tooMany } = require('../lib/requireUser');
 
 const CORS = {
@@ -40,7 +41,9 @@ exports.handler = async (event) => {
   const userId = auth.userId;
   if (!underLimit('oura-connect', userId, 10)) return tooMany(CORS);
 
-  const redirectUri = `https://${event.headers.host}/.netlify/functions/oura-callback`;
+  // Constant, registrable value — NOT the request's host. See lib/redirectUri.
+  const redirectUri = redirectUriFor(event, 'oura');
+  console.info('oura-connect: redirect_uri', redirectUri);
   const { state, cookie } = issueState(userId, 'oura', process.env);
   const url = `${AUTH_URL}?` + new URLSearchParams({
     client_id: OURA_CLIENT_ID,
@@ -55,6 +58,6 @@ exports.handler = async (event) => {
   return {
     statusCode: 200,
     headers: { ...CORS, 'Set-Cookie': cookie },
-    body: JSON.stringify({ ok: true, url }),
+    body: JSON.stringify({ ok: true, url, redirectUri }),
   };
 };
