@@ -5355,9 +5355,15 @@ button:active:not(:disabled),
 #widgetCanvas .widget-wrapper:has([data-react-widget]) > .link-island { height: 100%; box-sizing: border-box; display: flex; flex-direction: column; }
 #widgetCanvas .link-island:has([data-react-widget]) .hub-widget-body { flex: 1; min-height: 0; display: flex; flex-direction: column; }
 #widgetCanvas [data-react-widget] { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+/* Bodies that must fill the card rather than take their natural height.
+   Without this the chain from the wrapper down stops here and anything
+   inside — most importantly the picker — sizes to its content and
+   overruns a card it cannot see the bottom of. */
 #widgetCanvas [data-react-widget] > .sw-pot-fill,
 #widgetCanvas [data-react-widget] > .sw-pots,
-#widgetCanvas [data-react-widget] > .sw-proj { flex: 1; min-height: 0; }
+#widgetCanvas [data-react-widget] > .sw-proj,
+#widgetCanvas [data-react-widget] > .m-vitals,
+#widgetCanvas [data-react-widget] > .gw-goals { flex: 1; min-height: 0; }
 .sw-pot-fill-bar { position: absolute; left: 0; right: 0; bottom: 0; opacity: .9; transition: height .5s var(--ease-out, ease); }
 .sw-pot-fill-overlay { position: absolute; inset: 0; display: flex; flex-direction: column; justify-content: flex-end; gap: 2px; padding: 12px; background: linear-gradient(to top, rgba(0,0,0,.55), rgba(0,0,0,0) 55%); }
 .sw-pot-fill-name { font-family: var(--sans); font-size: 14px; font-weight: 600; color: #fff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-shadow: 0 1px 3px rgba(0,0,0,.5); }
@@ -5438,8 +5444,13 @@ button:active:not(:disabled),
 .m-macro-ring-label { font-family: var(--mono); font-size: 8.5px; letter-spacing: 1.2px; text-transform: uppercase; color: var(--text-muted); }
 
 /* ── Vitals widget — tap-to-log daily stats ── */
-.m-vitals { display: flex; flex-direction: column; gap: 10px; }
+/* position:relative so the pick chip (.sw-count, absolutely placed)
+   anchors HERE. Without it the chip escaped to the nearest positioned
+   ancestor — the widget wrapper — and landed on top of the card's ✕. */
+.m-vitals { position: relative; display: flex; flex-direction: column; gap: 10px; }
 .m-vitals-tiles { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+/* Reserve the chip's row so the first tile never sits under it. */
+.m-vitals-tiles.has-chip { padding-top: 26px; }
 .m-vitals-tile {
   position: relative; display: flex; flex-direction: column; gap: 3px;
   align-items: flex-start; padding: 10px 10px 8px; border-radius: 10px;
@@ -7032,6 +7043,9 @@ button:active:not(:disabled),
    the trend line, which is the thing a wide card can actually show. */
 [data-shape="banner"] .m-vitals { flex-direction: row; align-items: center; gap: 14px; }
 [data-shape="banner"] .m-vitals-tiles { flex: 1; grid-template-columns: repeat(3, 1fr); }
+/* A strip has no spare row to reserve — move the chip's clearance to
+   the side, the same trade the goals list makes. */
+[data-shape="banner"] .m-vitals-tiles.has-chip { padding-top: 0; padding-right: 44px; }
 [data-shape="banner"] .m-vitals-spark { flex: 1; min-width: 0; }
 [data-shape="banner"] .m-vitals-hint { display: none; }
 [data-shape="column"] .m-vitals-tiles { grid-template-columns: 1fr; }
@@ -7047,3 +7061,84 @@ button:active:not(:disabled),
 [data-shape="banner"] .mkt-track.is-marquee { animation: none; transform: none; }
 [data-shape="banner"] .mkt-track { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; }
 [data-shape="banner"] .mkt-list.is-scrolling { max-height: none; }
+
+/* ══ Height bands ═══════════════════════════════════════════════════════
+   Shape is a ratio, and a ratio cannot say "there are ninety pixels
+   left". Drag a 300x300 card down to 300x200 and the aspect moves 1.0 →
+   1.5 — still `square`, so nothing above responds and the card simply
+   clips. That is the gap these rules close: `data-h` (lib/hub/shape.js)
+   publishes ABSOLUTE height as xs / sm / md / lg, so a widget can shed
+   layers on vertical shrink the same way it already does on horizontal.
+
+   Order of sacrifice is the same everywhere, and it is deliberate:
+     1. hints, footnotes and quick-actions   (nice to have)
+     2. the card's own chrome                (identity, but not data)
+     3. secondary rows of the body           (context)
+   The primary number a widget exists to show is never dropped, and the
+   ✕ never goes — a widget you cannot delete is worse than a tight one.
+                                                                        */
+
+/* ── Chrome ───────────────────────────────────────────────────────────
+   `sm` compresses; the banner rule above did this already for one
+   shape, and short-and-square needs it just as much. */
+[data-h="sm"] .link-island-header { padding-top: 4px; padding-bottom: 0; }
+[data-h="sm"] .link-island-brand { padding-top: 2px; padding-bottom: 4px; }
+[data-h="sm"] .link-island-brand-title { font-size: 12px; }
+[data-h="sm"] .link-island-name { font-size: 8px; }
+[data-h="sm"] .link-island-body { padding-top: 7px; padding-bottom: 8px; }
+[data-h="sm"] .m-widget-head { padding: 5px 12px; }
+
+/* `xs` is a strip. The brand row goes entirely — the eyebrow in the
+   header already names the widget, so the display title is the one
+   piece of chrome that is pure duplication. */
+[data-h="xs"] .widget-drag-handle { height: 11px; }
+[data-h="xs"] .link-island-header { padding: 4px 10px 3px; gap: 7px; }
+[data-h="xs"] .link-island-icon { width: 17px; height: 17px; font-size: 10px; }
+[data-h="xs"] .link-island-name { font-size: 8px; letter-spacing: 1.4px; }
+[data-h="xs"] .link-island-url { display: none; }
+[data-h="xs"] .link-island-brand { display: none; }
+[data-h="xs"] .link-island-body { padding: 6px 10px 7px; }
+
+/* ── Bodies: shed the low-priority layer first ────────────────────── */
+[data-h="sm"] .m-vitals-hint,
+[data-h="sm"] .m-macros-quicklog,
+[data-h="sm"] .gw-how,
+[data-h="sm"] .gw-disclaimer,
+[data-h="sm"] .m-burn-acts { display: none; }
+[data-h="sm"] .m-vitals-spark { height: 26px; }
+[data-h="sm"] .mkt-list.is-scrolling { max-height: none; }
+
+/* ── Bodies at `xs`: one row of content, and it is the important one ── */
+[data-h="xs"] .m-vitals-hint,
+[data-h="xs"] .m-macros-quicklog,
+[data-h="xs"] .m-vitals-delta,
+[data-h="xs"] .gw-how,
+[data-h="xs"] .gw-disclaimer,
+[data-h="xs"] .gw-foot,
+[data-h="xs"] .m-burn-acts,
+[data-h="xs"] .nws-thumb,
+[data-h="xs"] .sw-pot-fill-nums { display: none; }
+/* Vitals keeps the tiles (the values) and drops the trend line — a
+   14px sparkline is a smudge, and the numbers are the point. */
+[data-h="xs"] .m-vitals-spark { display: none; }
+[data-h="xs"] .m-vitals-tiles.has-chip { padding-top: 0; padding-right: 44px; }
+/* One row, always. The width rules above drop to two columns on a
+   narrow card, which is right at normal heights and wrong here — a
+   strip has room for one row, so the second was simply cut off. Lay
+   them out in a line and let the line scroll instead. */
+[data-h="xs"] .m-vitals-tiles {
+  display: flex; gap: 5px; overflow-x: auto; overscroll-behavior-x: contain;
+}
+[data-h="xs"] .m-vitals-tile { flex: 1 0 auto; }
+[data-h="xs"] .m-vitals-tile { padding: 3px 6px; gap: 1px; }
+[data-h="xs"] .m-vitals-val { font-size: 14px; }
+[data-h="xs"] .m-vitals-unit { font-size: 8px; }
+[data-h="xs"] .m-vitals-label { font-size: 7px; letter-spacing: .6px; }
+[data-h="xs"] .nws-title { -webkit-line-clamp: 1; }
+[data-h="xs"] .m-macros { gap: 8px; }
+[data-h="xs"] .mkt-list.is-scrolling { max-height: none; }
+
+/* Anything not given an explicit strip layout scrolls rather than
+   clips. Clipping reads as a bug; a scrollbar reads as "there is more". */
+[data-h="xs"] .link-island-body,
+[data-h="sm"] .link-island-body { overflow-y: auto; }

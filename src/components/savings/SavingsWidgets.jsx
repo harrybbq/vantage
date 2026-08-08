@@ -97,6 +97,7 @@ export function SavingsPotsBody({ S, count = 1, picks, onSetCount, onSetPicks, n
             if (next.length) onSetPicks(next);
           }}
           onDone={() => setPicking(false)}
+          onReset={chosen.length ? () => onSetPicks([]) : null}
         />
       </div>
     );

@@ -10,15 +10,32 @@
   align-items:center;gap:5px;}
 .gw-chip-caret{font-size:9px;opacity:.8;display:inline-block;transition:transform .15s ease;}
 
-.gw-picklist{display:flex;flex-direction:column;gap:8px;min-height:0;}
+/* The picker must FIT the card. It is the only view where a control is
+   mandatory — Done is how you get back to the widget — and it is the
+   last thing in the flow, so anything that overruns the card takes the
+   exit with it. On a default 300x320 vitals widget the seven metric rows
+   plus the note pushed Done 75px below an overflow:hidden wrapper, and
+   the picker became a room with no door.
+   So: full height, and the ROW LIST is the only part allowed to give. */
+.gw-picklist{display:flex;flex-direction:column;gap:8px;flex:1 1 auto;min-height:0;}
 .gw-picklist-head{font-family:var(--mono);font-size:8.5px;letter-spacing:1.4px;
-  text-transform:uppercase;color:var(--text-muted);}
-.gw-picklist-scroll{display:flex;flex-direction:column;gap:5px;
+  text-transform:uppercase;color:var(--text-muted);
+  /* Clear the chip, which sits top-right of the body. */
+  padding-right:44px;}
+/* flex:1 + min-height:0 lets the list shrink on a short card; the
+   max-height still stops it sprawling on a tall one. */
+.gw-picklist-scroll{display:flex;flex-direction:column;gap:5px;flex:1 1 auto;min-height:0;
   max-height:min(200px,42vh);overflow-y:auto;overscroll-behavior:contain;padding-right:2px;}
+/* Neither the note nor the buttons may be squeezed out — they are what
+   the list is shrinking to protect. */
+.gw-picklist-note,.gw-picklist-foot{flex:0 0 auto;}
 .gw-picklist-scroll::-webkit-scrollbar{width:4px;}
 .gw-picklist-scroll::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px;}
 .gw-picklist-note{font-family:var(--mono);font-size:8px;color:var(--text-muted);line-height:1.5;}
+.gw-picklist-foot{display:flex;align-items:center;gap:12px;flex-wrap:wrap;}
 .gw-done{align-self:flex-start;}
+.gw-reset{color:var(--text-muted);}
+.gw-reset:hover{color:var(--em);}
 
 .gw-pickrow{display:flex;align-items:center;gap:9px;padding:7px 8px;border-radius:8px;
   border:1px solid var(--border);background:transparent;cursor:pointer;text-align:left;width:100%;}
