@@ -173,6 +173,21 @@ export function AppleHealthImport({ S, update }) {
 // save of the state blob.
 const REDIRECT_KEY = 'vb_whoop_redirect';
 
+/**
+ * The callback URL for the origin the browser is on RIGHT NOW.
+ *
+ * Not authoritative — the server decides what it actually sends, and the
+ * two differing is the whole failure mode this panel exists for. But it
+ * needs no round trip and no deploy, and when the site has moved to a new
+ * domain it is the fastest way to read that domain's callback URL off the
+ * screen instead of hunting for it in a dashboard. Labelled for what it
+ * is, so it can't be mistaken for what was sent.
+ */
+function callbackUrlForThisOrigin() {
+  if (typeof window === 'undefined') return '';
+  return `${window.location.origin}/.netlify/functions/whoop-callback`;
+}
+
 function WhoopPanel({ S, update }) {
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState('');
@@ -304,6 +319,24 @@ function WhoopPanel({ S, update }) {
           and the app has no idea why. This is the string WHOOP compared
           against its list, so it is the one piece of information that
           makes "redirect_uri does not match" actionable. */}
+      {/* Always available while unconnected, because it needs no round
+          trip: the callback URL for whatever origin you are looking at.
+          When the site moves domain this is the new value to register,
+          readable off the screen instead of hunted for in a dashboard. */}
+      {!connected && (
+        <div className="vitals-ah-diag">
+          <span className="vitals-ah-diag-label">Callback URL to register with WHOOP</span>
+          <code className="vitals-ah-diag-uri">{callbackUrlForThisOrigin()}</code>
+          <button type="button" className="vitals-ah-btn vitals-ah-btn-alt"
+                  onClick={() => navigator.clipboard?.writeText(callbackUrlForThisOrigin()).then(
+                    () => setMsg('Copied.'), () => setMsg(callbackUrlForThisOrigin()))}>Copy</button>
+          <span className="vitals-ah-diag-note">
+            This is the callback for the address you are on now. Register it in your
+            WHOOP app’s redirect URLs — and keep every other origin the app is reachable
+            on registered too, since each one counts separately.
+          </span>
+        </div>
+      )}
       {!connected && lastRedirect?.redirectUri && (
         <div className="vitals-ah-diag">
           <span className="vitals-ah-diag-label">Callback URL sent to WHOOP</span>
