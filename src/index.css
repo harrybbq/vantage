@@ -5013,6 +5013,35 @@ button:active:not(:disabled),
   opacity: .97;
 }
 .m-widget-swipe.is-lifted { overflow: visible; }
+
+/* Hold-to-reorder must not double as hold-to-select.
+   The reorder gesture is a long press, which is also iOS's gesture for
+   "select this word and show the copy callout" — so picking a card up
+   highlighted its title and popped a Copy/Look Up bar over the drag.
+   Suppressed across the whole card, callout included: nothing in a
+   widget body is text anyone reaches for by long-pressing, and the
+   gesture that overlaps is the primary way of rearranging the stack.
+   Inputs are exempted below, because selection is how you edit. */
+.m-widget,
+.m-widget-swipe,
+.m-widget-head,
+.m-widget-eyebrow,
+.m-widget-body {
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+}
+/* Typing needs selection — carets, double-tap to select a word, the
+   lot. Anything editable opts back in. */
+.m-widget input,
+.m-widget textarea,
+.m-widget select,
+.m-widget [contenteditable]:not([contenteditable="false"]) {
+  -webkit-user-select: text;
+  user-select: text;
+  -webkit-touch-callout: default;
+}
+
 .m-widget-head {
   display: flex;
   align-items: center;
