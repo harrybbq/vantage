@@ -6937,6 +6937,17 @@ button:active:not(:disabled),
 
    Shapes: column ▯  tall ▯  square ▢  wide ▭  banner ▬          */
 
+/* ── The card chrome itself has to give way on a banner ───────────────
+   A 165px strip spends ~120px on the header row and the title before
+   the body starts, which left the pot labels clipped off the top. The
+   header is compressed rather than hidden, because it carries the ✕ —
+   a widget you cannot delete is a worse outcome than a tight one. */
+[data-shape="banner"] .link-island-header { padding-top: 4px; padding-bottom: 0; }
+[data-shape="banner"] .link-island-brand { padding-top: 2px; padding-bottom: 4px; }
+[data-shape="banner"] .link-island-brand-title { font-size: 12px; }
+[data-shape="banner"] .link-island-name { font-size: 8px; }
+[data-shape="banner"] .m-widget-head { padding: 5px 12px; }
+
 /* ── Savings pots ─────────────────────────────────────────────────── */
 /* A thin card with four columns side by side gives four unreadable
    slivers. Stack them into rows instead — the fill still reads as a
@@ -6954,8 +6965,14 @@ button:active:not(:disabled),
 
 /* A banner is one strip: keep the columns, drop the vertical padding. */
 [data-shape="banner"] .sw-pot-fill.is-multi { min-height: 0; }
-[data-shape="banner"] .sw-pot-fill.is-multi .sw-pot-fill-overlay { padding: 7px 9px; }
-[data-shape="banner"] .sw-pot-fill.is-multi .sw-pot-fill-pct { font-size: 19px; }
+[data-shape="banner"] .sw-pot-fill.is-multi .sw-pot-fill-overlay {
+  padding: 6px 9px; flex-direction: row; align-items: center; gap: 8px;
+}
+[data-shape="banner"] .sw-pot-fill.is-multi .sw-pot-fill-name { flex: 1; min-width: 0; font-size: 11px; }
+[data-shape="banner"] .sw-pot-fill.is-multi .sw-pot-fill-pct { font-size: 17px; }
+/* The £ figure is the first thing to go: the percentage and the fill
+   height both already say how far along the pot is. */
+[data-shape="banner"] .sw-pot-fill.is-multi .sw-pot-fill-nums { display: none; }
 
 /* ── Macros ───────────────────────────────────────────────────────── */
 /* Banner: calorie ring, legend and the three donuts all on one line. */
@@ -6978,6 +6995,16 @@ button:active:not(:disabled),
 [data-shape="banner"] .gw-how,
 [data-shape="banner"] .gw-disclaimer,
 [data-shape="banner"] .gw-foot { display: none; }
+/* Wide is short too — 470x250 leaves ~130px of body once the header and
+   title have taken theirs, and a stacked gauge plus numbers needs more
+   than that, so the sessions and the timeline fell off the bottom. Use
+   the horizontal room the shape actually has. Less aggressive than the
+   banner: the workings stay, they just move beside the gauge. */
+[data-shape="wide"] .gw-hero { flex-direction: row; gap: 16px; align-items: center; }
+[data-shape="wide"] .gw-hero .gw-hero-side { align-items: flex-start; text-align: left; }
+[data-shape="wide"] .gw-hero .gw-nums { flex-direction: column; gap: 2px; }
+[data-shape="wide"] .gw-how { display: none; }
+
 /* Column: everything stacks and centres; the workings survive because a
    tall card has the room the banner doesn't. */
 [data-shape="column"] .gw-hero { flex-direction: column; }
@@ -6996,7 +7023,13 @@ button:active:not(:disabled),
 [data-shape="banner"] .nws-list li { border-bottom: 0; }
 
 /* ── Vitals ───────────────────────────────────────────────────────── */
-[data-shape="banner"] .m-vitals-tiles { grid-template-columns: repeat(6, 1fr); }
+/* repeat(6) left three tiles at a sixth of the width each with half the
+   card empty. Let the tiles take what they need and give the rest to
+   the trend line, which is the thing a wide card can actually show. */
+[data-shape="banner"] .m-vitals { flex-direction: row; align-items: center; gap: 14px; }
+[data-shape="banner"] .m-vitals-tiles { flex: 1; grid-template-columns: repeat(3, 1fr); }
+[data-shape="banner"] .m-vitals-spark { flex: 1; min-width: 0; }
+[data-shape="banner"] .m-vitals-hint { display: none; }
 [data-shape="column"] .m-vitals-tiles { grid-template-columns: 1fr; }
 
 /* ── Calories burned ──────────────────────────────────────────────── */

@@ -114,7 +114,7 @@ export function SavingsPotsBody({ S, count = 1, picks, onSetCount, onSetPicks, n
     const pct = Math.max(0, Math.min(1, (g.current || 0) / (g.target || 1)));
     return (
       <div className="sw-pot-fill" onClick={go} role={navigate ? 'link' : undefined} tabIndex={navigate ? 0 : undefined}>
-        <div className="sw-pot-fill-bar" style={{ height: `${Math.max(2, pct * 100)}%`, background: pct >= 1 ? 'var(--gold, #d4a017)' : potColor(g, goals.indexOf(g)) }} />
+        <div className="sw-pot-fill-bar" style={{ height: `${Math.max(2, pct * 100)}%`, '--sw-fill': `${Math.max(2, pct * 100)}%`, background: pct >= 1 ? 'var(--gold, #d4a017)' : potColor(g, goals.indexOf(g)) }} />
         {stepper}
         <div className="sw-pot-fill-overlay">
           <span className="sw-pot-fill-name">{g.icon || '💰'} {g.name}</span>
@@ -136,7 +136,7 @@ export function SavingsPotsBody({ S, count = 1, picks, onSetCount, onSetPicks, n
           const pct = Math.max(0, Math.min(1, (g.current || 0) / (g.target || 1)));
           return (
             <div key={g.id} className="sw-pot-fill is-multi">
-              <div className="sw-pot-fill-bar" style={{ height: `${Math.max(2, pct * 100)}%`, background: pct >= 1 ? 'var(--gold, #d4a017)' : potColor(g, goals.indexOf(g)) }} />
+              <div className="sw-pot-fill-bar" style={{ height: `${Math.max(2, pct * 100)}%`, '--sw-fill': `${Math.max(2, pct * 100)}%`, background: pct >= 1 ? 'var(--gold, #d4a017)' : potColor(g, goals.indexOf(g)) }} />
               <div className="sw-pot-fill-overlay">
                 <span className="sw-pot-fill-name">{g.icon || '💰'} {g.name}</span>
                 <span className="sw-pot-fill-pct">{Math.round(pct * 100)}%</span>
