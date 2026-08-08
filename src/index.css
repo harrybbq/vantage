@@ -5355,9 +5355,15 @@ button:active:not(:disabled),
 #widgetCanvas .widget-wrapper:has([data-react-widget]) > .link-island { height: 100%; box-sizing: border-box; display: flex; flex-direction: column; }
 #widgetCanvas .link-island:has([data-react-widget]) .hub-widget-body { flex: 1; min-height: 0; display: flex; flex-direction: column; }
 #widgetCanvas [data-react-widget] { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+/* Bodies that must fill the card rather than take their natural height.
+   Without this the chain from the wrapper down stops here and anything
+   inside — most importantly the picker — sizes to its content and
+   overruns a card it cannot see the bottom of. */
 #widgetCanvas [data-react-widget] > .sw-pot-fill,
 #widgetCanvas [data-react-widget] > .sw-pots,
-#widgetCanvas [data-react-widget] > .sw-proj { flex: 1; min-height: 0; }
+#widgetCanvas [data-react-widget] > .sw-proj,
+#widgetCanvas [data-react-widget] > .m-vitals,
+#widgetCanvas [data-react-widget] > .gw-goals { flex: 1; min-height: 0; }
 .sw-pot-fill-bar { position: absolute; left: 0; right: 0; bottom: 0; opacity: .9; transition: height .5s var(--ease-out, ease); }
 .sw-pot-fill-overlay { position: absolute; inset: 0; display: flex; flex-direction: column; justify-content: flex-end; gap: 2px; padding: 12px; background: linear-gradient(to top, rgba(0,0,0,.55), rgba(0,0,0,0) 55%); }
 .sw-pot-fill-name { font-family: var(--sans); font-size: 14px; font-weight: 600; color: #fff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-shadow: 0 1px 3px rgba(0,0,0,.5); }

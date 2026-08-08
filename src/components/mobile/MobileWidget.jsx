@@ -546,7 +546,17 @@ function VitalsBody({ S, update, picks, onSetPicks }) {
   if (picking) {
     const all = metricAvailability(S);
     return (
-      <div className="m-vitals">
+      <div className="m-vitals is-picking">
+        {/* The chip stays, and it toggles. Savings and goals both keep
+            theirs while their picker is open; vitals hid it and made the
+            chip one-way (setPicking(true)), so Done was the ONLY way back
+            to the chart — and Done is the last thing in the flow, so on a
+            default-sized card it fell outside an overflow:hidden wrapper
+            and took the exit with it. */}
+        {onSetPicks && (
+          <PickChip n={shownMetrics.length} open onToggle={() => setPicking(false)}
+                    label="Back to the chart" />
+        )}
         <PickList
           items={all.map(m => ({
             id: m.key,
