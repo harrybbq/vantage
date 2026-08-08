@@ -47,9 +47,24 @@ exports.handler = async (event) => {
   try {
     const accessToken = await getFreshToken(userId, env);
     if (!accessToken) return { statusCode: 404, headers: CORS, body: JSON.stringify({ error: 'not connected' }) };
-    const { vitals, burn } = await fetchWhoopData(accessToken, days);
-    return { statusCode: 200, headers: CORS, body: JSON.stringify({ ok: true, days, vitals, burn }) };
+    const { vitals, burn, warnings } = await fetchWhoopData(accessToken, days);
+    return {
+      statusCode: 200,
+      headers: CORS,
+      body: JSON.stringify({ ok: true, days, vitals, burn, warnings: warnings || [] }),
+    };
   } catch (e) {
-    return { statusCode: 502, headers: CORS, body: JSON.stringify({ error: e.message || 'whoop sync failed' }) };
+    // `reconnect` tells the client this is terminal until the user
+    // re-authorises, so it can show the Connect button rather than a
+    // "try again" that will fail identically every time.
+    console.error('whoop-sync failed', userId, e.whoopStatus || '', e.message, e.whoopDetail || '');
+    return {
+      statusCode: 502,
+      headers: CORS,
+      body: JSON.stringify({
+        error: e.message || 'whoop sync failed',
+        reconnect: e.whoopStatus === 400 || e.whoopStatus === 401 || e.whoopStatus === 403,
+      }),
+    };
   }
 };

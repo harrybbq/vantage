@@ -176,13 +176,22 @@ function WhoopPanel({ S, update }) {
     setBusy(true);
     if (!silent) setMsg('');
     try {
-      const { vDays, bDays } = await syncWhoop(update, days);
-      setMsg(`Synced ${vDays} day${vDays === 1 ? '' : 's'} of vitals · ${bDays} workout day${bDays === 1 ? '' : 's'}.`);
+      const { vDays, bDays, warnings } = await syncWhoop(update, days);
+      // "Synced 0 days" reads as success and is how a dead connection
+      // used to present itself. Say what actually happened instead.
+      const base = vDays === 0 && bDays === 0
+        ? `WHOOP had nothing for the last ${days} days.`
+        : `Synced ${vDays} day${vDays === 1 ? '' : 's'} of vitals · ${bDays} workout day${bDays === 1 ? '' : 's'}.`;
+      setMsg(warnings?.length ? `${base} ${warnings.join(' ')}` : base);
     } catch (e) {
       setMsg(e.message || 'WHOOP sync failed.');
     }
     setBusy(false);
   }
+
+  // A background sync that failed leaves this behind; surface it, since
+  // the user never saw the request that produced it.
+  const lastError = !msg && S.whoopLastError ? S.whoopLastError : null;
 
   // Handle the OAuth redirect (?whoop=connected). Routine freshness is
   // now driven by the app-level auto-sync (useWhoopAutoSync) on open/
@@ -245,13 +254,22 @@ function WhoopPanel({ S, update }) {
               {busy ? 'Syncing…' : 'Sync WHOOP'}
             </button>
             <button type="button" className="vitals-ah-btn vitals-ah-btn-alt" disabled={busy} onClick={() => syncNow(30)}>30d</button>
+            {/* When WHOOP has told us the authorisation is spent, retrying
+                does the same thing forever. Reconnecting is the only move
+                that helps, so offer it here rather than making the user
+                find Disconnect and guess. */}
+            {lastError?.reconnect && (
+              <button type="button" className="vitals-ah-btn" disabled={busy} onClick={connect}>Reconnect WHOOP</button>
+            )}
             <button type="button" className="vitals-ah-btn vitals-ah-btn-alt" disabled={busy} onClick={disconnect}>Disconnect</button>
           </>
         )}
-        <span className="vitals-ah-hint">
-          {msg || (connected
-            ? 'Pulls recovery, sleep, HRV, strain and workout burn. Auto-syncs when you open the app.'
-            : 'Link your WHOOP — recovery, sleep, HRV, strain and measured workout burn.')}
+        <span className={'vitals-ah-hint' + (lastError ? ' is-error' : '')}>
+          {msg || (lastError
+            ? `Last sync failed: ${lastError.message}`
+            : connected
+              ? 'Pulls recovery, sleep, HRV, strain and workout burn. Auto-syncs when you open the app.'
+              : 'Link your WHOOP — recovery, sleep, HRV, strain and measured workout burn.')}
         </span>
       </div>
     </div>
