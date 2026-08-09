@@ -48,6 +48,24 @@ export const MAX_SAFE_LOSS_FRACTION = 0.01;  // 1% of bodyweight per week
 
 import { bmrKcal, currentWeightKg } from '../burn.js';
 import { blendedDailyKcal } from '../diet/plan.js';
+import { plannedSessionsPerWeek } from '../rotation/pattern.js';
+
+/**
+ * Planned sessions a week.
+ *
+ * `goal.weeklyWeights + weeklyCardio` is a number typed once at setup —
+ * a guess about a rota that is already written down. When the rotation
+ * is in use its own cadence is the better input, and it is the same
+ * figure the calendar draws, so the two cannot disagree.
+ *
+ * Only used when the user actually has a rotation; a typed cadence still
+ * wins if there is one, because someone who set it deliberately meant it.
+ */
+function cadenceOf(S, goal) {
+  const typed = (goal.weeklyWeights || 0) + (goal.weeklyCardio || 0);
+  if (typed > 0) return typed;
+  return S && S.rotation ? plannedSessionsPerWeek() : 0;
+}
 
 const DAY = 86400000;
 const ymd = d => d.toISOString().slice(0, 10);
@@ -252,7 +270,7 @@ export function summariseIntake(entries, bmr, windowDays = 14) {
 }
 
 export function modelledRate(S, goal, intakeAvg = null) {
-  const cadence = (goal.weeklyWeights || 0) + (goal.weeklyCardio || 0);
+  const cadence = cadenceOf(S, goal);
   const tdee = tdeeKcal(S, cadence);
   if (!tdee) return null;
 
@@ -574,7 +592,7 @@ export function bodyGoalPlan(S, opts = {}) {
   // percentage climbs. Slacking would have looked like progress. Against
   // the plan, a slower rate stretches `weeks`, the remaining count grows,
   // and the bar correctly falls back.
-  const plannedPerWeek = (goal.weeklyWeights || 0) + (goal.weeklyCardio || 0) || perWeek;
+  const plannedPerWeek = cadenceOf(S, goal) || perWeek;
   const sessionsRemaining = Math.round(weeks * plannedPerWeek);
   const sessionsTotal = sessionsDone + sessionsRemaining;
   const pct = sessionsTotal > 0

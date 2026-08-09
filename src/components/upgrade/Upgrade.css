@@ -57,6 +57,15 @@
   padding: 3px 9px; border-radius: 999px; border: 1px solid rgba(200,151,10,.4); }
 .upg-holnext { margin-left: auto; font-family: var(--mono); font-size: 10.5px; color: var(--text-muted); }
 .upg-holnext b { color: var(--gold, #c8970a); }
+.upg-blocklist { display: flex; gap: 7px; flex-wrap: wrap; }
+.upg-block { display: inline-flex; align-items: center; gap: 7px; padding: 4px 6px 4px 10px;
+  border-radius: 999px; border: 1px solid rgba(200,151,10,.45); background: rgba(200,151,10,.09);
+  font-family: var(--mono); font-size: 10px; color: var(--text-muted); }
+.upg-block b { color: var(--gold, #c8970a); font-weight: 600; }
+.upg-block-n { color: var(--text-muted); opacity: .8; }
+.upg-block-x { background: none; border: 0; cursor: pointer; color: var(--text-muted);
+  font-size: 11px; line-height: 1; padding: 2px 4px; border-radius: 4px; }
+.upg-block-x:hover { color: #e0796a; }
 
 /* ── Legend ────────────────────────────────────────────────────── */
 .upg-legend { display: flex; flex-wrap: wrap; gap: 10px 16px; align-items: center;

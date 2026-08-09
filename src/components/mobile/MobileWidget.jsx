@@ -24,6 +24,7 @@ import { BodyBody, SubscriptionsBody, MoodBody } from '../widgets/LifeWidgets';
 import { GoalsBody, BodyGoalBody } from '../widgets/GoalsWidget';
 import { useSubscriptionContext } from '../../context/SubscriptionContext';
 import { observeShape } from '../../lib/hub/shape';
+import { RotationBody } from '../widgets/RotationWidget';
 import { metricAvailability, metricSeries, resolvePicks } from '../../lib/vitals/metrics';
 import { PickChip, PickList } from '../widgets/GoalsWidget';
 import { tradingWidgetAvailable, TRADING_WIDGET_BUILD_EXCLUDED } from '../../lib/trading/enabled';
@@ -54,6 +55,12 @@ const BASE_WIDGET_META = {
     label: 'Trading',
     eyebrow: 'TRADING',
     icon: '↗', svg: 'trending-up',
+    ownerOnly: true,
+  },
+  'rotation': {
+    label: 'Rotation',
+    eyebrow: 'ROTATION',
+    icon: '◷', svg: 'calendar-days',
     ownerOnly: true,
   },
   'market': {
@@ -476,6 +483,7 @@ function renderBody(widget, meta, S, update, navigate, userId, hasPro) {
     case 'vitals':      return <VitalsBody S={S} update={update} picks={widget.picks}
       onSetPicks={p => update(prev => ({ ...prev, mobileWidgets: (prev.mobileWidgets || []).map(w => w.id === widget.id ? { ...w, picks: p } : w) }))} />;
     case 'calories':    return <BurnBody S={S} update={update} userId={userId} />;
+    case 'rotation':    return <RotationBody S={S} navigate={navigate} />;
     case 'macros':      return <MacrosBody S={S} userId={userId} navigate={navigate} />;
     case 'body':        return <BodyBody S={S} update={update} navigate={navigate} />;
     case 'mood':        return <MoodBody S={S} update={update} navigate={navigate} />;

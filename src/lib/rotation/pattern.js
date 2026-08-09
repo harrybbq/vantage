@@ -242,9 +242,14 @@ export function datesBetween(isoA, isoB) {
 /**
  * Allowance usage.
  *
- * A day only costs you allowance if it replaced a shift you would
- * otherwise have worked. Marking an off day as leave is free, and
- * charging for it would quietly eat days you never actually booked.
+ * Counts ONLY real annual-leave bookings made on a day. Holiday blocks
+ * (below) are a visual overlay and deliberately do not touch this — you
+ * can shade a fortnight to see how far off it is without that being a
+ * claim about your entitlement.
+ *
+ * A day only costs allowance if it replaced a shift you would otherwise
+ * have worked. Marking an off day as leave is free, and charging for it
+ * would quietly eat days you never actually booked.
  */
 export function allowanceUsed(overrides = {}, allowance = ALLOWANCE_DEFAULT) {
   const total = (allowance.base || 0) + (allowance.extra || 0);
@@ -259,38 +264,72 @@ export function allowanceUsed(overrides = {}, allowance = ALLOWANCE_DEFAULT) {
   return { total, used, left: total - used, freeDays };
 }
 
-/**
- * Contiguous runs of leave, in date order. Derived rather than stored:
- * a "holiday block" is just days next to each other, so booking one day
- * and booking a fortnight are the same operation and cannot disagree.
+/* ══ Holiday blocks — a visual overlay ══════════════════════════════
+ *
+ * Stored as explicit ranges rather than as a flag on each day, because
+ * a block is the thing being reasoned about: "how far away is the next
+ * holiday" is a question about a range, and naming and deleting one
+ * should be a single act rather than an edit to fourteen days.
+ *
+ * They are PURELY VISUAL. They do not book leave, do not change the
+ * shift totals and do not draw down the allowance. Shading a fortnight
+ * to see how far off it is should not be a claim about entitlement —
+ * booking the days themselves is a separate, deliberate act.
+ *
+ *   S.rotation.holidayBlocks = [{ id, start, end, label }]
  */
-export function holidayBlocks(overrides = {}) {
-  const days = Object.entries(overrides)
-    .filter(([, ov]) => ov && CHARGEABLE.has(ov.leave))
-    .map(([iso]) => iso)
-    .sort();
-  const blocks = [];
-  for (const iso of days) {
-    const last = blocks[blocks.length - 1];
-    if (last && isoToNum(iso) === isoToNum(last.end) + 1) {
-      last.end = iso;
-      last.days++;
-    } else {
-      blocks.push({ start: iso, end: iso, days: 1 });
-    }
-  }
-  return blocks;
+
+/** Normalised so `start` is always the earlier end. */
+export function normaliseBlock(b) {
+  if (!b || !b.start || !b.end) return null;
+  const [start, end] = b.start <= b.end ? [b.start, b.end] : [b.end, b.start];
+  return { ...b, start, end };
 }
 
-/** The next block starting on or after `fromIso`, with the countdown. */
-export function nextHoliday(overrides = {}, fromIso) {
+export function blockDays(b) {
+  const n = normaliseBlock(b);
+  return n ? datesBetween(n.start, n.end).length : 0;
+}
+
+/** Every ISO date covered by any block — what the calendar shades. */
+export function holidayDaySet(blocks = []) {
+  const set = new Set();
+  for (const b of blocks) {
+    const n = normaliseBlock(b);
+    if (n) datesBetween(n.start, n.end).forEach(d => set.add(d));
+  }
+  return set;
+}
+
+/**
+ * The next block ending on or after `fromIso`, with the countdown.
+ * Blocks you are inside report `active` and count zero days away.
+ */
+export function nextHoliday(blocks = [], fromIso) {
   const from = isoToNum(fromIso);
-  const upcoming = holidayBlocks(overrides)
+  const upcoming = (blocks || [])
+    .map(normaliseBlock).filter(Boolean)
     .filter(b => isoToNum(b.end) >= from)
     .sort((a, b) => a.start.localeCompare(b.start))[0];
   if (!upcoming) return null;
   const startsIn = isoToNum(upcoming.start) - from;
-  return { ...upcoming, startsIn, active: startsIn <= 0 };
+  return {
+    ...upcoming,
+    days: blockDays(upcoming),
+    startsIn: Math.max(0, startsIn),
+    active: startsIn <= 0,
+  };
+}
+
+/**
+ * How many training sessions a week the rota actually plans.
+ *
+ * The body-goal projection otherwise takes a number the user typed at
+ * setup, which is a guess about a rota that is already written down.
+ * This is the same figure the calendar draws.
+ */
+export function plannedSessionsPerWeek() {
+  return Math.round((TRAIN_POS.length / CYCLE) * 7 * 100) / 100;
 }
 
 /** The default window the page shows: the anchor through Sep 2027. */

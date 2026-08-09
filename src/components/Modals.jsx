@@ -201,6 +201,15 @@ function AddLinkModal({ openId, onClose, onSwitchModal, onAddNotepad, onAddApp, 
           <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Agents · P/L</span>
         </button>
         )}
+        {/* Owner-only: reads the rotation, which is an owner-only page. */}
+        {typeof window !== 'undefined' && window.__vantageOwner && (
+        <button className="btn btn-ghost" style={{ padding: '16px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px', borderRadius: '12px', height: 'auto' }}
+          onClick={() => { onClose('addLinkModal'); onAddHubWidget('rotation'); }}>
+          <Icon name="calendar-days" size={22} strokeWidth={1.75} />
+          <span style={{ fontWeight: 700, fontSize: '13px', color: 'var(--text)' }}>Rotation</span>
+          <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Shift · session · holiday</span>
+        </button>
+        )}
         {/* Body widget retired — the Goals and Body Goal widgets both
             cover the weight trend. Existing hubs keep theirs. */}
         <button className="btn btn-ghost" style={{ padding: '16px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px', borderRadius: '12px', height: 'auto' }}

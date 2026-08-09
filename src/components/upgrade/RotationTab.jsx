@@ -21,8 +21,8 @@ import { useMemo, useState } from 'react';
 import Icon from '../Icon';
 import {
   ALLOWANCE_DEFAULT, LEAVE_TYPES, SESSION_OPTIONS, WINDOW, allowanceUsed,
-  chipText, datesBetween, leaveType, monthGrid, monthRange, nextHoliday,
-  rangeStats, patternDay,
+  chipText, datesBetween, holidayDaySet, leaveType, monthGrid, monthRange,
+  nextHoliday, normaliseBlock, rangeStats, patternDay,
 } from '../../lib/rotation/pattern';
 
 const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June',
@@ -53,6 +53,10 @@ export default function RotationTab({ S, update, isMobile }) {
   const allowance = useMemo(
     () => allowanceUsed(overrides, { ...ALLOWANCE_DEFAULT, ...((S.rotation || {}).allowance || {}) }),
     [overrides, S.rotation]);
+  // Holiday blocks are a visual overlay, stored separately from the
+  // per-day overrides. They shade the calendar and drive the countdown;
+  // they book nothing and cost no allowance.
+  const blocks = useMemo(() => (S.rotation && S.rotation.holidayBlocks) || [], [S.rotation]);
 
   // Additive: a new `rotation` key, and within it only the days that
   // deviate. Setting a day back to its pattern value deletes the entry
@@ -80,7 +84,8 @@ export default function RotationTab({ S, update, isMobile }) {
 
   const today = todayIso();
   const editedCount = Object.keys(overrides).length;
-  const upcoming = useMemo(() => nextHoliday(overrides, today), [overrides, today]);
+  const upcoming = useMemo(() => nextHoliday(blocks, today), [blocks, today]);
+  const holidayDays = useMemo(() => holidayDaySet(blocks), [blocks]);
 
   // The set of dates the picker is currently proposing, so the calendar
   // can shade them before anything is written.
@@ -88,27 +93,35 @@ export default function RotationTab({ S, update, isMobile }) {
     () => (booking && anchor ? new Set(datesBetween(anchor, hover || anchor)) : null),
     [booking, anchor, hover]);
 
-  /** Book (or clear) a whole range in one write. */
-  function bookRange(a, b, leave) {
-    const dates = datesBetween(a, b);
-    update(prev => {
-      const cur = { ...((prev.rotation && prev.rotation.overrides) || {}) };
-      for (const iso of dates) {
-        if (leave) cur[iso] = { ...(cur[iso] || {}), leave };
-        else if (cur[iso]) {
-          const next = { ...cur[iso] };
-          delete next.leave;
-          if (Object.keys(next).length) cur[iso] = next; else delete cur[iso];
-        }
-      }
-      return { ...prev, rotation: { ...(prev.rotation || {}), overrides: cur } };
+  /** Add a visual holiday block. Books nothing. */
+  function addBlock(a, b) {
+    const block = normaliseBlock({
+      id: Math.random().toString(36).slice(2, 10), start: a, end: b, label: '',
     });
+    if (!block) return;
+    update(prev => ({
+      ...prev,
+      rotation: {
+        ...(prev.rotation || {}),
+        holidayBlocks: [...((prev.rotation || {}).holidayBlocks || []), block],
+      },
+    }));
   }
 
-  /** A click in booking mode: first sets the anchor, second commits. */
+  function removeBlock(id) {
+    update(prev => ({
+      ...prev,
+      rotation: {
+        ...(prev.rotation || {}),
+        holidayBlocks: ((prev.rotation || {}).holidayBlocks || []).filter(b => b.id !== id),
+      },
+    }));
+  }
+
+  /** A click in marking mode: first sets the anchor, second commits. */
   function pickDate(iso) {
     if (!anchor) { setAnchor(iso); setHover(iso); return; }
-    bookRange(anchor, iso, 'annual');
+    addBlock(anchor, iso);
     setAnchor(null); setHover(null); setBooking(false);
   }
 
@@ -145,7 +158,7 @@ export default function RotationTab({ S, update, isMobile }) {
       <div className="upg-holbar">
         {!booking ? (
           <button type="button" className="upg-opt is-gold" onClick={() => setBooking(true)}>
-            <Icon name="plane" size={12} /> Book a holiday
+            <Icon name="plane" size={12} /> Mark a holiday
           </button>
         ) : (
           <>
@@ -165,6 +178,20 @@ export default function RotationTab({ S, update, isMobile }) {
           </span>
         )}
       </div>
+
+      {blocks.length > 0 && (
+        <div className="upg-blocklist">
+          {[...blocks].map(normaliseBlock).filter(Boolean)
+            .sort((a, b) => a.start.localeCompare(b.start)).map(b => (
+            <span key={b.id} className="upg-block">
+              <b>{b.start}</b> → <b>{b.end}</b>
+              <span className="upg-block-n">{datesBetween(b.start, b.end).length}d</span>
+              <button type="button" className="upg-block-x" aria-label="Remove holiday"
+                      onClick={() => removeBlock(b.id)}>✕</button>
+            </span>
+          ))}
+        </div>
+      )}
 
       <div className="upg-legend">
         <span><i className="upg-sw is-night" /> Night</span>
@@ -191,7 +218,7 @@ export default function RotationTab({ S, update, isMobile }) {
                 const inPreview = preview && preview.has(cell.iso);
                 const cls = [
                   'upg-cell', `is-${cell.shift}`,
-                  cell.leave === 'annual' ? 'is-holiday' : '',
+                  holidayDays.has(cell.iso) ? 'is-holiday' : '',
                   cell.cardio ? 'has-cardio' : '',
                   cell.edited ? 'is-edited' : '',
                   cell.iso === today ? 'is-today' : '',
