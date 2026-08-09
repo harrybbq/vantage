@@ -207,6 +207,92 @@ export function rangeStats(from, to, overrides = {}) {
   return stats;
 }
 
+/* ══ Holiday blocks and the leave allowance ═════════════════════════ */
+
+/**
+ * The yearly allowance. Base entitlement plus the bank holidays that
+ * are paid as leave rather than taken — this rota doesn't get them off,
+ * so they arrive as days in the pot instead.
+ */
+export const ALLOWANCE_DEFAULT = { base: 25, extra: 10 };
+
+/** Which leave types are drawn from the allowance. Sick and course are
+ *  not holiday; TOIL is time already worked, so it isn't either. */
+export const CHARGEABLE = new Set(['annual']);
+
+const isoToNum = iso => {
+  const [y, m, d] = iso.split('-').map(Number);
+  return dayNum(y, m - 1, d);
+};
+const numToIso = n => {
+  const dt = new Date(n * MS);
+  return isoOf(dt.getUTCFullYear(), dt.getUTCMonth(), dt.getUTCDate());
+};
+
+/** Every ISO date from a to b inclusive, in order, whichever way round. */
+export function datesBetween(isoA, isoB) {
+  if (!isoA || !isoB) return [];
+  let a = isoToNum(isoA), b = isoToNum(isoB);
+  if (a > b) [a, b] = [b, a];
+  const out = [];
+  for (let n = a; n <= b; n++) out.push(numToIso(n));
+  return out;
+}
+
+/**
+ * Allowance usage.
+ *
+ * A day only costs you allowance if it replaced a shift you would
+ * otherwise have worked. Marking an off day as leave is free, and
+ * charging for it would quietly eat days you never actually booked.
+ */
+export function allowanceUsed(overrides = {}, allowance = ALLOWANCE_DEFAULT) {
+  const total = (allowance.base || 0) + (allowance.extra || 0);
+  let used = 0, freeDays = 0;
+  for (const [iso, ov] of Object.entries(overrides)) {
+    if (!ov || !CHARGEABLE.has(ov.leave)) continue;
+    const [y, m, d] = iso.split('-').map(Number);
+    const base = patternDay(y, m - 1, d);
+    if (base.inPattern && (base.shift === 'night' || base.shift === 'day')) used++;
+    else freeDays++;
+  }
+  return { total, used, left: total - used, freeDays };
+}
+
+/**
+ * Contiguous runs of leave, in date order. Derived rather than stored:
+ * a "holiday block" is just days next to each other, so booking one day
+ * and booking a fortnight are the same operation and cannot disagree.
+ */
+export function holidayBlocks(overrides = {}) {
+  const days = Object.entries(overrides)
+    .filter(([, ov]) => ov && CHARGEABLE.has(ov.leave))
+    .map(([iso]) => iso)
+    .sort();
+  const blocks = [];
+  for (const iso of days) {
+    const last = blocks[blocks.length - 1];
+    if (last && isoToNum(iso) === isoToNum(last.end) + 1) {
+      last.end = iso;
+      last.days++;
+    } else {
+      blocks.push({ start: iso, end: iso, days: 1 });
+    }
+  }
+  return blocks;
+}
+
+/** The next block starting on or after `fromIso`, with the countdown. */
+export function nextHoliday(overrides = {}, fromIso) {
+  const from = isoToNum(fromIso);
+  const upcoming = holidayBlocks(overrides)
+    .filter(b => isoToNum(b.end) >= from)
+    .sort((a, b) => a.start.localeCompare(b.start))[0];
+  if (!upcoming) return null;
+  const startsIn = isoToNum(upcoming.start) - from;
+  return { ...upcoming, startsIn, active: startsIn <= 0 };
+}
+
 /** The default window the page shows: the anchor through Sep 2027. */
 export const WINDOW = {
   fromY: 2026, fromM: 6,

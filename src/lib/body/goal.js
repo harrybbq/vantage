@@ -47,6 +47,7 @@ export const RATE_WINDOWS = [28, 56, 90];
 export const MAX_SAFE_LOSS_FRACTION = 0.01;  // 1% of bodyweight per week
 
 import { bmrKcal, currentWeightKg } from '../burn.js';
+import { blendedDailyKcal } from '../diet/plan.js';
 
 const DAY = 86400000;
 const ymd = d => d.toISOString().slice(0, 10);
@@ -268,9 +269,16 @@ export function modelledRate(S, goal, intakeAvg = null) {
   const optedOut = goal.useMacros === false;
   const useActual = !optedOut && intakeAvg && intakeAvg.avgKcal > 0
     && intakeAvg.loggedDays >= MIN_INTAKE_DAYS;
-  // Target comes from the user's macro settings; goal.dailyKcal is only
-  // a fallback for goals saved before that was wired up.
-  const targetKcal = (intakeAvg && intakeAvg.targetKcal) || goal.dailyKcal || null;
+  // Target precedence, most authoritative first:
+  //   1. the macro goal in Track — what the food log measures against
+  //   2. goal.dailyKcal — legacy, for goals saved before that was wired
+  //   3. the Diet tab plan, blended across the rotation
+  // The plan is last because it is an intention, not the app's live
+  // target — but it is far better than refusing to project at all just
+  // because the same number wasn't typed into Track as well.
+  const planKcal = blendedDailyKcal(S);
+  const targetKcal = (intakeAvg && intakeAvg.targetKcal) || goal.dailyKcal || planKcal || null;
+  const targetFromPlan = !((intakeAvg && intakeAvg.targetKcal) || goal.dailyKcal) && !!planKcal;
   const intake = useActual ? intakeAvg.avgKcal : targetKcal;
   if (!intake) return null;
 
@@ -282,7 +290,7 @@ export function modelledRate(S, goal, intakeAvg = null) {
     tdee, intake, dailyDeficit,
     burnSource: measured ? 'measured' : 'estimated',
     ...(measured ? { burnDays: measured.days } : {}),
-    intakeSource: useActual ? 'logged' : optedOut ? 'target-opted-out' : 'target',
+    intakeSource: useActual ? 'logged' : optedOut ? 'target-opted-out' : targetFromPlan ? 'plan' : 'target',
     ...(intakeAvg ? { partialDays: intakeAvg.partialDays } : {}),
     ...(useActual ? { loggedDays: intakeAvg.loggedDays, coverage: intakeAvg.coverage,
                       targetKcal } : {}),
@@ -536,7 +544,7 @@ export function bodyGoalPlan(S, opts = {}) {
     const model = modelledRate(S, goal, opts.intakeAvg);
     if (!model) {
       if (!bmrKcal(S)) return { ok: false, reason: 'no-profile', current, target };
-      if (!(opts.intakeAvg && opts.intakeAvg.targetKcal) && !goal.dailyKcal) {
+      if (!(opts.intakeAvg && opts.intakeAvg.targetKcal) && !goal.dailyKcal && !blendedDailyKcal(S)) {
       return { ok: false, reason: 'no-intake', current, target };
     }
       return { ok: false, reason: 'no-recent-data', current, target,

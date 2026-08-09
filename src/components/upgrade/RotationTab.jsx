@@ -20,8 +20,9 @@
 import { useMemo, useState } from 'react';
 import Icon from '../Icon';
 import {
-  LEAVE_TYPES, SESSION_OPTIONS, WINDOW, chipText, leaveType,
-  monthGrid, monthRange, rangeStats, patternDay,
+  ALLOWANCE_DEFAULT, LEAVE_TYPES, SESSION_OPTIONS, WINDOW, allowanceUsed,
+  chipText, datesBetween, leaveType, monthGrid, monthRange, nextHoliday,
+  rangeStats, patternDay,
 } from '../../lib/rotation/pattern';
 
 const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June',
@@ -36,6 +37,12 @@ const todayIso = () => {
 export default function RotationTab({ S, update, isMobile }) {
   const overrides = useMemo(() => (S.rotation && S.rotation.overrides) || {}, [S.rotation]);
   const [editing, setEditing] = useState(null);   // resolved day | null
+  // Holiday range picker. `anchor` is the first date clicked; `hover`
+  // drives the live preview so the block is visible before committing,
+  // the way a flight search shows the nights between two dates.
+  const [booking, setBooking] = useState(false);
+  const [anchor, setAnchor] = useState(null);
+  const [hover, setHover] = useState(null);
 
   const months = useMemo(
     () => monthRange(WINDOW.fromY, WINDOW.fromM, WINDOW.toY, WINDOW.toM),
@@ -43,6 +50,9 @@ export default function RotationTab({ S, update, isMobile }) {
   const stats = useMemo(
     () => rangeStats(WINDOW.fromDate, WINDOW.toDate, overrides),
     [overrides]);
+  const allowance = useMemo(
+    () => allowanceUsed(overrides, { ...ALLOWANCE_DEFAULT, ...((S.rotation || {}).allowance || {}) }),
+    [overrides, S.rotation]);
 
   // Additive: a new `rotation` key, and within it only the days that
   // deviate. Setting a day back to its pattern value deletes the entry
@@ -70,6 +80,37 @@ export default function RotationTab({ S, update, isMobile }) {
 
   const today = todayIso();
   const editedCount = Object.keys(overrides).length;
+  const upcoming = useMemo(() => nextHoliday(overrides, today), [overrides, today]);
+
+  // The set of dates the picker is currently proposing, so the calendar
+  // can shade them before anything is written.
+  const preview = useMemo(
+    () => (booking && anchor ? new Set(datesBetween(anchor, hover || anchor)) : null),
+    [booking, anchor, hover]);
+
+  /** Book (or clear) a whole range in one write. */
+  function bookRange(a, b, leave) {
+    const dates = datesBetween(a, b);
+    update(prev => {
+      const cur = { ...((prev.rotation && prev.rotation.overrides) || {}) };
+      for (const iso of dates) {
+        if (leave) cur[iso] = { ...(cur[iso] || {}), leave };
+        else if (cur[iso]) {
+          const next = { ...cur[iso] };
+          delete next.leave;
+          if (Object.keys(next).length) cur[iso] = next; else delete cur[iso];
+        }
+      }
+      return { ...prev, rotation: { ...(prev.rotation || {}), overrides: cur } };
+    });
+  }
+
+  /** A click in booking mode: first sets the anchor, second commits. */
+  function pickDate(iso) {
+    if (!anchor) { setAnchor(iso); setHover(iso); return; }
+    bookRange(anchor, iso, 'annual');
+    setAnchor(null); setHover(null); setBooking(false);
+  }
 
   return (
     <div className="upg-pane">
@@ -83,6 +124,14 @@ export default function RotationTab({ S, update, isMobile }) {
           <div key={s.k} className={`upg-stat is-${s.k}`}>
             <div className="upg-stat-num">{s.n}</div>
             <div className="upg-stat-lbl">{s.label}</div>
+            {/* Allowance sits under the count it relates to rather than
+                in its own tile — it is the same fact, read the other
+                way round. */}
+            {s.k === 'leave' && (
+              <div className={'upg-stat-sub' + (allowance.left <= 5 ? ' is-low' : '')}>
+                {allowance.left} of {allowance.total} left
+              </div>
+            )}
           </div>
         ))}
       </div>
@@ -93,11 +142,35 @@ export default function RotationTab({ S, update, isMobile }) {
         {editedCount > 0 && <> · <b>{editedCount} day{editedCount === 1 ? '' : 's'} edited</b></>}
       </div>
 
+      <div className="upg-holbar">
+        {!booking ? (
+          <button type="button" className="upg-opt is-gold" onClick={() => setBooking(true)}>
+            <Icon name="plane" size={12} /> Book a holiday
+          </button>
+        ) : (
+          <>
+            <span className="upg-holhint">
+              {anchor ? 'Now pick the last day' : 'Pick the first day'}
+            </span>
+            {anchor && <span className="upg-holcount">{datesBetween(anchor, hover || anchor).length} days</span>}
+            <button type="button" className="upg-textbtn"
+                    onClick={() => { setBooking(false); setAnchor(null); setHover(null); }}>Cancel</button>
+          </>
+        )}
+        {upcoming && !booking && (
+          <span className="upg-holnext">
+            {upcoming.active
+              ? <>On holiday now — {upcoming.days} day{upcoming.days === 1 ? '' : 's'}</>
+              : <>Next holiday in <b>{upcoming.startsIn}</b> day{upcoming.startsIn === 1 ? '' : 's'} · {upcoming.days} day{upcoming.days === 1 ? '' : 's'}</>}
+          </span>
+        )}
+      </div>
+
       <div className="upg-legend">
         <span><i className="upg-sw is-night" /> Night</span>
         <span><i className="upg-sw is-day" /> Day</span>
         <span><i className="upg-sw is-off" /> Off</span>
-        <span><i className="upg-sw is-leave" /> Leave</span>
+        <span><i className="upg-sw is-leave" /> Holiday</span>
         <span><i className="upg-sw is-cardio" /> Cardio day</span>
         <span className="upg-legend-hint">
           <Icon name="pencil" size={11} /> Tap a day to change its session or book it off
@@ -115,17 +188,23 @@ export default function RotationTab({ S, update, isMobile }) {
                 if (!cell.inPattern) {
                   return <div key={cell.iso} className="upg-cell is-empty"><span className="upg-dt">{cell.iso.slice(8)}</span></div>;
                 }
+                const inPreview = preview && preview.has(cell.iso);
                 const cls = [
                   'upg-cell', `is-${cell.shift}`,
+                  cell.leave === 'annual' ? 'is-holiday' : '',
                   cell.cardio ? 'has-cardio' : '',
                   cell.edited ? 'is-edited' : '',
                   cell.iso === today ? 'is-today' : '',
                   cell.iso < today ? 'is-past' : '',
+                  inPreview ? 'in-range' : '',
+                  booking ? 'is-picking' : '',
                 ].filter(Boolean).join(' ');
                 const chip = chipText(cell);
                 return (
                   <button key={cell.iso} type="button" className={cls}
-                          onClick={() => setEditing(cell)}
+                          onClick={() => (booking ? pickDate(cell.iso) : setEditing(cell))}
+                          onMouseEnter={() => booking && anchor && setHover(cell.iso)}
+                          onFocus={() => booking && anchor && setHover(cell.iso)}
                           title={cell.shift === 'leave'
                             ? `${leaveType(cell.leave)?.label} — would have been ${cell.baseShift}${cell.baseShiftNum || ''}`
                             : undefined}>
