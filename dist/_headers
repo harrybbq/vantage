@@ -20,9 +20,10 @@
   Cache-Control: public, max-age=2592000, immutable
 
 # All pages: security headers + allow SW registration
-# SAMEORIGIN (not DENY): the owner Rotation section renders
-# /schedule/shift-rotation-2026.html in a same-origin iframe; DENY
-# blocks even that. Cross-origin embedding stays blocked.
+# SAMEORIGIN (not DENY). Must match netlify.toml, which wins when both
+# set a header. The same-origin iframe this was for is gone (the owner
+# Rotation page is a React tab now); see netlify.toml for why it hasn't
+# been tightened to DENY. Cross-origin embedding stays blocked.
 /*
   X-Frame-Options: SAMEORIGIN
   X-Content-Type-Options: nosniff

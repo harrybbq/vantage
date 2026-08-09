@@ -40,7 +40,7 @@ const MORE_ITEMS = [
 // Owner-only: shift rotation calendar. Slotted above Settings and
 // simply absent for everyone else (mirrors the desktop sidebar tab).
 const OWNER_ITEMS = [
-  { id: 'schedule', icon: 'calendar-days', label: 'Rotation', desc: 'Shift rotation + training calendar' },
+  { id: 'upgrade', icon: 'trending-up', label: 'Upgrade', desc: 'Rotation · diet · career' },
 ];
 
 export default function MoreDrawer({ open, onClose, onNavigate, activeSection, onUpgrade, isOwner }) {

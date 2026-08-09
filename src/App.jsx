@@ -19,7 +19,7 @@ import MobileHabitsSection from './components/mobile/MobileHabitsSection';
 import MobileFriendsSection from './components/mobile/MobileFriendsSection';
 import MobileProfileSection from './components/mobile/MobileProfileSection';
 import SettingsSection from './components/SettingsSection';
-import ScheduleSection from './components/ScheduleSection';
+import UpgradeSection from './components/upgrade/UpgradeSection';
 import { SCHEMES, applyScheme, applyTheme, schemeFromHex } from './components/SettingsSection';
 import { useSubscriptionContext } from './context/SubscriptionContext';
 import Modals from './components/Modals';
@@ -714,15 +714,18 @@ function Board({ userId, userEmail, onSignOut }) {
         )}
         {activeSection === 'settings' && (
           <motion.div key="settings" {...pageMotion}>
-            <SettingsSection S={S} update={update} active userId={userId} onOpenLegal={setLegalPage} onOpenPalette={() => setPaletteOpen(true)} onOpenShortcuts={() => setShortcutsOpen(true)} onOpenVisions={() => setVisionsOpen(true)} onOpenSchedule={isOwner ? () => navigate('schedule') : null} />
+            <SettingsSection S={S} update={update} active userId={userId} onOpenLegal={setLegalPage} onOpenPalette={() => setPaletteOpen(true)} onOpenShortcuts={() => setShortcutsOpen(true)} onOpenVisions={() => setVisionsOpen(true)} onOpenSchedule={isOwner ? () => navigate('upgrade') : null} />
           </motion.div>
         )}
-        {/* Schedule — owner-only shift rotation calendar. No sidebar
-            entry; reached via Settings → Tools (owner accounts only).
-            The section itself re-checks isOwner for deep links. */}
-        {activeSection === 'schedule' && (
-          <motion.div key="schedule" {...pageMotion}>
-            <ScheduleSection active isOwner={isOwner} />
+        {/* Upgrade — owner-only: rotation, diet, career. Reached from
+            the sidebar / More drawer / Settings → Tools, all of which
+            only render for the owner; the section re-checks isOwner so
+            a deep link shows nothing for anyone else.
+            'schedule' is the id this lived under before it grew tabs —
+            still accepted so an old link or a stale tab doesn't 404. */}
+        {(activeSection === 'upgrade' || activeSection === 'schedule') && (
+          <motion.div key="upgrade" {...pageMotion}>
+            <UpgradeSection S={S} update={update} active isOwner={isOwner} userId={userId} />
           </motion.div>
         )}
         {/* Friends — mobile-only route. Desktop puts FriendsRail in

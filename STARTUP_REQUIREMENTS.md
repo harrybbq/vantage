@@ -227,6 +227,9 @@ value was never recorded, nobody could check — see item 31.
     constant still has to be the RIGHT one. In the WHOOP developer
     dashboard, the app's redirect URLs must contain exactly:
     `https://vantagevision.netlify.app/.netlify/functions/whoop-callback`
+    *Origin confirmed by the owner 2026-08-08 — the site has NOT moved
+    domain, so the failure was the registration itself, not a stale
+    host.*
     - Register **every** origin the app is reachable on, not just one.
       The apex domain, `www.`, the `*.netlify.app` fallback and any
       custom domain are separate entries as far as OAuth is concerned.
