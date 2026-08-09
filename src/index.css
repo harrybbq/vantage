@@ -7201,7 +7201,12 @@ button:active:not(:disabled),
    The hub is greeting + widgets; everything that used to sit between
    them lives here. A working surface, not a summary — trackers tick
    without closing it. */
-.m-hubdrawer-scrim { position: fixed; inset: 0; background: rgba(20,18,15,.45);
+.m-hubdrawer-scrim { position: fixed; left: 0; right: 0; bottom: 0;
+  /* Starts below the app bar, same as the panel — a scrim that dimmed
+     the bar while the bar still sat on top of everything would read as
+     a rendering fault rather than a deliberate overlay. */
+  top: calc(var(--m-appbar-h) + var(--m-safe-top));
+  background: rgba(20,18,15,.45);
   backdrop-filter: blur(2px); -webkit-backdrop-filter: blur(2px);
   opacity: 0; pointer-events: none; transition: opacity .22s ease; z-index: 480; }
 .m-hubdrawer-scrim.is-open { opacity: 1; pointer-events: auto; }
@@ -7211,14 +7216,21 @@ button:active:not(:disabled),
    rotated, and leaves a wedge of page showing in the corner. (The More
    drawer IS a sheet and keeps its 24px top radius; these were sharing a
    class name until they were split apart.) */
-.m-hubdrawer { position: fixed; left: 0; top: 0; bottom: 0; z-index: 490;
+.m-hubdrawer { position: fixed; left: 0; bottom: 0; z-index: 490;
+  /* Sits UNDER the fixed app bar rather than behind it. At top:0 the
+     panel's own header — avatar, name, close — was hidden beneath the
+     bar, so the first thing in the drawer was unreachable. Offset by
+     the bar's real height plus the safe-area inset rather than a magic
+     number, so it stays correct on a notched device and if the bar is
+     ever resized. */
+  top: calc(var(--m-appbar-h) + var(--m-safe-top));
   border-radius: 0;
   width: min(84vw, 340px); display: flex; flex-direction: column;
   background: var(--bg-raised, var(--surface, #fff));
   border-right: 1px solid var(--border);
   transform: translateX(-102%); transition: transform .26s cubic-bezier(.22,1,.36,1);
   box-shadow: 14px 0 40px rgba(0,0,0,.22);
-  padding-top: env(safe-area-inset-top); padding-bottom: env(safe-area-inset-bottom); }
+  padding-bottom: env(safe-area-inset-bottom); }
 .m-hubdrawer.is-open { transform: translateX(0); }
 .m-drawer[aria-hidden="true"] { visibility: hidden; }
 .m-hubdrawer.is-open { visibility: visible; }
