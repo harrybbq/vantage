@@ -79,7 +79,7 @@ export default function UpgradeSection({ S, update, active, isOwner, userId }) {
       </div>
 
       {tab === 'rotation' && <RotationTab S={S} update={update} isMobile={isMobile} />}
-      {tab === 'diet' && <DietTab S={S} update={update} isMobile={isMobile} />}
+      {tab === 'diet' && <DietTab S={S} update={update} userId={userId} isMobile={isMobile} />}
       {tab === 'career' && <CareerTab S={S} update={update} userId={userId} isMobile={isMobile} />}
     </section>
   );

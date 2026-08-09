@@ -17,6 +17,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import Icon from '../Icon';
 import { listCvFiles, uploadCv, cvOpenUrl, deleteCv } from '../../lib/career/cvFile';
+import PracticePanel from './PracticePanel';
 
 const uid = () => Math.random().toString(36).slice(2, 10) + Date.now().toString(36).slice(-4);
 const today = () => new Date().toISOString().slice(0, 10);
@@ -43,7 +44,10 @@ export default function CareerTab({ S, update, userId }) {
       </div>
       {panel === 'certs' && <Certifications S={S} update={update} />}
       {panel === 'cv' && <CvPanel S={S} update={update} userId={userId} />}
-      {panel === 'practice' && <PracticeLog S={S} update={update} />}
+      {panel === 'practice' && (
+        <PracticePanel S={S} update={update} onOpenLog={() => setPanel('log')} />
+      )}
+      {panel === 'log' && <PracticeLog S={S} update={update} onBack={() => setPanel('practice')} />}
       {panel === 'library' && <SnippetLibrary S={S} update={update} />}
     </div>
   );
@@ -284,7 +288,7 @@ function CvPanel({ S, update, userId }) {
 const KINDS = [{ id: 'leetcode', label: 'LeetCode' }, { id: 'kql', label: 'KQL' }];
 const DIFFS = ['Easy', 'Medium', 'Hard'];
 
-function PracticeLog({ S, update }) {
+function PracticeLog({ S, update, onBack }) {
   const practice = useMemo(() => S.practice || { log: [], snippets: [] }, [S.practice]);
   const log = practice.log || [];
   const [kind, setKind] = useState('leetcode');
@@ -316,6 +320,7 @@ function PracticeLog({ S, update }) {
   return (
     <>
       <div className="upg-subnav is-inner">
+        {onBack && <button type="button" className="upg-subtab" onClick={onBack}>← Curriculum</button>}
         {KINDS.map(k => (
           <button key={k.id} type="button" className={'upg-subtab' + (kind === k.id ? ' is-on' : '')}
                   onClick={() => setKind(k.id)}>{k.label}</button>
@@ -324,6 +329,10 @@ function PracticeLog({ S, update }) {
                 onClick={() => setDraft({ id: uid(), kind, name: '', topic: '', difficulty: 'Medium', date: today(), confidence: 3, notes: '', url: '' })}>
           + Log
         </button>
+      </div>
+      <div className="upg-fine">
+        Anything outside the curriculum — a mock interview, a problem from somewhere else.
+        Curriculum attempts land here automatically.
       </div>
 
       <div className="upg-stats is-four">
