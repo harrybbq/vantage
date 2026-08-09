@@ -21,12 +21,13 @@
  * colour palette underneath.
  */
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import Icon from '../Icon';
 import { getTodayStr } from '../../utils/helpers';
 import { recalcStreaks } from '../../utils/streaks';
 import MobileWidget from './MobileWidget';
 import RatingsPanel from '../RatingsPanel';
+import HubDrawer, { EDGE_PX, OPEN_THRESHOLD } from './HubDrawer';
 
 function pad2(n) { return String(n).padStart(2, '0'); }
 
@@ -62,6 +63,26 @@ function fmtDate(d) {
 
 export default function MobileHubSection({ S, update, visionState, hasPro, navigate, onOpenModal, userId }) {
   const now = useClock();
+  const [drawer, setDrawer] = useState(false);
+  // Edge-swipe. Only a touch STARTING within EDGE_PX of the left edge is
+  // a candidate — past that, widget cards own horizontal drags for their
+  // delete reveal, and two gestures on the same axis is how you get a
+  // hub where neither works reliably.
+  const edge = useRef(null);
+  function edgeStart(e) {
+    const t = e.touches && e.touches[0];
+    if (!t || t.clientX > EDGE_PX) { edge.current = null; return; }
+    edge.current = { x: t.clientX, y: t.clientY };
+  }
+  function edgeMove(e) {
+    const t = e.touches && e.touches[0];
+    if (!t || !edge.current) return;
+    const dx = t.clientX - edge.current.x;
+    const dy = t.clientY - edge.current.y;
+    // Vertical wins — an edge drag that is mostly scroll is a scroll.
+    if (Math.abs(dy) > Math.abs(dx)) { edge.current = null; return; }
+    if (dx > OPEN_THRESHOLD) { setDrawer(true); edge.current = null; }
+  }
   const today = getTodayStr();
   const profileName = (S.profile?.name || '').trim();
   const g = greeting(profileName);
@@ -89,6 +110,23 @@ export default function MobileHubSection({ S, update, visionState, hasPro, navig
     });
   }
 
+  // Trackers in the shape the drawer wants: done/value resolved here so
+  // the drawer stays a view and the log shape lives in one place.
+  const drawerTrackers = trackers.map(t => {
+    const v = todayLogs[t.id];
+    const isBool = t.type === 'boolean';
+    return {
+      ...t, isBool,
+      value: typeof v === 'number' ? v : undefined,
+      done: isBool ? !!v : (typeof v === 'number' && v > 0),
+    };
+  });
+
+  // Undone trackers drive the dot on the avatar — the one thing from
+  // the drawer worth surfacing on the hub, because it is the only item
+  // in there that is an action rather than a number.
+  const trackersLeft = drawerTrackers.filter(t => !t.done).length;
+
   // Coach brief — read whatever's already cached. We don't kick off
   // useDailyBrief here because the desktop hub will fetch it for the
   // day; on mobile we just surface the result. If it's not there yet,
@@ -100,16 +138,23 @@ export default function MobileHubSection({ S, update, visionState, hasPro, navig
     : null;
 
   return (
-    <section className="section m-hub-wrap">
+    <section className="section m-hub-wrap"
+             onTouchStart={edgeStart} onTouchMove={edgeMove}>
     <div className="m-hub">
-      {/* Greeting hero ─────────────────────────────────────────── */}
+      {/* Greeting hero. The one thing that stays above the widgets —
+          it is orientation, not data, and it costs half a screen of
+          nothing to read it. The avatar opens the drawer, so the edge
+          swipe is never the only way in. */}
       <section className="m-hub-hero">
-        <div className="m-hub-eyebrow">DAY {dayOfYear(now)} OF {now.getFullYear()}</div>
-        <div className="m-hub-greet-row">
-          <div className="m-hub-greet">
-            <span className="m-hub-greet-part">{g.part}{' '}</span>
-            <span className="m-hub-greet-name">{g.name}.</span>
-          </div>
+        <div className="m-hub-hero-top">
+          <button type="button" className="m-hub-av" onClick={() => setDrawer(true)}
+                  aria-label="Open your day">
+            {S.profile?.photo
+              ? <img src={S.profile.photo} alt="" />
+              : <span>{(profileName || 'You').slice(0, 1).toUpperCase()}</span>}
+            {trackersLeft > 0 && <span className="m-hub-av-dot" aria-hidden="true" />}
+          </button>
+          <div className="m-hub-eyebrow">DAY {dayOfYear(now)} OF {now.getFullYear()}</div>
           <div className="m-hub-clock">
             <span className="m-hub-clock-h">{pad2(now.getHours())}</span>
             <span className="m-hub-clock-c">:</span>
@@ -117,87 +162,16 @@ export default function MobileHubSection({ S, update, visionState, hasPro, navig
             <span className="m-hub-clock-s">{pad2(now.getSeconds())}</span>
           </div>
         </div>
+        <div className="m-hub-greet">
+          <span className="m-hub-greet-part">{g.part}{' '}</span>
+          <span className="m-hub-greet-name">{g.name}.</span>
+        </div>
         <div className="m-hub-date">{fmtDate(now)}</div>
       </section>
 
-      {/* Ratings panel (F5 Sprint 3) — OVR + 4 categories ──────── */}
-      <RatingsPanel S={S} update={update} />
-
-      {/* Stats strip — coins + streak. Level was removed when OVR
-          became the headline number (RatingsPanel above shows OVR
-          + 4 categories). Two-column grid reads cleaner than a
-          single orphaned card. */}
-      <section className="m-hub-stats m-hub-stats-2col">
-        <StatCard
-          value={coins}
-          label="COINS"
-          accent="var(--coin, #d4a017)"
-          pct={Math.min(100, (coins % 500) / 5)}
-        />
-        <StatCard
-          value={streak}
-          label="STREAK"
-          accent="var(--em)"
-          pct={Math.min(100, streak * 3.3)}
-        />
-      </section>
-
-      {/* Today's trackers ──────────────────────────────────────── */}
-      <section className="m-hub-section">
-        <div className="m-hub-section-header">// TODAY'S TRACKERS</div>
-        {trackers.length === 0 && (
-          <div className="m-hub-empty">
-            No trackers yet. Tap <strong>Track</strong> below to add one.
-          </div>
-        )}
-        <div className="m-hub-trackers">
-          {trackers.map(t => {
-            const v = todayLogs[t.id];
-            const isBool = t.type === 'boolean';
-            const done = isBool ? !!v : (typeof v === 'number' && v > 0);
-            return (
-              <button
-                key={t.id}
-                className={`m-tracker-row${done ? ' is-done' : ''}`}
-                onClick={() => isBool ? toggleBoolean(t.id) : navigate?.('track')}
-              >
-                <span
-                  className="m-tracker-check"
-                  style={done ? { background: t.color || 'var(--em)', borderColor: t.color || 'var(--em)' } : undefined}
-                  aria-hidden="true"
-                >
-                  {done && <svg width="12" height="12" viewBox="0 0 12 12"><path d="M2.5 6L5 8.5L9.5 3.5" stroke="white" strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round"/></svg>}
-                </span>
-                <span className="m-tracker-name">{t.name}</span>
-                <span className={`m-tracker-pill${done ? ' is-done' : ''}`}>
-                  {done
-                    ? <>&#10003; Done</>
-                    : (isBool ? '–' : (t.unit ? `0 ${t.unit}` : '–'))}
-                </span>
-              </button>
-            );
-          })}
-        </div>
-      </section>
-
-      {/* AI Coach brief ────────────────────────────────────────── */}
-      <section className="m-hub-section">
-        <div className="m-hub-section-header">// AI COACH</div>
-        <div className="m-hub-coach">
-          <div className="m-hub-coach-eyebrow">
-            AT COACH {hasPro && <span className="m-hub-coach-badge">PRO</span>}
-          </div>
-          <div className="m-hub-coach-body">
-            {briefLine || (hasPro
-              ? "Today's brief hasn't loaded yet. Tap to open the Coach panel."
-              : "Pro unlocks daily briefs from your AI coach — patterns, focus areas, micro-actions.")}
-          </div>
-        </div>
-      </section>
-
-      {/* Widget stack — vertical list of user-added widgets, each
-          removable via the × in its head. New widgets append below
-          the last. + button below opens the picker modal. */}
+      {/* Widget stack. New widgets append below the last; hold one to
+          reorder — dragging near the top or bottom edge scrolls the
+          list so a card at the bottom can reach the top. */}
       {(S.mobileWidgets || []).map((w, i) => (
         <MobileWidget
           key={w.id}
@@ -223,16 +197,49 @@ export default function MobileHubSection({ S, update, visionState, hasPro, navig
         />
       ))}
 
-      <button
-        type="button"
-        className="m-widget-add"
-        onClick={() => onOpenModal?.('addMobileWidgetModal')}
-        aria-label="Add a widget below AI Coach"
-      >
-        <span className="m-widget-add-icon"><Icon name="plus" size={16} /></span>
-        <span className="m-widget-add-label">Add widget</span>
-      </button>
+      {/* First run. With the stats moved into the drawer a brand-new
+          account would otherwise land on a greeting and nothing else,
+          which reads as a broken page rather than an empty one. */}
+      {!(S.mobileWidgets || []).length ? (
+        <div className="m-hub-first">
+          <div className="m-hub-first-icon"><Icon name="layout-grid" size={26} /></div>
+          <div className="m-hub-first-h">Build your hub</div>
+          <p className="m-hub-first-p">
+            Add the things you want to see first thing — vitals, macros, savings, goals.
+            Hold a widget to reorder it.
+          </p>
+          <button type="button" className="m-hub-first-btn"
+                  onClick={() => onOpenModal?.('addMobileWidgetModal')}>
+            <Icon name="plus" size={15} /> Add your first widget
+          </button>
+          <button type="button" className="m-hub-first-alt" onClick={() => setDrawer(true)}>
+            Or see today&apos;s numbers
+          </button>
+        </div>
+      ) : (
+        <button
+          type="button"
+          className="m-widget-add"
+          onClick={() => onOpenModal?.('addMobileWidgetModal')}
+          aria-label="Add a widget"
+        >
+          <span className="m-widget-add-icon"><Icon name="plus" size={16} /></span>
+          <span className="m-widget-add-label">Add widget</span>
+        </button>
+      )}
     </div>
+
+    <HubDrawer
+      open={drawer}
+      onClose={() => setDrawer(false)}
+      S={S}
+      update={update}
+      trackers={drawerTrackers}
+      onToggleTracker={t => (t.isBool ? toggleBoolean(t.id) : (setDrawer(false), navigate?.('track')))}
+      onNavigate={navigate}
+      briefLine={briefLine}
+      hasPro={hasPro}
+    />
     </section>
   );
 }

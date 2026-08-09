@@ -7196,3 +7196,121 @@ button:active:not(:disabled),
   .rw-session-lbl { display: none; }
   .rw-hol-n { font-size: 20px; }
 }
+
+/* ── Hub drawer ─────────────────────────────────────────────
+   The hub is greeting + widgets; everything that used to sit between
+   them lives here. A working surface, not a summary — trackers tick
+   without closing it. */
+.m-hubdrawer-scrim { position: fixed; inset: 0; background: rgba(20,18,15,.45);
+  backdrop-filter: blur(2px); -webkit-backdrop-filter: blur(2px);
+  opacity: 0; pointer-events: none; transition: opacity .22s ease; z-index: 480; }
+.m-hubdrawer-scrim.is-open { opacity: 1; pointer-events: auto; }
+
+/* No border-radius. This is a full-height panel flush to the edge of
+   the screen — a rounded top would read as a bottom sheet that had been
+   rotated, and leaves a wedge of page showing in the corner. (The More
+   drawer IS a sheet and keeps its 24px top radius; these were sharing a
+   class name until they were split apart.) */
+.m-hubdrawer { position: fixed; left: 0; top: 0; bottom: 0; z-index: 490;
+  border-radius: 0;
+  width: min(84vw, 340px); display: flex; flex-direction: column;
+  background: var(--bg-raised, var(--surface, #fff));
+  border-right: 1px solid var(--border);
+  transform: translateX(-102%); transition: transform .26s cubic-bezier(.22,1,.36,1);
+  box-shadow: 14px 0 40px rgba(0,0,0,.22);
+  padding-top: env(safe-area-inset-top); padding-bottom: env(safe-area-inset-bottom); }
+.m-hubdrawer.is-open { transform: translateX(0); }
+.m-drawer[aria-hidden="true"] { visibility: hidden; }
+.m-hubdrawer.is-open { visibility: visible; }
+
+.m-hubdrawer-head { display: flex; align-items: center; gap: 11px; padding: 14px 16px;
+  border-bottom: 1px solid var(--border); flex: none; }
+.m-hubdrawer-av { width: 40px; height: 40px; border-radius: 50%; flex: none; overflow: hidden;
+  display: grid; place-items: center; background: rgba(var(--em-rgb),.12);
+  border: 1px solid var(--em); color: var(--em); font-weight: 700; font-size: 16px; }
+.m-hubdrawer-av img { width: 100%; height: 100%; object-fit: cover; }
+.m-hubdrawer-who { flex: 1; min-width: 0; }
+.m-hubdrawer-name { font-size: 15px; font-weight: 600; line-height: 1.2; }
+.m-hubdrawer-link { background: none; border: 0; padding: 0; cursor: pointer;
+  font-family: var(--mono); font-size: 9.5px; letter-spacing: .5px; color: var(--text-muted);
+  text-decoration: underline; text-underline-offset: 3px; }
+.m-hubdrawer-x { background: none; border: 0; cursor: pointer; color: var(--text-muted);
+  font-size: 15px; padding: 6px; line-height: 1; }
+
+.m-hubdrawer-body { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain;
+  padding: 14px 16px; display: flex; flex-direction: column; gap: 16px; }
+
+.m-hubdrawer-stats { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.m-hubdrawer-stat { border: 1px solid var(--border); border-radius: 12px; padding: 12px 14px; }
+.m-hubdrawer-stat-v { font-family: var(--mono); font-size: 22px; font-weight: 700; line-height: 1;
+  font-variant-numeric: tabular-nums; }
+.m-hubdrawer-stat-l { font-family: var(--mono); font-size: 9px; letter-spacing: 1.2px;
+  text-transform: uppercase; color: var(--text-muted); margin-top: 4px; }
+
+.m-hubdrawer-sec { display: flex; flex-direction: column; gap: 7px; }
+.m-hubdrawer-sec-h { font-family: var(--mono); font-size: 9px; letter-spacing: 1.6px;
+  text-transform: uppercase; color: var(--text-muted); }
+.m-hubdrawer-pro { color: var(--gold, #c8970a); margin-left: 4px; }
+.m-hubdrawer-empty, .m-hubdrawer-coach { text-align: left; width: 100%; background: transparent;
+  border: 1px solid var(--border); border-radius: 11px; padding: 11px 13px; cursor: pointer;
+  color: var(--text-muted); font-family: inherit; font-size: 13px; line-height: 1.5; }
+.m-hubdrawer-coach { color: var(--text); }
+
+.m-hubdrawer-track { display: flex; align-items: center; gap: 11px; width: 100%; text-align: left;
+  padding: 11px 13px; border-radius: 11px; border: 1px solid var(--border);
+  background: transparent; color: var(--text); font-family: inherit; cursor: pointer;
+  transition: border-color .12s ease, background .12s ease; }
+.m-hubdrawer-track.is-done { border-color: var(--em); background: rgba(var(--em-rgb),.07); }
+.m-hubdrawer-track.is-done .m-hubdrawer-track-name { color: var(--text-muted); }
+.m-hubdrawer-tick { width: 20px; height: 20px; flex: none; border-radius: 6px;
+  border: 1.5px solid var(--border); display: grid; place-items: center;
+  font-size: 11px; color: #fff; }
+.m-hubdrawer-tick.is-done { background: var(--em); border-color: var(--em); }
+.m-hubdrawer-track-name { flex: 1; min-width: 0; font-size: 14px; }
+.m-hubdrawer-track-t { font-family: var(--mono); font-size: 10px; color: var(--text-muted); }
+
+.m-hubdrawer-foot { flex: none; display: flex; gap: 8px; padding: 12px 16px;
+  border-top: 1px solid var(--border); }
+.m-hubdrawer-foot-btn { flex: 1; display: inline-flex; align-items: center; justify-content: center;
+  gap: 7px; padding: 10px; border-radius: 10px; border: 1px solid var(--border);
+  background: transparent; color: var(--text-muted); font-family: var(--mono); font-size: 10.5px;
+  cursor: pointer; }
+.m-hubdrawer-foot-btn:hover { color: var(--em); border-color: var(--em); }
+
+/* Hub hero — now carries the avatar that opens the drawer. */
+.m-hub-hero-top { display: flex; align-items: center; gap: 11px; margin-bottom: 10px; }
+.m-hub-av { position: relative; width: 34px; height: 34px; border-radius: 50%; flex: none;
+  overflow: hidden; display: grid; place-items: center; padding: 0; cursor: pointer;
+  background: rgba(var(--em-rgb),.12); border: 1px solid var(--em); color: var(--em);
+  font-weight: 700; font-size: 14px; font-family: inherit; }
+.m-hub-av img { width: 100%; height: 100%; object-fit: cover; }
+.m-hub-av-dot { position: absolute; top: 1px; right: 1px; width: 8px; height: 8px;
+  border-radius: 50%; background: var(--gold, #c8970a); border: 1.5px solid var(--bg-base, #fff); }
+.m-hub-hero-top .m-hub-eyebrow { flex: 1; margin: 0; }
+.m-hub-hero-top .m-hub-clock { margin: 0; }
+
+/* First run — the hub is nearly empty without widgets now, so it has
+   to invite rather than just be blank. */
+.m-hub-first { text-align: center; padding: 34px 22px; border: 1px dashed var(--border);
+  border-radius: 16px; display: flex; flex-direction: column; align-items: center; gap: 9px; }
+.m-hub-first-icon { width: 52px; height: 52px; border-radius: 15px; display: grid;
+  place-items: center; background: rgba(var(--em-rgb),.10); color: var(--em);
+  border: 1px solid rgba(var(--em-rgb),.28); }
+.m-hub-first-h { font-family: var(--display); font-style: italic; font-size: 20px; font-weight: 700; }
+.m-hub-first-p { margin: 0; font-size: 13.5px; color: var(--text-muted); line-height: 1.6;
+  max-width: 34ch; }
+.m-hub-first-btn { margin-top: 6px; display: inline-flex; align-items: center; gap: 8px;
+  padding: 11px 18px; border-radius: 11px; border: 1px solid var(--em);
+  background: rgba(var(--em-rgb),.12); color: var(--em); font-family: var(--mono);
+  font-size: 12px; cursor: pointer; }
+.m-hub-first-alt { background: none; border: 0; cursor: pointer; font-family: var(--mono);
+  font-size: 10.5px; color: var(--text-muted); text-decoration: underline;
+  text-underline-offset: 3px; padding: 4px; }
+
+/* Motion: the drawer is a position change, not a flourish — respect the
+   preference by fading instead of sliding, and keep it usable. */
+@media (prefers-reduced-motion: reduce) {
+  .m-hubdrawer { transition: opacity .12s linear; transform: none; opacity: 0; }
+  .m-hubdrawer.is-open { opacity: 1; }
+  .m-hubdrawer-scrim { transition: none; }
+}

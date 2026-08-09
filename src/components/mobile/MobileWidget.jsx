@@ -24,6 +24,7 @@ import { BodyBody, SubscriptionsBody, MoodBody } from '../widgets/LifeWidgets';
 import { GoalsBody, BodyGoalBody } from '../widgets/GoalsWidget';
 import { useSubscriptionContext } from '../../context/SubscriptionContext';
 import { observeShape } from '../../lib/hub/shape';
+import { createDragScroller } from '../../lib/mobile/dragScroll';
 import { RotationBody } from '../widgets/RotationWidget';
 import { metricAvailability, metricSeries, resolvePicks } from '../../lib/vitals/metrics';
 import { PickChip, PickList } from '../widgets/GoalsWidget';
@@ -231,7 +232,8 @@ export default function MobileWidget({ widget, S, update, onRemove, navigate, us
   const lpTimer = useRef(0);
   const rootRef = useRef(null);
   const cardRef = useRef(null);
-  const dragCtx = useRef(null); // { allRoots, myIdx, myRect, rects, lastDy, to }
+  const dragCtx = useRef(null); // { allRoots, myIdx, myRect, rects, lastDy, to, scrolled }
+  const scroller = useRef(null);
 
   const transparent = !!widget.transparent;
 
@@ -259,23 +261,58 @@ export default function MobileWidget({ widget, S, update, onRemove, navigate, us
       allRoots, myIdx,
       myRect: rootRef.current.getBoundingClientRect(),
       rects: allRoots.map(el => el.getBoundingClientRect()),
-      lastDy: 0, to: myIdx,
+      lastDy: 0, to: myIdx, scrolled: 0,
     };
+
+    // ── Edge auto-scroll ──
+    // Rects above are captured once, in VIEWPORT space. Scrolling moves
+    // the document under them, so every frame's delta is accumulated and
+    // added back — both to keep the card pinned under the finger and to
+    // keep the insertion index measured against where the cards actually
+    // are now. Without that the card slides out from under the thumb and
+    // the drop lands in the wrong slot.
+    scroller.current = createDragScroller({
+      getBounds: () => {
+        // Measure the content area, not the glass: the app bar and tab
+        // bar are not scroll targets, so a thumb resting on the tab bar
+        // should already be at full speed.
+        const bar = document.querySelector('.m-tabs');
+        const top = document.querySelector('.m-appbar');
+        return {
+          top: top ? top.getBoundingClientRect().bottom : 0,
+          bottom: bar ? bar.getBoundingClientRect().top : window.innerHeight,
+        };
+      },
+      onScrolled: total => {
+        const c = dragCtx.current;
+        if (!c) return;
+        c.scrolled = total;
+        applyDrag();
+      },
+    });
+
     document.addEventListener('touchmove', dragMove, { passive: false });
     document.addEventListener('touchend', dragEnd);
     document.addEventListener('touchcancel', dragEnd);
   }
-  function dragMove(e) {
-    const t = e.touches[0];
+  /**
+   * Position the card and recompute the drop slot.
+   *
+   * Shared by touchmove and by the auto-scroll frame, because BOTH move
+   * the card relative to the list — the finger moving down and the list
+   * moving up are the same thing from the card's point of view.
+   */
+  function applyDrag() {
     const ctx = dragCtx.current;
-    if (!t || !ctx) return;
-    e.preventDefault();
-    const dy = t.clientY - startY.current;
-    ctx.lastDy = dy;
-    if (cardRef.current) cardRef.current.style.transform = `translateY(${dy}px) scale(1.03)`;
+    if (!ctx) return;
+    // The card is transformed in viewport space, so a document that has
+    // scrolled under it has to be added back or it drifts off the thumb.
+    const shift = ctx.lastDy + ctx.scrolled;
+    if (cardRef.current) cardRef.current.style.transform = `translateY(${shift}px) scale(1.03)`;
     // Insertion index = how many OTHER cards have their midpoint above
-    // the dragged card's live centre.
-    const center = ctx.myRect.top + ctx.myRect.height / 2 + dy;
+    // the dragged card's live centre. Both sides were captured in the
+    // same frame, so the scroll offset cancels and only `shift` is added.
+    const center = ctx.myRect.top + ctx.myRect.height / 2 + shift;
     let to = 0;
     for (let i = 0; i < ctx.allRoots.length; i++) {
       if (i === ctx.myIdx) continue;
@@ -284,10 +321,22 @@ export default function MobileWidget({ widget, S, update, onRemove, navigate, us
     }
     ctx.to = to;
   }
+
+  function dragMove(e) {
+    const t = e.touches[0];
+    const ctx = dragCtx.current;
+    if (!t || !ctx) return;
+    e.preventDefault();
+    ctx.lastDy = t.clientY - startY.current;
+    scroller.current?.move(t.clientY);
+    applyDrag();
+  }
   function dragEnd() {
     document.removeEventListener('touchmove', dragMove);
     document.removeEventListener('touchend', dragEnd);
     document.removeEventListener('touchcancel', dragEnd);
+    scroller.current?.stop();
+    scroller.current = null;
     const ctx = dragCtx.current;
     dragCtx.current = null;
     if (cardRef.current) cardRef.current.style.transform = '';
@@ -296,7 +345,7 @@ export default function MobileWidget({ widget, S, update, onRemove, navigate, us
     if (!ctx) return;
     // A hold that never moved → open the menu (transparency / delete),
     // preserving the old long-press affordance.
-    if (Math.abs(ctx.lastDy) < 6) {
+    if (Math.abs(ctx.lastDy + ctx.scrolled) < 6) {
       setMenu({ x: startX.current, y: startY.current });
     } else if (ctx.to !== ctx.myIdx && onReorder) {
       onReorder(ctx.myIdx, ctx.to);
