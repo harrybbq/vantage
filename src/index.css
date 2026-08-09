@@ -7159,3 +7159,40 @@ button:active:not(:disabled),
    clips. Clipping reads as a bug; a scrollbar reads as "there is more". */
 [data-h="xs"] .link-island-body,
 [data-h="sm"] .link-island-body { overflow-y: auto; }
+
+/* ── Rotation widget ───────────────────────────────────────────────
+   Three facts, in the order you want them: what you're on, what you're
+   training, how far off the next break is. */
+.rw { display: flex; flex-direction: column; gap: 11px; }
+.rw-today { display: flex; align-items: center; gap: 11px; }
+.rw-badge { flex: none; min-width: 40px; height: 40px; padding: 0 8px; border-radius: 10px;
+  display: grid; place-items: center; font-family: var(--mono); font-size: 15px; font-weight: 700;
+  border: 1px solid var(--border); color: var(--text-muted); }
+.rw-badge.is-night { background: rgba(107,138,253,.14); border-color: rgba(107,138,253,.45); color: #6b8afd; }
+.rw-badge.is-day { background: rgba(217,145,20,.14); border-color: rgba(217,145,20,.45); color: #d99114; }
+.rw-badge.is-leave { background: rgba(var(--em-rgb),.14); border-color: var(--em); color: var(--em); }
+.rw-today-text { min-width: 0; }
+.rw-shift { font-size: 14.5px; font-weight: 600; line-height: 1.2; }
+.rw-next { font-family: var(--mono); font-size: 9.5px; color: var(--text-muted); margin-top: 3px; }
+.rw-session { display: flex; align-items: baseline; gap: 8px; padding: 9px 11px; border-radius: 10px;
+  border: 1px solid var(--border); }
+.rw-session-lbl { font-family: var(--mono); font-size: 9px; letter-spacing: 1.2px;
+  text-transform: uppercase; color: var(--text-muted); }
+.rw-session-val { font-size: 14px; font-weight: 600; margin-left: auto; }
+.rw-session.is-rest .rw-session-val { color: var(--text-muted); font-weight: 500; }
+.rw-cardio { font-family: var(--mono); font-size: 9px; color: #12a5a5; }
+.rw-hol { display: flex; align-items: baseline; gap: 8px; padding-top: 2px; }
+.rw-hol-n { font-family: var(--mono); font-size: 24px; font-weight: 700; line-height: 1;
+  color: var(--gold, #c8970a); font-variant-numeric: tabular-nums; }
+.rw-hol-lbl { font-family: var(--mono); font-size: 9.5px; color: var(--text-muted); line-height: 1.5; }
+.rw.is-holiday { position: relative; }
+.rw.is-holiday::before { content: ''; position: absolute; inset: -6px -8px; border-radius: 10px;
+  background: rgba(200,151,10,.10); pointer-events: none; }
+.rw-empty { font-family: var(--mono); font-size: 10.5px; color: var(--text-muted); }
+/* Compact: the countdown is the thing worth keeping small. */
+[data-h="xs"] .rw-today, [data-h="xs"] .rw-session { display: none; }
+[data-h="sm"] .rw-next { display: none; }
+@container widget (max-width: 210px) {
+  .rw-session-lbl { display: none; }
+  .rw-hol-n { font-size: 20px; }
+}

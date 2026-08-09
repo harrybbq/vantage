@@ -41,6 +41,31 @@
 .upg-stat.is-leave .upg-stat-num { color: var(--em); }
 .upg-stat-lbl { font-family: var(--mono); font-size: 9.5px; letter-spacing: 1.2px; text-transform: uppercase;
   color: var(--text-muted); margin-top: 4px; }
+.upg-stat-sub { font-family: var(--mono); font-size: 10px; color: var(--gold, #c8970a); margin-top: 3px;
+  font-variant-numeric: tabular-nums; }
+.upg-stat-sub.is-low { color: #e0796a; }
+.upg-stat.is-leave::before { background: var(--gold, #c8970a); }
+.upg-stat.is-leave .upg-stat-num { color: var(--gold, #c8970a); }
+
+/* Holiday booking bar */
+.upg-holbar { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.upg-opt.is-gold { display: inline-flex; align-items: center; gap: 6px;
+  border-color: rgba(200,151,10,.5); color: var(--gold, #c8970a); }
+.upg-opt.is-gold:hover { border-color: var(--gold, #c8970a); background: rgba(200,151,10,.1); }
+.upg-holhint { font-family: var(--mono); font-size: 10.5px; color: var(--gold, #c8970a); }
+.upg-holcount { font-family: var(--mono); font-size: 10.5px; color: var(--text-muted);
+  padding: 3px 9px; border-radius: 999px; border: 1px solid rgba(200,151,10,.4); }
+.upg-holnext { margin-left: auto; font-family: var(--mono); font-size: 10.5px; color: var(--text-muted); }
+.upg-holnext b { color: var(--gold, #c8970a); }
+.upg-blocklist { display: flex; gap: 7px; flex-wrap: wrap; }
+.upg-block { display: inline-flex; align-items: center; gap: 7px; padding: 4px 6px 4px 10px;
+  border-radius: 999px; border: 1px solid rgba(200,151,10,.45); background: rgba(200,151,10,.09);
+  font-family: var(--mono); font-size: 10px; color: var(--text-muted); }
+.upg-block b { color: var(--gold, #c8970a); font-weight: 600; }
+.upg-block-n { color: var(--text-muted); opacity: .8; }
+.upg-block-x { background: none; border: 0; cursor: pointer; color: var(--text-muted);
+  font-size: 11px; line-height: 1; padding: 2px 4px; border-radius: 4px; }
+.upg-block-x:hover { color: #e0796a; }
 
 /* ── Legend ────────────────────────────────────────────────────── */
 .upg-legend { display: flex; flex-wrap: wrap; gap: 10px 16px; align-items: center;
@@ -51,7 +76,7 @@
 .upg-sw.is-night { background: rgba(107,138,253,.35); border-color: rgba(107,138,253,.6); }
 .upg-sw.is-day { background: rgba(217,145,20,.35); border-color: rgba(217,145,20,.6); }
 .upg-sw.is-off { background: transparent; }
-.upg-sw.is-leave { background: rgba(var(--em-rgb),.35); border-color: var(--em); }
+.upg-sw.is-leave { background: rgba(200,151,10,.4); border-color: rgba(200,151,10,.7); }
 .upg-sw.is-cardio { background: transparent; border-bottom: 2px solid #12a5a5; border-radius: 0; }
 
 /* ── Calendar ──────────────────────────────────────────────────── */
@@ -75,6 +100,28 @@
 .upg-cell.is-night { background: rgba(107,138,253,.13); border-color: rgba(107,138,253,.4); }
 .upg-cell.is-day { background: rgba(217,145,20,.13); border-color: rgba(217,145,20,.38); }
 .upg-cell.is-leave { background: rgba(var(--em-rgb),.16); border-color: var(--em); }
+/* Holiday gold.
+   The tricky part is that DAY shifts are already amber (#d99114 at .13),
+   so a low-alpha gold holiday reads as just another day-shift block from
+   across the room — which is exactly the distance this is meant to work
+   at. Hue alone cannot carry it. So holidays differ in WEIGHT: a solid
+   fill and a full-strength border against the day shift's wash. */
+.upg-cell.is-holiday {
+  background: rgba(200,151,10,.46);
+  border-color: var(--gold, #c8970a);
+  box-shadow: inset 0 0 0 1px rgba(200,151,10,.35);
+}
+.upg-cell.is-holiday .upg-dt { color: #fff8e3; }
+.upg-cell.is-holiday .upg-chip { color: #fff2cf; }
+.upg-cell.is-holiday .upg-sess { color: rgba(255,244,219,.8); }
+/* Past holidays fade like everything else, but not so far that a block
+   you already took stops reading as one. */
+.upg-cell.is-holiday.is-past { opacity: .55; }
+/* Live preview while picking the second date. */
+.upg-cell.in-range { background: rgba(200,151,10,.16); border-color: rgba(200,151,10,.45);
+  box-shadow: inset 0 0 0 1px rgba(200,151,10,.3); }
+.upg-cell.is-picking { cursor: crosshair; }
+.upg-cell.is-picking:hover { border-color: rgba(200,151,10,.7); }
 .upg-cell.has-cardio { box-shadow: inset 0 -2px 0 0 #12a5a5; }
 .upg-cell.is-edited::after { content: ''; position: absolute; bottom: 3px; right: 3px; width: 4px; height: 4px;
   border-radius: 50%; background: var(--em); }

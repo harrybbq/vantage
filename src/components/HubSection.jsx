@@ -5,6 +5,7 @@ import { VitalsBody, BurnBody, MacrosBody } from './mobile/MobileWidget';
 import { BodyBody, SubscriptionsBody, MoodBody } from './widgets/LifeWidgets';
 import { SavingsPotsBody, SavingsProjectionBody } from './savings/SavingsWidgets';
 import { GoalsBody, BodyGoalBody } from './widgets/GoalsWidget';
+import { RotationBody } from './widgets/RotationWidget';
 import { tradingWidgetAvailable, TRADING_WIDGET_BUILD_EXCLUDED } from '../lib/trading/enabled';
 import MarketBody from './widgets/MarketWidget';
 import NewsBody from './widgets/NewsWidget';
@@ -523,6 +524,7 @@ export default function HubSection({ S, update, active, onOpenModal, onOpenWaitl
     switch (hw.type) {
       case 'vitals':   return <VitalsBody S={S} update={update} picks={hw.picks}
         onSetPicks={p => setHubWidgetPicks(hw.id, p)} />;
+      case 'rotation': return <RotationBody S={S} navigate={onNavigate} />;
       case 'macros':   return <MacrosBody S={S} userId={userId} navigate={onNavigate} />;
       case 'calories': return <BurnBody S={S} update={update} userId={userId} />;
       case 'savings-pots': return <SavingsPotsBody S={S} count={hw.count || 1} picks={hw.picks}
@@ -1185,6 +1187,7 @@ export default function HubSection({ S, update, active, onOpenModal, onOpenWaitl
         // shared with the mobile hub — rendered as React islands into
         // hosts the mount pass below picks up (see reactRootsRef).
         vitals:      { eyebrow: 'WIDGET · VITALS',      icon: '◐', title: 'Vitals',      sub: 'Weight · sleep · HR', body: () => `<div data-react-widget="vitals"></div>` },
+        rotation:    { eyebrow: 'WIDGET · ROTATION',   icon: '◷', title: 'Rotation',   sub: 'Shift · session · holiday', body: () => `<div data-react-widget="rotation"></div>` },
         macros:      { eyebrow: 'WIDGET · MACROS',      icon: '◑', title: 'Macros',      sub: 'Today · net kcal',    body: () => `<div data-react-widget="macros"></div>` },
         calories:    { eyebrow: 'WIDGET · BURN',        icon: '◔', title: 'Calories Burned', sub: 'Activity · net',  body: () => `<div data-react-widget="calories"></div>` },
         'savings-pots':       { eyebrow: 'WIDGET · SAVINGS',    icon: '◒', title: 'Savings pots', sub: 'Progress',      body: () => `<div data-react-widget="savings-pots"></div>` },

@@ -65,6 +65,8 @@ export default function AddMobileWidgetModal({ openId, onClose, existingTypes, o
     // Owner-only AND web-only: absent from native builds entirely, so
     // an app-store reviewer never meets a brokerage surface.
     ...(tradingWidgetAvailable() && (typeof window !== 'undefined' && window.__vantageOwner) ? ['trading'] : []),
+    // Owner-only: reads the rotation, which is an owner-only page.
+    ...((typeof window !== 'undefined' && window.__vantageOwner) ? ['rotation'] : []),
   ];
 
   function pick(type) {

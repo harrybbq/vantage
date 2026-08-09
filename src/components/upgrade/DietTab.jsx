@@ -14,18 +14,8 @@
 import { useMemo, useState } from 'react';
 import Icon from '../Icon';
 import { RecipesPanel, VideosPanel } from './MealLibrary';
+import { DEFAULT_PLAN, blendedDailyKcal } from '../../lib/diet/plan';
 import { SEQ, CARDIO_SESSIONS, TRAIN_POS, REST_POS, patternDay, ANCHOR } from '../../lib/rotation/pattern';
-
-/** The plan as it stood on the static page. */
-export const DEFAULT_PLAN = {
-  targetKg: 76,
-  heightCm: 175,
-  proteinPerKg: 2.5,
-  trainKcal: 2550, trainCarbs: 290, trainFat: 75,
-  restKcal: 2350, restCarbs: 250, restFat: 70,
-  build: 'Spider-Man / Invincible — broad shoulders, visible abs, no bulk-phase softness.',
-  rateKgPerMonth: 0.25,
-};
 
 function latestWeight(S) {
   const log = (S && S.vitalsLog) || {};
@@ -131,12 +121,17 @@ export default function DietTab({ S, update, userId }) {
       <SplitCard />
 
       <div className="upg-card">
-        <div className="upg-card-head"><h3>Pushing this into the app</h3></div>
+        <div className="upg-card-head">
+          <h3>How this reaches the rest of the app</h3>
+          <span className="upg-card-sub">Blended daily: {blendedDailyKcal(S)} kcal</span>
+        </div>
         <p className="upg-fine" style={{ margin: 0 }}>
-          These are the plan, not the app&apos;s live targets. The Body Goal widget projects from
-          your macro goals in Track → Daily Macros and from what you actually log, so set the
-          training-day figures there if you want the projection to use them.
-          {' '}<Icon name="arrow-right" size={11} />
+          The Body Goal projection needs one daily calorie figure, and this plan has two. It uses
+          the blend above — {plan.trainKcal} on the {TRAIN_POS.length} training days and {plan.restKcal} on
+          the other {16 - TRAIN_POS.length}, weighted by how the rotation actually falls.
+          {' '}That blend is a <b>fallback</b>: a calorie goal set in Track → Daily Macros wins, because
+          that is what your food log measures against. And once you have logged enough days, what you
+          actually ate beats both.
         </p>
       </div>
     </div>
