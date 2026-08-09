@@ -19,15 +19,22 @@
  *   positions  8–11  four day shifts      D1 D2 D3 D4
  *   positions 12–15  four off
  *
- * Training runs on all eight shift days plus the middle two days of each
- * off-block — 12 sessions per 16 days, ~5.3/week. Rest lands on the
- * first and last day of each off-block, which is where it is actually
- * wanted: coming off nights, and the day before going back in.
+ * Training is a 5-day PPLUL block slotted from the FIRST SHIFT to the
+ * FIRST DAY OFF, twice per cycle:
  *
- * The session sequence is PPLUL and rolls CONTINUOUSLY across cycles —
- * it does not reset every 16 days. 12 slots against a 5-long sequence
- * means each cycle starts two further along than the last, so no day of
- * the week is permanently the leg day.
+ *   0  1  2  3  4 | 5  6  7 | 8  9 10 11 12 | 13 14 15
+ *   N1 N2 N3 N4 off         | D1 D2 D3 D4 off
+ *   P  P  L  U  L  · rest · | P  P  L  U  L  ·  rest ·
+ *
+ * 10 sessions per 16 days, ~4.4/week, six rest days. Rest is the tail
+ * of each off-block — the run-up to going back in — rather than being
+ * split across both of its edges.
+ *
+ * The block length and the sequence length are both five, so each block
+ * is exactly one complete PPLUL and the sequence restarts every block.
+ * That makes the pattern strictly periodic: Push is always the first
+ * shift day, Lower is always the first day off. A continuous roll would
+ * produce the identical result here, so the simpler derivation is used.
  */
 
 const MS = 86400000;
@@ -40,10 +47,15 @@ export const ANCHOR = dayNum(2026, 6, 15);
 
 export const CYCLE = 16;
 
-/** Positions within a cycle that carry a training session. */
-export const TRAIN_POS = [0, 1, 2, 3, 5, 6, 8, 9, 10, 11, 13, 14];
-/** The four rest days: both edges of both off-blocks. */
-export const REST_POS = new Set([4, 7, 12, 15]);
+/**
+ * Positions carrying a training session: the four shift days plus the
+ * first day off, for each of the two shift blocks.
+ */
+export const TRAIN_POS = [0, 1, 2, 3, 4, 8, 9, 10, 11, 12];
+/** The six rest days: the tail of each off-block. */
+export const REST_POS = new Set([5, 6, 7, 13, 14, 15]);
+/** Cycle position each PPLUL block starts on. */
+export const BLOCK_STARTS = [0, 8];
 
 export const SEQ = ['Push', 'Pull', 'Legs', 'Upper', 'Lower'];
 /** Sessions that carry conditioning — upper days, so legs stay fresh. */
@@ -70,8 +82,14 @@ export function isoOf(y, m, d) {
   return `${y}-${String(m + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
 }
 
-/** Training slots elapsed before position p, within one cycle. */
-const slotsBefore = p => TRAIN_POS.filter(x => x < p).length;
+/** Which PPLUL block a position belongs to, and how far into it. */
+function blockOffset(pos) {
+  for (const start of BLOCK_STARTS) {
+    const off = pos - start;
+    if (off >= 0 && off < SEQ.length) return off;
+  }
+  return null;
+}
 
 /**
  * The pattern's own answer for a date, before any override.
@@ -86,11 +104,12 @@ export function patternDay(y, m, d) {
   const cycle = Math.floor(diff / CYCLE);
   const shift = pos < 4 ? 'night' : pos < 8 ? 'off' : pos < 12 ? 'day' : 'off';
   const shiftNum = pos < 4 ? pos + 1 : (pos >= 8 && pos < 12) ? pos - 7 : null;
-  if (REST_POS.has(pos)) return { inPattern: true, pos, cycle, shift, shiftNum, session: 'Rest', cardio: false };
-  // Continuous across cycles: count every slot since the anchor, not
-  // just the ones in this cycle.
-  const idx = (cycle * TRAIN_POS.length + slotsBefore(pos)) % SEQ.length;
-  const session = SEQ[idx];
+  const off = blockOffset(pos);
+  if (off == null || REST_POS.has(pos)) {
+    return { inPattern: true, pos, cycle, shift, shiftNum, session: 'Rest', cardio: false };
+  }
+  // One block is exactly one PPLUL, so the offset IS the index.
+  const session = SEQ[off];
   return { inPattern: true, pos, cycle, shift, shiftNum, session, cardio: CARDIO_SESSIONS.has(session) };
 }
 

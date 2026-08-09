@@ -88,7 +88,7 @@ export default function RotationTab({ S, update, isMobile }) {
       </div>
 
       <div className="upg-note">
-        16-day cycle · PPLUL rolling continuously · cardio on upper days ·
+        16-day cycle · PPLUL slotted from the 1st shift to the 1st day off · cardio on upper days ·
         {' '}{stats.sessions} sessions ({stats.cardio} with cardio) · 15 Jul 2026 → 30 Sep 2027
         {editedCount > 0 && <> · <b>{editedCount} day{editedCount === 1 ? '' : 's'} edited</b></>}
       </div>

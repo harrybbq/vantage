@@ -186,7 +186,9 @@ function SplitCard() {
     <div className="upg-card">
       <div className="upg-card-head">
         <h3>Gym split</h3>
-        <span className="upg-card-sub">{TRAIN_POS.length} sessions / 16 days ≈ 5.3 a week</span>
+        <span className="upg-card-sub">
+          {TRAIN_POS.length} sessions / 16 days ≈ {(TRAIN_POS.length * 7 / 16).toFixed(1)} a week
+        </span>
       </div>
       <div className="upg-split-row">
         {cycle.map(c => (
@@ -197,10 +199,11 @@ function SplitCard() {
         ))}
       </div>
       <div className="upg-fine" style={{ marginTop: 10 }}>
-        {SEQ.join(' → ')} rolls continuously and does <b>not</b> reset each cycle, so no weekday is
-        permanently leg day. Cardio rides on {[...CARDIO_SESSIONS].join(' / ')} days to keep legs
-        fresh. Rest lands on {REST_POS.size} days — both edges of each off-block, which is coming
-        off nights and the day before going back in.
+        {SEQ.join(' → ')} is slotted from the first shift to the first day off, so one block runs
+        across the four shifts and finishes on the day you come off them — then {REST_POS.size / 2}{' '}
+        rest days before the next block. Block length and sequence length are both five, so every
+        block is a complete PPLUL: Push always lands on the first shift, Lower always on the first
+        day off. Cardio rides on {[...CARDIO_SESSIONS].join(' / ')} days to keep legs fresh.
       </div>
     </div>
   );
