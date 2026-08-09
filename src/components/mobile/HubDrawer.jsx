@@ -50,11 +50,11 @@ export default function HubDrawer({
 
   return (
     <>
-      <div className={'m-drawer-scrim' + (open ? ' is-open' : '')}
+      <div className={'m-hubdrawer-scrim' + (open ? ' is-open' : '')}
            onClick={onClose} aria-hidden={!open} />
       <aside
         ref={panelRef}
-        className={'m-drawer' + (open ? ' is-open' : '')}
+        className={'m-hubdrawer' + (open ? ' is-open' : '')}
         role="dialog"
         aria-modal={open ? 'true' : undefined}
         aria-label="Your day"
@@ -63,64 +63,64 @@ export default function HubDrawer({
         // tab order stops a closed drawer swallowing focus.
         {...(open ? {} : { tabIndex: -1 })}
       >
-        <div className="m-drawer-head">
-          <div className="m-drawer-av" aria-hidden="true">
+        <div className="m-hubdrawer-head">
+          <div className="m-hubdrawer-av" aria-hidden="true">
             {(S.profile && S.profile.photo)
               ? <img src={S.profile.photo} alt="" />
               : <span>{name.slice(0, 1).toUpperCase()}</span>}
           </div>
-          <div className="m-drawer-who">
-            <div className="m-drawer-name">{name}</div>
-            <button type="button" className="m-drawer-link"
+          <div className="m-hubdrawer-who">
+            <div className="m-hubdrawer-name">{name}</div>
+            <button type="button" className="m-hubdrawer-link"
                     onClick={() => { onClose(); onNavigate?.('settings'); }}>
               Profile &amp; settings
             </button>
           </div>
-          <button type="button" className="m-drawer-x" onClick={onClose} aria-label="Close">✕</button>
+          <button type="button" className="m-hubdrawer-x" onClick={onClose} aria-label="Close">✕</button>
         </div>
 
-        <div className="m-drawer-body">
+        <div className="m-hubdrawer-body">
           <RatingsPanel S={S} update={update} />
 
-          <div className="m-drawer-stats">
-            <div className="m-drawer-stat">
-              <div className="m-drawer-stat-v" style={{ color: 'var(--coin, #d4a017)' }}>
+          <div className="m-hubdrawer-stats">
+            <div className="m-hubdrawer-stat">
+              <div className="m-hubdrawer-stat-v" style={{ color: 'var(--coin, #d4a017)' }}>
                 {coins.toLocaleString()}
               </div>
-              <div className="m-drawer-stat-l">Coins</div>
+              <div className="m-hubdrawer-stat-l">Coins</div>
             </div>
-            <div className="m-drawer-stat">
-              <div className="m-drawer-stat-v" style={{ color: 'var(--em)' }}>{streak}</div>
-              <div className="m-drawer-stat-l">Day streak</div>
+            <div className="m-hubdrawer-stat">
+              <div className="m-hubdrawer-stat-v" style={{ color: 'var(--em)' }}>{streak}</div>
+              <div className="m-hubdrawer-stat-l">Day streak</div>
             </div>
           </div>
 
-          <div className="m-drawer-sec">
-            <div className="m-drawer-sec-h">// Today&apos;s trackers</div>
+          <div className="m-hubdrawer-sec">
+            <div className="m-hubdrawer-sec-h">// Today&apos;s trackers</div>
             {!trackers.length && (
-              <button type="button" className="m-drawer-empty"
+              <button type="button" className="m-hubdrawer-empty"
                       onClick={() => { onClose(); onNavigate?.('track'); }}>
                 No trackers yet — add one in Track.
               </button>
             )}
             {trackers.map(t => (
               <button key={t.id} type="button"
-                      className={'m-drawer-track' + (t.done ? ' is-done' : '')}
+                      className={'m-hubdrawer-track' + (t.done ? ' is-done' : '')}
                       onClick={() => onToggleTracker(t)}>
-                <span className={'m-drawer-tick' + (t.done ? ' is-done' : '')} aria-hidden="true">
+                <span className={'m-hubdrawer-tick' + (t.done ? ' is-done' : '')} aria-hidden="true">
                   {t.done ? '✓' : ''}
                 </span>
-                <span className="m-drawer-track-name">{t.name}</span>
-                {t.target ? <span className="m-drawer-track-t">{t.value ?? 0}/{t.target}</span> : null}
+                <span className="m-hubdrawer-track-name">{t.name}</span>
+                {t.target ? <span className="m-hubdrawer-track-t">{t.value ?? 0}/{t.target}</span> : null}
               </button>
             ))}
           </div>
 
-          <div className="m-drawer-sec">
-            <div className="m-drawer-sec-h">
-              // AI Coach {hasPro && <span className="m-drawer-pro">PRO</span>}
+          <div className="m-hubdrawer-sec">
+            <div className="m-hubdrawer-sec-h">
+              // AI Coach {hasPro && <span className="m-hubdrawer-pro">PRO</span>}
             </div>
-            <button type="button" className="m-drawer-coach"
+            <button type="button" className="m-hubdrawer-coach"
                     onClick={() => { onClose(); onNavigate?.('track'); }}>
               {briefLine || (hasPro
                 ? 'Today&rsquo;s brief hasn&rsquo;t loaded yet.'
@@ -129,12 +129,12 @@ export default function HubDrawer({
           </div>
         </div>
 
-        <div className="m-drawer-foot">
-          <button type="button" className="m-drawer-foot-btn"
+        <div className="m-hubdrawer-foot">
+          <button type="button" className="m-hubdrawer-foot-btn"
                   onClick={() => { onClose(); onNavigate?.('achievements'); }}>
             <Icon name="star" size={14} /> Achievements
           </button>
-          <button type="button" className="m-drawer-foot-btn"
+          <button type="button" className="m-hubdrawer-foot-btn"
                   onClick={() => { onClose(); onNavigate?.('leaderboard'); }}>
             <Icon name="trophy" size={14} /> Leaderboard
           </button>
