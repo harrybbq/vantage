@@ -76,3 +76,36 @@ html[data-theme="dark"] .hub-footer {
   background: var(--bg-raised);
   border-top-color: var(--border);
 }
+
+/* ── Modals ────────────────────────────────────────────────────────────
+ * `.modal` in index.css hardcodes a cream gradient rather than reading a
+ * token, so no amount of token overriding above reaches it. dark-os
+ * patches it in hub-dark.css; the free dark theme never did — which left
+ * EVERY modal in the app rendering cream, with `var(--text)` (now light)
+ * written on top of it. Unreadable, and it has been that way for every
+ * free dark-theme user since this theme shipped.
+ *
+ * Fixed here rather than in index.css so the cream default is untouched.
+ */
+html[data-theme="dark"] .modal,
+html[data-theme="dark"] .modal-content {
+  background: var(--bg-raised);
+  border-color: var(--border);
+  color: var(--text);
+  box-shadow: 0 24px 60px rgba(0,0,0,.55), 0 0 0 1px rgba(255,255,255,.03);
+}
+
+/* Same cause: the form fields inside a modal hardcode #fffefa. */
+html[data-theme="dark"] .fg input,
+html[data-theme="dark"] .fg select,
+html[data-theme="dark"] .fg textarea {
+  background: var(--surface-deep);
+  border-color: var(--border);
+  color: var(--text);
+}
+html[data-theme="dark"] .fg input:focus,
+html[data-theme="dark"] .fg select:focus,
+html[data-theme="dark"] .fg textarea:focus {
+  background: var(--bg-base);
+  border-color: var(--em);
+}

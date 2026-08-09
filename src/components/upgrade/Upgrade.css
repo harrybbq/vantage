@@ -255,3 +255,55 @@
   .upg-card { border: 0; padding: 0 0 14px; }
   .upg-pane { gap: 0; }
 }
+
+/* ── Practice curriculum ───────────────────────────────────────────
+   Progress has to read at a glance — the panel is scanned to decide
+   what to do next, not read top to bottom. */
+.upg-stat-of { font-size: 14px; font-weight: 400; color: var(--text-muted); }
+
+.upg-next { border-left: 3px solid var(--em); }
+.upg-prow.is-next { flex-wrap: wrap; }
+.upg-why { flex: 1 1 100%; font-family: var(--mono); font-size: 9px; letter-spacing: 1.2px;
+  text-transform: uppercase; color: var(--em); }
+
+/* Status tick. A solved row should be distinguishable without reading. */
+.upg-tick { width: 16px; height: 16px; flex: none; border-radius: 5px; border: 1px solid var(--border);
+  display: grid; place-items: center; font-size: 10px; line-height: 1; color: var(--text-muted); }
+.upg-tick.is-solved { border-color: var(--em); background: rgba(var(--em-rgb),.14); color: var(--em); }
+.upg-tick.is-attempted { border-color: var(--gold, #c8970a); color: var(--gold, #c8970a); }
+.upg-prow.is-solved .upg-prow-name { color: var(--text-muted); }
+.upg-prow.is-due { border-color: rgba(var(--em-rgb),.4); }
+.upg-conf.is-shaky { color: var(--gold, #c8970a); }
+
+/* Topic bars */
+.upg-topics { display: flex; flex-direction: column; gap: 4px; }
+.upg-topicrow { display: flex; align-items: center; gap: 10px; width: 100%; padding: 6px 8px;
+  border-radius: 8px; border: 1px solid transparent; background: transparent; cursor: pointer;
+  color: var(--text); font-family: inherit; text-align: left; }
+.upg-topicrow:hover { border-color: var(--border); }
+.upg-topicrow.is-on { border-color: var(--em); background: rgba(var(--em-rgb),.08); }
+.upg-topicrow-name { flex: 0 0 132px; font-size: 12.5px; overflow: hidden; text-overflow: ellipsis;
+  white-space: nowrap; }
+.upg-topicrow-n { font-family: var(--mono); font-size: 10px; color: var(--text-muted);
+  font-variant-numeric: tabular-nums; flex: none; }
+.upg-bar { position: relative; flex: 1; height: 6px; border-radius: 3px; background: var(--border);
+  overflow: hidden; min-width: 40px; }
+.upg-bar-fill { position: absolute; left: 0; top: 0; bottom: 0; background: var(--em); border-radius: 3px;
+  transition: width .35s var(--ease-out, ease); }
+.upg-bar-shaky { position: absolute; right: 0; top: 0; bottom: 0; width: 5px;
+  background: var(--gold, #c8970a); }
+
+/* Problem sheet */
+.upg-prompt { font-size: 13.5px; line-height: 1.65; color: var(--text-mid, var(--text));
+  margin: 0 0 8px; }
+.upg-tables { display: flex; gap: 6px; flex-wrap: wrap; }
+.upg-reveal { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; }
+.upg-hint { flex: 1 1 100%; font-size: 13px; line-height: 1.6; padding: 10px 12px; border-radius: 9px;
+  border: 1px solid var(--gold, #c8970a); background: rgba(200,151,10,.09); }
+.upg-hint b { font-family: var(--mono); font-size: 9px; letter-spacing: 1.2px; text-transform: uppercase;
+  color: var(--gold, #c8970a); margin-right: 6px; }
+.upg-sheet .link-open-btn { display: inline-flex; align-items: center; gap: 6px; text-decoration: none; }
+
+@media (max-width: 700px) {
+  .upg-topicrow-name { flex: 0 0 96px; font-size: 11.5px; }
+}
