@@ -13,6 +13,7 @@
  */
 import { useMemo, useState } from 'react';
 import Icon from '../Icon';
+import { RecipesPanel, VideosPanel } from './MealLibrary';
 import { SEQ, CARDIO_SESSIONS, TRAIN_POS, REST_POS, patternDay, ANCHOR } from '../../lib/rotation/pattern';
 
 /** The plan as it stood on the static page. */
@@ -36,7 +37,14 @@ function latestWeight(S) {
   return null;
 }
 
-export default function DietTab({ S, update }) {
+const PANELS = [
+  { id: 'plan', label: 'Plan', icon: 'target' },
+  { id: 'recipes', label: 'Recipes', icon: 'utensils' },
+  { id: 'videos', label: 'Videos', icon: 'newspaper' },
+];
+
+export default function DietTab({ S, update, userId }) {
+  const [panel, setPanel] = useState('plan');
   const plan = useMemo(() => ({ ...DEFAULT_PLAN, ...(S.dietPlan || {}) }), [S.dietPlan]);
   const [editing, setEditing] = useState(false);
   const weight = latestWeight(S);
@@ -53,8 +61,23 @@ export default function DietTab({ S, update }) {
 
   const set = (k, v) => update(prev => ({ ...prev, dietPlan: { ...(prev.dietPlan || {}), [k]: v } }));
 
+  // What a recipe serving is measured against. Training-day figures,
+  // because that is the day you are usually planning food for.
+  const targets = { kcal: plan.trainKcal, protein: proteinG };
+
+  if (panel !== 'plan') {
+    return (
+      <div className="upg-pane">
+        <Nav panel={panel} setPanel={setPanel} />
+        {panel === 'recipes' && <RecipesPanel S={S} update={update} userId={userId} targets={targets} />}
+        {panel === 'videos' && <VideosPanel S={S} update={update} />}
+      </div>
+    );
+  }
+
   return (
     <div className="upg-pane">
+      <Nav panel={panel} setPanel={setPanel} />
       <div className="upg-card upg-build">
         <div className="upg-card-head">
           <h3>The build</h3>
@@ -116,6 +139,20 @@ export default function DietTab({ S, update }) {
           {' '}<Icon name="arrow-right" size={11} />
         </p>
       </div>
+    </div>
+  );
+}
+
+function Nav({ panel, setPanel }) {
+  return (
+    <div className="upg-subnav">
+      {PANELS.map(p => (
+        <button key={p.id} type="button"
+                className={'upg-subtab' + (panel === p.id ? ' is-on' : '')}
+                onClick={() => setPanel(p.id)}>
+          <Icon name={p.icon} size={13} /> {p.label}
+        </button>
+      ))}
     </div>
   );
 }
