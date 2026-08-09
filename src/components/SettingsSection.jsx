@@ -1152,22 +1152,22 @@ export default function SettingsSection({ S, update, active, userId, onOpenLegal
           </button>
         </div>
 
-        {/* Shift rotation — owner-only. App.jsx passes onOpenSchedule
-            as null for everyone else, so the card simply never
-            renders for non-owner accounts (same gating pattern as
+        {/* Upgrade — owner-only. App.jsx passes onOpenSchedule as null
+            for everyone else, so the card simply never renders for
+            non-owner accounts (same gating pattern as
             onCoinContextMenu admin powers). */}
         {onOpenSchedule && (
           <div className="card" style={{ padding: '22px' }}>
-            <h3 style={{ margin: '0 0 4px' }}>Rotation</h3>
+            <h3 style={{ margin: '0 0 4px' }}>Upgrade</h3>
             <p style={{ fontFamily: 'var(--mono)', fontSize: '11px', color: 'var(--text-muted)', margin: '0 0 16px', lineHeight: '1.7' }}>
-              Owner-only: shift rotation + training calendar, Jul 2026 – Sep 2027.
+              Owner-only: shift rotation and training calendar, the macro plan, and career tracking.
             </p>
             <button
               type="button"
               className="tut-replay-btn"
               onClick={onOpenSchedule}
             >
-              <span aria-hidden="true" style={{display:'inline-flex',marginRight:6}}><Icon name="calendar-days" size={15} /></span>Open rotation calendar
+              <span aria-hidden="true" style={{display:'inline-flex',marginRight:6}}><Icon name="trending-up" size={15} /></span>Open Upgrade
             </button>
           </div>
         )}

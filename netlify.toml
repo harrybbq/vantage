@@ -65,16 +65,20 @@
     # Clickjacking. Matters more now the app is heading for app stores,
     # where a webview wrapper shouldn't be frameable by anyone else.
     #
-    # SAMEORIGIN, not DENY. DENY blocks same-origin framing too, which
-    # broke the owner Rotation page — it renders
-    # /schedule/shift-rotation-2026.html in a same-origin iframe, and
-    # Firefox refused it outright. public/_headers already said
-    # SAMEORIGIN for this exact reason, but netlify.toml takes
-    # precedence over _headers when both set a header, so DENY won and
-    # the note in _headers had no effect. Keep the two in step.
+    # SAMEORIGIN, not DENY. The original reason is gone — the owner
+    # Rotation page used to iframe /schedule/shift-rotation-2026.html
+    # and DENY blocked even that same-origin frame; that page is now a
+    # React tab (Upgrade → Rotation) and nothing in the app frames
+    # itself any more. Kept at SAMEORIGIN because tightening to DENY is
+    # a change to how the Capacitor shell may embed the site, and that
+    # deserves its own test rather than riding along with a refactor.
     #
-    # Cross-origin embedding stays blocked, which is the clickjacking
-    # protection that actually matters.
+    # Still worth knowing: netlify.toml takes precedence over
+    # public/_headers when both set a header, so the two must agree or
+    # the _headers entry is silently dead. Keep them in step.
+    #
+    # Cross-origin embedding stays blocked either way, which is the
+    # clickjacking protection that actually matters.
     X-Frame-Options = "SAMEORIGIN"
     # Stop the browser second-guessing declared content types.
     X-Content-Type-Options = "nosniff"

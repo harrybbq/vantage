@@ -10,9 +10,9 @@ export default function Nav({ activeSection, onNavigate, onSignOut, isOwner }) {
     { id: 'holiday', icon: 'plane', label: 'Holiday' },
     { id: 'habits', icon: 'flame', label: 'Habits' },
     { id: 'leaderboard', icon: 'trophy', label: 'Leaderboard' },
-    // Owner-only: shift rotation calendar. Slotted above Settings and
+    // Owner-only: rotation, diet and career. Slotted above Settings and
     // simply absent for everyone else.
-    ...(isOwner ? [{ id: 'schedule', icon: 'calendar-days', label: 'Rotation' }] : []),
+    ...(isOwner ? [{ id: 'upgrade', icon: 'trending-up', label: 'Upgrade' }] : []),
     { id: 'settings', icon: 'settings', label: 'Settings', mobileHide: true },
   ];
 
