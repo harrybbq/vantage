@@ -181,7 +181,14 @@ export default function HolidaySection({ S, update, active, onOpenModal }) {
             transition={{ duration: 0.4, ease: 'easeOut' }}
           >
             <div className="eyebrow">Adventures</div>
-            <div className="sec-title">Holiday Planner <SectionHelp text="Trips tab: plan trips — dates, flights, accommodation, budget, itinerary and a cover photo, with a live countdown and destination costs. Link a trip to a savings goal to track what you've put aside. Interrail tab: chain European cities into a rail route, with journey times, changes and compulsory reservations. Visited tab: every country you've been to, filled in automatically as trips are completed." /></div>
+            <div className="sec-title">Holiday Planner <SectionHelp
+              title="Holiday planner"
+              rows={[
+                { term: 'Trips', def: 'Dates, flights, budget and a countdown. Link one to a savings goal.' },
+                { term: 'Interrail', def: 'Chain European cities into a route, with times and reservations.' },
+                { term: 'Visited', def: 'Fills itself in as trips finish.' },
+              ]}
+            /></div>
           </motion.div>
           {tab === 'trips' && (
             <motion.button className="btn btn-primary" onClick={() => onOpenModal('addHolidayModal')}

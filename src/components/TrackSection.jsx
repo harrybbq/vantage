@@ -444,7 +444,15 @@ export default function TrackSection({ S, update, active, onOpenModal, onShowCoi
         transition={{ duration: 0.4, ease: 'easeOut' }}
       >
         <div className="eyebrow">Daily Habits</div>
-        <div className="sec-title">Track <SectionHelp text="Everything you log daily lives here. Trackers: tick habits or numbers against weekly targets (multi-select calendar days to batch-log). Nutrition: search foods, scan a barcode, or identify a plate with AI — liquids preset to ml. Vitals sync from WHOOP or Apple Health. Body tracks your weight trend against a goal." /></div>
+        <div className="sec-title">Track <SectionHelp
+          title="Track"
+          rows={[
+            { term: 'Trackers', def: 'Tick habits against weekly targets. Select several days to log at once.' },
+            { term: 'Nutrition', def: 'Search, scan a barcode, or photograph a plate.' },
+            { term: 'Vitals', def: 'Syncs from WHOOP, Oura or Apple Health.' },
+            { term: 'Body', def: 'Your weight trend against a goal.' },
+          ]}
+        /></div>
       </motion.div>
       {/* Desktop: trackers strip on top, then a 3-column dashboard
           (Calendar · Vitals & Macros · Daily Macros). Collapses to a

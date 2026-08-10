@@ -62,3 +62,32 @@ build starts:
 
 ## Next project: Vantage Home
 A new dashboard surface styled like a Home Assistant wall panel (owner has a reference screenshot — ask for it): dense dark tile grid, at-a-glance stats with mini graphs/gauges, header chips, right rail with day recap + forecast-style rows + media-player-style card. Reimagines the hub's widgets (vitals, macros, body, mood, savings, subscriptions, weather?, calendar?) as compact tiles. Keep it OPTIONAL alongside the existing hub, reuse existing widget bodies/stores where possible, respect the existing theme system (`SettingsSection` SCHEMES) and Pro gating conventions.
+
+## Playtest feedback (Finlay, 2026-08-10) — LIVING DOCUMENT
+Artifact: https://claude.ai/code/artifact/d192f4b0-0bf1-431b-b636-001f685e6f37
+File: `/tmp/.../scratchpad/vantage-feedback.html` — republish the SAME
+path (or pass the URL as `url`) to keep that link.
+
+**Keep it current.** Whenever one of its items ships, update the
+artifact in the same session: move the item to shipped, replace the
+"before" mockup with what was actually built, and note the date. It is
+the running record of what the feedback asked for and what we did about
+it — a stale version is worse than none.
+
+The five named defects, in order:
+1. Visions unlock toast is a dead end; catalogue only opens from Settings
+2. Achievement anti-gaming rules (7-day spacing · first 8 full credit ·
+   sqrt taper) are invisible to the user
+3. Seven `SectionHelp` tooltips are 200–400 char run-on prose
+4. Export is `JSON.stringify(S)` — ~1 MB plaintext of weight/meals/money
+5. Audit features not touched in months (Mood was the first — removed)
+
+Also captured there: the "500+ apps in one" argument (the fix is to stop
+rendering unchosen features as empty states, not to cut features), the
+"looks like Claude" diagnosis (cream #fdfaf3 + Playfair + one accent is
+the generated-design house style; the operator console is the answer we
+already own), and the OVR-as-spine bet.
+
+**Correction worth remembering:** Vantage gathers NO purchase history
+and has no bank/Open Banking integration — savings and expenses are
+manual entry only. Don't repeat that claim.

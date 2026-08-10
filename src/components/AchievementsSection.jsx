@@ -7,6 +7,8 @@ import SavingsList from './SavingsList';
 import AchievementTree from './achievements/AchievementTree';
 import { useIsMobile } from '../hooks/useIsMobile';
 import { SubscriptionsManager } from './widgets/LifeWidgets';
+import { VISIONS } from '../lib/visions/definitions';
+import { achievementCreditState, achievementCreditStatus } from '../lib/ratings/derive';
 
 /**
  * Achievement Board — React-rendered canvas of goal nodes connected by
@@ -224,6 +226,7 @@ function AchNode({
     return p && p.completed;
   });
   const status = ach.completed ? 'completed' : ach.locked ? 'locked' : 'active';
+  const creditStatus = achievementCreditStatus(ach);
   const statusLabel =
     ach.completed
       ? '★ Completed'
@@ -373,6 +376,14 @@ function AchNode({
             {ach.coins > 0 && (
               <div className="ach-coin-badge">⬡ {ach.coins}</div>
             )}
+            {/* Completed, but inside the spacing window, so it is paying
+                coins without moving the rating. Saying so on the card is
+                the only place a user would ever find that out. */}
+            {creditStatus.state === 'too-soon' && (
+              <div className="ach-credit-note" title={`Completed within ${creditStatus.spacingDays} days of being created, so it does not count toward your rating.`}>
+                Rating credit in {creditStatus.daysLeft}d
+              </div>
+            )}
           </div>
         </div>
 
@@ -420,8 +431,11 @@ function AchNode({
 
 // ── Main section ─────────────────────────────────────────────────────
 
-export default function AchievementsSection({ S, update, active, onOpenModal, onShowCoinToast }) {
+export default function AchievementsSection({ S, update, active, onOpenModal, onShowCoinToast, onOpenVisions }) {
   const achievements = S.achievements || [];
+  const visionsUnlocked = Object.keys(S.visions || {}).length;
+  // Rating credit, shown rather than hidden — see achievementCreditState.
+  const credit = achievementCreditState(S);
   const connections = S.connections || [];
   const connectingFrom = S.connectingFrom || null;
 
@@ -828,7 +842,14 @@ export default function AchievementsSection({ S, update, active, onOpenModal, on
           <div className="eyebrow">Progress Map</div>
           <div className="sec-title">
             Achievement Board
-            <SectionHelp text="Goals tab: place goals on the canvas, draw connections to map your path, and complete them for coin rewards (max 10,000 per goal) — a parent unlocks its children. Savings tab: money goals with target dates and monthly guidance, plus Subscriptions & Bills to track recurring outgoings and see your monthly burn." />
+            <SectionHelp
+              title="Achievements"
+              rows={[
+                { term: 'Goals', def: 'Map goals on a canvas. Finishing one pays coins and unlocks whatever hangs off it.' },
+                { term: 'Savings', def: 'Money goals with a target date and a monthly figure to hit.' },
+                { term: 'Bills', def: 'Recurring outgoings, totalled into your monthly burn.' },
+              ]}
+            />
           </div>
         </motion.div>
         {/* Canvas affordances. On phones the goals tab is the derived
@@ -848,6 +869,22 @@ export default function AchievementsSection({ S, update, active, onOpenModal, on
             <span className="ach-hint-pill"><span className="ach-hint-key">Tap</span> edit</span>
             <span className="ach-hint-pill"><span className="ach-hint-key">★</span> complete</span>
           </div>
+        )}
+        {/* Visions belong next to achievements, not buried in Settings.
+            They are the same idea to a user — a thing you unlocked — and
+            the only place they were ever named was a toast that vanished. */}
+        {onOpenVisions && (
+          <motion.button
+            type="button"
+            className="btn btn-ghost ach-visions-btn"
+            onClick={onOpenVisions}
+            whileHover={{ scale: 1.04 }}
+            whileTap={{ scale: 0.96 }}
+            transition={{ type: 'spring', stiffness: 400, damping: 17 }}
+          >
+            <span aria-hidden="true">◆</span> Visions
+            <span className="ach-visions-count">{visionsUnlocked}/{VISIONS.length}</span>
+          </motion.button>
         )}
         {activeTab === 'goals' && (
           <motion.button
@@ -898,6 +935,29 @@ export default function AchievementsSection({ S, update, active, onOpenModal, on
             <div className="ach-stats-item">
               <span className="ach-stats-val">{lockedCount}</span>
               <span className="ach-stats-lbl">Locked</span>
+            </div>
+            {/* How many of those actually move your rating. The rules
+                behind this were invisible until now: complete something
+                within a week of creating it and it counts nothing, and
+                past the first handful each one is worth less than the
+                last. Both are deliberate — and both were impossible to
+                discover from inside the app. */}
+            <div className="ach-stats-item ach-stats-item--credit">
+              <span className="ach-stats-val">
+                {credit.atFullCredit}<span className="ach-credit-of">/{credit.fullCredit}</span>
+              </span>
+              <span className="ach-stats-lbl">Full credit</span>
+              <SectionHelp
+                title="Rating credit"
+                rows={[
+                  { term: 'Full credit', def: `The first ${credit.fullCredit} completed count in full.` },
+                  { term: 'After that', def: 'Each one is worth less than the last, so bulk-adding gains little.' },
+                  { term: `${credit.spacingDays}-day rule`, def: `Finish something within ${credit.spacingDays} days of creating it and it counts nothing.` },
+                ]}
+                foot={credit.pending > 0
+                  ? `${credit.pending} of yours are waiting out the ${credit.spacingDays} days.`
+                  : 'Make as many as you like — this only affects your rating.'}
+              />
             </div>
             <div className="ach-stats-divider" />
             <div className="ach-stats-item">

@@ -2724,6 +2724,100 @@ html[data-theme="dark"] {
 #coinToast.spend{background:#8b5e00;color:#fff;box-shadow:0 4px 20px rgba(139,94,0,.4);}
 #coinToast.error{background:#b91c1c;color:#fff;box-shadow:0 4px 20px rgba(185,28,28,.4);}
 #coinToast.show{opacity:1;transform:translateX(-50%) translateY(0);}
+/* The toast is pointer-events:none so it never swallows a click meant
+   for the page. An action button has to opt back in, or it is decoration. */
+.coin-toast-action{
+  pointer-events:auto;
+  margin-left:12px;padding:3px 10px;
+  border-radius:100px;border:1px solid rgba(255,255,255,.45);
+  background:rgba(255,255,255,.14);color:inherit;
+  font-family:var(--mono);font-size:11px;font-weight:700;letter-spacing:.4px;
+  cursor:pointer;transition:background .15s,border-color .15s;
+}
+.coin-toast-action:hover{background:rgba(255,255,255,.26);border-color:rgba(255,255,255,.7);}
+.coin-toast-action:focus-visible{outline:2px solid #fff;outline-offset:2px;}
+
+/* Visions button in the achievements toolbar — a quiet sibling to
+   "+ New", with the count doing the advertising. */
+.ach-visions-btn{display:inline-flex;align-items:center;gap:7px;}
+/* The credit stat carries its own "?" — the rule needs to be readable
+   exactly where the number is, not on a help page. */
+/* ── Settings → Your Data (encrypted export) ── */
+.dx-sub{font-family:var(--mono);font-size:11px;color:var(--text-muted);
+  margin:0 0 16px;line-height:1.7;}
+.dx-fields{display:flex;flex-wrap:wrap;gap:10px;}
+.dx-field{display:flex;flex-direction:column;gap:5px;flex:1 1 180px;min-width:0;}
+.dx-field-wide{flex:1 1 100%;}
+.dx-field span{font-family:var(--mono);font-size:10px;letter-spacing:1.6px;
+  text-transform:uppercase;color:var(--text-muted);}
+.dx-field input{
+  width:100%;background:var(--bg-base,rgba(0,0,0,.05));
+  border:1px solid var(--border);border-radius:9px;padding:9px 12px;
+  color:var(--text);font-family:var(--sans);font-size:13.5px;outline:none;
+  transition:border-color .18s;
+}
+.dx-field input:focus{border-color:var(--em);}
+.dx-field input[aria-invalid]{border-color:#b91c1c;}
+.dx-meta{min-height:18px;margin-top:8px;font-family:var(--mono);font-size:10.5px;}
+.dx-hint{color:var(--text-muted);}
+.dx-warn{color:#b91c1c;}
+.dx-strength{letter-spacing:1.2px;text-transform:uppercase;}
+.dx-strength-1,.dx-strength-0{color:#b91c1c;}
+.dx-strength-2,.dx-strength-3{color:#8b5e00;}
+.dx-strength-4{color:var(--em);}
+.dx-note{margin:10px 0 14px;font-size:11.5px;line-height:1.55;color:var(--text-mid);max-width:52ch;}
+.dx-primary{
+  display:inline-flex;align-items:center;gap:8px;
+  background:var(--em);border:none;border-radius:10px;color:#fff;
+  padding:10px 18px;font-size:13px;font-weight:600;cursor:pointer;
+  font-family:var(--sans);transition:filter .18s,opacity .18s;
+}
+.dx-primary:hover:not(:disabled){filter:brightness(1.08);}
+.dx-primary:disabled{opacity:.45;cursor:default;}
+.dx-alts{display:flex;flex-wrap:wrap;gap:16px;margin-top:14px;}
+.dx-link{background:none;border:none;padding:0;cursor:pointer;
+  font-family:var(--sans);font-size:12px;color:var(--text-muted);text-decoration:underline;}
+.dx-link:hover{color:var(--text);}
+.dx-msg{margin-top:14px;padding:10px 12px;border-radius:9px;
+  font-size:12.5px;line-height:1.5;border:1px solid;}
+.dx-msg-ok{border-color:rgba(var(--em-rgb),.4);background:rgba(var(--em-rgb),.09);color:var(--text);}
+.dx-msg-err{border-color:rgba(185,28,28,.45);background:rgba(185,28,28,.1);color:#c14a4a;}
+.dx-legal{margin-top:18px;display:flex;gap:14px;}
+.dx-legal button{background:none;border:none;padding:0;cursor:pointer;
+  color:var(--text-muted);font-size:12px;text-decoration:underline;font-family:var(--sans);}
+
+.ach-rule-note{
+  margin:14px 0 4px;padding:10px 12px;
+  border-radius:9px;border:1px solid var(--border);
+  background:rgba(128,128,128,.06);
+  font-size:11.5px;line-height:1.5;color:var(--text-mid);
+}
+
+.ach-credit-note{
+  margin-top:5px;display:inline-block;
+  font-family:var(--mono);font-size:9.5px;letter-spacing:.6px;
+  padding:2px 7px;border-radius:100px;
+  border:1px solid rgba(139,94,0,.35);
+  background:rgba(139,94,0,.12);
+  color:#8b5e00;
+}
+html[data-hub-os] .ach-credit-note,
+html[data-theme="dark"] .ach-credit-note{
+  border-color:rgba(194,154,69,.32);background:rgba(194,154,69,.1);color:#c29a45;
+}
+
+.ach-stats-item--credit{position:relative;}
+.ach-credit-of{font-size:.62em;color:var(--text-muted);margin-left:1px;}
+.ach-stats-item--credit .section-help-wrap{margin-left:5px;}
+.ach-stats-item--credit .section-help-btn{width:15px;height:15px;font-size:9px;}
+.ach-stats-item--credit .section-help-tooltip{left:auto;right:0;}
+.ach-stats-item--credit .section-help-arrow{left:auto;right:6px;}
+
+.ach-visions-count{
+  font-family:var(--mono);font-size:10.5px;font-weight:700;
+  padding:2px 7px;border-radius:100px;
+  background:rgba(var(--em-rgb),.14);color:var(--em);
+}
 /* Push the toast above the bottom tab bar + home indicator on mobile.
    Without this it sits behind the tabs and the user never sees it
    confirm a coin earn / spend. */
@@ -3476,7 +3570,8 @@ input,select,textarea,button{touch-action:manipulation;}
   position:absolute;
   top:calc(100% + 8px);
   left:0;
-  width:230px;
+  width:262px;
+  max-width:calc(100vw - 32px);
   background:rgba(10,14,10,.92);
   border:1px solid rgba(255,255,255,.15);
   border-radius:10px;
@@ -3489,6 +3584,36 @@ input,select,textarea,button{touch-action:manipulation;}
   z-index:9999;
   backdrop-filter:blur(12px);
   -webkit-backdrop-filter:blur(12px);
+}
+
+/* Structured rows. The term is the scannable bit — mono, tinted, and
+   on its own line so the eye can run down the left edge instead of
+   reading a paragraph. */
+.section-help-title{
+  font-family:var(--mono);
+  font-size:10px;letter-spacing:1.6px;text-transform:uppercase;
+  color:rgba(255,255,255,.45);
+  margin-bottom:9px;
+}
+.section-help-rows{
+  margin:0;display:flex;flex-direction:column;gap:9px;
+}
+.section-help-row{display:flex;flex-direction:column;gap:1px;}
+.section-help-row dt{
+  font-family:var(--mono);
+  font-size:10.5px;letter-spacing:.9px;
+  color:var(--em-light,#4fb37c);
+}
+.section-help-row dd{
+  margin:0;
+  font-size:12px;line-height:1.45;
+  color:rgba(255,255,255,.8);
+}
+.section-help-foot{
+  margin-top:10px;padding-top:9px;
+  border-top:1px solid rgba(255,255,255,.12);
+  font-size:11px;line-height:1.45;
+  color:rgba(255,255,255,.5);
 }
 
 .section-help-arrow{

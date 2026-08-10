@@ -276,12 +276,12 @@ function Board({ userId, userEmail, onSignOut }) {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [S.theme, hasPro, tierLoading]);
 
-  function showCoinToast(msg, isEarn, duration) {
+  function showCoinToast(msg, isEarn, duration, action) {
     const type = isEarn ? 'earn' : (msg.includes('Need') ? 'error' : 'spend');
     // 30-day streak toast stays 4 s; default 2.6 s
     const ms = duration ?? (msg.includes('30 day streak') ? 4000 : 2600);
     if (isEarn) haptic('HEAVY');
-    setCoinToast({ message: msg, type, visible: true });
+    setCoinToast({ message: msg, type, visible: true, action });
     clearTimeout(coinToastTimer.current);
     coinToastTimer.current = setTimeout(() => setCoinToast(t => ({ ...t, visible: false })), ms);
   }
@@ -295,7 +295,15 @@ function Board({ userId, userEmail, onSignOut }) {
   // own localStorage guard ensures this fires at most once per device,
   // even if a flurry of unlocks arrives in the same session.
   const [pushPrePromptOpen, setPushPrePromptOpen] = useState(false);
-  const visionState = useVisions(S, update, showCoinToast, () => {
+  // Vision toasts carry a way in to the catalogue. Without it the toast
+  // is the only place a vision is ever mentioned and the list itself is
+  // three taps deep in Settings — which is exactly how a playtester
+  // ended up unlocking one and never finding where it lived.
+  const showVisionToast = (msg, isEarn, duration) => showCoinToast(
+    msg, isEarn, duration,
+    { label: 'See all', onClick: () => setVisionsOpen(true) },
+  );
+  const visionState = useVisions(S, update, showVisionToast, () => {
     if (!hasAskedPushPrePrompt()) setPushPrePromptOpen(true);
   });
 
@@ -695,7 +703,7 @@ function Board({ userId, userEmail, onSignOut }) {
         )}
         {activeSection === 'achievements' && (
           <motion.div key="achievements" {...pageMotion}>
-            <AchievementsSection S={S} update={update} active onOpenModal={handleOpenModal} onShowCoinToast={showCoinToast} />
+            <AchievementsSection S={S} update={update} active onOpenModal={handleOpenModal} onShowCoinToast={showCoinToast} onOpenVisions={() => setVisionsOpen(true)} />
           </motion.div>
         )}
         {activeSection === 'track' && (
@@ -798,7 +806,8 @@ function Board({ userId, userEmail, onSignOut }) {
 
       <ConnectToast onCancel={handleCancelConnect} />
       <HubFooter visible={activeSection === 'hub'} onOpenLegal={setLegalPage} />
-      <CoinToast message={coinToast.message} type={coinToast.type} visible={coinToast.visible} />
+      <CoinToast message={coinToast.message} type={coinToast.type}
+                 visible={coinToast.visible} action={coinToast.action} />
       <CommandPalette
         open={paletteOpen}
         onClose={() => setPaletteOpen(false)}

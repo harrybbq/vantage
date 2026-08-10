@@ -429,6 +429,14 @@ function AddAchievementModal({ openId, onClose, onAdd }) {
       </div>
       <div className="fg"><label>⬡ Coin Reward on Completion</label><input type="number" placeholder="e.g. 50" min="0" max={MAX_ACH_COINS} value={form.coins} onChange={e => setForm(f => ({ ...f, coins: e.target.value }))} /><span style={{ fontFamily: 'var(--mono)', fontSize: '10px', color: 'var(--text-muted)', marginTop: '4px', display: 'block' }}>Max {MAX_ACH_COINS.toLocaleString()} ⬡ per achievement.</span></div>
       <CategoryPicker value={form.category} onChange={v => setForm(f => ({ ...f, category: v }))} />
+      {/* The spacing rule, stated at the moment it starts applying.
+          Hiding it made the rating feel arbitrary to anyone who noticed
+          their completions weren't moving it. */}
+      <div className="ach-rule-note">
+        Coins pay out the moment you complete this. Rating credit starts
+        7 days after you create it — the first 8 count in full, and each
+        one after that is worth a little less.
+      </div>
       <div className="modal-actions">
         <button className="btn btn-ghost" onClick={() => onClose('addAchievementModal')}>Cancel</button>
         <button className="btn btn-primary" onClick={submit}>Create</button>

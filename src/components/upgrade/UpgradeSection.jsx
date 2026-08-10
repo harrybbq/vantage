@@ -60,7 +60,14 @@ export default function UpgradeSection({ S, update, active, isOwner, userId }) {
         <div className="eyebrow">Owner</div>
         <div className="sec-title">
           Upgrade
-          <SectionHelp text="Rotation: the 16-day shift cycle with training mapped onto it — tap any day to swap the session or book it as leave. Diet: the macro targets and the build they're aimed at. Career: certifications, CV, and deliberate practice for LeetCode and KQL." />
+          <SectionHelp
+            title="Upgrade"
+            rows={[
+              { term: 'Rotation', def: 'The 16-day cycle with training on it. Tap a day to swap or book leave.' },
+              { term: 'Diet', def: 'Macro targets and the build they are aimed at.' },
+              { term: 'Career', def: 'Certifications, CV, and LeetCode and KQL practice.' },
+            ]}
+          />
         </div>
       </motion.div>
 
