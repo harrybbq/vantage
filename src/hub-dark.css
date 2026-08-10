@@ -413,13 +413,32 @@ html[data-hub-os] .hub-os-main > .os-col > .os-col-inner {
      nested scrollbar is the right answer. */
   position: sticky;
   top: 14px;
-  max-height: calc(100vh - 28px);
+  /* --os-col-max is set per scroll frame by useStickyColumnHeight: it is
+     the space actually visible below the column's current top, which is
+     smaller than the viewport until sticky takes over. The calc() is the
+     pinned-state value and the fallback if the hook has not run yet. */
+  max-height: var(--os-col-max, calc(100vh - 28px));
   /* Columns scroll internally when they hold more panels than fit.
      Without this, extra panels (e.g. an opt-in Cardio card on top of
      the standard Habits + QuickLog + Coach stack) get silently clipped
      at the column bottom. */
   overflow-y: auto;
   overflow-x: hidden;
+}
+/* Stop a column's scroll CHAINING to the page. Without this, a wheel over
+   the column that runs past the column's own end hands the rest of the
+   gesture to the document: the page scrolls, the sticky column re-lays-out
+   against its new position, and the ledger you had just scrolled into view
+   snaps away again. It reads as a bounce, and it drags the widget canvas
+   along with it. Scrolling should belong to whatever the pointer is over.
+
+   Only where the columns are rails beside the canvas. Below 1100px they
+   are full-width rows stacked under it, and containing the scroll there
+   would trap the page behind a band the width of the screen. */
+@media (min-width: 1100px) {
+  html[data-hub-os] .hub-os-main > .os-col > .os-col-inner {
+    overscroll-behavior: contain;
+  }
 }
 /* The column above says it scrolls when it holds more than fits — but
    its children are flex items, and a flex item defaults to
