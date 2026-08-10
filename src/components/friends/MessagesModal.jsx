@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import Icon from '../Icon';
 import { listThread, sendMessage, markThreadRead } from '../../lib/friends/messages';
 import { reportUser, blockUser } from '../../lib/friends/queries';
@@ -168,7 +169,21 @@ export default function MessagesModal({ open, userId, friend, onClose, onBlocked
       .slice(0, 400);
   }
 
-  return (
+  /* Portalled to <body>.
+   *
+   * The chat is rendered from FriendsRail, which on the OS hub lives
+   * inside a pinned column. `position: sticky` creates a stacking
+   * context, so the overlay's z-index:1000 was resolved against its
+   * SIBLINGS inside that column rather than against the page — and the
+   * widget canvas, which comes after the column in DOM order, painted
+   * straight over the top of it. Raising the z-index cannot fix that;
+   * a descendant can never escape its ancestor's stacking context.
+   *
+   * Same reason FoodSearch and FoodLogSheet portal (see their notes).
+   * Rendering into <body> puts the overlay in the root stacking context
+   * where its z-index means what it says, in every hub layout.
+   */
+  return createPortal(
     <div className="msg-overlay" onMouseDown={e => { if (e.target === e.currentTarget) onClose?.(); }}>
       <div className="msg-modal" role="dialog" aria-label={`Messages with ${name}`}>
         <div className="msg-head">
@@ -269,6 +284,7 @@ export default function MessagesModal({ open, userId, friend, onClose, onBlocked
           reportUser(userId, friendId, reason, [context, reportEvidence()].filter(Boolean).join(' — recent messages: '))}
         onClose={() => setReporting(false)}
       />
-    </div>
+    </div>,
+    document.body
   );
 }

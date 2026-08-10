@@ -9,7 +9,7 @@
  * toggle / re-arrange them — S.hubLayout will drive which render.
  */
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useSubscriptionContext } from '../context/SubscriptionContext';
 import { storeSubscriptionsUrl } from '../lib/billing/manageSubscription';
 import { motion } from 'framer-motion';
@@ -50,6 +50,55 @@ function useClock() {
 }
 
 function pad2(n) { return String(n).padStart(2, '0'); }
+
+/**
+ * Keep the pinned columns inside the viewport at every scroll position.
+ *
+ * `max-height: calc(100vh - 28px)` is only the right cap once a column
+ * is actually pinned at `top: 14px`. Before the page has scrolled that
+ * far the column still starts below the top row, so that cap lets it
+ * hang off the bottom of the screen — and a column whose own box runs
+ * past the fold cannot show its last panel no matter how far you scroll
+ * it internally. That is why the foot of the Ratings ledger stayed cut
+ * off even at the column's scroll end.
+ *
+ * Both columns share a row, so one measurement drives both. rAF-throttled
+ * and passive: this runs on every scroll frame, so it reads one rect and
+ * writes one custom property, nothing more.
+ */
+function useStickyColumnHeight(ref) {
+  useEffect(() => {
+    const host = ref.current;
+    if (!host) return undefined;
+    let raf = 0;
+    const measure = () => {
+      raf = 0;
+      // Below 1100px the columns are full-width rows stacked under the
+      // canvas, not rails beside it — capping them to the visible strip
+      // would squash them to nothing. Hand the height back to the CSS.
+      if (!window.matchMedia('(min-width: 1100px)').matches) {
+        host.style.removeProperty('--os-col-max');
+        return;
+      }
+      const track = host.querySelector('.os-col');
+      if (!track) return;
+      // Where the column's top actually is: its own position until the
+      // page has scrolled far enough for sticky to take over at 14px.
+      const top = Math.max(14, track.getBoundingClientRect().top);
+      const avail = Math.max(160, window.innerHeight - top - 14);
+      host.style.setProperty('--os-col-max', `${Math.round(avail)}px`);
+    };
+    const schedule = () => { if (!raf) raf = requestAnimationFrame(measure); };
+    measure();
+    window.addEventListener('scroll', schedule, { passive: true });
+    window.addEventListener('resize', schedule);
+    return () => {
+      window.removeEventListener('scroll', schedule);
+      window.removeEventListener('resize', schedule);
+      if (raf) cancelAnimationFrame(raf);
+    };
+  }, [ref]);
+}
 
 function greeting(name) {
   const h = new Date().getHours();
@@ -530,6 +579,8 @@ export default function HubOsLayout({
   const streak = S.currentStreak || 0;
   const level = Math.max(1, Math.floor(coins / 500) + 1);
   const ownHandle = useOwnHandle(userId);
+  const mainRef = useRef(null);
+  useStickyColumnHeight(mainRef);
 
   // Right-click any panel → toggle its background transparency.
   const moduleMenu = useHubModuleMenu({
@@ -559,7 +610,7 @@ export default function HubOsLayout({
       </div>
 
       {/* ── MAIN ROW ── */}
-      <div className="hub-os-main">
+      <div className="hub-os-main" ref={mainRef}>
         {/* Left col: actions + friends rail + ratings ledger.
             The outer div spans the full row height; the inner one is what
             sticks. See hub-dark.css — sticking the outer box means it is
