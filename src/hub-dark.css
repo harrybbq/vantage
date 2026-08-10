@@ -406,7 +406,13 @@ html[data-hub-os] .hub-os-main > .os-col > .os-col-inner {
   flex-direction: column;
   gap: 10px;
   min-height: 0;
-  max-height: calc(100vh - 28px);
+  /* --os-col-bottom-inset is however much of the year-countdown footer
+     is currently over the bottom of the screen, published per scroll
+     frame by useStickyColumnState. It is 0 until the footer scrolls
+     into view, so this is plain `100vh - 28px` for nearly the whole
+     page and only tightens where the footer would otherwise be painted
+     over the foot of the rail. */
+  max-height: calc(100vh - 28px - var(--os-col-bottom-inset, 0px));
   /* Pinned once the page has scrolled past the top row. 14px matches the
      shell padding, so a column sits where it started rather than jumping
      on first scroll. */
@@ -1517,13 +1523,13 @@ html[data-theme="dark-os"] .ach-connect-toast{
 
 /* ──────────────────────────────────────────────────────────────────
    HUB FOOTER (year countdown) — dark-os retint
-   Base CSS pins the footer at left:56px to clear the cream sidebar
-   (56px wide). Dark-os shrinks <nav> to 48px, leaving an 8px gap
-   between the sidebar's right edge and the footer's left edge. We
-   also retint the cream-beige background + colors for dark-os.
+   Base CSS offsets the footer by 56px to clear the cream sidebar.
+   Dark-os shrinks <nav> to 48px, leaving an 8px gap between the
+   sidebar's right edge and the footer's left edge. We also retint the
+   cream-beige background + colors for dark-os.
    ────────────────────────────────────────────────────────────────── */
 html[data-theme="dark-os"] .hub-footer{
-  left: 48px;
+  margin-left: 48px;
   background: rgba(12, 12, 11, 0.92);
   border-top: 1px solid var(--os-border);
   backdrop-filter: blur(20px);

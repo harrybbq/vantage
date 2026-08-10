@@ -74,8 +74,18 @@ const COL_STICKY_TOP = 14;
  * to the page and bounces; free while not, so a wheel over the rail can
  * still scroll the page far enough to pin it in the first place.
  *
+ * It also publishes how much of the year-countdown footer is currently
+ * over the bottom of the screen. The footer is the last thing on the
+ * page, so near the end of a scroll it takes the bottom strip of the
+ * viewport — and a rail that assumed the whole viewport height would
+ * simply be painted over, which is what hid the foot of the Ratings
+ * ledger. Shrinking the rail by exactly that intrusion parks it on top
+ * of the footer instead. The value is 0 for the whole page until the
+ * footer actually comes into view, so it never shortens a rail that had
+ * the room.
+ *
  * Both columns share a row, so one measurement drives both. rAF-throttled
- * and passive, and it only touches the DOM when the state actually flips.
+ * and passive, and it only touches the DOM when a value actually changes.
  */
 function useStickyColumnState(ref) {
   useEffect(() => {
@@ -83,6 +93,7 @@ function useStickyColumnState(ref) {
     if (!host) return undefined;
     let raf = 0;
     let pinned = null;
+    let inset = null;
     const measure = () => {
       raf = 0;
       const track = host.querySelector('.os-col');
@@ -91,10 +102,21 @@ function useStickyColumnState(ref) {
       const isPinned = !!track
         && window.matchMedia('(min-width: 1100px)').matches
         && track.getBoundingClientRect().top <= COL_STICKY_TOP + 0.5;
-      if (isPinned === pinned) return;
-      pinned = isPinned;
-      if (isPinned) host.setAttribute('data-os-pinned', '');
-      else host.removeAttribute('data-os-pinned');
+      if (isPinned !== pinned) {
+        pinned = isPinned;
+        if (isPinned) host.setAttribute('data-os-pinned', '');
+        else host.removeAttribute('data-os-pinned');
+      }
+
+      const footer = host.ownerDocument.getElementById('hubFooter');
+      const rect = footer && footer.offsetParent !== null
+        ? footer.getBoundingClientRect() : null;
+      const over = rect && rect.height > 0
+        ? Math.max(0, Math.round(window.innerHeight - rect.top)) : 0;
+      if (over !== inset) {
+        inset = over;
+        host.style.setProperty('--os-col-bottom-inset', `${over}px`);
+      }
     };
     const schedule = () => { if (!raf) raf = requestAnimationFrame(measure); };
     measure();
