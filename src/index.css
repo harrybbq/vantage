@@ -2157,8 +2157,13 @@ html[data-theme="dark"] {
 .shop-summary-val{font-family:var(--mono);font-size:20px;font-weight:700;color:var(--text);}
 .shop-summary-lbl{font-family:var(--mono);font-size:10px;color:var(--text-muted);margin-top:1px;}
 
-/* HUB FOOTER — year countdown */
-.hub-footer{position:fixed;bottom:0;left:56px;right:0;z-index:150;padding:12px 40px;background:rgba(253,250,243,.85);backdrop-filter:blur(20px);border-top:1px solid var(--accent-line-soft);display:none;align-items:center;justify-content:space-between;gap:20px;}
+/* HUB FOOTER — year countdown.
+   In normal flow at the very end of the page, NOT fixed over it. Fixed,
+   it sat on top of the bottom of whatever was on screen, and on the OS
+   hub that was the foot of the pinned side rails — the ledger looked
+   cut off because the countdown was covering it. The margin-left
+   matches .section so it clears the sidebar the same way. */
+.hub-footer{margin-left:56px;padding:12px 40px;background:rgba(253,250,243,.85);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);border-top:1px solid var(--accent-line-soft);display:none;align-items:center;justify-content:space-between;gap:20px;}
 .hub-footer.visible{display:flex;}
 .hub-footer-label{font-family:var(--mono);font-size:10px;color:var(--text-muted);letter-spacing:2px;text-transform:uppercase;}
 .year-countdown{display:flex;gap:18px;align-items:center;}
@@ -3701,7 +3706,7 @@ body{font-size:var(--text-base);line-height:var(--lh-body);}
   .quick-log-card{min-width:100px;flex-shrink:0;}
 
   /* Hub footer: compact */
-  .hub-footer{left:0 !important;right:0;padding-left:var(--space-4);padding-right:var(--space-4);}
+  .hub-footer{margin-left:0;padding-left:var(--space-4);padding-right:var(--space-4);}
   .year-countdown{gap:var(--space-2);}
   .yc-val{font-size:var(--text-lg);}
 
