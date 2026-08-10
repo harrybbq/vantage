@@ -20,7 +20,7 @@ import { APP_PRESETS, getAppPreset } from '../../data/appPresets';
 import { fetchAppPreview } from '../../lib/appPreview';
 import { strikeState } from '../../lib/habits/strikes';
 import { SavingsPotsBody, SavingsProjectionBody } from '../savings/SavingsWidgets';
-import { BodyBody, SubscriptionsBody, MoodBody } from '../widgets/LifeWidgets';
+import { BodyBody, SubscriptionsBody } from '../widgets/LifeWidgets';
 import { GoalsBody, BodyGoalBody } from '../widgets/GoalsWidget';
 import { useSubscriptionContext } from '../../context/SubscriptionContext';
 import { observeShape } from '../../lib/hub/shape';
@@ -145,12 +145,6 @@ const BASE_WIDGET_META = {
     label: 'Body',
     eyebrow: 'BODY',
     icon: '◍', svg: 'scale',
-  },
-  // Mood — one-tap daily mood + 8-week heatmap; journal on Track.
-  'mood': {
-    label: 'Mood',
-    eyebrow: 'MOOD',
-    icon: '☺', svg: 'smile',
   },
   // Goals — pinned progress across body / savings / achievements.
   'goals': {
@@ -535,7 +529,6 @@ function renderBody(widget, meta, S, update, navigate, userId, hasPro) {
     case 'rotation':    return <RotationBody S={S} navigate={navigate} />;
     case 'macros':      return <MacrosBody S={S} userId={userId} navigate={navigate} />;
     case 'body':        return <BodyBody S={S} update={update} navigate={navigate} />;
-    case 'mood':        return <MoodBody S={S} update={update} navigate={navigate} />;
     case 'subscriptions': return <SubscriptionsBody S={S} navigate={navigate} />;
     case 'goals':       return <GoalsBody S={S} picks={widget.picks} compact navigate={navigate} hasPro={hasPro}
       onSetPicks={p => update(prev => ({ ...prev, mobileWidgets: (prev.mobileWidgets || []).map(w => w.id === widget.id ? { ...w, picks: p } : w) }))} />;

@@ -213,12 +213,6 @@ function AddLinkModal({ openId, onClose, onSwitchModal, onAddNotepad, onAddApp, 
         {/* Body widget retired — the Goals and Body Goal widgets both
             cover the weight trend. Existing hubs keep theirs. */}
         <button className="btn btn-ghost" style={{ padding: '16px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px', borderRadius: '12px', height: 'auto' }}
-          onClick={() => { onClose('addLinkModal'); onAddHubWidget('mood'); }}>
-          <Icon name="smile" size={22} strokeWidth={1.75} />
-          <span style={{ fontWeight: 700, fontSize: '13px', color: 'var(--text)' }}>Mood</span>
-          <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Daily check-in · heatmap</span>
-        </button>
-        <button className="btn btn-ghost" style={{ padding: '16px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px', borderRadius: '12px', height: 'auto' }}
           onClick={() => { onClose('addLinkModal'); onAddHubWidget('subscriptions'); }}>
           <Icon name="repeat" size={22} strokeWidth={1.75} />
           <span style={{ fontWeight: 700, fontSize: '13px', color: 'var(--text)' }}>Subscriptions</span>

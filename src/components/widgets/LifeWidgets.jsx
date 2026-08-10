@@ -1,5 +1,5 @@
 /**
- * Life widgets — Body, Subscriptions, Mood. Widget bodies are shared by
+ * Life widgets — Body and Subscriptions. Widget bodies are shared by
  * the mobile hub (MobileWidget) and the desktop canvas (HubSection React
  * islands), one implementation per widget, same pattern as
  * savings/SavingsWidgets.jsx. The fuller page-level cards live here too:
@@ -7,7 +7,6 @@
  *   BodyBody / BodyCard             — weight trend + goal (Track page)
  *   SubscriptionsBody / SubscriptionsManager — recurring outgoings
  *                                     (Achievements → Savings tab)
- *   MoodBody / MoodCard             — daily mood + journal (Track page)
  *
  * Stores (all in S — no schema migrations):
  *   S.vitalsLog[date].weight  — existing store; Body reuses it so WHOOP /
@@ -16,7 +15,10 @@
  *   S.bodyLog[date]           — { waist?, bodyFat? } extra measurements
  *   S.bodyGoalKg              — goal weight (number)
  *   S.subscriptions           — [{ id, name, amount, freq, nextDate, category }]
- *   S.moodLog[date]           — { mood: 1..5, note? }
+ *
+ * S.moodLog is deliberately NOT read here any more — the Mood widget
+ * was withdrawn in 2026-08 and its code removed, but the entries
+ * people logged are left untouched in state.
  */
 import { useMemo, useState } from 'react';
 import { getTodayStr } from '../../utils/helpers';
@@ -398,135 +400,6 @@ export function SubscriptionsManager({ S, update }) {
             ))}
           </div>
         </>
-      )}
-    </div>
-  );
-}
-
-// ═══════════════════════════════════════════════════════════════════════
-// MOOD — one-tap daily mood + journal note, 8-week heatmap
-// ═══════════════════════════════════════════════════════════════════════
-
-export const MOODS = [
-  { v: 1, emoji: '😞', label: 'Rough' },
-  { v: 2, emoji: '😕', label: 'Low' },
-  { v: 3, emoji: '😐', label: 'OK' },
-  { v: 4, emoji: '🙂', label: 'Good' },
-  { v: 5, emoji: '😄', label: 'Great' },
-];
-// 1 → red-ish through 5 → em green; used for the heatmap cells.
-const MOOD_COLORS = ['#c4483a', '#d0793a', '#c9b23a', '#7fb84a', '#2fbf83'];
-export const moodColor = v => MOOD_COLORS[Math.max(1, Math.min(5, v)) - 1];
-
-function setMood(update, date, mood) {
-  update(prev => ({
-    ...prev,
-    moodLog: { ...(prev.moodLog || {}), [date]: { ...((prev.moodLog || {})[date] || {}), mood } },
-  }));
-}
-
-/** 8 weeks × 7 days grid, most recent week last — same visual language
- *  as the friends activity heatmap. */
-function MoodHeatmap({ S, weeks = 8 }) {
-  const log = S.moodLog || {};
-  const cells = useMemo(() => {
-    const out = [];
-    const today = new Date(getTodayStr() + 'T12:00');
-    // Start from the Monday `weeks` ago so columns align to weeks.
-    const start = new Date(today);
-    start.setDate(start.getDate() - (weeks * 7 - 1) - ((today.getDay() + 6) % 7));
-    for (let i = 0; i < weeks * 7 + ((today.getDay() + 6) % 7) + 1; i++) {
-      const d = new Date(start); d.setDate(start.getDate() + i);
-      if (d > today) break;
-      const key = d.toISOString().slice(0, 10);
-      out.push({ key, mood: log[key]?.mood });
-    }
-    return out;
-  }, [log, weeks]);
-  return (
-    <div style={{ display: 'grid', gridTemplateRows: 'repeat(7, 8px)', gridAutoFlow: 'column', gap: 3, justifyContent: 'start' }} aria-label="Mood heatmap">
-      {cells.map(c => (
-        <span key={c.key} title={c.mood ? `${c.key}: ${MOODS[c.mood - 1].label}` : c.key}
-          style={{ width: 8, height: 8, borderRadius: 2, background: c.mood ? moodColor(c.mood) : 'rgba(128,128,128,.16)' }} />
-      ))}
-    </div>
-  );
-}
-
-export function MoodBody({ S, update, navigate }) {
-  const today = getTodayStr();
-  const todayMood = (S.moodLog || {})[today]?.mood;
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-      <div style={{ display: 'flex', gap: 6 }}>
-        {MOODS.map(m => (
-          <button key={m.v} type="button" title={m.label}
-            onClick={() => setMood(update, today, m.v)}
-            style={{
-              flex: 1, padding: '7px 0', fontSize: 18, lineHeight: 1, cursor: 'pointer',
-              borderRadius: 9, transition: 'all .15s',
-              border: todayMood === m.v ? `2px solid ${moodColor(m.v)}` : '1px solid var(--border)',
-              background: todayMood === m.v ? moodColor(m.v) + '22' : 'transparent',
-              filter: todayMood && todayMood !== m.v ? 'grayscale(0.8) opacity(0.55)' : 'none',
-            }}
-          >{m.emoji}</button>
-        ))}
-      </div>
-      <MoodHeatmap S={S} />
-      {navigate && (
-        <button type="button" onClick={() => navigate('track')}
-          style={{ ...mono, alignSelf: 'flex-start', background: 'none', border: 'none', padding: 0, fontSize: 10, letterSpacing: 0.8, color: 'var(--text-muted)', cursor: 'pointer', textDecoration: 'underline' }}>
-          Journal → Track
-        </button>
-      )}
-    </div>
-  );
-}
-
-/** Track-page card: today's mood + journal note + recent entries. */
-export function MoodCard({ S, update }) {
-  const today = getTodayStr();
-  const log = S.moodLog || {};
-  const entry = log[today] || {};
-  const [note, setNote] = useState(entry.note || '');
-
-  function saveNote() {
-    const text = note.trim();
-    update(prev => ({
-      ...prev,
-      moodLog: { ...(prev.moodLog || {}), [today]: { ...((prev.moodLog || {})[today] || {}), note: text || undefined } },
-    }));
-  }
-
-  const recent = Object.keys(log)
-    .filter(d => d !== today && (log[d]?.mood || log[d]?.note))
-    .sort().reverse().slice(0, 4);
-
-  return (
-    <div className="card" style={{ padding: '18px', marginTop: 14 }}>
-      <h3 style={{ margin: '0 0 10px', fontSize: 'var(--text-md)' }}>Mood &amp; Journal</h3>
-      <MoodBody S={S} update={update} />
-      <textarea
-        value={note}
-        onChange={e => setNote(e.target.value)}
-        onBlur={saveNote}
-        placeholder="How was today? (optional — one line is plenty)"
-        rows={2}
-        maxLength={500}
-        style={{ width: '100%', marginTop: 10, padding: '9px 11px', border: '1px solid var(--border)', borderRadius: 9, background: 'transparent', color: 'var(--text)', fontFamily: 'var(--sans)', fontSize: 12.5, lineHeight: 1.5, resize: 'vertical', outline: 'none', boxSizing: 'border-box' }}
-      />
-      {recent.length > 0 && (
-        <div style={{ marginTop: 12, display: 'flex', flexDirection: 'column', gap: 7 }}>
-          {recent.map(d => (
-            <div key={d} style={{ display: 'flex', gap: 8, alignItems: 'flex-start' }}>
-              <span style={{ fontSize: 14, lineHeight: '17px' }}>{log[d]?.mood ? MOODS[log[d].mood - 1].emoji : '·'}</span>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <span style={{ ...mono, fontSize: 9.5, color: 'var(--text-muted)' }}>{d.slice(5)}</span>
-                {log[d]?.note && <div style={{ fontFamily: 'var(--sans)', fontSize: 11.5, color: 'var(--text-mid)', lineHeight: 1.45 }}>{log[d].note}</div>}
-              </div>
-            </div>
-          ))}
-        </div>
       )}
     </div>
   );

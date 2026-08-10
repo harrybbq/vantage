@@ -25,6 +25,7 @@ import { useSubscriptionContext } from './context/SubscriptionContext';
 import Modals from './components/Modals';
 import PaywallModal from './components/PaywallModal';
 import HubFooter from './components/HubFooter';
+import { isRetiredWidget } from './lib/widgets/retired';
 import CoinToast from './components/CoinToast';
 import ConnectToast from './components/ConnectToast';
 import CommandPalette from './components/CommandPalette';
@@ -225,6 +226,26 @@ function Board({ userId, userEmail, onSignOut }) {
     })();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loading]);
+
+  // One-time cleanup: drop layout pointers to withdrawn widgets, so a
+  // Mood card someone had pinned doesn't linger as an empty shell.
+  // Deliberately narrow — it filters the two layout arrays and spreads
+  // everything else through untouched. In particular S.moodLog is left
+  // exactly as it is: the entries someone logged are theirs, and if the
+  // widget ever comes back they should still be there.
+  const retiredPrunedRef = useRef(false);
+  useEffect(() => {
+    if (loading || retiredPrunedRef.current) return;
+    const stale = list => (list || []).some(w => isRetiredWidget(w.type));
+    if (!stale(S.hubWidgets) && !stale(S.mobileWidgets)) return;
+    retiredPrunedRef.current = true;
+    update(prev => ({
+      ...prev,
+      hubWidgets: (prev.hubWidgets || []).filter(w => !isRetiredWidget(w.type)),
+      mobileWidgets: (prev.mobileWidgets || []).filter(w => !isRetiredWidget(w.type)),
+    }));
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loading, S.hubWidgets, S.mobileWidgets]);
 
   // Apply stored theme — Pro-gated (lifetime counts as Pro). If entitlement
   // flips false we auto-revert via applyTheme's resolveEffectiveTheme, so

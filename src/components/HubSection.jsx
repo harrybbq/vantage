@@ -2,11 +2,12 @@ import { useEffect, useRef, useCallback, lazy, Suspense } from 'react';
 import { createRoot } from 'react-dom/client';
 import { motion } from 'framer-motion';
 import { VitalsBody, BurnBody, MacrosBody } from './mobile/MobileWidget';
-import { BodyBody, SubscriptionsBody, MoodBody } from './widgets/LifeWidgets';
+import { BodyBody, SubscriptionsBody } from './widgets/LifeWidgets';
 import { SavingsPotsBody, SavingsProjectionBody } from './savings/SavingsWidgets';
 import { GoalsBody, BodyGoalBody } from './widgets/GoalsWidget';
 import { RotationBody } from './widgets/RotationWidget';
 import { tradingWidgetAvailable, TRADING_WIDGET_BUILD_EXCLUDED } from '../lib/trading/enabled';
+import { isRetiredWidget } from '../lib/widgets/retired';
 import MarketBody from './widgets/MarketWidget';
 import NewsBody from './widgets/NewsWidget';
 import { reflow, MIN_W, MIN_H, SNAP_GAP as REFLOW_GAP } from '../lib/hub/reflow';
@@ -533,7 +534,6 @@ export default function HubSection({ S, update, active, onOpenModal, onOpenWaitl
       case 'body-goal':     return <BodyGoalBody S={S} update={update} navigate={onNavigate} userId={userId} hasPro={hasPro} onUpgrade={onUpgrade} />;
       case 'savings-projection': return <SavingsProjectionBody S={S} navigate={onNavigate} />;
       case 'body':          return <BodyBody S={S} update={update} navigate={onNavigate} />;
-      case 'mood':          return <MoodBody S={S} update={update} navigate={onNavigate} />;
       case 'subscriptions': return <SubscriptionsBody S={S} navigate={onNavigate} />;
       case 'market':        return <MarketBody S={S} update={update} hasPro={hasPro} />;
       case 'news':          return <NewsBody S={S} update={update} hasPro={hasPro} />;
@@ -1025,7 +1025,9 @@ export default function HubSection({ S, update, active, onOpenModal, onOpenWaitl
   // every single tick. Settings changes reach the island through the
   // sync effect above, which re-renders the mounted root with the fresh
   // hw — no rebuild needed.
-  const hubWidgetSig = (S.hubWidgets || []).map(w => `${w.id}:${w.type}`).join(',');
+  const hubWidgetSig = (S.hubWidgets || [])
+    .filter(w => !isRetiredWidget(w.type))
+    .map(w => `${w.id}:${w.type}`).join(',');
 
   // Render all widgets imperatively into the canvas
   const renderCanvas = useCallback(() => {
@@ -1164,6 +1166,12 @@ export default function HubSection({ S, update, active, onOpenModal, onOpenWaitl
     // shell as links. Habit timers tick via the interval effect below
     // (targeted DOM updates, no canvas rebuild).
     (S.hubWidgets || []).forEach(hw => {
+      // A withdrawn widget is skipped rather than deleted — the saved
+      // layout keeps the entry so un-retiring it restores the widget in
+      // place. Skipping BEFORE the META fallback matters: that fallback
+      // is `|| META.habits`, so a retired type would otherwise render as
+      // a second Habits card rather than disappearing.
+      if (isRetiredWidget(hw.type)) return;
       const wrapper = document.createElement('div');
       wrapper.className = 'widget-wrapper' + (hasPositions ? '' : ' snapping');
       wrapper.dataset.linkId = hw.id;
@@ -1198,7 +1206,6 @@ export default function HubSection({ S, update, active, onOpenModal, onOpenWaitl
         'market':             { eyebrow: 'WIDGET · MARKET',     icon: '↗', title: 'Market',       sub: 'Delayed quotes', body: () => `<div data-react-widget="market"></div>` },
         'news':               { eyebrow: 'WIDGET · NEWS',       icon: '❑', title: 'News',         sub: 'Today\u2019s headlines', body: () => `<div data-react-widget="news"></div>` },
         body:          { eyebrow: 'WIDGET · BODY', icon: '◍', title: 'Body',          sub: '7-day avg · goal',      body: () => `<div data-react-widget="body"></div>` },
-        mood:          { eyebrow: 'WIDGET · MOOD', icon: '☺', title: 'Mood',          sub: 'Today · 8-week map',    body: () => `<div data-react-widget="mood"></div>` },
         subscriptions: { eyebrow: 'WIDGET · BILLS', icon: '↻', title: 'Subscriptions', sub: 'Monthly burn · renewals', body: () => `<div data-react-widget="subscriptions"></div>` },
       };
       const meta = META[hw.type] || META.habits;

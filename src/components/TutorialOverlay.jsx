@@ -43,7 +43,7 @@ const STEPS_CREAM = [
   {
     id: 'hub', label: 'Hub',
     title: 'Your hub',
-    body: 'Home base. Your profile card, overall rating, friends rail (add by @handle, message, see streaks) and an AI daily brief. Pin the widgets you care about — Vitals, Macros, Body, Mood, Savings, Subscriptions, Projection, Habits, Holidays, a mini leaderboard, links, notepad. Drag them anywhere; right-click a module to make it transparent.',
+    body: 'Home base. Your profile card, overall rating, friends rail (add by @handle, message, see streaks) and an AI daily brief. Pin the widgets you care about — Vitals, Macros, Body, Savings, Subscriptions, Projection, Habits, Holidays, a mini leaderboard, links, notepad. Drag them anywhere; right-click a module to make it transparent.',
     target: 'hub', placement: 'bottom', arrowDir: 'up',
     navTo: 'hub',
   },
@@ -56,7 +56,7 @@ const STEPS_CREAM = [
   {
     id: 'track', label: 'Track',
     title: 'Track & log',
-    body: 'Daily trackers with streaks and weekly coin goals. Nutrition logging — search foods, scan barcodes, or identify a plate with AI (Pro); liquids log in ml automatically. Vitals (sleep, heart rate, recovery) sync from a WHOOP band, an Oura ring, or Apple Health. New: Body (weight trend + goal) and Mood & Journal (one-tap check-in) live here too.',
+    body: 'Daily trackers with streaks and weekly coin goals. Nutrition logging — search foods, scan barcodes, or identify a plate with AI (Pro); liquids log in ml automatically. Vitals (sleep, heart rate, recovery) sync from a WHOOP band, an Oura ring, or Apple Health. New: Body (weight trend + goal) lives here too.',
     target: 'nav-tab-track', placement: 'right', arrowDir: 'left',
   },
   {
@@ -108,7 +108,7 @@ const STEPS_DARK = [
   {
     id: 'hub', label: 'hub',
     title: 'the hub',
-    body: 'Home base. Profile, ratings ledger, friends rail (@handles, DMs, presence), AI daily brief, draggable widget canvas — vitals / macros / body / mood / savings / subscriptions / projection / leaderboard / links / notepad. Right-click any module to toggle transparency.',
+    body: 'Home base. Profile, ratings ledger, friends rail (@handles, DMs, presence), AI daily brief, draggable widget canvas — vitals / macros / body / savings / subscriptions / projection / leaderboard / links / notepad. Right-click any module to toggle transparency.',
     target: 'hub', placement: 'bottom', arrowDir: 'up',
     navTo: 'hub',
   },
@@ -121,7 +121,7 @@ const STEPS_DARK = [
   {
     id: 'track', label: 'track',
     title: 'track and log',
-    body: 'Daily trackers + nutrition (search / barcode / AI identify on Pro; liquids auto-ml). Vitals sync from WHOOP, Oura, or Apple Health. Body: weight trend, weekly rate, goal. Mood: one-tap check-in + journal + heatmap. Coin scams blocked: post-bonus untoggles reverse the award.',
+    body: 'Daily trackers + nutrition (search / barcode / AI identify on Pro; liquids auto-ml). Vitals sync from WHOOP, Oura, or Apple Health. Body: weight trend, weekly rate, goal. Coin scams blocked: post-bonus untoggles reverse the award.',
     target: 'nav-tab-track', placement: 'right', arrowDir: 'left',
   },
   {

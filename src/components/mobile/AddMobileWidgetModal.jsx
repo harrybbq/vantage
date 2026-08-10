@@ -53,7 +53,6 @@ export default function AddMobileWidgetModal({ openId, onClose, existingTypes, o
     // picker only: the META entry and render case stay so hubs that
     // already have one keep a working widget rather than having it
     // silently turn into something else.
-    'mood',
     'macros',
     'calories',
     'savings-pots',
