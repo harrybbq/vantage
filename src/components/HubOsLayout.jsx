@@ -560,23 +560,29 @@ export default function HubOsLayout({
 
       {/* ── MAIN ROW ── */}
       <div className="hub-os-main">
-        {/* Left col: actions + friends rail + ratings ledger */}
+        {/* Left col: actions + friends rail + ratings ledger.
+            The outer div spans the full row height; the inner one is what
+            sticks. See hub-dark.css — sticking the outer box means it is
+            clamped by its own short height and gets shoved off-screen at
+            the bottom of the page. */}
         <div className="os-col">
-          <OsActionsPanel
-            onAddWidget={onAddWidget}
-            onSort={onSort}
-            onSnapFill={onSnapFill}
-            onNavigateSettings={onNavigateSettings}
-            snapOn={!!S.hubSnap}
-            onToggleSnap={onToggleSnap}
-          />
-          {/* Friends rail sits above the (tall) Ratings ledger so incoming
-              friend requests — which render at the top of the rail — are
-              visible without scrolling the column past the ledger. Same
-              component as the cream hub, retinted via dark-os overrides
-              on the .fc-* classes in hub-dark.css. */}
-          <FriendsRail userId={userId} onUpgrade={onUpgrade} />
-          <OsRatingsPanel S={S} update={update} />
+          <div className="os-col-inner">
+            <OsActionsPanel
+              onAddWidget={onAddWidget}
+              onSort={onSort}
+              onSnapFill={onSnapFill}
+              onNavigateSettings={onNavigateSettings}
+              snapOn={!!S.hubSnap}
+              onToggleSnap={onToggleSnap}
+            />
+            {/* Friends rail sits above the (tall) Ratings ledger so incoming
+                friend requests — which render at the top of the rail — are
+                visible without scrolling the column past the ledger. Same
+                component as the cream hub, retinted via dark-os overrides
+                on the .fc-* classes in hub-dark.css. */}
+            <FriendsRail userId={userId} onUpgrade={onUpgrade} />
+            <OsRatingsPanel S={S} update={update} />
+          </div>
         </div>
 
         {/* Middle: imperative widgets canvas */}
@@ -584,23 +590,25 @@ export default function HubOsLayout({
 
         {/* Right col: quicklog, ai coach, optional cardio */}
         <div className="os-col">
-          <OsQuickLogPanel S={S} update={update}
-            onNavigateTrack={onNavigateTrack}
-            onShowCoinToast={onShowCoinToast} />
-          {S.hubPanels?.cardio && (
-            <OsCardioPanel
-              profile={S.profile || {}}
-              onSaveWeight={w => update(prev => ({ ...prev, profile: { ...prev.profile, weightKg: w } }))}
-              onLogBurn={entry => update(prev => ({
-                ...prev,
-                cardioLogs: [...(prev.cardioLogs || []), entry].slice(-200),
-              }))}
-            />
-          )}
-          <OsCoachPanel S={S} update={update}
-            onOpenWaitlist={onOpenWaitlist}
-            onCoachAct={onCoachAct}
-            userId={userId} />
+          <div className="os-col-inner">
+            <OsQuickLogPanel S={S} update={update}
+              onNavigateTrack={onNavigateTrack}
+              onShowCoinToast={onShowCoinToast} />
+            {S.hubPanels?.cardio && (
+              <OsCardioPanel
+                profile={S.profile || {}}
+                onSaveWeight={w => update(prev => ({ ...prev, profile: { ...prev.profile, weightKg: w } }))}
+                onLogBurn={entry => update(prev => ({
+                  ...prev,
+                  cardioLogs: [...(prev.cardioLogs || []), entry].slice(-200),
+                }))}
+              />
+            )}
+            <OsCoachPanel S={S} update={update}
+              onOpenWaitlist={onOpenWaitlist}
+              onCoachAct={onCoachAct}
+              userId={userId} />
+          </div>
         </div>
       </div>
 

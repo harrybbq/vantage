@@ -347,7 +347,61 @@ html[data-hub-os] .hub-os-main {
   align-items: start;
 }
 
+/* The column TRACK. It stretches to the full height of the row so that
+   the sticky element inside it has a containing block as tall as the
+   canvas.
+   This used to be the sticky element itself, and that was the bug: a
+   sticky box is clamped by its own containing block, so a column only as
+   tall as its content ran out of room near the bottom of the page and
+   got shoved upward — measured at -86px, putting the top of the Ratings
+   ledger above the viewport with no way to scroll back to it, because
+   the column's own scrollTop stayed at 0. Splitting track from sticky
+   content is the standard fix.
+
+   Splitting alone is NOT enough, though — see the min-width block below
+   for the second half of the fix. */
 html[data-hub-os] .hub-os-main > .os-col {
+  align-self: stretch;
+  min-height: 0;
+  position: static;
+}
+
+/* Second half of the sticky fix, and the reason the column bottoms were
+   unreachable at the foot of the page.
+
+   At max scroll the row ENDS ABOVE the viewport bottom: the hub's own
+   padding and the section's bottom padding sit below it, measured at
+   114px. A sticky box may never leave its containing block in EITHER
+   direction, so those 114px come off the bottom of the space the column
+   has to occupy and the column is shoved up by the shortfall — measured
+   at 40px on a 620px viewport and 86px on a 500px one, which is exactly
+   how much of the Ratings ledger's and the AI Coach brief's tops went
+   missing with no way to scroll back. (This is also why `bottom: 14px`
+   on the sticky child does not help: the clamp applies whichever edge
+   you stick to.)
+
+   A negative bottom margin on a stretched grid item resolves its height
+   to `row + 114`, so its CONTENT BOX — which is what the sticky
+   constraint rectangle is measured against — reaches the document
+   bottom. Padding does NOT work here and was tried: padding is outside
+   the content box, so the clamp did not move a pixel.
+
+   Because the margin box is unchanged, the grid row, the canvas and the
+   page height all stay exactly as they were — verified, docH identical
+   before and after.
+
+   114px = 14px .hub-os padding + 100px .section padding. Both are fixed
+   at these widths. Scoped to >=1100px because below it the right column
+   reflows to a full-width row of its own, where the same margin would
+   pull real content up over the canvas instead of filling empty space —
+   and where the row already runs to the page bottom, so there is no
+   clamp to escape. */
+@media (min-width: 1100px) {
+  html[data-hub-os] .hub-os-main > .os-col {
+    margin-bottom: -114px;
+  }
+}
+html[data-hub-os] .hub-os-main > .os-col > .os-col-inner {
   display: flex;
   flex-direction: column;
   gap: 10px;
@@ -377,13 +431,13 @@ html[data-hub-os] .hub-os-main > .os-col {
    scrollHeight never exceeded clientHeight.
 
    Pinning shrink is what makes the existing overflow-y:auto do its job. */
-html[data-hub-os] .hub-os-main > .os-col > * {
+html[data-hub-os] .hub-os-main > .os-col > .os-col-inner > * {
   flex-shrink: 0;
 }
 
 /* Thin scrollbars to match panel bodies */
-html[data-hub-os] .hub-os-main > .os-col::-webkit-scrollbar { width: 4px; }
-html[data-hub-os] .hub-os-main > .os-col::-webkit-scrollbar-thumb {
+html[data-hub-os] .hub-os-main > .os-col > .os-col-inner::-webkit-scrollbar { width: 4px; }
+html[data-hub-os] .hub-os-main > .os-col > .os-col-inner::-webkit-scrollbar-thumb {
   background: var(--os-border-md);
   border-radius: 2px;
 }
@@ -854,9 +908,10 @@ html[data-theme="dark-os"] .sec-title { color: var(--text); }
     min-height: calc(100vh - 32px);
     overflow: visible;
   }
-  html[data-theme="dark-os"] .hub-os-main > .os-col {
-    overflow: visible;
-  }
+  /* No .os-col overflow reset here any more: the column's scroll moved
+     to .os-col-inner, which is capped at the viewport height and must
+     keep scrolling internally on short screens — that internal scroll
+     is the only way to reach the foot of the Ratings ledger. */
 }
 
 @media (max-width: 1099px) {
@@ -880,10 +935,15 @@ html[data-theme="dark-os"] .sec-title { color: var(--text); }
   /* Right col drops to its own full-width row under main */
   html[data-theme="dark-os"] .hub-os-main > .os-col:last-child {
     grid-column: 1 / -1;
+  }
+  /* The flex container is .os-col-inner, not .os-col — the column was
+     split into track + sticky content so the sticky box is not clamped
+     by its own height. */
+  html[data-theme="dark-os"] .hub-os-main > .os-col:last-child > .os-col-inner {
     flex-direction: row;
     flex-wrap: wrap;
   }
-  html[data-theme="dark-os"] .hub-os-main > .os-col:last-child > .os-panel {
+  html[data-theme="dark-os"] .hub-os-main > .os-col:last-child > .os-col-inner > .os-panel {
     flex: 1 1 260px;
     min-height: 180px;
   }
@@ -901,10 +961,10 @@ html[data-theme="dark-os"] .sec-title { color: var(--text); }
   html[data-theme="dark-os"] .hub-os-main {
     grid-template-columns: 1fr;
   }
-  html[data-theme="dark-os"] .hub-os-main > .os-col:last-child {
+  html[data-theme="dark-os"] .hub-os-main > .os-col:last-child > .os-col-inner {
     flex-direction: column;
   }
-  html[data-theme="dark-os"] .hub-os-main > .os-col:last-child > .os-panel {
+  html[data-theme="dark-os"] .hub-os-main > .os-col:last-child > .os-col-inner > .os-panel {
     flex: 1 1 auto;
     min-height: 0;
   }

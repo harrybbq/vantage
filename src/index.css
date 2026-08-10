@@ -6116,6 +6116,9 @@ button:active:not(:disabled),
 }
 
 /* ── Expanded friend card ── */
+/* Pure anchor for scrolling the selected friend's card into view — it
+   must not change how the card lays out in either hub. */
+.fc-card-slot{ min-width:0; }
 .fc-card{
   background:var(--bg-raised);
   border:1px solid var(--border);

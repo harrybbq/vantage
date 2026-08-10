@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import Icon from '../Icon';
 import FriendsPanelList from './FriendsPanelList';
 import FriendCard from './FriendCard';
@@ -74,6 +74,43 @@ export default function FriendsRail({ userId, onUpgrade }) {
   function handleSelect(id) {
     setSelectedId(prev => (prev === id ? null : id));
   }
+
+  // Picking a friend appends their card BELOW the list. On the OS hub
+  // the rail lives in a pinned column that scrolls internally, so the
+  // card can open entirely below that column's fold and the click reads
+  // as having done nothing.
+  //
+  // Scrolls the COLUMN, never the page. scrollIntoView would be shorter
+  // but it walks every scrollable ancestor including the document, which
+  // on a hub whose columns are already pinned to the viewport means the
+  // whole canvas lurches for no reason.
+  const cardRef = useRef(null);
+  useEffect(() => {
+    if (!selectedId) return undefined;
+    // One frame later: the card mounts in its loading state first and
+    // grows when public_stats land, so measuring immediately measures
+    // the wrong box.
+    const id = requestAnimationFrame(() => {
+      const el = cardRef.current;
+      if (!el) return;
+      let box = el.parentElement;
+      while (box && box !== document.body) {
+        const oy = getComputedStyle(box).overflowY;
+        if ((oy === 'auto' || oy === 'scroll') && box.scrollHeight > box.clientHeight + 1) break;
+        box = box.parentElement;
+      }
+      if (!box || box === document.body) return;
+      const r = el.getBoundingClientRect();
+      const b = box.getBoundingClientRect();
+      // Prefer showing the TOP of the card when it can't fit whole —
+      // the name and avatar are what confirm the click landed.
+      if (r.top < b.top) box.scrollTop -= (b.top - r.top) + 8;
+      else if (r.bottom > b.bottom) {
+        box.scrollTop += Math.min(r.bottom - b.bottom + 8, r.top - b.top);
+      }
+    });
+    return () => cancelAnimationFrame(id);
+  }, [selectedId, statsLoading]);
 
   // The selected friend assembled from the list row + their public_stats.
   // FriendCard expects a single `friend` prop, so we merge here rather
@@ -214,39 +251,41 @@ export default function FriendsRail({ userId, onUpgrade }) {
       </button>
 
       {selectedFriend && (
-        <FriendCard
-          friend={selectedFriend}
-          loading={statsLoading}
-          statsMissing={!selectedStats && !statsLoading}
-          unread={unread[selectedFriend.id] || 0}
-          onMessage={(f) => setMessageTarget(f)}
-          onReport={(f) => setReportTarget(f)}
-          onBlock={async (f) => {
-            // Block is destructive — confirm via native dialog. The
-            // queries module also drops the friendship row in the same
-            // call, so the user is immediately removed from the list.
-            const ok = window.confirm(
-              `Block ${f.name}? They'll be removed from your friends and won't be able to find you again.`
-            );
-            if (!ok) return;
-            try {
-              await friends.block(f.id);
-              setSelectedId(null); // close the card since this friend is gone
-            } catch (e) {
-              window.alert(e.message || 'Could not block.');
-            }
-          }}
-          onUnfriend={async (f) => {
-            const ok = window.confirm(`Remove ${f.name} from your friends?`);
-            if (!ok) return;
-            try {
-              await friends.unfriend(f.id);
-              setSelectedId(null);
-            } catch (e) {
-              window.alert(e.message || 'Could not unfriend.');
-            }
-          }}
-        />
+        <div ref={cardRef} className="fc-card-slot">
+          <FriendCard
+            friend={selectedFriend}
+            loading={statsLoading}
+            statsMissing={!selectedStats && !statsLoading}
+            unread={unread[selectedFriend.id] || 0}
+            onMessage={(f) => setMessageTarget(f)}
+            onReport={(f) => setReportTarget(f)}
+            onBlock={async (f) => {
+              // Block is destructive — confirm via native dialog. The
+              // queries module also drops the friendship row in the same
+              // call, so the user is immediately removed from the list.
+              const ok = window.confirm(
+                `Block ${f.name}? They'll be removed from your friends and won't be able to find you again.`
+              );
+              if (!ok) return;
+              try {
+                await friends.block(f.id);
+                setSelectedId(null); // close the card since this friend is gone
+              } catch (e) {
+                window.alert(e.message || 'Could not block.');
+              }
+            }}
+            onUnfriend={async (f) => {
+              const ok = window.confirm(`Remove ${f.name} from your friends?`);
+              if (!ok) return;
+              try {
+                await friends.unfriend(f.id);
+                setSelectedId(null);
+              } catch (e) {
+                window.alert(e.message || 'Could not unfriend.');
+              }
+            }}
+          />
+        </div>
       )}
 
       <AddFriendModal
