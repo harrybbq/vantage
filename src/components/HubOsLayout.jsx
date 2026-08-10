@@ -51,42 +51,50 @@ function useClock() {
 
 function pad2(n) { return String(n).padStart(2, '0'); }
 
+/** Sticky offset of the columns — keep in step with `top` in hub-dark.css. */
+const COL_STICKY_TOP = 14;
+
 /**
- * Keep the pinned columns inside the viewport at every scroll position.
+ * Flag the main row while its columns are actually pinned.
  *
- * `max-height: calc(100vh - 28px)` is only the right cap once a column
- * is actually pinned at `top: 14px`. Before the page has scrolled that
- * far the column still starts below the top row, so that cap lets it
- * hang off the bottom of the screen — and a column whose own box runs
- * past the fold cannot show its last panel no matter how far you scroll
- * it internally. That is why the foot of the Ratings ledger stayed cut
- * off even at the column's scroll end.
+ * A column has two lives. Before the page has scrolled past the top row
+ * it is an ordinary block that happens to sit beside the canvas: it runs
+ * its natural length, the page scrolls it like everything else, and it
+ * needs no height cap. Once sticky takes over at `top: 14px` it becomes
+ * a rail, and only then does it want the viewport-height cap and its own
+ * scrollbar.
+ *
+ * Capping it in BOTH states was the mistake this replaces: the cap was
+ * the space visible below the column's current top, which on a short
+ * window is a few hundred pixels, so at the top of the page the rail
+ * was a stub with a scrollbar next to a full-height canvas.
+ *
+ * The attribute also gates scroll containment, and that pairing is the
+ * point: contained while pinned, so the rail's own scroll never chains
+ * to the page and bounces; free while not, so a wheel over the rail can
+ * still scroll the page far enough to pin it in the first place.
  *
  * Both columns share a row, so one measurement drives both. rAF-throttled
- * and passive: this runs on every scroll frame, so it reads one rect and
- * writes one custom property, nothing more.
+ * and passive, and it only touches the DOM when the state actually flips.
  */
-function useStickyColumnHeight(ref) {
+function useStickyColumnState(ref) {
   useEffect(() => {
     const host = ref.current;
     if (!host) return undefined;
     let raf = 0;
+    let pinned = null;
     const measure = () => {
       raf = 0;
-      // Below 1100px the columns are full-width rows stacked under the
-      // canvas, not rails beside it — capping them to the visible strip
-      // would squash them to nothing. Hand the height back to the CSS.
-      if (!window.matchMedia('(min-width: 1100px)').matches) {
-        host.style.removeProperty('--os-col-max');
-        return;
-      }
       const track = host.querySelector('.os-col');
-      if (!track) return;
-      // Where the column's top actually is: its own position until the
-      // page has scrolled far enough for sticky to take over at 14px.
-      const top = Math.max(14, track.getBoundingClientRect().top);
-      const avail = Math.max(160, window.innerHeight - top - 14);
-      host.style.setProperty('--os-col-max', `${Math.round(avail)}px`);
+      // Below 1100px the columns are full-width rows stacked under the
+      // canvas, not rails beside it — never treat those as pinned.
+      const isPinned = !!track
+        && window.matchMedia('(min-width: 1100px)').matches
+        && track.getBoundingClientRect().top <= COL_STICKY_TOP + 0.5;
+      if (isPinned === pinned) return;
+      pinned = isPinned;
+      if (isPinned) host.setAttribute('data-os-pinned', '');
+      else host.removeAttribute('data-os-pinned');
     };
     const schedule = () => { if (!raf) raf = requestAnimationFrame(measure); };
     measure();
@@ -580,7 +588,7 @@ export default function HubOsLayout({
   const level = Math.max(1, Math.floor(coins / 500) + 1);
   const ownHandle = useOwnHandle(userId);
   const mainRef = useRef(null);
-  useStickyColumnHeight(mainRef);
+  useStickyColumnState(mainRef);
 
   // Right-click any panel → toggle its background transparency.
   const moduleMenu = useHubModuleMenu({

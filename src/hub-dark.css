@@ -406,39 +406,48 @@ html[data-hub-os] .hub-os-main > .os-col > .os-col-inner {
   flex-direction: column;
   gap: 10px;
   min-height: 0;
-  /* Pinned while the page scrolls past. 14px matches the shell padding,
-     so a column sits where it started rather than jumping on first
-     scroll. Its own max-height plus overflow means a column taller than
-     the screen still scrolls internally — that is the one place a
-     nested scrollbar is the right answer. */
+  max-height: calc(100vh - 28px);
+  /* Pinned once the page has scrolled past the top row. 14px matches the
+     shell padding, so a column sits where it started rather than jumping
+     on first scroll. */
   position: sticky;
   top: 14px;
-  /* --os-col-max is set per scroll frame by useStickyColumnHeight: it is
-     the space actually visible below the column's current top, which is
-     smaller than the viewport until sticky takes over. The calc() is the
-     pinned-state value and the fallback if the hook has not run yet. */
-  max-height: var(--os-col-max, calc(100vh - 28px));
+  /* The box is never taller than the display. This is what stops sticky's
+     containing-block clamp from shoving the column up off the top of the
+     screen — a clamp can only bite a box that does not fit.
+     Note there is deliberately NO overflow here. Until the column is
+     pinned it is just a block beside the canvas: overflow stays visible,
+     so the panels render their full length past the fold and the page
+     scrolls them like everything else. Clipping to the box in that state
+     is what crushed the rail — on a short window the box is a couple of
+     hundred pixels, so it became a stub with its own scrollbar next to a
+     full-height canvas.
+     Do not add `overflow-x: hidden` here either: pairing it with a
+     visible overflow-y makes the browser compute overflow-y to auto, and
+     the clipping comes straight back. */
+}
+/* The pinned life of a column: it now occupies the display, so it clips
+   to the box and scrolls inside itself. [data-os-pinned] is set by
+   useStickyColumnState the moment sticky takes over, and only above
+   1100px where these are rails rather than stacked rows. */
+html[data-hub-os] .hub-os-main[data-os-pinned] > .os-col > .os-col-inner {
   /* Columns scroll internally when they hold more panels than fit.
      Without this, extra panels (e.g. an opt-in Cardio card on top of
      the standard Habits + QuickLog + Coach stack) get silently clipped
      at the column bottom. */
   overflow-y: auto;
   overflow-x: hidden;
-}
-/* Stop a column's scroll CHAINING to the page. Without this, a wheel over
-   the column that runs past the column's own end hands the rest of the
-   gesture to the document: the page scrolls, the sticky column re-lays-out
-   against its new position, and the ledger you had just scrolled into view
-   snaps away again. It reads as a bounce, and it drags the widget canvas
-   along with it. Scrolling should belong to whatever the pointer is over.
+  /* Stop that scroll CHAINING to the page. Without it, a wheel over the
+     column that runs past the column's own end hands the rest of the
+     gesture to the document: the page scrolls, the sticky column
+     re-lays-out against its new position, and the ledger you had just
+     scrolled into view snaps away again. It reads as a bounce, and it
+     drags the widget canvas along with it.
 
-   Only where the columns are rails beside the canvas. Below 1100px they
-   are full-width rows stacked under it, and containing the scroll there
-   would trap the page behind a band the width of the screen. */
-@media (min-width: 1100px) {
-  html[data-hub-os] .hub-os-main > .os-col > .os-col-inner {
-    overscroll-behavior: contain;
-  }
+     Gated on the pinned state rather than applied always, because an
+     UNPINNED column has to be able to hand the page a wheel — that is
+     how the page scrolls far enough to pin it in the first place. */
+  overscroll-behavior: contain;
 }
 /* The column above says it scrolls when it holds more than fits — but
    its children are flex items, and a flex item defaults to
