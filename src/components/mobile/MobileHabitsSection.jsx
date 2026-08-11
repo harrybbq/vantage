@@ -9,21 +9,32 @@
  *
  *   ┌─────────────────────────────────────────────┐
  *   │  Alcohol                              ⋯     │
- *   │  ───────                                    │
- *   │                          ⏳ 1 week  ⬡ 10    │
- *   │  ▮ 3d 01h 26m                               │
- *   │  ▮ SINCE LAST RELAPSE                       │
- *   │  ─────────────────────────────────────       │
- *   │  10 relapses                ↻ RELAPSE        │
+ *   │  ───────                     ⏳ 1 week  ⬡ 10 │
+ *   │  3d 01h 26m                                 │
+ *   │  SINCE LAST RELAPSE                         │
+ *   │        🏃  ▭      ▭                         │  ← runner lane
+ *   │  ▬▬▬▬▬▬▬│▬▬▬▬▬▬▬▬│▬▬▬▬▬▬▬▬▬▬▬               │  ← ladder + pips
+ *   │  RUNNING · DAY 9                       23%  │
+ *   │  ─────────────────────────────────────      │
+ *   │  10 relapses                ↻ RELAPSE       │
  *   └─────────────────────────────────────────────┘
  *
- * The pill on the left is a vertical capsule that fills upward in
- * the habit's color as elapsed/maxDuration approaches 1.
+ * The lane is the same HabitRunner canvas the desktop card uses: a
+ * stick figure walks, then jogs, then runs and vaults obstacles as the
+ * streak grows, and the distance it has covered IS the progress. It
+ * replaced a vertical capsule that filled upward — which said the same
+ * thing far more quietly, and said it differently from desktop.
+ *
+ * 64px is the lane height, not a round number: sampling the worst frame
+ * of an 8-second run at 390px wide, a vault clears the figure's head by
+ * 6px at 64 and clips it at 56.
  */
 
 import { useState, useEffect, useRef } from 'react';
 import { fireGoal } from '../../utils/confetti';
 import { strikeState, replenishLabel } from '../../lib/habits/strikes';
+import { ladderProgress, sortedMilestones, allMilestonesDone } from '../../lib/habits/ladder';
+import HabitRunner, { stageForDays } from '../habits/HabitRunner';
 import Icon from '../Icon';
 function formatElapsedShort(ms) {
   if (ms < 0) ms = 0;
@@ -91,14 +102,19 @@ function MobileHabitCard({ habit, update, onShowCoinToast, onOpenModal }) {
   }, [now]);
 
   const elapsed = now - habit.startTime;
+  const days = elapsed / 86400000;
   const strikes = strikeState(habit, now);
-  const maxDuration = habit.milestones?.length
-    ? Math.max(...habit.milestones.map(m => m.duration))
-    : 7 * 24 * 3600 * 1000;
-  const progress = Math.min(1, elapsed / maxDuration);
-  const allDone = habit.milestones?.length > 0 && habit.milestones.every(m => m.awarded);
+  // Same ladder as desktop: milestones get equal slices, so the runner
+  // is somewhere visible on day two rather than pinned at the start
+  // line until the one-month mark.
+  const sortedMs = sortedMilestones(habit);
+  const progress = ladderProgress(habit, elapsed);
+  const allDone = allMilestonesDone(habit);
   const fillColor = allDone ? 'var(--gold, #d4a017)' : (habit.color || 'var(--em)');
   const next = nextMilestone(habit);
+  const stageLabel = allDone
+    ? (habit.endless ? 'Cleared — still running' : 'All milestones cleared')
+    : `${stageForDays(days).label} · day ${Math.floor(days)}`;
 
   return (
     <div className="m-habit-card">
@@ -125,18 +141,40 @@ function MobileHabitCard({ habit, update, onShowCoinToast, onOpenModal }) {
         )}
       </div>
 
-      {/* Body — pill + time */}
-      <div className="m-habit-body">
-        <div className="m-habit-pill" aria-hidden="true">
+      {/* The clock. Full width now the capsule has gone. */}
+      <div className="m-habit-time-block">
+        <div className={`m-habit-time${strikes.state === 'struck' ? ' is-struck' : ''}${strikes.state === 'maxed' ? ' is-maxed' : ''}`}>{formatElapsedShort(elapsed)}</div>
+        <div className="m-habit-time-eyebrow">Since last relapse</div>
+      </div>
+
+      {/* Runner lane + ladder. The canvas pauses itself when it scrolls
+          off screen or the tab is hidden, and freezes to a static stance
+          under prefers-reduced-motion — the bar below always carries the
+          value, so nothing is said by movement alone. */}
+      <div className="m-habit-lane">
+        <HabitRunner
+          progress={progress}
+          days={days}
+          colour={fillColor}
+          done={allDone}
+          endless={!!habit.endless}
+          stumbleKey={habit.startTime}
+        />
+      </div>
+      <div className="habit-track m-habit-track">
+        <div className="habit-track-fill" style={{ width: `${progress * 100}%`, background: fillColor }} />
+        {sortedMs.map((m, i) => (
           <div
-            className="m-habit-pill-fill"
-            style={{ height: `${progress * 100}%`, background: fillColor }}
+            key={m.id}
+            className={`habit-pip${m.awarded ? ' awarded' : ''}`}
+            style={{ left: `${((i + 1) / sortedMs.length) * 100}%` }}
+            title={m.label}
           />
-        </div>
-        <div className="m-habit-time-block">
-          <div className={`m-habit-time${strikes.state === 'struck' ? ' is-struck' : ''}${strikes.state === 'maxed' ? ' is-maxed' : ''}`}>{formatElapsedShort(elapsed)}</div>
-          <div className="m-habit-time-eyebrow">Since last relapse</div>
-        </div>
+        ))}
+      </div>
+      <div className="m-habit-stage">
+        <span>{stageLabel}</span>
+        <span>{Math.round(progress * 100)}%</span>
       </div>
 
       {/* Footer — relapse count + button */}

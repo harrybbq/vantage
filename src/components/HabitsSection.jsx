@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import Icon from './Icon';
 import HabitRunner, { stageForDays } from './habits/HabitRunner';
+import { ladderProgress, sortedMilestones, allMilestonesDone } from '../lib/habits/ladder';
 import { motion } from 'framer-motion';
 import { fireGoal } from '../utils/confetti';
 import SectionHelp from './SectionHelp';
@@ -67,30 +68,14 @@ function HabitCard({ habit, update, onShowCoinToast, onOpenModal }) {
 
   const elapsed = now - habit.startTime;
   const strikes = strikeState(habit, now);
-  const maxDuration = habit.milestones.length > 0
-    ? Math.max(...habit.milestones.map(m => m.duration))
-    : 7 * 24 * 3600 * 1000; // default 1-week reference if no milestones
-  const allDone = habit.milestones.length > 0 && habit.milestones.every(m => m.awarded);
+  const allDone = allMilestonesDone(habit);
   const fillColor = allDone ? 'var(--gold)' : habit.color;
 
-  // Milestones ascending — the ladder the runner works along.
-  const sortedMs = [...habit.milestones].sort((a, b) => a.duration - b.duration);
+  // Milestones ascending — the ladder the runner works along. Shared
+  // with the mobile card so both surfaces agree on the distance.
+  const sortedMs = sortedMilestones(habit);
   const nextMsIdx = sortedMs.findIndex(m => elapsed < m.duration);
-
-  // Even-interval progress: each milestone owns an equal slice of the
-  // bar, and we interpolate within the current slice. Falls back to a
-  // plain 1-week ratio when a habit has no milestones at all.
-  const ladderProgress = (() => {
-    const n = sortedMs.length;
-    if (!n) return Math.min(1, elapsed / maxDuration);
-    let cleared = 0;
-    while (cleared < n && elapsed >= sortedMs[cleared].duration) cleared++;
-    if (cleared >= n) return 1;
-    const prev = cleared === 0 ? 0 : sortedMs[cleared - 1].duration;
-    const span = sortedMs[cleared].duration - prev;
-    const frac = span > 0 ? (elapsed - prev) / span : 0;
-    return (cleared + Math.max(0, Math.min(1, frac))) / n;
-  })();
+  const ladder = ladderProgress(habit, elapsed);
 
   const stageLabel = allDone
     ? (habit.endless ? 'All milestones cleared — still running' : 'All milestones cleared')
@@ -121,7 +106,7 @@ function HabitCard({ habit, update, onShowCoinToast, onOpenModal }) {
           movement at all. */}
       <div className="habit-lane">
         <HabitRunner
-          progress={ladderProgress}
+          progress={ladder}
           days={elapsed / 86400000}
           colour={fillColor}
           done={allDone}
@@ -132,7 +117,7 @@ function HabitCard({ habit, update, onShowCoinToast, onOpenModal }) {
       <div className="habit-track">
         <div
           className="habit-track-fill"
-          style={{ width: `${ladderProgress * 100}%`, background: fillColor }}
+          style={{ width: `${ladder * 100}%`, background: fillColor }}
         />
         {sortedMs.map((m, i) => (
           <div

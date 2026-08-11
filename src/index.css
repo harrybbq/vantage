@@ -5676,26 +5676,29 @@ button:active:not(:disabled),
   white-space: nowrap;
 }
 
-.m-habit-body {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-  padding: 4px 0 6px;
-}
-.m-habit-pill {
-  width: 22px;
-  height: 64px;
-  border-radius: 999px;
-  background: var(--border);
+/* Runner lane. 64px is measured, not chosen: at 390px wide a vault
+   clears the figure's head by 6px here and clips it at 56. The negative
+   bottom margin closes the gap the canvas leaves under the ground line
+   so the runner appears to stand ON the ladder bar. */
+.m-habit-lane {
   position: relative;
-  overflow: hidden;
-  flex-shrink: 0;
+  height: 64px;
+  margin: 2px 0 -2px;
 }
-.m-habit-pill-fill {
-  position: absolute;
-  bottom: 0; left: 0; right: 0;
-  border-radius: 999px;
-  transition: height 0.4s ease;
+.m-habit-track {
+  /* Slightly slimmer than the desktop track — the lane above it is
+     already carrying the drama. */
+  height: 8px;
+}
+.m-habit-stage {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  font-family: var(--mono);
+  font-size: 9px;
+  letter-spacing: 1.4px;
+  text-transform: uppercase;
+  color: var(--text-muted);
 }
 .m-habit-time-block {
   display: flex;
