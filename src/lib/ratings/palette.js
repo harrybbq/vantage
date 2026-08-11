@@ -8,30 +8,30 @@
  * Both modes are selected rather than flipped: the dark column is the
  * same four hues re-stepped for the dark surface.
  *
- * Fitness green (~156°) and Finance gold (~80°) are pinned to Vantage's
- * own accents — `--em` #1a7a4a and `--gold` #b08a3a — so the chart reads
- * as part of the app rather than a chart dropped into it. Brain and
- * Social were then searched for the best separation available around
- * them, and the set validated with the data-viz validator on ALL pairs
- * (a donut puts every slice next to every other), against the cream
- * card #fdfaf3 and the dark-os panel #131311:
+ * Muted on purpose — chroma 0.11, barely above the 0.10 floor below
+ * which the validator refuses a categorical palette outright. Anything
+ * greyer stops being a colour code. Fitness green (152°) and Finance
+ * gold (88°) stay in Vantage's own family, deepened to forest and
+ * pushed toward brass so neither reads as a highlighter.
  *
- *   light  protan ΔE 8.5 · tritan 12.2 · normal-vision 16.7
- *   dark   protan ΔE 8.7 · tritan  7.9 · normal-vision 15.5
- *   (CVD target ≥8, normal-vision floor 15 — both cleared)
+ * The separation comes from LIGHTNESS rather than saturation, which is
+ * what makes a sober palette possible at all: lightness is the channel
+ * colour-blind vision keeps, so spreading the four across L 0.44–0.73
+ * buys back everything the low chroma gives away. It also decides which
+ * hue gets the pale step — gold, because a pale ochre reads as
+ * parchment where a pale green reads mint and a pale pink reads sweet.
  *
- * Those margins are honest but thin, and that is the cost of pinning two
- * of the four hues to the brand: a free search gets to ΔE 17 by reaching
- * for hues Vantage does not own. Matching the themes was the ask, so the
- * gap is closed with encoding rather than colour — see below.
+ * Validated on ALL pairs, because a donut puts every slice next to every
+ * other, against the cream card #fdfaf3 and the dark-os panel #131311:
  *
- * Three things the validator flagged, and how they are answered:
+ *   light  deutan ΔE 11.6 · tritan 19.1 · normal-vision 19.0
+ *   dark   deutan ΔE  8.8 · tritan 11.4 · normal-vision 17.1
+ *   (CVD target ≥8, normal-vision floor 15 — cleared on every axis,
+ *   and clear of the 6–8 band the first attempt sat in)
  *
- *   · Dark tritan 7.9 sits just inside the 6–8 floor band, which is
- *     legal only with a second encoding channel. The donut ships three:
- *     a 2px gap of surface between every arc, a legend that names each
- *     pillar, and its score printed next to it.
- *   · Mint on cream is 2.1:1 against the surface, under the 3:1 line,
+ * Two things the validator flagged, and how they are answered:
+ *
+ *   · Brass on cream is 2.3:1 against the surface, under the 3:1 line,
  *     which obliges visible labels rather than colour alone. The legend
  *     is that relief — every arc's value and share are written out.
  *   · Identity is never colour-alone anywhere: the legend pairs each
@@ -39,8 +39,8 @@
  */
 
 export const RATING_COLOURS = {
-  light: { brain: '#125a98', finance: '#b8892d', fitness: '#65c18b', social: '#a8506f' },
-  dark:  { brain: '#2266a4', finance: '#aa7b19', fitness: '#4aa873', social: '#a9516f' },
+  light: { brain: '#4a8fc7', finance: '#c5a450', fitness: '#0d6332', social: '#955080' },
+  dark:  { brain: '#4288bf', finance: '#ae8e38', fitness: '#267543', social: '#9b5686' },
 };
 
 /**
