@@ -342,10 +342,22 @@ html[data-hub-os] .hub-os-top {
    height of the row rather than setting it. In a rail it stays stacked
    — same component, same markup, one flex direction different. */
 html[data-hub-os] .hub-os-top > .ratings-ledger .ratings-ledger-body {
-  flex-direction: row;
+  /* Grid rather than a flex row, because the body has conditional
+     children — the prestige badge and the prestige-up CTA — and as flex
+     siblings they became a third column that squeezed the key until its
+     labels collapsed to nothing and the scores fell out of the panel.
+     Explicit placement means an optional child cannot steal the row. */
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
   align-items: center;
-  gap: 14px;
+  gap: 12px;
 }
+html[data-hub-os] .hub-os-top > .ratings-ledger .ratings-ledger-donut-wrap { grid-column: 1; }
+html[data-hub-os] .hub-os-top > .ratings-ledger .ratings-ledger-legend { grid-column: 2; }
+/* The badge is redundant here — the hole already reads PRESTIGE IV. */
+html[data-hub-os] .hub-os-top > .ratings-ledger .ratings-ledger-prestige-row { display: none; }
+/* The 99-only CTA gets its own full-width row rather than a column. */
+html[data-hub-os] .hub-os-top > .ratings-ledger .prestige-up-cta { grid-column: 1 / -1; }
 html[data-hub-os] .hub-os-top > .ratings-ledger .ratings-ledger-donut-wrap {
   padding: 0;
   flex-shrink: 0;
@@ -356,8 +368,26 @@ html[data-hub-os] .hub-os-top > .ratings-ledger .ratings-ledger-legend {
 }
 html[data-hub-os] .hub-os-top > .ratings-ledger .ratings-legend-row {
   min-height: 30px;
-  padding: 2px 6px;
-  gap: 8px;
+  padding: 2px 4px;
+  /* Tighter columns and a smaller label so the numbers keep their own
+     lanes in a 320px slot rather than being squeezed out of line. */
+  grid-template-columns: 13px 8px minmax(0, 1fr) 26px 22px;
+  gap: 5px;
+}
+html[data-hub-os] .hub-os-top > .ratings-ledger .ratings-legend-label {
+  /* Small enough that FINANCE and FITNESS fit whole. A truncated word is
+     worse than a small one here: the label is the only thing naming an
+     arc now that the hover readout has gone. */
+  font-size: 8.5px;
+  letter-spacing: 0.4px;
+}
+/* A slightly smaller ring buys the label the width it needs. */
+html[data-hub-os] .hub-os-top > .ratings-ledger .ratings-donut {
+  width: 120px;
+  height: 120px;
+}
+html[data-hub-os] .hub-os-top > .ratings-ledger .ratings-legend-score {
+  font-size: 11.5px;
 }
 
 html[data-hub-os] .hub-os-main {

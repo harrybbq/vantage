@@ -47,20 +47,19 @@ export default function RatingsDonut({
   categories, ratings, ovr, tier, prestigeLabel, dark = false,
   onSelect, size = 156,
 }) {
-  // Which arc is under the pointer or focus ring. The palette is a ramp
-  // rather than four unrelated hues, so neighbouring arcs resemble each
-  // other on purpose — with the numerals off the ring, this readout is
-  // what names a slice without relying on that resemblance.
+  // Which arc is under the pointer or focus ring — used only to lift the
+  // arc itself now, not to write anything.
   const [active, setActive] = useState(null);
   const shares = ratingShares(ratings, categories);
   const segments = donutSegments(shares);
   const colours = RATING_COLOURS[dark ? 'dark' : 'light'];
   const byId = Object.fromEntries(categories.map(c => [c.id, c]));
   const mid = VB / 2;
-  const activeSeg = active && segments.find(s => s.id === active);
-  const sub = activeSeg
-    ? `${byId[activeSeg.id].label.toUpperCase()} ${activeSeg.value} · ${Math.round(activeSeg.share * 100)}%`
-    : prestigeLabel;
+  // The only thing under the rating is the prestige level. A hover
+  // readout used to appear here too and was a second label competing
+  // with the key for the same job — the key names every arc all of the
+  // time, which is better than one arc some of the time.
+  const sub = prestigeLabel;
 
   return (
     <svg
