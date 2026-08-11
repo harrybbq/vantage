@@ -8,42 +8,52 @@
  * Both modes are selected rather than flipped: the same four hues,
  * re-stepped for each surface.
  *
- * This is a RAMP, not four unrelated hues — gold 92° → copper 42° →
- * burgundy 2° → violet 300°, lightness falling the whole way, so the
- * ring reads as one sweep rather than four flags. That was the ask, and
- * it is worth being clear about what it costs, because a gradient and a
- * category code want opposite things: adjacent steps in a ramp are
- * SUPPOSED to resemble each other, and a category colour is supposed
- * not to.
+ * This is a RAMP, not four unrelated hues — gold 96° → copper 40° →
+ * burgundy 2° → plum 322°, lightness falling the whole way, so the ring
+ * reads as one sweep. The fourth stop carries ON past burgundy in the
+ * same direction rather than jumping to purple, which is what makes it
+ * a neighbour of the arc beside it instead of a stranger.
  *
- * Validated on ALL pairs, because a donut puts every slice next to
- * every other, against the cream card #fdfaf3 and the dark panel
- * #131311:
+ * Worth being clear about the cost, because a gradient and a category
+ * code want opposite things: adjacent steps in a ramp are SUPPOSED to
+ * resemble each other, and a category colour is supposed not to.
  *
- *   light  protan ΔE 10.6 · tritan 13.9 · normal-vision 17.0  — passes
- *   dark   deutan ΔE  9.2 · tritan  9.5 · normal-vision 13.4  — under
+ * Validated on ALL pairs, since a donut puts every slice next to every
+ * other, against the cream card #fdfaf3 and the dark panel #131311:
  *
- * The dark column cannot clear the 15-point normal-vision floor for
- * copper against gold: the dark lightness band is only 0.48–0.67 wide,
- * half of light's, and a four-step ramp cannot spread far enough inside
- * it. Every arrangement of these four hues was searched — per-slot
- * lightness and chroma, both directions — and none passes. Rather than
- * quietly ship colours that some people cannot tell apart, the donut
- * stops asking colour to carry identity at all:
+ *   light  protan ΔE 8.2 · tritan 12.7 · normal-vision 12.5
+ *   dark   deutan ΔE 7.2 · tritan  9.0 · normal-vision 12.4
  *
- *   · each arc is numbered, and the legend repeats the number
- *   · hovering or focusing an arc names it, with its score and share
+ * Both columns sit under the 15-point normal-vision floor, and dark
+ * sits inside the 6–8 CVD band. This is the floor of what the shape of
+ * the request allows, and it was measured rather than guessed:
+ *
+ *   · a violet fourth stop at 300° scores dark deutan 9.2 — the
+ *     warmest fourth stop that clears the CVD target. Every hue from
+ *     300° to 345° was searched at four lightnesses and three chromas
+ *     per slot; none warmer holds the line.
+ *   · a fully warm ramp — gold, amber, copper, burgundy, no purple at
+ *     all — collapses to dark deutan 5.5. Gold and amber become the
+ *     same colour to a red-green colour-blind reader. That one is not
+ *     shippable; 322° is the compromise.
+ *
+ * So the donut does not ask colour to carry identity at all:
+ *
+ *   · hovering or focusing an arc names it in the hole, with its score
+ *     and share — the main thing standing in for colour on the ring
+ *   · tapping an arc opens its breakdown, which names it too, so touch
+ *     (where there is no hover) still has a way through
  *   · the legend always shows all four with name, share and score
  *   · 2px of surface between every arc
  *
- * Colour groups the ring; the numbers and words identify it. That is
- * also the relief owed for gold at 1.99:1 on cream and for burgundy and
- * violet on the dark panel, all under the 3:1 line.
+ * Colour groups the ring; the words identify it. That doubles as the
+ * relief owed for gold at 2.09:1 on cream and plum at 2.72:1 on the
+ * dark panel, both under the 3:1 line.
  */
 
 export const RATING_COLOURS = {
-  light: { brain: '#d2b145', finance: '#c26b49', fitness: '#a72459', social: '#5d3890' },
-  dark:  { brain: '#b09018', finance: '#b06244', fitness: '#b3195c', social: '#6b4c9b' },
+  light: { brain: '#c6af4e', finance: '#b7684c', fitness: '#a71756', social: '#742b7f' },
+  dark:  { brain: '#aa932e', finance: '#b9694d', fitness: '#be3368', social: '#863c91' },
 };
 
 /**
