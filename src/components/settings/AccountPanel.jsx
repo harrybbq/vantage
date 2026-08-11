@@ -1,29 +1,31 @@
 /**
- * MobileProfileSection
+ * AccountPanel — the Account tab of Settings.
  *
- * Mobile-only Profile route. Surfaces account-level controls that
- * don't have a clean home in the desktop layout (photo + name live
- * on the hub ProfileCard there; email/password live nowhere). On
- * mobile we centralise them under More → Profile.
+ * This is the old mobile-only Profile route (MobileProfileSection),
+ * folded into Settings. Profile was its own destination reachable from
+ * exactly one place — More → Profile on mobile — while the same account
+ * lived under Settings on desktop and the photo lived on the hub card.
+ * Three homes for one thing. Settings is where every other account-level
+ * control already is, so Profile becomes a tab of it and the standalone
+ * route goes away.
  *
- * Sections:
- *   - Photo (tap to upload, tap × to remove)
- *   - Display name + tagline (both live in S.profile, debounced save)
- *   - Email (Supabase auth — update triggers a confirmation email
- *     to the new address)
- *   - Change password (Supabase auth — applies immediately)
- *   - Sign out
+ * The controls are unchanged, but the boxes are gone: the old route
+ * stacked four bordered `.m-profile-card`s, and Settings dropped exactly
+ * that pattern when its subsections were flattened into headed groups.
+ * Field-level classes (`.m-profile-input`, `-btn`, `-msg`) are reused so
+ * the inputs still look like the ones they replaced.
  *
- * Sensitive actions (password change, account-level mutations) keep
- * their feedback inline so the user always sees a result without
- * having to chase a toast.
+ * Sensitive actions (email change, password change) keep their feedback
+ * inline rather than in a toast — you should see the result without
+ * having to chase it.
  */
 import { useState, useRef } from 'react';
 import Icon from '../Icon';
+import SettingsGroup from './SettingsGroup';
 import { supabase } from '../../lib/supabase';
 import { useOwnHandle } from '../../hooks/useOwnHandle';
 
-export default function MobileProfileSection({ S, update, userId, userEmail, onSignOut }) {
+export default function AccountPanel({ S, update, userId, userEmail, onSignOut }) {
   const profile = S.profile || {};
   const handle = useOwnHandle(userId);
   const fileInputRef = useRef(null);
@@ -104,78 +106,70 @@ export default function MobileProfileSection({ S, update, userId, userEmail, onS
   }
 
   return (
-    <section className="section m-profile-wrap">
-      <div className="m-profile">
-        {/* Header */}
-        <div className="m-section-header-block">
-          <div className="m-section-eyebrow">// ACCOUNT</div>
-          <div className="m-section-title-row">
-            <div className="m-section-title">Profile</div>
-          </div>
-        </div>
-
-        {/* Photo + name + tagline */}
-        <div className="m-profile-card">
-          <div className="m-profile-photo-row">
+    <>
+      <SettingsGroup
+        title="Profile"
+        desc="Your photo, name and tagline — what friends see next to your rating."
+      >
+        <div className="m-profile-photo-row">
+          <button
+            type="button"
+            className="m-profile-photo"
+            onClick={() => fileInputRef.current?.click()}
+            aria-label="Change profile photo"
+          >
+            {profile.photo
+              ? <img src={profile.photo} alt="Profile" />
+              : <span className="m-profile-photo-placeholder"><Icon name="camera" size={20} strokeWidth={1.6} /></span>}
+            <span className="m-profile-photo-edit">Edit</span>
+          </button>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/*"
+            style={{ display: 'none' }}
+            onChange={handlePhotoChange}
+          />
+          {profile.photo && (
             <button
               type="button"
-              className="m-profile-photo"
-              onClick={() => fileInputRef.current?.click()}
-              aria-label="Change profile photo"
-            >
-              {profile.photo
-                ? <img src={profile.photo} alt="Profile" />
-                : <span className="m-profile-photo-placeholder"><Icon name="camera" size={20} strokeWidth={1.6} /></span>}
-              <span className="m-profile-photo-edit">Edit</span>
-            </button>
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept="image/*"
-              style={{ display: 'none' }}
-              onChange={handlePhotoChange}
-            />
-            {profile.photo && (
-              <button
-                type="button"
-                className="m-profile-photo-remove"
-                onClick={handlePhotoRemove}
-              >Remove</button>
-            )}
-          </div>
-
-          <label className="m-profile-field">
-            <span className="m-profile-label" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              Display name
-              {handle && <span className="m-profile-handle">@{handle}</span>}
-            </span>
-            <input
-              type="text"
-              className="m-profile-input"
-              placeholder="Your name"
-              defaultValue={profile.name || ''}
-              onChange={e => setProfileField('name', e.target.value)}
-            />
-          </label>
-
-          <label className="m-profile-field">
-            <span className="m-profile-label">Tagline</span>
-            <input
-              type="text"
-              className="m-profile-input"
-              placeholder="Short bio…"
-              defaultValue={profile.tagline || ''}
-              onChange={e => setProfileField('tagline', e.target.value)}
-            />
-          </label>
+              className="m-profile-photo-remove"
+              onClick={handlePhotoRemove}
+            >Remove</button>
+          )}
         </div>
 
-        {/* Email */}
-        <form className="m-profile-card" onSubmit={handleEmailUpdate}>
-          <div className="m-profile-card-eyebrow">Sign-in email</div>
-          <p className="m-profile-card-help">
-            Change requires confirming the new address by clicking the link we email you.
-          </p>
+        <label className="m-profile-field">
+          <span className="m-profile-label" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            Display name
+            {handle && <span className="m-profile-handle">@{handle}</span>}
+          </span>
+          <input
+            type="text"
+            className="m-profile-input"
+            placeholder="Your name"
+            defaultValue={profile.name || ''}
+            onChange={e => setProfileField('name', e.target.value)}
+          />
+        </label>
+
+        <label className="m-profile-field">
+          <span className="m-profile-label">Tagline</span>
+          <input
+            type="text"
+            className="m-profile-input"
+            placeholder="Short bio…"
+            defaultValue={profile.tagline || ''}
+            onChange={e => setProfileField('tagline', e.target.value)}
+          />
+        </label>
+      </SettingsGroup>
+
+      <SettingsGroup
+        title="Sign-in email"
+        desc="Changing it requires confirming the new address by clicking the link we email you."
+      >
+        <form onSubmit={handleEmailUpdate}>
           <input
             type="email"
             className="m-profile-input"
@@ -196,13 +190,13 @@ export default function MobileProfileSection({ S, update, userId, userEmail, onS
           </div>
           {emailMsg && <FieldMsg msg={emailMsg} />}
         </form>
+      </SettingsGroup>
 
-        {/* Password */}
-        <form className="m-profile-card" onSubmit={handlePasswordUpdate}>
-          <div className="m-profile-card-eyebrow">Change password</div>
-          <p className="m-profile-card-help">
-            Applies immediately. You'll stay signed in on this device.
-          </p>
+      <SettingsGroup
+        title="Password"
+        desc="Applies immediately. You'll stay signed in on this device."
+      >
+        <form onSubmit={handlePasswordUpdate}>
           <input
             type="password"
             className="m-profile-input"
@@ -230,13 +224,16 @@ export default function MobileProfileSection({ S, update, userId, userEmail, onS
           </div>
           {pwdMsg && <FieldMsg msg={pwdMsg} />}
         </form>
+      </SettingsGroup>
 
-        {/* Sign out */}
-        <div className="m-profile-card m-profile-card-quiet">
-          <div className="m-profile-card-eyebrow">Session</div>
-          <p className="m-profile-card-help">
-            Signs you out on this device only. Your data stays in the cloud.
-          </p>
+      {/* Sign out is only rendered where a handler was passed. Desktop
+          already has one in the sidebar; this is the mobile route's,
+          which had nowhere else to go once Profile stopped existing. */}
+      {onSignOut && (
+        <SettingsGroup
+          title="Session"
+          desc="Signs you out on this device only. Your data stays in the cloud."
+        >
           <div className="m-profile-actions">
             <button
               type="button"
@@ -246,9 +243,9 @@ export default function MobileProfileSection({ S, update, userId, userEmail, onS
               Sign out
             </button>
           </div>
-        </div>
-      </div>
-    </section>
+        </SettingsGroup>
+      )}
+    </>
   );
 }
 

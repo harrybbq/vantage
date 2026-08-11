@@ -64,11 +64,17 @@ export default function HubDrawer({
         {...(open ? {} : { tabIndex: -1 })}
       >
         <div className="m-hubdrawer-head">
-          <div className="m-hubdrawer-av" aria-hidden="true">
+          {/* Your own photo, so tapping it goes where a photo of you
+              should go: Settings → Account, which is where Profile
+              lives now. It was decorative before — the one thing on
+              this header that looked tappable and wasn't. */}
+          <button type="button" className="m-hubdrawer-av"
+                  onClick={() => { onClose(); onNavigate?.('profile'); }}
+                  aria-label="Your profile">
             {(S.profile && S.profile.photo)
               ? <img src={S.profile.photo} alt="" />
               : <span>{name.slice(0, 1).toUpperCase()}</span>}
-          </div>
+          </button>
           <div className="m-hubdrawer-who">
             <div className="m-hubdrawer-name">{name}</div>
             <button type="button" className="m-hubdrawer-link"
