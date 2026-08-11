@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import Icon from '../Icon';
+import SettingsGroup from './SettingsGroup';
 import { encryptExport, decryptExport, passphraseStrength } from '../../lib/data/exportCrypto';
 
 /**
@@ -95,8 +96,7 @@ export default function DataExportCard({ S, onOpenLegal }) {
   }
 
   return (
-    <div className="card" style={{ padding: '22px' }}>
-      <h3 style={{ margin: '0 0 4px' }}>Your Data</h3>
+    <SettingsGroup title="Your data">
       <p className="dx-sub">
         {summarise(S)}. Yours to take at any time — this is your right to data
         portability under UK GDPR.
@@ -192,6 +192,6 @@ export default function DataExportCard({ S, onOpenLegal }) {
           <button onClick={() => onOpenLegal('terms')}>Terms of Service</button>
         </div>
       )}
-    </div>
+    </SettingsGroup>
   );
 }

@@ -2947,6 +2947,84 @@ input,select,textarea,button{touch-action:manipulation;}
   font-weight:600;
 }
 
+/* ── Settings — flat subsections ──────────────────────────────────────
+   Each subsection used to be a `.card`: a bordered, blurred, glowing box
+   with 22px of inline padding. A tab was then a stack of boxes inside a
+   page, and the frames carried more weight than the settings in them.
+   They are all the same kind of thing read top to bottom, so a header
+   and a hairline do the separating and the tab reads as one column.
+
+   The gap and the group's bottom padding are the same number on purpose:
+   it puts each rule exactly halfway between the group above it and the
+   heading below, so no rule looks like it belongs to one side.
+   ────────────────────────────────────────────────────────────────────── */
+.settings-panel{
+  max-width:560px;
+  display:flex;
+  flex-direction:column;
+  gap:26px;
+}
+.settings-group{
+  padding:0 0 26px;
+  border-bottom:1px solid var(--border);
+}
+/* No trailing rule under the last group — it would read as the start of
+   something that isn't there. */
+.settings-panel > .settings-group:last-child{
+  border-bottom:0;
+  padding-bottom:0;
+}
+.settings-group-title{
+  margin:0 0 5px;
+  font-family:var(--sans);
+  font-size:15px;
+  font-weight:600;
+  letter-spacing:-.1px;
+  color:var(--text);
+  display:flex;align-items:center;gap:8px;
+}
+.settings-group-desc{
+  margin:0 0 16px;
+  font-family:var(--mono);
+  font-size:11px;
+  line-height:1.7;
+  letter-spacing:.3px;
+  color:var(--text-muted);
+  max-width:52ch;
+}
+/* Trailing note under a group's controls (Pro footnote, Apple Health
+   lead-in) — same voice as the description, just below the controls. */
+.settings-group-note{
+  margin:14px 0 0;
+  font-family:var(--mono);
+  font-size:10px;
+  line-height:1.7;
+  letter-spacing:.4px;
+  color:var(--text-muted);
+}
+/* Destructive group. The red used to come from a tinted card border;
+   with the box gone the heading carries it, and the button under it is
+   already red. */
+.settings-group-danger .settings-group-title{ color:#f87171; }
+
+/* The wearable and Apple Health connectors carry a dashed accent box
+   from the Track page, where each had to stand out against a card. In
+   the flat settings column three stacked dashed tiles are exactly the
+   boxes this layout got rid of, so here they are plain rows with a
+   hairline between them. */
+.settings-panel .vitals-ah{
+  margin:0;
+  padding:14px 0 0;
+  border:0;
+  border-radius:0;
+  background:none;
+}
+.settings-panel .vitals-ah:first-of-type{ padding-top:0; }
+.settings-panel .vitals-ah + .vitals-ah{
+  border-top:1px solid var(--border);
+  padding-top:14px;
+}
+
 /* Empty-state tile inside a tab when its content is conditionally
    gated (e.g. signed out, schema not applied). */
 .settings-empty{

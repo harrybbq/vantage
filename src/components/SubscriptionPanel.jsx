@@ -18,6 +18,7 @@
 import { useState } from 'react';
 import { useSubscriptionContext } from '../context/SubscriptionContext';
 import { restorePurchases, openManageSubscription, presentCustomerCenter } from '../lib/billing/revenuecat';
+import SettingsGroup from './settings/SettingsGroup';
 
 const PLAN_LABEL = {
   monthly:  'Pro — Monthly',
@@ -78,12 +79,10 @@ export default function SubscriptionPanel() {
   if (loading) return null;
 
   return (
-    <div className="card" style={{ padding: '22px' }}>
-      <h3 style={{ margin: '0 0 4px' }}>Subscription</h3>
-      <p style={{ fontFamily: 'var(--mono)', fontSize: '11px', color: 'var(--text-muted)', margin: '0 0 16px', lineHeight: '1.7' }}>
-        Manage your plan, restore prior purchases, and open the platform's
-        subscription settings.
-      </p>
+    <SettingsGroup
+      title="Subscription"
+      desc="Manage your plan, restore prior purchases, and open the platform's subscription settings."
+    >
 
       {/* Current plan */}
       <div style={{
@@ -223,6 +222,6 @@ export default function SubscriptionPanel() {
           lineHeight: '1.6',
         }}>{msg}</div>
       )}
-    </div>
+    </SettingsGroup>
   );
 }

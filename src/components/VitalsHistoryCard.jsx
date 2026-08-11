@@ -495,6 +495,29 @@ function OuraBadge({ connected }) {
   );
 }
 
+/**
+ * Both wearable connectors, as one block.
+ *
+ * These used to sit at the top of the Vitals & Macros card on Track,
+ * which meant the page that shows your history opened with two rows of
+ * connect/sync/disconnect buttons above it — setup furniture in front of
+ * the thing you came to read. They live in Settings › Tools now, beside
+ * the Apple Health import, so all three ways of getting vitals into the
+ * app are in one place and Track is just the log.
+ *
+ * The connected-state badges stay on the Track card: those are status,
+ * not setup, and they answer "is this data coming from my device?"
+ * exactly where the question gets asked.
+ */
+export function WearableSync({ S, update }) {
+  return (
+    <>
+      <WhoopPanel S={S} update={update} />
+      <OuraPanel S={S} update={update} />
+    </>
+  );
+}
+
 // Card heading + optional device indicators, shared by both card states.
 function VitalsHeading({ connected, oura }) {
   return (
@@ -684,10 +707,12 @@ export default function VitalsHistoryCard({ S, update }) {
         <VitalsHeading connected={!!S.whoopConnected} oura={!!S.ouraConnected} />
         <p className="vitals-sub">
           No history yet. Log weight/sleep/HR from the hub Vitals widget, or log food in Daily Macros — each day banks a “% of goal hit” snapshot here.
+          {/* The connect buttons used to be right below this line. Say
+              where they went, or an empty card is a dead end for anyone
+              who came here to link a device. */}
+          {' '}Wearing a WHOOP or an Oura Ring? Connect it in Settings › Tools and it fills this in for you.
         </p>
         {addDayPicker}
-        {update && <WhoopPanel S={S} update={update} />}
-        {update && <OuraPanel S={S} update={update} />}
       </div>
     );
   }
@@ -699,9 +724,6 @@ export default function VitalsHistoryCard({ S, update }) {
     <div className="card vitals-card">
       <VitalsHeading connected={!!S.whoopConnected} oura={!!S.ouraConnected} />
       <p className="vitals-sub">Vitals from the hub widget; macro days saved as % of each goal hit. Hover the chart for exact values.</p>
-
-      {update && <WhoopPanel S={S} update={update} />}
-      {update && <OuraPanel S={S} update={update} />}
 
       {/* Filter row — metric first (it names the chart), then range. */}
       <div className="vitals-controls">
