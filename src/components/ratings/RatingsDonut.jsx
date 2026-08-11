@@ -75,8 +75,11 @@ export default function RatingsDonut({
          lost to anyone who cannot use the colour. */
       style={{ '--rt-tier': tier.color }}
     >
-      <title>{`Overall rating ${ovr} of 99 — ${tier.label}`}</title>
-
+      {/* Deliberately NO <title>: a browser renders it as a native
+          tooltip, which meant hovering an arc produced two labels — the
+          instant one in the hole and a slow OS one over the top of it.
+          The tier is carried to assistive tech by the caption beside the
+          donut in RatingsPanel instead, which costs nothing visually. */}
       {/* The hole, tinted with the tier colour. */}
       <circle cx={mid} cy={mid} r={R - STROKE / 2 - 1}
               className="ratings-donut-hole" />

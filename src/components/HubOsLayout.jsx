@@ -296,48 +296,6 @@ export function OsSessionPanel({ name, trackers, logs }) {
   );
 }
 
-// ── Panel: Vitals (coins + streak + OVR) ──────────────────────────────────
-// `level` retained as a prop for backwards compatibility / coin-tier
-// progression math, but the displayed Level slot was replaced by OVR
-// (F5 Sprint 3) — Level is no longer the headline user metric.
-export function OsVitalsPanel({ coins = 0, streak = 0, level = 1, ovr = 1 }) {
-  const coinTierCap = level * 500;
-  const pct = Math.min(100, Math.round((coins % coinTierCap) / coinTierCap * 100));
-
-  return (
-    <OsPanel label="Vitals" right="Live" innerPadding={false}>
-      <div className="os-vitals">
-        <div>
-          <div className="os-vitals-hero">
-            <span className="os-vitals-val gold">{coins.toLocaleString()}</span>
-            <span className="os-vitals-unit">coins</span>
-          </div>
-          <div className="os-vitals-label">Total balance</div>
-        </div>
-        <div className="os-vitals-track">
-          <div className="os-vitals-fill gold" style={{ width: `${pct}%` }} />
-        </div>
-        <div className="os-vitals-divider" />
-        <div className="os-vitals-mini-row">
-          <div className="os-vitals-mini">
-            <div className="os-vitals-hero">
-              <span className="os-vitals-val green">{streak}</span>
-              <span className="os-vitals-unit">d</span>
-            </div>
-            <div className="os-vitals-label">Streak</div>
-          </div>
-          <div className="os-vitals-mini">
-            <div className="os-vitals-hero">
-              <span className="os-vitals-val">{ovr}</span>
-            </div>
-            <div className="os-vitals-label">OVR</div>
-          </div>
-        </div>
-      </div>
-    </OsPanel>
-  );
-}
-
 // ── Panel: Ratings (F5 Sprint 3) ──────────────────────────────────────────
 // The Ledger card IS the panel — its own border, eyebrow header
 // ("RATINGS · LEDGER"), and per-row layout already match the OS
@@ -602,9 +560,6 @@ export default function HubOsLayout({
   userId, onUpgrade,
 }) {
   const profile = S.profile || {};
-  const coins = S.coins || 0;
-  const streak = S.currentStreak || 0;
-  const level = Math.max(1, Math.floor(coins / 500) + 1);
   const ownHandle = useOwnHandle(userId);
   const mainRef = useRef(null);
   useStickyColumnState(mainRef);
@@ -628,17 +583,17 @@ export default function HubOsLayout({
           onUpgrade={onUpgrade}
         />
         <OsSessionPanel name={profile.name} trackers={S.trackers} logs={S.logs} />
-        <OsVitalsPanel
-          coins={coins}
-          streak={streak}
-          level={level}
-          ovr={S?.ratings?.ovr || 1}
-        />
+        {/* The ratings ledger sits here now, where a Vitals panel used to
+            repeat numbers the rest of the UI already carries: coins live
+            in the chrome bar and OVR is the donut's whole point. Moving
+            it up also shortens the left rail, which is the column that
+            has to fit the screen. */}
+        <OsRatingsPanel S={S} update={update} compact />
       </div>
 
       {/* ── MAIN ROW ── */}
       <div className="hub-os-main" ref={mainRef}>
-        {/* Left col: actions + friends rail + ratings ledger.
+        {/* Left col: actions + friends rail.
             The outer div spans the full row height; the inner one is what
             sticks. See hub-dark.css — sticking the outer box means it is
             clamped by its own short height and gets shoved off-screen at
@@ -658,7 +613,6 @@ export default function HubOsLayout({
                 component as the cream hub, retinted via dark-os overrides
                 on the .fc-* classes in hub-dark.css. */}
             <FriendsRail userId={userId} onUpgrade={onUpgrade} />
-            <OsRatingsPanel S={S} update={update} />
           </div>
         </div>
 
