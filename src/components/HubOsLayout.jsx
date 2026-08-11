@@ -24,11 +24,18 @@ import Icon from './Icon';
 import { useOwnHandle } from '../hooks/useOwnHandle';
 
 // ── Panel primitive ──────────────────────────────────────────────────────
-// Each panel tags itself with data-hub-module (derived from its label)
-// so the right-click transparency menu can target it. See HubModuleMenu.
-function OsPanel({ label, right, children, bodyClass = '', innerPadding = true }) {
+// Each panel tags itself with data-hub-module so the right-click
+// transparency menu can target it. See HubModuleMenu.
+//
+// The id defaults to a slug of the label, which is convenient right up
+// until a panel is renamed: the id is the key S.moduleTransparency stores
+// under, so "Session" → "Today" silently orphans the preference and the
+// panel springs back to opaque. Pass `moduleId` to pin the key and the
+// label becomes free to change. Renamed panels MUST keep their original
+// id — it is a saved preference, not a derived value.
+function OsPanel({ label, moduleId, right, children, bodyClass = '', innerPadding = true }) {
   return (
-    <div className="os-panel" data-hub-module={moduleIdFromLabel(label)} data-hub-module-label={label}>
+    <div className="os-panel" data-hub-module={moduleId || moduleIdFromLabel(label)} data-hub-module-label={label}>
       <div className="os-panel-label">
         <span className="os-panel-label-text">{label}</span>
         {right ? <span className="os-panel-label-right">{right}</span> : null}
@@ -230,7 +237,9 @@ export function OsProfilePanel({ profile, handle, onSaveName, onSaveTagline, onU
   );
 }
 
-// ── Panel: Session (greeting + clock + tracker nodes) ─────────────────────
+// ── Panel: Today (greeting + clock + tracker nodes) ───────────────────────
+// Labelled "Session" until 2026-08-11. The component keeps the old name
+// because its transparency preference is still stored under `session`.
 function trackerInitial(name) {
   return (name || '?').trim().charAt(0).toUpperCase() || '?';
 }
@@ -264,7 +273,7 @@ export function OsSessionPanel({ name, trackers, logs }) {
   const doneCount = nodes.filter(n => n.hit).length;
 
   return (
-    <OsPanel label="Session" right={`Day ${dayOfYear(time)} of ${time.getFullYear()}`} innerPadding={false}>
+    <OsPanel label="Today" moduleId="session" right={`Day ${dayOfYear(time)} of ${time.getFullYear()}`} innerPadding={false}>
       <div className="os-session">
         <div className="os-session-main">
           <div className="os-session-greeting">
@@ -341,6 +350,11 @@ export function OsActionsPanel({ onAddWidget, onSnapFill, onNavigateSettings, sn
 }
 
 // ── Panel: Trackers Mini ──────────────────────────────────────────────────
+// Not rendered by the OS layout today. If it is ever brought back, note
+// that the quick-log panel now carries the "Trackers" label — two panels
+// with the same label would also derive the same data-hub-module id and
+// so share one transparency preference. Give this one an explicit
+// moduleId before rendering it.
 export function OsTrackersPanel({ trackers, logs }) {
   const today = (() => {
     const d = new Date();
@@ -388,7 +402,7 @@ export const OsWidgetsPanel = ({ canvasRef }) => (
 // ── Panel: QuickLog wrapper ───────────────────────────────────────────────
 export function OsQuickLogPanel({ S, update, onNavigateTrack, onShowCoinToast }) {
   return (
-    <OsPanel label="Nutrition Log" innerPadding={false}>
+    <OsPanel label="Trackers" moduleId="nutrition-log" innerPadding={false}>
       <div className="os-panel-body os-quicklog-body">
         <QuickLog S={S} update={update} onNavigateTrack={onNavigateTrack} onShowCoinToast={onShowCoinToast} />
       </div>

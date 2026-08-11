@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import Icon from './Icon';
+import SettingsGroup from './settings/SettingsGroup';
 import { supabase } from '../lib/supabase';
 
 const UNIT_OPTIONS = ['g', 'mg', 'µg', 'kcal', 'ml', 'IU'];
@@ -134,11 +135,10 @@ export default function MacroGoalsPanel({ userId }) {
   if (loading) return null;
 
   return (
-    <div className="card" style={{ padding: '22px' }}>
-      <h3 style={{ margin: '0 0 4px', fontSize: 'var(--text-md)', color: 'var(--text)' }}>Nutrition Goals</h3>
-      <p style={{ fontFamily: 'var(--mono)', fontSize: '11px', color: 'var(--text-muted)', margin: '0 0 18px', letterSpacing: '0.5px', lineHeight: '1.6' }}>
-        Set daily targets for each macro. These appear as progress bars on the Track page.
-      </p>
+    <SettingsGroup
+      title="Nutrition goals"
+      desc="Set daily targets for each macro. These appear as progress bars on the Track page."
+    >
 
       {macros.length === 0 && (
         <div style={{ textAlign: 'center', padding: '20px', color: 'var(--text-muted)', fontFamily: 'var(--mono)', fontSize: 'var(--text-sm)' }}>
@@ -198,6 +198,6 @@ export default function MacroGoalsPanel({ userId }) {
           + Add macro
         </button>
       )}
-    </div>
+    </SettingsGroup>
   );
 }

@@ -14,6 +14,7 @@
 
 import { useState } from 'react';
 import NotificationPermissionPrompt, { PushPermissionStatusRow } from './NotificationPermissionPrompt';
+import SettingsGroup from './settings/SettingsGroup';
 
 const CATEGORIES = [
   {
@@ -80,13 +81,10 @@ export default function NotificationsPanel({ S, update }) {
   const quiet = prefs.quietHours || { start: '', end: '' };
 
   return (
-    <div className="card" style={{ padding: '22px' }}>
-      <h3 style={{ margin: '0 0 4px' }}>Notifications</h3>
-      <p style={{ fontFamily: 'var(--mono)', fontSize: '11px', color: 'var(--text-muted)', margin: '0 0 16px', lineHeight: '1.7' }}>
-        Choose what we ping you about. Notifications only fire on the native app —
-        web users see in-app toasts only. Quiet hours and the daily reminder
-        require the iOS or Android build.
-      </p>
+    <SettingsGroup
+      title="Notifications"
+      desc="Choose what we ping you about. Notifications only fire on the native app — web users see in-app toasts only. Quiet hours and the daily reminder require the iOS or Android build."
+    >
 
       {/* Device permission status */}
       <PushPermissionStatusRow
@@ -152,7 +150,10 @@ export default function NotificationsPanel({ S, update }) {
         <div style={{ fontFamily: 'var(--mono)', fontSize: '10px', color: 'var(--text-muted)', letterSpacing: '0.5px', marginBottom: '12px' }}>
           No notifications fire in this window. Leave both blank to disable.
         </div>
-        <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+        {/* A `time` input sizes itself to its widest rendering (~137px in
+            Chrome), so two of them plus the "to" ran ~20px past the edge
+            of a 390px phone. They shrink and wrap now. */}
+        <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
           <input
             type="time"
             value={quiet.start}
@@ -166,6 +167,7 @@ export default function NotificationsPanel({ S, update }) {
               fontFamily: 'var(--mono)', fontSize: '12px',
               color: 'var(--text)',
               colorScheme: 'inherit',
+              flex: '1 1 110px', minWidth: 0, maxWidth: 150,
             }}
           />
           <span style={{ fontFamily: 'var(--mono)', fontSize: '11px', color: 'var(--text-muted)' }}>to</span>
@@ -182,6 +184,7 @@ export default function NotificationsPanel({ S, update }) {
               fontFamily: 'var(--mono)', fontSize: '12px',
               color: 'var(--text)',
               colorScheme: 'inherit',
+              flex: '1 1 110px', minWidth: 0, maxWidth: 150,
             }}
           />
         </div>
@@ -215,6 +218,6 @@ export default function NotificationsPanel({ S, update }) {
           }}
         />
       </div>
-    </div>
+    </SettingsGroup>
   );
 }

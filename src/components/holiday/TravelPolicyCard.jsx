@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
 import Icon from '../Icon';
+import SettingsGroup from '../settings/SettingsGroup';
 import { ALL_COUNTRIES } from '../../lib/holiday/destinations';
 import { getPolicy, setCountryLevel, POLICY_LEVELS } from '../../lib/holiday/policy';
 
@@ -61,16 +62,10 @@ export default function TravelPolicyCard({ S, update }) {
   const count = assigned.length;
 
   return (
-    <div className="card" style={{ padding: '22px' }}>
-      <div className="set-card-title">
-        <Icon name="shield" size={15} />
-        Travel policy
-      </div>
-      <p className="set-card-sub">
-        Colour-code countries by whether you need permission to travel there.
-        The Holiday map can show these, and trips to a flagged country get a
-        warning on their card.
-      </p>
+    <SettingsGroup
+      title="Travel policy"
+      desc="Colour-code countries by whether you need permission to travel there. The Holiday map can show these, and trips to a flagged country get a warning on their card."
+    >
 
       <div className="tp-privacy">
         <Icon name="lock" size={13} />
@@ -142,6 +137,6 @@ export default function TravelPolicyCard({ S, update }) {
         not an authoritative source. Always confirm with your vetting or security
         team before booking.
       </p>
-    </div>
+    </SettingsGroup>
   );
 }

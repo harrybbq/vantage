@@ -269,7 +269,23 @@ html[data-hub-os] .os-panel[data-transparent="true"] .os-panel-body {
   box-shadow: none !important;
 }
 
-html[data-hub-os] .os-panel-label {
+/* The Ledger's header joins these selectors rather than being copied
+   into a rule of its own.
+
+   It is not inside an OsPanel — the Ledger card IS its own panel — so it
+   carries its own `.ratings-ledger-head` markup, and that markup had its
+   own look: 10px, bold, accent-coloured, over a dashed rule, with no //
+   marker. Sitting in the top row beside OPERATOR and TODAY it was the
+   one header that announced itself, which read as a different kind of
+   thing rather than the same kind of thing. Adding the selectors here
+   (instead of duplicating the declarations) means it cannot drift back
+   out of step the next time this block is edited.
+
+   Scoped to `.hub-os-top` on purpose: the same component also renders in
+   the mobile drawer and the mobile hub, where there are no OS panel
+   labels to be consistent WITH, so it keeps its own header there. */
+html[data-hub-os] .os-panel-label,
+html[data-hub-os] .hub-os-top > .ratings-ledger .ratings-ledger-head {
   font-family: var(--mono);
   font-size: 8.5px;
   letter-spacing: 2px;
@@ -283,17 +299,25 @@ html[data-hub-os] .os-panel-label {
   flex-shrink: 0;
   user-select: none;
 }
-html[data-hub-os] .os-panel-label-text {
+html[data-hub-os] .os-panel-label-text,
+html[data-hub-os] .hub-os-top > .ratings-ledger .ratings-ledger-eyebrow {
   display: flex;
   align-items: center;
   gap: 6px;
+  /* Overrides the standalone eyebrow's 10px / 700 / --em. */
+  font-size: inherit;
+  font-weight: inherit;
+  letter-spacing: inherit;
+  color: inherit;
 }
-html[data-hub-os] .os-panel-label-text::before {
+html[data-hub-os] .os-panel-label-text::before,
+html[data-hub-os] .hub-os-top > .ratings-ledger .ratings-ledger-eyebrow::before {
   content: '//';
   color: var(--em);
   opacity: 0.7;
 }
-html[data-hub-os] .os-panel-label-right {
+html[data-hub-os] .os-panel-label-right,
+html[data-hub-os] .hub-os-top > .ratings-ledger .ratings-ledger-tag {
   color: var(--text-muted);
   font-size: 8px;
   letter-spacing: 1.5px;
@@ -338,10 +362,24 @@ html[data-hub-os] .hub-os-top {
   flex-shrink: 0;
 }
 
+/* An OsPanel carries no padding of its own — the label spans the full
+   width and the body is what's inset. The Ledger pads the whole card
+   instead, which left its header rule stopping 16px short of the border
+   on both sides while every rule beside it ran edge to edge. Move the
+   inset off the card and onto the body so the two match. */
+html[data-hub-os] .hub-os-top > .ratings-ledger {
+  padding: 0;
+  gap: 0;
+  /* .os-panel rounds to 9px; the Ledger was on 10px. Border colour and
+     surface already match through the same theme vars. */
+  border-radius: 9px;
+}
+
 /* The ledger in the top row: donut left, key right, so it matches the
    height of the row rather than setting it. In a rail it stays stacked
    — same component, same markup, one flex direction different. */
 html[data-hub-os] .hub-os-top > .ratings-ledger .ratings-ledger-body {
+  padding: 12px 14px;
   /* Grid rather than a flex row, because the body has conditional
      children — the prestige badge and the prestige-up CTA — and as flex
      siblings they became a third column that squeezed the key until its

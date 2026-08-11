@@ -5,67 +5,21 @@ import { adjustColour } from '../utils/helpers';
 import MacroGoalsPanel from './MacroGoalsPanel';
 import NotificationsPanel from './NotificationsPanel';
 import SubscriptionPanel from './SubscriptionPanel';
-import { AppleHealthImport } from './VitalsHistoryCard';
+import { AppleHealthImport, WearableSync } from './VitalsHistoryCard';
 import DataExportCard from './settings/DataExportCard';
+import SettingsGroup from './settings/SettingsGroup';
 import { useSubscriptionContext } from '../context/SubscriptionContext';
 import { getOwnProfile, updateOwnProfile } from '../lib/friends/queries';
 import { VISIONS_BY_ID } from '../lib/visions/definitions';
 import Icon from './Icon';
 import TravelPolicyCard from './holiday/TravelPolicyCard';
 import { authFetch } from '../lib/authFetch';
-import { bankingStatus, beginConnect } from '../lib/banking/enableBanking';
 
 // Small helper: inline icon + label for the Tools/Data action buttons.
 const IconLabel = ({ name, children, size = 15 }) => (
   <span style={{ display: 'inline-flex', alignItems: 'center', gap: 7 }}><Icon name={name} size={size} />{children}</span>
 );
 
-// Open Banking — foundation card. Fail-soft: while the backend isn't
-// configured it shows a coming-soon state. It never touches the manual
-// Subscriptions/Savings features; when live it will only *augment* them.
-function BankingCard() {
-  const [status, setStatus] = useState(null); // null=loading
-  const [note, setNote] = useState('');
-  useEffect(() => { let c = false; bankingStatus().then(s => { if (!c) setStatus(s); }); return () => { c = true; }; }, []);
-  const configured = status?.configured;
-  const connected = status?.connected;
-
-  async function onConnect() {
-    setNote('');
-    const r = await beginConnect();
-    if (!r.ok) setNote('Bank connections aren’t switched on yet — coming soon. Your subscriptions and savings stay fully manual until then.');
-  }
-
-  return (
-    <div className="card" style={{ padding: '22px' }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
-        <Icon name="link" size={16} />
-        <h3 style={{ margin: 0 }}>Connected accounts</h3>
-        {!connected && (
-          <span style={{ fontFamily: 'var(--mono)', fontSize: 8.5, fontWeight: 700, letterSpacing: 1, padding: '2px 6px', borderRadius: 4, background: 'rgba(128,128,128,.16)', color: 'var(--text-muted)', border: '1px solid var(--border)' }}>
-            {configured ? 'BETA' : 'SOON'}
-          </span>
-        )}
-      </div>
-      <p style={{ fontFamily: 'var(--mono)', fontSize: '11px', color: 'var(--text-muted)', margin: '0 0 16px', lineHeight: '1.7' }}>
-        Securely connect a bank (Open Banking) to auto-detect recurring subscriptions and keep savings balances up to date. Read-only, and it only ever <em>adds</em> to what you already track manually — nothing you’ve entered is replaced or removed.
-      </p>
-      <button
-        onClick={onConnect}
-        disabled={status === null}
-        style={{
-          background: 'rgba(255,255,255,.07)', border: '1px solid var(--border)',
-          borderRadius: '10px', color: 'var(--text)', padding: '10px 18px',
-          fontSize: '13px', fontWeight: 600, cursor: status === null ? 'default' : 'pointer',
-          fontFamily: 'var(--sans)', transition: 'all .18s', opacity: status === null ? 0.6 : 1,
-        }}
-      >
-        {connected ? 'Manage connection' : configured ? 'Connect a bank' : 'Connect a bank'}
-      </button>
-      {note && <div style={{ marginTop: 10, fontFamily: 'var(--mono)', fontSize: 10.5, color: 'var(--text-muted)', lineHeight: 1.6 }}>{note}</div>}
-    </div>
-  );
-}
 
 // Pastel app-gradient derived from a dark accent by lightening it.
 function pastelGrad(em) {
@@ -226,17 +180,6 @@ export function applyScheme(scheme) {
   r.style.setProperty('--grad', scheme.grad);
 }
 
-// Optional Dark OS panels users can toggle on/off from settings.
-// This list is the source of truth — adding a panel here and gating
-// its render in HubOsLayout on S.hubPanels[id] is all that's needed.
-export const OPTIONAL_PANELS = [
-  {
-    id: 'cardio',
-    name: 'Cardio calculator',
-    tagline: 'MET-based kcal burn · logs to cardioLogs',
-  },
-];
-
 /**
  * Self-contained card for the Friends privacy toggle. Reads + writes
  * the user's `profiles.is_searchable` directly via the friends
@@ -344,11 +287,10 @@ function FriendsPrivacyCard({ userId, S, update }) {
   }
 
   return (
-    <div className="card" style={{ padding: '22px' }}>
-      <h3 style={{ margin: '0 0 4px' }}>Friends</h3>
-      <p style={{ fontFamily: 'var(--mono)', fontSize: '11px', color: 'var(--text-muted)', margin: '0 0 16px', lineHeight: '1.7' }}>
-        Friends added to your list always see your activity. This setting only controls whether strangers can find you by handle search.
-      </p>
+    <SettingsGroup
+      title="Friends"
+      desc="Friends added to your list always see your activity. This setting only controls whether strangers can find you by handle search."
+    >
       <label
         style={{
           display: 'flex', alignItems: 'center', gap: '14px',
@@ -563,7 +505,7 @@ function FriendsPrivacyCard({ userId, S, update }) {
           })}
         </div>
       </div>
-    </div>
+    </SettingsGroup>
   );
 }
 
@@ -577,28 +519,34 @@ const SETTINGS_TABS = [
   { id: 'data',       label: 'Data'       },
 ];
 
+/**
+ * Which tab to open on.
+ *
+ * Normally Appearance. But the WHOOP and Oura connect flows send the
+ * browser back to the app root with `?whoop=connected`, and the panels
+ * that consume that parameter now live under Tools — a tab whose content
+ * is not mounted until it is selected. Landing on Appearance would leave
+ * the redirect unread and the account looking unconnected. App.jsx sends
+ * the same test to the section router so the user lands here at all.
+ */
+function initialTab() {
+  if (typeof window === 'undefined') return 'appearance';
+  return /[?&](whoop|oura)=/.test(window.location.search) ? 'tools' : 'appearance';
+}
+
 export default function SettingsSection({ S, update, active, userId, onOpenLegal, onOpenPalette, onOpenShortcuts, onOpenVisions, onOpenSchedule }) {
   const [deleting, setDeleting] = useState(false);
-  const [activeTab, setActiveTab] = useState('appearance');
+  const [activeTab, setActiveTab] = useState(initialTab);
   const currentScheme = S.colorScheme || 'green';
   // Resolved, not raw — someone still carrying a retired `cream`/`dark`
   // should see the card they actually landed on marked active.
   const currentTheme = resolveEffectiveTheme(S.theme || 'cream-pro');
   const { hasPro } = useSubscriptionContext();
-  const hubPanels = S.hubPanels || {};
-  const osLayoutActive = isOsLayoutTheme(currentTheme);
 
   function handleThemeChange(themeId) {
     if (!THEMES.some(x => x.id === themeId)) return;
     applyTheme(themeId);
     update(prev => ({ ...prev, theme: themeId }));
-  }
-
-  function handleTogglePanel(panelId) {
-    update(prev => ({
-      ...prev,
-      hubPanels: { ...(prev.hubPanels || {}), [panelId]: !prev.hubPanels?.[panelId] },
-    }));
   }
 
   function handleSchemeChange(scheme) {
@@ -677,20 +625,18 @@ export default function SettingsSection({ S, update, active, userId, onOpenLegal
 
       <div
         id={`settings-panel-${activeTab}`}
+        className="settings-panel"
         role="tabpanel"
         aria-labelledby={`settings-tab-${activeTab}`}
-        style={{ maxWidth: '560px', display: 'flex', flexDirection: 'column', gap: '20px' }}
       >
 
         {/* ─── APPEARANCE TAB ─── */}
         {activeTab === 'appearance' && (
         <>
-        {/* Colour Scheme */}
-        <div className="card" style={{ padding: '22px' }}>
-          <h3 style={{ margin: '0 0 4px' }}>Colour Scheme</h3>
-          <p style={{ fontFamily: 'var(--mono)', fontSize: '11px', color: 'var(--text-muted)', margin: '0 0 18px', letterSpacing: '0.5px', lineHeight: 1.6 }}>
-            An accent colour applied across the whole app. ✦ accents unlock by achieving visions; 🔒 accents are Pro.
-          </p>
+        <SettingsGroup
+          title="Colour scheme"
+          desc="An accent colour applied across the whole app. ✦ accents unlock by achieving visions; 🔒 accents are Pro."
+        >
           <div className="scheme-grid">
             {SCHEMES.map(scheme => {
               const isActive = currentScheme === scheme.id;
@@ -784,15 +730,15 @@ export default function SettingsSection({ S, update, active, userId, onOpenLegal
               }}
             />
           </div>
-        </div>
+        </SettingsGroup>
 
-        {/* Theme mode — 4 themes: light/dark × free/Pro */}
-        <div className="card" style={{ padding: '22px' }}>
-          <h3 style={{ margin: '0 0 4px' }}>Theme</h3>
-          <p style={{ fontFamily: 'var(--mono)', fontSize: '11px', color: 'var(--text-muted)', margin: '0 0 18px', letterSpacing: '0.5px' }}>
-            Cream and Dark are free. Cream Pro and Dark OS are Pro variants —
-            Dark OS turns the hub into a customisable control-panel grid.
-          </p>
+        {/* Theme mode. The blurb here still described Cream Pro and Dark
+            OS as Pro variants of two free themes that no longer exist —
+            it was written before the free pair was retired. */}
+        <SettingsGroup
+          title="Theme"
+          desc="Both themes are free — pick whichever you'd rather look at."
+        >
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '10px' }}>
             {THEMES.map(t => {
               const isActive = currentTheme === t.id;
@@ -843,61 +789,18 @@ export default function SettingsSection({ S, update, active, userId, onOpenLegal
             })}
           </div>
           {!hasPro && (
-            <p style={{ fontFamily: 'var(--mono)', fontSize: '10px', color: 'var(--text-muted)', margin: '14px 0 0', letterSpacing: '0.5px' }}>
-              Both themes are free. Pro adds the accent colours below, lifts the limits, and opens the rest of the widgets.
+            <p className="settings-group-note">
+              Pro adds the accent colours above, lifts the limits, and opens the rest of the widgets.
             </p>
           )}
-        </div>
+        </SettingsGroup>
 
-        {/* Optional control-panel add-ons. Shown for EITHER Pro theme —
-            both use the operator-console layout, and Cream Pro used to
-            get the layout with no way to configure it. */}
-        {osLayoutActive && (
-          <div className="card" style={{ padding: '22px' }}>
-            <h3 style={{ margin: '0 0 4px' }}>Control panel add-ons</h3>
-            <p style={{ fontFamily: 'var(--mono)', fontSize: '11px', color: 'var(--text-muted)', margin: '0 0 18px', letterSpacing: '0.5px' }}>
-              Optional add-ons for your control panel. Toggle on what you want to see in the hub.
-            </p>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-              {OPTIONAL_PANELS.map(p => {
-                const on = !!hubPanels[p.id];
-                return (
-                  <label
-                    key={p.id}
-                    style={{
-                      display: 'flex', alignItems: 'center', gap: '14px',
-                      padding: '12px 14px', borderRadius: '10px',
-                      border: on ? '2px solid var(--em)' : '2px solid var(--border)',
-                      background: on ? 'rgba(var(--em-rgb),0.08)' : 'var(--card, rgba(255,255,255,0.04))',
-                      cursor: 'pointer', transition: 'all .18s',
-                    }}
-                  >
-                    <input
-                      type="checkbox"
-                      checked={on}
-                      onChange={() => handleTogglePanel(p.id)}
-                      style={{ width: '18px', height: '18px', accentColor: 'var(--em)', cursor: 'pointer' }}
-                    />
-                    <div style={{ flex: 1 }}>
-                      <div style={{ fontFamily: 'var(--sans)', fontSize: '13px', fontWeight: 600, color: 'var(--text)' }}>
-                        {p.name}
-                      </div>
-                      <div style={{ fontFamily: 'var(--mono)', fontSize: '10px', color: 'var(--text-muted)', letterSpacing: '0.5px', marginTop: '2px' }}>
-                        {p.tagline}
-                      </div>
-                    </div>
-                    <span style={{
-                      fontFamily: 'var(--mono)', fontSize: '9px', letterSpacing: '1.4px',
-                      textTransform: 'uppercase', color: on ? 'var(--em)' : 'var(--text-muted)',
-                    }}>
-                      {on ? 'On' : 'Off'}
-                    </span>
-                  </label>
-                );
-              })}
-            </div>
-          </div>
-        )}
+        {/* The "Control panel add-ons" group stood here — one checkbox,
+            for the hub's cardio calculator, under a heading that promised
+            a family of them. It was removed 2026-08-11. `S.hubPanels` is
+            deliberately left alone: HubOsLayout still reads
+            S.hubPanels.cardio, so anyone who had the calculator on keeps
+            it. Nothing was written to state to make this change. */}
 
         </>
         )}
@@ -918,20 +821,24 @@ export default function SettingsSection({ S, update, active, userId, onOpenLegal
         {/* ─── DATA TAB ─── */}
         {activeTab === 'data' && (
         <>
-        {/* Open Banking — foundation card (fail-soft; augments, never
-            replaces, the manual Subscriptions & Savings features). */}
-        <BankingCard />
+        {/* A "Connected accounts" group opened this tab — an Open Banking
+            foundation that never got a backend, so it advertised a
+            "SOON" bank connection that could only ever answer "not
+            switched on yet". Removed 2026-08-11: subscriptions and
+            savings are manual entry, and the settings page should not
+            promise otherwise. */}
         {/* Data & Privacy — encrypted export, see DataExportCard. */}
         <DataExportCard S={S} onOpenLegal={onOpenLegal} />
 
         {/* Danger Zone — lives inside the Data tab so destructive
-            actions are co-located with export. The visible separation
-            from the rest of Data tab is the red-tinted border. */}
-        <div className="card" style={{ padding: '22px', borderColor: 'rgba(220,38,38,0.3)' }}>
-          <h3 style={{ margin: '0 0 4px', color: '#f87171' }}>Danger Zone</h3>
-          <p style={{ fontFamily: 'var(--mono)', fontSize: '11px', color: 'var(--text-muted)', margin: '0 0 16px', lineHeight: '1.7' }}>
-            Permanently deletes all boards, trackers, achievements, and settings. Your login email is retained for re-registration.
-          </p>
+            actions are co-located with export. Without the card border
+            it used to sit behind, the red heading and the red button
+            carry the warning. */}
+        <SettingsGroup
+          tone="danger"
+          title="Danger zone"
+          desc="Permanently deletes all boards, trackers, achievements, and settings. Your login email is retained for re-registration."
+        >
           <button
             onClick={handleDeleteAccount}
             disabled={deleting}
@@ -944,7 +851,7 @@ export default function SettingsSection({ S, update, active, userId, onOpenLegal
           >
             {deleting ? 'Deleting…' : <IconLabel name="trash-2">Delete All Data</IconLabel>}
           </button>
-        </div>
+        </SettingsGroup>
 
         </>
         )}
@@ -963,11 +870,10 @@ export default function SettingsSection({ S, update, active, userId, onOpenLegal
         {(() => {
           const requireCoins = S?.shopRequireCoins !== false;
           return (
-            <div className="card" style={{ padding: '22px' }}>
-              <h3 style={{ margin: '0 0 4px' }}>Shopping coins</h3>
-              <p style={{ fontFamily: 'var(--mono)', fontSize: '11px', color: 'var(--text-muted)', margin: '0 0 16px', lineHeight: '1.7' }}>
-                Controls whether your coin balance can stop you unlocking an item on the shopping list.
-              </p>
+            <SettingsGroup
+              title="Shopping coins"
+              desc="Controls whether your coin balance can stop you unlocking an item on the shopping list."
+            >
               <label
                 style={{
                   display: 'flex', alignItems: 'center', gap: '14px',
@@ -998,7 +904,7 @@ export default function SettingsSection({ S, update, active, userId, onOpenLegal
                   {requireCoins ? 'On' : 'Off'}
                 </span>
               </label>
-            </div>
+            </SettingsGroup>
           );
         })()}
         </>
@@ -1011,11 +917,10 @@ export default function SettingsSection({ S, update, active, userId, onOpenLegal
             as a button in the page header but moved here to keep the
             chrome quieter. The Cmd+K / Ctrl+K hotkey still works. */}
         {(onOpenPalette || onOpenShortcuts) && (
-          <div className="card" style={{ padding: '22px' }}>
-            <h3 style={{ margin: '0 0 4px' }}>Tools</h3>
-            <p style={{ fontFamily: 'var(--mono)', fontSize: '11px', color: 'var(--text-muted)', margin: '0 0 16px', lineHeight: '1.7' }}>
-              Quick navigation and keyboard reference. Cmd+K (or Ctrl+K) opens the command palette from anywhere.
-            </p>
+          <SettingsGroup
+            title="Navigation"
+            desc="Quick navigation and keyboard reference. Cmd+K (or Ctrl+K) opens the command palette from anywhere."
+          >
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px' }}>
               {onOpenPalette && (
                 <button
@@ -1058,21 +963,29 @@ export default function SettingsSection({ S, update, active, userId, onOpenLegal
                 </button>
               )}
             </div>
-          </div>
+          </SettingsGroup>
         )}
 
-        {/* Health & sync — owner-only Apple Health import + live-sync
-            URL. Moved here from the Vitals & Macros card (Track) so the
-            card stays focused on the log itself. Same owner gate. */}
-        {typeof window !== 'undefined' && window.__vantageOwner && (
-          <div className="card" style={{ padding: '22px' }}>
-            <h3 style={{ margin: '0 0 4px' }}>Health &amp; sync</h3>
-            <p style={{ fontFamily: 'var(--mono)', fontSize: '11px', color: 'var(--text-muted)', margin: '0 0 16px', lineHeight: '1.7' }}>
-              Import your Apple Health export, or enable live daily sync via an iOS Shortcut. Vitals flow into your Vitals &amp; Macros history.
-            </p>
-            <AppleHealthImport S={S} update={update} />
-          </div>
-        )}
+        {/* Health & sync — every route vitals can arrive by, in one
+            place. WHOOP and Oura moved here from the Vitals & Macros
+            card on Track, which opened with two rows of connect/sync
+            buttons above the history you came to read. Apple Health was
+            already here and stays owner-only; the wearables are open to
+            any account, each linking its own device. */}
+        <SettingsGroup
+          title="Health & sync"
+          desc="Connect a wearable and its vitals flow into your Vitals & Macros history — sleep, resting HR, HRV, recovery and daily burn. Nothing you've logged by hand is ever replaced."
+        >
+          <WearableSync S={S} update={update} />
+          {typeof window !== 'undefined' && window.__vantageOwner && (
+            <>
+              <p className="settings-group-note">
+                Apple Health: import an export file, or turn on live daily sync via an iOS Shortcut.
+              </p>
+              <AppleHealthImport S={S} update={update} />
+            </>
+          )}
+        </SettingsGroup>
 
         {/* Notifications — preferences card. The push delivery
             pipeline reads these to gate which kinds of pushes fire.
@@ -1087,11 +1000,10 @@ export default function SettingsSection({ S, update, active, userId, onOpenLegal
         <SubscriptionPanel />
 
         {/* Visions catalogue — milestones the user can chase. */}
-        <div className="card" style={{ padding: '22px' }}>
-          <h3 style={{ margin: '0 0 4px' }}>Visions</h3>
-          <p style={{ fontFamily: 'var(--mono)', fontSize: '11px', color: 'var(--text-muted)', margin: '0 0 16px', lineHeight: '1.7' }}>
-            See every system milestone and which ones you've unlocked. Each feeds your category ratings.
-          </p>
+        <SettingsGroup
+          title="Visions"
+          desc="See every system milestone and which ones you've unlocked. Each feeds your category ratings."
+        >
           <button
             type="button"
             className="tut-replay-btn"
@@ -1099,18 +1011,17 @@ export default function SettingsSection({ S, update, active, userId, onOpenLegal
           >
             <span aria-hidden="true" style={{display:'inline-flex',marginRight:6}}><Icon name="sparkles" size={15} /></span>Open visions catalogue
           </button>
-        </div>
+        </SettingsGroup>
 
         {/* Upgrade — owner-only. App.jsx passes onOpenSchedule as null
             for everyone else, so the card simply never renders for
             non-owner accounts (same gating pattern as
             onCoinContextMenu admin powers). */}
         {onOpenSchedule && (
-          <div className="card" style={{ padding: '22px' }}>
-            <h3 style={{ margin: '0 0 4px' }}>Upgrade</h3>
-            <p style={{ fontFamily: 'var(--mono)', fontSize: '11px', color: 'var(--text-muted)', margin: '0 0 16px', lineHeight: '1.7' }}>
-              Owner-only: shift rotation and training calendar, the macro plan, and career tracking.
-            </p>
+          <SettingsGroup
+            title="Upgrade"
+            desc="Owner-only: shift rotation and training calendar, the macro plan, and career tracking."
+          >
             <button
               type="button"
               className="tut-replay-btn"
@@ -1118,15 +1029,14 @@ export default function SettingsSection({ S, update, active, userId, onOpenLegal
             >
               <span aria-hidden="true" style={{display:'inline-flex',marginRight:6}}><Icon name="trending-up" size={15} /></span>Open Upgrade
             </button>
-          </div>
+          </SettingsGroup>
         )}
 
         {/* Walkthrough / tour */}
-        <div className="card" style={{ padding: '22px' }}>
-          <h3 style={{ margin: '0 0 4px' }}>Walkthrough</h3>
-          <p style={{ fontFamily: 'var(--mono)', fontSize: '11px', color: 'var(--text-muted)', margin: '0 0 16px', lineHeight: '1.7' }}>
-            Replay the intro tour — useful if you want a refresher or you skipped it the first time.
-          </p>
+        <SettingsGroup
+          title="Walkthrough"
+          desc="Replay the intro tour — useful if you want a refresher or you skipped it the first time."
+        >
           <button
             type="button"
             className="tut-replay-btn"
@@ -1134,7 +1044,7 @@ export default function SettingsSection({ S, update, active, userId, onOpenLegal
           >
             <span aria-hidden="true" style={{display:'inline-flex',marginRight:6}}><Icon name="rotate-ccw" size={15} /></span>Replay tutorial
           </button>
-        </div>
+        </SettingsGroup>
         </>
         )}
 

@@ -158,7 +158,16 @@ function Board({ userId, userEmail, onSignOut }) {
   // ones you've unlocked". Triggered from Settings + a coin-wallet
   // menu option.
   const [visionsOpen, setVisionsOpen] = useState(false);
-  const [activeSection, setActiveSection] = useState('hub');
+  // Normally the hub. The exception is coming back from a WHOOP or Oura
+  // OAuth round trip: those land on the app root with `?whoop=connected`,
+  // and the panel that reads that parameter lives in Settings › Tools —
+  // a section that isn't mounted unless you're on it, so landing on the
+  // hub would leave the redirect unread and the device unconnected.
+  // SettingsSection runs the same test to pick the Tools tab.
+  const [activeSection, setActiveSection] = useState(() => (
+    typeof window !== 'undefined' && /[?&](whoop|oura)=/.test(window.location.search)
+      ? 'settings' : 'hub'
+  ));
   const [openModal, setOpenModal] = useState(null);
   const [coinToast, setCoinToast] = useState({ message: '', type: '', visible: false });
   const [localDataExists, setLocalDataExists] = useState(() => hasLocalStorageData());
