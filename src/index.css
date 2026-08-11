@@ -4611,6 +4611,21 @@ button:active:not(:disabled),
    with the rating in the hole. Colours come from
    src/lib/ratings/palette.js, where the CVD validation record for them
    lives; nothing here picks a series colour. */
+/* Available to screen readers, absent from the page. */
+.sr-only{
+  position:absolute;width:1px;height:1px;padding:0;margin:-1px;
+  overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;border:0;
+}
+
+/* Everything under the header. Stacked by default; the hub's top row
+   flips it to a side-by-side (see hub-dark.css). */
+.ratings-ledger-body{
+  display:flex;
+  flex-direction:column;
+  gap:10px;
+  min-width:0;
+}
+
 .ratings-ledger-donut-wrap {
   display: flex;
   justify-content: center;

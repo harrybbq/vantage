@@ -212,6 +212,7 @@ export default function RatingsPanel({ S, update, compact = false }) {
             the number in the hole says how high it is. Arcs are
             controls — tapping one opens the same breakdown the legend
             row does. */}
+        <div className="ratings-ledger-body">
         <div className="ratings-ledger-donut-wrap" data-admin-target="rating">
           <RatingsDonut
             categories={CATEGORIES}
@@ -223,6 +224,13 @@ export default function RatingsPanel({ S, update, compact = false }) {
             size={compact ? 132 : 156}
             onSelect={setActiveBreakdown}
           />
+          {/* The tier in words, for anyone who cannot use the colour.
+              Not drawn — the donut says it in the tint, and a visible
+              repeat is what we just removed. */}
+          <span className="sr-only">
+            Overall rating {ovr} of 99 — {glow.label}
+            {prestigeLevel > 0 ? `, prestige ${toRoman(prestigeLevel)}` : ''}
+          </span>
         </div>
 
         {/* Prestige badge — own row so it never crowds the donut in the
@@ -284,6 +292,7 @@ export default function RatingsPanel({ S, update, compact = false }) {
             );
           })}
         </ul>
+        </div>
       </div>
 
       {activeBreakdown && (

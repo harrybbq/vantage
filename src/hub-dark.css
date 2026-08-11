@@ -330,9 +330,34 @@ html[data-hub-os] .hub-os {
 
 html[data-hub-os] .hub-os-top {
   display: grid;
-  grid-template-columns: 240px 1fr 240px;
+  /* Third column widened from 240 to 320: the ratings ledger sits there
+     now and needs room for the donut and its key side by side, which is
+     what keeps the panel the same height as the two beside it. */
+  grid-template-columns: 240px 1fr 320px;
   gap: 10px;
   flex-shrink: 0;
+}
+
+/* The ledger in the top row: donut left, key right, so it matches the
+   height of the row rather than setting it. In a rail it stays stacked
+   — same component, same markup, one flex direction different. */
+html[data-hub-os] .hub-os-top > .ratings-ledger .ratings-ledger-body {
+  flex-direction: row;
+  align-items: center;
+  gap: 14px;
+}
+html[data-hub-os] .hub-os-top > .ratings-ledger .ratings-ledger-donut-wrap {
+  padding: 0;
+  flex-shrink: 0;
+}
+html[data-hub-os] .hub-os-top > .ratings-ledger .ratings-ledger-legend {
+  flex: 1;
+  min-width: 0;
+}
+html[data-hub-os] .hub-os-top > .ratings-ledger .ratings-legend-row {
+  min-height: 30px;
+  padding: 2px 6px;
+  gap: 8px;
 }
 
 html[data-hub-os] .hub-os-main {
@@ -643,65 +668,6 @@ html[data-hub-os] .os-session-clock-sep {
   animation: osBlink 1s infinite;
 }
 @keyframes osBlink { 0%,100% { opacity: 1; } 50% { opacity: 0.25; } }
-
-/* ── Vitals panel ── */
-html[data-hub-os] .os-vitals {
-  padding: 10px 14px;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-html[data-hub-os] .os-vitals-hero { display: flex; align-items: baseline; gap: 6px; }
-html[data-hub-os] .os-vitals-val {
-  font-family: var(--mono);
-  font-size: 22px;
-  color: var(--text);
-  font-weight: 400;
-  line-height: 1;
-}
-html[data-hub-os] .os-vitals-val.gold { color: var(--gold-lt); }
-html[data-hub-os] .os-vitals-val.green { color: var(--em-light); }
-html[data-hub-os] .os-vitals-unit {
-  font-family: var(--mono);
-  font-size: 8.5px;
-  color: var(--text-muted);
-  letter-spacing: 1px;
-  text-transform: uppercase;
-}
-html[data-hub-os] .os-vitals-label {
-  font-family: var(--mono);
-  font-size: 8px;
-  letter-spacing: 1.5px;
-  text-transform: uppercase;
-  color: var(--text-muted);
-  margin-top: 1px;
-}
-html[data-hub-os] .os-vitals-track {
-  height: 2px;
-  background: var(--os-surface3);
-  border-radius: 1px;
-  overflow: hidden;
-}
-html[data-hub-os] .os-vitals-fill {
-  height: 100%;
-  background: var(--em);
-  transition: width 0.4s ease;
-}
-html[data-hub-os] .os-vitals-fill.gold { background: var(--gold); }
-html[data-hub-os] .os-vitals-divider {
-  height: 1px;
-  background: var(--os-border);
-  margin: 2px 0;
-}
-html[data-hub-os] .os-vitals-mini-row {
-  display: flex;
-  gap: 12px;
-}
-html[data-hub-os] .os-vitals-mini {
-  flex: 1;
-  min-width: 0;
-}
-html[data-hub-os] .os-vitals-mini .os-vitals-val { font-size: 15px; }
 
 /* ── Left column — Quick actions + Trackers preview ── */
 html[data-hub-os] .os-actions {
