@@ -25,6 +25,7 @@
 
 import { useEffect, useState } from 'react';
 import { backdropClose } from '../utils/backdropClose';
+import Overlay from './ui/Overlay';
 
 const TIME_LIMIT_MS = 12 * 60 * 1000;
 const COOLDOWN_DAYS = 30;
@@ -146,6 +147,9 @@ export default function SelfCheck({
   if (done) {
     const { correct, total, result } = scoreFromAnswers(answers, questions);
     return (
+      // Portalled — a self-check is opened from the ratings panel, which
+      // sits in a sticky column. See components/ui/Overlay.jsx.
+      <Overlay>
       <div className="modal-overlay open" {...backdropClose(() => onClose())}>
         <div className="modal" style={{ maxWidth: 460 }}>
           <div style={{
@@ -176,11 +180,13 @@ export default function SelfCheck({
           </div>
         </div>
       </div>
+      </Overlay>
     );
   }
 
   const Q = questions[idx];
   return (
+    <Overlay>
     <div className="modal-overlay open" onClick={() => { /* don't dismiss mid-test */ }}>
       <div className="modal" style={{ maxWidth: 520 }}>
         <div style={{
@@ -251,5 +257,6 @@ export default function SelfCheck({
         </p>
       </div>
     </div>
+    </Overlay>
   );
 }

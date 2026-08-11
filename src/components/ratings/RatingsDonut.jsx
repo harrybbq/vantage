@@ -58,6 +58,9 @@ export default function RatingsDonut({
   const byId = Object.fromEntries(categories.map(c => [c.id, c]));
   const mid = VB / 2;
   const activeSeg = active && segments.find(s => s.id === active);
+  const sub = activeSeg
+    ? `${byId[activeSeg.id].label.toUpperCase()} ${activeSeg.value} · ${Math.round(activeSeg.share * 100)}%`
+    : prestigeLabel;
 
   return (
     <svg
@@ -65,9 +68,11 @@ export default function RatingsDonut({
       viewBox={`0 0 ${VB} ${VB}`}
       width={size}
       height={size}
-      /* The glow behind the number is the tier's colour, so the band a
-         user is in is legible without reading the word. The word is
-         there too — colour never carries it alone. */
+      /* The number itself wears the tier's colour. The word used to sit
+         under it as well, which meant the hole carried three lines and
+         the tier was said twice — once in colour, once in text. It is
+         still on the accessible name and the tooltip, so nothing is
+         lost to anyone who cannot use the colour. */
       style={{ '--rt-tier': tier.color }}
     >
       <title>{`Overall rating ${ovr} of 99 — ${tier.label}`}</title>
@@ -124,16 +129,15 @@ export default function RatingsDonut({
         })}
       </g>
 
-      {/* Centre. Text wears text tokens; only the OVR takes the tier
-          colour, and that is a status colour rather than one of the
-          four series. */}
-      <text className="ratings-donut-ovr" x={mid} y={mid + (prestigeLabel ? 0 : 4)}
+      {/* Centre. The rating takes the tier colour; the only thing that
+          sits under it is the prestige level, or — while an arc is being
+          hovered or focused — that arc's name, which is what stands in
+          for colour on a ramped palette. */}
+      <text className="ratings-donut-ovr" x={mid} y={mid + (sub ? 0 : 4)}
             textAnchor="middle" dominantBaseline="middle">{ovr}</text>
-      <text className="ratings-donut-sub" x={mid} y={mid + 22} textAnchor="middle">
-        {activeSeg
-          ? `${byId[activeSeg.id].label.toUpperCase()} ${activeSeg.value} · ${Math.round(activeSeg.share * 100)}%`
-          : (prestigeLabel || tier.label.toUpperCase())}
-      </text>
+      {sub && (
+        <text className="ratings-donut-sub" x={mid} y={mid + 22} textAnchor="middle">{sub}</text>
+      )}
     </svg>
   );
 }

@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { setHandle, validateHandle } from '../../lib/friends/queries';
+import Overlay from '../ui/Overlay';
 
 /**
  * Modal shown the first time a user opens the Friends rail without a
@@ -44,10 +45,11 @@ export default function HandleClaimModal({ open, userId, suggested = '', onClaim
   }
 
   return (
+    <Overlay>
     <AnimatePresence>
       {open && (
         <motion.div
-          className="modal-bg"
+          className="modal-overlay open"
           initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
           transition={{ duration: 0.18 }}
           onClick={onClose}
@@ -110,5 +112,6 @@ export default function HandleClaimModal({ open, userId, suggested = '', onClaim
         </motion.div>
       )}
     </AnimatePresence>
+    </Overlay>
   );
 }
