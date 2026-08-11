@@ -7331,6 +7331,13 @@ button:active:not(:disabled),
   border: 1px solid var(--border); border-radius: 11px; padding: 11px 13px; cursor: pointer;
   color: var(--text-muted); font-family: inherit; font-size: 13px; line-height: 1.5; }
 .m-hubdrawer-coach { color: var(--text); }
+/* The coach block is a div, not a button, whenever there is nothing to
+   tap — a real brief, or a line explaining why there isn't one. */
+div.m-hubdrawer-coach { cursor: default; display: flex; flex-direction: column; gap: 7px; }
+.m-hubdrawer-coach.is-quiet { color: var(--text-muted); }
+.m-hubdrawer-coach-line { margin: 0; font-size: 13px; line-height: 1.5; }
+.m-hubdrawer-coach-k { font-family: var(--mono); font-size: 9px; letter-spacing: 1.4px;
+  text-transform: uppercase; color: var(--em); margin-right: 8px; }
 
 .m-hubdrawer-track { display: flex; align-items: center; gap: 11px; width: 100%; text-align: left;
   padding: 11px 13px; border-radius: 11px; border: 1px solid var(--border);

@@ -12,7 +12,8 @@
  *   2. Stats strip — coins / streak (level removed 2026-05-12; OVR
  *      lives in the Ledger card above and is the headline number now)
  *   3. Today's trackers — vertical list with at-a-glance done state
- *   4. AI Coach brief — single line teaser (Pro)
+ *   4. AI Coach brief — focus / watch / micro-action (Pro), fetched
+ *      here because nothing else on mobile ever did
  *
  * Styling follows the dark-os "operator console" aesthetic (mono caps,
  * `// HEADER` markers, em-green accents) since it reads better at
@@ -29,6 +30,7 @@ import MobileWidget from './MobileWidget';
 import { isRetiredWidget } from '../../lib/widgets/retired';
 import RatingsPanel from '../RatingsPanel';
 import HubDrawer, { EDGE_PX, OPEN_THRESHOLD } from './HubDrawer';
+import { useDailyBrief } from '../../hooks/useDailyBrief';
 
 function pad2(n) { return String(n).padStart(2, '0'); }
 
@@ -128,15 +130,19 @@ export default function MobileHubSection({ S, update, visionState, hasPro, navig
   // in there that is an action rather than a number.
   const trackersLeft = drawerTrackers.filter(t => !t.done).length;
 
-  // Coach brief — read whatever's already cached. We don't kick off
-  // useDailyBrief here because the desktop hub will fetch it for the
-  // day; on mobile we just surface the result. If it's not there yet,
-  // a stand-in line invites the user to open the Coach panel.
-  const brief = S.coachBrief;
-  const briefIsToday = brief?.date === today;
-  const briefLine = briefIsToday
-    ? (brief?.focus || brief?.micro || brief?.watch)
-    : null;
+  // Coach brief.
+  //
+  // This used to read S.coachBrief and nothing else, on the reasoning
+  // that "the desktop hub will fetch it for the day". Nothing on a
+  // phone ever calls useDailyBrief — CoachBriefPanel is the only
+  // caller and it renders in HubSection and HubOsLayout, both desktop
+  // — so on a phone the key was never written and the drawer showed a
+  // stand-in line every day, forever. Running the hook here is what
+  // makes the section real: it serves the rules-based brief instantly
+  // and upgrades to the LLM one when that returns. It no-ops entirely
+  // for non-Pro, so the free tier still costs nothing.
+  const { brief, loading: briefLoading, error: briefError } =
+    useDailyBrief({ S, update, isPro: hasPro });
 
   return (
     <section className="section m-hub-wrap"
@@ -238,7 +244,10 @@ export default function MobileHubSection({ S, update, visionState, hasPro, navig
       trackers={drawerTrackers}
       onToggleTracker={t => (t.isBool ? toggleBoolean(t.id) : (setDrawer(false), navigate?.('track')))}
       onNavigate={navigate}
-      briefLine={briefLine}
+      brief={brief}
+      briefLoading={briefLoading}
+      briefError={briefError}
+      onUpgrade={() => { setDrawer(false); onOpenModal?.('paywall:generic'); }}
       hasPro={hasPro}
     />
     </section>

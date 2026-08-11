@@ -25,7 +25,8 @@ export const EDGE_PX = 20;
 export const OPEN_THRESHOLD = 44;
 
 export default function HubDrawer({
-  open, onClose, S, update, trackers, onToggleTracker, onNavigate, briefLine, hasPro,
+  open, onClose, S, update, trackers, onToggleTracker, onNavigate,
+  brief, briefLoading, briefError, onUpgrade, hasPro,
 }) {
   const panelRef = useRef(null);
 
@@ -121,16 +122,52 @@ export default function HubDrawer({
             ))}
           </div>
 
+          {/* AI Coach.
+              Three defects lived here. The brief was never fetched on a
+              phone, so this was always the fallback line; the fallback
+              was written with HTML entities inside a JS string, so it
+              read "Today&rsquo;s brief" literally; and tapping it went
+              to Track, which has no coach surface at all. It now shows
+              the real brief, says plainly when there isn't one, and
+              only offers a tap when there is somewhere to go. */}
           <div className="m-hubdrawer-sec">
             <div className="m-hubdrawer-sec-h">
               // AI Coach {hasPro && <span className="m-hubdrawer-pro">PRO</span>}
             </div>
-            <button type="button" className="m-hubdrawer-coach"
-                    onClick={() => { onClose(); onNavigate?.('track'); }}>
-              {briefLine || (hasPro
-                ? 'Today&rsquo;s brief hasn&rsquo;t loaded yet.'
-                : 'Pro unlocks daily briefs — patterns, focus areas, micro-actions.')}
-            </button>
+            {!hasPro && (
+              <button type="button" className="m-hubdrawer-coach" onClick={onUpgrade}>
+                Pro unlocks daily briefs — patterns, focus areas, micro-actions.
+              </button>
+            )}
+            {hasPro && briefLoading && !brief && (
+              <div className="m-hubdrawer-coach is-quiet">Reading your week…</div>
+            )}
+            {hasPro && !briefLoading && !brief && (
+              <div className="m-hubdrawer-coach is-quiet">
+                {briefError
+                  ? 'Today’s brief couldn’t be fetched. It will retry tomorrow.'
+                  : 'Not enough logged yet today for a brief.'}
+              </div>
+            )}
+            {hasPro && brief && (
+              <div className="m-hubdrawer-coach">
+                {brief.focus && (
+                  <p className="m-hubdrawer-coach-line">
+                    <span className="m-hubdrawer-coach-k">Focus</span>{brief.focus}
+                  </p>
+                )}
+                {brief.watch && (
+                  <p className="m-hubdrawer-coach-line">
+                    <span className="m-hubdrawer-coach-k">Watch</span>{brief.watch}
+                  </p>
+                )}
+                {brief.micro && (
+                  <p className="m-hubdrawer-coach-line">
+                    <span className="m-hubdrawer-coach-k">Now</span>{brief.micro}
+                  </p>
+                )}
+              </div>
+            )}
           </div>
         </div>
 
