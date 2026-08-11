@@ -80,11 +80,26 @@ Artifact: https://claude.ai/code/artifact/d192f4b0-0bf1-431b-b636-001f685e6f37
 File: `/tmp/.../scratchpad/vantage-feedback.html` — republish the SAME
 path (or pass the URL as `url`) to keep that link.
 
-**Keep it current.** Whenever one of its items ships, update the
-artifact in the same session: move the item to shipped, replace the
-"before" mockup with what was actually built, and note the date. It is
-the running record of what the feedback asked for and what we did about
-it — a stale version is worse than none.
+**Keep it current, with evidence.** Whenever anything visual ships,
+update the artifact in the same session — it is the running record of
+what we changed and why, and a stale version is worse than none.
+
+Every visual change gets a **before/after pair** in its "Change log"
+section, captured from the running app rather than drawn:
+
+1. Screenshot the new state from a Playwright harness (same component,
+   same data, tight crop round the module).
+2. `git checkout <pre-change-sha> -- <files>` , screenshot again, then
+   `git checkout HEAD -- <files>`. The "before" must be the real thing,
+   not a reconstruction from memory.
+3. Add an entry with the date, the merged SHA and PR, one paragraph on
+   what the change is FOR, and a measurements table where there are
+   numbers worth keeping.
+
+The point is that a decision can be re-examined by looking. If something
+turns out to have been better the old way, the old way is on the page
+next to the commit that replaced it — which is what makes a revert a
+decision rather than an archaeology exercise.
 
 The five named defects, in order:
 1. Visions unlock toast is a dead end; catalogue only opens from Settings
