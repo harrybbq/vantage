@@ -2,7 +2,6 @@ import { useMemo, useState } from 'react';
 import { motion } from 'framer-motion';
 import Icon from './Icon';
 import SectionHelp from './SectionHelp';
-import InterrailTab from './holiday/InterrailTab';
 import VisitedTab from './holiday/VisitedTab';
 import DestinationPanel from './holiday/DestinationPanel';
 import { tripSavings } from '../lib/holiday/savings';
@@ -181,7 +180,13 @@ export default function HolidaySection({ S, update, active, onOpenModal }) {
             transition={{ duration: 0.4, ease: 'easeOut' }}
           >
             <div className="eyebrow">Adventures</div>
-            <div className="sec-title">Holiday Planner <SectionHelp text="Trips tab: plan trips — dates, flights, accommodation, budget, itinerary and a cover photo, with a live countdown and destination costs. Link a trip to a savings goal to track what you've put aside. Interrail tab: chain European cities into a rail route, with journey times, changes and compulsory reservations. Visited tab: every country you've been to, filled in automatically as trips are completed." /></div>
+            <div className="sec-title">Holiday Planner <SectionHelp
+              title="Holiday planner"
+              rows={[
+                { term: 'Trips', def: 'Dates, flights, budget and a countdown. Link one to a savings goal.' },
+                { term: 'Visited', def: 'Fills itself in as trips finish.' },
+              ]}
+            /></div>
           </motion.div>
           {tab === 'trips' && (
             <motion.button className="btn btn-primary" onClick={() => onOpenModal('addHolidayModal')}
@@ -191,7 +196,10 @@ export default function HolidaySection({ S, update, active, onOpenModal }) {
         </div>
 
         <div className="holiday-tabs" role="tablist">
-          {[['trips', 'Trips'], ['rail', 'Interrail'], ['visited', 'Visited']].map(([key, label]) => (
+          {/* Interrail retired 2026-08 — a route planner nobody used, and a
+              static European rail graph to maintain for it. S.railTrips is
+              left in state so any saved route survives. */}
+          {[['trips', 'Trips'], ['visited', 'Visited']].map(([key, label]) => (
             <button
               key={key}
               role="tab"
@@ -225,7 +233,6 @@ export default function HolidaySection({ S, update, active, onOpenModal }) {
           </div>
         )}
 
-        {tab === 'rail' && <InterrailTab S={S} update={update} />}
         {tab === 'visited' && <VisitedTab S={S} update={update} />}
       </div>
     </section>

@@ -88,7 +88,7 @@ function Modal({ id, openId, onClose, children, style }) {
 }
 
 // ── Add Widget picker ──
-function AddLinkModal({ openId, onClose, onSwitchModal, onAddNotepad, onAddApp, onAddHubWidget }) {
+function AddLinkModal({ openId, onClose, onSwitchModal, onAddApp, onAddHubWidget }) {
   // Our Apps presets are a Pro bonus. Free users see them locked with
   // a PRO badge; clicking routes to the paywall instead of adding.
   const { hasPro } = useSubscriptionContext();
@@ -105,12 +105,6 @@ function AddLinkModal({ openId, onClose, onSwitchModal, onAddNotepad, onAddApp, 
           <Icon name="link" size={22} strokeWidth={1.75} />
           <span style={{ fontWeight: 700, fontSize: '13px', color: 'var(--text)' }}>Default Link</span>
           <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>URL bookmark or GitHub profile</span>
-        </button>
-        <button className="btn btn-ghost" style={{ padding: '16px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px', borderRadius: '12px', height: 'auto' }}
-          onClick={() => { onClose('addLinkModal'); onAddNotepad(); }}>
-          <Icon name="notebook-pen" size={22} strokeWidth={1.75} />
-          <span style={{ fontWeight: 700, fontSize: '13px', color: 'var(--text)' }}>Notepad</span>
-          <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Quick notes & tasks for today</span>
         </button>
         <button className="btn btn-ghost" style={{ padding: '16px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px', borderRadius: '12px', height: 'auto' }}
           onClick={() => { onClose('addLinkModal'); onAddHubWidget('habits'); }}>
@@ -212,12 +206,6 @@ function AddLinkModal({ openId, onClose, onSwitchModal, onAddNotepad, onAddApp, 
         )}
         {/* Body widget retired — the Goals and Body Goal widgets both
             cover the weight trend. Existing hubs keep theirs. */}
-        <button className="btn btn-ghost" style={{ padding: '16px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px', borderRadius: '12px', height: 'auto' }}
-          onClick={() => { onClose('addLinkModal'); onAddHubWidget('mood'); }}>
-          <Icon name="smile" size={22} strokeWidth={1.75} />
-          <span style={{ fontWeight: 700, fontSize: '13px', color: 'var(--text)' }}>Mood</span>
-          <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Daily check-in · heatmap</span>
-        </button>
         <button className="btn btn-ghost" style={{ padding: '16px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px', borderRadius: '12px', height: 'auto' }}
           onClick={() => { onClose('addLinkModal'); onAddHubWidget('subscriptions'); }}>
           <Icon name="repeat" size={22} strokeWidth={1.75} />
@@ -435,6 +423,14 @@ function AddAchievementModal({ openId, onClose, onAdd }) {
       </div>
       <div className="fg"><label>⬡ Coin Reward on Completion</label><input type="number" placeholder="e.g. 50" min="0" max={MAX_ACH_COINS} value={form.coins} onChange={e => setForm(f => ({ ...f, coins: e.target.value }))} /><span style={{ fontFamily: 'var(--mono)', fontSize: '10px', color: 'var(--text-muted)', marginTop: '4px', display: 'block' }}>Max {MAX_ACH_COINS.toLocaleString()} ⬡ per achievement.</span></div>
       <CategoryPicker value={form.category} onChange={v => setForm(f => ({ ...f, category: v }))} />
+      {/* The spacing rule, stated at the moment it starts applying.
+          Hiding it made the rating feel arbitrary to anyone who noticed
+          their completions weren't moving it. */}
+      <div className="ach-rule-note">
+        Coins pay out the moment you complete this. Rating credit starts
+        7 days after you create it — the first 8 count in full, and each
+        one after that is worth a little less.
+      </div>
       <div className="modal-actions">
         <button className="btn btn-ghost" onClick={() => onClose('addAchievementModal')}>Cancel</button>
         <button className="btn btn-primary" onClick={submit}>Create</button>
@@ -1875,10 +1871,6 @@ export default function Modals({ openModal, S, update, onClose, onOpen, onShowCo
   function handleAddTracker(tracker) {
     update(prev => ({ ...prev, trackers: [...prev.trackers, tracker] }));
   }
-  function handleAddNotepad() {
-    // Set a flag so HubSection knows to render the notepad widget
-    update(prev => ({ ...prev, _showNotepad: true }));
-  }
   function handleAddHubWidget(type) {
     // Desktop content widgets (habits / holidays) added to the canvas.
     update(prev => ({
@@ -1966,7 +1958,6 @@ export default function Modals({ openModal, S, update, onClose, onOpen, onShowCo
         openId={effectiveOpen}
         onClose={onClose}
         onSwitchModal={onOpen}
-        onAddNotepad={handleAddNotepad}
         onAddApp={preset => { handleAddLink(appPresetToLink(preset)); onClose('addLinkModal'); }}
         onAddHubWidget={handleAddHubWidget}
       />

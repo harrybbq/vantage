@@ -22,7 +22,15 @@ export default function LeaderboardSection({
       <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
         <div>
           <div className="eyebrow">Standings</div>
-          <div className="sec-title">Leaderboard <SectionHelp text="Your OVR rating (Brain, Finance, Fitness, Social — each 0–99) ranked against friends or everyone, by all-time or weekly climb. Add people straight from the board with the + button. At OVR 99 you can Prestige for a colour-band badge. Hide yourself from the global board any time in Settings → Privacy." /></div>
+          <div className="sec-title">Leaderboard <SectionHelp
+            title="Leaderboard"
+            rows={[
+              { term: 'OVR', def: 'Brain, Finance, Fitness and Social, each out of 99, averaged.' },
+              { term: 'Ranking', def: 'Against friends or everyone, all-time or this week.' },
+              { term: 'Prestige', def: 'At 99 you can trade it for a colour band and start again.' },
+            ]}
+            foot="Hide yourself from the global board in Settings → Privacy."
+          /></div>
         </div>
         <LeaderboardPanel
           userId={userId}

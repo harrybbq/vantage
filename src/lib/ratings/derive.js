@@ -358,3 +358,56 @@ export function categoryBreakdown(S, category, ctx = {}) {
 }
 
 export { CATEGORIES };
+
+/**
+ * The achievement credit rules, in a shape the UI can render.
+ *
+ * These rules are good and defensible — they stop forty achievements
+ * made in an afternoon out-ranking a year of real ones — but until now
+ * they lived only in this file. A playtester worked out that he could
+ * "still take the piss and get all the achievements anyways", was told
+ * about the taper in a chat, and said: that should be made more clear.
+ * He was right. Nothing in the product said any of it.
+ *
+ * Returns, across every category:
+ *   fullCredit  how many completed achievements count at full weight
+ *   counted     how many currently qualify (spacing rule passed)
+ *   pending     completed, but still inside the 7-day window
+ *   spacingDays the window itself
+ */
+export function achievementCreditState(S) {
+  const list = S?.achievements || [];
+  let counted = 0;
+  let pending = 0;
+  for (const a of list) {
+    if (!a.completed) continue;
+    if (a.createdAt && a.completedAt && (a.completedAt - a.createdAt) < TIME_SPACING_MS) {
+      pending += 1;
+      continue;
+    }
+    counted += 1;
+  }
+  return {
+    fullCredit: FULL_CREDIT_N,
+    counted,
+    pending,
+    spacingDays: Math.round(TIME_SPACING_MS / DAY_MS),
+    atFullCredit: Math.min(counted, FULL_CREDIT_N),
+    tapering: Math.max(0, counted - FULL_CREDIT_N),
+  };
+}
+
+/**
+ * Whether a single achievement is earning rating credit yet, and if
+ * not, when it will. Used on the card itself so the rule is visible
+ * where it applies rather than in a help page.
+ */
+export function achievementCreditStatus(a) {
+  if (!a?.completed) return { state: 'open' };
+  if (!a.createdAt || !a.completedAt) return { state: 'counting' };
+  const elapsed = a.completedAt - a.createdAt;
+  if (elapsed >= TIME_SPACING_MS) return { state: 'counting' };
+  const daysLeft = Math.max(1, Math.ceil((TIME_SPACING_MS - elapsed) / DAY_MS));
+  return { state: 'too-soon', daysLeft, spacingDays: Math.round(TIME_SPACING_MS / DAY_MS) };
+}
+

@@ -25,6 +25,7 @@ import { useSubscriptionContext } from './context/SubscriptionContext';
 import Modals from './components/Modals';
 import PaywallModal from './components/PaywallModal';
 import HubFooter from './components/HubFooter';
+import { isRetiredWidget } from './lib/widgets/retired';
 import CoinToast from './components/CoinToast';
 import ConnectToast from './components/ConnectToast';
 import CommandPalette from './components/CommandPalette';
@@ -226,6 +227,26 @@ function Board({ userId, userEmail, onSignOut }) {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loading]);
 
+  // One-time cleanup: drop layout pointers to withdrawn widgets, so a
+  // Mood card someone had pinned doesn't linger as an empty shell.
+  // Deliberately narrow — it filters the two layout arrays and spreads
+  // everything else through untouched. In particular S.moodLog is left
+  // exactly as it is: the entries someone logged are theirs, and if the
+  // widget ever comes back they should still be there.
+  const retiredPrunedRef = useRef(false);
+  useEffect(() => {
+    if (loading || retiredPrunedRef.current) return;
+    const stale = list => (list || []).some(w => isRetiredWidget(w.type));
+    if (!stale(S.hubWidgets) && !stale(S.mobileWidgets)) return;
+    retiredPrunedRef.current = true;
+    update(prev => ({
+      ...prev,
+      hubWidgets: (prev.hubWidgets || []).filter(w => !isRetiredWidget(w.type)),
+      mobileWidgets: (prev.mobileWidgets || []).filter(w => !isRetiredWidget(w.type)),
+    }));
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loading, S.hubWidgets, S.mobileWidgets]);
+
   // Apply stored theme — Pro-gated (lifetime counts as Pro). If entitlement
   // flips false we auto-revert via applyTheme's resolveEffectiveTheme, so
   // a lapsed subscriber on dark-os falls to free `dark` (same mode), and
@@ -255,12 +276,12 @@ function Board({ userId, userEmail, onSignOut }) {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [S.theme, hasPro, tierLoading]);
 
-  function showCoinToast(msg, isEarn, duration) {
+  function showCoinToast(msg, isEarn, duration, action) {
     const type = isEarn ? 'earn' : (msg.includes('Need') ? 'error' : 'spend');
     // 30-day streak toast stays 4 s; default 2.6 s
     const ms = duration ?? (msg.includes('30 day streak') ? 4000 : 2600);
     if (isEarn) haptic('HEAVY');
-    setCoinToast({ message: msg, type, visible: true });
+    setCoinToast({ message: msg, type, visible: true, action });
     clearTimeout(coinToastTimer.current);
     coinToastTimer.current = setTimeout(() => setCoinToast(t => ({ ...t, visible: false })), ms);
   }
@@ -274,7 +295,15 @@ function Board({ userId, userEmail, onSignOut }) {
   // own localStorage guard ensures this fires at most once per device,
   // even if a flurry of unlocks arrives in the same session.
   const [pushPrePromptOpen, setPushPrePromptOpen] = useState(false);
-  const visionState = useVisions(S, update, showCoinToast, () => {
+  // Vision toasts carry a way in to the catalogue. Without it the toast
+  // is the only place a vision is ever mentioned and the list itself is
+  // three taps deep in Settings — which is exactly how a playtester
+  // ended up unlocking one and never finding where it lived.
+  const showVisionToast = (msg, isEarn, duration) => showCoinToast(
+    msg, isEarn, duration,
+    { label: 'See all', onClick: () => setVisionsOpen(true) },
+  );
+  const visionState = useVisions(S, update, showVisionToast, () => {
     if (!hasAskedPushPrePrompt()) setPushPrePromptOpen(true);
   });
 
@@ -674,7 +703,7 @@ function Board({ userId, userEmail, onSignOut }) {
         )}
         {activeSection === 'achievements' && (
           <motion.div key="achievements" {...pageMotion}>
-            <AchievementsSection S={S} update={update} active onOpenModal={handleOpenModal} onShowCoinToast={showCoinToast} />
+            <AchievementsSection S={S} update={update} active onOpenModal={handleOpenModal} onShowCoinToast={showCoinToast} onOpenVisions={() => setVisionsOpen(true)} />
           </motion.div>
         )}
         {activeSection === 'track' && (
@@ -777,7 +806,8 @@ function Board({ userId, userEmail, onSignOut }) {
 
       <ConnectToast onCancel={handleCancelConnect} />
       <HubFooter visible={activeSection === 'hub'} onOpenLegal={setLegalPage} />
-      <CoinToast message={coinToast.message} type={coinToast.type} visible={coinToast.visible} />
+      <CoinToast message={coinToast.message} type={coinToast.type}
+                 visible={coinToast.visible} action={coinToast.action} />
       <CommandPalette
         open={paletteOpen}
         onClose={() => setPaletteOpen(false)}

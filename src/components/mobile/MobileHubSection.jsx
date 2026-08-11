@@ -26,6 +26,7 @@ import Icon from '../Icon';
 import { getTodayStr } from '../../utils/helpers';
 import { recalcStreaks } from '../../utils/streaks';
 import MobileWidget from './MobileWidget';
+import { isRetiredWidget } from '../../lib/widgets/retired';
 import RatingsPanel from '../RatingsPanel';
 import HubDrawer, { EDGE_PX, OPEN_THRESHOLD } from './HubDrawer';
 
@@ -172,7 +173,7 @@ export default function MobileHubSection({ S, update, visionState, hasPro, navig
       {/* Widget stack. New widgets append below the last; hold one to
           reorder — dragging near the top or bottom edge scrolls the
           list so a card at the bottom can reach the top. */}
-      {(S.mobileWidgets || []).map((w, i) => (
+      {(S.mobileWidgets || []).map((w, i) => isRetiredWidget(w.type) ? null : (
         <MobileWidget
           key={w.id}
           widget={w}

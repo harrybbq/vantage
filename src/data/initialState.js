@@ -41,9 +41,9 @@ export const DEFAULT_STATE = {
   multiSelectedDays: [],
   coins: 0,
   coinHistory: [],
-  notepadText: '',
-  notepadPos: null,
-  notepadWidth: 380,
+  // notepadText / notepadPos / notepadWidth are no longer seeded — the
+  // Notepad was removed in 2026-08. Anyone who had one keeps their text
+  // in state; nothing reads it.
   ytWidgets: [],
   lastfm: { username: '', track: '', artist: '', album: '', artUrl: '', trackUrl: '', nowPlaying: false },
   ghCache: {},
@@ -106,7 +106,6 @@ export const DEFAULT_STATE = {
   // Each entry: { id, type, ...config }. Order = render order.
   //
   // Widget types implemented today (work without external APIs):
-  //   - 'notepad'      — quick-jot text, mirrors S.notepadText
   //   - 'recent-wins'  — last 3 completed achievements
   //   - 'coin-history' — last 5 coin events
   //

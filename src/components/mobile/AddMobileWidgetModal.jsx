@@ -35,7 +35,6 @@ export default function AddMobileWidgetModal({ openId, onClose, existingTypes, o
   // Built per-open (not module-level) so owner-only presets resolve
   // against the signed-in account — TubeLube only lists for the owner.
   const pickerOrder = [
-    'notepad',
     'recent-wins',
     'coin-history',
     'habits',
@@ -53,7 +52,6 @@ export default function AddMobileWidgetModal({ openId, onClose, existingTypes, o
     // picker only: the META entry and render case stay so hubs that
     // already have one keep a working widget rather than having it
     // silently turn into something else.
-    'mood',
     'macros',
     'calories',
     'savings-pots',

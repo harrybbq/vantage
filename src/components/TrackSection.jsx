@@ -7,7 +7,7 @@ import { recalcStreaks } from '../utils/streaks';
 import SectionHelp from './SectionHelp';
 import NutritionSection from './NutritionSection';
 import VitalsHistoryCard from './VitalsHistoryCard';
-import { BodyCard, MoodCard } from './widgets/LifeWidgets';
+import { BodyCard } from './widgets/LifeWidgets';
 
 function getWeekProgress(logs, trackerId, weeklyTarget) {
   const dateStr = getTodayStr();
@@ -444,7 +444,15 @@ export default function TrackSection({ S, update, active, onOpenModal, onShowCoi
         transition={{ duration: 0.4, ease: 'easeOut' }}
       >
         <div className="eyebrow">Daily Habits</div>
-        <div className="sec-title">Track <SectionHelp text="Everything you log daily lives here. Trackers: tick habits or numbers against weekly targets (multi-select calendar days to batch-log). Nutrition: search foods, scan a barcode, or identify a plate with AI — liquids preset to ml. Vitals sync from WHOOP or Apple Health. Body tracks your weight trend against a goal, and Mood & Journal is a one-tap daily check-in." /></div>
+        <div className="sec-title">Track <SectionHelp
+          title="Track"
+          rows={[
+            { term: 'Trackers', def: 'Tick habits against weekly targets. Select several days to log at once.' },
+            { term: 'Nutrition', def: 'Search, scan a barcode, or photograph a plate.' },
+            { term: 'Vitals', def: 'Syncs from WHOOP, Oura or Apple Health.' },
+            { term: 'Body', def: 'Your weight trend against a goal.' },
+          ]}
+        /></div>
       </motion.div>
       {/* Desktop: trackers strip on top, then a 3-column dashboard
           (Calendar · Vitals & Macros · Daily Macros). Collapses to a
@@ -468,8 +476,6 @@ export default function TrackSection({ S, update, active, onOpenModal, onShowCoi
             {/* Body — weight trend/goal + waist/body-fat measurements.
                 Shares S.vitalsLog.weight with the vitals history above. */}
             <BodyCard S={S} update={update} />
-            {/* Mood & Journal — one-tap mood + optional daily note. */}
-            <MoodCard S={S} update={update} />
           </div>
           <div className="track-col">
             {userId

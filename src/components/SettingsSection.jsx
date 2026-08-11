@@ -6,6 +6,7 @@ import MacroGoalsPanel from './MacroGoalsPanel';
 import NotificationsPanel from './NotificationsPanel';
 import SubscriptionPanel from './SubscriptionPanel';
 import { AppleHealthImport } from './VitalsHistoryCard';
+import DataExportCard from './settings/DataExportCard';
 import { useSubscriptionContext } from '../context/SubscriptionContext';
 import { getOwnProfile, updateOwnProfile } from '../lib/friends/queries';
 import { VISIONS_BY_ID } from '../lib/visions/definitions';
@@ -596,21 +597,6 @@ export default function SettingsSection({ S, update, active, userId, onOpenLegal
     }));
   }
 
-  function handleExportData() {
-    const exportData = {
-      exportedAt: new Date().toISOString(),
-      appVersion: 'Vantage v1',
-      data: S,
-    };
-    const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `vantage-export-${new Date().toISOString().split('T')[0]}.json`;
-    a.click();
-    URL.revokeObjectURL(url);
-  }
-
   function handleSchemeChange(scheme) {
     if (scheme.pro && !hasPro) return; // Pro accent — gated
     applyScheme(scheme);
@@ -946,34 +932,8 @@ export default function SettingsSection({ S, update, active, userId, onOpenLegal
         {/* Open Banking — foundation card (fail-soft; augments, never
             replaces, the manual Subscriptions & Savings features). */}
         <BankingCard />
-        {/* Data & Privacy */}
-        <div className="card" style={{ padding: '22px' }}>
-          <h3 style={{ margin: '0 0 4px' }}>Your Data</h3>
-          <p style={{ fontFamily: 'var(--mono)', fontSize: '11px', color: 'var(--text-muted)', margin: '0 0 16px', lineHeight: '1.7' }}>
-            Download a copy of all your Vantage data as a JSON file. This satisfies your right to data portability under UK GDPR.
-          </p>
-          <button
-            onClick={handleExportData}
-            style={{
-              background: 'rgba(255,255,255,.07)', border: '1px solid var(--border)',
-              borderRadius: '10px', color: 'var(--text)', padding: '10px 18px',
-              fontSize: '13px', fontWeight: 600, cursor: 'pointer',
-              fontFamily: 'var(--sans)', transition: 'all .18s',
-            }}
-          >
-            <IconLabel name="download">Export My Data</IconLabel>
-          </button>
-          {onOpenLegal && (
-            <div style={{ marginTop: '16px', display: 'flex', gap: '14px' }}>
-              <button onClick={() => onOpenLegal('privacy')} style={{ background: 'none', border: 'none', color: 'var(--text-muted)', fontSize: '12px', cursor: 'pointer', textDecoration: 'underline', fontFamily: 'var(--sans)', padding: 0 }}>
-                Privacy Policy
-              </button>
-              <button onClick={() => onOpenLegal('terms')} style={{ background: 'none', border: 'none', color: 'var(--text-muted)', fontSize: '12px', cursor: 'pointer', textDecoration: 'underline', fontFamily: 'var(--sans)', padding: 0 }}>
-                Terms of Service
-              </button>
-            </div>
-          )}
-        </div>
+        {/* Data & Privacy — encrypted export, see DataExportCard. */}
+        <DataExportCard S={S} onOpenLegal={onOpenLegal} />
 
         {/* Danger Zone — lives inside the Data tab so destructive
             actions are co-located with export. The visible separation

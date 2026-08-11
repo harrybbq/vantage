@@ -700,21 +700,6 @@ nav:hover .nav-tab-label{opacity:1;}
      every widget match GitHub's height after Sort). */
   align-self:start;
 }
-/* ── Hub widgets (redesigned F4 Sprint 4) ─────────────────────────
-   All widget surfaces (link / GitHub / YouTube / notepad) now share
-   one visual language: surface bg + hairline border + mono `// NAME`
-   eyebrow + tinted icon chip. Brand colour is demoted to the chip's
-   tint — never a saturated fill — so the row reads as a sibling of
-   the OS panels rather than a foreign poster. Themed via tokens so
-   cream/dark × free/Pro all render the right surface tones. */
-.link-island{
-  padding:0;overflow:hidden;
-  background:var(--bg-raised, #fff);
-  border:1px solid var(--border);
-  border-radius:10px;
-  box-shadow:0 1px 0 rgba(255,255,255,.55) inset, 0 4px 16px rgba(28,26,23,.06);
-  transition:box-shadow .22s, opacity .18s, border-color .15s;
-}
 .link-island:hover{
   border-color:var(--accent-line, var(--border));
   box-shadow:0 1px 0 rgba(255,255,255,.6) inset, 0 8px 22px rgba(28,26,23,.09);
@@ -2510,110 +2495,6 @@ html[data-theme="dark"] {
   }
 }
 
-/* ── NOTEPAD WIDGET ── */
-/* Notepad — same surface language as the link/GitHub/YouTube cards.
-   Previously a dark glassy treatment that read as a foreign poster on
-   the cream hub; now a sibling of the other widgets, with a gold-tinted
-   icon chip in the header for identity. */
-.notepad-island{
-  background:var(--bg-raised, #fff);
-  border:1px solid var(--border);
-  border-radius:10px;
-  box-shadow:0 1px 0 rgba(255,255,255,.55) inset, 0 4px 16px rgba(28,26,23,.06);
-  overflow:hidden;
-  transition:box-shadow .22s, border-color .15s;
-  display:flex;flex-direction:column;
-}
-.notepad-island:hover{
-  border-color:var(--accent-line, var(--border));
-  box-shadow:0 1px 0 rgba(255,255,255,.6) inset, 0 8px 22px rgba(28,26,23,.09);
-}
-.notepad-header{
-  display:flex;align-items:center;gap:10px;
-  padding:9px 12px 8px;
-  border-bottom:1px solid var(--border);
-  flex-shrink:0;
-}
-.notepad-header-icon{
-  width:22px;height:22px;border-radius:6px;flex-shrink:0;
-  display:flex;align-items:center;justify-content:center;
-  font-size:12px;line-height:1;font-weight:700;
-  background:rgba(200,151,10,.10);
-  border:1px solid var(--border);
-  color:var(--gold, #c8970a);
-}
-.notepad-header-title{
-  flex:1;min-width:0;
-  font-family:var(--mono);font-size:9px;letter-spacing:2px;
-  text-transform:uppercase;color:var(--text-muted);font-weight:500;
-  display:flex;align-items:center;gap:6px;
-}
-.notepad-header-title::before{
-  content:'//';color:var(--gold, #c8970a);opacity:.85;letter-spacing:0;
-}
-.notepad-date{
-  font-family:var(--mono);font-size:9px;letter-spacing:1px;
-  text-transform:uppercase;color:var(--text-muted);
-}
-.notepad-clear-btn{
-  background:transparent;
-  border:1px solid var(--accent-line, var(--border));
-  border-radius:6px;
-  padding:4px 9px;font-family:var(--mono);font-size:9px;font-weight:700;
-  letter-spacing:1.2px;text-transform:uppercase;
-  color:var(--text-muted);
-  cursor:pointer;transition:background .15s, color .15s, border-color .15s;
-}
-.notepad-clear-btn:hover{
-  background:rgba(var(--em-rgb),.06);
-  color:var(--text);border-color:var(--accent-line);
-}
-.notepad-textarea{
-  width:100%;flex:1;min-height:160px;
-  background:transparent;border:none;outline:none;resize:none;
-  padding:12px 14px;
-  font-size:13px;line-height:1.65;
-  color:var(--text);
-  font-family:var(--body);
-  caret-color:var(--em);
-}
-.notepad-textarea::placeholder{color:var(--text-muted);opacity:.7;font-style:italic;}
-.notepad-footer{
-  padding:8px 12px;
-  border-top:1px solid var(--accent-line-soft);
-  display:flex;align-items:center;justify-content:space-between;
-  flex-shrink:0;
-}
-.notepad-saved-indicator{
-  font-family:var(--mono);font-size:9px;color:var(--text-muted);
-  letter-spacing:.8px;transition:color .3s;
-  text-transform:uppercase;
-}
-.notepad-saved-indicator.saved{color:var(--em);}
-.notepad-char-count{
-  font-family:var(--mono);font-size:9px;color:var(--text-muted);
-  letter-spacing:.5px;
-}
-/* Notepad wrapper — wider by default, freely resizable */
-.notepad-wrapper{
-  position:absolute;
-  width:380px;
-  min-width:260px;
-  max-width:700px;
-  resize:horizontal;
-  overflow:visible;
-  user-select:none;
-}
-.notepad-wrapper.snapping{
-  position:static;
-  width:380px;
-  min-width:260px;
-  max-width:700px;
-  resize:horizontal;
-  overflow:visible;
-}
-
-/* ── YOUTUBE WIDGET ── */
 /* YouTube body — surface-tone treatment matching the link/GitHub
    widgets. Brand red is demoted to the date label only; everything
    else uses theme tokens so it sits naturally in cream and dark. */
@@ -2724,6 +2605,100 @@ html[data-theme="dark"] {
 #coinToast.spend{background:#8b5e00;color:#fff;box-shadow:0 4px 20px rgba(139,94,0,.4);}
 #coinToast.error{background:#b91c1c;color:#fff;box-shadow:0 4px 20px rgba(185,28,28,.4);}
 #coinToast.show{opacity:1;transform:translateX(-50%) translateY(0);}
+/* The toast is pointer-events:none so it never swallows a click meant
+   for the page. An action button has to opt back in, or it is decoration. */
+.coin-toast-action{
+  pointer-events:auto;
+  margin-left:12px;padding:3px 10px;
+  border-radius:100px;border:1px solid rgba(255,255,255,.45);
+  background:rgba(255,255,255,.14);color:inherit;
+  font-family:var(--mono);font-size:11px;font-weight:700;letter-spacing:.4px;
+  cursor:pointer;transition:background .15s,border-color .15s;
+}
+.coin-toast-action:hover{background:rgba(255,255,255,.26);border-color:rgba(255,255,255,.7);}
+.coin-toast-action:focus-visible{outline:2px solid #fff;outline-offset:2px;}
+
+/* Visions button in the achievements toolbar — a quiet sibling to
+   "+ New", with the count doing the advertising. */
+.ach-visions-btn{display:inline-flex;align-items:center;gap:7px;}
+/* The credit stat carries its own "?" — the rule needs to be readable
+   exactly where the number is, not on a help page. */
+/* ── Settings → Your Data (encrypted export) ── */
+.dx-sub{font-family:var(--mono);font-size:11px;color:var(--text-muted);
+  margin:0 0 16px;line-height:1.7;}
+.dx-fields{display:flex;flex-wrap:wrap;gap:10px;}
+.dx-field{display:flex;flex-direction:column;gap:5px;flex:1 1 180px;min-width:0;}
+.dx-field-wide{flex:1 1 100%;}
+.dx-field span{font-family:var(--mono);font-size:10px;letter-spacing:1.6px;
+  text-transform:uppercase;color:var(--text-muted);}
+.dx-field input{
+  width:100%;background:var(--bg-base,rgba(0,0,0,.05));
+  border:1px solid var(--border);border-radius:9px;padding:9px 12px;
+  color:var(--text);font-family:var(--sans);font-size:13.5px;outline:none;
+  transition:border-color .18s;
+}
+.dx-field input:focus{border-color:var(--em);}
+.dx-field input[aria-invalid]{border-color:#b91c1c;}
+.dx-meta{min-height:18px;margin-top:8px;font-family:var(--mono);font-size:10.5px;}
+.dx-hint{color:var(--text-muted);}
+.dx-warn{color:#b91c1c;}
+.dx-strength{letter-spacing:1.2px;text-transform:uppercase;}
+.dx-strength-1,.dx-strength-0{color:#b91c1c;}
+.dx-strength-2,.dx-strength-3{color:#8b5e00;}
+.dx-strength-4{color:var(--em);}
+.dx-note{margin:10px 0 14px;font-size:11.5px;line-height:1.55;color:var(--text-mid);max-width:52ch;}
+.dx-primary{
+  display:inline-flex;align-items:center;gap:8px;
+  background:var(--em);border:none;border-radius:10px;color:#fff;
+  padding:10px 18px;font-size:13px;font-weight:600;cursor:pointer;
+  font-family:var(--sans);transition:filter .18s,opacity .18s;
+}
+.dx-primary:hover:not(:disabled){filter:brightness(1.08);}
+.dx-primary:disabled{opacity:.45;cursor:default;}
+.dx-alts{display:flex;flex-wrap:wrap;gap:16px;margin-top:14px;}
+.dx-link{background:none;border:none;padding:0;cursor:pointer;
+  font-family:var(--sans);font-size:12px;color:var(--text-muted);text-decoration:underline;}
+.dx-link:hover{color:var(--text);}
+.dx-msg{margin-top:14px;padding:10px 12px;border-radius:9px;
+  font-size:12.5px;line-height:1.5;border:1px solid;}
+.dx-msg-ok{border-color:rgba(var(--em-rgb),.4);background:rgba(var(--em-rgb),.09);color:var(--text);}
+.dx-msg-err{border-color:rgba(185,28,28,.45);background:rgba(185,28,28,.1);color:#c14a4a;}
+.dx-legal{margin-top:18px;display:flex;gap:14px;}
+.dx-legal button{background:none;border:none;padding:0;cursor:pointer;
+  color:var(--text-muted);font-size:12px;text-decoration:underline;font-family:var(--sans);}
+
+.ach-rule-note{
+  margin:14px 0 4px;padding:10px 12px;
+  border-radius:9px;border:1px solid var(--border);
+  background:rgba(128,128,128,.06);
+  font-size:11.5px;line-height:1.5;color:var(--text-mid);
+}
+
+.ach-credit-note{
+  margin-top:5px;display:inline-block;
+  font-family:var(--mono);font-size:9.5px;letter-spacing:.6px;
+  padding:2px 7px;border-radius:100px;
+  border:1px solid rgba(139,94,0,.35);
+  background:rgba(139,94,0,.12);
+  color:#8b5e00;
+}
+html[data-hub-os] .ach-credit-note,
+html[data-theme="dark"] .ach-credit-note{
+  border-color:rgba(194,154,69,.32);background:rgba(194,154,69,.1);color:#c29a45;
+}
+
+.ach-stats-item--credit{position:relative;}
+.ach-credit-of{font-size:.62em;color:var(--text-muted);margin-left:1px;}
+.ach-stats-item--credit .section-help-wrap{margin-left:5px;}
+.ach-stats-item--credit .section-help-btn{width:15px;height:15px;font-size:9px;}
+.ach-stats-item--credit .section-help-tooltip{left:auto;right:0;}
+.ach-stats-item--credit .section-help-arrow{left:auto;right:6px;}
+
+.ach-visions-count{
+  font-family:var(--mono);font-size:10.5px;font-weight:700;
+  padding:2px 7px;border-radius:100px;
+  background:rgba(var(--em-rgb),.14);color:var(--em);
+}
 /* Push the toast above the bottom tab bar + home indicator on mobile.
    Without this it sits behind the tabs and the user never sees it
    confirm a coin earn / spend. */
@@ -3476,7 +3451,8 @@ input,select,textarea,button{touch-action:manipulation;}
   position:absolute;
   top:calc(100% + 8px);
   left:0;
-  width:230px;
+  width:262px;
+  max-width:calc(100vw - 32px);
   background:rgba(10,14,10,.92);
   border:1px solid rgba(255,255,255,.15);
   border-radius:10px;
@@ -3491,6 +3467,36 @@ input,select,textarea,button{touch-action:manipulation;}
   -webkit-backdrop-filter:blur(12px);
 }
 
+/* Structured rows. The term is the scannable bit — mono, tinted, and
+   on its own line so the eye can run down the left edge instead of
+   reading a paragraph. */
+.section-help-title{
+  font-family:var(--mono);
+  font-size:10px;letter-spacing:1.6px;text-transform:uppercase;
+  color:rgba(255,255,255,.45);
+  margin-bottom:9px;
+}
+.section-help-rows{
+  margin:0;display:flex;flex-direction:column;gap:9px;
+}
+.section-help-row{display:flex;flex-direction:column;gap:1px;}
+.section-help-row dt{
+  font-family:var(--mono);
+  font-size:10.5px;letter-spacing:.9px;
+  color:var(--em-light,#4fb37c);
+}
+.section-help-row dd{
+  margin:0;
+  font-size:12px;line-height:1.45;
+  color:rgba(255,255,255,.8);
+}
+.section-help-foot{
+  margin-top:10px;padding-top:9px;
+  border-top:1px solid rgba(255,255,255,.12);
+  font-size:11px;line-height:1.45;
+  color:rgba(255,255,255,.5);
+}
+
 .section-help-arrow{
   position:absolute;
   top:-5px;left:6px;
@@ -3500,7 +3506,6 @@ input,select,textarea,button{touch-action:manipulation;}
   border-right:none;border-bottom:none;
   transform:rotate(45deg);
 }
-
 
 /* ── COMMAND PALETTE (cmdk) ── */
 [cmdk-root]{width:100%;}
@@ -3609,11 +3614,6 @@ body{font-size:var(--text-base);line-height:var(--lh-body);}
 .yc-val{font-size:var(--text-xl);}
 .yc-lbl{font-size:var(--text-xs);letter-spacing:1px;}
 .year-progress-pct{font-size:11px;}
-
-/* ── Notepad ── */
-.notepad-header-title{font-size:var(--text-base);}
-.notepad-date{font-size:11px;}
-.notepad-char-count{font-size:11px;}
 
 /* ── Nav labels ── */
 .nav-tab-label{font-size:var(--text-xs) !important;}
@@ -5116,23 +5116,6 @@ button:active:not(:disabled),
   color: var(--text-muted);
   line-height: 1.6;
   padding: 4px 0;
-}
-
-.m-widget-notepad {
-  width: 100%;
-  background: var(--bg-base, rgba(255,255,255,0.6));
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  padding: 10px 12px;
-  font-family: var(--mono);
-  font-size: 12px;
-  color: var(--text);
-  resize: vertical;
-  min-height: 100px;
-}
-.m-widget-notepad:focus {
-  outline: none;
-  border-color: var(--em);
 }
 
 .m-widget-list {
