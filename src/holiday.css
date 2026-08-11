@@ -63,86 +63,12 @@
 .hol-legend-green{color:var(--holiday-map-green,#2fa96b);}
 .hol-legend-none{color:var(--text-muted);}
 .hol-legend-note{text-transform:none;letter-spacing:.3px;opacity:.8;}
-
-/* ── Interrail tab ── */
-.hol-rail{display:grid;grid-template-columns:320px 1fr;gap:20px;align-items:start;}
-.hol-rail-side{display:flex;flex-direction:column;gap:10px;min-width:0;}
-.hol-rail-main{min-width:0;}
-.hol-rail-search{display:flex;align-items:center;gap:8px;padding:10px 12px;border-radius:10px;
-  border:var(--border-card);background:var(--surface);color:var(--text-muted);}
-.hol-rail-search input{flex:1;min-width:0;background:transparent;border:0;outline:0;
-  color:var(--text);font-family:var(--sans);font-size:13px;}
-.hol-rail-results{display:flex;flex-direction:column;border-radius:10px;overflow:hidden;border:var(--border-card);}
-.hol-rail-result{display:flex;justify-content:space-between;gap:8px;padding:9px 12px;background:var(--surface);
-  border:0;border-bottom:1px solid var(--border-soft,rgba(255,255,255,.06));color:var(--text);
-  font-family:var(--sans);font-size:13px;text-align:left;cursor:pointer;}
-.hol-rail-result:last-child{border-bottom:0;}
-.hol-rail-result:hover{background:var(--accent-line);}
-.hol-rail-result-c{font-family:var(--mono);font-size:10px;color:var(--text-muted);}
-
-.hol-rail-stops{display:flex;flex-direction:column;}
-.hol-rail-empty,.hol-itin-empty{padding:16px;border-radius:10px;border:1px dashed var(--border-color,rgba(255,255,255,.14));
-  font-family:var(--sans);font-size:12px;color:var(--text-muted);text-align:center;}
-.hol-rail-stop-row{display:flex;align-items:center;gap:8px;padding:8px 10px;border-radius:9px;
-  background:var(--surface);border:var(--border-card);}
-.hol-rail-stop-n{width:18px;height:18px;flex:none;border-radius:50%;background:var(--em);color:var(--on-em,#fff);
-  font-family:var(--mono);font-size:9px;display:flex;align-items:center;justify-content:center;}
-.hol-rail-stop-name{flex:1;min-width:0;font-family:var(--sans);font-size:13px;color:var(--text);
-  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
-.hol-rail-stop-c{font-family:var(--mono);font-size:10px;color:var(--text-muted);}
-.hol-rail-stop-x{background:transparent;border:0;color:var(--text-muted);cursor:pointer;display:flex;padding:2px;}
-.hol-rail-stop-x:hover{color:var(--danger,#e5484d);}
-.hol-rail-leg{display:flex;align-items:center;gap:8px;padding:4px 0 4px 18px;margin-left:8px;
-  border-left:2px dotted var(--border-color,rgba(255,255,255,.2));
-  font-family:var(--mono);font-size:9px;letter-spacing:.8px;text-transform:uppercase;color:var(--text-muted);}
-.hol-rail-leg-time{color:var(--text);}
-.hol-rail-leg-res{color:var(--holiday-map-amber,#f5a524);}
-
-.hol-rail-gap{padding:10px 12px;border-radius:9px;font-family:var(--sans);font-size:12px;
-  background:rgba(245,165,36,.1);border:1px solid rgba(245,165,36,.35);color:var(--text);}
-.hol-rail-flags{display:flex;flex-direction:column;gap:6px;}
-.hol-rail-flags-note,.hol-visited-detail-note{font-family:var(--mono);font-size:9px;letter-spacing:.6px;color:var(--text-muted);}
 .hol-flag{display:inline-flex;align-items:center;gap:7px;padding:7px 10px;border-radius:8px;
   font-family:var(--sans);font-size:12px;font-weight:600;}
 .hol-flag-card{margin-bottom:10px;}
 .hol-flag-red{background:rgba(229,72,77,.12);border:1px solid rgba(229,72,77,.4);color:#e5484d;}
 .hol-flag-amber{background:rgba(245,165,36,.12);border:1px solid rgba(245,165,36,.4);color:#c8860d;}
 .hol-flag-green{background:rgba(47,169,107,.12);border:1px solid rgba(47,169,107,.4);color:#2fa96b;}
-
-.hol-rail-save{display:flex;gap:8px;}
-.hol-rail-save input{flex:1;min-width:0;padding:9px 11px;border-radius:9px;border:var(--border-card);
-  background:var(--surface);color:var(--text);font-family:var(--sans);font-size:13px;}
-.hol-rail-saved{border-top:var(--border-card);padding-top:10px;display:flex;flex-direction:column;gap:6px;}
-.hol-rail-saved-title{font-family:var(--mono);font-size:9px;letter-spacing:1.4px;text-transform:uppercase;color:var(--text-muted);}
-.hol-rail-saved-row{display:flex;align-items:center;gap:6px;}
-.hol-rail-saved-load{flex:1;min-width:0;display:flex;justify-content:space-between;gap:8px;padding:8px 10px;
-  border-radius:8px;border:var(--border-card);background:var(--surface);color:var(--text);
-  font-family:var(--sans);font-size:12px;text-align:left;cursor:pointer;}
-.hol-rail-saved-load span{font-family:var(--mono);font-size:9px;color:var(--text-muted);flex:none;}
-.hol-rail-saved-load:hover{border-color:var(--accent-line);}
-.hol-rail-saved-x{background:transparent;border:0;color:var(--text-muted);cursor:pointer;padding:4px;display:flex;}
-.hol-rail-saved-x:hover{color:var(--danger,#e5484d);}
-
-.hol-rail-stats{display:flex;flex-wrap:wrap;align-items:center;gap:16px;margin-bottom:12px;}
-.hol-rail-stat,.hol-visited-stat{display:flex;flex-direction:column;line-height:1.15;}
-.hol-rail-stat b,.hol-visited-stat b{font-family:var(--display,var(--sans));font-size:19px;color:var(--text);}
-.hol-rail-stat span,.hol-visited-stat span{font-family:var(--mono);font-size:8px;letter-spacing:1.2px;
-  text-transform:uppercase;color:var(--text-muted);}
-.hol-rail-toggle{margin-left:auto;display:inline-flex;align-items:center;gap:7px;padding:7px 12px;
-  border-radius:999px;border:var(--border-card);cursor:pointer;
-  font-family:var(--mono);font-size:9px;letter-spacing:1.2px;text-transform:uppercase;color:var(--text-muted);}
-.hol-rail-toggle.is-on{border-color:var(--em);color:var(--em);}
-.hol-rail-toggle input{accent-color:var(--em);cursor:pointer;}
-.hol-rail-disclaimer,.hol-visited-hint{margin-top:10px;font-family:var(--mono);font-size:9px;
-  letter-spacing:.6px;line-height:1.6;color:var(--text-muted);}
-
-.hol-rail-teaser{padding:40px 24px;text-align:center;border-radius:var(--radius-xl);
-  border:1px dashed var(--border-color,rgba(255,255,255,.16));background:var(--surface);}
-.hol-rail-teaser-icon{color:var(--em);margin-bottom:10px;}
-.hol-rail-teaser-title{font-family:var(--display,var(--sans));font-size:19px;color:var(--text);margin-bottom:8px;}
-.hol-rail-teaser p{font-family:var(--sans);font-size:13px;color:var(--text-muted);max-width:46ch;margin:0 auto 6px;line-height:1.6;}
-.hol-rail-teaser-pro{font-family:var(--mono)!important;font-size:9px!important;letter-spacing:1.6px;
-  text-transform:uppercase;color:var(--gold,#d4af37)!important;}
 
 /* ── Visited tab ── */
 .hol-visited-stats{display:flex;flex-wrap:wrap;align-items:center;gap:18px;margin-bottom:12px;}
@@ -319,54 +245,8 @@
   /* Bigger map controls — 28px is a desktop cursor target, not a thumb. */
   .hol-map-zoom{right:8px;bottom:8px;gap:6px;}
   .hol-map-zoom button{width:36px;height:36px;font-size:16px;}
-
-  /* ══ Interrail ══════════════════════════════════════════════════
-     The desktop layout is two columns: a builder rail on the left and
-     the map on the right. Stacking them put a 300px map above the
-     search box, so the primary action — add a stop — started below the
-     fold, and the empty state told you to tap stations that sit a few
-     pixels apart at this width.
-
-     display:contents dissolves both columns so every block becomes a
-     direct child of .hol-rail and can be ordered on its own. Search
-     first, then the stops you've picked, then the map (still tappable,
-     now a companion to the list rather than a wall in front of it),
-     then the summary, warnings and saved routes. */
-  /* align-items:stretch overrides the desktop grid's `start`, which in
-     column-flex made every block shrink to its content width. */
-  .hol-rail{display:flex;flex-direction:column;align-items:stretch;gap:10px;}
-  .hol-rail-side,.hol-rail-main{display:contents;}
-  .hol-rail-search{order:1;}
-  .hol-rail-results{order:2;}
-  .hol-rail-stops{order:3;display:flex;flex-direction:column;gap:6px;}
   .hol-map-wrap{order:4;}
   .hol-map-legend{order:5;margin-top:0;}
-  .hol-rail-stats{order:6;margin-bottom:0;}
-  .hol-rail-gap{order:7;}
-  .hol-rail-flags{order:8;}
-  .hol-rail-save{order:9;}
-  .hol-rail-saved{order:10;}
-  .hol-rail-disclaimer{order:11;margin-top:0;}
-
-  /* Six metrics on one line ran off the right edge. As a 3×2 card they
-     fit, stay aligned, and read as one object. */
-  .hol-rail-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:0;
-    border:var(--border-card);border-radius:12px;background:var(--surface);overflow:hidden;}
-  .hol-rail-stat{padding:9px 4px;align-items:center;text-align:center;
-    border-left:1px solid var(--border);border-top:1px solid var(--border);}
-  .hol-rail-stat:nth-child(-n+3){border-top:0;}
-  .hol-rail-stat:nth-child(3n+1){border-left:0;}
-  .hol-rail-stat b{font-size:16px;}
-  .hol-rail-stat span{font-size:7.5px;letter-spacing:.9px;}
-  /* The clearance switch becomes the card's footer row instead of
-     claiming a 50px line of its own. */
-  .hol-rail-toggle{order:0;grid-column:1/-1;margin-left:0;justify-content:center;
-    border:0;border-top:1px solid var(--border);border-radius:0;padding:9px;}
-  .hol-rail-search{min-height:44px;padding:0 12px;}
-  .hol-rail-save{flex-direction:column;gap:8px;}
-  .hol-rail-save .btn{width:100%;min-height:42px;}
-  .hol-rail-saved-load{padding:10px;}
-  .hol-rail-teaser{padding:28px 18px;}
 
   /* ══ Visited ════════════════════════════════════════════════════ */
   .hol-visited-stats{display:flex;gap:0;margin-bottom:10px;overflow:hidden;
@@ -393,13 +273,11 @@
   .hol-visited-listwrap{margin-top:12px;}
 }
 
-
 /* Someone who asked for less motion gets the jump, not the glide —
    scroll-behavior is set globally on <html>, so it needs unsetting. */
 @media (prefers-reduced-motion: reduce){
   html{scroll-behavior:auto;}
 }
-
 
 /* ── Operator panel: plan row ───────────────────────────────────────
    Sits at the foot of the Operator card. It never changes the tier —

@@ -43,7 +43,7 @@ const STEPS_CREAM = [
   {
     id: 'hub', label: 'Hub',
     title: 'Your hub',
-    body: 'Home base. Your profile card, overall rating, friends rail (add by @handle, message, see streaks) and an AI daily brief. Pin the widgets you care about — Vitals, Macros, Body, Savings, Subscriptions, Projection, Habits, Holidays, a mini leaderboard, links, notepad. Drag them anywhere; right-click a module to make it transparent.',
+    body: 'Home base. Your profile card, overall rating, friends rail (add by @handle, message, see streaks) and an AI daily brief. Pin the widgets you care about — Vitals, Macros, Body, Savings, Subscriptions, Projection, Habits, Holidays, a mini leaderboard, links. Drag them anywhere; right-click a module to make it transparent.',
     target: 'hub', placement: 'bottom', arrowDir: 'up',
     navTo: 'hub',
   },
@@ -108,7 +108,7 @@ const STEPS_DARK = [
   {
     id: 'hub', label: 'hub',
     title: 'the hub',
-    body: 'Home base. Profile, ratings ledger, friends rail (@handles, DMs, presence), AI daily brief, draggable widget canvas — vitals / macros / body / savings / subscriptions / projection / leaderboard / links / notepad. Right-click any module to toggle transparency.',
+    body: 'Home base. Profile, ratings ledger, friends rail (@handles, DMs, presence), AI daily brief, draggable widget canvas — vitals / macros / body / savings / subscriptions / projection / leaderboard / links. Right-click any module to toggle transparency.',
     target: 'hub', placement: 'bottom', arrowDir: 'up',
     navTo: 'hub',
   },

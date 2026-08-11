@@ -3,7 +3,7 @@
  * mobile hub. Type determines content. All widgets share the same
  * outer chrome (em-tinted border, mono eyebrow, optional × remove).
  *
- * Each type either works today (notepad / recent-wins / coin-history)
+ * Each type either works today (recent-wins / coin-history)
  * or surfaces a "Coming soon" CTA explaining what's needed to wire
  * the real data (HealthKit entitlement, Gmail OAuth, etc).
  *
@@ -73,11 +73,6 @@ const BASE_WIDGET_META = {
     label: 'News',
     eyebrow: 'NEWS',
     icon: '❑', svg: 'newspaper',
-  },
-  'notepad': {
-    label: 'Notepad',
-    eyebrow: 'NOTES',
-    icon: '✎', svg: 'notebook-pen',
   },
   'recent-wins': {
     label: 'Recent Wins',
@@ -516,7 +511,6 @@ function renderBody(widget, meta, S, update, navigate, userId, hasPro) {
       ? <Suspense fallback={null}><TradingBody compact /></Suspense> : null;
     case 'market':      return <MarketBody S={S} update={update} compact />;
     case 'news':        return <NewsBody S={S} update={update} compact />;
-    case 'notepad':     return <NotepadBody S={S} update={update} />;
     case 'recent-wins': return <RecentWinsBody S={S} />;
     case 'coin-history':return <CoinHistoryBody S={S} />;
     case 'habits':      return <HabitsBody S={S} navigate={navigate} />;
@@ -968,25 +962,6 @@ function MacrosBody({ S, userId, navigate }) {
         }}
       ><span style={{display:'inline-flex',alignItems:'center',gap:5}}><Icon name="plus" size={13} /> Log food</span></button>
     </div>
-  );
-}
-
-// ── Notepad ──
-function NotepadBody({ S, update }) {
-  const [draft, setDraft] = useState(S.notepadText || '');
-  function handleChange(e) {
-    const value = e.target.value;
-    setDraft(value);
-    update(prev => ({ ...prev, notepadText: value }));
-  }
-  return (
-    <textarea
-      className="m-widget-notepad"
-      value={draft}
-      onChange={handleChange}
-      placeholder="Quick notes…"
-      rows={5}
-    />
   );
 }
 

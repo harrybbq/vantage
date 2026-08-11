@@ -10,9 +10,13 @@
  * that rewrites saved state on load is the shape of bug that cost us
  * real user data once already (see CLAUDE.md).
  *
- * mood — removed 2026-08. `S.moodLog` is deliberately left in place.
+ * mood    — removed 2026-08. `S.moodLog` is deliberately left in place.
+ * notepad — removed 2026-08. `S.notepadText` is left in place; the
+ *           desktop notepad was never a hubWidgets entry (it hung off
+ *           `S.notepadText`/`_showNotepad`) so only the mobile card
+ *           needs retiring here.
  */
-export const RETIRED_WIDGET_TYPES = new Set(['mood']);
+export const RETIRED_WIDGET_TYPES = new Set(['mood', 'notepad']);
 
 export function isRetiredWidget(type) {
   return RETIRED_WIDGET_TYPES.has(type);

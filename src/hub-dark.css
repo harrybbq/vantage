@@ -810,15 +810,6 @@ html[data-hub-os] .os-widgets-body .card {
 html[data-hub-os] .os-widgets-body .link-island-name { color: var(--text); }
 html[data-hub-os] .os-widgets-body .link-island-url { color: var(--text-muted); }
 html[data-hub-os] .os-widgets-body .link-island-notes { color: var(--text-mid); }
-html[data-hub-os] .os-widgets-body .notepad-island {
-  background: var(--os-surface2);
-  border-color: var(--os-border-md);
-  color: var(--text);
-}
-html[data-hub-os] .os-widgets-body .notepad-textarea {
-  background: none;
-  color: var(--text-mid);
-}
 html[data-hub-os] .os-widgets-body .gh-stat-val,
 html[data-hub-os] .os-widgets-body .gh-repo-name { color: var(--text); }
 

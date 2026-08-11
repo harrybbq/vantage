@@ -88,7 +88,7 @@ function Modal({ id, openId, onClose, children, style }) {
 }
 
 // ── Add Widget picker ──
-function AddLinkModal({ openId, onClose, onSwitchModal, onAddNotepad, onAddApp, onAddHubWidget }) {
+function AddLinkModal({ openId, onClose, onSwitchModal, onAddApp, onAddHubWidget }) {
   // Our Apps presets are a Pro bonus. Free users see them locked with
   // a PRO badge; clicking routes to the paywall instead of adding.
   const { hasPro } = useSubscriptionContext();
@@ -105,12 +105,6 @@ function AddLinkModal({ openId, onClose, onSwitchModal, onAddNotepad, onAddApp, 
           <Icon name="link" size={22} strokeWidth={1.75} />
           <span style={{ fontWeight: 700, fontSize: '13px', color: 'var(--text)' }}>Default Link</span>
           <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>URL bookmark or GitHub profile</span>
-        </button>
-        <button className="btn btn-ghost" style={{ padding: '16px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px', borderRadius: '12px', height: 'auto' }}
-          onClick={() => { onClose('addLinkModal'); onAddNotepad(); }}>
-          <Icon name="notebook-pen" size={22} strokeWidth={1.75} />
-          <span style={{ fontWeight: 700, fontSize: '13px', color: 'var(--text)' }}>Notepad</span>
-          <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Quick notes & tasks for today</span>
         </button>
         <button className="btn btn-ghost" style={{ padding: '16px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px', borderRadius: '12px', height: 'auto' }}
           onClick={() => { onClose('addLinkModal'); onAddHubWidget('habits'); }}>
@@ -1877,10 +1871,6 @@ export default function Modals({ openModal, S, update, onClose, onOpen, onShowCo
   function handleAddTracker(tracker) {
     update(prev => ({ ...prev, trackers: [...prev.trackers, tracker] }));
   }
-  function handleAddNotepad() {
-    // Set a flag so HubSection knows to render the notepad widget
-    update(prev => ({ ...prev, _showNotepad: true }));
-  }
   function handleAddHubWidget(type) {
     // Desktop content widgets (habits / holidays) added to the canvas.
     update(prev => ({
@@ -1968,7 +1958,6 @@ export default function Modals({ openModal, S, update, onClose, onOpen, onShowCo
         openId={effectiveOpen}
         onClose={onClose}
         onSwitchModal={onOpen}
-        onAddNotepad={handleAddNotepad}
         onAddApp={preset => { handleAddLink(appPresetToLink(preset)); onClose('addLinkModal'); }}
         onAddHubWidget={handleAddHubWidget}
       />

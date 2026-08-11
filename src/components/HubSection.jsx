@@ -130,7 +130,7 @@ function canvasFloor() {
 function growCanvas(canvas) {
   if (!canvas || canvas.style.display === 'grid') return;
   let bottom = 0;
-  canvas.querySelectorAll('.widget-wrapper, .notepad-wrapper').forEach(w => {
+  canvas.querySelectorAll('.widget-wrapper').forEach(w => {
     const b = w.offsetTop + w.offsetHeight;
     if (b > bottom) bottom = b;
   });
@@ -208,7 +208,7 @@ function gridFits(wrapper, rect) {
   const canvas = wrapper.parentElement;
   if (!canvas) return true;
   const me = { x: rect.x, y: rect.y, w: rect.w, h: rect.h };
-  for (const other of canvas.querySelectorAll('.widget-wrapper, .notepad-wrapper')) {
+  for (const other of canvas.querySelectorAll('.widget-wrapper')) {
     if (other === wrapper) continue;
     const o = { x: other.offsetLeft, y: other.offsetTop, w: other.offsetWidth, h: other.offsetHeight };
     if (rectsIntersect(me, o)) return false;
@@ -634,7 +634,7 @@ export default function HubSection({ S, update, active, onOpenModal, onOpenWaitl
   function handleSortWidgets() {
     // Sort re-flows widgets into the grid AND resets any custom sizes
     // the user dragged the widgets to (per the resize feature).
-    update(prev => ({ ...prev, widgetPositions: {}, widgetSizes: {}, notepadPos: null }));
+    update(prev => ({ ...prev, widgetPositions: {}, widgetSizes: {} }));
   }
 
   function handleToggleSnap() {
@@ -660,8 +660,6 @@ export default function HubSection({ S, update, active, onOpenModal, onOpenWaitl
     const ids = [];
     for (const l of (S.links || [])) ids.push(l.id);
     for (const h of (S.hubWidgets || [])) ids.push(h.id);
-    // Notepad lives outside hubWidgets — included only if visible.
-    if (S.notepadText || S.notepadPos || S._showNotepad) ids.push('__notepad__');
     if (!ids.length) return;
 
     // Switch canvas to absolute-positioned mode (matches drag flow).
@@ -695,7 +693,6 @@ export default function HubSection({ S, update, active, onOpenModal, onOpenWaitl
 
     const newPositions = {};
     const newSizes = {};
-    let notepadW = null, notepadPos = null;
     ids.forEach((id, i) => {
       const col = i % cols;
       const row = Math.floor(i / cols);
@@ -706,20 +703,14 @@ export default function HubSection({ S, update, active, onOpenModal, onOpenWaitl
       const w = col === cols - 1 ? cw - col * (colW + gap) : colW;
       const x = col * (colW + gap);
       const y = row * (rowH + gap);
-      if (id === '__notepad__') {
-        notepadPos = { x, y };
-        notepadW = w;
-      } else {
-        newPositions[id] = { x, y };
-        newSizes[id] = { w, h: rowH };
-      }
+      newPositions[id] = { x, y };
+      newSizes[id] = { w, h: rowH };
     });
 
     update(prev => ({
       ...prev,
       widgetPositions: { ...(prev.widgetPositions || {}), ...newPositions },
       widgetSizes:     { ...(prev.widgetSizes || {}),     ...newSizes     },
-      ...(notepadPos ? { notepadPos, notepadWidth: notepadW } : {}),
     }));
   }
 
@@ -1042,20 +1033,11 @@ export default function HubSection({ S, update, active, onOpenModal, onOpenWaitl
 
     // ── Preserve the caret across the rebuild ──
     // Everything below is destroyed and recreated, so whatever the user
-    // was typing into loses focus, caret and selection. Commit any
-    // in-flight notepad edit first (else the rebuild renders the stale
-    // text from S), remember where the caret was, and put it back after.
-    // Restoring rather than skipping the rebuild keeps the canvas honest
-    // — the widgets still redraw, the user just isn't thrown out of the
-    // box they were typing in.
-    flushNotepadSave();
-    // The flush commits to React state, but setS is asynchronous — this
-    // render still sees the OLD S, so rebuilding the textarea from
-    // S.notepadText would show stale text, and the next debounced save
-    // would then write that stale text back over the good state. Carry
-    // the live value across the wipe by hand instead of trusting the
-    // state round-trip to have landed.
-    const liveNotepad = document.getElementById('notepadTextarea')?.value ?? null;
+    // was typing into loses focus, caret and selection. Remember where
+    // the caret was and put it back after. Restoring rather than
+    // skipping the rebuild keeps the canvas honest — the widgets still
+    // redraw, the user just isn't thrown out of the box they were
+    // typing in.
     const focused = document.activeElement;
     const caret = focused && focused.id && canvas.contains(focused)
       && (focused.tagName === 'TEXTAREA' || focused.tagName === 'INPUT')
@@ -1265,20 +1247,6 @@ export default function HubSection({ S, update, active, onOpenModal, onOpenWaitl
       }
     });
 
-    // Notepad — show if text exists, position saved, or explicitly shown via _showNotepad flag
-    if (S.notepadText || S.notepadPos || S._showNotepad) {
-      renderNotepadInCanvas(canvas, S, update, hasPositions);
-    }
-
-    // Restore any edit that hadn't made the round trip through state yet.
-    if (liveNotepad != null) {
-      const ta = document.getElementById('notepadTextarea');
-      if (ta && ta.value !== liveNotepad) {
-        ta.value = liveNotepad;
-        const cc = document.getElementById('notepadCharCount');
-        if (cc) cc.textContent = liveNotepad.length + ' chars';
-      }
-    }
 
     // Put the caret back in the element the user was typing in. Same id,
     // same offsets — the rebuild recreates elements with stable ids.
@@ -1314,7 +1282,7 @@ export default function HubSection({ S, update, active, onOpenModal, onOpenWaitl
         // column if it overlaps it horizontally at all — widgets the
         // user has dragged do not respect column boundaries.
         const colBottom = new Array(cols).fill(0);
-        canvas.querySelectorAll('.widget-wrapper, .notepad-wrapper').forEach(w => {
+        canvas.querySelectorAll('.widget-wrapper').forEach(w => {
           if (newIds.has(w.dataset.linkId)) return;
           const x = w.offsetLeft, x2 = x + w.offsetWidth, b = w.offsetTop + w.offsetHeight + AUTO_GAP;
           for (let c = 0; c < cols; c++) {
@@ -1349,18 +1317,7 @@ export default function HubSection({ S, update, active, onOpenModal, onOpenWaitl
 
     growCanvas(canvas);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  // `!!S.notepadText`, not the text itself — and no notepadWidth at all.
-  // Both were in here as raw values, so the notepad's own debounced save
-  // (600ms after any typing pause) and its own ResizeObserver each
-  // changed a dependency, re-ran this callback, and wiped the canvas
-  // including the textarea being typed into. The notepad was kicking the
-  // user out of the notepad. What this render actually needs to know is
-  // only whether a notepad should EXIST — which is a boolean, so
-  // clearing the text still makes it disappear, and text arriving on a
-  // fresh device still makes it appear, while ordinary typing changes
-  // nothing here. Width is applied to the live element by the user's own
-  // resize; re-rendering to set the width it already has is pure loss.
-  }, [S.links, hubWidgetSig, S.holidays, S.habits, S.widgetPositions, !!S.notepadText, S.notepadPos, S._showNotepad, S.hubSnap]);
+  }, [S.links, hubWidgetSig, S.holidays, S.habits, S.widgetPositions, S.hubSnap]);
 
   useEffect(() => {
     if (active) renderCanvas();
@@ -1578,177 +1535,3 @@ async function loadLeaderboardIntoWidget(hwId) {
   }
 }
 
-// ── Notepad in canvas ──
-// The pending debounced save, plus the textarea it belongs to. Both are
-// module-level because the canvas destroys and rebuilds the element:
-// a timer left holding the OLD textarea would fire after the rebuild and
-// write that dead element's value over whatever the user has typed into
-// the new one since. flushNotepadSave() is called before every wipe.
-let _notepadSaveTimer = null;
-let _notepadPendingSave = null;
-
-/**
- * Commit any in-flight notepad edit immediately.
- *
- * Called at the top of renderCanvas, before `canvas.innerHTML = ''`.
- * Without it the 600ms debounce can straddle a rebuild, and the loser is
- * whatever the user typed in between — this is their note text, so the
- * cost of getting it wrong is lost data, not a cosmetic glitch.
- */
-function flushNotepadSave() {
-  if (!_notepadSaveTimer) return;
-  clearTimeout(_notepadSaveTimer);
-  _notepadSaveTimer = null;
-  const fn = _notepadPendingSave;
-  _notepadPendingSave = null;
-  fn?.();
-}
-
-function renderNotepadInCanvas(canvas, S, update, hasPositions) {
-  if (document.getElementById('notepadWrapper')) return;
-
-  const wrapper = document.createElement('div');
-  wrapper.className = 'notepad-wrapper' + (hasPositions || S.notepadPos ? '' : ' snapping');
-  wrapper.id = 'notepadWrapper';
-  wrapper.style.width = (S.notepadWidth || 380) + 'px';
-
-  if (S.notepadPos) {
-    wrapper.style.position = 'absolute';
-    wrapper.style.left = S.notepadPos.x + 'px';
-    wrapper.style.top = S.notepadPos.y + 'px';
-  }
-
-  const now = new Date();
-  const dateLabel = now.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' });
-
-  wrapper.innerHTML = `
-    <div class="notepad-island">
-      <div class="widget-drag-handle" id="notepadDragHandle"><span></span></div>
-      <div class="notepad-header">
-        <span class="notepad-header-icon">✎</span>
-        <span class="notepad-header-title">NOTEPAD</span>
-        <span class="notepad-date">${dateLabel}</span>
-        <button class="notepad-clear-btn" id="notepadClearBtn">Clear</button>
-        <button class="link-del-btn" id="notepadDelBtn" style="margin-left:4px;">✕</button>
-      </div>
-      <!-- escapeHtml: being inside a <textarea> is not protection when
-           the whole thing is built with innerHTML. Typing
-           "</textarea><img src=x onerror=…>" closed the element and ran
-           the payload on every hub render, and notepadText persists in
-           user_data.state, so it came back on each load and synced to
-           the account's other devices. The browser decodes the entities
-           back to plain text for the textarea's value, so what the user
-           sees and edits is unchanged. -->
-      <textarea class="notepad-textarea" id="notepadTextarea" placeholder="Quick notes, tasks for today, things to remember…">${escapeHtml(S.notepadText || '')}</textarea>
-      <div class="notepad-footer">
-        <span class="notepad-saved-indicator" id="notepadSavedIndicator">Auto-saved</span>
-        <span class="notepad-char-count" id="notepadCharCount">${(S.notepadText || '').length} chars</span>
-      </div>
-    </div>
-  `;
-
-  canvas.appendChild(wrapper);
-
-  // Wire textarea
-  const ta = wrapper.querySelector('#notepadTextarea');
-  ta?.addEventListener('input', () => {
-    const cc = document.getElementById('notepadCharCount');
-    if (cc) cc.textContent = ta.value.length + ' chars';
-    const ind = document.getElementById('notepadSavedIndicator');
-    if (ind) { ind.textContent = 'Saving…'; ind.classList.remove('saved'); }
-    clearTimeout(_notepadSaveTimer);
-    // Held so flushNotepadSave() can run it early if the canvas is about
-    // to be rebuilt out from under this textarea.
-    _notepadPendingSave = () => {
-      const text = ta.value;
-      update(prev => (prev.notepadText === text ? prev : { ...prev, notepadText: text }));
-      if (ind) { ind.textContent = '✓ Saved'; ind.classList.add('saved'); setTimeout(() => { ind.textContent = 'Auto-saved'; ind.classList.remove('saved'); }, 1600); }
-    };
-    _notepadSaveTimer = setTimeout(() => {
-      _notepadSaveTimer = null;
-      const fn = _notepadPendingSave;
-      _notepadPendingSave = null;
-      fn?.();
-    }, 600);
-  });
-
-  // Wire clear button
-  const clearBtn = wrapper.querySelector('#notepadClearBtn');
-  clearBtn?.addEventListener('click', () => {
-    if (!confirm('Clear all notes?')) return;
-    if (ta) { ta.value = ''; ta.dispatchEvent(new Event('input')); }
-  });
-
-  // Wire delete button
-  const delBtn = wrapper.querySelector('#notepadDelBtn');
-  delBtn?.addEventListener('click', e => {
-    e.stopPropagation();
-    update(prev => {
-      const next = { ...prev, notepadText: '', notepadPos: null, notepadWidth: null };
-      delete next._showNotepad;
-      return next;
-    });
-  });
-
-  // Resize observer.
-  // ResizeObserver fires once immediately on observe(), so the un-guarded
-  // version committed a width on every single render — including the
-  // first, where it took notepadWidth from undefined to 380. Bail when
-  // nothing actually changed, or the notepad schedules a cloud save (and
-  // formerly a full canvas rebuild) just by existing.
-  const ro = new ResizeObserver(() => {
-    const w = wrapper.offsetWidth;
-    if (!w) return;
-    update(prev => ((prev.notepadWidth || 380) === w ? prev : { ...prev, notepadWidth: w }));
-  });
-  ro.observe(wrapper);
-
-  // Drag handle
-  const handle = document.getElementById('notepadDragHandle');
-  if (!handle) return;
-  handle.style.cursor = 'grab';
-
-  handle.addEventListener('mousedown', e => {
-    e.preventDefault();
-    if (wrapper.classList.contains('snapping')) {
-      const all = canvas.querySelectorAll('.widget-wrapper, .notepad-wrapper');
-      const snapshots = [];
-      all.forEach(w => { const r = w.getBoundingClientRect(); snapshots.push({ w, x: r.left, y: r.top }); });
-      canvas.style.cssText = 'position:relative;flex:1;min-height:calc(100vh - 180px);display:block;';
-      const cr = canvas.getBoundingClientRect();
-      snapshots.forEach(({ w, x, y }) => {
-        w.classList.remove('snapping');
-        const id = w.dataset.linkId;
-        if (id) {
-          w.style.cssText = `position:absolute;min-width:280px;max-width:360px;width:300px;user-select:none;left:${x - cr.left}px;top:${y - cr.top}px;`;
-          update(prev => ({ ...prev, widgetPositions: { ...prev.widgetPositions, [id]: { x: x - cr.left, y: y - cr.top } } }));
-        } else {
-          w.style.cssText += `;position:absolute;left:${x - cr.left}px;top:${y - cr.top}px;`;
-        }
-      });
-    }
-
-    handle.style.cursor = 'grabbing';
-    const island = wrapper.querySelector('.notepad-island');
-    if (island) island.style.opacity = '.88';
-
-    const startX = e.clientX - wrapper.offsetLeft;
-    const startY = e.clientY - wrapper.offsetTop;
-
-    function onMove(ev) {
-      let nx = Math.max(0, ev.clientX - startX);
-      let ny = Math.max(0, ev.clientY - startY);
-      wrapper.style.left = nx + 'px';
-      wrapper.style.top = ny + 'px';
-    }
-    function onUp() {
-      handle.style.cursor = 'grab';
-      if (island) island.style.opacity = '';
-      update(prev => ({ ...prev, notepadPos: { x: wrapper.offsetLeft, y: wrapper.offsetTop } }));
-      document.removeEventListener('mousemove', onMove);
-      document.removeEventListener('mouseup', onUp);
-    }
-    document.addEventListener('mousemove', onMove);
-    document.addEventListener('mouseup', onUp);
-  });
-}

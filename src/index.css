@@ -700,21 +700,6 @@ nav:hover .nav-tab-label{opacity:1;}
      every widget match GitHub's height after Sort). */
   align-self:start;
 }
-/* ── Hub widgets (redesigned F4 Sprint 4) ─────────────────────────
-   All widget surfaces (link / GitHub / YouTube / notepad) now share
-   one visual language: surface bg + hairline border + mono `// NAME`
-   eyebrow + tinted icon chip. Brand colour is demoted to the chip's
-   tint — never a saturated fill — so the row reads as a sibling of
-   the OS panels rather than a foreign poster. Themed via tokens so
-   cream/dark × free/Pro all render the right surface tones. */
-.link-island{
-  padding:0;overflow:hidden;
-  background:var(--bg-raised, #fff);
-  border:1px solid var(--border);
-  border-radius:10px;
-  box-shadow:0 1px 0 rgba(255,255,255,.55) inset, 0 4px 16px rgba(28,26,23,.06);
-  transition:box-shadow .22s, opacity .18s, border-color .15s;
-}
 .link-island:hover{
   border-color:var(--accent-line, var(--border));
   box-shadow:0 1px 0 rgba(255,255,255,.6) inset, 0 8px 22px rgba(28,26,23,.09);
@@ -2510,110 +2495,6 @@ html[data-theme="dark"] {
   }
 }
 
-/* ── NOTEPAD WIDGET ── */
-/* Notepad — same surface language as the link/GitHub/YouTube cards.
-   Previously a dark glassy treatment that read as a foreign poster on
-   the cream hub; now a sibling of the other widgets, with a gold-tinted
-   icon chip in the header for identity. */
-.notepad-island{
-  background:var(--bg-raised, #fff);
-  border:1px solid var(--border);
-  border-radius:10px;
-  box-shadow:0 1px 0 rgba(255,255,255,.55) inset, 0 4px 16px rgba(28,26,23,.06);
-  overflow:hidden;
-  transition:box-shadow .22s, border-color .15s;
-  display:flex;flex-direction:column;
-}
-.notepad-island:hover{
-  border-color:var(--accent-line, var(--border));
-  box-shadow:0 1px 0 rgba(255,255,255,.6) inset, 0 8px 22px rgba(28,26,23,.09);
-}
-.notepad-header{
-  display:flex;align-items:center;gap:10px;
-  padding:9px 12px 8px;
-  border-bottom:1px solid var(--border);
-  flex-shrink:0;
-}
-.notepad-header-icon{
-  width:22px;height:22px;border-radius:6px;flex-shrink:0;
-  display:flex;align-items:center;justify-content:center;
-  font-size:12px;line-height:1;font-weight:700;
-  background:rgba(200,151,10,.10);
-  border:1px solid var(--border);
-  color:var(--gold, #c8970a);
-}
-.notepad-header-title{
-  flex:1;min-width:0;
-  font-family:var(--mono);font-size:9px;letter-spacing:2px;
-  text-transform:uppercase;color:var(--text-muted);font-weight:500;
-  display:flex;align-items:center;gap:6px;
-}
-.notepad-header-title::before{
-  content:'//';color:var(--gold, #c8970a);opacity:.85;letter-spacing:0;
-}
-.notepad-date{
-  font-family:var(--mono);font-size:9px;letter-spacing:1px;
-  text-transform:uppercase;color:var(--text-muted);
-}
-.notepad-clear-btn{
-  background:transparent;
-  border:1px solid var(--accent-line, var(--border));
-  border-radius:6px;
-  padding:4px 9px;font-family:var(--mono);font-size:9px;font-weight:700;
-  letter-spacing:1.2px;text-transform:uppercase;
-  color:var(--text-muted);
-  cursor:pointer;transition:background .15s, color .15s, border-color .15s;
-}
-.notepad-clear-btn:hover{
-  background:rgba(var(--em-rgb),.06);
-  color:var(--text);border-color:var(--accent-line);
-}
-.notepad-textarea{
-  width:100%;flex:1;min-height:160px;
-  background:transparent;border:none;outline:none;resize:none;
-  padding:12px 14px;
-  font-size:13px;line-height:1.65;
-  color:var(--text);
-  font-family:var(--body);
-  caret-color:var(--em);
-}
-.notepad-textarea::placeholder{color:var(--text-muted);opacity:.7;font-style:italic;}
-.notepad-footer{
-  padding:8px 12px;
-  border-top:1px solid var(--accent-line-soft);
-  display:flex;align-items:center;justify-content:space-between;
-  flex-shrink:0;
-}
-.notepad-saved-indicator{
-  font-family:var(--mono);font-size:9px;color:var(--text-muted);
-  letter-spacing:.8px;transition:color .3s;
-  text-transform:uppercase;
-}
-.notepad-saved-indicator.saved{color:var(--em);}
-.notepad-char-count{
-  font-family:var(--mono);font-size:9px;color:var(--text-muted);
-  letter-spacing:.5px;
-}
-/* Notepad wrapper — wider by default, freely resizable */
-.notepad-wrapper{
-  position:absolute;
-  width:380px;
-  min-width:260px;
-  max-width:700px;
-  resize:horizontal;
-  overflow:visible;
-  user-select:none;
-}
-.notepad-wrapper.snapping{
-  position:static;
-  width:380px;
-  min-width:260px;
-  max-width:700px;
-  resize:horizontal;
-  overflow:visible;
-}
-
-/* ── YOUTUBE WIDGET ── */
 /* YouTube body — surface-tone treatment matching the link/GitHub
    widgets. Brand red is demoted to the date label only; everything
    else uses theme tokens so it sits naturally in cream and dark. */
@@ -3626,7 +3507,6 @@ input,select,textarea,button{touch-action:manipulation;}
   transform:rotate(45deg);
 }
 
-
 /* ── COMMAND PALETTE (cmdk) ── */
 [cmdk-root]{width:100%;}
 [cmdk-group-heading]{padding:6px 14px 4px;font-family:var(--mono);font-size:10px;letter-spacing:1px;text-transform:uppercase;color:rgba(255,255,255,.35);}
@@ -3734,11 +3614,6 @@ body{font-size:var(--text-base);line-height:var(--lh-body);}
 .yc-val{font-size:var(--text-xl);}
 .yc-lbl{font-size:var(--text-xs);letter-spacing:1px;}
 .year-progress-pct{font-size:11px;}
-
-/* ── Notepad ── */
-.notepad-header-title{font-size:var(--text-base);}
-.notepad-date{font-size:11px;}
-.notepad-char-count{font-size:11px;}
 
 /* ── Nav labels ── */
 .nav-tab-label{font-size:var(--text-xs) !important;}
@@ -5241,23 +5116,6 @@ button:active:not(:disabled),
   color: var(--text-muted);
   line-height: 1.6;
   padding: 4px 0;
-}
-
-.m-widget-notepad {
-  width: 100%;
-  background: var(--bg-base, rgba(255,255,255,0.6));
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  padding: 10px 12px;
-  font-family: var(--mono);
-  font-size: 12px;
-  color: var(--text);
-  resize: vertical;
-  min-height: 100px;
-}
-.m-widget-notepad:focus {
-  outline: none;
-  border-color: var(--em);
 }
 
 .m-widget-list {

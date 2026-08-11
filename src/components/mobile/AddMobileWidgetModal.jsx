@@ -35,7 +35,6 @@ export default function AddMobileWidgetModal({ openId, onClose, existingTypes, o
   // Built per-open (not module-level) so owner-only presets resolve
   // against the signed-in account — TubeLube only lists for the owner.
   const pickerOrder = [
-    'notepad',
     'recent-wins',
     'coin-history',
     'habits',
