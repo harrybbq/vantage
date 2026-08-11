@@ -1084,13 +1084,6 @@ nav:hover .nav-tab-label{opacity:1;}
   --ach-grid-line:        rgba(0,0,0,0.04);
   --ach-conn-active:      #88c4a4;
 }
-/* Free dark theme: give the achievement board a dark default so the
-   right-click "Light background" toggle is meaningful (dark-os already
-   has its own dark override in hub-dark.css). */
-html[data-theme="dark"] {
-  --ach-canvas-bg:        #0e0e0d;
-  --ach-grid-line:        rgba(255,255,255,0.04);
-}
 :root {
   --ach-conn-done:        #c8970a;
   --ach-conn-locked:      #ccc;
@@ -2682,8 +2675,7 @@ html[data-theme="dark"] {
   background:rgba(139,94,0,.12);
   color:#8b5e00;
 }
-html[data-hub-os] .ach-credit-note,
-html[data-theme="dark"] .ach-credit-note{
+html[data-hub-os] .ach-credit-note{
   border-color:rgba(194,154,69,.32);background:rgba(194,154,69,.1);color:#c29a45;
 }
 

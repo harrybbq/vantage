@@ -32,7 +32,7 @@ export const FREE_CAPS = {
   generic: {
     feature: true,
     label: 'Vantage Pro',
-    sub: 'Unlock unlimited everything, proactive coach nudges, the daily AI brief, custom themes, and every Pro perk across mobile + desktop.',
+    sub: 'Unlock unlimited everything, proactive coach nudges, the daily AI brief, accent colours, and every Pro perk across mobile + desktop.',
   },
 };
 

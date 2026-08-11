@@ -22,7 +22,7 @@ import FriendsRail from './friends/FriendsRail';
 import RatingsPanel from './RatingsPanel';
 import { ovrTier } from '../lib/ratings/tiers';
 import { useSubscriptionContext } from '../context/SubscriptionContext';
-import { isOsLayoutTheme } from './SettingsSection';
+import { isOsLayoutTheme, resolveEffectiveTheme } from './SettingsSection';
 import { useHubModuleMenu } from './HubModuleMenu';
 import { APP_PRESETS } from '../data/appPresets';
 import { fetchAppPreview } from '../lib/appPreview';
@@ -619,7 +619,13 @@ export default function HubSection({ S, update, active, onOpenModal, onOpenWaitl
   // never see it. The two themes share the same panel/grid structure
   // but keep their own palettes (dark for dark-os, cream for cream-pro)
   // via the data-hub-os attribute + theme-scoped token overrides.
-  const isOsLayout = hasPro && isOsLayoutTheme(S.theme);
+  // No longer gated on Pro. applyTheme sets data-hub-os for both themes,
+  // so gating the LAYOUT on the tier while the STYLESHEET followed the
+  // theme would have handed free users the operator-console CSS wrapped
+  // round the old cream markup. Resolved rather than raw, so a retired
+  // `cream`/`dark` still picks the right branch on the render before the
+  // write-back lands.
+  const isOsLayout = isOsLayoutTheme(resolveEffectiveTheme(S.theme));
 
   function handleUploadPhoto(e) {
     const file = e.target.files[0];
@@ -1335,7 +1341,7 @@ export default function HubSection({ S, update, active, onOpenModal, onOpenWaitl
     }), 0);
   }, []);
 
-  // ── Dark OS layout (Pro only) ─────────────────────────────────────────
+  // ── Operator-console layout — both themes, every tier ────────────────
   if (isOsLayout) {
     return (
       <section id="hub" className={`section${active ? ' active' : ''}`}>

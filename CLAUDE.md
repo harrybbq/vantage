@@ -6,6 +6,18 @@ Personal productivity/wellness app. React 18 + Vite SPA · Supabase (auth + Post
 Develop on the designated `claude/*` branch — direct pushes to `master` are blocked.
 Build → verify → commit → push → create PR (`harrybbq/visionboardreal`, base `master`) via GitHub MCP → merge it. Netlify auto-deploys master. Bump `CACHE_VERSION` in `public/sw.js` when a deploy should force clients onto the new build.
 
+## Tier line (decided 2026-08-11)
+**Both themes are free.** Cream and Dark OS ship to everyone — charging
+for the good-looking one meant every new account met the weaker version
+of the app first. Pro earns its money on **limits, customisation and
+widget count**: accent colour schemes stay Pro, the caps stay Pro, the
+wider widget set stays Pro. When adding anything, ask which side of that
+line it falls on — looks are free, *more* is paid.
+
+Theme ids keep their legacy `-pro` suffix (`cream-pro`, `dark-os`)
+because they are what `S.theme` holds; only the labels changed. The
+retired `cream`/`dark` ids map forward in `resolveEffectiveTheme`.
+
 ## Hard rules
 - **DATA SAFETY IS PRIORITY #1.** All existing user data — the `user_data.state` JSON, `nutrition_log`, uploaded backgrounds, and profile pictures (Supabase Storage `avatars`/backgrounds buckets) — must be preserved and kept safe above all else. Before EVERY Netlify deploy, verify the change cannot lose or corrupt user data: state writes must be **additive** (new keys only, never overwrite/replace whole `state`), never run destructive migrations/Storage deletes/`user_data` rewrites, and never let a new client build wipe or reset state on load. The 2026-05-03 stale-SW incident (git `f6a7a50`) wiped data — treat that class of bug as unacceptable. When unsure whether a change is data-safe, stop and confirm before deploying.
 - Commit trailers: `Co-Authored-By: Claude <model name> <noreply@anthropic.com>` — never put raw model IDs in commits/PRs/code.
