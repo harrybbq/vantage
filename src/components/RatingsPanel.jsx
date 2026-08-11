@@ -23,7 +23,10 @@ import Icon from './Icon';
 import { useState, useRef, useEffect } from 'react';
 import { categoryBreakdown } from '../lib/ratings/derive';
 import { ovrTier } from '../lib/ratings/tiers';
-import { PRESTIGE_MAX } from '../lib/ratings/prestige';
+import { PRESTIGE_MAX, toRoman } from '../lib/ratings/prestige';
+import RatingsDonut from './ratings/RatingsDonut';
+import { RATING_COLOURS, ratingShares } from '../lib/ratings/palette';
+import { useDarkSurface } from '../hooks/useDarkSurface';
 import PrestigeBadge from './PrestigeBadge';
 import { supabase } from '../lib/supabase';
 import { isCooldownActive, daysUntilRetake } from './SelfCheck';
@@ -92,6 +95,14 @@ export default function RatingsPanel({ S, update, compact = false }) {
   const [activeCheck, setActiveCheck] = useState(null);
   const [menu, setMenu] = useState(null); // long-press transparency menu { x, y }
   const [prestiging, setPrestiging] = useState(false);
+  // Data-viz colour is chosen per surface rather than flipped, so the
+  // donut has to know which set of steps it is drawing on.
+  const dark = useDarkSurface();
+  const donutColours = RATING_COLOURS[dark ? 'dark' : 'light'];
+  const byId = Object.fromEntries(CATEGORIES.map(c => [c.id, c]));
+  // One computation of the shares, used by the ring and the legend, so
+  // the two can never disagree about a number.
+  const shares = ratingShares(r, CATEGORIES);
   const [prestigeError, setPrestigeError] = useState(null);
   // CTA shows on the local OVR hitting 99; the endpoint re-checks the
   // CANONICAL profiles.ratings_ovr, so a gamed local value gets a 400.
@@ -195,22 +206,26 @@ export default function RatingsPanel({ S, update, compact = false }) {
           <span className="ratings-ledger-tag">F5 · S3</span>
         </div>
 
-        {/* OVR hero — bracket label, big italic number, /99 suffix, tier.
-            Prestige badge (colour band + Roman numeral) sits beside the
-            number once the user has prestiged at least once. */}
-        <div className="ratings-ledger-ovr-row" data-admin-target="rating">
-          <div className="ratings-ledger-ovr-block">
-            <span className="ratings-ledger-ovr-label">[ OVR ]</span>
-            <span className={`ratings-ledger-ovr-value ovr-num ovr-tier-${glow.key}`}>{ovr}</span>
-            <span className="ratings-ledger-ovr-suffix">/99</span>
-          </div>
-          <span className="ratings-ledger-ovr-tier" style={{ color: glow.color }}>
-            → {glow.label.toUpperCase()}
-          </span>
+        {/* The donut. Each arc is that pillar's share of the four added
+            together, so the ring says where a rating comes FROM while
+            the number in the hole says how high it is. Arcs are
+            controls — tapping one opens the same breakdown the legend
+            row does. */}
+        <div className="ratings-ledger-donut-wrap" data-admin-target="rating">
+          <RatingsDonut
+            categories={CATEGORIES}
+            ratings={r}
+            ovr={ovr}
+            tier={glow}
+            prestigeLabel={prestigeLevel > 0 ? `PRESTIGE ${toRoman(prestigeLevel)}` : ''}
+            dark={dark}
+            size={compact ? 132 : 156}
+            onSelect={setActiveBreakdown}
+          />
         </div>
 
-        {/* Prestige badge — own row so it never crowds the hero number
-            in the 144px rail / compact variants. */}
+        {/* Prestige badge — own row so it never crowds the donut in the
+            144px rail / compact variants. */}
         {prestigeLevel > 0 && (
           <div className="ratings-ledger-prestige-row">
             <PrestigeBadge prestige={prestigeLevel} size="md" />
@@ -235,33 +250,27 @@ export default function RatingsPanel({ S, update, compact = false }) {
           </div>
         )}
 
-        {/* Per-category rows */}
-        <ul className="ratings-ledger-rows">
-          {CATEGORIES.map((c, i) => {
-            const score = r[c.id] || 1;
-            const t = tier(score);
-            const pct = Math.max(2, Math.min(100, score));
+        {/* Legend. Always present, and it is what stops identity ever
+            resting on colour alone — every arc gets a word, its score
+            and its share in writing. That is also the relief the
+            palette owes for the two steps that sit under 3:1 against
+            their surface. */}
+        <ul className="ratings-ledger-legend">
+          {shares.map(s => {
+            const c = byId[s.id];
             return (
-              <li key={c.id}>
+              <li key={s.id}>
                 <button
                   type="button"
-                  className="ratings-ledger-row"
-                  onClick={() => setActiveBreakdown(c.id)}
-                  aria-label={`${c.label} ${score} of 99 — tap for breakdown`}
+                  className="ratings-legend-row"
+                  onClick={() => setActiveBreakdown(s.id)}
+                  aria-label={`${c.label} ${s.value} of 99, ${Math.round(s.share * 100)} percent of your rating — open breakdown`}
                 >
-                  <span className="ratings-ledger-row-idx">{String(i + 1).padStart(2, '0')}</span>
-                  <span className="ratings-ledger-row-icon">{c.icon}</span>
-                  <span className="ratings-ledger-row-label">{c.label}</span>
-                  <span className="ratings-ledger-row-track" aria-hidden="true">
-                    <span
-                      className={`ratings-ledger-row-fill ratings-ledger-row-fill-${t.key}`}
-                      style={{ width: `${pct}%` }}
-                    />
-                  </span>
-                  <span
-                    className="ratings-ledger-row-score"
-                    style={{ color: t.color }}
-                  >{score}</span>
+                  <span className="ratings-legend-chip" aria-hidden="true"
+                        style={{ background: donutColours[s.id] }} />
+                  <span className="ratings-legend-label">{c.label}</span>
+                  <span className="ratings-legend-share">{Math.round(s.share * 100)}%</span>
+                  <span className="ratings-legend-score">{s.value}</span>
                 </button>
               </li>
             );
