@@ -4654,12 +4654,15 @@ button:active:not(:disabled),
   font-family: var(--serif, Georgia, serif);
   font-style: italic;
   font-weight: 700;
-  font-size: 40px;
-  fill: var(--text);
+  font-size: 42px;
   font-variant-numeric: tabular-nums;
-  /* The tier glow the mock asked for — a halo rather than a recolour,
-     so the number keeps text-token contrast on both surfaces. */
-  filter: drop-shadow(0 0 7px color-mix(in srgb, var(--rt-tier) 55%, transparent));
+  /* Tinted with the tier, not painted in it. A straight fill of the tier
+     colour would put bronze at roughly 3:1 on cream, which is thin for
+     the largest number on the card — mixing it into the text token keeps
+     the band legible while the figure stays as readable as body copy.
+     The halo carries the rest of the colour. */
+  fill: color-mix(in srgb, var(--rt-tier) 62%, var(--text));
+  filter: drop-shadow(0 0 8px color-mix(in srgb, var(--rt-tier) 45%, transparent));
 }
 .ratings-donut-sub {
   font-family: var(--mono);

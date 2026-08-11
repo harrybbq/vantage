@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import Overlay from '../ui/Overlay';
 
 /**
  * Search-by-handle + send-request UI. The whole search runs through
@@ -83,10 +84,11 @@ export default function AddFriendModal({
   }
 
   return (
+    <Overlay>
     <AnimatePresence>
       {open && (
         <motion.div
-          className="modal-bg"
+          className="modal-overlay open"
           initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
           transition={{ duration: 0.18 }}
           onClick={onClose}
@@ -176,5 +178,6 @@ export default function AddFriendModal({
         </motion.div>
       )}
     </AnimatePresence>
+    </Overlay>
   );
 }

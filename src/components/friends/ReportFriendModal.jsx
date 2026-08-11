@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import Overlay from '../ui/Overlay';
 
 /**
  * Report flow — minimum viable moderation surface.
@@ -56,10 +57,11 @@ export default function ReportFriendModal({ open, friend, onSubmit, onClose }) {
   }
 
   return (
+    <Overlay>
     <AnimatePresence>
       {open && (
         <motion.div
-          className="modal-bg"
+          className="modal-overlay open"
           initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
           transition={{ duration: 0.18 }}
           onClick={onClose}
@@ -149,5 +151,6 @@ export default function ReportFriendModal({ open, friend, onSubmit, onClose }) {
         </motion.div>
       )}
     </AnimatePresence>
+    </Overlay>
   );
 }

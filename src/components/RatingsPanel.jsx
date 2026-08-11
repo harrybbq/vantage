@@ -35,6 +35,7 @@ import FinanceCheck from './FinanceCheck';
 import FitnessCheck from './FitnessCheck';
 import SocialCheck  from './SocialCheck';
 import { backdropClose } from '../utils/backdropClose';
+import Overlay from './ui/Overlay';
 
 const CATEGORIES = [
   { id: 'brain',   label: 'Brain',   icon: '◉' },
@@ -345,6 +346,10 @@ function BreakdownModal({ S, category, onClose, onTakeCheck }) {
   const cooldownDaysLeft = daysUntilRetake(lastResult);
 
   return (
+    // Portalled: the ratings panel lives in a sticky column, which is a
+    // stacking context, so an overlay declared in place is painted under
+    // the widget canvas no matter what its z-index says.
+    <Overlay>
     <div
       className="modal-overlay open"
       {...backdropClose(() => onClose())}
@@ -448,5 +453,6 @@ function BreakdownModal({ S, category, onClose, onTakeCheck }) {
         </div>
       </div>
     </div>
+    </Overlay>
   );
 }

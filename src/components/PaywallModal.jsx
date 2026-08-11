@@ -25,6 +25,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { FREE_CAPS } from '../hooks/useTierLimits';
 import { useSubscriptionContext } from '../context/SubscriptionContext';
 import { getOfferings, purchasePackage, isAvailable as rcIsAvailable } from '../lib/billing/revenuecat';
+import Overlay from './ui/Overlay';
 
 // Display order for package cards. RC's `availablePackages` array
 // arrives in dashboard order which is unreliable; sort by our own
@@ -116,10 +117,11 @@ export default function PaywallModal({ openId, onClose, onUpgrade, onShowToast }
   const sortedPackages = hasPackages ? [...packages].sort((a, b) => packageWeight(a) - packageWeight(b)) : [];
 
   return (
+    <Overlay>
     <AnimatePresence>
       {isOpen && cap && (
         <motion.div
-          className="modal-bg"
+          className="modal-overlay open"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
@@ -252,6 +254,7 @@ export default function PaywallModal({ openId, onClose, onUpgrade, onShowToast }
         </motion.div>
       )}
     </AnimatePresence>
+    </Overlay>
   );
 }
 
