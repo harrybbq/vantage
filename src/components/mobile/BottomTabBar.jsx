@@ -7,7 +7,8 @@
  *   - Track    ☑  daily logging
  *   - Holiday  ✈  trip countdown
  *   - Habits   ◷  habit tracker
- *   - More     ⊞  bottom sheet → Achievements / Shopping / Friends / Settings
+ *   - More     ⊞  bottom sheet → Achievements / Shopping / Friends /
+ *                 Leaderboard
  *
  * Why these five and not all seven? Bottom-tab nav becomes useless
  * past ~5 entries (each tab gets too narrow to tap reliably). The
@@ -29,11 +30,10 @@ const PRIMARY_TABS = [
 
 // Sections that live behind the More drawer. Used so we can highlight
 // the More tab when the user is on one of these and they expect a
-// nav indicator somewhere.
-const MORE_SECTIONS = new Set(['achievements', 'shop', 'settings']);
-// Friends doesn't have its own section yet (rail lives on hub) but
-// we reserve the slot here so the More drawer can route there in
-// future without changing the highlight logic.
+// nav indicator somewhere. Must match MORE_ITEMS in MoreDrawer —
+// Settings is deliberately absent, because it is reached from the
+// app-bar logo and the left drawer rather than from More.
+const MORE_SECTIONS = new Set(['achievements', 'shop', 'friends', 'leaderboard', 'upgrade']);
 
 export default function BottomTabBar({ activeSection, onNavigate, onOpenMore, moreOpen }) {
   // Highlight state:

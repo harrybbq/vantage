@@ -6,6 +6,7 @@ import MacroGoalsPanel from './MacroGoalsPanel';
 import NotificationsPanel from './NotificationsPanel';
 import SubscriptionPanel from './SubscriptionPanel';
 import { AppleHealthImport, WearableSync } from './VitalsHistoryCard';
+import AccountPanel from './settings/AccountPanel';
 import DataExportCard from './settings/DataExportCard';
 import SettingsGroup from './settings/SettingsGroup';
 import { useSubscriptionContext } from '../context/SubscriptionContext';
@@ -512,6 +513,9 @@ function FriendsPrivacyCard({ userId, S, update }) {
 // Tab definition — single source of truth so the nav and the
 // content switcher stay in sync. Order = display order.
 const SETTINGS_TABS = [
+  // Account is first because it is the one tab reached by name from
+  // outside Settings — tapping your own photo lands here.
+  { id: 'account',    label: 'Account'    },
   { id: 'appearance', label: 'Appearance' },
   { id: 'privacy',    label: 'Privacy'    },
   { id: 'goals',      label: 'Goals'      },
@@ -534,9 +538,20 @@ function initialTab() {
   return /[?&](whoop|oura)=/.test(window.location.search) ? 'tools' : 'appearance';
 }
 
-export default function SettingsSection({ S, update, active, userId, onOpenLegal, onOpenPalette, onOpenShortcuts, onOpenVisions, onOpenSchedule }) {
+export default function SettingsSection({ S, update, active, userId, userEmail, onSignOut, requestedTab, onOpenLegal, onOpenPalette, onOpenShortcuts, onOpenVisions, onOpenSchedule }) {
   const [deleting, setDeleting] = useState(false);
   const [activeTab, setActiveTab] = useState(initialTab);
+
+  // Deep-link into a tab. App.jsx bumps `requestedTab` when something
+  // outside Settings routes here by name — tapping your avatar asks for
+  // 'account'. It carries a nonce rather than being a bare tab id so
+  // asking for the same tab twice still moves you back to it, and so a
+  // request never re-fires when this component happens to re-render.
+  useEffect(() => {
+    if (!requestedTab?.tab) return;
+    if (!SETTINGS_TABS.some(t => t.id === requestedTab.tab)) return;
+    setActiveTab(requestedTab.tab);
+  }, [requestedTab]);
   const currentScheme = S.colorScheme || 'green';
   // Resolved, not raw — someone still carrying a retired `cream`/`dark`
   // should see the card they actually landed on marked active.
@@ -629,6 +644,19 @@ export default function SettingsSection({ S, update, active, userId, onOpenLegal
         role="tabpanel"
         aria-labelledby={`settings-tab-${activeTab}`}
       >
+
+        {/* ─── ACCOUNT TAB ───
+            Photo, name, tagline, email, password, sign out. Was the
+            mobile-only Profile route until it folded in here. */}
+        {activeTab === 'account' && (
+          <AccountPanel
+            S={S}
+            update={update}
+            userId={userId}
+            userEmail={userEmail}
+            onSignOut={onSignOut}
+          />
+        )}
 
         {/* ─── APPEARANCE TAB ─── */}
         {activeTab === 'appearance' && (

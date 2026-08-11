@@ -2946,6 +2946,15 @@ input,select,textarea,button{touch-action:manipulation;}
   border-bottom-color:var(--em);
   font-weight:600;
 }
+/* Six tabs at 390px CSS pixels wanted 482px of strip. It has always
+   scrolled, but with the scrollbar hidden there was nothing to say so,
+   and Account arriving pushed two whole tabs past the edge instead of
+   clipping one. Tightening the gutters on narrow viewports fits all six
+   without touching the type size — the mono caps are already at 10px
+   and shrinking them further is not a trade worth making. */
+@media (max-width: 480px){
+  .settings-tab{ padding:10px 6px; letter-spacing:1.15px; }
+}
 
 /* ── Settings — flat subsections ──────────────────────────────────────
    Each subsection used to be a `.card`: a bordered, blurred, glowing box
@@ -5832,41 +5841,12 @@ button:active:not(:disabled),
 .m-habit-relapse-btn:active { background: var(--border); }
 
 /* ──────────────────────────────────────────────────────────────────────────
-   Mobile Profile Section
+   Account fields (Settings → Account)
+   Field-level styling for what used to be the mobile Profile route.
+   The wrapper and the four bordered `.m-profile-card` boxes are gone —
+   SettingsGroup supplies the heading, the description and the hairline,
+   the same as every other group in Settings.
    ────────────────────────────────────────────────────────────────────────── */
-
-.m-profile {
-  max-width: 480px;
-  margin: 0 auto;
-  width: 100%;
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
-}
-.m-profile-card {
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  background: var(--card, rgba(255,255,255,0.04));
-  padding: 16px;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-.m-profile-card-quiet { background: transparent; }
-.m-profile-card-eyebrow {
-  font-family: var(--mono);
-  font-size: 10px;
-  letter-spacing: 1.6px;
-  text-transform: uppercase;
-  color: var(--text-muted);
-}
-.m-profile-card-help {
-  font-family: var(--mono);
-  font-size: 11px;
-  line-height: 1.55;
-  color: var(--text-muted);
-  margin: -2px 0 4px;
-}
 
 /* Photo block */
 .m-profile-photo-row {
@@ -7311,9 +7291,14 @@ button:active:not(:disabled),
 
 .m-hubdrawer-head { display: flex; align-items: center; gap: 11px; padding: 14px 16px;
   border-bottom: 1px solid var(--border); flex: none; }
+/* A button, not a div — it navigates to Settings → Account. The reset
+   bits (padding, font, cursor) are here because a UA button would
+   otherwise bring its own. */
 .m-hubdrawer-av { width: 40px; height: 40px; border-radius: 50%; flex: none; overflow: hidden;
   display: grid; place-items: center; background: rgba(var(--em-rgb),.12);
-  border: 1px solid var(--em); color: var(--em); font-weight: 700; font-size: 16px; }
+  border: 1px solid var(--em); color: var(--em); font-weight: 700; font-size: 16px;
+  padding: 0; cursor: pointer; font-family: inherit; }
+.m-hubdrawer-av:active { transform: scale(.94); }
 .m-hubdrawer-av img { width: 100%; height: 100%; object-fit: cover; }
 .m-hubdrawer-who { flex: 1; min-width: 0; }
 .m-hubdrawer-name { font-size: 15px; font-weight: 600; line-height: 1.2; }

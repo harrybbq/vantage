@@ -17,7 +17,6 @@ import HolidaySection from './components/HolidaySection';
 import HabitsSection from './components/HabitsSection';
 import MobileHabitsSection from './components/mobile/MobileHabitsSection';
 import MobileFriendsSection from './components/mobile/MobileFriendsSection';
-import MobileProfileSection from './components/mobile/MobileProfileSection';
 import SettingsSection from './components/SettingsSection';
 import UpgradeSection from './components/upgrade/UpgradeSection';
 import { SCHEMES, applyScheme, applyTheme, resolveEffectiveTheme, schemeFromHex } from './components/SettingsSection';
@@ -320,7 +319,24 @@ function Board({ userId, userEmail, onSignOut }) {
   // wired into the friends rail.
   useRatings(userId, S, update, 0);
 
-  function navigate(id) { setActiveSection(id); }
+  // Which Settings tab an incoming navigation asked for, if any. The
+  // nonce means two consecutive requests for the same tab both land —
+  // tap your avatar, wander to Appearance, tap it again, go back to
+  // Account.
+  const [settingsTab, setSettingsTab] = useState(null);
+
+  function navigate(id) {
+    // 'profile' is no longer a section of its own — the photo, name,
+    // email and password it used to hold live in Settings → Account.
+    // The id stays routable so existing callers (and any stale deep
+    // link) land in the right place rather than on a blank screen.
+    if (id === 'profile') {
+      setSettingsTab({ tab: 'account', n: Date.now() });
+      setActiveSection('settings');
+      return;
+    }
+    setActiveSection(id);
+  }
   function handleOpenModal(id) {
     // Intercept add-flows that have a free-tier cap. If the user is over,
     // open the paywall modal instead of the add modal.
@@ -741,7 +757,7 @@ function Board({ userId, userEmail, onSignOut }) {
         )}
         {activeSection === 'settings' && (
           <motion.div key="settings" {...pageMotion}>
-            <SettingsSection S={S} update={update} active userId={userId} onOpenLegal={setLegalPage} onOpenPalette={() => setPaletteOpen(true)} onOpenShortcuts={() => setShortcutsOpen(true)} onOpenVisions={() => setVisionsOpen(true)} onOpenSchedule={isOwner ? () => navigate('upgrade') : null} />
+            <SettingsSection S={S} update={update} active userId={userId} userEmail={userEmail} onSignOut={onSignOut} requestedTab={settingsTab} onOpenLegal={setLegalPage} onOpenPalette={() => setPaletteOpen(true)} onOpenShortcuts={() => setShortcutsOpen(true)} onOpenVisions={() => setVisionsOpen(true)} onOpenSchedule={isOwner ? () => navigate('upgrade') : null} />
           </motion.div>
         )}
         {/* Upgrade — owner-only: rotation, diet, career. Reached from
@@ -764,20 +780,6 @@ function Board({ userId, userEmail, onSignOut }) {
             <MobileFriendsSection
               userId={userId}
               onUpgrade={() => handleOpenModal('paywall:friends')}
-            />
-          </motion.div>
-        )}
-        {/* Profile — mobile-only route. Centralises photo / name /
-            email / password / sign-out under More → Profile so users
-            don't have to dig into Settings tabs to find them. */}
-        {activeSection === 'profile' && (
-          <motion.div key="profile" {...pageMotion}>
-            <MobileProfileSection
-              S={S}
-              update={update}
-              userId={userId}
-              userEmail={userEmail}
-              onSignOut={onSignOut}
             />
           </motion.div>
         )}

@@ -10,13 +10,19 @@ const PRO_CHIP_DISMISSED_KEY = 'vb4_more_pro_chip_dismissed';
  *
  * Holds the secondary sections that don't make the cut for primary
  * bottom tabs:
- *   - Profile      (mobile-only — photo, name, email, password)
  *   - Achievements
  *   - Shopping
  *   - Friends   (mobile-only route → MobileFriendsSection wraps the
  *               FriendsRail orchestrator full-width)
  *   - Leaderboard
- *   - Settings
+ *
+ * Settings and Profile used to sit at the bottom of this list and no
+ * longer do. Both are already one tap away from the left drawer — the
+ * avatar in its header opens Settings → Account, the link under your
+ * name opens Settings — and the app-bar logo cap opens Settings from
+ * any screen. A second route to each only made this sheet longer.
+ * Profile is not a section at all now; `navigate('profile')` resolves
+ * to Settings → Account.
  *
  * Interactions:
  *   - Tap row → close drawer + navigate
@@ -25,7 +31,6 @@ const PRO_CHIP_DISMISSED_KEY = 'vb4_more_pro_chip_dismissed';
  *   - Esc → close (keyboard accessibility)
  */
 const MORE_ITEMS = [
-  { id: 'profile',      icon: 'circle-user', label: 'Profile',      desc: 'Photo, name, email, password' },
   { id: 'achievements', icon: 'star',        label: 'Achievements', desc: 'Your goal map' },
   { id: 'shop',         icon: 'shopping-bag', label: 'Shopping',     desc: 'Things to buy with coins' },
   { id: 'friends',      icon: 'users',       label: 'Friends',      desc: 'See your friends\' progress' },
@@ -34,11 +39,10 @@ const MORE_ITEMS = [
   // tab, not a drawer row — so on a phone the section existed and
   // rendered fine but nothing could navigate to it.
   { id: 'leaderboard',  icon: 'trophy',      label: 'Leaderboard',  desc: 'Where you rank overall' },
-  { id: 'settings',     icon: 'settings',    label: 'Settings',     desc: 'Theme, privacy, tools' },
 ];
 
-// Owner-only: shift rotation calendar. Slotted above Settings and
-// simply absent for everyone else (mirrors the desktop sidebar tab).
+// Owner-only: shift rotation calendar. Appended last and simply absent
+// for everyone else (mirrors the desktop sidebar tab).
 const OWNER_ITEMS = [
   { id: 'upgrade', icon: 'trending-up', label: 'Upgrade', desc: 'Rotation · diet · career' },
 ];
@@ -144,9 +148,8 @@ export default function MoreDrawer({ open, onClose, onNavigate, activeSection, o
           <div className="m-drawer-eyebrow">More</div>
           <ul className="m-drawer-list">
             {[
-              ...MORE_ITEMS.slice(0, -1),
+              ...MORE_ITEMS,
               ...(isOwner ? OWNER_ITEMS : []),
-              ...MORE_ITEMS.slice(-1),
             ].map(item => {
               const isActive = activeSection === item.id;
               return (
