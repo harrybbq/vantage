@@ -25,7 +25,7 @@ import SettingsGroup from './SettingsGroup';
 import { supabase } from '../../lib/supabase';
 import { useOwnHandle } from '../../hooks/useOwnHandle';
 
-export default function AccountPanel({ S, update, userId, userEmail, onSignOut }) {
+export default function AccountPanel({ S, update, userId, userEmail, onSignOut, children }) {
   const profile = S.profile || {};
   const handle = useOwnHandle(userId);
   const fileInputRef = useRef(null);
@@ -245,6 +245,13 @@ export default function AccountPanel({ S, update, userId, userEmail, onSignOut }
           </div>
         </SettingsGroup>
       )}
+
+      {/* Export and delete-account, passed in by SettingsSection. They
+          were the whole Data tab until it folded in here: both act on
+          the account rather than on a feature, and a tab holding two
+          groups was a tab for the sake of one. Delete stays last on the
+          page, which is where the destructive thing belongs. */}
+      {children}
     </>
   );
 }
