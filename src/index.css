@@ -4698,9 +4698,13 @@ button:active:not(:disabled),
   flex-direction: column;
   gap: 2px;
 }
+/* Every row is its own grid, so `auto` columns sized themselves per row
+   and the shares and scores wandered a few pixels out of line down the
+   list. Fixed numeric columns make them a column again — the whole point
+   of putting numbers in a list is that the eye can run down them. */
 .ratings-legend-row {
   display: grid;
-  grid-template-columns: 16px 10px 1fr auto auto;
+  grid-template-columns: 16px 10px minmax(0, 1fr) 30px 26px;
   align-items: center;
   gap: 10px;
   width: 100%;
@@ -4745,6 +4749,7 @@ button:active:not(:disabled),
   font-size: 10px;
   color: var(--text-muted);
   font-variant-numeric: tabular-nums;
+  text-align: right;
 }
 .ratings-legend-score {
   font-family: var(--mono);
@@ -4752,8 +4757,14 @@ button:active:not(:disabled),
   font-weight: 700;
   color: var(--text);
   font-variant-numeric: tabular-nums;
-  min-width: 22px;
   text-align: right;
+}
+/* The label is the only thing allowed to give way — truncating a word
+   is recoverable, a number sliding out of its column is not. */
+.ratings-legend-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 /* Compact variant for desktop profile rail + dark-os column. Tightens
