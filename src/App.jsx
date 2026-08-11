@@ -20,7 +20,7 @@ import MobileFriendsSection from './components/mobile/MobileFriendsSection';
 import MobileProfileSection from './components/mobile/MobileProfileSection';
 import SettingsSection from './components/SettingsSection';
 import UpgradeSection from './components/upgrade/UpgradeSection';
-import { SCHEMES, applyScheme, applyTheme, schemeFromHex } from './components/SettingsSection';
+import { SCHEMES, applyScheme, applyTheme, resolveEffectiveTheme, schemeFromHex } from './components/SettingsSection';
 import { useSubscriptionContext } from './context/SubscriptionContext';
 import Modals from './components/Modals';
 import PaywallModal from './components/PaywallModal';
@@ -110,7 +110,7 @@ function Board({ userId, userEmail, onSignOut }) {
     loadError, retryLoad, startFresh, restoreFromBackup, hasBackup,
   } = useVisionBoardState(userId);
   const { atLimit } = useTierLimits();
-  const { hasPro, loading: tierLoading } = useSubscriptionContext();
+  const { hasPro } = useSubscriptionContext();
   const { isOwner } = useIsOwner(userEmail);
   // Passive WHOOP sync — refreshes vitals/burn whenever the app opens or
   // regains focus (throttled), so data stays fresh without visiting Track.
@@ -247,34 +247,23 @@ function Board({ userId, userEmail, onSignOut }) {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loading, S.hubWidgets, S.mobileWidgets]);
 
-  // Apply stored theme — Pro-gated (lifetime counts as Pro). If entitlement
-  // flips false we auto-revert via applyTheme's resolveEffectiveTheme, so
-  // a lapsed subscriber on dark-os falls to free `dark` (same mode), and
-  // one on cream-pro falls to free `cream`. The resolved id is also
-  // written back to S.theme on tier change so the saved preference stays
-  // accurate — otherwise refreshing would keep showing the lock.
+  // Apply the stored theme. No longer tier-dependent — both themes are
+  // free, so this only has to land the two retired ids (`cream`, `dark`)
+  // on their replacements, which is deterministic and needs no wait.
   useEffect(() => {
-    const saved = S.theme || 'cream';
-    const effective = applyTheme(saved, { hasPro });
-    // Only PERSIST a downgrade once the tier is actually known.
-    //
-    // hasPro starts false and stays false until the subscription
-    // resolves, so on every cold load there was a window where a Pro
-    // theme looked unaffordable. This effect wrote the downgrade
-    // straight into saved state, and by the time hasPro flipped true
-    // the preference was already gone — dark-os silently became dark
-    // and had to be re-picked by hand. Worse after a deploy, where the
-    // cache is cold and the profile fetch takes longer, which is
-    // exactly when it was reported.
-    //
-    // The visual fallback still applies immediately (applyTheme above),
-    // so a genuinely free account never sees a Pro theme it can't have.
-    // Only the write-back waits for a definite answer.
-    if (effective !== saved && !tierLoading) {
+    const saved = S.theme || 'cream-pro';
+    const effective = applyTheme(saved);
+    // Write the resolved id back so a retired preference is only
+    // translated once. This used to wait on `tierLoading`, because
+    // resolution depended on an entitlement that starts out unknown and
+    // a premature write silently downgraded Pro users. It no longer
+    // depends on anything asynchronous, so there is nothing to wait for
+    // — and only this one key is touched.
+    if (effective !== saved) {
       update(prev => ({ ...prev, theme: effective }));
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [S.theme, hasPro, tierLoading]);
+  }, [S.theme]);
 
   function showCoinToast(msg, isEarn, duration, action) {
     const type = isEarn ? 'earn' : (msg.includes('Need') ? 'error' : 'spend');
@@ -862,7 +851,7 @@ function Board({ userId, userEmail, onSignOut }) {
           from Settings. Dark OS users get the terser voice variant. */}
       <TutorialOverlay
         visible={!S.tutorialCompleted}
-        theme={(S.theme === 'dark-os' && hasPro) || S.theme === 'dark' ? 'dark' : 'cream'}
+        theme={resolveEffectiveTheme(S.theme || 'cream-pro') === 'dark-os' ? 'dark' : 'cream'}
         onNavigate={navigate}
         onClose={() => update(prev => ({ ...prev, tutorialCompleted: true }))}
       />

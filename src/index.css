@@ -1084,13 +1084,6 @@ nav:hover .nav-tab-label{opacity:1;}
   --ach-grid-line:        rgba(0,0,0,0.04);
   --ach-conn-active:      #88c4a4;
 }
-/* Free dark theme: give the achievement board a dark default so the
-   right-click "Light background" toggle is meaningful (dark-os already
-   has its own dark override in hub-dark.css). */
-html[data-theme="dark"] {
-  --ach-canvas-bg:        #0e0e0d;
-  --ach-grid-line:        rgba(255,255,255,0.04);
-}
 :root {
   --ach-conn-done:        #c8970a;
   --ach-conn-locked:      #ccc;
@@ -2682,8 +2675,7 @@ html[data-theme="dark"] {
   background:rgba(139,94,0,.12);
   color:#8b5e00;
 }
-html[data-hub-os] .ach-credit-note,
-html[data-theme="dark"] .ach-credit-note{
+html[data-hub-os] .ach-credit-note{
   border-color:rgba(194,154,69,.32);background:rgba(194,154,69,.1);color:#c29a45;
 }
 
@@ -4552,46 +4544,6 @@ button:active:not(:disabled),
   letter-spacing: 1.4px;
   color: var(--text-muted);
 }
-.ratings-ledger-ovr-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-}
-.ratings-ledger-ovr-block {
-  display: flex;
-  align-items: baseline;
-  gap: 8px;
-  min-width: 0;
-}
-.ratings-ledger-ovr-label {
-  font-size: 11px;
-  letter-spacing: 1.4px;
-  color: var(--text-muted);
-  white-space: nowrap; /* never wrap "[ OVR ]" vertically in the rail */
-}
-.ratings-ledger-ovr-value {
-  font-family: var(--serif, Georgia, serif);
-  font-style: italic;
-  font-weight: 700;
-  font-size: 48px;
-  line-height: 1;
-  color: var(--text);
-  font-variant-numeric: tabular-nums;
-  letter-spacing: -1px;
-}
-.ratings-ledger-ovr-suffix {
-  font-size: 12px;
-  color: var(--text-muted);
-  letter-spacing: 0.5px;
-}
-.ratings-ledger-ovr-tier {
-  font-size: 11px;
-  letter-spacing: 1.6px;
-  text-transform: uppercase;
-  font-weight: 700;
-  white-space: nowrap;
-}
 /* Prestige badge sits on its own row under the OVR hero so narrow
    variants (144px rail, compact) never crowd the number/tier. */
 .ratings-ledger-prestige-row {
@@ -4654,21 +4606,90 @@ button:active:not(:disabled),
   .ovr-num { animation: none !important; }
 }
 
-.ratings-ledger-rows {
+/* ── OVR donut ─────────────────────────────────────────────────────
+   Four arcs sized by each pillar's share of the four added together,
+   with the rating in the hole. Colours come from
+   src/lib/ratings/palette.js, where the CVD validation record for them
+   lives; nothing here picks a series colour. */
+.ratings-ledger-donut-wrap {
+  display: flex;
+  justify-content: center;
+  padding: 2px 0 4px;
+}
+.ratings-donut { display: block; overflow: visible; }
+
+/* The hole, tinted with the tier band so bronze/silver/gold reads at a
+   glance. Kept faint — it sits behind a number that has to stay the
+   most legible thing in the card. */
+.ratings-donut-hole {
+  fill: color-mix(in srgb, var(--rt-tier) 13%, var(--surface, transparent));
+  stroke: color-mix(in srgb, var(--rt-tier) 26%, transparent);
+  stroke-width: 1;
+}
+.ratings-donut-track {
+  stroke: var(--border);
+  opacity: 0.5;
+}
+.ratings-donut-hit {
+  stroke: transparent;
+  cursor: pointer;
+  outline: none;
+  -webkit-tap-highlight-color: transparent;
+}
+/* Hover/focus lifts the ARC, not the invisible hit ring above it. */
+.ratings-donut-arc { transition: opacity .16s ease, stroke-width .16s ease; }
+.ratings-donut-seg:hover .ratings-donut-arc { stroke-width: 16; }
+.ratings-donut-hit:focus-visible + .ratings-donut-arc {
+  stroke-width: 16;
+}
+.ratings-donut-seg:hover ~ .ratings-donut-seg .ratings-donut-arc,
+.ratings-donut-seg:has(~ .ratings-donut-seg:hover) .ratings-donut-arc {
+  opacity: 0.55;
+}
+@media (prefers-reduced-motion: reduce) {
+  .ratings-donut-arc { transition: none; }
+}
+
+.ratings-donut-ovr {
+  font-family: var(--serif, Georgia, serif);
+  font-style: italic;
+  font-weight: 700;
+  font-size: 40px;
+  fill: var(--text);
+  font-variant-numeric: tabular-nums;
+  /* The tier glow the mock asked for — a halo rather than a recolour,
+     so the number keeps text-token contrast on both surfaces. */
+  filter: drop-shadow(0 0 7px color-mix(in srgb, var(--rt-tier) 55%, transparent));
+}
+.ratings-donut-sub {
+  font-family: var(--mono);
+  font-size: 8.5px;
+  letter-spacing: 1.6px;
+  fill: var(--text-muted);
+}
+
+/* ── Legend ────────────────────────────────────────────────────────
+   Always present. Identity never rests on colour alone, and this is
+   also the visible-label relief the palette owes for the two steps
+   under 3:1 against their surface. */
+.ratings-ledger-legend {
   list-style: none;
   margin: 0;
   padding: 0;
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 2px;
 }
-.ratings-ledger-row {
+.ratings-legend-row {
   display: grid;
-  grid-template-columns: 22px 18px 70px 1fr 32px;
+  grid-template-columns: 16px 10px 1fr auto auto;
   align-items: center;
   gap: 10px;
   width: 100%;
-  padding: 6px 4px;
+  /* A comfortable thumb target — the legend row is the other way into a
+     breakdown, so it has to be as tappable as the arc it names. */
+  min-height: 40px;
+  padding: 6px 6px;
   border-radius: 6px;
   background: transparent;
   border: none;
@@ -4679,70 +4700,47 @@ button:active:not(:disabled),
   transition: background .15s;
   -webkit-tap-highlight-color: transparent;
 }
-.ratings-ledger-row:hover { background: rgba(var(--em-rgb), 0.05); }
-.ratings-ledger-row-idx {
-  font-size: 10px;
-  color: var(--text-muted);
-  letter-spacing: 0.4px;
+.ratings-legend-row:hover { background: rgba(var(--em-rgb), 0.06); }
+.ratings-legend-row:focus-visible {
+  outline: 2px solid var(--em);
+  outline-offset: -2px;
 }
-.ratings-ledger-row-icon {
-  font-size: 12px;
+.ratings-legend-idx {
+  font-family: var(--mono);
+  font-size: 9px;
   color: var(--text-muted);
-  text-align: center;
+  font-variant-numeric: tabular-nums;
 }
-.ratings-ledger-row-label {
+.ratings-legend-chip {
+  width: 10px; height: 10px;
+  border-radius: 3px;
+}
+.ratings-legend-label {
+  font-family: var(--mono);
   font-size: 10.5px;
   letter-spacing: 1.4px;
   text-transform: uppercase;
   color: var(--text);
 }
-.ratings-ledger-row-track {
-  position: relative;
-  height: 8px;
-  display: flex;
-  align-items: center;
-  /* Dotted baseline — the "empty" portion of the bar reads as dots */
-  background-image: radial-gradient(circle, var(--border) 0.8px, transparent 1.2px);
-  background-size: 5px 8px;
-  background-position: 0 center;
-  background-repeat: repeat-x;
-  border-radius: 2px;
-  overflow: hidden;
-}
-.ratings-ledger-row-fill {
-  position: absolute;
-  inset: 2px 0;
-  border-radius: 1px;
-  transition: width .4s ease;
-}
-.ratings-ledger-row-fill-starting {
-  background: var(--text-muted);
-  opacity: 0.45;
-}
-.ratings-ledger-row-fill-mid {
-  background: var(--em, #1a7a4a);
-}
-.ratings-ledger-row-fill-elite {
-  background: var(--gold, #c8970a);
-}
-.ratings-ledger-row-score {
-  font-size: 14px;
-  font-weight: 700;
-  text-align: right;
+.ratings-legend-share {
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--text-muted);
   font-variant-numeric: tabular-nums;
+}
+.ratings-legend-score {
+  font-family: var(--mono);
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+  min-width: 22px;
+  text-align: right;
 }
 
 /* Compact variant for desktop profile rail + dark-os column. Tightens
    spacing; OVR number stays large because it's the headline number. */
 .ratings-ledger-compact { padding: 12px 14px; gap: 10px; }
-.ratings-ledger-compact .ratings-ledger-ovr-value { font-size: 38px; }
-.ratings-ledger-compact .ratings-ledger-row {
-  grid-template-columns: 20px 16px 56px 1fr 28px;
-  gap: 8px;
-  padding: 4px 2px;
-}
-.ratings-ledger-compact .ratings-ledger-row-label { font-size: 9.5px; letter-spacing: 1.2px; }
-.ratings-ledger-compact .ratings-ledger-row-score { font-size: 12.5px; }
 
 /* Profile rail is 144px wide — compact isn't tight enough. Strip the
    index + icon columns, stack the OVR header, hide the F5·S3 tag. */
@@ -4757,31 +4755,6 @@ button:active:not(:disabled),
 }
 .profile-col--with-rail .ratings-ledger-eyebrow { font-size: 8.5px; letter-spacing: 1.4px; }
 .profile-col--with-rail .ratings-ledger-tag { display: none; }
-/* Stack OVR row vertically so tier doesn't fight the value for space */
-.profile-col--with-rail .ratings-ledger-ovr-row {
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 2px;
-}
-.profile-col--with-rail .ratings-ledger-ovr-block { gap: 4px; }
-.profile-col--with-rail .ratings-ledger-ovr-label { font-size: 9px; letter-spacing: 1.2px; }
-.profile-col--with-rail .ratings-ledger-ovr-value { font-size: 28px; }
-.profile-col--with-rail .ratings-ledger-ovr-suffix { font-size: 10px; }
-.profile-col--with-rail .ratings-ledger-ovr-tier { font-size: 9px; letter-spacing: 1.2px; }
-/* Drop index + icon columns — just label + bar + score */
-.profile-col--with-rail .ratings-ledger-row {
-  grid-template-columns: 40px 1fr 22px;
-  gap: 6px;
-  padding: 3px 2px;
-}
-.profile-col--with-rail .ratings-ledger-row-idx,
-.profile-col--with-rail .ratings-ledger-row-icon { display: none; }
-.profile-col--with-rail .ratings-ledger-row-label {
-  font-size: 8.5px;
-  letter-spacing: 0.8px;
-}
-.profile-col--with-rail .ratings-ledger-row-track { height: 6px; background-size: 4px 6px; }
-.profile-col--with-rail .ratings-ledger-row-score { font-size: 11px; }
 
 /* ── Leaderboard ── */
 .lb-panel{

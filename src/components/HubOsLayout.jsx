@@ -1,9 +1,10 @@
 /**
- * Dark OS Hub layout.
+ * Operator-console hub layout.
  *
- * Opt-in for Pro users (S.theme === 'dark-os'). Reuses the existing
- * HubSection's widget canvas, QuickLog, AiCoachWidget, and CoachBriefPanel,
- * but arranges them in a 3-zone OS grid with chrome-style panels.
+ * Used by BOTH themes and every tier since the free themes were retired
+ * in 2026-08 — it is simply what the hub looks like now. Reuses the
+ * existing HubSection widget canvas, QuickLog, AiCoachWidget and
+ * CoachBriefPanel, arranged in a 3-zone grid with chrome-style panels.
  *
  * Each panel is a standalone component so future work can let users
  * toggle / re-arrange them — S.hubLayout will drive which render.
@@ -351,17 +352,13 @@ export function OsRatingsPanel({ S, update }) {
 }
 
 // ── Panel: Quick Actions ──────────────────────────────────────────────────
-export function OsActionsPanel({ onAddWidget, onSort, onSnapFill, onNavigateSettings, snapOn, onToggleSnap }) {
+export function OsActionsPanel({ onAddWidget, onSnapFill, onNavigateSettings, snapOn, onToggleSnap }) {
   return (
     <OsPanel label="Actions" innerPadding={false}>
       <div className="os-actions">
         <motion.button className="os-action-btn primary" onClick={onAddWidget}
           whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
           <Icon name="plus" size={14} /> Add widget
-        </motion.button>
-        <motion.button className="os-action-btn" onClick={onSort}
-          whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
-          <Icon name="layout-grid" size={13} /> Sort
         </motion.button>
         {onSnapFill && (
           <motion.button className="os-action-btn" onClick={onSnapFill}
@@ -599,7 +596,7 @@ export function OsCardioPanel({ profile = {}, onSaveWeight, onLogBurn }) {
 // ── Main OS layout ────────────────────────────────────────────────────────
 export default function HubOsLayout({
   S, update, canvasRef,
-  onAddWidget, onSort, onSnapFill, onNavigateSettings, onNavigateTrack,
+  onAddWidget, onSnapFill, onNavigateSettings, onNavigateTrack,
   onShowCoinToast, onOpenWaitlist, onCoachAct,
   onUploadPhoto, onToggleSnap,
   userId, onUpgrade,
@@ -650,7 +647,6 @@ export default function HubOsLayout({
           <div className="os-col-inner">
             <OsActionsPanel
               onAddWidget={onAddWidget}
-              onSort={onSort}
               onSnapFill={onSnapFill}
               onNavigateSettings={onNavigateSettings}
               snapOn={!!S.hubSnap}

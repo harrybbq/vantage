@@ -142,62 +142,68 @@ export function currentAccentHex(S) {
 // dark-os (existing operator console). All four are real themes,
 // not gates on the same theme — Pro users get a real visual upgrade
 // in BOTH light AND dark modes.
+/**
+ * The two themes, both free.
+ *
+ * There used to be four: a plain cream and a plain dark for free users,
+ * with these two behind Pro. Charging for the good-looking one meant
+ * every new account met the weaker version of the app first, which is a
+ * strange thing to do when you are trying to be liked. Pro now earns its
+ * money on limits, customisation and the wider widget set — the things
+ * someone wants MORE of once they already like it.
+ *
+ * The ids keep their `-pro` suffix on purpose: they are what is saved in
+ * S.theme, and renaming them would orphan every existing preference for
+ * no gain. Only the labels changed.
+ */
 export const THEMES = [
   {
-    id: 'cream', name: 'Cream', tagline: 'Warm parchment · free',
+    id: 'cream-pro', name: 'Cream', tagline: 'Warm parchment · refined accents',
     mode: 'light', pro: false,
-    swatch: 'linear-gradient(145deg,#f7f4ef 0%,#ede8e0 45%,#e0d8cc 100%)',
-  },
-  {
-    id: 'dark', name: 'Dark', tagline: 'Cream tones inverted · free',
-    mode: 'dark', pro: false,
-    swatch: 'linear-gradient(145deg,#2a2724 0%,#1d1b18 50%,#14120f 100%)',
-  },
-  {
-    id: 'cream-pro', name: 'Cream Pro', tagline: 'Refined accents · Pro',
-    mode: 'light', pro: true,
     swatch: 'linear-gradient(145deg,#f9f6f0 0%,#ede4d4 45%,#cdb88c 100%)',
   },
   {
-    id: 'dark-os', name: 'Dark OS', tagline: 'Operator console · Pro',
-    mode: 'dark', pro: true,
+    id: 'dark-os', name: 'Dark OS', tagline: 'Operator console',
+    mode: 'dark', pro: false,
     swatch: 'linear-gradient(145deg,#1f1f1c 0%,#131311 55%,#0a0a09 100%)',
   },
 ];
 
-// Migration rule for users who saved a theme they no longer qualify
-// for (e.g. Pro lapse). Always falls back to a same-mode free theme
-// rather than flipping light↔dark, so a Pro user demoted at night
-// doesn't get blinded by cream.
-function resolveEffectiveTheme(saved, hasPro) {
-  const t = THEMES.find(x => x.id === saved);
-  if (!t) return 'cream'; // unknown id → safest default
-  if (!t.pro || hasPro) return t.id;
-  // Pro theme but user is free — pick the same-mode free counterpart
-  return t.mode === 'dark' ? 'dark' : 'cream';
+/** Retired ids → where a saved preference lands now, by mode. */
+const LEGACY_THEMES = { cream: 'cream-pro', dark: 'dark-os' };
+
+/**
+ * Where a saved theme id actually lands.
+ *
+ * No longer depends on the tier — both themes are free, so this is now
+ * purely about retired ids. A saved `dark` goes to `dark-os` and a saved
+ * `cream` to `cream-pro`, matching mode so nobody who chose dark gets a
+ * face full of cream on next load. Anything unrecognised falls to the
+ * light one rather than throwing.
+ */
+export function resolveEffectiveTheme(saved) {
+  if (THEMES.some(x => x.id === saved)) return saved;
+  return LEGACY_THEMES[saved] || 'cream-pro';
 }
 
 /**
- * Apply (or clear) the theme attribute on <html>.
- * Called on boot from main.jsx and whenever the user toggles the theme.
- * Cream is the default (no data-theme attribute); all other themes set
- * data-theme="<id>" so CSS rules can scope on it.
+ * Apply the theme attribute to <html>.
  *
- * Also sets data-hub-os="1" on <html> whenever the active theme uses
- * the operator-console hub layout (dark-os OR cream-pro). hub-dark.css
- * layout rules key on this attribute so cream-pro inherits the OS
- * panel/grid structure without picking up dark-os's palette.
+ * Called on boot from main.jsx and whenever the theme is toggled. Both
+ * themes now set data-theme="<id>" — there is no longer an
+ * attribute-less default, because the bare-cream theme it stood for is
+ * gone.
+ *
+ * Also sets data-hub-os="1", which both remaining themes want:
+ * hub-dark.css keys its layout on that attribute so Cream inherits the
+ * operator-console structure without picking up Dark OS's palette.
  */
-export function applyTheme(theme, { hasPro = false } = {}) {
-  const effective = resolveEffectiveTheme(theme || 'cream', hasPro);
+export function applyTheme(theme) {
+  const effective = resolveEffectiveTheme(theme || 'cream-pro');
   const r = document.documentElement;
-  if (effective === 'cream') r.removeAttribute('data-theme');
-  else r.setAttribute('data-theme', effective);
-  if (isOsLayoutTheme(effective)) {
-    r.setAttribute('data-hub-os', '1');
-  } else {
-    r.removeAttribute('data-hub-os');
-  }
+  r.setAttribute('data-theme', effective);
+  if (isOsLayoutTheme(effective)) r.setAttribute('data-hub-os', '1');
+  else r.removeAttribute('data-hub-os');
   return effective;
 }
 
@@ -575,18 +581,16 @@ export default function SettingsSection({ S, update, active, userId, onOpenLegal
   const [deleting, setDeleting] = useState(false);
   const [activeTab, setActiveTab] = useState('appearance');
   const currentScheme = S.colorScheme || 'green';
-  const currentTheme = S.theme || 'cream';
+  // Resolved, not raw — someone still carrying a retired `cream`/`dark`
+  // should see the card they actually landed on marked active.
+  const currentTheme = resolveEffectiveTheme(S.theme || 'cream-pro');
   const { hasPro } = useSubscriptionContext();
   const hubPanels = S.hubPanels || {};
-  const osLayoutActive = hasPro && isOsLayoutTheme(currentTheme);
+  const osLayoutActive = isOsLayoutTheme(currentTheme);
 
   function handleThemeChange(themeId) {
-    const t = THEMES.find(x => x.id === themeId);
-    if (!t) return;
-    // Free users can't select the Pro theme — show a nudge instead.
-    // Lifetime users count as Pro via hasPro.
-    if (t.pro && !hasPro) return;
-    applyTheme(themeId, { hasPro });
+    if (!THEMES.some(x => x.id === themeId)) return;
+    applyTheme(themeId);
     update(prev => ({ ...prev, theme: themeId }));
   }
 
@@ -792,23 +796,19 @@ export default function SettingsSection({ S, update, active, userId, onOpenLegal
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '10px' }}>
             {THEMES.map(t => {
               const isActive = currentTheme === t.id;
-              const locked = t.pro && !hasPro;
               return (
                 <button
                   key={t.id}
                   onClick={() => handleThemeChange(t.id)}
-                  disabled={locked}
                   style={{
                     position: 'relative', textAlign: 'left',
                     padding: '14px 14px 16px', borderRadius: '12px',
-                    cursor: locked ? 'not-allowed' : 'pointer',
+                    cursor: 'pointer',
                     border: isActive ? '2px solid var(--em)' : '2px solid var(--border)',
                     background: isActive ? 'rgba(var(--em-rgb),0.08)' : 'var(--card, rgba(255,255,255,0.04))',
-                    opacity: locked ? 0.6 : 1,
                     transition: 'all .18s',
                     display: 'flex', flexDirection: 'column', gap: '10px',
                   }}
-                  title={locked ? 'Upgrade to Pro to unlock Dark OS' : ''}
                 >
                   <div style={{
                     height: '48px', borderRadius: '8px',
@@ -822,17 +822,6 @@ export default function SettingsSection({ S, update, active, userId, onOpenLegal
                       color: 'var(--text)',
                     }}>
                       {t.name}
-                      {t.pro && (
-                        <span style={{
-                          fontFamily: 'var(--mono)', fontSize: '8px', letterSpacing: '1.4px',
-                          textTransform: 'uppercase', padding: '2px 6px', borderRadius: '3px',
-                          background: locked ? 'rgba(200,151,10,0.12)' : 'rgba(var(--em-rgb),0.14)',
-                          color: locked ? 'var(--gold)' : 'var(--em)',
-                          border: `1px solid ${locked ? 'rgba(200,151,10,0.28)' : 'rgba(var(--em-rgb),0.28)'}`,
-                        }}>
-                          {locked ? '🔒 Pro' : 'Pro'}
-                        </span>
-                      )}
                       {isActive && (
                         <span style={{
                           fontFamily: 'var(--mono)', fontSize: '8px', letterSpacing: '1.4px',
@@ -855,7 +844,7 @@ export default function SettingsSection({ S, update, active, userId, onOpenLegal
           </div>
           {!hasPro && (
             <p style={{ fontFamily: 'var(--mono)', fontSize: '10px', color: 'var(--text-muted)', margin: '14px 0 0', letterSpacing: '0.5px' }}>
-              The control-panel hub layout (Dark OS and Cream Pro) is part of Pro. Upgrade to unlock it and colour-scheme customisation.
+              Both themes are free. Pro adds the accent colours below, lifts the limits, and opens the rest of the widgets.
             </p>
           )}
         </div>

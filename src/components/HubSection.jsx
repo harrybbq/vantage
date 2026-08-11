@@ -11,6 +11,7 @@ import { isRetiredWidget } from '../lib/widgets/retired';
 import MarketBody from './widgets/MarketWidget';
 import NewsBody from './widgets/NewsWidget';
 import { reflow, MIN_W, MIN_H, SNAP_GAP as REFLOW_GAP } from '../lib/hub/reflow';
+import { rescaleLayout, rebaseLayout } from '../lib/hub/rescale';
 import { observeShape } from '../lib/hub/shape';
 const TradingBody = TRADING_WIDGET_BUILD_EXCLUDED ? null : lazy(() => import('./widgets/TradingWidget'));
 import { timeAgo } from '../utils/helpers';
@@ -22,7 +23,7 @@ import FriendsRail from './friends/FriendsRail';
 import RatingsPanel from './RatingsPanel';
 import { ovrTier } from '../lib/ratings/tiers';
 import { useSubscriptionContext } from '../context/SubscriptionContext';
-import { isOsLayoutTheme } from './SettingsSection';
+import { isOsLayoutTheme, resolveEffectiveTheme } from './SettingsSection';
 import { useHubModuleMenu } from './HubModuleMenu';
 import { APP_PRESETS } from '../data/appPresets';
 import { fetchAppPreview } from '../lib/appPreview';
@@ -280,7 +281,14 @@ function useWidgetDrag(canvasRef, S, update, snapRef) {
           if (id) newPositions[id] = { x: left, y: top };
         });
         if (Object.keys(newPositions).length) {
-          update(prev => ({ ...prev, widgetPositions: { ...prev.widgetPositions, ...newPositions } }));
+          // First moment this layout has coordinates at all, so this
+          // canvas width is the space they are expressed in.
+          const spaceW = Math.round(cr.width);
+          update(prev => ({
+            ...prev,
+            widgetPositions: { ...prev.widgetPositions, ...newPositions },
+            ...(spaceW > 0 ? { widgetLayoutW: spaceW } : {}),
+          }));
         }
       }
 
@@ -371,7 +379,15 @@ function useWidgetDrag(canvasRef, S, update, snapRef) {
           if (g) { wrapper.style.left = g.x + 'px'; wrapper.style.top = g.y + 'px'; }
         }
         update(prev => {
-          const wp = { ...prev.widgetPositions, [linkId]: { x: wrapper.offsetLeft, y: wrapper.offsetTop } };
+          // The drag landed in CURRENT-width pixels. If the rest of the
+          // layout is still stored against another display's width, bring
+          // it into this one first — otherwise half the layout would be in
+          // one coordinate space and half in another. Rebasing on a real
+          // edit rather than on load is what keeps a glance on a small
+          // laptop from flattening a layout built on a big monitor.
+          const base = rebaseLayout(prev, cwDrop) || {};
+          const next = { ...prev, ...base };
+          const wp = { ...(next.widgetPositions || {}), [linkId]: { x: wrapper.offsetLeft, y: wrapper.offsetTop } };
           // Snap mode moved neighbours too — commit them in the same write.
           if (snapOthers) {
             for (const o of snapOthers) {
@@ -379,7 +395,7 @@ function useWidgetDrag(canvasRef, S, update, snapRef) {
               if (id) wp[id] = { x: o.el.offsetLeft, y: o.el.offsetTop };
             }
           }
-          return { ...prev, widgetPositions: wp };
+          return { ...next, widgetPositions: wp };
         });
         if (snapOthers) snapOthers.forEach(o => o.el.classList.remove('snap-push'));
         growCanvas(canvas);
@@ -401,7 +417,7 @@ function useWidgetDrag(canvasRef, S, update, snapRef) {
 // after the action buttons — used by the cream layout to slot the
 // QuickLog trackers under "Sort". The `--with-rail` modifier widens
 // the column so the trackers stack vertically without being clipped.
-function ProfileCard({ profile, S, update, handle, onSaveName, onSaveTagline, onUploadPhoto, onAddWidget, onSortWidgets, onSnapFill, onToggleSnap, onNavigateSettings, visionState, children }) {
+function ProfileCard({ profile, S, update, handle, onSaveName, onSaveTagline, onUploadPhoto, onAddWidget, onSnapFill, onToggleSnap, onNavigateSettings, visionState, children }) {
   // OVR replaces the old Lvl badge (F5 Sprint 3). Read from S.ratings
   // — which is refreshed by useRatings on a 1.5s debounce. Falls back
   // to 1 if no rating computed yet (fresh user) so the chip never
@@ -463,9 +479,6 @@ function ProfileCard({ profile, S, update, handle, onSaveName, onSaveTagline, on
       <motion.button className="hub-action-btn add-widget" onClick={onAddWidget}
         whileHover={{ scale: 1.04 }} whileTap={{ scale: 0.96 }}
         transition={{ type: 'spring', stiffness: 400, damping: 17 }}><Icon name="plus" size={14} /> Add widget</motion.button>
-      <motion.button className="hub-action-btn sort-widgets" onClick={onSortWidgets}
-        whileHover={{ scale: 1.04 }} whileTap={{ scale: 0.96 }}
-        transition={{ type: 'spring', stiffness: 400, damping: 17 }}><Icon name="layout-grid" size={13} /> Sort</motion.button>
       {onSnapFill && (
         <motion.button className="hub-action-btn sort-widgets" onClick={onSnapFill}
           whileHover={{ scale: 1.04 }} whileTap={{ scale: 0.96 }}
@@ -619,7 +632,13 @@ export default function HubSection({ S, update, active, onOpenModal, onOpenWaitl
   // never see it. The two themes share the same panel/grid structure
   // but keep their own palettes (dark for dark-os, cream for cream-pro)
   // via the data-hub-os attribute + theme-scoped token overrides.
-  const isOsLayout = hasPro && isOsLayoutTheme(S.theme);
+  // No longer gated on Pro. applyTheme sets data-hub-os for both themes,
+  // so gating the LAYOUT on the tier while the STYLESHEET followed the
+  // theme would have handed free users the operator-console CSS wrapped
+  // round the old cream markup. Resolved rather than raw, so a retired
+  // `cream`/`dark` still picks the right branch on the render before the
+  // write-back lands.
+  const isOsLayout = isOsLayoutTheme(resolveEffectiveTheme(S.theme));
 
   function handleUploadPhoto(e) {
     const file = e.target.files[0];
@@ -629,12 +648,6 @@ export default function HubSection({ S, update, active, onOpenModal, onOpenWaitl
       update(prev => ({ ...prev, profile: { ...prev.profile, photo: ev.target.result } }));
     };
     r.readAsDataURL(file);
-  }
-
-  function handleSortWidgets() {
-    // Sort re-flows widgets into the grid AND resets any custom sizes
-    // the user dragged the widgets to (per the resize feature).
-    update(prev => ({ ...prev, widgetPositions: {}, widgetSizes: {} }));
   }
 
   function handleToggleSnap() {
@@ -711,6 +724,9 @@ export default function HubSection({ S, update, active, onOpenModal, onOpenWaitl
       ...prev,
       widgetPositions: { ...(prev.widgetPositions || {}), ...newPositions },
       widgetSizes:     { ...(prev.widgetSizes || {}),     ...newSizes     },
+      // Everything just moved, computed against this canvas — so this
+      // width IS the layout's space now.
+      widgetLayoutW: cw,
     }));
   }
 
@@ -720,8 +736,10 @@ export default function HubSection({ S, update, active, onOpenModal, onOpenWaitl
   // that by a pointerdown landing in the bottom-right grip zone, then
   // read the size on pointerup — so content-driven layout changes (e.g.
   // a GitHub widget's stats loading) never get mistaken for a resize.
-  const makeResizable = useCallback((wrapper, id) => {
-    const saved = (S.widgetSizes || {})[id];
+  const makeResizable = useCallback((wrapper, id, sizeMap) => {
+    // sizeMap is the SCALED map from renderCanvas — falling back to the
+    // stored one keeps any caller that predates the scaling working.
+    const saved = (sizeMap || S.widgetSizes || {})[id];
     if (saved) {
       if (saved.w) wrapper.style.width = saved.w + 'px';
       if (saved.h) wrapper.style.height = saved.h + 'px';
@@ -802,8 +820,11 @@ export default function HubSection({ S, update, active, onOpenModal, onOpenWaitl
       growCanvas(canvasRef.current);
 
       update(prev => {
-        const sizes = { ...(prev.widgetSizes || {}) };
-        const pos = { ...(prev.widgetPositions || {}) };
+        // Same rebase as the drag commit — see there for why.
+        const base = rebaseLayout(prev, cw) || {};
+        const next = { ...prev, ...base };
+        const sizes = { ...(next.widgetSizes || {}) };
+        const pos = { ...(next.widgetPositions || {}) };
         sizes[id] = { w, h };
         pos[id] = { x, y };
         if (nbs) {
@@ -815,7 +836,7 @@ export default function HubSection({ S, update, active, onOpenModal, onOpenWaitl
             sizes[nid] = { w: nb.el.offsetWidth, h: nb.el.offsetHeight };
           }
         }
-        return { ...prev, widgetSizes: sizes, widgetPositions: pos };
+        return { ...next, widgetSizes: sizes, widgetPositions: pos };
       });
     }
 
@@ -1046,7 +1067,19 @@ export default function HubSection({ S, update, active, onOpenModal, onOpenWaitl
 
     canvas.innerHTML = '';
 
-    const hasPositions = Object.keys(S.widgetPositions).length > 0;
+    // Positions and sizes are stored in the coordinate space of the
+    // display they were arranged on (S.widgetLayoutW). Map them into the
+    // canvas width in front of us before anything reads them, so a
+    // layout built at 1440 fills a 2560 monitor in the same proportions
+    // instead of hugging the left half of it. View-only — see
+    // lib/hub/rescale.js for why this is never written back on load.
+    const canvasW0 = canvas.clientWidth || 0;
+    const scaled = rescaleLayout(
+      S.widgetPositions || {}, S.widgetSizes || {}, S.widgetLayoutW, canvasW0,
+    );
+    const layoutPositions = scaled.positions;
+    const layoutSizes = scaled.sizes;
+    const hasPositions = Object.keys(layoutPositions).length > 0;
     // Widgets added AFTER the canvas went free-position have no saved
     // spot. They used to all land on the same default coordinate, one
     // on top of the next — the three-across rule only ever applied to
@@ -1073,7 +1106,7 @@ export default function HubSection({ S, update, active, onOpenModal, onOpenWaitl
       wrapper.dataset.linkId = link.id;
 
       if (hasPositions) {
-        const pos = S.widgetPositions[link.id];
+        const pos = layoutPositions[link.id];
         wrapper.style.cssText = `position:absolute;min-width:280px;max-width:360px;width:300px;user-select:none;left:${pos ? pos.x : 0}px;top:${pos ? pos.y : 0}px;`;
         if (!pos) unplaced.push({ id: link.id, wrapper });
       }
@@ -1137,7 +1170,7 @@ export default function HubSection({ S, update, active, onOpenModal, onOpenWaitl
       wrapper.appendChild(island);
       canvas.appendChild(wrapper);
       makeDraggable(wrapper, link.id);
-      makeResizable(wrapper, link.id);
+      makeResizable(wrapper, link.id, layoutSizes);
 
       if (isGH) loadGHIsland(link, S.ghCache, update);
       else if (isLivePreset) loadLivePreviewIntoLink(link.id, link.url);
@@ -1158,7 +1191,7 @@ export default function HubSection({ S, update, active, onOpenModal, onOpenWaitl
       wrapper.className = 'widget-wrapper' + (hasPositions ? '' : ' snapping');
       wrapper.dataset.linkId = hw.id;
       if (hasPositions) {
-        const pos = S.widgetPositions[hw.id];
+        const pos = layoutPositions[hw.id];
         wrapper.style.cssText = `position:absolute;min-width:280px;max-width:360px;width:300px;user-select:none;left:${pos ? pos.x : 40}px;top:${pos ? pos.y : 40}px;`;
         if (!pos) unplaced.push({ id: hw.id, wrapper });
       }
@@ -1226,7 +1259,7 @@ export default function HubSection({ S, update, active, onOpenModal, onOpenWaitl
       wrapper.appendChild(island);
       canvas.appendChild(wrapper);
       makeDraggable(wrapper, hw.id);
-      makeResizable(wrapper, hw.id);
+      makeResizable(wrapper, hw.id, layoutSizes);
       if (hw.type === 'leaderboard') loadLeaderboardIntoWidget(hw.id);
       // Mount React-island bodies (vitals / macros / calories).
       const host = island.querySelector('[data-react-widget]');
@@ -1317,11 +1350,41 @@ export default function HubSection({ S, update, active, onOpenModal, onOpenWaitl
 
     growCanvas(canvas);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [S.links, hubWidgetSig, S.holidays, S.habits, S.widgetPositions, S.hubSnap]);
+  }, [S.links, hubWidgetSig, S.holidays, S.habits, S.widgetPositions, S.widgetSizes, S.widgetLayoutW, S.hubSnap]);
 
   useEffect(() => {
     if (active) renderCanvas();
   }, [active, renderCanvas, isOsLayout]);
+
+  // Re-lay the canvas when the window changes WIDTH.
+  //
+  // Only width: height changes constantly on mobile as the URL bar
+  // slides, and the layout does not depend on it — rebuilding the whole
+  // canvas for that would be a lot of work to change nothing. rAF-
+  // coalesced so a drag of the window edge does one rebuild per frame at
+  // most, and guarded on the width actually differing so a resize event
+  // that only moved the height is free.
+  const lastCanvasWRef = useRef(0);
+  useEffect(() => {
+    if (!active) return undefined;
+    let raf = 0;
+    const onResize = () => {
+      if (raf) return;
+      raf = requestAnimationFrame(() => {
+        raf = 0;
+        const w = canvasRef.current?.clientWidth || 0;
+        if (!w || w === lastCanvasWRef.current) return;
+        lastCanvasWRef.current = w;
+        renderCanvas();
+      });
+    };
+    lastCanvasWRef.current = canvasRef.current?.clientWidth || 0;
+    window.addEventListener('resize', onResize);
+    return () => {
+      window.removeEventListener('resize', onResize);
+      if (raf) cancelAnimationFrame(raf);
+    };
+  }, [active, renderCanvas]);
 
   // Tear down any live React islands when HubSection itself unmounts.
   // Deferred a tick — unmounting a root synchronously inside React's
@@ -1335,7 +1398,7 @@ export default function HubSection({ S, update, active, onOpenModal, onOpenWaitl
     }), 0);
   }, []);
 
-  // ── Dark OS layout (Pro only) ─────────────────────────────────────────
+  // ── Operator-console layout — both themes, every tier ────────────────
   if (isOsLayout) {
     return (
       <section id="hub" className={`section${active ? ' active' : ''}`}>
@@ -1344,7 +1407,6 @@ export default function HubSection({ S, update, active, onOpenModal, onOpenWaitl
           update={update}
           canvasRef={canvasRef}
           onAddWidget={() => onOpenModal('addLinkModal')}
-          onSort={handleSortWidgets}
           onSnapFill={handleSnapToFill}
           onNavigateSettings={onNavigateSettings}
           onNavigateTrack={onNavigateTrack}
@@ -1378,7 +1440,6 @@ export default function HubSection({ S, update, active, onOpenModal, onOpenWaitl
           onSaveTagline={tagline => update(prev => ({ ...prev, profile: { ...prev.profile, tagline } }))}
           onUploadPhoto={handleUploadPhoto}
           onAddWidget={() => onOpenModal('addLinkModal')}
-          onSortWidgets={handleSortWidgets}
           onSnapFill={handleSnapToFill}
           onToggleSnap={handleToggleSnap}
           onNavigateSettings={onNavigateSettings}
