@@ -520,7 +520,6 @@ const SETTINGS_TABS = [
   { id: 'privacy',    label: 'Privacy'    },
   { id: 'goals',      label: 'Goals'      },
   { id: 'tools',      label: 'Tools'      },
-  { id: 'data',       label: 'Data'       },
 ];
 
 /**
@@ -646,8 +645,11 @@ export default function SettingsSection({ S, update, active, userId, userEmail, 
       >
 
         {/* ─── ACCOUNT TAB ───
-            Photo, name, tagline, email, password, sign out. Was the
-            mobile-only Profile route until it folded in here. */}
+            Photo, name, tagline, email, password, sign out — the old
+            mobile-only Profile route — followed by what used to be the
+            whole Data tab. Export and delete-account are account-level
+            actions, not a category of their own; a tab holding two
+            groups was a tab for the sake of one. */}
         {activeTab === 'account' && (
           <AccountPanel
             S={S}
@@ -655,7 +657,31 @@ export default function SettingsSection({ S, update, active, userId, userEmail, 
             userId={userId}
             userEmail={userEmail}
             onSignOut={onSignOut}
-          />
+          >
+            <DataExportCard S={S} onOpenLegal={onOpenLegal} />
+
+            {/* Last group on the page. Without the card border it used
+                to sit behind, the red heading and the red button carry
+                the warning. */}
+            <SettingsGroup
+              tone="danger"
+              title="Danger zone"
+              desc="Permanently deletes all boards, trackers, achievements, and settings. Your login email is retained for re-registration."
+            >
+              <button
+                onClick={handleDeleteAccount}
+                disabled={deleting}
+                style={{
+                  background: 'rgba(220,38,38,0.10)', border: '1px solid rgba(220,38,38,0.35)',
+                  borderRadius: '10px', color: '#f87171', padding: '10px 18px',
+                  fontSize: '13px', fontWeight: 600, cursor: deleting ? 'not-allowed' : 'pointer',
+                  fontFamily: 'var(--sans)', opacity: deleting ? 0.6 : 1, transition: 'all .18s',
+                }}
+              >
+                {deleting ? 'Deleting…' : <IconLabel name="trash-2">Delete All Data</IconLabel>}
+              </button>
+            </SettingsGroup>
+          </AccountPanel>
         )}
 
         {/* ─── APPEARANCE TAB ─── */}
@@ -846,43 +872,11 @@ export default function SettingsSection({ S, update, active, userId, userEmail, 
         </>
         )}
 
-        {/* ─── DATA TAB ─── */}
-        {activeTab === 'data' && (
-        <>
-        {/* A "Connected accounts" group opened this tab — an Open Banking
-            foundation that never got a backend, so it advertised a
-            "SOON" bank connection that could only ever answer "not
-            switched on yet". Removed 2026-08-11: subscriptions and
-            savings are manual entry, and the settings page should not
-            promise otherwise. */}
-        {/* Data & Privacy — encrypted export, see DataExportCard. */}
-        <DataExportCard S={S} onOpenLegal={onOpenLegal} />
-
-        {/* Danger Zone — lives inside the Data tab so destructive
-            actions are co-located with export. Without the card border
-            it used to sit behind, the red heading and the red button
-            carry the warning. */}
-        <SettingsGroup
-          tone="danger"
-          title="Danger zone"
-          desc="Permanently deletes all boards, trackers, achievements, and settings. Your login email is retained for re-registration."
-        >
-          <button
-            onClick={handleDeleteAccount}
-            disabled={deleting}
-            style={{
-              background: 'rgba(220,38,38,0.10)', border: '1px solid rgba(220,38,38,0.35)',
-              borderRadius: '10px', color: '#f87171', padding: '10px 18px',
-              fontSize: '13px', fontWeight: 600, cursor: deleting ? 'not-allowed' : 'pointer',
-              fontFamily: 'var(--sans)', opacity: deleting ? 0.6 : 1, transition: 'all .18s',
-            }}
-          >
-            {deleting ? 'Deleting…' : <IconLabel name="trash-2">Delete All Data</IconLabel>}
-          </button>
-        </SettingsGroup>
-
-        </>
-        )}
+        {/* The Data tab stood here: an encrypted export and the danger
+            zone, two groups deep. Both moved into Account on 2026-08-11
+            — they act on the account, not on a feature. A "Connected
+            accounts" group had already gone from it the same day, which
+            is what left it that thin. */}
 
         {/* ─── GOALS TAB ─── */}
         {activeTab === 'goals' && (

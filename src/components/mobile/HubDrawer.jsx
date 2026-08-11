@@ -17,7 +17,6 @@
  * swipe would fight every widget on the screen.
  */
 import { useEffect, useRef } from 'react';
-import Icon from '../Icon';
 import RatingsPanel from '../RatingsPanel';
 
 /** How far in from the left edge a drag may start and still open it. */
@@ -135,16 +134,10 @@ export default function HubDrawer({
           </div>
         </div>
 
-        <div className="m-hubdrawer-foot">
-          <button type="button" className="m-hubdrawer-foot-btn"
-                  onClick={() => { onClose(); onNavigate?.('achievements'); }}>
-            <Icon name="star" size={14} /> Achievements
-          </button>
-          <button type="button" className="m-hubdrawer-foot-btn"
-                  onClick={() => { onClose(); onNavigate?.('leaderboard'); }}>
-            <Icon name="trophy" size={14} /> Leaderboard
-          </button>
-        </div>
+        {/* An Achievements / Leaderboard footer sat here. Both are rows
+            in the More sheet, so it was a second door to each pinned
+            across the bottom of a drawer that is about today's numbers —
+            and it cost the trackers above it the last of the height. */}
       </aside>
     </>
   );

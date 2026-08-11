@@ -2955,6 +2955,11 @@ input,select,textarea,button{touch-action:manipulation;}
 @media (max-width: 480px){
   .settings-tab{ padding:10px 6px; letter-spacing:1.15px; }
 }
+/* 320px devices are 16px short of the whole row even so. One more
+   notch off the gutters there and every phone shows every tab. */
+@media (max-width: 340px){
+  .settings-tab{ padding:10px 4px; }
+}
 
 /* ── Settings — flat subsections ──────────────────────────────────────
    Each subsection used to be a `.card`: a bordered, blurred, glowing box
@@ -7339,14 +7344,6 @@ button:active:not(:disabled),
 .m-hubdrawer-tick.is-done { background: var(--em); border-color: var(--em); }
 .m-hubdrawer-track-name { flex: 1; min-width: 0; font-size: 14px; }
 .m-hubdrawer-track-t { font-family: var(--mono); font-size: 10px; color: var(--text-muted); }
-
-.m-hubdrawer-foot { flex: none; display: flex; gap: 8px; padding: 12px 16px;
-  border-top: 1px solid var(--border); }
-.m-hubdrawer-foot-btn { flex: 1; display: inline-flex; align-items: center; justify-content: center;
-  gap: 7px; padding: 10px; border-radius: 10px; border: 1px solid var(--border);
-  background: transparent; color: var(--text-muted); font-family: var(--mono); font-size: 10.5px;
-  cursor: pointer; }
-.m-hubdrawer-foot-btn:hover { color: var(--em); border-color: var(--em); }
 
 /* Hub hero — now carries the avatar that opens the drawer. */
 .m-hub-hero-top { display: flex; align-items: center; gap: 11px; margin-bottom: 10px; }

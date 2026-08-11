@@ -143,7 +143,7 @@ function PrivacyPolicyContent() {
 
       <Section title="11. Data Retention & Deletion">
         <Ul items={[
-          'Account & content — retained while your account is active. Delete your account at any time via Settings → Data → Danger Zone; all associated data is permanently erased within 30 days.',
+          'Account & content — retained while your account is active. Delete your account at any time via Settings → Account → Danger zone; all associated data is permanently erased within 30 days.',
           'WHOOP and Oura tokens — deleted immediately when you disconnect that device.',
           'Direct messages — retained until you delete them or your account.',
           'Camera frames & AI snapshots — not stored; discarded after each request.',
@@ -286,7 +286,7 @@ function TermsContent() {
       </Section>
 
       <Section title="15. Termination">
-        <P>You may close your account at any time in Settings (Settings → Data → Danger Zone), which deletes your data as described in the Privacy Policy. We may suspend or terminate accounts that violate these terms, with notice where reasonably possible. Sections that by their nature should survive termination (your content licence for anonymised aggregates, disclaimers, liability limits, governing law) survive.</P>
+        <P>You may close your account at any time in Settings (Settings → Account → Danger zone), which deletes your data as described in the Privacy Policy. We may suspend or terminate accounts that violate these terms, with notice where reasonably possible. Sections that by their nature should survive termination (your content licence for anonymised aggregates, disclaimers, liability limits, governing law) survive.</P>
       </Section>
 
       <Section title="16. Changes to These Terms">
