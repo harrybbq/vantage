@@ -15,6 +15,7 @@
  * thick; an invisible 24-unit stroke sits under it so the hit target is
  * comfortably bigger than the mark on a phone.
  */
+import { useState } from 'react';
 import { RATING_COLOURS, ratingShares } from '../../lib/ratings/palette';
 
 const VB = 132;              // viewBox units
@@ -46,11 +47,17 @@ export default function RatingsDonut({
   categories, ratings, ovr, tier, prestigeLabel, dark = false,
   onSelect, size = 156,
 }) {
+  // Which arc is under the pointer or focus ring. The palette is a ramp
+  // rather than four unrelated hues, so neighbouring arcs resemble each
+  // other on purpose — this is what stops the ring from relying on that
+  // resemblance to tell them apart.
+  const [active, setActive] = useState(null);
   const shares = ratingShares(ratings, categories);
   const segments = donutSegments(shares);
   const colours = RATING_COLOURS[dark ? 'dark' : 'light'];
   const byId = Object.fromEntries(categories.map(c => [c.id, c]));
   const mid = VB / 2;
+  const activeSeg = active && segments.find(s => s.id === active);
 
   return (
     <svg
@@ -81,8 +88,13 @@ export default function RatingsDonut({
           const cat = byId[seg.id];
           const pct = Math.round(seg.share * 100);
           const label = `${cat.label} ${seg.value} of 99 — ${pct}% of your rating. Open breakdown.`;
+          const idx = String(segments.indexOf(seg) + 1).padStart(2, '0');
+          // Where the arc's midpoint sits, for the number that rides on it.
+          const a = ((seg.offset + seg.length / 2) / C) * Math.PI * 2;
+          const nx = mid + Math.cos(a) * R;
+          const ny = mid + Math.sin(a) * R;
           return (
-            <g key={seg.id} className="ratings-donut-seg">
+            <g key={seg.id} className={'ratings-donut-seg' + (active === seg.id ? ' is-active' : '')}>
               {/* Hit target first, so it never paints over the arc. */}
               <circle
                 cx={mid} cy={mid} r={R} fill="none"
@@ -94,6 +106,10 @@ export default function RatingsDonut({
                 tabIndex={0}
                 aria-label={label}
                 onClick={() => onSelect?.(seg.id)}
+                onMouseEnter={() => setActive(seg.id)}
+                onMouseLeave={() => setActive(a2 => (a2 === seg.id ? null : a2))}
+                onFocus={() => setActive(seg.id)}
+                onBlur={() => setActive(a2 => (a2 === seg.id ? null : a2))}
                 onKeyDown={e => {
                   if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onSelect?.(seg.id); }
                 }}
@@ -108,6 +124,18 @@ export default function RatingsDonut({
                 strokeLinecap="butt"
                 pointerEvents="none"
               />
+              {/* The arc's number, rotated back upright. Colour groups
+                  the ring; this is what identifies a slice on it. Only
+                  drawn when the arc is wide enough to hold it. */}
+              {seg.length > 16 && (
+                <text
+                  className="ratings-donut-idx"
+                  x={nx} y={ny}
+                  transform={`rotate(90 ${nx} ${ny})`}
+                  textAnchor="middle" dominantBaseline="central"
+                  pointerEvents="none"
+                >{idx}</text>
+              )}
             </g>
           );
         })}
@@ -119,7 +147,9 @@ export default function RatingsDonut({
       <text className="ratings-donut-ovr" x={mid} y={mid + (prestigeLabel ? 0 : 4)}
             textAnchor="middle" dominantBaseline="middle">{ovr}</text>
       <text className="ratings-donut-sub" x={mid} y={mid + 22} textAnchor="middle">
-        {prestigeLabel || tier.label.toUpperCase()}
+        {activeSeg
+          ? `${byId[activeSeg.id].label.toUpperCase()} ${activeSeg.value} · ${Math.round(activeSeg.share * 100)}%`
+          : (prestigeLabel || tier.label.toUpperCase())}
       </text>
     </svg>
   );

@@ -5,42 +5,45 @@
  * slot order, never cycled, and the colour follows the pillar rather
  * than its rank — a filter or a re-sort must never repaint them.
  *
- * Both modes are selected rather than flipped: the dark column is the
- * same four hues re-stepped for the dark surface.
+ * Both modes are selected rather than flipped: the same four hues,
+ * re-stepped for each surface.
  *
- * Muted on purpose — chroma 0.11, barely above the 0.10 floor below
- * which the validator refuses a categorical palette outright. Anything
- * greyer stops being a colour code. Fitness green (152°) and Finance
- * gold (88°) stay in Vantage's own family, deepened to forest and
- * pushed toward brass so neither reads as a highlighter.
+ * This is a RAMP, not four unrelated hues — gold 92° → copper 42° →
+ * burgundy 2° → violet 300°, lightness falling the whole way, so the
+ * ring reads as one sweep rather than four flags. That was the ask, and
+ * it is worth being clear about what it costs, because a gradient and a
+ * category code want opposite things: adjacent steps in a ramp are
+ * SUPPOSED to resemble each other, and a category colour is supposed
+ * not to.
  *
- * The separation comes from LIGHTNESS rather than saturation, which is
- * what makes a sober palette possible at all: lightness is the channel
- * colour-blind vision keeps, so spreading the four across L 0.44–0.73
- * buys back everything the low chroma gives away. It also decides which
- * hue gets the pale step — gold, because a pale ochre reads as
- * parchment where a pale green reads mint and a pale pink reads sweet.
+ * Validated on ALL pairs, because a donut puts every slice next to
+ * every other, against the cream card #fdfaf3 and the dark panel
+ * #131311:
  *
- * Validated on ALL pairs, because a donut puts every slice next to every
- * other, against the cream card #fdfaf3 and the dark-os panel #131311:
+ *   light  protan ΔE 10.6 · tritan 13.9 · normal-vision 17.0  — passes
+ *   dark   deutan ΔE  9.2 · tritan  9.5 · normal-vision 13.4  — under
  *
- *   light  deutan ΔE 11.6 · tritan 19.1 · normal-vision 19.0
- *   dark   deutan ΔE  8.8 · tritan 11.4 · normal-vision 17.1
- *   (CVD target ≥8, normal-vision floor 15 — cleared on every axis,
- *   and clear of the 6–8 band the first attempt sat in)
+ * The dark column cannot clear the 15-point normal-vision floor for
+ * copper against gold: the dark lightness band is only 0.48–0.67 wide,
+ * half of light's, and a four-step ramp cannot spread far enough inside
+ * it. Every arrangement of these four hues was searched — per-slot
+ * lightness and chroma, both directions — and none passes. Rather than
+ * quietly ship colours that some people cannot tell apart, the donut
+ * stops asking colour to carry identity at all:
  *
- * Two things the validator flagged, and how they are answered:
+ *   · each arc is numbered, and the legend repeats the number
+ *   · hovering or focusing an arc names it, with its score and share
+ *   · the legend always shows all four with name, share and score
+ *   · 2px of surface between every arc
  *
- *   · Brass on cream is 2.3:1 against the surface, under the 3:1 line,
- *     which obliges visible labels rather than colour alone. The legend
- *     is that relief — every arc's value and share are written out.
- *   · Identity is never colour-alone anywhere: the legend pairs each
- *     swatch with a word, and every arc carries an aria-label.
+ * Colour groups the ring; the numbers and words identify it. That is
+ * also the relief owed for gold at 1.99:1 on cream and for burgundy and
+ * violet on the dark panel, all under the 3:1 line.
  */
 
 export const RATING_COLOURS = {
-  light: { brain: '#4a8fc7', finance: '#c5a450', fitness: '#0d6332', social: '#955080' },
-  dark:  { brain: '#4288bf', finance: '#ae8e38', fitness: '#267543', social: '#9b5686' },
+  light: { brain: '#d2b145', finance: '#c26b49', fitness: '#a72459', social: '#5d3890' },
+  dark:  { brain: '#b09018', finance: '#b06244', fitness: '#b3195c', social: '#6b4c9b' },
 };
 
 /**

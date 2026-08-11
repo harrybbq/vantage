@@ -256,7 +256,7 @@ export default function RatingsPanel({ S, update, compact = false }) {
             palette owes for the two steps that sit under 3:1 against
             their surface. */}
         <ul className="ratings-ledger-legend">
-          {shares.map(s => {
+          {shares.map((s, i) => {
             const c = byId[s.id];
             return (
               <li key={s.id}>
@@ -266,6 +266,13 @@ export default function RatingsPanel({ S, update, compact = false }) {
                   onClick={() => setActiveBreakdown(s.id)}
                   aria-label={`${c.label} ${s.value} of 99, ${Math.round(s.share * 100)} percent of your rating — open breakdown`}
                 >
+                  {/* Same number as the arc wears. The palette is a ramp,
+                      so neighbouring slices are meant to resemble each
+                      other — this is what pairs a row to its arc without
+                      relying on that resemblance. */}
+                  <span className="ratings-legend-idx" aria-hidden="true">
+                    {String(i + 1).padStart(2, '0')}
+                  </span>
                   <span className="ratings-legend-chip" aria-hidden="true"
                         style={{ background: donutColours[s.id] }} />
                   <span className="ratings-legend-label">{c.label}</span>
