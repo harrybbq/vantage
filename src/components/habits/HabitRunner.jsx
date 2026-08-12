@@ -504,20 +504,54 @@ export default function HabitRunner({ progress, days, colour, done, endless = fa
         const stumbleT = st.stumbleStart ? (now - st.stumbleStart) / 700 : 2;
         const stumbling = stumbleT < 1;
 
-        // While a hand/foot is committed to an obstacle the world has to
-        // slow with it, otherwise the wall scrolls out from under the grip
-        // mid-move. A climb nearly stalls (he's clinging to it) then
-        // catches back up as he drops off the far side.
+        // While a hand or foot is committed to an obstacle the world has
+        // to slow with it, otherwise the wall scrolls out from under the
+        // grip mid-move.
+        //
+        // These used to be step functions — the vault snapped 1 → 0.6 at
+        // t=0.08 and back at 0.88, the climb snapped 1 → 0.08 — so he ran
+        // at full pace and then, in a single frame, was doing a twelfth of
+        // it. Nothing in the animation caused the change, so it read as a
+        // stutter rather than as effort.
+        //
+        // Now every move eases: each curve STARTS at 1 (the pace he
+        // arrived at), eases down through the plant, and eases back to
+        // exactly 1 by the time it ends. Both ends use smoothstep, whose
+        // slope is zero at its endpoints, so the acceleration is
+        // continuous too — there is no frame where the speed jumps.
+        //
+        // The dip depths are not free: the old curves put the obstacle a
+        // particular distance behind him by the end of the move, which is
+        // what keeps it inside arm's reach while a hand is planted. Each
+        // constant below is solved so the curve's MEAN equals the old
+        // one's — vault 0.68, climb 0.417 — so the geometry the IK anchors
+        // were tuned against is unchanged. Change a breakpoint and you
+        // must re-solve the depth, or he starts grabbing at air.
+        const VAULT_DIP  = 0.36;  // mean 0.484 + 0.55·dip  = 0.68
+        const CLIMB_HOLD = 0.062; // mean 0.374 + 0.69·hold = 0.417
         const worldMul = (() => {
           const a = st.action;
           if (!a) return 1;
           const at = clamp01(a.t);
           if (a.mode === 'climb') {
-            if (at < 0.12) return 1;
-            if (at < 0.72) return 0.08;
-            return lerp(0.08, 1.7, phase(at, 0.72, 1));
+            // A mantle genuinely does stop you — but you decelerate into
+            // the wall, you don't arrive at a standstill. Hold while he
+            // pulls up and walks the feet, then drive off the far side
+            // slightly hot and settle back to pace.
+            if (at < 0.20) return lerp(1, CLIMB_HOLD, phase(at, 0, 0.20));
+            if (at < 0.68) return CLIMB_HOLD;
+            if (at < 0.90) return lerp(CLIMB_HOLD, 1.4, phase(at, 0.68, 0.90));
+            return lerp(1.4, 1, phase(at, 0.90, 1));
           }
-          if (a.mode === 'vault') return at > 0.08 && at < 0.88 ? 0.6 : 1;
+          if (a.mode === 'vault') {
+            // A speed vault trades a little pace for height and gives it
+            // back on the drive-off. It should never feel like a stop:
+            // the dip is brief and sits either side of the hand plant.
+            if (at < 0.30) return lerp(1, VAULT_DIP, phase(at, 0, 0.30));
+            if (at < 0.55) return VAULT_DIP;
+            if (at < 0.85) return lerp(VAULT_DIP, 1.15, phase(at, 0.55, 0.85));
+            return lerp(1.15, 1, phase(at, 0.85, 1));
+          }
           return 1;
         })();
 
