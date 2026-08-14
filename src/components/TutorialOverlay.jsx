@@ -43,7 +43,14 @@ const STEPS_CREAM = [
   {
     id: 'hub', label: 'Hub',
     title: 'Your hub',
-    body: 'Home base. Your profile card, overall rating, friends rail (add by @handle, message, see streaks) and an AI daily brief. Pin the widgets you care about — Vitals, Macros, Body, Savings, Subscriptions, Projection, Habits, Holidays, a mini leaderboard, links. Drag them anywhere; right-click a module to make it transparent.',
+    body: 'Home base. Your profile card, overall rating, friends rail (add by @handle, message, see streaks) and an AI daily brief. Below that, a canvas you build yourself — drag widgets anywhere, right-click a module to make it transparent.',
+    target: 'hub', placement: 'bottom', arrowDir: 'up',
+    navTo: 'hub',
+  },
+  {
+    id: 'widgets', label: 'Widgets',
+    title: 'Widgets earn their place',
+    body: 'Add Widget lists everything Vantage can show you — but a widget only becomes addable once there is something for it to show. Log a weight and Vitals unlocks; add a savings goal and Pots and Projection unlock. Nothing is hidden: every locked row says exactly what it needs, and tapping it takes you to the page that fills it in. That way your hub is only ever the things you actually use, instead of a wall of cards asking you to set them up.',
     target: 'hub', placement: 'bottom', arrowDir: 'up',
     navTo: 'hub',
   },
@@ -108,7 +115,14 @@ const STEPS_DARK = [
   {
     id: 'hub', label: 'hub',
     title: 'the hub',
-    body: 'Home base. Profile, ratings ledger, friends rail (@handles, DMs, presence), AI daily brief, draggable widget canvas — vitals / macros / body / savings / subscriptions / projection / leaderboard / links. Right-click any module to toggle transparency.',
+    body: 'Home base. Profile, ratings ledger, friends rail (@handles, DMs, presence), AI daily brief, draggable widget canvas. Right-click any module to toggle transparency.',
+    target: 'hub', placement: 'bottom', arrowDir: 'up',
+    navTo: 'hub',
+  },
+  {
+    id: 'widgets', label: 'widgets',
+    title: 'widget gating',
+    body: 'The picker lists the full set — vitals / macros / calories / savings / projection / subscriptions / habits / holidays / goals / leaderboard / market / news / links. A widget unlocks when its source has data: log a weight for vitals, set macros for macros, add a pot for savings. Locked rows stay visible and state their requirement; tapping one routes to the page that satisfies it. No empty cards on the canvas by construction.',
     target: 'hub', placement: 'bottom', arrowDir: 'up',
     navTo: 'hub',
   },

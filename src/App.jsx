@@ -795,6 +795,7 @@ function Board({ userId, userEmail, onSignOut }) {
         onShowCoinToast={showCoinToast}
         userId={userId}
         userEmail={userEmail}
+        onNavigate={navigate}
       />
 
       <PaywallModal

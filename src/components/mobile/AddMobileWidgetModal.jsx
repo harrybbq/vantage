@@ -15,6 +15,7 @@ import { APP_PRESETS, visibleAppPresets } from '../../data/appPresets';
 import { tradingWidgetAvailable } from '../../lib/trading/enabled';
 import { useSubscriptionContext } from '../../context/SubscriptionContext';
 import { backdropClose } from '../../utils/backdropClose';
+import { widgetReadiness } from '../../lib/widgets/readiness';
 
 // App-preset widget types (FloorplanStudio / TubeLube / …) — a Pro
 // bonus, so they're locked for free users in the picker below.
@@ -26,7 +27,7 @@ const APP_PRESET_TYPES = new Set(APP_PRESETS.map(p => p.id));
 const PRO_WIDGET_TYPES = new Set(['body-goal']);
 const isProWidget = type => APP_PRESET_TYPES.has(type) || PRO_WIDGET_TYPES.has(type);
 
-export default function AddMobileWidgetModal({ openId, onClose, existingTypes, onAdd, onUpgrade }) {
+export default function AddMobileWidgetModal({ openId, onClose, existingTypes, onAdd, onUpgrade, S = {}, onNavigate }) {
   const { hasPro } = useSubscriptionContext();
   const isOpen = openId === 'addMobileWidgetModal';
   if (!isOpen) return null;
@@ -75,6 +76,16 @@ export default function AddMobileWidgetModal({ openId, onClose, existingTypes, o
       onUpgrade?.();
       return;
     }
+    // Not set up yet: take them to the page that fills it in rather
+    // than adding a card whose only possible state is an empty state.
+    // Tapping the row is the request to use the feature — answering it
+    // with the setup page is more useful than refusing.
+    const { ready, where } = widgetReadiness(type, S);
+    if (!ready) {
+      onClose('addMobileWidgetModal');
+      if (where) onNavigate?.(where);
+      return;
+    }
     onAdd({ id: 'w' + Date.now(), type });
     onClose('addMobileWidgetModal');
   }
@@ -91,7 +102,8 @@ export default function AddMobileWidgetModal({ openId, onClose, existingTypes, o
           margin: '0 0 16px', lineHeight: 1.65,
         }}>
           Widgets stack below AI Coach. Pick one to add — you can remove
-          any with the × in its top-right corner.
+          any with the × in its top-right corner. Anything that needs
+          data first says so; tapping it takes you where to enter it.
         </p>
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
@@ -100,6 +112,10 @@ export default function AddMobileWidgetModal({ openId, onClose, existingTypes, o
             if (!meta) return null;
             const alreadyAdded = existing.has(type);
             const stub = !!meta.requires;
+            // Shown, not hidden. A disabled row that names what unlocks
+            // it teaches that the feature exists; a missing row cannot.
+            // Same call as PickList's locked rows.
+            const { ready, need } = widgetReadiness(type, S);
             // Locked for free users, but still tappable (routes to the
             // paywall via pick()).
             const proLocked = isProWidget(type) && !hasPro;
@@ -116,7 +132,7 @@ export default function AddMobileWidgetModal({ openId, onClose, existingTypes, o
                   background: alreadyAdded ? 'transparent' : 'var(--card, rgba(255,255,255,0.04))',
                   color: 'var(--text)', textAlign: 'left',
                   cursor: alreadyAdded ? 'not-allowed' : 'pointer',
-                  opacity: alreadyAdded ? 0.5 : proLocked ? 0.75 : 1,
+                  opacity: alreadyAdded ? 0.5 : (!ready || proLocked) ? 0.75 : 1,
                   transition: 'all .15s',
                 }}
               >
@@ -156,6 +172,7 @@ export default function AddMobileWidgetModal({ openId, onClose, existingTypes, o
                     {alreadyAdded ? 'Already added'
                       : proLocked ? 'Pro bonus — tap to upgrade'
                       : stub ? 'Coming soon'
+                      : !ready ? need
                       : 'Available now'}
                   </span>
                 </span>
