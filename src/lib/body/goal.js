@@ -539,6 +539,31 @@ export function bodyGoalPlan(S, opts = {}) {
   const start = goal.startKg || current;
   const remaining = target - current;                 // signed
 
+  // What is knowable WITHOUT a rate.
+  //
+  // Every refusal below is about the same missing thing: a trustworthy
+  // rate, and therefore a timeline. None of them are about progress —
+  // sessions logged and ground covered are plain counting, and the app
+  // has both. It was returning a bare { ok:false, reason } anyway, so a
+  // user with a flat month, or two weigh-ins, or a cut that has gone the
+  // wrong way, saw an em-dash where their 39 logged sessions should be.
+  //
+  // Spread into every refusal from here on. `pct` is the weight figure
+  // rather than the session one because there is no timeline to derive a
+  // session total from; pctBasis says which it is so the UI can label it
+  // honestly instead of implying sessions.
+  const spanKg = Math.abs(start - target);
+  const knownWeightPct = spanKg > 0
+    ? Math.max(0, Math.min(100, Math.round((Math.abs(start - current) / spanKg) * 100)))
+    : 0;
+  const known = {
+    current, target, start,
+    pct: knownWeightPct,
+    weightPct: knownWeightPct,
+    pctBasis: 'weight',
+    sessionsDone: sessionsSince(S, goal),
+  };
+
   // Cadence: what the user actually does beats what they typed at setup.
   const weights = opts.weightsPerWeek != null ? opts.weightsPerWeek : (goal.weeklyWeights || 0);
   const cardio = opts.cardioPerWeek != null ? opts.cardioPerWeek : (goal.weeklyCardio || 0);
@@ -563,10 +588,10 @@ export function bodyGoalPlan(S, opts = {}) {
     // scale is actually reporting, which is the one thing this must
     // never do.
     if (Math.abs(fit.rate) < 0.02) {
-      return { ok: false, reason: 'no-trend', current, target, window: fit.days };
+      return { ok: false, reason: 'no-trend', ...known, window: fit.days };
     }
     if (Math.sign(fit.rate) !== Math.sign(remaining)) {
-      return { ok: false, reason: 'wrong-way', current, target, rate: fit.rate };
+      return { ok: false, reason: 'wrong-way', ...known, rate: fit.rate };
     }
     rate = fit.rate; source = 'measured';
     rateWindowDays = fit.days; ratePoints = fit.points;
@@ -576,15 +601,15 @@ export function bodyGoalPlan(S, opts = {}) {
     // one is a different thing for the user to go and do.
     const model = modelledRate(S, goal, opts.intakeAvg);
     if (!model) {
-      if (!bmrKcal(S)) return { ok: false, reason: 'no-profile', current, target };
+      if (!bmrKcal(S)) return { ok: false, reason: 'no-profile', ...known };
       if (!(opts.intakeAvg && opts.intakeAvg.targetKcal) && !goal.dailyKcal && !blendedDailyKcal(S)) {
-      return { ok: false, reason: 'no-intake', current, target };
+      return { ok: false, reason: 'no-intake', ...known };
     }
-      return { ok: false, reason: 'no-recent-data', current, target,
+      return { ok: false, reason: 'no-recent-data', ...known,
                have: recentPoints(series), need: MIN_RATE_POINTS };
     }
     if (Math.sign(model.kgPerWeek) !== Math.sign(remaining)) {
-      return { ok: false, reason: 'intake-wrong-way', current, target,
+      return { ok: false, reason: 'intake-wrong-way', ...known,
                dailyDeficit: model.dailyDeficit, tdee: model.tdee, intake: model.intake };
     }
     rate = model.kgPerWeek; source = 'projected';

@@ -147,6 +147,12 @@
 .gw-how-row b{color:var(--text);font-weight:700;white-space:nowrap;}
 
 .gw-refusal{font-family:var(--mono);font-size:9.5px;color:var(--text-mid);line-height:1.6;}
+/* What is known even when the timeline isn't — sits above the
+   explanation, because it is the answer and the explanation is the
+   caveat, not the other way round. */
+.gw-refusal-sessions{margin-bottom:1px;}
+.gw-refusal-nums{font-family:var(--mono);font-size:9px;letter-spacing:.4px;
+  color:var(--text-muted);margin-bottom:6px;}
 
 .gw-note{display:flex;gap:7px;padding:8px 9px;border-radius:8px;
   font-family:var(--mono);font-size:8.5px;color:var(--text-mid);line-height:1.6;}
