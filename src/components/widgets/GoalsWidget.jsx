@@ -448,11 +448,29 @@ export function BodyGoalBody({ S, update, navigate, userId, hasPro = false, comp
           <span className="gw-goal-type">{goal.type}</span>
           <button type="button" className="gw-textbtn gw-edit" onClick={() => setEditing(true)}>Edit</button>
         </div>
+        {/* A refusal is about the TIMELINE — no trustworthy rate, so no
+            ETA. It is not about progress: sessions logged and ground
+            covered are plain counting and we have both. Showing the
+            em-dash and nothing else threw away a user's 39 sessions to
+            report a missing projection. */}
         <div className="gw-hero is-compact">
           <Gauge pct={plan.pct || 0} size={84} stroke={7}
-                 label={plan.pct != null ? `${plan.pct}%` : '—'} sub="to goal" />
+                 label={plan.pct != null ? `${plan.pct}%` : '—'}
+                 sub={plan.pctBasis === 'weight' ? 'of the weight' : 'to goal'} />
           <div className="gw-refusal">
-            {refusalCopy(plan.reason, plan)}
+            {plan.sessionsDone > 0 && (
+              <div className="gw-sessions gw-refusal-sessions">
+                <b>{plan.sessionsDone}</b> session{plan.sessionsDone === 1 ? '' : 's'} logged
+              </div>
+            )}
+            {plan.current != null && (
+              <div className="gw-refusal-nums">
+                {plan.current.toFixed(1)} kg now · {plan.target.toFixed(1)} kg goal
+              </div>
+            )}
+            {/* The copy is its own block, or the pill below flows inline
+                after the last word of the sentence. */}
+            <div className="gw-refusal-copy">{refusalCopy(plan.reason, plan)}</div>
             <button type="button" className="gw-textbtn gw-refusal-link"
                     onClick={() => setShowAccuracy(true)}>What does this need?</button>
           </div>
