@@ -88,6 +88,12 @@
 
 .gw-sessions{font-family:var(--mono);font-size:10px;letter-spacing:.4px;color:var(--text-muted);}
 .gw-sessions b{font-family:var(--sans);font-size:15px;font-weight:700;color:var(--text);}
+/* Stands in for the session counts when there is no cadence to count
+   against. A button, because it is the way to fix that. */
+.gw-sessions-missing{display:block;width:100%;text-align:left;background:none;border:0;
+  padding:0;cursor:pointer;line-height:1.45;color:var(--em);text-decoration:underline;
+  text-underline-offset:3px;text-decoration-thickness:1px;}
+.gw-sessions-missing:hover{opacity:.8;}
 .gw-nums{display:flex;gap:12px;flex-wrap:wrap;justify-content:center;
   font-family:var(--mono);font-size:9.5px;letter-spacing:.4px;color:var(--text-muted);}
 .gw-hero.is-compact .gw-nums{flex-direction:column;gap:3px;}

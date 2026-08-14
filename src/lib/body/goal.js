@@ -379,13 +379,28 @@ export function deviceWorkoutDays(S) {
 export const CARDIO_RE = /(cardio|run(?!g)|jog|walk|bike|cycl|spin|swim|row|hiit|treadmill|elliptical|hike|steps)/i;
 export const WEIGHTS_RE = /(gym|lift|weight|strength|resistance|workout|train|crossfit|calisthen|exercise)/i;
 
+// Numeric trackers count as sessions too — "Gym", target 3/week, is a
+// perfectly ordinary way to track training, and skipping every non-boolean
+// tracker meant those users' sessions were invisible and their plan
+// collapsed to zero. countSessions already treats any truthy value as
+// "did it that day", so a numeric tracker needs no special counting.
+//
+// The exception is a tracker that is a DAILY QUANTITY rather than a
+// session: step counts get logged every day, so admitting them would
+// report seven cardio sessions a week for someone who simply owns a
+// phone. Booleans are unaffected — ticking "Steps" every day is a choice
+// the user made, a step count arriving is not.
+const DAILY_METRIC_RE = /(steps|distance|km\b|miles)/i;
+
 export function trainingTrackers(S, goal = {}) {
   const out = { weights: [], cardio: [] };
   for (const t of ((S && S.trackers) || [])) {
-    if (t.type !== 'boolean') continue;
-    // An explicit pick at setup always wins over the name guess.
+    const numeric = t.type !== 'boolean';
+    // An explicit pick at setup always wins over the name guess — and
+    // over the daily-metric exclusion, because it was a deliberate act.
     if (t.id === goal.cardioTrackerId) { out.cardio.push(t.id); continue; }
     if (t.id === goal.gymTrackerId) { out.weights.push(t.id); continue; }
+    if (numeric && DAILY_METRIC_RE.test(t.name || '')) continue;
     if (CARDIO_RE.test(t.name || '')) out.cardio.push(t.id);
     else if (WEIGHTS_RE.test(t.name || '')) out.weights.push(t.id);
   }
@@ -593,19 +608,33 @@ export function bodyGoalPlan(S, opts = {}) {
   // the plan, a slower rate stretches `weeks`, the remaining count grows,
   // and the bar correctly falls back.
   const plannedPerWeek = cadenceOf(S, goal) || perWeek;
-  const sessionsRemaining = Math.round(weeks * plannedPerWeek);
-  const sessionsTotal = sessionsDone + sessionsRemaining;
-  const pct = sessionsTotal > 0
-    ? Math.max(0, Math.min(100, Math.round((sessionsDone / sessionsTotal) * 100)))
-    : 0;
 
-  // Kept alongside, because the two can disagree and that is worth
-  // seeing: plenty of sessions logged but the weight not moving is a
-  // real signal, not a rounding error.
+  // Kept alongside the session count, because the two can disagree and
+  // that is worth seeing: plenty of sessions logged but the weight not
+  // moving is a real signal, not a rounding error.
   const span = Math.abs(start - target);
   const weightPct = span > 0
     ? Math.max(0, Math.min(100, Math.round((Math.abs(start - current) / span) * 100)))
     : 0;
+
+  // No cadence to plan against — no typed commitment, no rotation, and
+  // nothing that reads like a training tracker ticked in the last eight
+  // weeks. This used to fall through and multiply by zero, which printed
+  // answers that were not answers: "0 of 0 sessions · 0 to go · 0%" for
+  // a new goal, and — far worse — a flat 100% for anyone who trained for
+  // a while and then stopped, because zero remaining over N done rounds
+  // to complete. Someone 6 kg out was being told they had arrived.
+  //
+  // The weight trend is still real in this case, so the widget keeps a
+  // percentage; it just says which one it is and what is missing.
+  const sessionsUnknown = !(plannedPerWeek > 0);
+  const sessionsRemaining = sessionsUnknown ? null : Math.round(weeks * plannedPerWeek);
+  const sessionsTotal = sessionsUnknown ? null : sessionsDone + sessionsRemaining;
+  const pct = sessionsUnknown
+    ? weightPct
+    : (sessionsTotal > 0
+        ? Math.max(0, Math.min(100, Math.round((sessionsDone / sessionsTotal) * 100)))
+        : 0);
 
   const tooFast = remaining < 0 && Math.abs(rate) > current * MAX_SAFE_LOSS_FRACTION;
 
@@ -613,6 +642,8 @@ export function bodyGoalPlan(S, opts = {}) {
     ok: true,
     atGoal: false,
     pct,                       // session progress — the headline
+    pctBasis: sessionsUnknown ? 'weight' : 'sessions',
+    sessionsUnknown,           // no cadence: session counts are null, not 0
     weightPct,                 // the same journey measured in kg
     current, target, start, rate, weeks, source,
     weightSessions: Math.round(weeks * weights),
