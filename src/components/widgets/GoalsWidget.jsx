@@ -495,27 +495,42 @@ export function BodyGoalBody({ S, update, navigate, userId, hasPro = false, comp
           on top. Same component, same reading either way. */}
       <div className={'gw-hero' + (compact ? ' is-compact' : '')}>
         <Gauge pct={plan.pct} size={compact ? 84 : 118} stroke={compact ? 7 : 9}
-               label={`${plan.pct}%`} sub="sessions done" />
+               label={`${plan.pct}%`} sub={plan.sessionsUnknown ? 'of the weight' : 'sessions done'} />
         <div className="gw-hero-side">
           <button type="button" className={'gw-acc' + (plan.source === 'measured' ? ' is-measured' : '')}
                   onClick={() => setShowAccuracy(true)}
                   title="What this estimate is based on">
             {plan.source === 'measured' ? 'MEASURED' : 'ESTIMATED'} ⓘ
           </button>
-          <div className="gw-sessions">
-            <b>{plan.sessionsDone}</b> of <b>{plan.sessionsTotal}</b> sessions
-          </div>
-          <div className="gw-eta">
-            <strong>{plan.sessionsRemaining}</strong> to go
-            {sessionBits.length > 0 && <> · {sessionBits.join(' + ')}</>}
-          </div>
+          {/* With no cadence there is nothing to count sessions against,
+              and printing zeros would be inventing an answer. Say what is
+              missing and where to fix it — the gauge above has switched to
+              weight progress, which is real either way. */}
+          {plan.sessionsUnknown ? (
+            <button type="button" className="gw-sessions gw-sessions-missing"
+                    onClick={() => setEditing(true)}>
+              Set your weekly sessions to see this in gym sessions ↗
+            </button>
+          ) : (
+            <>
+              <div className="gw-sessions">
+                <b>{plan.sessionsDone}</b> of <b>{plan.sessionsTotal}</b> sessions
+              </div>
+              <div className="gw-eta">
+                <strong>{plan.sessionsRemaining}</strong> to go
+                {sessionBits.length > 0 && <> · {sessionBits.join(' + ')}</>}
+              </div>
+            </>
+          )}
           <div className="gw-nums">
             <span><b>{plan.current.toFixed(1)}</b> now</span>
             <span><b className="is-rate">{rateLabel.replace(' kg/wk', '')}</b> kg/wk</span>
             <span><b>{plan.target.toFixed(1)}</b> goal</span>
           </div>
           <div className="gw-eta-sub">
-            ≈ {plan.weeks} week{plan.weeks === 1 ? '' : 's'} at {(plan.weightsPerWeek + plan.cardioPerWeek).toFixed(1)}/wk
+            ≈ {plan.weeks} week{plan.weeks === 1 ? '' : 's'}
+            {!plan.sessionsUnknown &&
+              <> at {(plan.weightsPerWeek + plan.cardioPerWeek).toFixed(1)}/wk</>}
           </div>
         </div>
       </div>
