@@ -8,6 +8,7 @@ import { backdropClose } from '../utils/backdropClose';
 import { useIsMobile } from '../hooks/useIsMobile';
 import Icon from './Icon';
 import { tradingWidgetAvailable } from '../lib/trading/enabled';
+import { widgetReadiness } from '../lib/widgets/readiness';
 import { authFetch } from '../lib/authFetch';
 import {
   emptyHolidayForm, HolidayTabBar, BasicsFields, ItineraryFields, BudgetFields,
@@ -88,7 +89,45 @@ function Modal({ id, openId, onClose, children, style }) {
 }
 
 // ── Add Widget picker ──
-function AddLinkModal({ openId, onClose, onSwitchModal, onAddApp, onAddHubWidget }) {
+/**
+ * One tile in the desktop Add Widget grid.
+ *
+ * Exists so the readiness gate is applied in ONE place. These were
+ * sixteen hand-rolled buttons, and a rule enforced sixteen times is a
+ * rule that will be enforced fifteen times by the next person to add a
+ * widget.
+ *
+ * A widget with no data behind it is shown, dimmed, with what unlocks
+ * it — and tapping it goes to the page that fills it in rather than
+ * adding a card whose only possible state is an empty state.
+ */
+function HubWidgetTile({ type, icon, title, sub, S, onClose, onAdd, onNavigate }) {
+  const { ready, need, where } = widgetReadiness(type, S);
+  return (
+    <button
+      className="btn btn-ghost"
+      title={ready ? `Add ${title} to your hub` : need}
+      style={{
+        padding: '16px', display: 'flex', flexDirection: 'column',
+        alignItems: 'center', gap: '6px', borderRadius: '12px', height: 'auto',
+        opacity: ready ? 1 : 0.6,
+      }}
+      onClick={() => {
+        onClose('addLinkModal');
+        if (!ready) { if (where) onNavigate?.(where); return; }
+        onAdd(type);
+      }}
+    >
+      <Icon name={icon} size={22} strokeWidth={1.75} />
+      <span style={{ fontWeight: 700, fontSize: '13px', color: 'var(--text)' }}>{title}</span>
+      <span style={{ fontSize: '11px', color: ready ? 'var(--text-muted)' : 'var(--em)' }}>
+        {ready ? sub : need}
+      </span>
+    </button>
+  );
+}
+
+function AddLinkModal({ openId, onClose, onSwitchModal, onAddApp, onAddHubWidget, S = {}, onNavigate }) {
   // Our Apps presets are a Pro bonus. Free users see them locked with
   // a PRO badge; clicking routes to the paywall instead of adding.
   const { hasPro } = useSubscriptionContext();
@@ -106,48 +145,20 @@ function AddLinkModal({ openId, onClose, onSwitchModal, onAddApp, onAddHubWidget
           <span style={{ fontWeight: 700, fontSize: '13px', color: 'var(--text)' }}>Default Link</span>
           <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>URL bookmark or GitHub profile</span>
         </button>
-        <button className="btn btn-ghost" style={{ padding: '16px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px', borderRadius: '12px', height: 'auto' }}
-          onClick={() => { onClose('addLinkModal'); onAddHubWidget('habits'); }}>
-          <Icon name="flame" size={22} strokeWidth={1.75} />
-          <span style={{ fontWeight: 700, fontSize: '13px', color: 'var(--text)' }}>Habits</span>
-          <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Longest streaks · live timers</span>
-        </button>
-        <button className="btn btn-ghost" style={{ padding: '16px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px', borderRadius: '12px', height: 'auto' }}
-          onClick={() => { onClose('addLinkModal'); onAddHubWidget('holidays'); }}>
-          <Icon name="plane" size={22} strokeWidth={1.75} />
-          <span style={{ fontWeight: 700, fontSize: '13px', color: 'var(--text)' }}>Holidays</span>
-          <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Closest upcoming trips</span>
-        </button>
-        <button className="btn btn-ghost" style={{ padding: '16px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px', borderRadius: '12px', height: 'auto' }}
-          onClick={() => { onClose('addLinkModal'); onAddHubWidget('leaderboard'); }}>
-          <Icon name="trophy" size={22} strokeWidth={1.75} />
-          <span style={{ fontWeight: 700, fontSize: '13px', color: 'var(--text)' }}>Leaderboard</span>
-          <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Top friends, at a glance</span>
-        </button>
-        <button className="btn btn-ghost" style={{ padding: '16px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px', borderRadius: '12px', height: 'auto' }}
-          onClick={() => { onClose('addLinkModal'); onAddHubWidget('vitals'); }}>
-          <Icon name="activity" size={22} strokeWidth={1.75} />
-          <span style={{ fontWeight: 700, fontSize: '13px', color: 'var(--text)' }}>Vitals</span>
-          <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Weight · sleep · resting HR</span>
-        </button>
-        <button className="btn btn-ghost" style={{ padding: '16px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px', borderRadius: '12px', height: 'auto' }}
-          onClick={() => { onClose('addLinkModal'); onAddHubWidget('macros'); }}>
-          <Icon name="pie-chart" size={22} strokeWidth={1.75} />
-          <span style={{ fontWeight: 700, fontSize: '13px', color: 'var(--text)' }}>Macros</span>
-          <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>% rings · net calories</span>
-        </button>
-        <button className="btn btn-ghost" style={{ padding: '16px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px', borderRadius: '12px', height: 'auto' }}
-          onClick={() => { onClose('addLinkModal'); onAddHubWidget('calories'); }}>
-          <Icon name="zap" size={22} strokeWidth={1.75} />
-          <span style={{ fontWeight: 700, fontSize: '13px', color: 'var(--text)' }}>Calories Burned</span>
-          <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Activity burn · net intake</span>
-        </button>
-        <button className="btn btn-ghost" style={{ padding: '16px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px', borderRadius: '12px', height: 'auto' }}
-          onClick={() => { onClose('addLinkModal'); onAddHubWidget('goals'); }}>
-          <Icon name="target" size={22} strokeWidth={1.75} />
-          <span style={{ fontWeight: 700, fontSize: '13px', color: 'var(--text)' }}>Goals</span>
-          <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Pin any goal · progress</span>
-        </button>
+        <HubWidgetTile type="habits" icon="flame" title="Habits" sub="Longest streaks · live timers"
+          S={S} onClose={onClose} onAdd={onAddHubWidget} onNavigate={onNavigate} />
+        <HubWidgetTile type="holidays" icon="plane" title="Holidays" sub="Closest upcoming trips"
+          S={S} onClose={onClose} onAdd={onAddHubWidget} onNavigate={onNavigate} />
+        <HubWidgetTile type="leaderboard" icon="trophy" title="Leaderboard" sub="Top friends, at a glance"
+          S={S} onClose={onClose} onAdd={onAddHubWidget} onNavigate={onNavigate} />
+        <HubWidgetTile type="vitals" icon="activity" title="Vitals" sub="Weight · sleep · resting HR"
+          S={S} onClose={onClose} onAdd={onAddHubWidget} onNavigate={onNavigate} />
+        <HubWidgetTile type="macros" icon="pie-chart" title="Macros" sub="% rings · net calories"
+          S={S} onClose={onClose} onAdd={onAddHubWidget} onNavigate={onNavigate} />
+        <HubWidgetTile type="calories" icon="zap" title="Calories Burned" sub="Activity burn · net intake"
+          S={S} onClose={onClose} onAdd={onAddHubWidget} onNavigate={onNavigate} />
+        <HubWidgetTile type="goals" icon="target" title="Goals" sub="Pin any goal · progress"
+          S={S} onClose={onClose} onAdd={onAddHubWidget} onNavigate={onNavigate} />
         {/* Body goal is Pro. Locked tiles stay clickable and route to
             the paywall — the same treatment the Our Apps presets get,
             rather than a dead control that doesn't explain itself. */}
@@ -161,57 +172,29 @@ function AddLinkModal({ openId, onClose, onSwitchModal, onAddApp, onAddHubWidget
           <span style={{ fontWeight: 700, fontSize: '13px', color: 'var(--text)' }}>Body Goal</span>
           <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>{hasPro ? 'Target weight · plan' : 'Pro feature'}</span>
         </button>
-        <button className="btn btn-ghost" style={{ padding: '16px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px', borderRadius: '12px', height: 'auto' }}
-          onClick={() => { onClose('addLinkModal'); onAddHubWidget('savings-pots'); }}>
-          <Icon name="piggy-bank" size={22} strokeWidth={1.75} />
-          <span style={{ fontWeight: 700, fontSize: '13px', color: 'var(--text)' }}>Savings Pots</span>
-          <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>1 bar or 4 donuts</span>
-        </button>
-        <button className="btn btn-ghost" style={{ padding: '16px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px', borderRadius: '12px', height: 'auto' }}
-          onClick={() => { onClose('addLinkModal'); onAddHubWidget('savings-projection'); }}>
-          <Icon name="trending-up" size={22} strokeWidth={1.75} />
-          <span style={{ fontWeight: 700, fontSize: '13px', color: 'var(--text)' }}>Projection</span>
-          <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Net · balance trend</span>
-        </button>
+        <HubWidgetTile type="savings-pots" icon="piggy-bank" title="Savings Pots" sub="1 bar or 4 donuts"
+          S={S} onClose={onClose} onAdd={onAddHubWidget} onNavigate={onNavigate} />
+        <HubWidgetTile type="savings-projection" icon="trending-up" title="Projection" sub="Net · balance trend"
+          S={S} onClose={onClose} onAdd={onAddHubWidget} onNavigate={onNavigate} />
         {/* Owner-only AND web-only. tradingWidgetAvailable() is false in
             native builds, so this never reaches an app-store reviewer. */}
-        <button className="btn btn-ghost" style={{ padding: '16px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px', borderRadius: '12px', height: 'auto' }}
-          onClick={() => { onClose('addLinkModal'); onAddHubWidget('market'); }}>
-          <Icon name="trending-up" size={22} strokeWidth={1.75} />
-          <span style={{ fontWeight: 700, fontSize: '13px', color: 'var(--text)' }}>Market</span>
-          <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Delayed quotes</span>
-        </button>
-        <button className="btn btn-ghost" style={{ padding: '16px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px', borderRadius: '12px', height: 'auto' }}
-          onClick={() => { onClose('addLinkModal'); onAddHubWidget('news'); }}>
-          <Icon name="newspaper" size={22} strokeWidth={1.75} />
-          <span style={{ fontWeight: 700, fontSize: '13px', color: 'var(--text)' }}>News</span>
-          <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Today’s headlines</span>
-        </button>
+        <HubWidgetTile type="market" icon="trending-up" title="Market" sub="Delayed quotes"
+          S={S} onClose={onClose} onAdd={onAddHubWidget} onNavigate={onNavigate} />
+        <HubWidgetTile type="news" icon="newspaper" title="News" sub="Today’s headlines"
+          S={S} onClose={onClose} onAdd={onAddHubWidget} onNavigate={onNavigate} />
         {tradingWidgetAvailable() && typeof window !== 'undefined' && window.__vantageOwner && (
-        <button className="btn btn-ghost" style={{ padding: '16px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px', borderRadius: '12px', height: 'auto' }}
-          onClick={() => { onClose('addLinkModal'); onAddHubWidget('trading'); }}>
-          <Icon name="trending-up" size={22} strokeWidth={1.75} />
-          <span style={{ fontWeight: 700, fontSize: '13px', color: 'var(--text)' }}>Trading</span>
-          <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Agents · P/L</span>
-        </button>
+        <HubWidgetTile type="trading" icon="trending-up" title="Trading" sub="Agents · P/L"
+          S={S} onClose={onClose} onAdd={onAddHubWidget} onNavigate={onNavigate} />
         )}
         {/* Owner-only: reads the rotation, which is an owner-only page. */}
         {typeof window !== 'undefined' && window.__vantageOwner && (
-        <button className="btn btn-ghost" style={{ padding: '16px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px', borderRadius: '12px', height: 'auto' }}
-          onClick={() => { onClose('addLinkModal'); onAddHubWidget('rotation'); }}>
-          <Icon name="calendar-days" size={22} strokeWidth={1.75} />
-          <span style={{ fontWeight: 700, fontSize: '13px', color: 'var(--text)' }}>Rotation</span>
-          <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Shift · session · holiday</span>
-        </button>
+        <HubWidgetTile type="rotation" icon="calendar-days" title="Rotation" sub="Shift · session · holiday"
+          S={S} onClose={onClose} onAdd={onAddHubWidget} onNavigate={onNavigate} />
         )}
         {/* Body widget retired — the Goals and Body Goal widgets both
             cover the weight trend. Existing hubs keep theirs. */}
-        <button className="btn btn-ghost" style={{ padding: '16px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px', borderRadius: '12px', height: 'auto' }}
-          onClick={() => { onClose('addLinkModal'); onAddHubWidget('subscriptions'); }}>
-          <Icon name="repeat" size={22} strokeWidth={1.75} />
-          <span style={{ fontWeight: 700, fontSize: '13px', color: 'var(--text)' }}>Subscriptions</span>
-          <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Monthly burn · renewals</span>
-        </button>
+        <HubWidgetTile type="subscriptions" icon="repeat" title="Subscriptions" sub="Monthly burn · renewals"
+          S={S} onClose={onClose} onAdd={onAddHubWidget} onNavigate={onNavigate} />
       </div>
 
       {/* Our Apps — one-click presets for our own apps, a Pro bonus.
@@ -1756,7 +1739,7 @@ function WaitlistModal({ openId, onClose, userId, userEmail }) {
 }
 
 // ── Main Modals container ──
-export default function Modals({ openModal, S, update, onClose, onOpen, onShowCoinToast, userId, userEmail }) {
+export default function Modals({ openModal, S, update, onClose, onOpen, onShowCoinToast, userId, userEmail, onNavigate }) {
   const { hasPro } = useSubscriptionContext();
   function handleAddLink(link) {
     update(prev => ({ ...prev, links: [...prev.links, link] }));
@@ -1960,6 +1943,8 @@ export default function Modals({ openModal, S, update, onClose, onOpen, onShowCo
         onSwitchModal={onOpen}
         onAddApp={preset => { handleAddLink(appPresetToLink(preset)); onClose('addLinkModal'); }}
         onAddHubWidget={handleAddHubWidget}
+        S={S}
+        onNavigate={onNavigate}
       />
       <AddLinkOnlyModal openId={effectiveOpen} onClose={onClose} onAdd={handleAddLink} />
       <CoinHistoryModal openId={effectiveOpen} onClose={onClose} coins={S.coins || 0} coinHistory={S.coinHistory || []} />
@@ -1974,6 +1959,8 @@ export default function Modals({ openModal, S, update, onClose, onOpen, onShowCo
         existingTypes={(S.mobileWidgets || []).map(w => w.type)}
         onAdd={handleAddMobileWidget}
         onUpgrade={() => onOpen('paywall:ourApps')}
+        S={S}
+        onNavigate={onNavigate}
       />
       <AddTrackerModal openId={effectiveOpen} onClose={onClose} onAdd={handleAddTracker} />
       <MultiLogModal
