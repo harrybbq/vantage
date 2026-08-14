@@ -89,11 +89,22 @@
 .gw-sessions{font-family:var(--mono);font-size:10px;letter-spacing:.4px;color:var(--text-muted);}
 .gw-sessions b{font-family:var(--sans);font-size:15px;font-weight:700;color:var(--text);}
 /* Stands in for the session counts when there is no cadence to count
-   against. A button, because it is the way to fix that. */
-.gw-sessions-missing{display:block;width:100%;text-align:left;background:none;border:0;
-  padding:0;cursor:pointer;line-height:1.45;color:var(--em);text-decoration:underline;
-  text-underline-offset:3px;text-decoration-thickness:1px;}
-.gw-sessions-missing:hover{opacity:.8;}
+   against. A sentence, so it takes the tinted-note shape the widget
+   already uses for .gw-note rather than a pill — but it is a button,
+   because it is also the way to fix the thing it is reporting. */
+.gw-sessions-missing{
+  display:block;width:100%;text-align:left;cursor:pointer;
+  padding:7px 9px;border-radius:8px;
+  border:1px solid rgba(var(--em-rgb),.28);
+  background:rgba(var(--em-rgb),.06);
+  color:var(--text-mid);
+  font-family:var(--mono);font-size:8.5px;letter-spacing:.3px;line-height:1.6;
+  transition:border-color .15s, background .15s;
+}
+.gw-sessions-missing:hover{
+  border-color:rgba(var(--em-rgb),.5);
+  background:rgba(var(--em-rgb),.1);
+}
 .gw-nums{display:flex;gap:12px;flex-wrap:wrap;justify-content:center;
   font-family:var(--mono);font-size:9.5px;letter-spacing:.4px;color:var(--text-muted);}
 .gw-hero.is-compact .gw-nums{flex-direction:column;gap:3px;}
@@ -142,11 +153,29 @@
 .gw-note.is-warn{border:1px solid rgba(217,145,20,.35);background:rgba(217,145,20,.07);}
 .gw-note-icon{color:#d99114;font-size:11px;line-height:1.3;flex:none;}
 
-.gw-foot{display:flex;gap:12px;align-items:center;}
+.gw-foot{display:flex;gap:6px;align-items:center;flex-wrap:wrap;}
 .gw-foot-btn{align-self:flex-start;}
-.gw-textbtn{background:none;border:0;padding:0;cursor:pointer;font-family:var(--mono);
-  font-size:9px;letter-spacing:.5px;color:var(--em);text-decoration:underline;
-  text-underline-offset:2px;}
+/* Secondary action.
+   These were underlined green text — four of them in a row across the
+   footer, reading as a paragraph of hyperlinks rather than as controls,
+   and looking like nothing else in the app. Every other button in this
+   widget is a quiet bordered pill (.gw-seg-btn, .gw-acc) and the shared
+   one is .link-open-btn, so this is that geometry at a secondary weight:
+   muted until you point at it, then it takes the accent. */
+.gw-textbtn{
+  display:inline-flex;align-items:center;gap:4px;white-space:nowrap;
+  padding:4px 8px;border-radius:6px;cursor:pointer;
+  background:transparent;border:1px solid var(--border);
+  color:var(--text-mid);
+  font-family:var(--mono);font-size:8.5px;letter-spacing:1.1px;
+  text-transform:uppercase;font-weight:700;
+  transition:color .15s, border-color .15s, background .15s;
+}
+.gw-textbtn:hover{
+  color:var(--em);
+  border-color:rgba(var(--em-rgb),.38);
+  background:rgba(var(--em-rgb),.07);
+}
 .gw-edit{margin-left:auto;}
 .gw-disclaimer{font-family:var(--mono);font-size:7.5px;color:var(--text-muted);line-height:1.6;
   opacity:.85;}
@@ -191,7 +220,9 @@
   padding:2px 6px;cursor:pointer;font-family:var(--mono);font-size:7.5px;
   letter-spacing:1.2px;font-weight:700;color:var(--text-muted);}
 .gw-acc.is-measured{color:var(--em);border-color:rgba(var(--em-rgb),.45);}
-.gw-refusal-link{display:block;margin-top:6px;}
+/* A pill can't be display:block — it would stretch to the refusal
+   paragraph's full width. Inline-flex keeps it the size of its label. */
+.gw-refusal-link{display:inline-flex;margin-top:8px;}
 
 .gw-modal{width:440px;}
 .gw-modal-lede{font-family:var(--mono);font-size:11px;color:var(--text-muted);
