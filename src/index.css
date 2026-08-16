@@ -7504,3 +7504,61 @@ div.m-hubdrawer-coach { cursor: default; display: flex; flex-direction: column; 
 .cal-event-dot{ width:5px; height:5px; border-radius:2px; flex:none; }
 .cal-event-more{ font-family:var(--mono); font-size:8px; color:var(--text-muted); }
 #track .cal-event{ color:rgba(255,255,255,.82); }
+
+/* ── Day tick menu ────────────────────────────────────────────────────
+   Right-click a calendar day. Every tick writes immediately — there is
+   no Save because there is nothing to save, and an unsaved checkbox is
+   a state the user has to remember they are in.
+   Portalled to <body>: the calendar card is overflow-hidden, so in
+   place it would be clipped by the cell that opened it.
+   ─────────────────────────────────────────────────────────────────── */
+/* Explicitly dark, not themed. The Track calendar is dark in BOTH
+   themes (see the unconditional #track .cal-* overrides), so a menu
+   that belongs to it has to be dark too — and it is portalled to
+   <body>, where var(--text) is the PAGE's text colour. Inheriting that
+   put cream-theme dark text on this dark surface and made every
+   tracker name unreadable. */
+.daymenu{
+  position:fixed; z-index:6000; min-width:210px; max-width:280px;
+  display:flex; flex-direction:column; gap:2px; padding:7px;
+  border-radius:12px; border:1px solid rgba(255,255,255,.14);
+  background:#16161a; color:rgba(255,255,255,.92);
+  box-shadow:0 12px 40px rgba(0,0,0,.45);
+}
+.daymenu-head{
+  display:flex; align-items:baseline; gap:8px;
+  font-family:var(--mono); font-size:9px; letter-spacing:1.2px;
+  text-transform:uppercase; color:rgba(255,255,255,.5); padding:4px 6px 6px;
+}
+.daymenu-multi{ margin-left:auto; color:var(--em); letter-spacing:.6px; }
+.daymenu-empty{ font-family:var(--mono); font-size:10px; color:rgba(255,255,255,.5); padding:6px; }
+.daymenu-row{
+  display:flex; align-items:center; gap:9px; width:100%; text-align:left;
+  padding:8px 7px; border-radius:8px; border:0; cursor:pointer;
+  background:transparent; color:rgba(255,255,255,.92); font-family:inherit; font-size:13px;
+  transition:background .12s;
+}
+.daymenu-row:hover{ background:rgba(255,255,255,.09); }
+.daymenu-box{
+  width:17px; height:17px; flex:none; border-radius:5px;
+  border:1.5px solid rgba(255,255,255,.28); display:grid; place-items:center;
+  font-size:11px; line-height:1; color:#fff; font-weight:700;
+}
+/* Mixed is its own mark, not a half-guess at on or off. With ten days
+   selected and three ticked, showing either would misdescribe data the
+   user is about to overwrite. */
+.daymenu-box.is-mixed{ color:var(--em); font-weight:700; }
+.daymenu-name{ flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.daymenu-partial{ font-family:var(--mono); font-size:8px; letter-spacing:.8px;
+  text-transform:uppercase; color:rgba(255,255,255,.45); }
+.daymenu-clear{
+  margin-top:3px; padding:7px; border-radius:8px; cursor:pointer;
+  border:1px solid rgba(255,255,255,.18); background:transparent;
+  font-family:var(--mono); font-size:9px; letter-spacing:1.1px;
+  text-transform:uppercase; color:rgba(255,255,255,.55);
+}
+.daymenu-clear:hover{ color:#e06b5a; border-color:rgba(224,107,90,.4); }
+.daymenu-foot{
+  font-family:var(--mono); font-size:8px; letter-spacing:.8px;
+  color:rgba(255,255,255,.42); padding:5px 6px 2px; text-align:center;
+}

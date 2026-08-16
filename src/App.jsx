@@ -324,6 +324,7 @@ function Board({ userId, userEmail, onSignOut }) {
   // tap your avatar, wander to Appearance, tap it again, go back to
   // Account.
   const [settingsTab, setSettingsTab] = useState(null);
+  const [trackTab, setTrackTab] = useState(null);
 
   function navigate(id) {
     // 'profile' is no longer a section of its own — the photo, name,
@@ -333,6 +334,14 @@ function Board({ userId, userEmail, onSignOut }) {
     if (id === 'profile') {
       setSettingsTab({ tab: 'account', n: Date.now() });
       setActiveSection('settings');
+      return;
+    }
+    // Track's tabs, addressed by name. The macros widget means "take me
+    // to my food log", and landing on Track's Trackers tab made that a
+    // second click every time.
+    if (id === 'diet' || id === 'vitals' || id === 'trackers') {
+      setTrackTab({ tab: id, n: Date.now() });
+      setActiveSection('track');
       return;
     }
     setActiveSection(id);
@@ -722,7 +731,7 @@ function Board({ userId, userEmail, onSignOut }) {
         )}
         {activeSection === 'track' && (
           <motion.div key="track" {...pageMotion}>
-            <TrackSection S={S} update={update} active onOpenModal={handleOpenModal} onShowCoinToast={showCoinToast} userId={userId} />
+            <TrackSection S={S} update={update} active onOpenModal={handleOpenModal} onShowCoinToast={showCoinToast} userId={userId} requestedTab={trackTab} />
           </motion.div>
         )}
         {activeSection === 'shop' && (
