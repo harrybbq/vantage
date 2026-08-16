@@ -34,6 +34,7 @@ import NewsBody from '../widgets/NewsWidget';
 // Dead branch when the flag is set, so the chunk is never emitted.
 const TradingBody = TRADING_WIDGET_BUILD_EXCLUDED ? null : lazy(() => import('../widgets/TradingWidget'));
 import Icon from '../Icon';
+import { planDayFor, planGoalFor, planBadge } from '../../lib/plan/planDay';
 
 // App presets (FloorplanStudio / TubeLube / …) become mobile widget
 // types too — generated from the shared config so adding an app in one
@@ -889,12 +890,16 @@ function MacroRing({ label, consumed, goal, color, size = 52 }) {
 function MacrosBody({ S, userId, navigate }) {
   const today = getTodayStr();
   const { macros, summary, loaded } = useDaySummary(userId);
+  // The plan, when it applies. Owner-only and inactive for everyone
+  // else, so every read below falls back to the macro's own goal.
+  const plan = planDayFor(today, S);
   if (!userId) return <div className="m-widget-empty">Sign in to see your macros.</div>;
   if (!loaded) return <div className="m-widget-empty">Loading macros…</div>;
   if (!macros.length) return <div className="m-widget-empty">Set up macros in Track → Daily Macros first.</div>;
 
   const byName = n => macros.find(m => m.name === n);
-  const calGoal = byName('Calories')?.daily_goal || 2000;
+  const goalOf = m => (m ? (planGoalFor(plan, m.name) ?? m.daily_goal) : 0);
+  const calGoal = goalOf(byName('Calories')) || 2000;
   const eaten = summary?.calories || 0;
   // Use the SAME burn figure the Calories Burned widget shows so the two
   // never disagree: WHOOP's measured all-day total when present, else the
@@ -916,11 +921,23 @@ function MacrosBody({ S, userId, navigate }) {
     { name: 'Fat',     field: 'fat_g'    },
   ].map(r => {
     const m = byName(r.name);
-    return m ? { label: r.name, consumed: Number(summary?.[r.field] || 0), goal: m.daily_goal || 0, color: m.color || 'var(--em)' } : null;
+    return m ? { label: r.name, consumed: Number(summary?.[r.field] || 0), goal: goalOf(m) || 0, color: m.color || 'var(--em)' } : null;
   }).filter(Boolean);
 
   return (
     <div className="m-macros m-widget-clickable" onClick={() => navigate && navigate('track')} role="link" tabIndex={0}>
+      {/* Where today's numbers come from. Without it a target that moves
+          with the rota looks like the widget changing its mind. */}
+      {plan.active && (
+        <div className="m-macros-plan">
+          <span className="m-macros-plan-badge">{planBadge(plan)}</span>
+          {plan.targets.kcalDelta !== 0 && (
+            <span className={'m-macros-plan-d' + (plan.targets.kcalDelta > 0 ? ' is-up' : ' is-down')}>
+              {plan.targets.kcalDelta > 0 ? '+' : '\u2212'}{Math.abs(plan.targets.kcalDelta)}
+            </span>
+          )}
+        </div>
+      )}
       <div className="m-macros-cal">
         <div className="m-macros-cal-ring">
           <svg width="76" height="76" viewBox="0 0 76 76" aria-hidden="true">

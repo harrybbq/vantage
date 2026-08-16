@@ -7407,3 +7407,21 @@ div.m-hubdrawer-coach { cursor: default; display: flex; flex-direction: column; 
   .m-hubdrawer.is-open { opacity: 1; }
   .m-hubdrawer-scrim { transition: none; }
 }
+
+/* ── Plan badge (owner-only recomp plan) ──────────────────────────────
+   Shown wherever a target the plan moves is displayed, because a number
+   that changes with the rota has to say why or it reads as instability.
+   ──────────────────────────────────────────────────────────────────── */
+.nut-plan{display:flex; align-items:center; gap:9px; flex-wrap:wrap; margin-bottom:14px;
+  padding:8px 11px; border:1px solid var(--border); border-radius:10px;}
+.nut-plan-badge{font-family:var(--mono); font-size:9.5px; letter-spacing:1.1px;
+  text-transform:uppercase; font-weight:700; color:var(--em);}
+.nut-plan-d{font-family:var(--mono); font-size:11px; font-weight:700;}
+.nut-plan-d.is-up{color:var(--em);} .nut-plan-d.is-down{color:var(--gold,#c8970a);}
+.nut-plan-why{font-family:var(--mono); font-size:9.5px; color:var(--text-muted); line-height:1.5;}
+/* Same, condensed, inside the macro widget. */
+.m-macros-plan{display:flex; align-items:center; gap:7px; margin-bottom:8px;}
+.m-macros-plan-badge{font-family:var(--mono); font-size:8.5px; letter-spacing:1px;
+  text-transform:uppercase; font-weight:700; color:var(--em);}
+.m-macros-plan-d{font-family:var(--mono); font-size:9px; font-weight:700; margin-left:auto;}
+.m-macros-plan-d.is-up{color:var(--em);} .m-macros-plan-d.is-down{color:var(--gold,#c8970a);}
