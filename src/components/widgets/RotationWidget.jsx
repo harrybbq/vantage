@@ -15,7 +15,7 @@ import {
   chipText, holidayDaySet, leaveType, nextHoliday, resolveDay,
   rotaDayIndex, dayTypeOf, loadScaleOf,
 } from '../../lib/rotation/pattern';
-import { targetsFor } from '../../data/trainingProgramme';
+import { targetsForDay } from '../../data/trainingProgramme';
 
 const todayIso = () => {
   const n = new Date();
@@ -54,7 +54,7 @@ export function RotationBody({ S, navigate }) {
   // whatever the pattern underneath says it would have been.
   const dayType = day.shift === 'leave' ? 'off' : dayTypeOf(day.shift);
   const scale = day.shift === 'leave' ? 1 : loadScaleOf(day.shift);
-  const fuel = targetsFor(dayType);
+  const fuel = targetsForDay(dayType, day.session);
   const label = day.shift === 'leave'
     ? (leaveType(day.leave)?.label || 'Booked off')
     : SHIFT_LABEL[day.shift];
@@ -87,6 +87,13 @@ export function RotationBody({ S, navigate }) {
           shift it is, is the one that can answer it without being asked. */}
       <div className="rw-fuel">
         <span className="rw-fuel-k">{fuel.kcal}<i>kcal</i></span>
+        {/* Why today differs from the baseline. Without it the number
+            looks unstable rather than cycled. */}
+        {fuel.kcalDelta !== 0 && (
+          <span className={'rw-fuel-d' + (fuel.kcalDelta > 0 ? ' is-up' : ' is-down')}>
+            {fuel.kcalDelta > 0 ? '+' : '\u2212'}{Math.abs(fuel.kcalDelta)}
+          </span>
+        )}
         <span className="rw-fuel-k">{fuel.protein}<i>g protein</i></span>
         <span className="rw-fuel-day">Day {dayIdx}</span>
       </div>

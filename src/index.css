@@ -7253,6 +7253,10 @@ button:active:not(:disabled),
   color: var(--text-muted); margin-left: 3px; }
 .rw-fuel-day { margin-left: auto; font-family: var(--mono); font-size: 8.5px;
   letter-spacing: 1.2px; text-transform: uppercase; color: var(--text-muted); }
+/* Session delta against the shift baseline. */
+.rw-fuel-d { font-family: var(--mono); font-size: 9px; font-weight: 700; margin-left: -8px; }
+.rw-fuel-d.is-up { color: var(--em); }
+.rw-fuel-d.is-down { color: var(--gold, #c8970a); }
 .rw-cardio { font-family: var(--mono); font-size: 9px; color: #12a5a5; }
 .rw-hol { display: flex; align-items: baseline; gap: 8px; padding-top: 2px; }
 .rw-hol-n { font-family: var(--mono); font-size: 24px; font-weight: 700; line-height: 1;
