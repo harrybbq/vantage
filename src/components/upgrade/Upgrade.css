@@ -501,3 +501,14 @@
   .upg-macros{grid-template-columns:repeat(2,1fr);}
   .upg-today-load{margin-left:0;}
 }
+
+/* Session cycling — why today's number differs from the baseline, and
+   the reassurance that the fortnight still averages what it should. */
+.upg-cycle{display:flex; align-items:baseline; gap:9px; flex-wrap:wrap;
+  font-family:var(--mono); font-size:9.5px; color:var(--text-muted);}
+.upg-cycle-d{font-size:12px; font-weight:700;}
+.upg-cycle-d.is-up{color:var(--em);}
+.upg-cycle-d.is-down{color:var(--gold,#c8970a);}
+.upg-cycle-why{flex:1; min-width:0; line-height:1.6;}
+.upg-cycle-avg{letter-spacing:.8px; text-transform:uppercase; font-size:8px; opacity:.75;}
+.upg-cycle-flat{line-height:1.6;}

@@ -26,7 +26,7 @@ import {
   resolveDay, rotaDayIndex, dayTypeOf, loadScaleOf,
 } from '../../lib/rotation/pattern';
 import {
-  DAY_TYPE_LABEL, FLOOR_MACROS, NIGHT_LOAD_SCALE, exercisesFor, targetsFor,
+  DAY_TYPE_LABEL, FLOOR_MACROS, NIGHT_LOAD_SCALE, exercisesFor, targetsForDay,
 } from '../../data/trainingProgramme';
 
 const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June',
@@ -59,7 +59,7 @@ function TodayPanel({ overrides }) {
   const dayIdx = rotaDayIndex(day.pos);
   const dayType = day.shift === 'leave' ? 'off' : dayTypeOf(day.shift);
   const scale = day.shift === 'leave' ? 1 : loadScaleOf(day.shift);
-  const t = targetsFor(dayType);
+  const t = targetsForDay(dayType, day.session);
   const exercises = exercisesFor(day.session);
   const isNight = dayType === 'night_shift';
 
@@ -82,6 +82,27 @@ function TodayPanel({ overrides }) {
           than a loss. Same sets and reps at {Math.round(NIGHT_LOAD_SCALE * 100)}% of the bar.
         </p>
       )}
+
+      {/* The session delta, said out loud. A leg day reading 2430 when
+          the plan says 2250 has to explain itself, and the fact that
+          the fortnight still averages 2300 is the reassurance. */}
+      <div className="upg-cycle">
+        {t.kcalDelta === 0 ? (
+          <span className="upg-cycle-flat">Baseline day &mdash; no session adjustment.</span>
+        ) : (
+          <>
+            <span className={'upg-cycle-d' + (t.kcalDelta > 0 ? ' is-up' : ' is-down')}>
+              {t.kcalDelta > 0 ? '+' : '\u2212'}{Math.abs(t.kcalDelta)} kcal
+            </span>
+            <span className="upg-cycle-why">
+              {t.kcalDelta > 0
+                ? `${day.session} day \u2014 ${t.carbDelta > 0 ? '+' : ''}${t.carbDelta}g carbs on top of the ${DAY_TYPE_LABEL[dayType].toLowerCase()} baseline`
+                : `Rest day \u2014 \u2212${Math.abs(t.carbDelta)}g carbs, paying back the training days`}
+            </span>
+            <span className="upg-cycle-avg">16-day average unchanged</span>
+          </>
+        )}
+      </div>
 
       <div className="upg-macros">
         {[
