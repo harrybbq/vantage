@@ -23,7 +23,11 @@ import {
   ALLOWANCE_DEFAULT, LEAVE_TYPES, SESSION_OPTIONS, WINDOW, allowanceUsed,
   chipText, datesBetween, holidayDaySet, leaveType, monthGrid, monthRange,
   nextHoliday, normaliseBlock, rangeStats, patternDay,
+  resolveDay, rotaDayIndex, dayTypeOf, loadScaleOf,
 } from '../../lib/rotation/pattern';
+import {
+  DAY_TYPE_LABEL, FLOOR_MACROS, NIGHT_LOAD_SCALE, exercisesFor, targetsFor,
+} from '../../data/trainingProgramme';
 
 const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June',
   'July', 'August', 'September', 'October', 'November', 'December'];
@@ -33,6 +37,92 @@ const todayIso = () => {
   const n = new Date();
   return `${n.getFullYear()}-${String(n.getMonth() + 1).padStart(2, '0')}-${String(n.getDate()).padStart(2, '0')}`;
 };
+
+/**
+ * Today, from the plan's point of view.
+ *
+ * The calendar answers "what does the next fortnight look like"; this
+ * answers "what am I doing now" — which is the question being asked on
+ * the day, and it was taking a scan of a 15-month grid to work out.
+ *
+ * Nutrition sits next to training because on this rota they move
+ * together: a night shift is both the 2450 kcal day and the 80% day,
+ * and seeing one without the other is how the higher target starts
+ * looking like a bug.
+ */
+function TodayPanel({ overrides }) {
+  const iso = todayIso();
+  const [y, m, d] = iso.split('-').map(Number);
+  const day = resolveDay(y, m - 1, d, overrides);
+  if (!day.inPattern) return null;
+
+  const dayIdx = rotaDayIndex(day.pos);
+  const dayType = day.shift === 'leave' ? 'off' : dayTypeOf(day.shift);
+  const scale = day.shift === 'leave' ? 1 : loadScaleOf(day.shift);
+  const t = targetsFor(dayType);
+  const exercises = exercisesFor(day.session);
+  const isNight = dayType === 'night_shift';
+
+  return (
+    <div className="upg-today">
+      <div className="upg-today-head">
+        <span className={`upg-today-badge is-${day.shift}`}>Day {dayIdx}</span>
+        <span className="upg-today-type">{DAY_TYPE_LABEL[dayType]}</span>
+        <span className="upg-today-sep">·</span>
+        <span className="upg-today-session">{day.session}</span>
+        {scale !== 1 && (
+          <span className="upg-today-load">{Math.round(scale * 100)}% load · maintenance</span>
+        )}
+      </div>
+
+      {isNight && (
+        <p className="upg-today-note">
+          Nights run at maintenance on purpose — appetite regulation goes on a
+          night shift, and holding the deficit through one buys a binge rather
+          than a loss. Same sets and reps at {Math.round(NIGHT_LOAD_SCALE * 100)}% of the bar.
+        </p>
+      )}
+
+      <div className="upg-macros">
+        {[
+          ['Calories', t.kcal, 'kcal', 'kcal'],
+          ['Protein', t.protein, 'g', 'protein'],
+          ['Fat', t.fat, 'g', 'fat'],
+          ['Carbs', t.carbs, 'g', 'carbs'],
+        ].map(([label, val, unit, key]) => (
+          <div key={key} className="upg-macro">
+            <div className="upg-macro-n">{val}<span className="upg-macro-u">{unit}</span></div>
+            <div className="upg-macro-l">
+              {label}
+              {FLOOR_MACROS.has(key) && <span className="upg-macro-floor">floor</span>}
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {exercises.length > 0 ? (
+        <div className="upg-exlist">
+          <div className="upg-exlist-h">
+            // {day.session} &middot; {exercises.length} exercises
+            {scale !== 1 && <span className="upg-exlist-scale">at {Math.round(scale * 100)}%</span>}
+          </div>
+          {exercises.map(ex => (
+            <div key={ex.name} className="upg-ex">
+              <span className="upg-ex-n">{ex.name}</span>
+              <span className="upg-ex-p">{ex.sets} &times; {ex.reps}</span>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <div className="upg-exlist is-rest">
+          <div className="upg-exlist-h">// rest day</div>
+          <div className="upg-ex-rest">No session today. The rest days are the tail of each
+          off-block, so they run into going back in.</div>
+        </div>
+      )}
+    </div>
+  );
+}
 
 export default function RotationTab({ S, update, isMobile }) {
   const overrides = useMemo(() => (S.rotation && S.rotation.overrides) || {}, [S.rotation]);
@@ -127,6 +217,7 @@ export default function RotationTab({ S, update, isMobile }) {
 
   return (
     <div className="upg-pane">
+      <TodayPanel overrides={overrides} />
       <div className="upg-stats">
         {[
           { k: 'night', n: stats.night, label: 'Night shifts' },

@@ -437,3 +437,67 @@
   .upg-two { grid-template-columns: 1fr; }
   .upg-logrow { flex-direction: column; align-items: stretch; }
 }
+
+/* ── Today panel ──────────────────────────────────────────────────────
+   Sits above the calendar: what the plan says about today, so the
+   answer to "what am I doing now" isn't a scan of a 15-month grid.
+   Training and nutrition are one block because on this rota they move
+   together — a night shift is both the 2450 kcal day and the 80% day.
+   ──────────────────────────────────────────────────────────────────── */
+.upg-today{
+  border:1px solid var(--border); border-radius:14px; padding:14px 16px;
+  margin-bottom:14px; display:flex; flex-direction:column; gap:12px;
+}
+.upg-today-head{display:flex; align-items:center; gap:8px; flex-wrap:wrap;}
+.upg-today-badge{
+  font-family:var(--mono); font-size:10px; letter-spacing:1.2px; font-weight:700;
+  padding:3px 8px; border-radius:6px; border:1px solid var(--border); color:var(--text-mid);
+}
+.upg-today-badge.is-night{border-color:rgba(110,120,200,.5); color:#8a94d8;}
+.upg-today-badge.is-day{border-color:rgba(var(--em-rgb),.5); color:var(--em);}
+.upg-today-badge.is-off,.upg-today-badge.is-leave{border-color:var(--border); color:var(--text-muted);}
+.upg-today-type{font-family:var(--sans); font-size:14px; font-weight:700; color:var(--text);}
+.upg-today-sep{color:var(--text-muted);}
+.upg-today-session{font-family:var(--sans); font-size:14px; font-weight:700; color:var(--em);}
+.upg-today-load{
+  margin-left:auto; font-family:var(--mono); font-size:9px; letter-spacing:1.1px;
+  text-transform:uppercase; font-weight:700; padding:3px 8px; border-radius:6px;
+  color:var(--gold,#c8970a); border:1px solid rgba(200,151,10,.35);
+  background:rgba(200,151,10,.08);
+}
+.upg-today-note{
+  margin:0; font-family:var(--mono); font-size:10px; line-height:1.7;
+  color:var(--text-muted); border-left:2px solid rgba(200,151,10,.45); padding-left:11px;
+}
+.upg-macros{display:grid; grid-template-columns:repeat(4,1fr); gap:8px;}
+.upg-macro{border:1px solid var(--border); border-radius:10px; padding:9px 10px;}
+.upg-macro-n{font-family:var(--mono); font-size:18px; font-weight:700; color:var(--text); line-height:1;}
+.upg-macro-u{font-size:9px; color:var(--text-muted); margin-left:2px;}
+.upg-macro-l{
+  font-family:var(--mono); font-size:8.5px; letter-spacing:1.1px; text-transform:uppercase;
+  color:var(--text-muted); margin-top:5px; display:flex; align-items:center; gap:5px;
+}
+/* A floor is a different promise from a target: over is fine, under is
+   the only thing that counts as a miss. */
+.upg-macro-floor{
+  font-size:7.5px; letter-spacing:.8px; padding:1px 4px; border-radius:3px;
+  color:var(--em); border:1px solid rgba(var(--em-rgb),.35); background:rgba(var(--em-rgb),.07);
+}
+.upg-exlist{display:flex; flex-direction:column; gap:5px;}
+.upg-exlist-h{
+  font-family:var(--mono); font-size:9px; letter-spacing:1.3px; text-transform:uppercase;
+  color:var(--text-muted); display:flex; align-items:center; gap:8px;
+}
+.upg-exlist-scale{margin-left:auto; color:var(--gold,#c8970a);}
+.upg-ex{
+  display:flex; align-items:baseline; gap:10px; padding:6px 0;
+  border-top:1px solid var(--border);
+}
+.upg-ex:first-of-type{border-top:none;}
+.upg-ex-n{flex:1; min-width:0; font-family:var(--sans); font-size:12.5px; color:var(--text);}
+.upg-ex-p{font-family:var(--mono); font-size:10.5px; color:var(--text-muted); white-space:nowrap;}
+.upg-ex-rest{font-family:var(--mono); font-size:10px; line-height:1.7; color:var(--text-muted);}
+@media (max-width:640px){
+  .upg-macros{grid-template-columns:repeat(2,1fr);}
+  .upg-today-load{margin-left:0;}
+}
