@@ -186,11 +186,8 @@ function AddLinkModal({ openId, onClose, onSwitchModal, onAddApp, onAddHubWidget
         <HubWidgetTile type="trading" icon="trending-up" title="Trading" sub="Agents · P/L"
           S={S} onClose={onClose} onAdd={onAddHubWidget} onNavigate={onNavigate} />
         )}
-        {/* Owner-only: reads the rotation, which is an owner-only page. */}
-        {typeof window !== 'undefined' && window.__vantageOwner && (
-        <HubWidgetTile type="rotation" icon="calendar-days" title="Rotation" sub="Shift · session · holiday"
-          S={S} onClose={onClose} onAdd={onAddHubWidget} onNavigate={onNavigate} />
-        )}
+        {/* The Rotation tile stood here. Retired 2026-08-16 — see
+            lib/widgets/retired.js. The rotation PAGE is untouched. */}
         {/* Body widget retired — the Goals and Body Goal widgets both
             cover the weight trend. Existing hubs keep theirs. */}
         <HubWidgetTile type="subscriptions" icon="repeat" title="Subscriptions" sub="Monthly burn · renewals"

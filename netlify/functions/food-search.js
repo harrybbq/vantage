@@ -135,13 +135,47 @@ function mapProduct(p) {
   };
 }
 
-// A result needs a name to be worth showing. Zero-calorie entries used
-// to be dropped entirely, which quietly made water, diet drinks and
-// black coffee unsearchable — they're real foods people log. They're
-// kept now and simply ranked last, so they never crowd out real hits.
+// A result needs a name to be worth showing.
 function usable(prod) {
   return !!toText(prod.food_name).trim();
 }
+
+/**
+ * Entries carrying no nutrition at all.
+ *
+ * Every macro AND the calories at zero almost always means an
+ * incomplete database record rather than a food that genuinely has
+ * nothing in it — someone scanned a barcode and never filled the panel
+ * in. They are noise in a list you are scanning to pick from.
+ *
+ * They are not ALL junk, though, and that is why they were kept before
+ * this: water, black coffee and diet drinks are real things people log
+ * and they are legitimately all-zero. Dropping the lot made them
+ * unsearchable, which was the bug that put them back.
+ *
+ * So the filter is conditional on the query rather than absolute — see
+ * mergeResults. Search "chicken" and the empties are gone; search
+ * "water" and it is still there, because the name matches what you
+ * asked for.
+ */
+function isEmptyEntry(p) {
+  return (Number(p.calories) || 0) <= 0
+      && (Number(p.protein_g) || 0) <= 0
+      && (Number(p.carbs_g) || 0) <= 0
+      && (Number(p.fat_g) || 0) <= 0;
+}
+
+/**
+ * Things that are legitimately all-zero.
+ *
+ * Matched on the NAME rather than on the query, which was the first
+ * thing tried and is worse: keying off the query meant "chicken" kept
+ * "Chicken blank scan" (it starts with the term) while "water" dropped
+ * "Sparkling Water" (it does not equal the term). The property that
+ * actually matters is a property of the FOOD — some foods have no
+ * calories and that is correct — so the test belongs on the food.
+ */
+const ZERO_CAL_RE = /(water|coffee|espresso|americano|tea\b|diet |zero|sugar[- ]free|no added sugar|sweetener|black coffee|soda water|sparkling)/i;
 
 /** Merge sources, drop duplicates, put substantive results first. */
 function mergeResults(lists, q) {
@@ -180,11 +214,38 @@ function mergeResults(lists, q) {
     // to also say "McDonald's", but searching "milk" shouldn't drag
     // every restaurant item to the top either.
     if (p.isRestaurant && (name === term || name.startsWith(term) || name.includes(term))) s -= 20;
+
+    // Searching by COMPANY. "Tesco", "Gregg's", "McDonald's" are
+    // perfectly ordinary things to type, and they score nothing on the
+    // name tests above — every hit is "Chicken Salad" by that brand,
+    // not a food called Tesco. Without this they mixed in with whatever
+    // else the sources returned for the word.
+    if (brand) {
+      if (brand === term) s -= 70;                     // the whole query is the brand
+      else if (brand.startsWith(term)) s -= 45;
+      else if (brand.includes(term)) s -= 25;
+      // Per-word, so "tesco chicken" ranks a Tesco chicken above both
+      // a Tesco yoghurt and someone else's chicken.
+      s -= words.filter(w => brand.includes(w)).length * 6;
+    }
+
     if (p.calories <= 0) s += 40;                      // sink empties
     if (!p.brand) s += 4;                              // brandless is vaguer
     return s;
   };
-  return out.sort((a, b) => score(a) - score(b));
+
+  // Drop the no-nutrition entries, keeping the ones that are supposed
+  // to be empty. A blank barcode scan and a bottle of water look
+  // identical in the numbers; only the name separates them.
+  //
+  // If that would empty the list entirely, keep everything — a search
+  // that returns nothing is worse than one that returns something
+  // vague, and it also covers the case where a source is returning
+  // nutrition-less rows for a whole query.
+  const wanted = out.filter(p => !isEmptyEntry(p) || ZERO_CAL_RE.test(toText(p.food_name)));
+  const kept = wanted.length ? wanted : out;
+
+  return kept.sort((a, b) => score(a) - score(b));
 }
 
 // image_small_url gives the packaging shot, which is the closest thing

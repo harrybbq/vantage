@@ -925,7 +925,10 @@ function MacrosBody({ S, userId, navigate }) {
   }).filter(Boolean);
 
   return (
-    <div className="m-macros m-widget-clickable" onClick={() => navigate && navigate('track')} role="link" tabIndex={0}>
+    /* 'diet' rather than 'track': the macro rings mean "take me to my
+       food log", and landing on Track's Trackers tab made that a second
+       click every single time. */
+    <div className="m-macros m-widget-clickable" onClick={() => navigate && navigate('diet')} role="link" tabIndex={0}>
       {/* Where today's numbers come from. Without it a target that moves
           with the rota looks like the widget changing its mind. */}
       {plan.active && (
@@ -975,7 +978,7 @@ function MacrosBody({ S, userId, navigate }) {
         onClick={e => {
           e.stopPropagation();
           try { sessionStorage.setItem('vb_quicklog_food', '1'); } catch { /* ignore */ }
-          navigate && navigate('track');
+          navigate && navigate('diet');
         }}
       ><span style={{display:'inline-flex',alignItems:'center',gap:5}}><Icon name="plus" size={13} /> Log food</span></button>
     </div>

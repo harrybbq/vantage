@@ -1,4 +1,5 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { eventsInMonth, kindColour } from '../lib/calendar/events';
 import Icon from './Icon';
 import { motion } from 'framer-motion';
@@ -158,6 +159,148 @@ const TRACK_TABS = [
   { id: 'vitals',   label: 'Vitals'   },
 ];
 
+/**
+ * Right-click a day → tick trackers, saved as you tick.
+ *
+ * Logging a day used to be: click the day, scroll to a panel below the
+ * calendar, tick, then find Save. Four actions and a scroll for a
+ * checkbox, and on a tall calendar the panel was off-screen — so the
+ * click appeared to do nothing.
+ *
+ * Every tick here writes immediately. There is no Save because there is
+ * nothing to save: an unsaved checkbox is a state the user has to
+ * remember they are in, and this is the one interaction in the app
+ * where they are doing five in a row.
+ *
+ * In multi-select the same menu applies to every selected day at once,
+ * which is what the mode was always for — it previously selected days
+ * and then still made you use the panel.
+ *
+ * Portalled to <body> because the calendar cell is inside an
+ * overflow-hidden card; rendered in place it would be clipped by the
+ * cell it belongs to.
+ */
+function DayTickMenu({ x, y, dates, trackers, logs, onClose, update }) {
+  const ref = useRef(null);
+
+  // Close on anything that is not this menu: outside click, Escape,
+  // scroll, resize. A context menu that survives a scroll ends up
+  // floating over unrelated content.
+  useEffect(() => {
+    const onDown = e => { if (ref.current && !ref.current.contains(e.target)) onClose(); };
+    const onKey = e => { if (e.key === 'Escape') onClose(); };
+    document.addEventListener('mousedown', onDown);
+    document.addEventListener('keydown', onKey);
+    window.addEventListener('scroll', onClose, true);
+    window.addEventListener('resize', onClose);
+    return () => {
+      document.removeEventListener('mousedown', onDown);
+      document.removeEventListener('keydown', onKey);
+      window.removeEventListener('scroll', onClose, true);
+      window.removeEventListener('resize', onClose);
+    };
+  }, [onClose]);
+
+  // Keep it on screen. Measured after mount rather than guessed from
+  // the click point, because the height depends on how many trackers
+  // there are.
+  const [pos, setPos] = useState({ left: x, top: y });
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const r = el.getBoundingClientRect();
+    const pad = 8;
+    setPos({
+      left: Math.max(pad, Math.min(x, window.innerWidth - r.width - pad)),
+      top: Math.max(pad, Math.min(y, window.innerHeight - r.height - pad)),
+    });
+  }, [x, y, trackers.length]);
+
+  const multi = dates.length > 1;
+
+  /**
+   * A tracker's state across the selected days: on, off, or mixed.
+   * Mixed matters — with ten days selected and three already ticked,
+   * neither "on" nor "off" is true, and showing either would be a lie
+   * about data the user is about to overwrite.
+   */
+  function stateOf(t) {
+    let on = 0;
+    for (const d of dates) if ((logs[d] || {})[t.id]) on++;
+    if (on === 0) return 'off';
+    if (on === dates.length) return 'on';
+    return 'mixed';
+  }
+
+  /** Mixed resolves to ON — the intent of clicking a partial box is
+   *  "make them all like this", and off is what the row already mostly
+   *  is. Numbers store a count, booleans a flag, same as the panel. */
+  function toggle(t) {
+    const next = stateOf(t) !== 'on';
+    update(prev => {
+      const newLogs = { ...prev.logs };
+      for (const d of dates) {
+        const day = { ...(newLogs[d] || {}) };
+        if (next) day[t.id] = t.type === 'boolean' ? true : (typeof day[t.id] === 'number' ? day[t.id] : 1);
+        else delete day[t.id];
+        if (Object.keys(day).length) newLogs[d] = day;
+        else delete newLogs[d];       // an empty day is no day, not {}
+      }
+      const streaks = recalcStreaks(newLogs, prev.trackers || [], prev.streaks || {});
+      return { ...prev, logs: newLogs, streaks };
+    });
+  }
+
+  function clearAll() {
+    update(prev => {
+      const newLogs = { ...prev.logs };
+      for (const d of dates) delete newLogs[d];
+      const streaks = recalcStreaks(newLogs, prev.trackers || [], prev.streaks || {});
+      return { ...prev, logs: newLogs, streaks };
+    });
+  }
+
+  const label = multi
+    ? `${dates.length} days selected`
+    : new Date(dates[0] + 'T12:00').toLocaleDateString(undefined,
+        { weekday: 'short', day: 'numeric', month: 'short' });
+
+  return createPortal(
+    <div ref={ref} className="daymenu" style={{ left: pos.left, top: pos.top }}
+         role="dialog" aria-label="Log trackers">
+      <div className="daymenu-head">
+        {label}
+        {multi && <span className="daymenu-multi">applies to all</span>}
+      </div>
+
+      {!trackers.length && <div className="daymenu-empty">No trackers yet.</div>}
+
+      {trackers.map(t => {
+        const st = stateOf(t);
+        return (
+          <button key={t.id} type="button"
+                  className={`daymenu-row is-${st}`}
+                  onClick={() => toggle(t)}>
+            <span className={`daymenu-box is-${st}`} style={st !== 'off' ? { borderColor: t.color, background: st === 'on' ? t.color : 'transparent' } : undefined}>
+              {st === 'on' ? '✓' : st === 'mixed' ? '–' : ''}
+            </span>
+            <span className="daymenu-name">{t.name}</span>
+            {st === 'mixed' && <span className="daymenu-partial">some</span>}
+          </button>
+        );
+      })}
+
+      {trackers.length > 0 && (
+        <button type="button" className="daymenu-clear" onClick={clearAll}>
+          Clear {multi ? 'these days' : 'this day'}
+        </button>
+      )}
+      <div className="daymenu-foot">Saves as you tick</div>
+    </div>,
+    document.body,
+  );
+}
+
 function CalendarView({ S, update, onShowCoinToast, nutritionMonthData }) {
   // Events for the visible month, read in one pass rather than 42
   // lookups. Empty until the add-event UI exists; the grid is built to
@@ -199,6 +342,18 @@ function CalendarView({ S, update, onShowCoinToast, nutritionMonthData }) {
       (prev.multiSelectedDays || []).forEach(key => { delete newLogs[key]; });
       return { ...prev, logs: newLogs, multiSelectMode: false, multiSelectedDays: [] };
     });
+  }
+
+  // Right-click target: the day under the cursor, or — in multi-select
+  // — every day currently chosen.
+  const [menu, setMenu] = useState(null);   // { x, y, dates } | null
+  function handleDayContext(e, key) {
+    e.preventDefault();
+    e.stopPropagation();
+    const dates = multiSelectMode
+      ? (multiSelectedDays.length ? multiSelectedDays : [key])
+      : [key];
+    setMenu({ x: e.clientX, y: e.clientY, dates });
   }
 
   function handleDayClick(key) {
@@ -372,6 +527,8 @@ function CalendarView({ S, update, onShowCoinToast, nutritionMonthData }) {
               key={cell.key}
               className={`cal-cell${cell.isToday ? ' today' : ''}${cell.tids.length ? ' has-logs' : ''}${cell.isSelected ? ' selected' : ''}`}
               onClick={() => handleDayClick(cell.key)}
+              onContextMenu={e => handleDayContext(e, cell.key)}
+              title="Right-click to log trackers"
             >
               {firstTracker && <div className="cal-cell-fill" style={{ background: firstTracker.color }}></div>}
               <div className="cal-date">{cell.day}</div>
@@ -409,6 +566,15 @@ function CalendarView({ S, update, onShowCoinToast, nutritionMonthData }) {
           );
         })}
       </div>
+
+      {menu && (
+        <DayTickMenu
+          x={menu.x} y={menu.y} dates={menu.dates}
+          trackers={trackers} logs={logs}
+          update={update}
+          onClose={() => setMenu(null)}
+        />
+      )}
 
       <div className="cal-legend">
         {trackers.map(t => (
@@ -462,9 +628,18 @@ function CalendarView({ S, update, onShowCoinToast, nutritionMonthData }) {
   );
 }
 
-export default function TrackSection({ S, update, active, onOpenModal, onShowCoinToast, userId }) {
+export default function TrackSection({ S, update, active, onOpenModal, onShowCoinToast, userId, requestedTab }) {
   const [nutritionMonthData, setNutritionMonthData] = useState({});
   const [tab, setTab] = useState('trackers');
+
+  // Deep-link into a tab. Carries a nonce rather than a bare id so
+  // asking for the same tab twice still moves you back to it — same
+  // shape as SettingsSection's.
+  useEffect(() => {
+    if (!requestedTab?.tab) return;
+    if (!TRACK_TABS.some(t => t.id === requestedTab.tab)) return;
+    setTab(requestedTab.tab);
+  }, [requestedTab]);
 
   return (
     <section id="track" className={`section${active ? ' active' : ''}`}>
