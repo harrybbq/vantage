@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import Icon from './Icon';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -9,6 +9,8 @@ import FoodLogSheet from './FoodLogSheet';
 import FoodLogList from './FoodLogList';
 import FoodSearch from './FoodSearch';
 import { backdropClose } from '../utils/backdropClose';
+import { planDayFor, planGoalFor, planBadge } from '../lib/plan/planDay';
+import { FLOOR_MACROS } from '../data/trainingProgramme';
 
 // ── Helpers ───────────────────────────────────────────────────────────────
 function fmt(n) {
@@ -41,7 +43,12 @@ function getMacroValue(summary, macro) {
 function MacroBar({ macro, consumed, isCal, index, onMenuClick }) {
   const goal = macro.daily_goal || 1;
   const pct = Math.min(100, (consumed / goal) * 100);
-  const over = consumed > goal;
+  // Under the plan, protein and fat are FLOORS: crossing one is the
+  // point of it, so it reads as met rather than as an overshoot.
+  // Calories stay a target you land on, and still flag when passed.
+  const isFloor = !!macro.plannedGoal && FLOOR_MACROS.has(String(macro.name).toLowerCase());
+  const over = consumed > goal && !isFloor;
+  const met = isFloor && consumed >= goal;
   const [animated, setAnimated] = useState(0);
 
   useEffect(() => {
@@ -57,6 +64,18 @@ function MacroBar({ macro, consumed, isCal, index, onMenuClick }) {
       <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '5px' }}>
         <span style={{ fontWeight: 700, fontSize: 'var(--text-sm)', color: 'var(--text)', flex: 1, minWidth: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
           {macro.name}
+          {/* A floor that has been cleared is done, not overshot — say so
+              where the number is, or 170 against a 165 floor looks like
+              a miss in the other direction. */}
+          {isFloor && (
+            <span style={{ fontFamily: 'var(--mono)', fontSize: '8px', letterSpacing: '.9px', textTransform: 'uppercase',
+                           marginLeft: 6, padding: '1px 4px', borderRadius: 3, verticalAlign: 'middle',
+                           color: met ? 'var(--em)' : 'var(--text-muted)',
+                           border: `1px solid ${met ? 'rgba(var(--em-rgb),.35)' : 'var(--border)'}`,
+                           background: met ? 'rgba(var(--em-rgb),.08)' : 'transparent' }}>
+              {met ? 'floor met' : 'floor'}
+            </span>
+          )}
         </span>
         <span style={{ fontFamily: 'var(--mono)', fontSize: '11px', color: valueColour, whiteSpace: 'nowrap', opacity: 0.9, fontVariantNumeric: 'tabular-nums' }}>
           {fmt(consumed)}<span style={{ color: 'var(--text-muted)' }}>/{fmt(goal)}{macro.unit}</span>
@@ -239,7 +258,20 @@ function AddMacroSheet({ onClose, onSave }) {
 // ── Main NutritionSection ────────────────────────────────────────────────
 export default function NutritionSection({ userId, S, selectedDate, calYear, calMonth, onShowCoinToast, onMonthDataReady, onOpenModal, update }) {
   const date = selectedDate || getTodayStr();
-  const { macros, summary, logEntries, monthSummary, loading, reload, recalcSummary, loadMonth } = useNutrition(userId, date);
+  const { macros: rawMacros, summary, logEntries, monthSummary, loading, reload, recalcSummary, loadMonth } = useNutrition(userId, date);
+
+  // The recomposition plan for the DATE BEING VIEWED, not for today —
+  // scrolling back to a rest day should show that day's target, not
+  // this one's. Inactive for anyone but the owner, in which case every
+  // goal below is the macro's own and nothing changes.
+  const plan = planDayFor(date, S);
+  // Overridden once, here, so every downstream reader — the bars, the
+  // goal-hit toast, the % written to macroHistory — picks it up without
+  // each of them having to know the plan exists.
+  const macros = useMemo(() => (rawMacros || []).map(m => {
+    const g = planGoalFor(plan, m.name);
+    return g == null ? m : { ...m, daily_goal: g, plannedGoal: true };
+  }), [rawMacros, plan.active, plan.dayIndex, plan.session]);
 
   const [menuMacro, setMenuMacro] = useState(null);
   const [editingId, setEditingId] = useState(null);
@@ -377,6 +409,27 @@ export default function NutritionSection({ userId, S, selectedDate, calYear, cal
           <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--text-xs)', color: 'var(--text-muted)' }}>{formatDate(date)}</div>
         </div>
       </div>
+
+      {/* Where today's targets come from. The rota moves them by shift
+          AND by session, so a number that changed since yesterday needs
+          to say why — otherwise it reads as the app being unreliable. */}
+      {plan.active && (
+        <div className="nut-plan">
+          <span className="nut-plan-badge">{planBadge(plan)}</span>
+          {plan.targets.kcalDelta !== 0 && (
+            <span className={'nut-plan-d' + (plan.targets.kcalDelta > 0 ? ' is-up' : ' is-down')}>
+              {plan.targets.kcalDelta > 0 ? '+' : '\u2212'}{Math.abs(plan.targets.kcalDelta)} kcal
+            </span>
+          )}
+          <span className="nut-plan-why">
+            {plan.isRest
+              ? 'Rest day — the training days pay for this one'
+              : plan.isNight
+                ? 'Night shift at maintenance · session at 80%'
+                : `${plan.session} day`}
+          </span>
+        </div>
+      )}
 
       {/* Calorie summary — donut ring (same language as the tracker
           rings) + figures + the primary Log Food action beside it. */}

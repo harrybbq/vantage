@@ -1035,6 +1035,35 @@ export default function SettingsSection({ S, update, active, userId, userEmail, 
           </button>
         </SettingsGroup>
 
+        {/* Plan-driven fuelling — owner-only, same gate as Upgrade.
+            An off switch rather than a setup screen: the plan is
+            defined in code, so the only decision left is whether it
+            drives the macro targets or the flat goals do. */}
+        {onOpenSchedule && (
+          <SettingsGroup
+            title="Plan-driven fuelling"
+            desc="Let the shift rota set your daily macro targets — higher on nights, higher again on leg days, lower on rest days. Off means your flat Daily Macros goals are used everywhere, as they were."
+          >
+            <label className="settings-row" style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer' }}>
+              <input
+                type="checkbox"
+                checked={(S.rotation || {}).planFuelling !== false}
+                onChange={e => update(prev => ({
+                  ...prev,
+                  rotation: { ...(prev.rotation || {}), planFuelling: e.target.checked },
+                }))}
+              />
+              <span style={{ fontFamily: 'var(--mono)', fontSize: 11 }}>
+                Targets follow the rota
+              </span>
+            </label>
+            <p className="settings-group-note">
+              Redistributes rather than adds: the training days and the rest days
+              cancel out, so the 16-day average is the same either way.
+            </p>
+          </SettingsGroup>
+        )}
+
         {/* Upgrade — owner-only. App.jsx passes onOpenSchedule as null
             for everyone else, so the card simply never renders for
             non-owner accounts (same gating pattern as
