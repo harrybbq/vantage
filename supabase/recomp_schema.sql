@@ -200,19 +200,24 @@ create index if not exists nutrition_macro_targets_user_idx
 -- fact only you know, and guessing it would silently put every shift on
 -- the wrong day. Set it with the statement at the bottom of this file.
 
-create or replace function seed_recomp_macro_targets()
+create or replace function seed_recomp_macro_targets(p_user_id uuid default null)
 returns void
 language plpgsql
--- SECURITY INVOKER (the default), deliberately. seed_default_macros()
--- takes a user id as an argument so it needs definer rights; this one
--- resolves auth.uid() itself and only ever writes the caller's own
--- rows, so RLS applying as the caller IS the guarantee we want. A
--- definer function here would be a privilege-escalation surface for no
--- gain.
+-- SECURITY INVOKER (the default), deliberately. It only ever writes
+-- rows whose user_id it was given, and the RLS insert policy is
+-- `auth.uid() = user_id` — so an authenticated caller physically
+-- cannot seed somebody else's targets even though the id is an
+-- argument. A definer function here would remove that guarantee for
+-- no gain.
+--
+-- The argument exists because the Supabase SQL EDITOR is not a
+-- signed-in user: it runs as the service role with no JWT, so
+-- auth.uid() is null there and the no-argument form cannot work. Pass
+-- your id when running it by hand; omit it when the client calls it.
 set search_path = public
 as $$
 declare
-  v_user uuid := auth.uid();
+  v_user uuid := coalesce(p_user_id, auth.uid());
   v_macro record;
   v_targets jsonb := jsonb_build_object(
     'Calories', jsonb_build_object('day_shift', 2250, 'off', 2250, 'night_shift', 2450, 'floor', false),
@@ -222,9 +227,13 @@ declare
   );
   v_row jsonb;
   v_day text;
+  v_n int := 0;
 begin
   if v_user is null then
-    raise exception 'seed_recomp_macro_targets() must be called by a signed-in user';
+    raise exception 'No user id. The Supabase SQL editor is not a signed-in '
+      'user, so auth.uid() is null here. Pass your id instead, e.g. '
+      'select seed_recomp_macro_targets((select id from auth.users where '
+      'email = ''you@example.com''));';
   end if;
 
   for v_macro in
@@ -236,21 +245,36 @@ begin
       insert into nutrition_macro_targets (user_id, macro_id, day_type, daily_goal, is_floor)
       values (v_user, v_macro.id, v_day, (v_row ->> v_day)::numeric, (v_row ->> 'floor')::boolean)
       on conflict (macro_id, day_type) do nothing;   -- never clobber an edit
+      v_n := v_n + 1;
     end loop;
   end loop;
+
+  if v_n = 0 then
+    raise notice 'No Calories/Protein/Fat/Carbs macros found for %. Nothing seeded.', v_user;
+  end if;
 end;
 $$;
 
 -- ═══════════════════════════════════════════════════════════════
--- AFTER running the above, run these two as the signed-in owner:
+-- AFTER running the above, run these as the OWNER of the data.
 --
---   -- 1. Seed the nine day-type targets (safe to re-run):
---   select seed_recomp_macro_targets();
+-- The Supabase SQL editor is NOT a signed-in user — it runs as the
+-- service role, so auth.uid() is null in it. Pass your id explicitly:
 --
---   -- 2. Set your rota anchor — ANY date you know was a Day 1
---   --    (the first DAY shift of a block). Replace the date:
+--   -- 1. Find your user id:
+--   select id, email from auth.users order by created_at;
+--
+--   -- 2. Seed the nine day-type targets (safe to re-run). Either pass
+--   --    the id, or look it up inline by email:
+--   select seed_recomp_macro_targets(
+--     (select id from auth.users where email = 'harrym3002@outlook.com')
+--   );
+--
+--   -- 3. Set your rota anchor — ANY date you know was a Day 1 (the
+--   --    first DAY shift of a block). Replace the date if needed:
 --   insert into rota_config (user_id, anchor_date)
---   values (auth.uid(), '2026-07-23')
+--   values ((select id from auth.users where email = 'harrym3002@outlook.com'),
+--           '2026-07-23')
 --   on conflict (user_id) do update set anchor_date = excluded.anchor_date;
 --
 -- To check it took:
@@ -259,4 +283,7 @@ $$;
 --     from nutrition_macro_targets t
 --     join nutrition_macros m on m.id = t.macro_id
 --    order by m.name, t.day_type;
+--
+-- From the CLIENT (a real signed-in session) the argument is optional:
+--   select seed_recomp_macro_targets();
 -- ═══════════════════════════════════════════════════════════════
