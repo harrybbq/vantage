@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
+import { eventsInMonth, kindColour } from '../lib/calendar/events';
 import Icon from './Icon';
 import { motion } from 'framer-motion';
 import { getWeekKey, countWeekLogs, getTodayStr } from '../utils/helpers';
@@ -149,7 +150,22 @@ function TrackersList({ trackers, logs, streaks, onDelete, onOpenModal, update }
   );
 }
 
+// Tab definition — one source of truth for the nav and the switcher,
+// same shape as SETTINGS_TABS so the two read alike.
+const TRACK_TABS = [
+  { id: 'trackers', label: 'Trackers' },
+  { id: 'diet',     label: 'Diet'     },
+  { id: 'vitals',   label: 'Vitals'   },
+];
+
 function CalendarView({ S, update, onShowCoinToast, nutritionMonthData }) {
+  // Events for the visible month, read in one pass rather than 42
+  // lookups. Empty until the add-event UI exists; the grid is built to
+  // carry them now so that UI is a form, not a redesign.
+  const monthEvents = useMemo(
+    () => eventsInMonth(S, S.calYear, S.calMonth),
+    [S, S.calYear, S.calMonth],
+  );
   const months = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
   const { calYear, calMonth, trackers, logs, multiSelectMode, multiSelectedDays } = S;
 
@@ -359,6 +375,21 @@ function CalendarView({ S, update, onShowCoinToast, nutritionMonthData }) {
             >
               {firstTracker && <div className="cal-cell-fill" style={{ background: firstTracker.color }}></div>}
               <div className="cal-date">{cell.day}</div>
+              {/* Two titles then a count — a cell that lists everything
+                  stops being a month view. */}
+              {(monthEvents[cell.key] || []).length > 0 && (
+                <div className="cal-events">
+                  {monthEvents[cell.key].slice(0, 2).map(ev => (
+                    <span key={ev.id} className="cal-event" title={ev.time ? `${ev.time} · ${ev.title}` : ev.title}>
+                      <span className="cal-event-dot" style={{ background: kindColour(ev.kind) }} />
+                      {ev.title}
+                    </span>
+                  ))}
+                  {monthEvents[cell.key].length > 2 && (
+                    <span className="cal-event-more">+{monthEvents[cell.key].length - 2} more</span>
+                  )}
+                </div>
+              )}
               {(cell.tids.length > 0 || (nutritionMonthData && nutritionMonthData[cell.key])) && (
                 <div className="cal-dots">
                   {cell.tids.map(tid => {
@@ -433,6 +464,7 @@ function CalendarView({ S, update, onShowCoinToast, nutritionMonthData }) {
 
 export default function TrackSection({ S, update, active, onOpenModal, onShowCoinToast, userId }) {
   const [nutritionMonthData, setNutritionMonthData] = useState({});
+  const [tab, setTab] = useState('trackers');
 
   return (
     <section id="track" className={`section${active ? ' active' : ''}`}>
@@ -454,46 +486,92 @@ export default function TrackSection({ S, update, active, onOpenModal, onShowCoi
           ]}
         /></div>
       </motion.div>
-      {/* Desktop: trackers strip on top, then a 3-column dashboard
-          (Calendar · Vitals & Macros · Daily Macros). Collapses to a
-          single stacked column on narrow/mobile via CSS. */}
-      <div className="track-dash">
-        <TrackersList
-          trackers={S.trackers}
-          logs={S.logs}
-          streaks={S.streaks || {}}
-          onDelete={id => update(prev => ({ ...prev, trackers: prev.trackers.filter(t => t.id !== id) }))}
-          onOpenModal={onOpenModal}
-          update={update}
-        />
-        <div className="track-cols">
-          <div className="track-col">
-            <CalendarView S={S} update={update} onShowCoinToast={onShowCoinToast} nutritionMonthData={nutritionMonthData} />
+      {/* Tabs, not columns.
+          This was three columns side by side — Calendar, Vitals+Body,
+          Nutrition — which meant the calendar, the thing the page is
+          actually organised around, got a third of the width and drew a
+          grid of 30px cells. Splitting them into tabs gives each one the
+          full page, and the calendar the room to become something you
+          can put events on.
+          The tab classes are Settings' own, deliberately: consistency
+          here is a shared stylesheet, not a second implementation that
+          looks similar until one of them is edited. */}
+      <div className="track-tabs" role="tablist" aria-label="Track sections">
+        {TRACK_TABS.map(t => (
+          <button
+            key={t.id}
+            type="button"
+            role="tab"
+            aria-selected={tab === t.id}
+            aria-controls={`track-panel-${t.id}`}
+            id={`track-tab-${t.id}`}
+            className={`settings-tab${tab === t.id ? ' settings-tab-active' : ''}`}
+            onClick={() => setTab(t.id)}
+          >
+            {t.label}
+          </button>
+        ))}
+      </div>
+
+      <div
+        id={`track-panel-${tab}`}
+        className="track-panel"
+        role="tabpanel"
+        aria-labelledby={`track-tab-${tab}`}
+      >
+        {/* ── TRACKERS ── the list beside a full-width calendar. */}
+        {tab === 'trackers' && (
+          <div className="track-layout">
+            <aside className="track-side">
+              <TrackersList
+                trackers={S.trackers}
+                logs={S.logs}
+                streaks={S.streaks || {}}
+                onDelete={id => update(prev => ({ ...prev, trackers: prev.trackers.filter(t => t.id !== id) }))}
+                onOpenModal={onOpenModal}
+                update={update}
+              />
+            </aside>
+            <div className="track-main">
+              <CalendarView S={S} update={update} onShowCoinToast={onShowCoinToast} nutritionMonthData={nutritionMonthData} />
+            </div>
           </div>
-          <div className="track-col">
-            {/* Vitals + macro-% history chart. */}
+        )}
+
+        {/* ── DIET ── */}
+        {tab === 'diet' && (
+          userId
+            ? <NutritionSection
+                userId={userId}
+                S={S}
+                update={update}
+                selectedDate={S.selectedLogDate || null}
+                calYear={S.calYear}
+                calMonth={S.calMonth}
+                onShowCoinToast={onShowCoinToast}
+                onMonthDataReady={setNutritionMonthData}
+                onOpenModal={onOpenModal}
+              />
+            : <div className="card" style={{ padding: '22px' }}><div className="settings-empty">Sign in to log nutrition.</div></div>
+        )}
+
+        {/* ── VITALS ── vitals history + the body card that shares its
+            weight series. */}
+        {tab === 'vitals' && (
+          <div className="track-vitals">
             <VitalsHistoryCard S={S} update={update} />
-            {/* Body — weight trend/goal + waist/body-fat measurements.
-                Shares S.vitalsLog.weight with the vitals history above. */}
             <BodyCard S={S} update={update} />
           </div>
-          <div className="track-col">
-            {userId
-              ? <NutritionSection
-                  userId={userId}
-                  S={S}
-                  update={update}
-                  selectedDate={S.selectedLogDate || null}
-                  calYear={S.calYear}
-                  calMonth={S.calMonth}
-                  onShowCoinToast={onShowCoinToast}
-                  onMonthDataReady={setNutritionMonthData}
-                  onOpenModal={onOpenModal}
-                />
-              : <div className="card" style={{ padding: '22px' }}><div className="settings-empty">Sign in to log nutrition.</div></div>}
-          </div>
-        </div>
+        )}
       </div>
+
+      {/* The Diet tab reports the month's nutrition totals up so the
+          calendar can dot the days that have food logged. It only does
+          that while mounted, so a user who has not opened Diet this
+          session sees no nutrition dots until they do — mounting it
+          hidden purely to collect them would cost a query per month on
+          every visit to Track, which is the wrong trade on a Micro
+          instance. */}
     </section>
   );
 }
