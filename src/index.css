@@ -7425,3 +7425,82 @@ div.m-hubdrawer-coach { cursor: default; display: flex; flex-direction: column; 
   text-transform:uppercase; font-weight:700; color:var(--em);}
 .m-macros-plan-d{font-family:var(--mono); font-size:9px; font-weight:700; margin-left:auto;}
 .m-macros-plan-d.is-up{color:var(--em);} .m-macros-plan-d.is-down{color:var(--gold,#c8970a);}
+
+/* ══ Track — tabbed layout ═══════════════════════════════════════════
+   Was three columns side by side, which gave the calendar a third of
+   the page and 30px cells. Tabs give each surface the full width, and
+   the calendar the room to hold events.
+   ═════════════════════════════════════════════════════════════════ */
+.track-tabs{
+  display:flex; gap:0; margin:0 0 22px; padding:0;
+  border-bottom:1px solid var(--border);
+  overflow-x:auto; scrollbar-width:none;
+}
+.track-tabs::-webkit-scrollbar{ display:none; }
+.track-panel{ min-width:0; }
+
+/* Trackers list beside the calendar. The list is a fixed, narrow
+   column because it is a list of short names — giving it a share of
+   the width would take that width from the grid, which is the thing
+   that needed it. Below 900px it stacks above. */
+.track-layout{ display:grid; grid-template-columns:1fr; gap:18px; align-items:start; }
+@media (min-width:900px){
+  .track-layout{ grid-template-columns:270px minmax(0,1fr); }
+}
+.track-side{ min-width:0; }
+.track-main{ min-width:0; }
+.track-side > .card{ max-width:none !important; margin:0 !important; width:100%; }
+.track-main > .card{ max-width:none !important; margin:0 !important; width:100%; }
+
+/* The point of the whole change: cells with room in them. A month grid
+   that has to carry a date, up to a few tracker dots and an event or
+   two cannot do it at 30px, so the cells stop being square and get a
+   minimum height instead. */
+#track .track-main .cal-grid{ gap:5px; }
+#track .track-main .cal-cell{
+  aspect-ratio:auto; min-height:74px; border-radius:8px;
+  align-items:flex-start; justify-content:flex-start;
+  padding:6px 7px; gap:3px;
+}
+#track .track-main .cal-date{ font-size:12px; }
+#track .track-main .cal-dots{ margin-top:auto; max-width:100%; justify-content:flex-start; }
+#track .track-main .cal-dot{ width:5px; height:5px; }
+#track .track-main .cal-day-label{ font-size:10px; }
+@media (min-width:1200px){
+  #track .track-main .cal-cell{ min-height:96px; }
+}
+@media (max-width:640px){
+  #track .track-main .cal-cell{ min-height:52px; padding:4px; }
+  #track .track-main .cal-date{ font-size:10px; }
+  /* A 36px-wide cell cannot hold a title — it holds the first two
+     characters and an ellipsis, which is worse than a dot because it
+     looks like information. So the titles go and the kind colours
+     become a second dot row; tapping the day still opens the detail. */
+  #track .cal-events{ flex-direction:row; gap:3px; flex-wrap:wrap; }
+  #track .cal-event{ font-size:0; gap:0; }
+  #track .cal-event-dot{ width:5px; height:5px; }
+  #track .cal-event-more{ font-size:7px; }
+}
+
+/* Vitals tab — one column, both cards full width. */
+.track-vitals{ display:flex; flex-direction:column; gap:18px; }
+.track-vitals > .card, .track-vitals .vitals-card{
+  max-width:none !important; margin:0 !important; width:100%;
+}
+
+/* ── Events on a day ──────────────────────────────────────────────
+   Rendered from S.calendarEvents. Nothing writes these yet — the
+   foundation is in lib/calendar/events.js — so in practice this is
+   dormant until the add-event UI lands. It is styled now so the
+   cell's layout is already correct when it does, rather than the
+   grid having to be redesigned around content it never carried. */
+.cal-events{ display:flex; flex-direction:column; gap:2px; width:100%;
+  position:relative; z-index:1; overflow:hidden; }
+.cal-event{
+  display:flex; align-items:center; gap:4px; width:100%;
+  font-family:var(--mono); font-size:9px; line-height:1.3;
+  color:var(--text); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+}
+.cal-event-dot{ width:5px; height:5px; border-radius:2px; flex:none; }
+.cal-event-more{ font-family:var(--mono); font-size:8px; color:var(--text-muted); }
+#track .cal-event{ color:rgba(255,255,255,.82); }
