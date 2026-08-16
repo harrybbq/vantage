@@ -60,16 +60,24 @@ export const BLOCK_STARTS = [0, 8];
 /**
  * The PPLUL order.
  *
- * Reordered 2026-08-16 to match Harry's written plan: Legs → Push →
- * Pull → Lower → Upper, chosen so no muscle group is hit on
- * consecutive days. It was Push, Pull, Legs, Upper, Lower.
+ * Push → Pull → Legs → Upper → Lower, set by the owner on 2026-08-16.
  *
- * This is the ONE constant that separated the code from the plan — the
- * shift blocks, the rest days and the ten-sessions-per-cycle cadence
- * already agreed exactly. Changing it re-labels the training on every
- * day the calendar draws; the shifts themselves do not move.
+ * History, because this has moved twice and the reason matters more
+ * than the value: it was this order originally, was changed to
+ * Legs → Push → Pull → Lower → Upper to match the written recomp plan
+ * (which picked that so no muscle group lands on consecutive days), and
+ * was then set back here by explicit instruction. The plan document's
+ * §2.2 day-by-day table therefore no longer matches what the calendar
+ * draws — the SHIFTS still match exactly, only the session labels
+ * differ.
+ *
+ * Changing this re-labels the training on every day the calendar draws
+ * and does not move a single shift. The calorie cycling is keyed by
+ * session NAME, not by position, so the deltas follow the sessions
+ * automatically and the 16-day balance stays at zero — each session
+ * still occurs exactly twice per cycle whatever the order.
  */
-export const SEQ = ['Legs', 'Push', 'Pull', 'Lower', 'Upper'];
+export const SEQ = ['Push', 'Pull', 'Legs', 'Upper', 'Lower'];
 /** Sessions that carry conditioning — upper days, so legs stay fresh. */
 export const CARDIO_SESSIONS = new Set(['Push', 'Pull', 'Upper']);
 
