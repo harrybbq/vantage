@@ -57,7 +57,19 @@ export const REST_POS = new Set([5, 6, 7, 13, 14, 15]);
 /** Cycle position each PPLUL block starts on. */
 export const BLOCK_STARTS = [0, 8];
 
-export const SEQ = ['Push', 'Pull', 'Legs', 'Upper', 'Lower'];
+/**
+ * The PPLUL order.
+ *
+ * Reordered 2026-08-16 to match Harry's written plan: Legs → Push →
+ * Pull → Lower → Upper, chosen so no muscle group is hit on
+ * consecutive days. It was Push, Pull, Legs, Upper, Lower.
+ *
+ * This is the ONE constant that separated the code from the plan — the
+ * shift blocks, the rest days and the ten-sessions-per-cycle cadence
+ * already agreed exactly. Changing it re-labels the training on every
+ * day the calendar draws; the shifts themselves do not move.
+ */
+export const SEQ = ['Legs', 'Push', 'Pull', 'Lower', 'Upper'];
 /** Sessions that carry conditioning — upper days, so legs stay fresh. */
 export const CARDIO_SESSIONS = new Set(['Push', 'Pull', 'Upper']);
 
@@ -76,6 +88,37 @@ export const LEAVE_TYPES = [
   { id: 'other', label: 'Other', short: 'OTH', worked: false },
 ];
 export const leaveType = id => LEAVE_TYPES.find(l => l.id === id) || null;
+
+/**
+ * The plan numbers the cycle from the first DAY shift; this file
+ * anchors position 0 on the first NIGHT shift. Same physical rota, two
+ * origins, so the index is re-based rather than the anchor moved —
+ * moving the anchor would shift every date the calendar has already
+ * drawn.
+ *
+ *   position 8  → Day 1   (first day shift)
+ *   position 0  → Day 9   (first night shift)
+ */
+export const ROTA_DAY_ONE_POS = 8;
+export function rotaDayIndex(pos) {
+  if (pos == null) return null;
+  return ((pos - ROTA_DAY_ONE_POS + CYCLE) % CYCLE) + 1;
+}
+
+/** The plan's vocabulary for a shift, used to pick nutrition targets. */
+export function dayTypeOf(shift) {
+  if (shift === 'night') return 'night_shift';
+  if (shift === 'day') return 'day_shift';
+  return 'off';           // includes booked leave — not a working night
+}
+
+/**
+ * Prescribed load multiplier. Night sessions run at 80%: same sets,
+ * same reps, lighter bar. Maintenance intent, not progression.
+ */
+export function loadScaleOf(shift) {
+  return shift === 'night' ? 0.8 : 1;
+}
 
 /** 'YYYY-MM-DD' for a y/m/d triple (m is 0-based, as everywhere else here). */
 export function isoOf(y, m, d) {

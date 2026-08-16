@@ -13,7 +13,9 @@
 import { useMemo } from 'react';
 import {
   chipText, holidayDaySet, leaveType, nextHoliday, resolveDay,
+  rotaDayIndex, dayTypeOf, loadScaleOf,
 } from '../../lib/rotation/pattern';
+import { targetsFor } from '../../data/trainingProgramme';
 
 const todayIso = () => {
   const n = new Date();
@@ -47,6 +49,12 @@ export function RotationBody({ S, navigate }) {
   }
 
   const chip = chipText(day);
+  const dayIdx = rotaDayIndex(day.pos);
+  // Booked leave is an off day for fuelling: it is not a working night,
+  // whatever the pattern underneath says it would have been.
+  const dayType = day.shift === 'leave' ? 'off' : dayTypeOf(day.shift);
+  const scale = day.shift === 'leave' ? 1 : loadScaleOf(day.shift);
+  const fuel = targetsFor(dayType);
   const label = day.shift === 'leave'
     ? (leaveType(day.leave)?.label || 'Booked off')
     : SHIFT_LABEL[day.shift];
@@ -67,6 +75,20 @@ export function RotationBody({ S, navigate }) {
         <span className="rw-session-lbl">Training</span>
         <span className="rw-session-val">{day.session}</span>
         {day.cardio && <span className="rw-cardio">+ cardio</span>}
+        {/* 80% on nights. Shown next to the session because that is the
+            one place it changes what you do when you get there. */}
+        {scale !== 1 && day.session !== 'Rest' && (
+          <span className="rw-load">{Math.round(scale * 100)}%</span>
+        )}
+      </div>
+
+      {/* Today's intake targets. On this rota they are a property of the
+          SHIFT, not of the week — so the widget that already knows which
+          shift it is, is the one that can answer it without being asked. */}
+      <div className="rw-fuel">
+        <span className="rw-fuel-k">{fuel.kcal}<i>kcal</i></span>
+        <span className="rw-fuel-k">{fuel.protein}<i>g protein</i></span>
+        <span className="rw-fuel-day">Day {dayIdx}</span>
       </div>
 
       <div className="rw-hol">

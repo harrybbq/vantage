@@ -7239,6 +7239,20 @@ button:active:not(:disabled),
   text-transform: uppercase; color: var(--text-muted); }
 .rw-session-val { font-size: 14px; font-weight: 600; margin-left: auto; }
 .rw-session.is-rest .rw-session-val { color: var(--text-muted); font-weight: 500; }
+/* 80% marker — sits with the session because that is where it changes
+   what you actually do. */
+.rw-load { font-family: var(--mono); font-size: 8.5px; letter-spacing: 1px; font-weight: 700;
+  padding: 2px 5px; border-radius: 4px; color: var(--gold, #c8970a);
+  border: 1px solid rgba(200,151,10,.35); background: rgba(200,151,10,.08); }
+/* Today's fuel. A property of the shift on this rota, not of the week —
+   so the widget that already knows the shift can answer it for free. */
+.rw-fuel { display: flex; align-items: baseline; gap: 12px; padding: 8px 11px;
+  border-radius: 10px; border: 1px solid var(--border); }
+.rw-fuel-k { font-family: var(--mono); font-size: 14px; font-weight: 700; color: var(--text); }
+.rw-fuel-k i { font-style: normal; font-size: 8.5px; letter-spacing: .8px;
+  color: var(--text-muted); margin-left: 3px; }
+.rw-fuel-day { margin-left: auto; font-family: var(--mono); font-size: 8.5px;
+  letter-spacing: 1.2px; text-transform: uppercase; color: var(--text-muted); }
 .rw-cardio { font-family: var(--mono); font-size: 9px; color: #12a5a5; }
 .rw-hol { display: flex; align-items: baseline; gap: 8px; padding-top: 2px; }
 .rw-hol-n { font-family: var(--mono); font-size: 24px; font-weight: 700; line-height: 1;
