@@ -26,7 +26,7 @@
  */
 
 /** Sessions, in the order the rota runs them. Mirrors SEQ in pattern.js. */
-export const SESSION_CODES = ['Legs', 'Push', 'Pull', 'Lower', 'Upper'];
+export const SESSION_CODES = ['Push', 'Pull', 'Legs', 'Upper', 'Lower'];
 
 /**
  * Prescribed work per session. `sets` × `reps` are the written
