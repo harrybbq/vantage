@@ -23,6 +23,10 @@
  *
  * Pure data + pure selectors. No DOM, no React, no network.
  */
+// Explicit .js, like the other pure lib modules — it is what keeps
+// them runnable under node, which is how the selection logic here gets
+// tested without a browser.
+import { CODE_PUZZLES } from '../../data/codePuzzles.js';
 
 /* ══════════════════════════════════════════════════════════════════════
    LeetCode — the Blind 75. A finite, well-known list with broad pattern
@@ -496,7 +500,11 @@ DeviceFileEvents
 | order by conns desc`),
 ];
 
-export const ALL_PROBLEMS = [...LEETCODE, ...KQL];
+/* The runnable puzzles join the curriculum rather than sitting beside
+   it, so progress, the review schedule and "next up" work the same way
+   for all three kinds. They live in data/codePuzzles.js because they
+   are content, not selection logic. */
+export const ALL_PROBLEMS = [...CODE_PUZZLES, ...LEETCODE, ...KQL];
 export const problemById = id => ALL_PROBLEMS.find(p => p.id === id) || null;
 
 /* ══════════════════════════════════════════════════════════════════════
