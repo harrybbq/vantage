@@ -606,6 +606,21 @@ export default function ShopSection({ S, update, active, onOpenModal, onShowCoin
             /></div>
           </motion.div>
           <div className="shop-toolbar-actions" style={{ display: 'flex', gap: '10px' }}>
+            {/* Show/hide Trending. A plain toggle beside the other two
+                actions rather than buried in Settings: it is a view
+                preference about this page, so it belongs on this page.
+                Settings → Privacy still governs whether you are COUNTED
+                in it, which is a different question. */}
+            <motion.button
+              className="btn btn-ghost"
+              onClick={() => update(prev => ({ ...prev, showTrending: prev.showTrending === false }))}
+              title={S.showTrending !== false ? 'Hide the Trending board' : 'Show the Trending board'}
+              aria-pressed={S.showTrending !== false}
+              whileHover={{ scale: 1.04 }} whileTap={{ scale: 0.96 }}
+              transition={{ type: 'spring', stiffness: 400, damping: 17 }}>
+              <Icon name={S.showTrending !== false ? 'eye' : 'eye-off'} size={14} />
+              {S.showTrending !== false ? 'Hide Trending' : 'Show Trending'}
+            </motion.button>
             <motion.button className="btn btn-ghost" onClick={() => onOpenModal('addCategoryModal')}
               whileHover={{ scale: 1.04 }} whileTap={{ scale: 0.96 }}
               transition={{ type: 'spring', stiffness: 400, damping: 17 }}>
@@ -813,7 +828,12 @@ export default function ShopSection({ S, update, active, onOpenModal, onShowCoin
           )}
         </div>
       </div>
-      <TrendingBoard onAdd={handleAddTrending} />
+      {/* Trending is opt-out, not permanent furniture. It is the one
+          thing on this page that is about other people, and someone
+          shopping their own list should be able to put it away. `!==
+          false` so the absence of the key means shown — the same shape
+          every other opt-out in S uses. */}
+      {S.showTrending !== false && <TrendingBoard onAdd={handleAddTrending} />}
       </div>
     </section>
   );
