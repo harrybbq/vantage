@@ -2962,13 +2962,23 @@ input,select,textarea,button{touch-action:manipulation;}
   padding:10px 16px;
   font-family:var(--mono);
   font-size:10px;letter-spacing:1.6px;text-transform:uppercase;
-  color:var(--text-muted);
+  /* --text-muted is tuned for muted text on a solid panel. A tab is a
+     CONTROL, and these sit on the section background — which on Track
+     and Shopping can be a photo — so muted read as barely-there. An
+     unselected tab still has to be legible enough to aim at. */
+  color:var(--text-mid, var(--text-muted));
+  font-weight:600;
   cursor:pointer;
   white-space:nowrap;
   transition:color .14s ease, border-color .14s ease;
   position:relative;
 }
 .settings-tab:hover{ color:var(--text); }
+/* Over a background image the tabs have nothing behind them, so they
+   get a shadow to sit on rather than a plate to sit in — a plate would
+   undo the point of setting a background at all. */
+#track .track-tabs .settings-tab,
+#shop .shop-tabs-row .settings-tab{ text-shadow:0 1px 4px rgba(0,0,0,.55); }
 .settings-tab-active{
   color:var(--em);
   border-bottom-color:var(--em);

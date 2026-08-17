@@ -279,16 +279,13 @@ export default function QuickLog({ S, update, onNavigateTrack, onShowCoinToast }
   }
 
   const trackers = S.trackers || [];
-  const dateLabel = new Date().toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' });
 
   return (
     <div className="quick-log-section">
-      <div className="quick-log-header">
-        <div>
-          <div className="eyebrow" style={{ marginBottom: '2px' }}>TODAY</div>
-          <div className="quick-log-date">{dateLabel}</div>
-        </div>
-      </div>
+      {/* The date used to sit here. It is already the headline of the
+          Today module directly above, and two of the same date on one
+          screen is one of them being noise. The eyebrow goes with it —
+          without a date under it, "TODAY" labelled nothing. */}
 
       <StreakBrokenBanner broken={brokenStreaks} onDismiss={dismissBroken} />
 
