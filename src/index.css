@@ -1972,17 +1972,45 @@ nav:hover .nav-tab-label{opacity:1;}
 #track .cal-days-header{gap:2px;margin-bottom:2px;}
 #track .cal-day-label{font-size:8px;color:rgba(255,255,255,.45);padding:2px 0;}
 #track .cal-grid{gap:2px;}
+/* Day cells carry their own legibility.
+   These were a 6% white wash, which is invisible the moment there is a
+   photo behind them — and with the panel now switchable to transparent,
+   the cell IS the only opaque thing between the date and the wallpaper.
+   A dark scrim rather than a light one because the numerals and dots on
+   this page are light; tinting toward the text colour would have made
+   it worse. */
 #track .cal-cell{
-  background:rgba(255,255,255,.06);
-  border-color:rgba(255,255,255,.1);
+  background:rgba(10,10,12,.52);
+  border-color:rgba(255,255,255,.16);
   border-radius:5px;
   min-height:0;
 }
-#track .cal-cell:hover{background:rgba(255,255,255,.15);border-color:rgba(77,196,133,.5);}
+#track .cal-cell:hover{background:rgba(10,10,12,.7);border-color:rgba(77,196,133,.55);}
+/* Transparent panel: no surface behind the grid at all, so the cells
+   take a little more weight to stay readable over a bright image. The
+   gaps between them are what shows the wallpaper through — which is
+   the point of the setting, and why the cells do not go transparent
+   with the panel. */
+#track .track-main[data-transparent="true"] .cal-cell{
+  background:rgba(8,8,10,.62);
+  border-color:rgba(255,255,255,.2);
+}
+#track .track-main[data-transparent="true"] .cal-cell:hover{ background:rgba(8,8,10,.78); }
+/* The chrome around the grid loses its panel too, so it gets a shadow
+   to sit on instead. */
+.track-main[data-transparent="true"] .cal-header,
+.track-main[data-transparent="true"] .cal-days-header,
+.track-main[data-transparent="true"] .cal-legend,
+.track-side[data-transparent="true"] .trackers-panel h3,
+.track-side[data-transparent="true"] .tracker-row{
+  text-shadow:0 1px 3px rgba(0,0,0,.75);
+}
 #track .cal-cell.empty{background:transparent;border-color:transparent;}
 #track .cal-cell.today{border-color:var(--em-light);border-width:2px;}
 #track .cal-cell.selected{background:rgba(26,122,74,.28);border-color:var(--em-light);box-shadow:0 0 0 2px rgba(77,196,133,.25);}
-#track .cal-date{font-size:9px;color:rgba(255,255,255,.5);}
+/* 50% white was fine on a solid panel and is not on a scrim over a
+   photo — the date is the one thing on the cell that must always read. */
+#track .cal-date{font-size:9px;color:rgba(255,255,255,.75);}
 #track .cal-cell.has-logs .cal-date{color:var(--em-light);font-weight:700;}
 #track .cal-dot{width:3px;height:3px;}
 #track .cal-legend{border-top-color:rgba(255,255,255,.1);}
@@ -7453,15 +7481,24 @@ div.m-hubdrawer-coach { cursor: default; display: flex; flex-direction: column; 
   display:grid; grid-template-columns:1fr; gap:0;
   align-items:stretch;                    /* both columns full height */
   border:var(--border-widget); border-radius:var(--radius-lg);
-  background:var(--surface);
-  backdrop-filter:blur(20px) saturate(1.1);
-  -webkit-backdrop-filter:blur(20px) saturate(1.1);
   box-shadow:var(--accent-glow);
   overflow:hidden;                        /* corners clip the children */
   /* Reaches the bottom rather than stopping at its content. The month
      grid is the tallest thing on the page and the list beside it was
      ending a third of the way down. */
   min-height:min(720px, calc(100vh - 210px));
+}
+/* The SURFACE lives on the columns, not the shell.
+   It was on the shell, which meant "transparent" could clear the shell's
+   fill but not its backdrop-filter — and a blur with no fill still
+   frosts everything behind it, so the background image came through
+   smeared rather than visible. It also meant switching one column
+   cleared the fill under both. Each column now carries its own fill and
+   its own blur, so each can drop both, independently. */
+.track-side, .track-main{
+  background:var(--surface);
+  backdrop-filter:blur(20px) saturate(1.1);
+  -webkit-backdrop-filter:blur(20px) saturate(1.1);
 }
 @media (min-width:900px){
   .track-layout{ grid-template-columns:280px minmax(0,1fr); }
@@ -7488,12 +7525,21 @@ div.m-hubdrawer-coach { cursor: default; display: flex; flex-direction: column; 
 .track-side #trackersList{ flex:1; min-height:0; overflow-y:auto; }
 
 /* Transparency, driven by the same right-click menu and the same
-   S.moduleTransparency store the hub modules use. Only the fill goes;
-   the hairline between the columns stays, or the two halves stop
-   reading as one module the moment either is switched. */
-.track-layout:has(> [data-transparent="true"]){ background:transparent; box-shadow:none; }
+   S.moduleTransparency store the hub modules use.
+   The blur goes with the fill — that is the whole fix. Keeping
+   backdrop-filter while clearing background is why this did not look
+   transparent: a 20px blur over a photo is still an opaque-looking
+   frost. The hairline between the columns stays, or the two halves
+   stop reading as one module the moment either is switched. */
 .track-side[data-transparent="true"], .track-main[data-transparent="true"]{
-  background:transparent !important; box-shadow:none !important;
+  background:transparent !important;
+  backdrop-filter:none !important; -webkit-backdrop-filter:none !important;
+  box-shadow:none !important;
+}
+/* Both off: drop the outer glow too, so nothing is left hinting at a
+   panel that is no longer drawn. */
+.track-layout:has(> .track-side[data-transparent="true"]):has(> .track-main[data-transparent="true"]){
+  box-shadow:none;
 }
 
 /* The point of the whole change: cells with room in them. A month grid
