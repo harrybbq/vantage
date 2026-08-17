@@ -312,6 +312,36 @@ function DropZone({ categoryId, items, coins, requireCoins = true, onToggleBough
   );
 }
 
+/**
+ * One category in the rail.
+ *
+ * Carries the two things the old horizontal tab strip could not fit
+ * beside a name: how many items are in it, and what they come to. The
+ * total is the same totalFor() the category headings use, so the rail
+ * and the heading can never disagree — and it reports unknown-price
+ * items as "+N" rather than quietly leaving them out of a number
+ * someone might budget against.
+ */
+function RailCat({ label, items, count, colour, active, onGo }) {
+  const { sum, unknown } = totalFor(items || []);
+  return (
+    <button
+      type="button"
+      role="tab"
+      aria-selected={active}
+      className={`shop-railcat${active ? ' is-active' : ''}`}
+      onClick={onGo}
+    >
+      <span className="shop-railcat-dot" style={colour ? { background: colour } : undefined} />
+      <span className="shop-railcat-name">{label}</span>
+      <span className="shop-railcat-meta">
+        {sum > 0 && <span className="shop-railcat-sum">{fmtMoney(sum)}{unknown ? <i>+{unknown}</i> : null}</span>}
+        <span className="shop-railcat-n">{count}</span>
+      </span>
+    </button>
+  );
+}
+
 export default function ShopSection({ S, update, active, onOpenModal, onShowCoinToast }) {
   const { shopItems, shopCategories, shopFilter, coins } = S;
   // Settings → Goals → Shopping coins. Absent means required, so no
@@ -634,23 +664,74 @@ export default function ShopSection({ S, update, active, onOpenModal, onShowCoin
           </div>
         </div>
 
-        <div className="shop-summary">
-          <div className="shop-summary-stat"><div className="shop-summary-val">{total}</div><div className="shop-summary-lbl">Items</div></div>
-          <div className="shop-summary-stat"><div className="shop-summary-val">{bought}</div><div className="shop-summary-lbl">Bought</div></div>
-          <div className="shop-summary-stat"><div className="shop-summary-val">{total - bought}</div><div className="shop-summary-lbl">Remaining</div></div>
-          {totalVal > 0 && <div className="shop-summary-stat"><div className="shop-summary-val">£{totalVal.toFixed(2)}</div><div className="shop-summary-lbl">Total Value</div></div>}
-        </div>
+        {/* One board: a rail of context beside the list it describes,
+            both inside a single shell. Everything in the rail already
+            existed — the summary, the priority filters, the category
+            tabs — it was just strewn across the page as three separate
+            stripes above the grid. */}
+        <div className="shop-board">
+        <aside className="shop-rail" data-hub-module="shop-rail" data-hub-module-label="Sidebar">
+          {/* The COLUMN carries the surface and the full height; the
+              inner block is what sticks. Making the sticky element
+              itself the column left the fill ending wherever the
+              content did, so the left side of the board just stopped
+              partway down. */}
+          <div className="shop-rail-sticky">
+          <div className="shop-rail-sum">
+            <div className="shop-rail-stat"><span className="shop-rail-n">{total}</span><span className="shop-rail-l">Items</span></div>
+            <div className="shop-rail-stat"><span className="shop-rail-n">{total - bought}</span><span className="shop-rail-l">Remaining</span></div>
+            <div className="shop-rail-stat"><span className="shop-rail-n">{bought}</span><span className="shop-rail-l">Bought</span></div>
+            {totalVal > 0 && (
+              <div className="shop-rail-stat"><span className="shop-rail-n is-money">£{totalVal.toFixed(0)}</span><span className="shop-rail-l">Value</span></div>
+            )}
+          </div>
 
-        <div className="shop-filters">
-          {filters.map(f => (
-            <button
-              key={f.key}
-              className={`shop-filter-btn${shopFilter === f.key ? ' active' : ''}`}
-              style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}
-              onClick={() => setFilter(f.key)}
-            >{f.label}</button>
-          ))}
-        </div>
+          <div className="shop-rail-group">
+            <div className="shop-rail-h">// Priority</div>
+            <div className="shop-filters">
+              {filters.map(f => (
+                <button
+                  key={f.key}
+                  className={`shop-filter-btn${shopFilter === f.key ? ' active' : ''}`}
+                  style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}
+                  onClick={() => setFilter(f.key)}
+                >{f.label}</button>
+              ))}
+            </div>
+          </div>
+
+          {/* Categories. Same goToCategory as before — it still scrolls
+              the grid to that heading and the scroll-spy still lights
+              the row you land on — but now each one carries its count
+              AND its running total, which the horizontal strip had no
+              room for. */}
+          {shopFilter === 'all' && (
+            <div className="shop-rail-group">
+              <div className="shop-rail-h">// Categories</div>
+              <div className="shop-rail-cats" role="tablist">
+                <RailCat label="All" count={filtered.length} items={filtered}
+                         active={activeCategory === 'all'} onGo={() => goToCategory('all')} />
+                <RailCat label="Uncategorised"
+                         items={filtered.filter(s => !s.categoryId)}
+                         count={filtered.filter(s => !s.categoryId).length}
+                         active={activeCategory === 'uncategorised'}
+                         onGo={() => goToCategory('uncategorised')} />
+                {shopCategories.map(cat => {
+                  const inCat = filtered.filter(s => s.categoryId === cat.id);
+                  return (
+                    <RailCat key={cat.id} label={cat.name} items={inCat} count={inCat.length}
+                             colour={cat.color}
+                             active={activeCategory === cat.id}
+                             onGo={() => goToCategory(cat.id)} />
+                  );
+                })}
+              </div>
+            </div>
+          )}
+          </div>
+        </aside>
+
+        <div className="shop-main" data-hub-module="shop-list" data-hub-module-label="List">
 
         <div className="shop-controls">
           <div className="shop-search">
@@ -717,34 +798,9 @@ export default function ShopSection({ S, update, active, onOpenModal, onShowCoin
           </div>
         )}
 
-        {/* Category tabs — pivots between categories one tap at a
-            time. "All" stacks every category (legacy desktop view).
-            Lives at every viewport so behavior is predictable. */}
-        {shopFilter === 'all' && (
-          <div className="shop-tabs" role="tablist">
-            <button
-              role="tab"
-              aria-selected={activeCategory === 'all'}
-              className={`shop-tab${activeCategory === 'all' ? ' is-active' : ''}`}
-              onClick={() => goToCategory('all')}
-            >All ({filtered.length})</button>
-            <button
-              role="tab"
-              aria-selected={activeCategory === 'uncategorised'}
-              className={`shop-tab${activeCategory === 'uncategorised' ? ' is-active' : ''}`}
-              onClick={() => goToCategory('uncategorised')}
-            >Uncategorised ({filtered.filter(s => !s.categoryId).length})</button>
-            {shopCategories.map(cat => (
-              <button
-                key={cat.id}
-                role="tab"
-                aria-selected={activeCategory === cat.id}
-                className={`shop-tab${activeCategory === cat.id ? ' is-active' : ''}`}
-                onClick={() => goToCategory(cat.id)}
-              >{cat.name} ({filtered.filter(s => s.categoryId === cat.id).length})</button>
-            ))}
-          </div>
-        )}
+        {/* The horizontal category strip lived here. It is the rail's
+            category list now — same goToCategory, same scroll-spy,
+            with the running total the strip could not fit. */}
 
         <div className="shop-grid" id="shopGrid" ref={gridRef} style={{ marginTop: '16px', display: 'block' }}>
           {shopFilter === 'all' ? (
@@ -833,7 +889,17 @@ export default function ShopSection({ S, update, active, onOpenModal, onShowCoin
           shopping their own list should be able to put it away. `!==
           false` so the absence of the key means shown — the same shape
           every other opt-out in S uses. */}
-      {S.showTrending !== false && <TrendingBoard onAdd={handleAddTrending} />}
+        {/* Trending sits INSIDE the board now, along the bottom, rather
+            than as a rail beside it. It is the one part of this page
+            about other people and it was getting the same billing as
+            the list you came to read. */}
+        {S.showTrending !== false && (
+          <div className="shop-trend-strip" data-hub-module="shop-trending" data-hub-module-label="Trending">
+            <TrendingBoard onAdd={handleAddTrending} />
+          </div>
+        )}
+        </div>{/* /.shop-main */}
+        </div>{/* /.shop-board */}
       </div>
     </section>
   );
