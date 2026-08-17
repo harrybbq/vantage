@@ -7670,7 +7670,14 @@ div.m-hubdrawer-coach { cursor: default; display: flex; flex-direction: column; 
    filters, category tabs — put beside the thing it describes.
    ═════════════════════════════════════════════════════════════════ */
 .shop-board{
-  display:grid; grid-template-columns:1fr; gap:0; align-items:stretch;
+  /* minmax(0,1fr), NOT 1fr. `1fr` is minmax(AUTO,1fr), and an auto track
+     minimum is the largest min-content contribution of the things in it
+     — which here included the Trending marquee, a width:max-content
+     ticker. One column track therefore resolved to 6632px inside a
+     358px board, and the page went out to 6649px at a 390px viewport:
+     iOS zooms out to fit that, which is why the whole app looked
+     shrunk to a quarter of the screen. Measured before and after. */
+  display:grid; grid-template-columns:minmax(0,1fr); gap:0; align-items:stretch;
   border:var(--border-widget); border-radius:var(--radius-lg);
   box-shadow:var(--accent-glow);
   /* NOT overflow:hidden. It clips the corners, but it also makes the
@@ -7790,6 +7797,13 @@ div.m-hubdrawer-coach { cursor: default; display: flex; flex-direction: column; 
 }
 .shop-trend-strip .shop-trending{max-width:none;width:100%;}
 
-/* The page no longer needs the old flex row that held the grid and the
-   Trending rail side by side. */
-.shop-page{display:block;}
+/* Above the mobile breakpoint the page no longer needs the old flex row
+   that held the grid and the Trending rail side by side — the board owns
+   both. Below it, the board is not used and .shop-page goes back to
+   being the flex column it was: `align-items:stretch` down there is
+   load-bearing (see the ≤900px block near .shop-trending), because
+   without it one long nowrap product name shrink-to-fits the column and
+   blows the layout past the viewport. */
+@media (min-width:769px){
+  .shop-page{display:block;}
+}

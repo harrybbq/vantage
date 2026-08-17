@@ -5,6 +5,8 @@ import { firePurchase } from '../utils/confetti';
 import SectionHelp from './SectionHelp';
 import TrendingBoard from './shop/TrendingBoard';
 import Icon from './Icon';
+import { useHubModuleMenu } from './HubModuleMenu';
+import { useIsMobile } from '../hooks/useIsMobile';
 import { SORTS, sortItems, searchItems, totalFor, fmtMoney } from '../lib/shop/list';
 import { sweepPrices, priceMovement } from '../lib/shop/priceWatch';
 
@@ -354,6 +356,29 @@ export default function ShopSection({ S, update, active, onOpenModal, onShowCoin
   const [activeCategory, setActiveCategory] = useState('all');
   const gridRef = useRef(null);
 
+  /*
+   * The board — a rail of context beside the list — is a DESKTOP layout,
+   * and only a desktop layout.
+   *
+   * On a phone it was wrong twice over. Visually, a sidebar has nowhere
+   * to go on a 390px screen: it becomes a tall stack of stats and
+   * category rows that the wishlist has to be scrolled past, which is
+   * the opposite of what the rail is for. Structurally it was worse —
+   * putting the Trending marquee inside the board's grid handed the
+   * track's `1fr` minimum to a `width:max-content` ticker, blowing the
+   * page out to 6649px at a 390px viewport (measured) and making iOS
+   * zoom out to fit it. That second part is fixed in CSS regardless,
+   * but the first part is a judgement, and the judgement is that phones
+   * keep the rendition they had: stats strip, priority pills, category
+   * tabs, then the list.
+   */
+  const isMobile = useIsMobile();
+
+  // Right-click a column of the board to drop its fill so the user's
+  // background shows through — the same gesture, store and switch the
+  // hub and Track use. Desktop only, because the board is.
+  const moduleMenu = useHubModuleMenu({ S, update });
+
   // View state, deliberately NOT persisted to S — a way of looking at
   // the list for a minute, not a setting, and every stored key is paid
   // for on every load and save.
@@ -613,6 +638,169 @@ export default function ShopSection({ S, update, active, onOpenModal, onShowCoin
   filtered = sortItems(searchItems(filtered, query), sortKey, shopItems);
   const matching = filtered.length;
 
+  /*
+   * Everything from here to `gridNode` is shared by both layouts, held
+   * as values rather than duplicated in the two branches below. The
+   * list is 30+ cards on a real account; rendering it twice and hiding
+   * one with CSS would be the easy version of this and the wrong one.
+   */
+  const controlsNode = (
+    <div className="shop-controls">
+      <div className="shop-search">
+        <Icon name="search" size={14} />
+        <input
+          type="search"
+          value={query}
+          onChange={e => setQuery(e.target.value)}
+          placeholder="Search your list…"
+          aria-label="Search wishlist"
+        />
+        {query && (
+          <button type="button" className="shop-search-clear" onClick={() => setQuery('')} aria-label="Clear search">
+            <Icon name="x" size={13} />
+          </button>
+        )}
+      </div>
+      <label className="shop-sort">
+        {/* The word "Sort" is redundant next to a select that reads
+            "Recently added" — it only earns its space on desktop. */}
+        <span className="shop-sort-lbl">Sort</span>
+        <select value={sortKey} onChange={e => setSortKey(e.target.value)} aria-label="Sort items">
+          {SORTS.map(o => <option key={o.key} value={o.key}>{o.label}</option>)}
+        </select>
+      </label>
+      <button
+        type="button"
+        className={`shop-select-toggle${bulkMode ? ' is-on' : ''}`}
+        onClick={() => (bulkMode ? exitBulk() : setBulkMode(true))}
+      >
+        <Icon name={bulkMode ? 'check' : 'square-check-big'} size={13} />
+        <span>{bulkMode ? 'Done' : 'Select'}</span>
+      </button>
+    </div>
+  );
+
+  const searchNoteNode = query ? (
+    <div className="shop-search-note">
+      {matching === 0
+        ? <>No items match <strong>{query}</strong>.</>
+        : <>{matching} item{matching > 1 ? 's' : ''} matching <strong>{query}</strong>.</>}
+    </div>
+  ) : null;
+
+  const bulkBarNode = bulkMode ? (
+    <div className="shop-bulkbar">
+      <span className="shop-bulkbar-count">{selected.size} selected</span>
+      <button type="button" onClick={() => setSelected(new Set(filtered.map(i => i.id)))}>
+        Select all{query || shopFilter !== 'all' ? ' shown' : ''}
+      </button>
+      <button type="button" onClick={() => setSelected(new Set())} disabled={!selected.size}>Clear</button>
+      <select
+        value={moveTo}
+        disabled={!selected.size}
+        onChange={e => { setMoveTo(e.target.value); if (e.target.value) bulkMove(e.target.value === '__none' ? null : e.target.value); }}
+        aria-label="Move selected to category"
+      >
+        <option value="">Move to…</option>
+        <option value="__none">Uncategorised</option>
+        {shopCategories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+      </select>
+      <button type="button" onClick={() => bulkBought(true)} disabled={!selected.size}>Mark bought</button>
+      <button type="button" onClick={() => bulkBought(false)} disabled={!selected.size}>Mark unbought</button>
+      <button type="button" className="shop-bulkbar-del" onClick={bulkDelete} disabled={!selected.size}>Delete</button>
+    </div>
+  ) : null;
+
+  const gridNode = (
+    <div className="shop-grid" id="shopGrid" ref={gridRef} style={{ marginTop: '16px', display: 'block' }}>
+      {shopFilter === 'all' ? (
+        <>
+          <div className="shop-category-section" data-shop-cat="uncategorised">
+            <div className="shop-category-header">
+              <div className="shop-category-label">Uncategorised</div>
+              <div className="shop-category-line"></div>
+              <CategoryTotal items={filtered.filter(s => !s.categoryId)} />
+              <div className="shop-category-count">{filtered.filter(s => !s.categoryId).length}</div>
+            </div>
+            <DropZone
+              categoryId={null}
+              items={filtered.filter(s => !s.categoryId)}
+              coins={coins}
+              requireCoins={requireCoins}
+              onToggleBought={handleToggleBought}
+              onDeleteItem={handleDeleteItem}
+              onEditItem={handleEditItem}
+              onDrop={handleDrop}
+              bulkMode={bulkMode}
+              selected={selected}
+              onToggleSelect={toggleSelect}
+            />
+          </div>
+          {shopCategories.map(cat => (
+            <div key={cat.id} className="shop-category-section" data-shop-cat={cat.id}>
+              <div className="shop-category-header">
+                <div className="shop-category-label">{cat.name}</div>
+                <div className="shop-category-line"></div>
+                <CategoryTotal items={filtered.filter(s => s.categoryId === cat.id)} />
+                <div className="shop-category-count">{filtered.filter(s => s.categoryId === cat.id).length}</div>
+                <button className="shop-category-del-btn" onClick={() => handleDeleteCategory(cat.id)} title="Delete category" aria-label={`Delete category ${cat.name}`}><Icon name="x" size={11} /></button>
+              </div>
+              <DropZone
+                categoryId={cat.id}
+                items={filtered.filter(s => s.categoryId === cat.id)}
+                coins={coins}
+                requireCoins={requireCoins}
+                onToggleBought={handleToggleBought}
+                onDeleteItem={handleDeleteItem}
+                onEditItem={handleEditItem}
+                onDrop={handleDrop}
+                bulkMode={bulkMode}
+                selected={selected}
+                onToggleSelect={toggleSelect}
+              />
+            </div>
+          ))}
+          {!shopItems.length && (
+            <div className="section-empty">
+              <div className="section-empty-icon"><Icon name="shopping-bag" size={34} strokeWidth={1.5} /></div>
+              <div className="section-empty-title">Nothing here yet</div>
+              <div className="section-empty-body">Add things you want to save up for. Earn coins by hitting your tracker goals.</div>
+              <button className="btn btn-primary btn-sm section-empty-cta" onClick={() => onOpenModal('addShopModal')}>Add first item</button>
+            </div>
+          )}
+        </>
+      ) : (
+        filtered.length === 0
+          ? <div className="shop-empty"><div className="shop-empty-icon"><Icon name={shopFilter === 'bought' ? 'archive' : 'shopping-bag'} size={30} strokeWidth={1.5} /></div><div>{shopFilter === 'bought' ? 'Archive is empty — items you mark as bought land here.' : 'Nothing here.'}</div></div>
+          : (
+            <div className="shop-grid" style={{ display: 'grid' }}>
+              {filtered.map((item, index) => (
+                <ShopCard
+                  key={item.id}
+                  item={item}
+                  coins={coins}
+                  requireCoins={requireCoins}
+                  onToggleBought={handleToggleBought}
+                  onDelete={handleDeleteItem}
+                  onEdit={handleEditItem}
+                  revealDelay={index * 0.06}
+                  bulkMode={bulkMode}
+                  selected={selected.has(item.id)}
+                  onToggleSelect={toggleSelect}
+                />
+              ))}
+            </div>
+          )
+      )}
+    </div>
+  );
+
+  // Trending is opt-out, not permanent furniture. It is the one thing on
+  // this page that is about other people, and someone shopping their own
+  // list should be able to put it away. `!== false` so the absence of the
+  // key means shown — the same shape every other opt-out in S uses.
+  const showTrending = S.showTrending !== false;
+
   return (
     <section id="shop" className={`section${active ? ' active' : ''}`}>
       <div className="shop-page">
@@ -664,30 +852,21 @@ export default function ShopSection({ S, update, active, onOpenModal, onShowCoin
           </div>
         </div>
 
-        {/* One board: a rail of context beside the list it describes,
-            both inside a single shell. Everything in the rail already
-            existed — the summary, the priority filters, the category
-            tabs — it was just strewn across the page as three separate
-            stripes above the grid. */}
-        <div className="shop-board">
-        <aside className="shop-rail" data-hub-module="shop-rail" data-hub-module-label="Sidebar">
-          {/* The COLUMN carries the surface and the full height; the
-              inner block is what sticks. Making the sticky element
-              itself the column left the fill ending wherever the
-              content did, so the left side of the board just stopped
-              partway down. */}
-          <div className="shop-rail-sticky">
-          <div className="shop-rail-sum">
-            <div className="shop-rail-stat"><span className="shop-rail-n">{total}</span><span className="shop-rail-l">Items</span></div>
-            <div className="shop-rail-stat"><span className="shop-rail-n">{total - bought}</span><span className="shop-rail-l">Remaining</span></div>
-            <div className="shop-rail-stat"><span className="shop-rail-n">{bought}</span><span className="shop-rail-l">Bought</span></div>
-            {totalVal > 0 && (
-              <div className="shop-rail-stat"><span className="shop-rail-n is-money">£{totalVal.toFixed(0)}</span><span className="shop-rail-l">Value</span></div>
-            )}
-          </div>
+        {isMobile ? (
+          /* ── Phones: the rendition this page had before the board ──
+             Stats strip, priority pills, search/sort, category tabs,
+             then the list. Trending sits outside .shop-layout, where
+             the ≤900px rules expect it — it is sticky above the tab
+             bar there, and a sticky box inside the board's column
+             would have been positioned against the column instead. */
+          <>
+            <div className="shop-summary">
+              <div className="shop-summary-stat"><div className="shop-summary-val">{total}</div><div className="shop-summary-lbl">Items</div></div>
+              <div className="shop-summary-stat"><div className="shop-summary-val">{bought}</div><div className="shop-summary-lbl">Bought</div></div>
+              <div className="shop-summary-stat"><div className="shop-summary-val">{total - bought}</div><div className="shop-summary-lbl">Remaining</div></div>
+              {totalVal > 0 && <div className="shop-summary-stat"><div className="shop-summary-val">£{totalVal.toFixed(2)}</div><div className="shop-summary-lbl">Total Value</div></div>}
+            </div>
 
-          <div className="shop-rail-group">
-            <div className="shop-rail-h">// Priority</div>
             <div className="shop-filters">
               {filters.map(f => (
                 <button
@@ -698,209 +877,144 @@ export default function ShopSection({ S, update, active, onOpenModal, onShowCoin
                 >{f.label}</button>
               ))}
             </div>
-          </div>
 
-          {/* Categories. Same goToCategory as before — it still scrolls
-              the grid to that heading and the scroll-spy still lights
-              the row you land on — but now each one carries its count
-              AND its running total, which the horizontal strip had no
-              room for. */}
-          {shopFilter === 'all' && (
-            <div className="shop-rail-group">
-              <div className="shop-rail-h">// Categories</div>
-              <div className="shop-rail-cats" role="tablist">
-                <RailCat label="All" count={filtered.length} items={filtered}
-                         active={activeCategory === 'all'} onGo={() => goToCategory('all')} />
-                <RailCat label="Uncategorised"
-                         items={filtered.filter(s => !s.categoryId)}
-                         count={filtered.filter(s => !s.categoryId).length}
-                         active={activeCategory === 'uncategorised'}
-                         onGo={() => goToCategory('uncategorised')} />
-                {shopCategories.map(cat => {
-                  const inCat = filtered.filter(s => s.categoryId === cat.id);
-                  return (
-                    <RailCat key={cat.id} label={cat.name} items={inCat} count={inCat.length}
-                             colour={cat.color}
-                             active={activeCategory === cat.id}
-                             onGo={() => goToCategory(cat.id)} />
-                  );
-                })}
+            {controlsNode}
+            {searchNoteNode}
+            {bulkBarNode}
+
+            {/* Category tabs — same goToCategory and the same scroll-spy
+                the rail uses, so the two layouts navigate identically. */}
+            {shopFilter === 'all' && (
+              <div className="shop-tabs" role="tablist">
+                <button
+                  role="tab"
+                  aria-selected={activeCategory === 'all'}
+                  className={`shop-tab${activeCategory === 'all' ? ' is-active' : ''}`}
+                  onClick={() => goToCategory('all')}
+                >All ({filtered.length})</button>
+                <button
+                  role="tab"
+                  aria-selected={activeCategory === 'uncategorised'}
+                  className={`shop-tab${activeCategory === 'uncategorised' ? ' is-active' : ''}`}
+                  onClick={() => goToCategory('uncategorised')}
+                >Uncategorised ({filtered.filter(s => !s.categoryId).length})</button>
+                {shopCategories.map(cat => (
+                  <button
+                    key={cat.id}
+                    role="tab"
+                    aria-selected={activeCategory === cat.id}
+                    className={`shop-tab${activeCategory === cat.id ? ' is-active' : ''}`}
+                    onClick={() => goToCategory(cat.id)}
+                  >{cat.name} ({filtered.filter(s => s.categoryId === cat.id).length})</button>
+                ))}
               </div>
-            </div>
-          )}
-          </div>
-        </aside>
-
-        <div className="shop-main" data-hub-module="shop-list" data-hub-module-label="List">
-
-        <div className="shop-controls">
-          <div className="shop-search">
-            <Icon name="search" size={14} />
-            <input
-              type="search"
-              value={query}
-              onChange={e => setQuery(e.target.value)}
-              placeholder="Search your list…"
-              aria-label="Search wishlist"
-            />
-            {query && (
-              <button type="button" className="shop-search-clear" onClick={() => setQuery('')} aria-label="Clear search">
-                <Icon name="x" size={13} />
-              </button>
             )}
-          </div>
-          <label className="shop-sort">
-            {/* The word "Sort" is redundant next to a select that reads
-                "Recently added" — it only earns its space on desktop. */}
-            <span className="shop-sort-lbl">Sort</span>
-            <select value={sortKey} onChange={e => setSortKey(e.target.value)} aria-label="Sort items">
-              {SORTS.map(o => <option key={o.key} value={o.key}>{o.label}</option>)}
-            </select>
-          </label>
-          <button
-            type="button"
-            className={`shop-select-toggle${bulkMode ? ' is-on' : ''}`}
-            onClick={() => (bulkMode ? exitBulk() : setBulkMode(true))}
+
+            {gridNode}
+          </>
+        ) : (
+          /* ── Desktop: one board ──
+             A rail of context beside the list it describes, both inside
+             a single shell. Everything in the rail already existed — the
+             summary, the priority filters, the category tabs — it was
+             just strewn across the page as three separate stripes above
+             the grid. */
+          <div
+            className="shop-board"
+            ref={moduleMenu.rootRef}
+            onContextMenu={moduleMenu.onContextMenu}
           >
-            <Icon name={bulkMode ? 'check' : 'square-check-big'} size={13} />
-            <span>{bulkMode ? 'Done' : 'Select'}</span>
-          </button>
-        </div>
-
-        {query && (
-          <div className="shop-search-note">
-            {matching === 0
-              ? <>No items match <strong>{query}</strong>.</>
-              : <>{matching} item{matching > 1 ? 's' : ''} matching <strong>{query}</strong>.</>}
-          </div>
-        )}
-
-        {bulkMode && (
-          <div className="shop-bulkbar">
-            <span className="shop-bulkbar-count">{selected.size} selected</span>
-            <button type="button" onClick={() => setSelected(new Set(filtered.map(i => i.id)))}>
-              Select all{query || shopFilter !== 'all' ? ' shown' : ''}
-            </button>
-            <button type="button" onClick={() => setSelected(new Set())} disabled={!selected.size}>Clear</button>
-            <select
-              value={moveTo}
-              disabled={!selected.size}
-              onChange={e => { setMoveTo(e.target.value); if (e.target.value) bulkMove(e.target.value === '__none' ? null : e.target.value); }}
-              aria-label="Move selected to category"
-            >
-              <option value="">Move to…</option>
-              <option value="__none">Uncategorised</option>
-              {shopCategories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-            </select>
-            <button type="button" onClick={() => bulkBought(true)} disabled={!selected.size}>Mark bought</button>
-            <button type="button" onClick={() => bulkBought(false)} disabled={!selected.size}>Mark unbought</button>
-            <button type="button" className="shop-bulkbar-del" onClick={bulkDelete} disabled={!selected.size}>Delete</button>
-          </div>
-        )}
-
-        {/* The horizontal category strip lived here. It is the rail's
-            category list now — same goToCategory, same scroll-spy,
-            with the running total the strip could not fit. */}
-
-        <div className="shop-grid" id="shopGrid" ref={gridRef} style={{ marginTop: '16px', display: 'block' }}>
-          {shopFilter === 'all' ? (
-            <>
-              <div className="shop-category-section" data-shop-cat="uncategorised">
-                  <div className="shop-category-header">
-                    <div className="shop-category-label">Uncategorised</div>
-                    <div className="shop-category-line"></div>
-                    <CategoryTotal items={filtered.filter(s => !s.categoryId)} />
-                    <div className="shop-category-count">{filtered.filter(s => !s.categoryId).length}</div>
-                  </div>
-                  <DropZone
-                    categoryId={null}
-                    items={filtered.filter(s => !s.categoryId)}
-                    coins={coins}
-            requireCoins={requireCoins}
-                    onToggleBought={handleToggleBought}
-                    onDeleteItem={handleDeleteItem}
-                    onEditItem={handleEditItem}
-                    onDrop={handleDrop}
-                    bulkMode={bulkMode}
-                    selected={selected}
-                    onToggleSelect={toggleSelect}
-                  />
-              </div>
-              {shopCategories.map(cat => (
-                <div key={cat.id} className="shop-category-section" data-shop-cat={cat.id}>
-                  <div className="shop-category-header">
-                    <div className="shop-category-label">{cat.name}</div>
-                    <div className="shop-category-line"></div>
-                    <CategoryTotal items={filtered.filter(s => s.categoryId === cat.id)} />
-                    <div className="shop-category-count">{filtered.filter(s => s.categoryId === cat.id).length}</div>
-                    <button className="shop-category-del-btn" onClick={() => handleDeleteCategory(cat.id)} title="Delete category" aria-label={`Delete category ${cat.name}`}><Icon name="x" size={11} /></button>
-                  </div>
-                  <DropZone
-                    categoryId={cat.id}
-                    items={filtered.filter(s => s.categoryId === cat.id)}
-                    coins={coins}
-            requireCoins={requireCoins}
-                    onToggleBought={handleToggleBought}
-                    onDeleteItem={handleDeleteItem}
-                    onEditItem={handleEditItem}
-                    onDrop={handleDrop}
-                    bulkMode={bulkMode}
-                    selected={selected}
-                    onToggleSelect={toggleSelect}
-                  />
+            <aside className="shop-rail" data-hub-module="shop-rail" data-hub-module-label="Sidebar">
+              {/* The COLUMN carries the surface and the full height; the
+                  inner block is what sticks. Making the sticky element
+                  itself the column left the fill ending wherever the
+                  content did, so the left side of the board just stopped
+                  partway down. */}
+              <div className="shop-rail-sticky">
+                <div className="shop-rail-sum">
+                  <div className="shop-rail-stat"><span className="shop-rail-n">{total}</span><span className="shop-rail-l">Items</span></div>
+                  <div className="shop-rail-stat"><span className="shop-rail-n">{total - bought}</span><span className="shop-rail-l">Remaining</span></div>
+                  <div className="shop-rail-stat"><span className="shop-rail-n">{bought}</span><span className="shop-rail-l">Bought</span></div>
+                  {totalVal > 0 && (
+                    <div className="shop-rail-stat"><span className="shop-rail-n is-money">£{totalVal.toFixed(0)}</span><span className="shop-rail-l">Value</span></div>
+                  )}
                 </div>
-              ))}
-              {!shopItems.length && (
-                <div className="section-empty">
-                  <div className="section-empty-icon"><Icon name="shopping-bag" size={34} strokeWidth={1.5} /></div>
-                  <div className="section-empty-title">Nothing here yet</div>
-                  <div className="section-empty-body">Add things you want to save up for. Earn coins by hitting your tracker goals.</div>
-                  <button className="btn btn-primary btn-sm section-empty-cta" onClick={() => onOpenModal('addShopModal')}>Add first item</button>
+
+                <div className="shop-rail-group">
+                  <div className="shop-rail-h">// Priority</div>
+                  <div className="shop-filters">
+                    {filters.map(f => (
+                      <button
+                        key={f.key}
+                        className={`shop-filter-btn${shopFilter === f.key ? ' active' : ''}`}
+                        style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}
+                        onClick={() => setFilter(f.key)}
+                      >{f.label}</button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Categories. Same goToCategory as before — it still
+                    scrolls the grid to that heading and the scroll-spy
+                    still lights the row you land on — but now each one
+                    carries its count AND its running total, which the
+                    horizontal strip had no room for. */}
+                {shopFilter === 'all' && (
+                  <div className="shop-rail-group">
+                    <div className="shop-rail-h">// Categories</div>
+                    <div className="shop-rail-cats" role="tablist">
+                      <RailCat label="All" count={filtered.length} items={filtered}
+                               active={activeCategory === 'all'} onGo={() => goToCategory('all')} />
+                      <RailCat label="Uncategorised"
+                               items={filtered.filter(s => !s.categoryId)}
+                               count={filtered.filter(s => !s.categoryId).length}
+                               active={activeCategory === 'uncategorised'}
+                               onGo={() => goToCategory('uncategorised')} />
+                      {shopCategories.map(cat => {
+                        const inCat = filtered.filter(s => s.categoryId === cat.id);
+                        return (
+                          <RailCat key={cat.id} label={cat.name} items={inCat} count={inCat.length}
+                                   colour={cat.color}
+                                   active={activeCategory === cat.id}
+                                   onGo={() => goToCategory(cat.id)} />
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </aside>
+
+            <div className="shop-main" data-hub-module="shop-list" data-hub-module-label="List">
+              {controlsNode}
+              {searchNoteNode}
+              {bulkBarNode}
+              {gridNode}
+
+              {/* Trending sits INSIDE the board, along the bottom, rather
+                  than as a rail beside it. It is the one part of this
+                  page about other people and it was getting the same
+                  billing as the list you came to read. */}
+              {showTrending && (
+                <div className="shop-trend-strip" data-hub-module="shop-trending" data-hub-module-label="Trending">
+                  <TrendingBoard onAdd={handleAddTrending} />
                 </div>
               )}
-            </>
-          ) : (
-            filtered.length === 0
-              ? <div className="shop-empty"><div className="shop-empty-icon"><Icon name={shopFilter === 'bought' ? 'archive' : 'shopping-bag'} size={30} strokeWidth={1.5} /></div><div>{shopFilter === 'bought' ? 'Archive is empty — items you mark as bought land here.' : 'Nothing here.'}</div></div>
-              : (
-                <div className="shop-grid" style={{ display: 'grid' }}>
-                  {filtered.map((item, index) => (
-                    <ShopCard
-                      key={item.id}
-                      item={item}
-                      coins={coins}
-            requireCoins={requireCoins}
-                      onToggleBought={handleToggleBought}
-                      onDelete={handleDeleteItem}
-                      onEdit={handleEditItem}
-                      revealDelay={index * 0.06}
-                      bulkMode={bulkMode}
-                      selected={selected.has(item.id)}
-                      onToggleSelect={toggleSelect}
-                    />
-                  ))}
-                </div>
-              )
-          )}
-        </div>
-      </div>
-      {/* Trending is opt-out, not permanent furniture. It is the one
-          thing on this page that is about other people, and someone
-          shopping their own list should be able to put it away. `!==
-          false` so the absence of the key means shown — the same shape
-          every other opt-out in S uses. */}
-        {/* Trending sits INSIDE the board now, along the bottom, rather
-            than as a rail beside it. It is the one part of this page
-            about other people and it was getting the same billing as
-            the list you came to read. */}
-        {S.showTrending !== false && (
-          <div className="shop-trend-strip" data-hub-module="shop-trending" data-hub-module-label="Trending">
-            <TrendingBoard onAdd={handleAddTrending} />
+            </div>
           </div>
         )}
-        </div>{/* /.shop-main */}
-        </div>{/* /.shop-board */}
       </div>
+
+      {/* Phones keep Trending as a sibling of the list, which is what the
+          ≤900px sticky-above-the-tab-bar rules are written against. */}
+      {isMobile && showTrending && <TrendingBoard onAdd={handleAddTrending} />}
+
+      {/* Outside .shop-board on purpose. The columns carry backdrop-filter,
+          which makes them the containing block for position:fixed
+          descendants — the Track menu was landing at y=1081 in a 950px
+          viewport before this was moved out. */}
+      {!isMobile && moduleMenu.menuNode}
+      </div>{/* /.shop-page */}
     </section>
   );
 }
