@@ -23,10 +23,11 @@ import {
   ALLOWANCE_DEFAULT, LEAVE_TYPES, SESSION_OPTIONS, WINDOW, allowanceUsed,
   chipText, datesBetween, holidayDaySet, leaveType, monthGrid, monthRange,
   nextHoliday, normaliseBlock, rangeStats, patternDay,
-  resolveDay, rotaDayIndex, dayTypeOf, loadScaleOf,
+  resolveDay, rotaDayIndex, dayTypeOf, loadScaleOf, daysUntilReset,
 } from '../../lib/rotation/pattern';
 import {
-  DAY_TYPE_LABEL, FLOOR_MACROS, NIGHT_LOAD_SCALE, exercisesFor, targetsForDay,
+  DAY_TYPE_LABEL, FLOOR_MACROS, NIGHT_LOAD_SCALE, STRETCH_GOAL,
+  exercisesFor, stretchesFor, targetsForDay,
 } from '../../data/trainingProgramme';
 
 const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June',
@@ -61,6 +62,8 @@ function TodayPanel({ overrides }) {
   const scale = day.shift === 'leave' ? 1 : loadScaleOf(day.shift);
   const t = targetsForDay(dayType, day.session);
   const exercises = exercisesFor(day.session);
+  // Rest days fall through to the longer flow inside stretchesFor().
+  const stretches = stretchesFor(day.session);
   const isNight = dayType === 'night_shift';
 
   return (
@@ -141,6 +144,26 @@ function TodayPanel({ overrides }) {
           off-block, so they run into going back in.</div>
         </div>
       )}
+
+      {/* Stretch block. Attached to the session rather than given a day
+          of its own, because five minutes on the end of something that
+          is already happening gets done and a mobility day does not. */}
+      <div className="upg-stretch">
+        <div className="upg-exlist-h">
+          // stretch &middot; {stretches.length} moves
+          <span className="upg-exlist-scale">Spider-Man</span>
+        </div>
+        <div className="upg-stretch-goal">{STRETCH_GOAL}</div>
+        {stretches.map(s => (
+          <div key={s.name} className="upg-stretchrow">
+            <div className="upg-stretchrow-top">
+              <span className="upg-ex-n">{s.name}</span>
+              <span className="upg-ex-p">{s.hold}</span>
+            </div>
+            <div className="upg-stretchrow-why">{s.why}</div>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
@@ -162,7 +185,13 @@ export default function RotationTab({ S, update, isMobile }) {
     () => rangeStats(WINDOW.fromDate, WINDOW.toDate, overrides),
     [overrides]);
   const allowance = useMemo(
-    () => allowanceUsed(overrides, { ...ALLOWANCE_DEFAULT, ...((S.rotation || {}).allowance || {}) }),
+    // Scoped to the CURRENT leave year, which is what an allowance is.
+    // Counting the whole override map meant the number could only fall,
+    // and would have been wrong the moment January arrived.
+    () => allowanceUsed(
+      overrides,
+      { ...ALLOWANCE_DEFAULT, ...((S.rotation || {}).allowance || {}) },
+      new Date().getFullYear()),
     [overrides, S.rotation]);
   // Holiday blocks are a visual overlay, stored separately from the
   // per-day overrides. They shade the calendar and drive the countdown;
@@ -194,6 +223,7 @@ export default function RotationTab({ S, update, isMobile }) {
   }
 
   const today = todayIso();
+  const resetIn = daysUntilReset(today);
   const editedCount = Object.keys(overrides).length;
   const upcoming = useMemo(() => nextHoliday(blocks, today), [blocks, today]);
   const holidayDays = useMemo(() => holidayDaySet(blocks), [blocks]);
@@ -253,9 +283,19 @@ export default function RotationTab({ S, update, isMobile }) {
                 in its own tile — it is the same fact, read the other
                 way round. */}
             {s.k === 'leave' && (
-              <div className={'upg-stat-sub' + (allowance.left <= 5 ? ' is-low' : '')}>
-                {allowance.left} of {allowance.total} left
-              </div>
+              <>
+                <div className={'upg-stat-sub' + (allowance.left <= 5 ? ' is-low' : '')}>
+                  {allowance.over > 0
+                    ? `0 left — ${allowance.over} over`
+                    : `${allowance.left} of ${allowance.total} left`}
+                </div>
+                {/* The reset is the other half of the number: 12 days
+                    left is a different fact in September than it is on
+                    27 December. */}
+                <div className="upg-stat-sub is-quiet">
+                  {allowance.year} · back to {allowance.total} in {resetIn} day{resetIn === 1 ? '' : 's'}
+                </div>
+              </>
             )}
           </div>
         ))}

@@ -21,8 +21,17 @@ import Icon from '../Icon';
 import {
   ALL_PROBLEMS, SHAKY, isDue, nextUp, progressOf, summarise,
 } from '../../lib/career/problems';
+import { JsRunner, KqlRunner } from './Runners';
 
-const KINDS = [{ id: 'leetcode', label: 'LeetCode' }, { id: 'kql', label: 'KQL' }];
+/* Code sits FIRST because it is the only one you can finish without
+   leaving the page. LeetCode is a link out, KQL is checkable but
+   read-only for the exercises the runner cannot execute; the runnable
+   set is the one to open by default. */
+const KINDS = [
+  { id: 'code', label: 'Code' },
+  { id: 'leetcode', label: 'LeetCode' },
+  { id: 'kql', label: 'KQL' },
+];
 const FILTERS = [
   { id: 'all', label: 'All' },
   { id: 'due', label: 'Due' },
@@ -33,7 +42,7 @@ const FILTERS = [
 const today = () => new Date().toISOString().slice(0, 10);
 
 export default function PracticePanel({ S, update, onOpenLog }) {
-  const [kind, setKind] = useState('leetcode');
+  const [kind, setKind] = useState('code');
   const [filter, setFilter] = useState('all');
   const [topic, setTopic] = useState('');
   const [q, setQ] = useState('');
@@ -202,8 +211,17 @@ export default function PracticePanel({ S, update, onOpenLog }) {
  */
 function ProblemSheet({ problem, pr, onClose, onSet }) {
   const [showHint, setShowHint] = useState(false);
-  const [showSolution, setShowSolution] = useState(false);
   const isKql = problem.kind === 'kql';
+  const isCode = problem.kind === 'code';
+
+  /* Solving it in the editor marks it solved — you have just proved it
+     against the tests, and making you then tell the app what it already
+     watched happen is the kind of friction that stops people using a
+     tracker at all. Confidence stays yours to set; it seeds at 3 so the
+     spaced-repetition schedule has something to work from. */
+  const markSolved = () => {
+    if (pr.status !== 'solved') onSet({ status: 'solved', confidence: pr.confidence || 3 });
+  };
 
   return (
     <div className="modal-overlay open" onClick={onClose} role="presentation">
@@ -221,7 +239,26 @@ function ProblemSheet({ problem, pr, onClose, onSet }) {
         </div>
 
         <div className="upg-sheet-body">
-          {isKql ? (
+          {isCode ? (
+            <>
+              <div className="upg-field">
+                <span className="upg-field-lbl">Problem</span>
+                <p className="upg-prompt">{problem.prompt}</p>
+              </div>
+              <div className="upg-reveal">
+                {!showHint
+                  ? <button type="button" className="upg-opt" onClick={() => setShowHint(true)}>Show hint</button>
+                  : <div className="upg-hint"><b>Hint</b> {problem.hint}</div>}
+                {problem.lc && (
+                  <a className="upg-opt" href={`https://leetcode.com/problems/${problem.lc}/`}
+                     target="_blank" rel="noreferrer noopener">
+                    The same pattern on LeetCode <Icon name="external-link" size={11} />
+                  </a>
+                )}
+              </div>
+              <JsRunner puzzle={problem} onSolved={markSolved} />
+            </>
+          ) : isKql ? (
             <>
               <div className="upg-field">
                 <span className="upg-field-lbl">Scenario</span>
@@ -235,16 +272,9 @@ function ProblemSheet({ problem, pr, onClose, onSet }) {
                 {!showHint
                   ? <button type="button" className="upg-opt" onClick={() => setShowHint(true)}>Show hint</button>
                   : <div className="upg-hint"><b>Hint</b> {problem.hint}</div>}
-                {!showSolution
-                  ? <button type="button" className="upg-opt" onClick={() => setShowSolution(true)}>Show solution</button>
-                  : null}
               </div>
-              {showSolution && (
-                <div className="upg-field">
-                  <span className="upg-field-lbl">One correct answer</span>
-                  <pre className="upg-snip-body">{problem.solution}</pre>
-                </div>
-              )}
+
+              <KqlRunner problem={problem} onSolved={markSolved} />
             </>
           ) : (
             <div className="upg-field">

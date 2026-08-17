@@ -110,7 +110,7 @@
     # would supersede that header once this policy is enforced, so
     # leaving it at 'none' would have re-broken the Rotation page the
     # day the CSP was promoted.
-    Content-Security-Policy-Report-Only = "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; font-src 'self' data:; connect-src 'self' https://*.supabase.co wss://*.supabase.co https://api.open-meteo.com https://archive-api.open-meteo.com https://geocoding-api.open-meteo.com https://api.frankfurter.app https://ipwho.is https://api.github.com https://ws.audioscrobbler.com; frame-ancestors 'self'; base-uri 'self'; form-action 'self'; object-src 'none'"
+    Content-Security-Policy-Report-Only = "default-src 'self'; script-src 'self'; worker-src 'self' blob:; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; font-src 'self' data:; connect-src 'self' https://*.supabase.co wss://*.supabase.co https://api.open-meteo.com https://archive-api.open-meteo.com https://geocoding-api.open-meteo.com https://api.frankfurter.app https://ipwho.is https://api.github.com https://ws.audioscrobbler.com; frame-ancestors 'self'; base-uri 'self'; form-action 'self'; object-src 'none'"
 
 # The service worker must never be cached, or a stale one can pin
 # clients to an old build — the failure mode behind the 2026-05-03

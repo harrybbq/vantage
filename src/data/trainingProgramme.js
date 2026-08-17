@@ -76,6 +76,81 @@ export const PROGRAMME = {
   ],
 };
 
+/* ══════════════════════════════════════════════════════════════════════
+   Stretch and mobility — the Spider-Man block.
+   ══════════════════════════════════════════════════════════════════════
+
+   The goal is a shape and a way of moving, not just a set of lifts: wide
+   shoulders over a narrow waist, and hips and a mid-back that actually
+   go where you point them. The lifting programme above builds the first
+   half. This is the second, and it is deliberately SMALL — five minutes
+   attached to a session that is already happening beats a mobility day
+   that never gets done.
+
+   Two constraints shaped every choice below:
+
+   1. There is ongoing chiropractic care for MID-THORACIC pain, which is
+      why thoracic extension and rotation appear on almost every day
+      rather than once a week. It is the joint under treatment and the
+      one that decides whether the shoulders can sit back where the
+      V-taper needs them.
+   2. Nothing here loads the spine. These are positions held or moved
+      through, at the end of a session when the tissue is warm — never
+      the thing that hurts you.
+
+   THIS LIST IS A STARTING POINT. The owner is going to supply what they
+   have actually been doing, and these get tuned against it rather than
+   replacing it. Keep the shape — three or four per session, a reason
+   attached, seconds not sets — so a swap is an edit and not a redesign.
+*/
+
+/** `hold` is per side where the movement has sides. */
+const ST = (name, hold, why) => ({ name, hold, why });
+
+export const STRETCHES = {
+  Legs: [
+    ST('Couch stretch', '60s / side', 'Hip flexors shorten under a day of sitting and a hack squat; short hip flexors tip the pelvis and push the belly forward — the opposite of the taper.'),
+    ST('90/90 hip switch', '8 slow / side', 'Rotation, not just length. It is what makes a deep squat position available without the low back rounding.'),
+    ST('Standing calf wall stretch', '45s / side', 'Ankles decide squat depth. Depth you cannot reach is depth you cannot train.'),
+  ],
+  Lower: [
+    ST('Couch stretch', '60s / side', 'Same reason as Legs, and hip thrusts leave the flexors on the short side of the joint.'),
+    ST('Seated hamstring floss', '10 slow / side', 'Moved, not held — after leg curls the hamstrings want length under control rather than a static pull.'),
+    ST('Child’s pose with side reach', '45s / side', 'Lats and the side of the ribcage, which is where the day’s posterior work ends up tight.'),
+  ],
+  Push: [
+    ST('Doorway pec stretch, three heights', '30s each', 'Bench and dips shorten the chest. A short chest rounds the shoulders forward and narrows the very line the taper is built on.'),
+    ST('Thoracic extension over a roller', '8 slow breaths', 'The mid-back joint under treatment. Extension here is what lets the shoulders sit back instead of the low back arching to fake it.'),
+    ST('Overhead lat stretch on a bench', '45s / side', 'Tight lats cap overhead reach, and pressing overhead with a capped reach is where the mid-back pays for it.'),
+  ],
+  Pull: [
+    ST('Dead hang from the bar', '30s × 2', 'Decompresses after pulling, and it is free grip work. Stop early if the shoulders complain rather than pushing through.'),
+    ST('Thread the needle', '8 slow / side', 'Thoracic ROTATION, the half that extension work misses. Directly the segment under chiropractic care.'),
+    ST('Forearm and biceps stretch at a wall', '30s / side', 'Curls and pull-ups leave the elbow flexors short; a short biceps quietly limits how straight the arm hangs.'),
+  ],
+  Upper: [
+    ST('Wall slides', '10 slow', 'Teaches the shoulder blade to travel while the ribs stay down. The rehearsal for every overhead press.'),
+    ST('Thoracic extension over a roller', '8 slow breaths', 'Twice a cycle, because it is the segment being treated and once a fortnight is not a dose.'),
+    ST('Levator and upper trap stretch', '30s / side', 'Lateral raises and shrugging under fatigue leave the neck doing the work. This is where a day-shift headache comes from.'),
+  ],
+  Rest: [
+    ST('Cat–cow', '10 slow', 'Wakes the whole spine through its range with no load at all. The safest possible entry on a day off.'),
+    ST('90/90 hip switch', '10 slow / side', 'Hips keep their rotation on the days you are not training them, or they do not have it on the days you are.'),
+    ST('Deep squat hold, heels down', '60s', 'Ankles, knees and hips at end range at once. Hold a doorframe — this is a position to own, not a test to pass.'),
+    ST('Dead hang', '30s × 2', 'Shoulders and spine under nothing but gravity. Two minutes of the week that pay for themselves.'),
+  ],
+};
+
+/** What the block is FOR, shown once above the list. */
+export const STRETCH_GOAL =
+  'Shoulders wide, waist narrow, mid-back that moves. Five minutes at the '
+  + 'end of the session while everything is still warm.';
+
+/** The stretch block for a session code; rest days get the longer flow. */
+export function stretchesFor(session) {
+  return STRETCHES[session] || STRETCHES.Rest;
+}
+
 /**
  * Movements that must never appear. Matched loosely on purpose — a
  * future "Barbell Back Squat (heavy)" has to trip this too.

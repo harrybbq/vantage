@@ -291,7 +291,34 @@ export function datesBetween(isoA, isoB) {
 }
 
 /**
- * Allowance usage.
+ * The leave YEAR.
+ *
+ * The allowance resets on 1 January, so "how many days are left" is a
+ * question about a year and not about the whole override map — which is
+ * what it used to be counted against. Every day booked since the rota
+ * page existed was being subtracted from one pot forever, so the number
+ * could only ever go down and would have been wrong from next January.
+ */
+export const leaveYearOf = iso => Number(String(iso).slice(0, 4));
+
+/**
+ * Days already spent this leave year BEFORE the app started counting.
+ *
+ * The rota page arrived on 2026-08-09 with 23 of the 35 days already
+ * taken — 12 left. Nothing in the override map knows about those, and
+ * back-filling 23 invented bookings on invented dates would have put
+ * fiction in the calendar to make one number right. So the opening
+ * position is stored as a number, and the map is left to mean what it
+ * says: the days booked here.
+ *
+ * Only 2026 has one. 2027 opens on a clean 35 with nothing subtracted,
+ * which is the whole point of making this year-aware.
+ */
+export const TRACKING_FROM = '2026-08-09';
+export const OPENING_LEFT = { 2026: 12 };
+
+/**
+ * Allowance usage for one leave year.
  *
  * Counts ONLY real annual-leave bookings made on a day. Holiday blocks
  * (below) are a visual overlay and deliberately do not touch this — you
@@ -301,18 +328,50 @@ export function datesBetween(isoA, isoB) {
  * A day only costs allowance if it replaced a shift you would otherwise
  * have worked. Marking an off day as leave is free, and charging for it
  * would quietly eat days you never actually booked.
+ *
+ * In a year with an opening position, bookings BEFORE `TRACKING_FROM`
+ * are excluded: the opening figure already accounts for them, and
+ * counting both would charge the same day twice. Years without one
+ * count everything they contain.
+ *
+ * @param year  the leave year to report on; defaults to the current one
  */
-export function allowanceUsed(overrides = {}, allowance = ALLOWANCE_DEFAULT) {
+export function allowanceUsed(overrides = {}, allowance = ALLOWANCE_DEFAULT, year = new Date().getFullYear()) {
   const total = (allowance.base || 0) + (allowance.extra || 0);
-  let used = 0, freeDays = 0;
+  const openingLeft = ((allowance.openingLeft || OPENING_LEFT)[year]);
+  const hasOpening = Number.isFinite(openingLeft);
+  const opening = hasOpening ? Math.max(0, total - openingLeft) : 0;
+
+  let booked = 0, freeDays = 0;
   for (const [iso, ov] of Object.entries(overrides)) {
     if (!ov || !CHARGEABLE.has(ov.leave)) continue;
+    if (leaveYearOf(iso) !== year) continue;
+    if (hasOpening && iso < TRACKING_FROM) continue;     // already in `opening`
     const [y, m, d] = iso.split('-').map(Number);
     const base = patternDay(y, m - 1, d);
-    if (base.inPattern && (base.shift === 'night' || base.shift === 'day')) used++;
+    if (base.inPattern && (base.shift === 'night' || base.shift === 'day')) booked++;
     else freeDays++;
   }
-  return { total, used, left: total - used, freeDays };
+
+  const used = opening + booked;
+  return {
+    year, total, used, booked, opening,
+    // Clamped: over-booking is possible and the honest thing is to show
+    // "0 left" plus the overspend, not a negative allowance.
+    left: Math.max(0, total - used),
+    over: Math.max(0, used - total),
+    freeDays,
+  };
+}
+
+/** 1 January next year — when the pot goes back to full. */
+export function leaveResetsOn(year = new Date().getFullYear()) {
+  return `${year + 1}-01-01`;
+}
+
+/** Whole days until the reset, from a given date. */
+export function daysUntilReset(fromIso, year = leaveYearOf(fromIso)) {
+  return isoToNum(leaveResetsOn(year)) - isoToNum(fromIso);
 }
 
 /* ══ Holiday blocks — a visual overlay ══════════════════════════════
