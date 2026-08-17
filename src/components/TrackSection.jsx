@@ -1,5 +1,6 @@
 import { useState, useMemo, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
+import { useHubModuleMenu } from './HubModuleMenu';
 import { eventsInMonth, kindColour } from '../lib/calendar/events';
 import Icon from './Icon';
 import { motion } from 'framer-motion';
@@ -632,6 +633,14 @@ export default function TrackSection({ S, update, active, onOpenModal, onShowCoi
   const [nutritionMonthData, setNutritionMonthData] = useState({});
   const [tab, setTab] = useState('trackers');
 
+  // Same right-click transparency the hub modules have, same store
+  // (S.moduleTransparency) and same menu component — a second
+  // implementation would drift the first time either was touched.
+  // Day cells stopPropagation on their own context menu, so
+  // right-clicking a day still gets the tracker ticks and only the
+  // chrome around it opens this.
+  const moduleMenu = useHubModuleMenu({ S, update });
+
   // Deep-link into a tab. Carries a nonce rather than a bare id so
   // asking for the same tab twice still moves you back to it — same
   // shape as SettingsSection's.
@@ -696,8 +705,12 @@ export default function TrackSection({ S, update, active, onOpenModal, onShowCoi
       >
         {/* ── TRACKERS ── the list beside a full-width calendar. */}
         {tab === 'trackers' && (
-          <div className="track-layout">
-            <aside className="track-side">
+          <div className="track-layout"
+               ref={moduleMenu.rootRef}
+               onContextMenu={moduleMenu.onContextMenu}>
+            <aside className="track-side"
+                   data-hub-module="track-trackers"
+                   data-hub-module-label="Trackers">
               <TrackersList
                 trackers={S.trackers}
                 logs={S.logs}
@@ -707,7 +720,9 @@ export default function TrackSection({ S, update, active, onOpenModal, onShowCoi
                 update={update}
               />
             </aside>
-            <div className="track-main">
+            <div className="track-main"
+                 data-hub-module="track-calendar"
+                 data-hub-module-label="Calendar">
               <CalendarView S={S} update={update} onShowCoinToast={onShowCoinToast} nutritionMonthData={nutritionMonthData} />
             </div>
           </div>
@@ -739,6 +754,13 @@ export default function TrackSection({ S, update, active, onOpenModal, onShowCoi
           </div>
         )}
       </div>
+
+      {/* Rendered OUTSIDE .track-layout on purpose. That element has a
+          backdrop-filter, which makes it the containing block for any
+          position:fixed descendant — so a menu rendered inside it was
+          positioned relative to the panel instead of the viewport and
+          landed off-screen the moment the panel was tall. */}
+      {moduleMenu.menuNode}
 
       {/* The Diet tab reports the month's nutrition totals up so the
           calendar can dot the days that have food logged. It only does
