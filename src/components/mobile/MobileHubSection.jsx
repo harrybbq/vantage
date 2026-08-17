@@ -25,6 +25,7 @@
 import { useState, useEffect, useRef } from 'react';
 import Icon from '../Icon';
 import { getTodayStr } from '../../utils/helpers';
+import { eventColour, todayAgenda } from '../../lib/calendar/events';
 import { recalcStreaks } from '../../utils/streaks';
 import MobileWidget from './MobileWidget';
 import { isRetiredWidget } from '../../lib/widgets/retired';
@@ -95,6 +96,8 @@ export default function MobileHubSection({ S, update, visionState, hasPro, navig
 
   const trackers = S.trackers || [];
   const todayLogs = S.logs?.[today] || {};
+  // `now` ticks every second, so an event crosses into `past` on its own.
+  const agenda = todayAgenda(S, now);
 
   // Boolean toggle handler — mirrors the boolean branch of QuickLog's
   // handleChange (logs + streak recalc). Number trackers route to the
@@ -174,6 +177,24 @@ export default function MobileHubSection({ S, update, visionState, hasPro, navig
           <span className="m-hub-greet-name">{g.name}.</span>
         </div>
         <div className="m-hub-date">{fmtDate(now)}</div>
+
+        {/* Today's events, in the hero for the same reason as on the
+            desktop hub: this block is already the "what is now" block,
+            and a reminder that needs a widget added before it can remind
+            you isn't one. Tapping goes to the calendar that owns them. */}
+        {agenda.length > 0 && (
+          <button type="button" className="m-hub-events" onClick={() => navigate('track')}
+                  aria-label="Today's events — open the calendar">
+            {agenda.slice(0, 3).map(ev => (
+              <span key={ev.id} className={`m-hub-event${ev.past ? ' is-past' : ''}`}>
+                <span className="m-hub-event-dot" style={{ background: eventColour(ev) }} />
+                {ev.time && <span className="m-hub-event-at">{ev.time}</span>}
+                <span className="m-hub-event-name">{ev.title}</span>
+              </span>
+            ))}
+            {agenda.length > 3 && <span className="m-hub-events-meta">+{agenda.length - 3}</span>}
+          </button>
+        )}
       </section>
 
       {/* Widget stack. New widgets append below the last; hold one to

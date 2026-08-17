@@ -22,6 +22,7 @@ import RatingsPanel from './RatingsPanel';
 import { useHubModuleMenu, moduleIdFromLabel } from './HubModuleMenu';
 import Icon from './Icon';
 import { useOwnHandle } from '../hooks/useOwnHandle';
+import { eventColour, eventWhen, todayAgenda } from '../lib/calendar/events';
 
 // ── Panel primitive ──────────────────────────────────────────────────────
 // Each panel tags itself with data-hub-module so the right-click
@@ -244,7 +245,7 @@ function trackerInitial(name) {
   return (name || '?').trim().charAt(0).toUpperCase() || '?';
 }
 
-export function OsSessionPanel({ name, trackers, logs }) {
+export function OsSessionPanel({ name, trackers, logs, S }) {
   const time = useClock();
   const h = pad2(time.getHours());
   const m = pad2(time.getMinutes());
@@ -272,6 +273,23 @@ export function OsSessionPanel({ name, trackers, logs }) {
   });
   const doneCount = nodes.filter(n => n.hit).length;
 
+  /*
+   * Today's events, beside the tracker nodes.
+   *
+   * This panel is the one thing on the hub that is already about "now",
+   * so an event belongs here rather than in a widget of its own —
+   * something you have to add before it can remind you is not a
+   * reminder. Recomputed against `time`, which ticks every second, so an
+   * event greys out the minute it ends without anything having to poll.
+   *
+   * Three, then a count. A day with nine things on it is exactly the day
+   * where a nine-row list stops being glanceable, and the calendar is
+   * one tap away for the rest.
+   */
+  const agenda = todayAgenda(S || {}, time);
+  const shownEvents = agenda.slice(0, 3);
+  const upcomingCount = agenda.filter(e => !e.past).length;
+
   return (
     <OsPanel label="Today" moduleId="session" right={`Day ${dayOfYear(time)} of ${time.getFullYear()}`} innerPadding={false}>
       <div className="os-session">
@@ -293,6 +311,27 @@ export function OsSessionPanel({ name, trackers, logs }) {
                 </span>
               ))}
               <span className="os-session-trackers-meta">{doneCount}/{nodes.length}</span>
+            </div>
+          )}
+
+          {shownEvents.length > 0 && (
+            <div className="os-session-events" role="list" aria-label="Today's events">
+              {shownEvents.map(ev => (
+                <span key={ev.id}
+                      className={`os-session-event${ev.past ? ' is-past' : ''}`}
+                      role="listitem"
+                      title={[eventWhen(ev), ev.title, ev.location].filter(Boolean).join(' · ')}>
+                  <span className="os-session-event-dot" style={{ background: eventColour(ev) }} />
+                  {ev.time && <span className="os-session-event-at">{ev.time}</span>}
+                  <span className="os-session-event-name">{ev.title}</span>
+                </span>
+              ))}
+              {agenda.length > shownEvents.length && (
+                <span className="os-session-events-meta">+{agenda.length - shownEvents.length}</span>
+              )}
+              {upcomingCount === 0 && (
+                <span className="os-session-events-meta">all done</span>
+              )}
             </div>
           )}
         </div>
@@ -596,7 +635,7 @@ export default function HubOsLayout({
           onUploadPhoto={onUploadPhoto}
           onUpgrade={onUpgrade}
         />
-        <OsSessionPanel name={profile.name} trackers={S.trackers} logs={S.logs} />
+        <OsSessionPanel name={profile.name} trackers={S.trackers} logs={S.logs} S={S} />
         {/* The ratings ledger sits here now, where a Vitals panel used to
             repeat numbers the rest of the UI already carries: coins live
             in the chrome bar and OVR is the donut's whole point. Moving
