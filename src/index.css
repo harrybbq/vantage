@@ -7662,3 +7662,134 @@ div.m-hubdrawer-coach { cursor: default; display: flex; flex-direction: column; 
   font-family:var(--mono); font-size:8px; letter-spacing:.8px;
   color:rgba(255,255,255,.42); padding:5px 6px 2px; text-align:center;
 }
+
+/* ══ Shopping — one board ═════════════════════════════════════════════
+   Same move as Track: a shell owns the border and the surface, the
+   columns own a hairline between them. The rail is everything that was
+   previously three separate stripes above the grid — summary, priority
+   filters, category tabs — put beside the thing it describes.
+   ═════════════════════════════════════════════════════════════════ */
+.shop-board{
+  display:grid; grid-template-columns:1fr; gap:0; align-items:stretch;
+  border:var(--border-widget); border-radius:var(--radius-lg);
+  box-shadow:var(--accent-glow);
+  /* NOT overflow:hidden. It clips the corners, but it also makes the
+     board a scroll container, which silently kills position:sticky on
+     the rail inside it. The children round their own outer corners
+     instead — one more rule, and the rail actually sticks. */
+}
+.shop-rail{ border-radius:var(--radius-lg) 0 0 0; }
+.shop-main{ border-radius:0 var(--radius-lg) 0 0; }
+.shop-rail:last-child, .shop-rail:nth-last-child(2){ border-bottom-left-radius:var(--radius-lg); }
+.shop-main:last-child{ border-bottom-right-radius:var(--radius-lg); }
+.shop-trend-strip:last-child{ border-radius:0 0 var(--radius-lg) var(--radius-lg); }
+@media (max-width:979px){
+  .shop-rail{ border-radius:var(--radius-lg) var(--radius-lg) 0 0; }
+  .shop-main{ border-radius:0; }
+}
+/* Surface on the COLUMNS, not the shell — so right-click transparency
+   can drop the fill AND the blur together. Learned on Track: clearing
+   a background while keeping backdrop-filter still frosts the page. */
+.shop-rail, .shop-main{
+  background:var(--surface);
+  backdrop-filter:blur(20px) saturate(1.1);
+  -webkit-backdrop-filter:blur(20px) saturate(1.1);
+  min-width:0; display:flex; flex-direction:column;
+}
+.shop-rail[data-transparent="true"], .shop-main[data-transparent="true"]{
+  background:transparent !important;
+  backdrop-filter:none !important; -webkit-backdrop-filter:none !important;
+  box-shadow:none !important;
+}
+@media (min-width:980px){
+  .shop-board{ grid-template-columns:238px minmax(0,1fr); }
+  .shop-rail{ border-right:1px solid var(--border); }
+}
+@media (max-width:979px){
+  .shop-rail{ border-bottom:1px solid var(--border); }
+  .shop-board{ min-height:0; }
+}
+
+/* The rail sticks; the PAGE scrolls.
+   Deliberately different from Track, and for a reason: Track's calendar
+   is a fixed-size month grid, so both columns can be one screen tall. A
+   wishlist is arbitrarily long, and the whole point of the category
+   list is jumping around a list taller than the screen — so the grid
+   keeps the page's own scrolling (which is what goToCategory and its
+   scroll-spy already drive) and the rail follows you down it. */
+.shop-rail{ padding:0; }
+.shop-rail-sticky{
+  display:flex; flex-direction:column; gap:18px;
+  padding:14px 12px; position:sticky; top:12px;
+  max-height:calc(100vh - 24px); overflow-y:auto;
+}
+@media (max-width:979px){
+  .shop-rail-sticky{ position:static; max-height:none; }
+}
+.shop-rail-h{font-family:var(--mono);font-size:8.5px;letter-spacing:1.5px;
+  text-transform:uppercase;color:var(--text-muted);margin-bottom:8px;}
+.shop-rail-group{display:flex;flex-direction:column;}
+
+/* Summary — a 2×2 of the numbers that were a full-width stat bar. */
+.shop-rail-sum{display:grid;grid-template-columns:1fr 1fr;gap:9px;}
+.shop-rail-stat{display:flex;flex-direction:column;gap:1px;min-width:0;}
+.shop-rail-n{font-family:var(--mono);font-size:19px;font-weight:700;line-height:1;
+  color:var(--text);font-variant-numeric:tabular-nums;}
+.shop-rail-n.is-money{color:var(--em);}
+.shop-rail-l{font-family:var(--mono);font-size:8px;letter-spacing:1.3px;
+  text-transform:uppercase;color:var(--text-muted);}
+
+/* Priority filters stack in the rail rather than running across. */
+.shop-rail-group .shop-filters{display:flex;flex-direction:column;gap:3px;margin:0;}
+.shop-rail-group .shop-filter-btn{width:100%;justify-content:flex-start;text-align:left;}
+
+/* Categories — name, running total, count. */
+.shop-rail-cats{display:flex;flex-direction:column;gap:2px;}
+.shop-railcat{
+  display:flex;align-items:center;gap:8px;width:100%;text-align:left;
+  padding:7px 8px;border-radius:7px;border:1px solid transparent;
+  background:transparent;color:var(--text-mid);cursor:pointer;
+  font-family:var(--sans);font-size:12px;transition:background .12s,color .12s;
+}
+.shop-railcat:hover{background:rgba(127,127,127,.1);color:var(--text);}
+.shop-railcat.is-active{
+  background:rgba(var(--em-rgb),.1);border-color:rgba(var(--em-rgb),.28);color:var(--em);
+}
+.shop-railcat-dot{width:7px;height:7px;border-radius:2px;flex:none;background:var(--border);}
+.shop-railcat.is-active .shop-railcat-dot{background:var(--em);}
+.shop-railcat-name{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.shop-railcat-meta{display:flex;align-items:baseline;gap:7px;flex:none;}
+.shop-railcat-sum{font-family:var(--mono);font-size:9.5px;color:var(--text-muted);
+  font-variant-numeric:tabular-nums;}
+.shop-railcat-sum i{font-style:normal;opacity:.7;}
+.shop-railcat-n{font-family:var(--mono);font-size:10px;color:var(--text-muted);
+  min-width:16px;text-align:right;font-variant-numeric:tabular-nums;}
+.shop-railcat.is-active .shop-railcat-n{color:var(--em);}
+
+/* Main column: the controls become the grid's own chrome instead of a
+   free-floating stripe, and the grid scrolls inside the board. */
+.shop-main{padding:14px;gap:12px;}
+.shop-main .shop-controls{margin:0;}
+.shop-main .shop-grid{margin-top:0 !important;}
+
+/* Trending: a strip along the FULL width of the board's bottom edge —
+   it is a child of the grid, so it spans both columns rather than
+   sitting under the list only. That is the right shape for it: it is
+   context for the whole page, not a footnote to the item list. */
+.shop-trend-strip{
+  grid-column:1 / -1;
+  border-top:1px solid var(--border);
+  background:var(--surface);
+  backdrop-filter:blur(20px) saturate(1.1);
+  -webkit-backdrop-filter:blur(20px) saturate(1.1);
+  padding:12px 14px;
+}
+.shop-trend-strip[data-transparent="true"]{
+  background:transparent !important;
+  backdrop-filter:none !important; -webkit-backdrop-filter:none !important;
+}
+.shop-trend-strip .shop-trending{max-width:none;width:100%;}
+
+/* The page no longer needs the old flex row that held the grid and the
+   Trending rail side by side. */
+.shop-page{display:block;}
