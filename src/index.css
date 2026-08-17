@@ -7443,14 +7443,58 @@ div.m-hubdrawer-coach { cursor: default; display: flex; flex-direction: column; 
    column because it is a list of short names — giving it a share of
    the width would take that width from the grid, which is the thing
    that needed it. Below 900px it stacks above. */
-.track-layout{ display:grid; grid-template-columns:1fr; gap:18px; align-items:start; }
-@media (min-width:900px){
-  .track-layout{ grid-template-columns:270px minmax(0,1fr); }
+/* One module, not two floating cards.
+   The shell owns the border, the radius and the surface; the two
+   columns own nothing but a hairline between them. Two cards with a
+   gap read as two unrelated things that happen to be near each other —
+   which is wrong, because the list on the left is the legend for the
+   grid on the right. */
+.track-layout{
+  display:grid; grid-template-columns:1fr; gap:0;
+  align-items:stretch;                    /* both columns full height */
+  border:var(--border-widget); border-radius:var(--radius-lg);
+  background:var(--surface);
+  backdrop-filter:blur(20px) saturate(1.1);
+  -webkit-backdrop-filter:blur(20px) saturate(1.1);
+  box-shadow:var(--accent-glow);
+  overflow:hidden;                        /* corners clip the children */
+  /* Reaches the bottom rather than stopping at its content. The month
+     grid is the tallest thing on the page and the list beside it was
+     ending a third of the way down. */
+  min-height:min(720px, calc(100vh - 210px));
 }
-.track-side{ min-width:0; }
-.track-main{ min-width:0; }
-.track-side > .card{ max-width:none !important; margin:0 !important; width:100%; }
-.track-main > .card{ max-width:none !important; margin:0 !important; width:100%; }
+@media (min-width:900px){
+  .track-layout{ grid-template-columns:280px minmax(0,1fr); }
+  /* The join. A hairline, not a gap — they are one surface. */
+  .track-side{ border-right:1px solid var(--border); }
+}
+@media (max-width:899px){
+  .track-side{ border-bottom:1px solid var(--border); }
+}
+.track-side, .track-main{ min-width:0; display:flex; flex-direction:column; }
+
+/* The children stop being cards: no border, no radius, no shadow, no
+   fill of their own — the shell already has all four, and stacking a
+   card inside a card is what made them look like they were floating. */
+.track-side > .card, .track-main > .card{
+  max-width:none !important; margin:0 !important; width:100%;
+  flex:1; min-height:0;
+  border:0 !important; border-radius:0 !important;
+  background:transparent !important; box-shadow:none !important;
+  backdrop-filter:none !important; -webkit-backdrop-filter:none !important;
+}
+/* The tracker list fills its column and scrolls inside it, so a long
+   list cannot push the shell taller than the calendar. */
+.track-side #trackersList{ flex:1; min-height:0; overflow-y:auto; }
+
+/* Transparency, driven by the same right-click menu and the same
+   S.moduleTransparency store the hub modules use. Only the fill goes;
+   the hairline between the columns stays, or the two halves stop
+   reading as one module the moment either is switched. */
+.track-layout:has(> [data-transparent="true"]){ background:transparent; box-shadow:none; }
+.track-side[data-transparent="true"], .track-main[data-transparent="true"]{
+  background:transparent !important; box-shadow:none !important;
+}
 
 /* The point of the whole change: cells with room in them. A month grid
    that has to carry a date, up to a few tracker dots and an event or
