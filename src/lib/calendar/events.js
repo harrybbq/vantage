@@ -14,9 +14,15 @@
  *   S.calendarEvents = {
  *     '2026-08-16': [
  *       { id: 'ev_...', title: 'Chiro', kind: 'appointment',
- *         time: '14:30', note: '', createdAt: 1755… },
+ *         time: '14:30', end: '15:00', location: 'Kings Rd',
+ *         colour: '#4d9ec4', note: '', createdAt: 1755… },
  *     ],
  *   }
+ *
+ * `time` is the START. It kept its old name when `end` was added rather
+ * than being renamed to `start`, because renaming it would have orphaned
+ * every event already written — and events live in the same synced JSON
+ * as everything else, where a rename is a migration.
  *
  * Keyed by DATE rather than a flat list, because every read this app
  * does is "what is on this day" — the month grid asks it 42 times per
@@ -60,6 +66,41 @@ export function kindColour(id) {
   return eventKind(id).colour;
 }
 
+/**
+ * The palette the colour picker offers.
+ *
+ * A fixed set rather than a free colour input, for two reasons. A month
+ * grid full of arbitrary hexes stops being readable — the whole value of
+ * colour here is telling two things apart at a glance, and thirty
+ * near-identical blues do the opposite. And every one of these is picked
+ * to hold up against both the cream and the dark surfaces, which a
+ * user-chosen `#f5f2e8` would not.
+ */
+export const EVENT_COLOURS = [
+  { id: 'blue',   hex: '#4d9ec4' },
+  { id: 'green',  hex: '#1a7a4a' },
+  { id: 'purple', hex: '#a44dc4' },
+  { id: 'amber',  hex: '#c47a4d' },
+  { id: 'red',    hex: '#c4504d' },
+  { id: 'teal',   hex: '#3aa79b' },
+  { id: 'pink',   hex: '#c44d8f' },
+  { id: 'grey',   hex: '#6b665d' },
+];
+
+const HEX_RE = /^#[0-9a-f]{6}$/i;
+
+/**
+ * What colour to draw an event in.
+ *
+ * The user's own choice wins; the kind's colour is the fallback, so
+ * events written before the picker existed still come out sensibly
+ * instead of all grey.
+ */
+export function eventColour(ev) {
+  if (ev && typeof ev.colour === 'string' && HEX_RE.test(ev.colour)) return ev.colour;
+  return kindColour(ev && ev.kind);
+}
+
 const ISO_RE = /^\d{4}-\d{2}-\d{2}$/;
 export const isIsoDate = v => typeof v === 'string' && ISO_RE.test(v);
 
@@ -77,7 +118,31 @@ export function eventsOn(S, iso) {
   const all = S && S.calendarEvents;
   if (!all || typeof all !== 'object') return [];
   const day = all[iso];
-  return Array.isArray(day) ? day.filter(e => e && typeof e === 'object') : [];
+  if (!Array.isArray(day)) return [];
+  return sortEvents(day.filter(e => e && typeof e === 'object'));
+}
+
+/**
+ * Chronological, with untimed events last.
+ *
+ * Sorted on read rather than on write so the order is right for events
+ * added before this existed, and so editing a start time reorders the
+ * day without anyone having to remember to re-sort the array.
+ */
+export function sortEvents(list) {
+  return list.slice().sort((a, b) => {
+    const at = a.time || '', bt = b.time || '';
+    if (at && bt && at !== bt) return at < bt ? -1 : 1;
+    if (at && !bt) return -1;                  // timed before untimed
+    if (!at && bt) return 1;
+    return (a.createdAt || 0) - (b.createdAt || 0);
+  });
+}
+
+/** "14:30 – 15:15", "14:30", or "" — whatever the event actually has. */
+export function eventWhen(ev) {
+  if (!ev || !ev.time) return '';
+  return ev.end ? `${ev.time} – ${ev.end}` : ev.time;
 }
 
 /** Whether a date has anything on it — the month grid's hot path. */
@@ -104,16 +169,50 @@ export function eventsInMonth(S, year, month) {
   return out;
 }
 
-/** A new event object. Not persisted — the caller decides that. */
-export function makeEvent({ title, kind = DEFAULT_KIND, time = '', note = '' } = {}) {
+const TIME_RE = /^([01]\d|2[0-3]):[0-5]\d$/;
+export const isTime = v => typeof v === 'string' && TIME_RE.test(v);
+
+/**
+ * A new event object. Not persisted — the caller decides that.
+ *
+ * Everything is normalised HERE rather than trusted from the form,
+ * because this is also what an import or a future quick-add would go
+ * through, and a bad `time` reaching the store is a bad time in the
+ * month grid forever.
+ *
+ * An end time earlier than the start is dropped rather than kept or
+ * swapped: "14:00–09:00" is a typo, and silently reordering it into
+ * 09:00–14:00 would invent a two-hour-longer event nobody asked for.
+ */
+export function makeEvent({
+  title, kind = DEFAULT_KIND, time = '', end = '', location = '', colour = '', note = '',
+} = {}) {
+  const start = isTime(time) ? time : '';
+  const finish = isTime(end) && start && end > start ? end : '';
   return {
     id: 'ev_' + Math.random().toString(36).slice(2, 10) + Date.now().toString(36),
     title: String(title || '').slice(0, 120).trim(),
     kind: EVENT_KINDS.some(k => k.id === kind) ? kind : DEFAULT_KIND,
-    time: /^\d{2}:\d{2}$/.test(time) ? time : '',
+    time: start,
+    end: finish,
+    location: String(location || '').slice(0, 120).trim(),
+    colour: HEX_RE.test(colour) ? colour : '',
     note: String(note || '').slice(0, 500),
     createdAt: Date.now(),
   };
+}
+
+/** The same normalisation, for an edit. Returns only the touched keys. */
+export function cleanPatch(patch = {}) {
+  const out = {};
+  if ('title' in patch) out.title = String(patch.title || '').slice(0, 120).trim();
+  if ('kind' in patch) out.kind = EVENT_KINDS.some(k => k.id === patch.kind) ? patch.kind : DEFAULT_KIND;
+  if ('time' in patch) out.time = isTime(patch.time) ? patch.time : '';
+  if ('end' in patch) out.end = isTime(patch.end) ? patch.end : '';
+  if ('location' in patch) out.location = String(patch.location || '').slice(0, 120).trim();
+  if ('colour' in patch) out.colour = HEX_RE.test(patch.colour) ? patch.colour : '';
+  if ('note' in patch) out.note = String(patch.note || '').slice(0, 500);
+  return out;
 }
 
 /*
@@ -150,10 +249,49 @@ export function updateEvent(prev, iso, eventId, patch) {
   const all = (prev && prev.calendarEvents) || {};
   const day = Array.isArray(all[iso]) ? all[iso] : [];
   if (!day.some(e => e && e.id === eventId)) return prev;
-  const next = day.map(e => (e && e.id === eventId
-    ? { ...e, ...patch, id: e.id, createdAt: e.createdAt }   // id and birth are not patchable
-    : e));
+  const next = day.map(e => {
+    if (!e || e.id !== eventId) return e;
+    const merged = { ...e, ...patch, id: e.id, createdAt: e.createdAt };  // id and birth are not patchable
+    // Re-check the pair after the merge, not just the incoming key:
+    // editing the START can invalidate an end time that was fine before.
+    if (merged.end && (!merged.time || merged.end <= merged.time)) merged.end = '';
+    return merged;
+  });
   return { ...prev, calendarEvents: { ...all, [iso]: next } };
+}
+
+/* ── Today, for the hub ───────────────────────────────────────────────
+ *
+ * The hub asks a different question from the calendar: not "what is on
+ * this date" but "what is still coming". Both live here so the two
+ * surfaces cannot drift on what counts as over.
+ */
+
+/** Local ISO date — NOT toISOString(), which is UTC and gets yesterday
+ *  wrong for anyone west of Greenwich late in the evening. */
+export function todayIso(now = new Date()) {
+  const p = n => String(n).padStart(2, '0');
+  return `${now.getFullYear()}-${p(now.getMonth() + 1)}-${p(now.getDate())}`;
+}
+
+export function eventsToday(S, now = new Date()) {
+  return eventsOn(S, todayIso(now));
+}
+
+/**
+ * Today's events, each marked `past` once it is over.
+ *
+ * An event with an end time is over when the end passes; one with only a
+ * start is over when the start does. An untimed event is never past —
+ * "dentist, some time today" is still outstanding at 4pm, and greying it
+ * out would say otherwise.
+ */
+export function todayAgenda(S, now = new Date()) {
+  const hhmm = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+  return eventsToday(S, now).map(ev => {
+    const over = ev.end ? ev.end < hhmm : (ev.time ? ev.time < hhmm : false);
+    return { ...ev, past: over };
+  });
 }
 
 /** Total events stored — for a future "you have N events" surface. */

@@ -1,7 +1,8 @@
 import { useState, useMemo, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { useHubModuleMenu } from './HubModuleMenu';
-import { eventsInMonth, kindColour } from '../lib/calendar/events';
+import { eventColour, eventWhen, eventsInMonth, eventsOn } from '../lib/calendar/events';
+import EventModal from './calendar/EventModal';
 import Icon from './Icon';
 import { motion } from 'framer-motion';
 import { getWeekKey, countWeekLogs, getTodayStr } from '../utils/helpers';
@@ -181,7 +182,7 @@ const TRACK_TABS = [
  * overflow-hidden card; rendered in place it would be clipped by the
  * cell it belongs to.
  */
-function DayTickMenu({ x, y, dates, trackers, logs, onClose, update }) {
+function DayTickMenu({ x, y, dates, trackers, logs, events, onClose, update, onAddEvent, onEditEvent }) {
   const ref = useRef(null);
 
   // Close on anything that is not this menu: outside click, Escape,
@@ -215,7 +216,7 @@ function DayTickMenu({ x, y, dates, trackers, logs, onClose, update }) {
       left: Math.max(pad, Math.min(x, window.innerWidth - r.width - pad)),
       top: Math.max(pad, Math.min(y, window.innerHeight - r.height - pad)),
     });
-  }, [x, y, trackers.length]);
+  }, [x, y, trackers.length, (events || []).length]);
 
   const multi = dates.length > 1;
 
@@ -291,12 +292,38 @@ function DayTickMenu({ x, y, dates, trackers, logs, onClose, update }) {
         );
       })}
 
+      {/* Events. Below the ticks because ticking is the frequent act and
+          the frequent act keeps the top of the menu; adding an event is
+          deliberate and can afford the extra travel. Existing events are
+          listed so the menu answers "what is on this day" too — right-
+          clicking a day and being told only about trackers, when the
+          cell plainly shows an event, would read as a dead end. */}
+      <div className="daymenu-sep" role="separator" />
+
+      {!multi && (events || []).length > 0 && (
+        <div className="daymenu-events">
+          {events.map(ev => (
+            <button key={ev.id} type="button" className="daymenu-ev"
+                    onClick={() => onEditEvent(ev)}>
+              <span className="daymenu-ev-dot" style={{ background: eventColour(ev) }} />
+              <span className="daymenu-ev-name">{ev.title}</span>
+              <span className="daymenu-ev-when">{eventWhen(ev) || 'All day'}</span>
+            </button>
+          ))}
+        </div>
+      )}
+
+      <button type="button" className="daymenu-add" onClick={onAddEvent}>
+        <span className="daymenu-add-plus" aria-hidden="true">+</span>
+        Add event{multi ? ` to ${dates.length} days` : ''}
+      </button>
+
       {trackers.length > 0 && (
         <button type="button" className="daymenu-clear" onClick={clearAll}>
           Clear {multi ? 'these days' : 'this day'}
         </button>
       )}
-      <div className="daymenu-foot">Saves as you tick</div>
+      <div className="daymenu-foot">Ticks save as you go</div>
     </div>,
     document.body,
   );
@@ -348,6 +375,11 @@ function CalendarView({ S, update, onShowCoinToast, nutritionMonthData }) {
   // Right-click target: the day under the cursor, or — in multi-select
   // — every day currently chosen.
   const [menu, setMenu] = useState(null);   // { x, y, dates } | null
+  // { dates, event } — event null for a new one. Separate from `menu`
+  // because the menu closes the moment the modal opens; keeping them in
+  // one piece of state made "add event" close its own dialog.
+  const [eventForm, setEventForm] = useState(null);
+
   function handleDayContext(e, key) {
     e.preventDefault();
     e.stopPropagation();
@@ -529,7 +561,7 @@ function CalendarView({ S, update, onShowCoinToast, nutritionMonthData }) {
               className={`cal-cell${cell.isToday ? ' today' : ''}${cell.tids.length ? ' has-logs' : ''}${cell.isSelected ? ' selected' : ''}`}
               onClick={() => handleDayClick(cell.key)}
               onContextMenu={e => handleDayContext(e, cell.key)}
-              title="Right-click to log trackers"
+              title="Right-click to tick trackers or add an event"
             >
               {firstTracker && <div className="cal-cell-fill" style={{ background: firstTracker.color }}></div>}
               <div className="cal-date">{cell.day}</div>
@@ -538,9 +570,14 @@ function CalendarView({ S, update, onShowCoinToast, nutritionMonthData }) {
               {(monthEvents[cell.key] || []).length > 0 && (
                 <div className="cal-events">
                   {monthEvents[cell.key].slice(0, 2).map(ev => (
-                    <span key={ev.id} className="cal-event" title={ev.time ? `${ev.time} · ${ev.title}` : ev.title}>
-                      <span className="cal-event-dot" style={{ background: kindColour(ev.kind) }} />
-                      {ev.title}
+                    <span key={ev.id} className="cal-event"
+                          title={[eventWhen(ev), ev.title, ev.location].filter(Boolean).join(' · ')}>
+                      <span className="cal-event-dot" style={{ background: eventColour(ev) }} />
+                      {/* The title needs its own box. text-overflow does
+                          nothing on a flex container, so a bare text node
+                          here was hard-clipped mid-word instead of
+                          ellipsised — "Flight to Dublin — ba". */}
+                      <span className="cal-event-name">{ev.title}</span>
                     </span>
                   ))}
                   {monthEvents[cell.key].length > 2 && (
@@ -572,8 +609,20 @@ function CalendarView({ S, update, onShowCoinToast, nutritionMonthData }) {
         <DayTickMenu
           x={menu.x} y={menu.y} dates={menu.dates}
           trackers={trackers} logs={logs}
+          events={menu.dates.length === 1 ? eventsOn(S, menu.dates[0]) : []}
           update={update}
           onClose={() => setMenu(null)}
+          onAddEvent={() => { setEventForm({ dates: menu.dates, event: null }); setMenu(null); }}
+          onEditEvent={ev => { setEventForm({ dates: menu.dates, event: ev }); setMenu(null); }}
+        />
+      )}
+
+      {eventForm && (
+        <EventModal
+          dates={eventForm.dates}
+          event={eventForm.event}
+          update={update}
+          onClose={() => setEventForm(null)}
         />
       )}
 
