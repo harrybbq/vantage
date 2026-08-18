@@ -654,3 +654,248 @@
   .upg-editor { font-size: 12px; }
   .upg-run-sig { flex-basis: 100%; }
 }
+
+
+/* ══ Career section tabs (N1) ═════════════════════════════════════════
+   The app's `.settings-tabs` row, so the inactive colour, the hover and
+   the narrow-viewport gutters all come for free. Only the count is new. */
+.career-tabs{ margin-bottom: 16px; }
+.career-tab-n{
+  margin-left: 7px;
+  font-size: 8.5px;
+  letter-spacing: .8px;
+  color: var(--text-muted);
+  font-weight: 400;
+}
+.settings-tab-active .career-tab-n{ color: rgba(var(--em-rgb), .8); }
+/* The counts go on phones. At 390px they pushed "Library" off the edge:
+   the row still scrolls, but a destination you cannot see is one you do
+   not know about, and the label is the navigation while the count is
+   only ever context. 480px is where the shared rule already tightens
+   the gutters, so the two breakpoints agree. */
+@media (max-width: 480px){
+  .career-tab-n{ display: none; }
+}
+
+/* ══ CV editor — Direction A ══════════════════════════════════════════
+   Document on the left, inspector on the right. The document is a piece
+   of paper: it keeps cream-and-black in every theme, because that is
+   what comes out of the printer. Everything around it is the app. */
+.cvx{ display: flex; flex-direction: column; gap: 12px; }
+
+.cvx-bar{ display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.cvx-spacer{ flex: 1; }
+.cvx-btn{
+  display: inline-flex; align-items: center; gap: 7px;
+  padding: 7px 13px; border-radius: 9px; cursor: pointer;
+  border: 1px solid var(--border); background: transparent; color: var(--text-mid, var(--text-muted));
+  font-family: var(--mono); font-size: 9.5px; letter-spacing: 1.1px; text-transform: uppercase;
+}
+.cvx-btn:hover{ color: var(--text); border-color: var(--text-muted); }
+.cvx-btn.is-pri{ background: var(--em); border-color: var(--em); color: #fff; font-weight: 600; }
+.cvx-btn.is-pri:hover{ filter: brightness(1.08); color: #fff; }
+.cvx-btn.is-on{ color: var(--em); border-color: rgba(var(--em-rgb), .5); }
+
+.cvx-versions{ display: flex; align-items: center; gap: 7px; flex-wrap: wrap; }
+.cvx-ver{
+  padding: 5px 11px; border-radius: 999px; cursor: pointer;
+  border: 1px solid var(--border); background: transparent; color: var(--text-muted);
+  font-family: var(--sans); font-size: 12.5px;
+}
+.cvx-ver:hover{ color: var(--text); }
+.cvx-ver.is-on{ color: var(--em); border-color: rgba(var(--em-rgb), .5); background: rgba(var(--em-rgb), .1); }
+.cvx-ver-wrap{ display: inline-flex; align-items: center; gap: 2px; }
+
+.cvx-grid{ display: grid; grid-template-columns: minmax(0, 1fr) 264px; gap: 14px; align-items: start; }
+@media (max-width: 900px){ .cvx-grid{ grid-template-columns: 1fr; } }
+.cvx-docwrap{ min-width: 0; position: relative; }
+.cvx-side{ display: flex; flex-direction: column; gap: 10px; position: sticky; top: 12px; min-width: 0; }
+
+.cvx-first{
+  font-family: var(--mono); font-size: 10.5px; color: var(--text-muted);
+  margin-bottom: 8px;
+}
+
+/* ── The document ── */
+.cvdoc{
+  background: #f6f4ef;
+  color: #1b1c1e;
+  border-radius: 10px;
+  padding: 30px 34px 36px;
+  box-shadow: 0 10px 34px rgba(0, 0, 0, .28);
+  font-family: var(--sans);
+  line-height: 1.5;
+  min-width: 0;
+}
+.cvdoc-name{ font-family: var(--serif, Georgia, serif); font-size: 25px; font-weight: 700; line-height: 1.15; }
+.cvdoc-contact{ font-family: var(--mono); font-size: 10.5px; color: #6a6c70; letter-spacing: .4px; margin-top: 3px; }
+.cvdoc-rule{ height: 1px; background: #d9d5cc; margin: 15px 0; }
+.cvdoc-sec{
+  font-family: var(--mono); font-size: 9px; letter-spacing: 1.9px; text-transform: uppercase;
+  color: #8a8579; margin-bottom: 7px;
+}
+.cvdoc-p{ font-size: 13.5px; margin: 0; color: #2b2d30; }
+.cvdoc-ph{ color: #a8a396; font-style: italic; }
+.cvdoc-role + .cvdoc-role{ margin-top: 11px; }
+.cvdoc-roletop{ display: flex; justify-content: space-between; gap: 14px; align-items: baseline; }
+.cvdoc-roletop b{ font-size: 14px; }
+.cvdoc-roletop span{ font-family: var(--mono); font-size: 10.5px; color: #6a6c70; white-space: nowrap; }
+.cvdoc-org{ font-family: var(--mono); font-size: 10.5px; color: #6a6c70; margin-top: 1px; }
+.cvdoc-bullets{ margin: 5px 0 0; padding-left: 17px; font-size: 12.5px; color: #2b2d30; }
+.cvdoc-bullets li{ margin-bottom: 2px; }
+.cvdoc-skills{ display: flex; flex-wrap: wrap; gap: 5px; }
+.cvdoc-skills i{
+  font-style: normal; font-family: var(--mono); font-size: 10.5px;
+  background: #e8e4da; border-radius: 4px; padding: 2px 7px; color: #3a3c40;
+}
+.cvdoc-edu{ display: flex; justify-content: space-between; gap: 14px; align-items: baseline; }
+.cvdoc-edu + .cvdoc-edu{ margin-top: 4px; }
+.cvdoc-edu b{ font-size: 13px; }
+.cvdoc-edu span{ font-family: var(--mono); font-size: 10.5px; color: #6a6c70; white-space: nowrap; }
+.cvdoc-add{
+  display: inline-flex; align-items: center; gap: 6px; width: 100%; justify-content: center;
+  /* Clear of the last role — butted up against its final bullet it read
+     as part of that role rather than as a sibling of all of them. */
+  margin-top: 16px; padding: 7px; cursor: pointer;
+  border: 1px dashed #cbc6ba; border-radius: 7px; background: transparent; color: #8a8579;
+  font-family: var(--mono); font-size: 9.5px; letter-spacing: 1.1px; text-transform: uppercase;
+}
+.cvdoc-add:hover{ border-color: var(--em); color: var(--em); }
+
+/* Selectable regions. A button, so the whole document is keyboard
+   reachable; reset to look like the text it wraps. */
+.cvz{
+  display: block; width: 100%; text-align: left; padding: 3px 5px; margin: -3px -5px;
+  border: 0; background: transparent; color: inherit; font: inherit; cursor: pointer;
+  border-radius: 5px; box-shadow: 0 0 0 1px transparent;
+  transition: background .12s ease, box-shadow .12s ease;
+}
+.cvz:hover{ background: rgba(26, 122, 74, .07); box-shadow: 0 0 0 1px rgba(26, 122, 74, .35); }
+.cvz.is-on{ background: rgba(26, 122, 74, .1); box-shadow: 0 0 0 2px var(--em); }
+.cvz:focus-visible{ outline: 2px solid var(--em); outline-offset: 2px; }
+
+/* ── Inspector ── */
+.cvi-card{
+  border: 1px solid var(--border); border-radius: 11px; background: var(--card, rgba(255,255,255,.02));
+  padding: 13px; display: flex; flex-direction: column; gap: 9px; min-width: 0;
+}
+.cvi-hint{ color: var(--text-muted); }
+.cvi-lbl{
+  font-family: var(--mono); font-size: 9px; letter-spacing: 1.4px; text-transform: uppercase;
+  color: var(--text-muted);
+}
+.cvi-p{ font-family: var(--sans); font-size: 12.5px; color: var(--text-muted); margin: 0; line-height: 1.55; }
+.cvi-fine{ font-family: var(--mono); font-size: 9.5px; color: var(--text-muted); line-height: 1.6; }
+.cvi-field{ display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.cvi-row2{ display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 8px; }
+.cvi-card input, .cvi-card textarea{
+  width: 100%; min-width: 0; box-sizing: border-box;
+  padding: 7px 9px; border-radius: 7px;
+  border: 1px solid var(--border); background: rgba(0, 0, 0, .18); color: var(--text);
+  font-family: var(--sans); font-size: 13px; line-height: 1.5; resize: vertical;
+}
+.cvi-card input:focus, .cvi-card textarea:focus{ outline: none; border-color: var(--em); }
+
+.cvi-chips{ display: flex; flex-wrap: wrap; gap: 5px; }
+.cvi-chip{
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 3px 5px 3px 9px; border-radius: 999px;
+  border: 1px solid var(--border); background: rgba(127, 127, 127, .08);
+  font-size: 12px; color: var(--text);
+}
+.cvi-chip button{
+  border: 0; background: none; cursor: pointer; color: var(--text-muted);
+  display: inline-flex; padding: 1px; border-radius: 4px;
+}
+.cvi-chip button:hover{ color: #e0796a; }
+.cvi-skilladd{ font-family: var(--sans); }
+
+.cvi-sub{
+  display: flex; flex-direction: column; gap: 6px;
+  padding: 9px; border-radius: 9px; border: 1px solid var(--border);
+  background: rgba(127, 127, 127, .04);
+}
+.cvi-subhead{ display: flex; align-items: center; gap: 4px; }
+.cvi-subhead .cvi-fine{ flex: 1; }
+
+.cvi-bullet{ display: flex; gap: 6px; align-items: flex-start; }
+.cvi-bullet textarea{ flex: 1; min-width: 0; resize: none; overflow: hidden; }
+.cvi-bullet-acts{ display: flex; flex-direction: column; gap: 2px; flex: none; }
+
+.cvi-icon{
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 24px; height: 22px; border-radius: 6px; cursor: pointer;
+  border: 1px solid var(--border); background: transparent; color: var(--text-muted);
+}
+.cvi-icon:hover:not(:disabled){ color: var(--text); border-color: var(--text-muted); }
+.cvi-icon:disabled{ opacity: .3; cursor: not-allowed; }
+.cvi-icon.is-del:hover:not(:disabled){ color: #e0796a; border-color: rgba(224, 121, 106, .5); }
+
+.cvi-btn{
+  display: inline-flex; align-items: center; gap: 6px; align-self: flex-start;
+  padding: 6px 11px; border-radius: 8px; cursor: pointer;
+  border: 1px solid var(--border); background: transparent; color: var(--text-muted);
+  font-family: var(--mono); font-size: 9.5px; letter-spacing: 1px; text-transform: uppercase;
+}
+.cvi-btn:hover:not(:disabled){ color: var(--text); border-color: var(--text-muted); }
+.cvi-btn:disabled{ opacity: .35; cursor: not-allowed; }
+.cvi-btn.is-del:hover{ color: #e0796a; border-color: rgba(224, 121, 106, .5); }
+.cvi-acts{ display: flex; gap: 6px; flex-wrap: wrap; margin-top: 3px; }
+
+.cvx-bar-meter{ height: 5px; border-radius: 3px; background: rgba(127, 127, 127, .16); overflow: hidden; }
+.cvx-bar-meter i{ display: block; height: 100%; background: var(--em); transition: width .18s ease; }
+
+.cvx-file{ }
+.cvx-filerow{ display: flex; align-items: center; gap: 9px; flex-wrap: wrap; }
+.cvx-filename{ flex: 1; min-width: 0; font-size: 12.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* ── Mobile: the inspector becomes a sheet ──
+   Capped height with its own scroll, so the document behind it stays
+   reachable — the house rule for every sheet in the app. */
+.cvx-sheet{
+  position: fixed; left: 0; right: 0; bottom: 0; z-index: 500;
+  max-height: 66vh; display: flex; flex-direction: column;
+  background: var(--bg-raised, #16161a);
+  border-top: 1px solid var(--border);
+  border-radius: 16px 16px 0 0;
+  box-shadow: 0 -14px 40px rgba(0, 0, 0, .45);
+  padding: 8px 12px calc(12px + var(--m-safe-bottom, 0px));
+}
+.cvx-sheet-grab{
+  width: 38px; height: 4px; border-radius: 2px; margin: 2px auto 8px;
+  background: rgba(127, 127, 127, .4);
+}
+.cvx-sheet-x{
+  position: absolute; top: 10px; right: 12px;
+  width: 28px; height: 28px; border-radius: 8px; cursor: pointer;
+  display: inline-flex; align-items: center; justify-content: center;
+  border: 1px solid var(--border); background: transparent; color: var(--text-muted);
+}
+.cvx-sheet-body{ overflow-y: auto; min-height: 0; }
+.cvx-sheet .cvi-card{ border: 0; background: none; padding: 0; }
+
+/* ══ Print ════════════════════════════════════════════════════════════
+   The document is already the print target, which is the whole point of
+   this direction — Export PDF is window.print() and the stylesheet does
+   the rest. visibility rather than display, because display:none on an
+   ancestor would take the document down with it. */
+@media print{
+  body *{ visibility: hidden !important; }
+  .cvdoc, .cvdoc *{ visibility: visible !important; }
+  .cvdoc{
+    position: absolute !important; left: 0 !important; top: 0 !important;
+    width: 100% !important; margin: 0 !important; padding: 0 !important;
+    background: #fff !important; color: #000 !important;
+    box-shadow: none !important; border-radius: 0 !important;
+  }
+  /* Selection chrome is editing furniture and must not print. */
+  .cvz, .cvz.is-on{ box-shadow: none !important; background: none !important; padding: 0 !important; margin: 0 !important; }
+  .cvdoc-add{ display: none !important; }
+  .cvdoc-ph{ visibility: hidden !important; }
+  .cvdoc-skills i{ background: none !important; padding: 0 !important; }
+  .cvdoc-skills{ gap: 0 !important; }
+  .cvdoc-skills i::after{ content: ' · '; }
+  .cvdoc-skills i:last-child::after{ content: ''; }
+  .cvdoc-role{ break-inside: avoid; page-break-inside: avoid; }
+}
+@page{ margin: 14mm; }
