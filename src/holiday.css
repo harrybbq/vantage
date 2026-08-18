@@ -311,35 +311,47 @@
    hard-coding cream would have broken the dark themes outright. */
 .hol-planner{ display:flex; flex-direction:column; gap:18px; }
 
-/* ── Rail (desktop) ─────────────────────────────────────────────── */
+/* ── The rail ────────────────────────────────────────────────────────
+   Spans the whole page. It is the one element that gets better with
+   width, so it breaks out of the 1100px column the rest of the section
+   sits in. The formula: take the full width available inside the
+   section's own gutters, then pull the card out by half the difference
+   on each side. `100%` in a margin resolves against the containing
+   block's width, which is the capped column. */
 .hol-rail-card{
+  --hol-nav: 56px;                       /* the fixed side nav */
+  --hol-gutter: 28px;                    /* .section's horizontal padding */
+  --hol-full: calc(100vw - var(--hol-nav) - 2 * var(--hol-gutter));
+  width: var(--hol-full);
+  margin-left: calc((100% - var(--hol-full)) / 2);
   border:var(--border-widget); border-radius:20px;
   background:var(--surface); box-shadow:var(--accent-glow);
   backdrop-filter:blur(20px) saturate(1.1);
   -webkit-backdrop-filter:blur(20px) saturate(1.1);
   overflow:hidden;
 }
+@media (max-width:768px){
+  .hol-rail-card{ --hol-nav: 0px; --hol-gutter: 14px; }
+}
 .hol-rail-card[data-transparent="true"]{
   background:transparent !important;
   backdrop-filter:none !important; -webkit-backdrop-filter:none !important;
   box-shadow:none !important;
 }
-.hol-rail-head{ display:flex; align-items:center; gap:12px; padding:14px 18px 10px; }
+.hol-rail-head{ display:flex; align-items:center; gap:12px; padding:12px 16px 8px; }
 .hol-rail-eyebrow{
   font-family:var(--mono); font-size:9px; letter-spacing:1.6px;
   text-transform:uppercase; color:var(--text-muted); white-space:nowrap;
 }
 .hol-rail-line{ flex:1; height:1px; background:var(--border); }
-.hol-rail-key{
-  display:flex; align-items:center; gap:14px;
-  font-family:var(--mono); font-size:8.5px; letter-spacing:1.1px;
-  text-transform:uppercase; color:var(--text-muted);
+.hol-rail-jump{
+  font-family:var(--mono); font-size:9px; letter-spacing:1.1px; text-transform:uppercase;
+  padding:5px 12px; border-radius:999px; cursor:pointer; flex:none;
+  border:1px solid var(--border); background:transparent; color:var(--text-muted);
 }
-.hol-rail-key span{ display:inline-flex; align-items:center; gap:6px; }
-.hol-key-dot{ width:8px; height:8px; border-radius:50%; display:inline-block; }
-.hol-key-dot.is-up{ background:var(--em); }
-.hol-key-dot.is-past{ background:var(--text-muted); }
-/* ── Zoom control ── */
+.hol-rail-jump:hover{ color:var(--em); border-color:rgba(var(--em-rgb),.5); }
+
+/* Zoom control */
 .hol-zoom{
   display:inline-flex; align-items:center; gap:2px; flex:none;
   border:1px solid var(--border); border-radius:999px; padding:2px;
@@ -349,173 +361,153 @@
   border:0; background:transparent; color:var(--text-muted); font-size:14px;
   display:inline-flex; align-items:center; justify-content:center;
 }
-.hol-zoom-btn:hover:not(:disabled){ color:var(--text); background:rgba(127,127,127,.14); }
-.hol-zoom-btn:disabled{ opacity:.32; cursor:not-allowed; }
+.hol-zoom-btn:hover{ color:var(--text); background:rgba(127,127,127,.14); }
 .hol-zoom-level{
   font-family:var(--mono); font-size:8.5px; letter-spacing:1.2px; text-transform:uppercase;
   color:var(--text-muted); min-width:46px; text-align:center;
 }
 
-.hol-rail-jump{
-  font-family:var(--mono); font-size:9px; letter-spacing:1.1px; text-transform:uppercase;
-  padding:5px 11px; border-radius:999px; cursor:pointer;
-  border:1px solid var(--border); background:transparent; color:var(--text-muted);
-}
-.hol-rail-jump:hover{ color:var(--text); border-color:var(--text-muted); }
-
-/* Grab-to-pan. `overscroll-behavior-x:contain` stops a fast drag at the
-   end of the rail turning into the browser's back-swipe gesture. */
+/* ── The scroller ──
+   `overscroll-behavior:contain` stops a fast pan at the end turning into
+   the browser's back-swipe. `touch-action:none` because the wheel and
+   the drag are both handled here. */
 .hol-rail-scroll{
-  overflow-x:auto; overflow-y:hidden; padding:0 18px 14px; scrollbar-width:thin;
-  cursor:grab; overscroll-behavior-x:contain; touch-action:pan-x;
+  position:relative; cursor:grab;
+  overflow-x:auto; overflow-y:hidden;
+  overscroll-behavior:contain; scrollbar-width:none;
 }
-.hol-rail-scroll.is-dragging{ cursor:grabbing; scroll-behavior:auto; }
-/* While panning, nothing inside should try to select or drag itself. */
+.hol-rail-scroll::-webkit-scrollbar{ display:none; }
+.hol-rail-scroll.is-dragging{ cursor:grabbing; }
 .hol-rail-scroll.is-dragging *{ user-select:none; pointer-events:none; }
-.hol-rail-scroll::-webkit-scrollbar{ height:6px; }
-.hol-rail-scroll::-webkit-scrollbar-thumb{ background:rgba(var(--em-rgb),.3); border-radius:99px; }
-.hol-rail-scroll::-webkit-scrollbar-track{ background:transparent; }
-/* ── Rail vertical layout ──
-   Every band has a stated y so nothing can land on anything else. The
-   mockup stacked the stop as a flex column and let the heights fall
-   where they may, which put the dots just ABOVE the track and dropped
-   the date labels straight on top of the month ticks. Fixed rows:
 
-     0–64    trip thumbnail
-     68–86   destination
-     112     the track, and the dot centred on it
-     122–152 month / year ticks
-     156–168 the trip's date
-     172–190 the "today" pill
-
-   Change one of these and check the two either side of it. */
+/* ── Rail bands, horizontal ──
+   Stacked down the rail: outside labels on top, then the bands, then the
+   track and its ticks underneath.
+     4–55    outside labels (three rows of 18, each 15 tall)
+     60–148  the bands
+     156     the track line
+     162–190 month / year ticks
+   The leader rules are drawn from those numbers, so they move together:
+   a label's rule is (60 − 4 − row*18 − 15) = 41 − row*18 tall. */
 .hol-rail-inner{ position:relative; height:200px; }
-/* Past on the left in muted, future on the right in accent — the line
-   itself says which side of today you are looking at. */
 .hol-rail-track{
-  position:absolute; left:0; right:0; top:112px; height:2px;
+  position:absolute; left:0; right:0; top:156px; height:2px;
   background:linear-gradient(90deg,
-    rgba(127,127,127,.4) 0%, rgba(127,127,127,.4) 48%,
+    rgba(127,127,127,.32) 0%, rgba(127,127,127,.32) 48%,
     rgba(var(--em-rgb),.45) 52%, rgba(var(--em-rgb),.45) 100%);
 }
 .hol-tick{
-  position:absolute; top:122px; transform:translateX(-50%);
+  position:absolute; top:162px; transform:translateX(-50%);
   display:flex; flex-direction:column; align-items:center; gap:5px;
 }
 .hol-tick i{ width:1px; height:8px; background:var(--border); display:block; }
 .hol-tick span{
   font-family:var(--mono); font-size:8px; letter-spacing:1.2px;
-  text-transform:uppercase; color:var(--text-muted); white-space:nowrap; opacity:.75;
+  text-transform:uppercase; color:var(--text-muted); white-space:nowrap; opacity:.8;
 }
 .hol-tick.is-year i{ height:14px; }
 .hol-tick.is-year span{ font-size:10px; color:var(--text); opacity:1; }
 
-/* The line starts BELOW the thumbnails. Running it the full height put
-   it through whichever trip happened to be near today, and the pill on
-   top of that trip's photo. */
-.hol-today{ position:absolute; top:94px; height:78px; width:1px; background:var(--em); }
+.hol-today{ position:absolute; top:56px; height:118px; width:1px; background:var(--em); z-index:5; }
 .hol-today span{
-  position:absolute; top:76px; left:50%; transform:translateX(-50%);
+  position:absolute; top:118px; left:50%; transform:translateX(-50%);
   font-family:var(--mono); font-size:8px; letter-spacing:1.4px; text-transform:uppercase;
   color:var(--em); background:var(--bg-raised, var(--surface));
   padding:2px 6px; border-radius:99px; border:1px solid rgba(var(--em-rgb),.35); white-space:nowrap;
 }
 
-.hol-stop{
-  position:absolute; top:0; height:200px; transform:translateX(-50%); width:132px;
-  background:transparent; border:0; padding:0; cursor:pointer;
-  opacity:.86; transition:opacity .14s ease;
+/* ── A band ──
+   The trip's photo, cropped to the stretch of time it covers. */
+.hol-band{
+  position:absolute; top:60px; height:88px; z-index:2;
+  padding:0; border:0; cursor:pointer; overflow:hidden;
+  border-radius:9px;
+  background-image:var(--band-photo, none);
+  background-size:cover; background-position:center;
+  background-color:rgba(127,127,127,.16);
+  box-shadow:0 0 0 1px rgba(127,127,127,.34), 0 6px 18px rgba(0,0,0,.28);
+  display:flex; align-items:flex-end;
+  transition:box-shadow .16s ease, filter .16s ease;
 }
-/* ── Three densities ──
-   Which one a stop gets is decided by railStops() from the actual gap
-   to its nearest neighbour, not by the zoom level — two trips can be
-   crowded at any zoom. The width shrinks with the tier so a stop's hit
-   area never reaches past the room it has. */
-.hol-stop.is-compact{ width:96px; }
-.hol-stop.is-dot{ width:22px; }
-/* These three widths ARE the FULL_GAP / COMPACT_GAP / DOT_GAP constants
-   in lib/holiday/timeline.js. A tier is only chosen when the gap is at
-   least this wide, which is what stops two stops overlapping; if you
-   change one, change the other. */
-.hol-stop.is-compact .hol-stop-name{ font-size:11px; max-width:92px; }
-.hol-stop.is-dot .hol-stop-name{ display:none; }
-/* The selected stop keeps its name at any density. It overflows the
-   22px box and takes no pointer events, so the hit area stays exactly
-   as wide as its gap allows. */
-.hol-stop.is-dot.is-named .hol-stop-name{
-  display:block; top:88px; pointer-events:none; white-space:nowrap;
-  max-width:none; font-size:11px; font-weight:600;
+/* A trip with no photo keeps the striped stand-in the thumbnails had. */
+.hol-band:not([style*="--band-photo"]){
+  background-image:repeating-linear-gradient(135deg,rgba(127,127,127,.16) 0 5px,rgba(127,127,127,.04) 5px 10px);
 }
-/* Compact and dot stops have nothing above the line, so their label
-   sits just under the dot instead of down in the date band. */
-.hol-stop.is-compact .hol-stop-name{ top:88px; }
-
-/* ── Cluster marker ──
-   Two or more trips too close together to be separate targets. Sits on
-   the track where they are, says how many, and zooms in when clicked. */
-.hol-cluster{
-  position:absolute; top:112px; transform:translate(-50%,-50%); z-index:2;
-  min-width:22px; height:22px; padding:0 6px; border-radius:999px; cursor:pointer;
-  display:inline-flex; align-items:center; justify-content:center;
-  border:2px solid var(--bg-raised, var(--surface));
-  background:var(--em); color:#fff;
-  font-family:var(--mono); font-size:10px; font-weight:700; line-height:1;
-  box-shadow:0 0 0 1px rgba(var(--em-rgb),.5);
+.hol-band.is-past{ filter:saturate(.45) brightness(.74); }
+.hol-band:hover{ box-shadow:0 0 0 1px rgba(var(--em-rgb),.6), 0 8px 22px rgba(0,0,0,.34); }
+.hol-band.is-sel{
+  box-shadow:0 0 0 2px var(--em), 0 10px 26px rgba(var(--em-rgb),.3);
+  filter:none; z-index:4;
 }
-.hol-cluster:hover{ filter:brightness(1.12); }
-.hol-cluster.is-sel{ box-shadow:0 0 0 4px rgba(var(--em-rgb),.22); }
-/* Absolutely placed so each part sits in its own band (see above). */
-.hol-stop > *{ position:absolute; left:50%; transform:translateX(-50%); }
-.hol-stop .hol-thumb{ top:0; }
-.hol-stop.is-full .hol-stop-name{ top:70px; }
-.hol-stop .hol-dot{ top:112px; transform:translate(-50%,-50%); }
-.hol-stop-when{ top:156px; }
-.hol-stop.is-past{ opacity:.52; }
-.hol-stop:hover, .hol-stop.is-sel{ opacity:1; }
-.hol-stop-name{
-  font-family:var(--sans); font-size:12px; font-weight:600; color:var(--text);
-  max-width:126px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+/* A trip booked inside a longer one: inset so both edges show. */
+.hol-band.is-nested{
+  top:calc(60px + var(--band-inset, 0px));
+  height:calc(88px - 2 * var(--band-inset, 0px));
 }
-/* Selected wins the stacking order, so its ring and label sit over a
-   neighbour that happens to be a few days away. */
-.hol-stop.is-sel{ z-index:3; }
-.hol-stop:hover{ z-index:2; }
-.hol-stop.is-past .hol-stop-name{ color:var(--text-muted); }
-.hol-stop-when{
-  font-family:var(--mono); font-size:8.5px; letter-spacing:1px;
-  text-transform:uppercase; color:var(--text-muted); white-space:nowrap;
+/* The scrim only has to carry the label at the bottom, so it is clear
+   at the top where the photo is. */
+.hol-band-scrim{
+  position:absolute; inset:0; pointer-events:none;
+  background:linear-gradient(180deg,
+    rgba(6,10,8,.10) 0%, rgba(6,10,8,.26) 44%, rgba(6,10,8,.86) 100%);
 }
-.hol-stop.is-sel .hol-stop-when{ color:var(--em); }
-
-.hol-thumb{
-  width:112px; height:64px; border-radius:10px; overflow:hidden; display:block;
-  border:1px solid var(--border); background-size:cover; background-position:center;
-  background-color:rgba(127,127,127,.12);
-  background-image:repeating-linear-gradient(135deg,rgba(127,127,127,.14) 0 4px,rgba(127,127,127,.03) 4px 8px);
-  display:flex; align-items:flex-end; padding:5px 7px;
+.hol-band-label{
+  position:relative; z-index:2; width:100%; min-width:0;
+  padding:6px 9px; text-align:left;
 }
-.hol-thumb.is-sel{ border:2px solid var(--em); box-shadow:0 10px 26px rgba(var(--em-rgb),.22); }
-.hol-thumb.is-past{ filter:saturate(.5); }
-.hol-thumb-ph{
-  font-family:var(--mono); font-size:7px; letter-spacing:.8px;
-  text-transform:uppercase; color:var(--text-muted);
+.hol-band-name{
+  display:block; font-family:var(--sans); font-size:12.5px; font-weight:700; color:#fff;
+  text-shadow:0 1px 5px rgba(0,0,0,.75);
+  white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+}
+.hol-band-when{
+  display:block; font-family:var(--mono); font-size:8.5px; letter-spacing:.8px;
+  text-transform:uppercase; color:rgba(255,255,255,.88); text-shadow:0 1px 5px rgba(0,0,0,.75);
+  white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
 }
 
-.hol-dot{
-  width:10px; height:10px; border-radius:50%; background:var(--em);
-  border:2px solid var(--bg-raised, var(--surface)); display:block; flex:none;
+/* ── Labels for bands too narrow to hold one ──
+   Left-anchored on the band, not centred over it, with a leader rule
+   down onto the band's leading corner. Centred labels floated between
+   two bands with nothing to say which was theirs, and clipped at the
+   ends of the rail; this pair of rules is the association drawn instead
+   of guessed. `--out-lead` is the offset back to the band and is signed:
+   positive when the label was pulled left off the end of the rail,
+   negative when it was pushed right past a neighbour. */
+.hol-band-out{
+  position:absolute; z-index:6;
+  top:calc(4px + var(--out-row) * 18px);
+  height:15px; line-height:15px;
+  padding:0; border:0; background:transparent; cursor:pointer;
+  font-family:var(--sans); font-size:11px; font-weight:600; color:var(--text);
+  white-space:nowrap; text-shadow:0 1px 4px rgba(0,0,0,.55);
 }
-.hol-dot.is-past{ background:var(--text-muted); }
-.hol-dot.is-sel{ width:14px; height:14px; box-shadow:0 0 0 4px rgba(var(--em-rgb),.18); }
-/* The track passes behind the dots, not through them. */
-.hol-stop .hol-dot, .hol-today{ z-index:2; }
+/* The run back to the band, when the label had to move along the rail. */
+.hol-band-out::before{
+  content:''; position:absolute; top:100%; height:1px;
+  left:min(0px, var(--out-lead, 0px));
+  width:max(var(--out-lead, 0px), -1 * var(--out-lead, 0px));
+  background:rgba(127,127,127,.55);
+}
+/* …and the drop onto the band itself. */
+.hol-band-out::after{
+  content:''; position:absolute; top:100%; width:1px;
+  left:var(--out-lead, 0px);
+  height:calc(41px - var(--out-row) * 18px);
+  background:rgba(127,127,127,.55);
+}
+.hol-band-out.is-past{ color:var(--text-muted); }
+.hol-band-out.is-past::before, .hol-band-out.is-past::after{ background:rgba(127,127,127,.34); }
+.hol-band-out.is-sel{ color:var(--em); }
+.hol-band-out.is-sel::before, .hol-band-out.is-sel::after{ background:rgba(var(--em-rgb),.8); }
+.hol-band-out:hover{ color:var(--em); }
 
 .hol-rail-nodates{
-  font-family:var(--mono); font-size:10px; color:var(--text-muted); padding:14px 0;
+  font-family:var(--mono); font-size:10px; color:var(--text-muted); padding:24px 18px;
 }
 .hol-rail-foot{
   display:flex; align-items:center; gap:14px; flex-wrap:wrap;
-  padding:0 18px 14px; min-height:20px;
+  padding:8px 16px 12px; min-height:20px;
 }
 .hol-rail-hint{
   font-family:var(--mono); font-size:8.5px; letter-spacing:1px;
@@ -528,67 +520,66 @@
 }
 .hol-undated-chip.is-sel{ color:var(--em); border-color:rgba(var(--em-rgb),.5); background:rgba(var(--em-rgb),.1); }
 
-/* ── Rail (phone): a vertical spine beside the pass ─────────────────
-   The design puts the timeline down the left of a 390px screen rather
-   than across the top, and that is the right call: a horizontal strip
-   on a phone shows two trips and hides the rest behind a swipe nobody
-   discovers, while a 74px column shows six. */
-@media (max-width:768px){
-  .hol-planner{
-    display:grid; grid-template-columns:74px minmax(0,1fr);
-    column-gap:10px; row-gap:14px; align-items:start;
-  }
-  /* The spine spans every row, so it stays beside the pass AND the
-     destination brief below it. */
-  .hol-vrail{ grid-column:1; grid-row:1 / -1; }
-  .hol-planner > *:not(.hol-vrail){ grid-column:2; min-width:0; }
+/* ══ Vertical: the phone ══════════════════════════════════════════════
+   Same geometry rotated. Time runs down the page, the rail fills the
+   viewport height, and today sits near the bottom. Bands become tall
+   rather than wide, which suits a photo just as well. */
+.hol-rail-card.is-vertical{ display:flex; flex-direction:column; }
+.hol-rail-card.is-vertical .hol-rail-scroll{
+  overflow-x:hidden; overflow-y:auto;
+  /* The page itself does not scroll behind this, so it takes a real
+     height rather than growing with its content. */
+  height:calc(100vh - 300px); min-height:320px;
 }
-
-.hol-vrail{
-  position:relative; display:flex; flex-direction:column;
-  padding:2px 0 8px; min-width:0;
-  /* Sticky rather than a fixed-height pane: the section scrolls as a
-     page like every other one in the app, and a nested scroller here
-     would fight the thumb. */
-  position:sticky; top:8px;
-  max-height:calc(100vh - 150px); overflow-y:auto;
-  scrollbar-width:none;
-}
-.hol-vrail::-webkit-scrollbar{ display:none; }
-/* The spine. Past above, upcoming below — same gradient logic as the
-   desktop track, rotated. */
-.hol-vrail-line{
-  position:absolute; left:22px; top:10px; bottom:10px; width:2px;
+.hol-rail-card.is-vertical .hol-rail-inner{ height:auto; width:100%; }
+.hol-rail-card.is-vertical .hol-rail-track{
+  left:auto; right:14px; top:0; bottom:0; width:2px; height:auto;
   background:linear-gradient(180deg,
-    rgba(127,127,127,.4) 0%, rgba(127,127,127,.4) 46%,
-    rgba(var(--em-rgb),.45) 54%, rgba(var(--em-rgb),.45) 100%);
+    rgba(127,127,127,.32) 0%, rgba(127,127,127,.32) 48%,
+    rgba(var(--em-rgb),.45) 52%, rgba(var(--em-rgb),.45) 100%);
 }
-.hol-vrail-item{ position:relative; }
-.hol-vrail-year{
-  font-family:var(--mono); font-size:8px; letter-spacing:1.2px;
-  text-transform:uppercase; color:var(--text-muted); padding:0 0 4px 40px;
+.hol-rail-card.is-vertical .hol-tick{
+  top:auto; left:auto; right:22px; transform:translateY(-50%);
+  flex-direction:row-reverse; align-items:center; gap:5px;
 }
-.hol-vstop{
-  display:flex; align-items:center; gap:8px; width:100%;
-  background:transparent; border:0; padding:0 0 12px; cursor:pointer;
-  text-align:left; opacity:.85;
+.hol-rail-card.is-vertical .hol-tick i{ width:8px; height:1px; }
+.hol-rail-card.is-vertical .hol-tick.is-year i{ width:14px; height:1px; }
+.hol-rail-card.is-vertical .hol-today{
+  top:auto; left:8px; right:8px; width:auto; height:1px;
 }
-.hol-vstop.is-past{ opacity:.5; }
-.hol-vstop.is-sel{ opacity:1; }
-.hol-vstop .hol-dot{ flex:none; margin-left:16px; position:relative; z-index:2; }
-.hol-vstop:not(.is-sel) .hol-dot{ margin-left:18px; }
-.hol-vstop-body{ display:flex; flex-direction:column; gap:2px; min-width:0; flex:1; }
-.hol-vstop .hol-thumb{ width:38px; height:26px; padding:0; border-radius:6px; }
-.hol-vstop .hol-thumb-ph{ display:none; }
-.hol-vstop-name{
-  font-size:10px; font-weight:600; color:var(--text);
-  max-width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+.hol-rail-card.is-vertical .hol-today span{
+  top:auto; left:auto; right:0; transform:translateY(-50%);
 }
-.hol-vstop-when{
-  font-family:var(--mono); font-size:8px; letter-spacing:.6px;
-  text-transform:uppercase; color:var(--text-muted); white-space:nowrap;
+.hol-rail-card.is-vertical .hol-band{
+  top:auto; left:10px; right:44px; height:auto; width:auto;
+  align-items:flex-end;
 }
-.hol-vstop.is-sel .hol-vstop-when{ color:var(--em); }
+.hol-rail-card.is-vertical .hol-band.is-nested{
+  top:auto; height:auto;
+  left:calc(10px + var(--band-inset, 0px));
+  right:calc(44px + var(--band-inset, 0px));
+}
+/* Vertical: the bands already fill the width, so a name that will not
+   fit inside one sits ON the rail as a chip at the band's leading edge
+   rather than beside it — there is no "beside" on a phone. The chip is
+   opaque enough to read over a photo, and its rule runs back along the
+   time axis when it had to be nudged clear of the chip above. */
+.hol-rail-card.is-vertical .hol-band-out{
+  top:auto; left:12px; height:16px; line-height:16px;
+  padding:0 7px; border-radius:99px;
+  background:var(--surface); box-shadow:0 0 0 1px var(--border);
+  font-size:10.5px; text-shadow:none;
+  max-width:calc(100% - 60px); overflow:hidden; text-overflow:ellipsis;
+}
+.hol-rail-card.is-vertical .hol-band-out::before{
+  top:min(0px, var(--out-lead, 0px)); left:-5px; width:1px;
+  height:max(var(--out-lead, 0px), -1 * var(--out-lead, 0px));
+}
+.hol-rail-card.is-vertical .hol-band-out::after{ display:none; }
+.hol-rail-card.is-vertical .hol-band-out.is-sel{
+  box-shadow:0 0 0 1px rgba(var(--em-rgb),.6);
+}
+.hol-rail-card.is-vertical .hol-rail-head{ flex-wrap:wrap; }
 
 /* ── Boarding pass ──────────────────────────────────────────────── */
 .hol-pass{

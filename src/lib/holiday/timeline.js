@@ -180,9 +180,40 @@ export function defaultTrip(trips, now = new Date()) {
  * cannot land on. Roughly doubling each time, so three clicks is an
  * order of magnitude.
  */
-export const ZOOM_LEVELS = [0.35, 0.7, 1.45, 3, 6, 12];
-export const DEFAULT_ZOOM = 2;                      // index of 1.45
-export const PX_PER_DAY = ZOOM_LEVELS[DEFAULT_ZOOM];
+/*
+ * Zoom is a CONTINUOUS px-per-day, not one of a few steps.
+ *
+ * The wheel drives it now, and a wheel delivers a stream of small
+ * deltas — quantising those to six stops turns a smooth gesture into a
+ * series of jumps. The buttons multiply by a fixed ratio so they still
+ * have a notch you can feel.
+ *
+ * The default moved IN, from 1.45 to 6. Bands only read as photographs
+ * once a trip is about 60px wide, and at 1.45 a fortnight was 20px — a
+ * sliver. At 6 a fortnight is 84px and a season fits the screen, which
+ * is the right window for a planner anyway.
+ */
+export const PX_PER_DAY = 6;
+export const MIN_PX_DAY = 0.15;
+export const MAX_PX_DAY = 48;
+export const ZOOM_STEP = 1.8;                        // one button press
+/* Number.isFinite, not `||` — `0 || PX_PER_DAY` is 6, so a zoom of zero
+   silently became the default instead of clamping to the minimum. */
+export const clampZoom = v =>
+  (Number.isFinite(v) ? Math.min(MAX_PX_DAY, Math.max(MIN_PX_DAY, v)) : PX_PER_DAY);
+
+/**
+ * A wheel delta → a new scale.
+ *
+ * Exponential, so one notch feels the same at 0.2 px/day as at 20 — a
+ * linear step would crawl when zoomed out and leap when zoomed in.
+ */
+export const wheelZoom = (pxPerDay, deltaY) => clampZoom(pxPerDay * Math.exp(-deltaY * 0.0016));
+
+/** Where today sits across the rail on first paint.
+ *  Not 1.0: flush right puts every upcoming trip off-screen, including
+ *  the next one, which is the trip the page mostly exists for. */
+export const TODAY_ANCHOR = 0.72;
 
 const PAD_BEFORE = 75;      // days of runway before the first trip
 const PAD_AFTER = 90;       // …and after the last
@@ -195,16 +226,20 @@ const PAD_AFTER = 90;       // …and after the last
  * a list cannot. Evenly spaced stops would make a fortnight and three
  * years look the same.
  */
-export function railGeometry(trips, now = new Date(), pxPerDay = PX_PER_DAY) {
+export function railGeometry(trips, now = new Date(), pxPerDay = PX_PER_DAY, padPx = 0) {
   const dated = trips.filter(t => dayAt(t.from));
   if (!dated.length) return null;
 
   const firstTrip = dayAt(dated[0].from).getTime();
   const lastTrip = dayAt(dated[dated.length - 1].to || dated[dated.length - 1].from).getTime();
-  // The window always contains today, so the "today" marker cannot fall
-  // off the end when every trip is in the past or all still ahead.
-  const start = Math.min(firstTrip - PAD_BEFORE * DAY, middayOf(now).getTime() - 30 * DAY);
-  const end = Math.max(lastTrip + PAD_AFTER * DAY, middayOf(now).getTime() + 30 * DAY);
+  /* The window always contains today, so the marker cannot fall off the
+     end when every trip is behind or all still ahead. `padPx` is a
+     viewport width in pixels, converted to days at the current scale:
+     without it there is not always enough rail to the left of today to
+     put today at TODAY_ANCHOR, and the anchor silently clamps. */
+  const padDays = padPx / Math.max(0.01, pxPerDay);
+  const start = Math.min(firstTrip - PAD_BEFORE * DAY, middayOf(now).getTime() - 30 * DAY) - padDays * DAY;
+  const end = Math.max(lastTrip + PAD_AFTER * DAY, middayOf(now).getTime() + 30 * DAY) + padDays * DAY;
 
   const at = ms => Math.round((ms - start) / DAY * pxPerDay);
   return {
@@ -218,123 +253,160 @@ export function railGeometry(trips, now = new Date(), pxPerDay = PX_PER_DAY) {
   };
 }
 
-/* ══ Crowding ═════════════════════════════════════════════════════════
+/* ══ Bands ════════════════════════════════════════════════════════════
  *
- * Two trips a week apart are 10px apart at the default zoom, and a stop
- * is 132px wide with a 112px thumbnail on it. They overlap into an
- * unreadable pile — which is the bug this whole zoom exists to fix, and
- * zooming in is only half the fix, because the widest zoom-out still
- * has to be legible.
+ * A trip is drawn as a band covering the dates it actually spans, with
+ * its own photo as the fill.
  *
- * So a stop renders at one of three densities, chosen by how much room
- * it actually has: the distance to its NEAREST neighbour on either
- * side. Thumbnail first, then the name, then nothing but a dot. The
- * information degrades in the order you would give it up.
+ * The versions before this drew a fixed-width thumbnail on a dot, which
+ * meant two trips a week apart overlapped by 100px. Shrinking them lost
+ * the photo; hiding them behind a cluster marker lost the trip. Bands
+ * make the collision impossible instead of managing it: two trips cannot
+ * occupy the same dates, so two bands cannot occupy the same pixels. The
+ * thing that was colliding no longer exists.
+ *
+ * It also puts duration on screen for the first time. A weekend and a
+ * fortnight were the same dot; now one is seven times wider than the
+ * other, and the gaps between bands are the waits between trips.
+ *
+ * Axis-neutral on purpose — `start` and `size` are along the time axis,
+ * whichever way the component draws it. Desktop maps them to left/width,
+ * the phone to top/height.
  */
-/*
- * These are the STOP BOX WIDTHS, and that is the point: a tier is only
- * allowed when the gap is at least as wide as the box it draws. Set
- * them any smaller — the first version had COMPACT_GAP at 62 against a
- * 96px box — and stops still overlap by half their width, quietly
- * stealing each other's hit areas. Change one of these and change
- * .hol-stop's width in holiday.css to match.
- *
- * Because the gap each stop sees is the distance to its NEAREST
- * neighbour, both sides of a pair get the same tier, so gap >= width is
- * enough to guarantee they never overlap.
- */
-export const FULL_GAP = 132;      // 112px thumbnail + air
-export const COMPACT_GAP = 96;    // a short name
-export const DOT_GAP = 22;        // a dot you can still hit
+
+/** A band this narrow is still a visible sliver rather than nothing. */
+export const MIN_BAND = 14;
+/** Rough width of a character in the band's label font, for deciding
+ *  whether the name fits inside. An estimate is fine: it only chooses
+ *  inside vs outside, and the CSS ellipsises either way. */
+export const LABEL_CHAR_W = 6.7;
+export const LABEL_PAD = 20;
+/** Rows available above the bands for names that will not fit inside. */
+export const OUT_ROWS = 3;
+/** Clear space demanded between two labels sharing a row. */
+export const OUT_GAP = 8;
+/** How far a label may be dragged off its band before it stops being
+ *  worth drawing a leader to — past this it is lying about which band it
+ *  belongs to, so the band keeps the label and the row moves instead. */
+export const OUT_LEAD_MAX = 90;
+/** A vertical band needs this much of the time axis to hold one line. */
+export const V_INSIDE = 26;
+/** …and this much room along the axis for an outside chip. */
+export const V_OUT_EXTENT = 19;
 
 /**
- * Stops, at the density each one has room for — and clustered when even
- * a dot will not fit.
+ * Every dated trip as a band.
  *
- * Shrinking a stop is not enough on its own. Three trips nine days
- * apart are 3px apart at the widest zoom: as separate dots their hit
- * areas sit on top of each other and only the last one is clickable.
- * Below DOT_GAP they therefore become ONE marker carrying a count, and
- * clicking it zooms in — which is exactly the move the user would have
- * made anyway.
- *
- * The selected trip is lifted out of its cluster and drawn on its own,
- * because losing sight of the thing you are reading is worse than a
- * slightly crowded rail.
- *
- * @returns {Array} stops — { kind:'stop', trip, left, gap, tier }
- *                        | { kind:'cluster', trips, left, count }
- *   tier: 'full' | 'compact' | 'dot'
- *
- * Undated trips are excluded — they have no position on a timeline and
- * the rail queues them separately.
+ * @returns {Array<{trip, start, size, end, labelInside, outRow, outAt, lead, depth, selected}>}
+ *   `outAt` is where an outside label starts along the axis and `lead`
+ *   the distance from there back to the band, for the leader rule.
+ *   `depth` is how many earlier bands this one sits inside — nearly
+ *   always 0, but a day trip booked inside a longer stay is real, and
+ *   the shorter band insets and draws on top rather than vanishing
+ *   under the longer one.
  */
-export function railStops(trips, geo, selectedId = null) {
+export function railBands(trips, geo, selectedId = null, opts = {}) {
   if (!geo) return [];
+  const minBand = opts.minBand || MIN_BAND;
+  const charW = opts.charW || LABEL_CHAR_W;
+  /* The phone draws the same bands rotated: full-width strips whose
+     size along the axis is height. A name fits inside one of those when
+     the band is TALL enough, not wide enough — the same question asked
+     of a different dimension, which is why it is a flag here and not a
+     second function. */
+  const vertical = !!opts.vertical;
+
   const placed = trips
-    .map(t => ({ trip: t, left: geo.atIso(t.from) }))
-    .filter(s => s.left != null)
-    .sort((a, b) => a.left - b.left);
-  if (!placed.length) return [];
+    .map(t => {
+      const a = dayAt(t.from);
+      if (!a) return null;
+      const b = dayAt(t.to && t.to >= t.from ? t.to : t.from);
+      // +1 day: a trip that ends on the 27th occupies the whole of the
+      // 27th, so the band runs to the start of the 28th.
+      const s0 = geo.at(a.getTime());
+      const s1 = geo.at(b.getTime() + DAY);
+      return { trip: t, start: s0, raw: Math.max(1, s1 - s0), size: Math.max(1, s1 - s0) };
+    })
+    .filter(Boolean)
+    .sort((a, b) => a.start - b.start || b.size - a.size);
 
-  // Group runs of stops that are too close to be separate targets.
-  const groups = [[placed[0]]];
-  for (let i = 1; i < placed.length; i++) {
-    const run = groups[groups.length - 1];
-    if (placed[i].left - run[run.length - 1].left < DOT_GAP) run.push(placed[i]);
-    else groups.push([placed[i]]);
+  /* The minimum width only grows into space that is actually free.
+     Applying it unconditionally pushed a one-day band 14px wide over the
+     trip three days after it — reintroducing the overlap that bands
+     exist to make impossible. A band never grows past the next one's
+     start; where there is no room it stays its true width, which is
+     honest and still visible. */
+  for (let i = 0; i < placed.length; i++) {
+    const room = i < placed.length - 1 ? placed[i + 1].start - placed[i].start - 1 : Infinity;
+    placed[i].size = Math.max(placed[i].raw, Math.min(minBand, room));
   }
 
-  // Pull the selected trip out of any group it shares, so it is always
-  // drawn as itself.
-  const out = [];
-  for (const run of groups) {
-    let members = run;
-    const sel = selectedId ? run.find(s => s.trip.id === selectedId) : null;
-    if (sel && run.length > 1) {
-      const rest = run.filter(s => s !== sel);
-      const restLeft = Math.round(rest.reduce((a, m) => a + m.left, 0) / rest.length);
-      /* Only lift the selection out if there is room for it beside what
-         is left. Lifting unconditionally put a 22px dot 9px from a 22px
-         cluster — the lift was quietly exempt from the very spacing
-         rule the clustering exists to enforce. When there is no room the
-         selection stays in, and the cluster renders as selected. */
-      if (Math.abs(sel.left - restLeft) >= DOT_GAP) {
-        members = rest;
-        out.push({ kind: 'stop', ...sel, gap: 0, tier: 'dot', showName: true, lifted: true });
-      }
+  // Depth: how many already-open bands this one begins inside.
+  const open = [];
+  for (const band of placed) {
+    while (open.length && open[open.length - 1].end <= band.start) open.pop();
+    band.depth = open.length;
+    band.end = band.start + band.size;
+    open.push(band);
+    open.sort((a, b) => a.end - b.end);
+  }
+
+  /* ── Labels ───────────────────────────────────────────────────────
+     Inside the band when the name fits and nothing is drawn over it;
+     otherwise on a row above, anchored to the band's LEFT EDGE.
+
+     Centring them was the mistake in the first cut. A centred label
+     floats between its band and the next one with nothing to say which
+     it belongs to, and near the ends of the rail half of it is outside
+     the inner and gets clipped. Left-anchored, the label starts exactly
+     where its band starts and a leader rule drops from its first
+     character onto the band's corner, so the association is drawn
+     rather than inferred. */
+  const rows = vertical ? 1 : (opts.rows || OUT_ROWS);
+  const rowEnd = new Array(rows).fill(-Infinity);
+
+  for (const band of placed) {
+    const name = band.trip.dest || 'Untitled';
+    band.selected = band.trip.id === selectedId;
+    const textW = name.length * charW;
+
+    /* A day trip booked inside a fortnight draws on top of the longer
+       band — including over the longer band's name. Whoever is covered
+       loses the inside label rather than keeping an unreadable one. */
+    const labelZone = vertical
+      ? [band.end - V_INSIDE, band.end]
+      : [band.start, band.start + textW + LABEL_PAD];
+    const covered = placed.some(o => o !== band && o.depth > band.depth
+      && o.start < labelZone[1] && o.start + o.size > labelZone[0]);
+
+    band.labelInside = !covered
+      && (vertical ? band.size >= V_INSIDE : band.size >= textW + LABEL_PAD);
+    if (band.labelInside) { band.outRow = null; band.outAt = null; band.lead = 0; continue; }
+
+    /* Extent along the time axis: a horizontal label is as long as its
+       text, a vertical chip is one line tall whatever it says. */
+    const extent = vertical ? V_OUT_EXTENT : textW + 12;
+    // Clamped into the rail so no label is half-drawn at either end.
+    const wanted = Math.max(0, Math.min(band.start, geo.width - extent));
+
+    /* First row with clear space. Sorted by start, so a row's last
+       label is always the one to the left of this one. */
+    let row = rowEnd.findIndex(e => wanted >= e + OUT_GAP);
+    let at = wanted;
+    if (row < 0) {
+      /* Every row is busy here. Prefer nudging along the axis on the
+         emptiest row over stacking a fourth row nobody can trace — but
+         only while the leader still reaches the band. */
+      row = rowEnd.reduce((best, e, i) => (e < rowEnd[best] ? i : best), 0);
+      at = rowEnd[row] + OUT_GAP;
+      if (at - band.start > OUT_LEAD_MAX) at = wanted;   // overlap beats lying
     }
-    if (!members.length) continue;
-    if (members.length === 1) out.push({ kind: 'stop', ...members[0], gap: Infinity, tier: null });
-    else {
-      out.push({
-        kind: 'cluster',
-        trips: members.map(m => m.trip),
-        count: members.length,
-        left: Math.round(members.reduce((a, m) => a + m.left, 0) / members.length),
-      });
-    }
+    rowEnd[row] = at + extent;
+    band.outRow = row;
+    band.outAt = at;
+    band.lead = band.start - at;   // where the leader meets the band
   }
-
-  // Density for the singles, from the distance to whatever is next to
-  // them — cluster or stop, since either takes up room.
-  const marks = out.slice().sort((a, b) => a.left - b.left);
-  for (const m of marks) {
-    if (m.kind !== 'stop' || m.tier) continue;
-    const i = marks.indexOf(m);
-    const prev = i > 0 ? m.left - marks[i - 1].left : Infinity;
-    const next = i < marks.length - 1 ? marks[i + 1].left - m.left : Infinity;
-    const gap = Math.min(prev, next);
-    m.gap = gap;
-    m.tier = gap >= FULL_GAP ? 'full' : gap >= COMPACT_GAP ? 'compact' : 'dot';
-    /* The selected trip always shows its name — but as a LABEL, not by
-       promoting its tier. Promoting widened its hit box to 96px inside
-       a 35px gap, which put it straight back on top of its neighbour:
-       the one thing the tiers exist to prevent. The label overflows the
-       box and takes no pointer events, so it costs nothing. */
-    if (m.trip.id === selectedId) m.showName = true;
-  }
-  return marks;
+  return placed;
 }
 
 /**
