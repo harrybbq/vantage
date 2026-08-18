@@ -7736,6 +7736,9 @@ div.m-hubdrawer-coach { cursor: default; display: flex; flex-direction: column; 
   font-family:var(--sans); font-size:12px;
 }
 .daymenu-ev:hover{ background:rgba(255,255,255,.09); }
+/* Trips are read-only here, so they must not look pressable. */
+.daymenu-ev.is-derived{ cursor:default; }
+.daymenu-ev.is-derived:hover{ background:transparent; }
 .daymenu-ev-dot{ width:8px; height:8px; border-radius:3px; flex:none; }
 .daymenu-ev-name{ flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .daymenu-ev-when{

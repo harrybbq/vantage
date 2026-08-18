@@ -302,14 +302,24 @@ function DayTickMenu({ x, y, dates, trackers, logs, events, onClose, update, onA
 
       {!multi && (events || []).length > 0 && (
         <div className="daymenu-events">
-          {events.map(ev => (
+          {events.map(ev => (ev.derived ? (
+            /* A trip. It is a VIEW of S.holidays, not a stored event, so
+               there is nothing here to edit — offering an editor that
+               could not save would be worse than not offering one. It
+               says where it comes from instead. */
+            <div key={ev.id} className="daymenu-ev is-derived" title={`${ev.title} — ${ev.span}. Edit it in the Holiday planner.`}>
+              <span className="daymenu-ev-dot" style={{ background: eventColour(ev) }} />
+              <span className="daymenu-ev-name">{ev.title}</span>
+              <span className="daymenu-ev-when">{ev.span}</span>
+            </div>
+          ) : (
             <button key={ev.id} type="button" className="daymenu-ev"
                     onClick={() => onEditEvent(ev)}>
               <span className="daymenu-ev-dot" style={{ background: eventColour(ev) }} />
               <span className="daymenu-ev-name">{ev.title}</span>
               <span className="daymenu-ev-when">{eventWhen(ev) || 'All day'}</span>
             </button>
-          ))}
+          )))}
         </div>
       )}
 
@@ -571,7 +581,7 @@ function CalendarView({ S, update, onShowCoinToast, nutritionMonthData }) {
                 <div className="cal-events">
                   {monthEvents[cell.key].slice(0, 2).map(ev => (
                     <span key={ev.id} className="cal-event"
-                          title={[eventWhen(ev), ev.title, ev.location].filter(Boolean).join(' · ')}>
+                          title={[ev.span || eventWhen(ev), ev.title, ev.location].filter(Boolean).join(' · ')}>
                       <span className="cal-event-dot" style={{ background: eventColour(ev) }} />
                       {/* The title needs its own box. text-overflow does
                           nothing on a flex container, so a bare text node

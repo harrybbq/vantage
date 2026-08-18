@@ -42,8 +42,16 @@
  * recurrence rule is worse than none, because data written under it has
  * to be migrated when the real one arrives.
  *
+ * ── Trips are merged in on read ──────────────────────────────────────
+ * A holiday covers a stretch of days, and those days belong on the
+ * calendar. They are DERIVED from S.holidays rather than written into
+ * this store — see lib/calendar/holidayEvents.js for why — and merged
+ * here, so every surface that already reads through `eventsOn` gets them
+ * without knowing they exist.
+ *
  * Pure — no React, no DOM, no network.
  */
+import { holidayEventsInMonth, holidayEventsOn } from './holidayEvents.js';
 
 /** The kinds an event can be. `id` is stored; `label`/`colour` are display. */
 export const EVENT_KINDS = [
@@ -115,11 +123,14 @@ export const isIsoDate = v => typeof v === 'string' && ISO_RE.test(v);
  */
 export function eventsOn(S, iso) {
   if (!isIsoDate(iso)) return [];
-  const all = S && S.calendarEvents;
-  if (!all || typeof all !== 'object') return [];
-  const day = all[iso];
-  if (!Array.isArray(day)) return [];
-  return sortEvents(day.filter(e => e && typeof e === 'object'));
+  const all = (S && S.calendarEvents) || {};
+  const day = (all && typeof all === 'object' && Array.isArray(all[iso])) ? all[iso] : [];
+  const stored = day.filter(e => e && typeof e === 'object');
+  // Trips first: an all-day thing that frames the whole date belongs
+  // above the 09:30 that sits inside it. sortEvents puts untimed events
+  // last, which is right for "call Mum some time" and wrong for "you
+  // are in Lisbon", so trips are prepended rather than merged into it.
+  return [...holidayEventsOn(S, iso), ...sortEvents(stored)];
 }
 
 /**
@@ -158,16 +169,25 @@ export function hasEvents(S, iso) {
  */
 export function eventsInMonth(S, year, month) {
   const all = (S && S.calendarEvents) || {};
-  if (typeof all !== 'object') return {};
   const prefix = `${year}-${String(month + 1).padStart(2, '0')}-`;
   const out = {};
-  for (const iso of Object.keys(all)) {
+  const trips = holidayEventsInMonth(S, year, month);
+
+  // Union of the dates either source has something on. Iterating only
+  // the stored keys would have dropped a trip on a day with no stored
+  // event, which is most days of most trips.
+  const dates = new Set([...Object.keys(typeof all === 'object' ? all : {}), ...Object.keys(trips)]);
+  for (const iso of dates) {
     if (!iso.startsWith(prefix)) continue;
     const list = eventsOn(S, iso);
     if (list.length) out[iso] = list;
   }
   return out;
 }
+
+/** Ids of derived events. Nothing in this store owns them, so the
+ *  writers below refuse them rather than quietly doing nothing. */
+export const isDerivedId = id => typeof id === 'string' && id.startsWith('hol:');
 
 const TIME_RE = /^([01]\d|2[0-3]):[0-5]\d$/;
 export const isTime = v => typeof v === 'string' && TIME_RE.test(v);
@@ -234,7 +254,7 @@ export function addEvent(prev, iso, event) {
 }
 
 export function removeEvent(prev, iso, eventId) {
-  if (!isIsoDate(iso)) return prev;
+  if (!isIsoDate(iso) || isDerivedId(eventId)) return prev;
   const all = (prev && prev.calendarEvents) || {};
   const day = Array.isArray(all[iso]) ? all[iso] : [];
   const next = day.filter(e => e && e.id !== eventId);
@@ -245,7 +265,7 @@ export function removeEvent(prev, iso, eventId) {
 }
 
 export function updateEvent(prev, iso, eventId, patch) {
-  if (!isIsoDate(iso)) return prev;
+  if (!isIsoDate(iso) || isDerivedId(eventId)) return prev;
   const all = (prev && prev.calendarEvents) || {};
   const day = Array.isArray(all[iso]) ? all[iso] : [];
   if (!day.some(e => e && e.id === eventId)) return prev;
