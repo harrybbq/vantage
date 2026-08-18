@@ -1,49 +1,100 @@
 /**
  * Career tab — certifications, CV, and deliberate practice.
  *
- * Four panels behind a sub-nav rather than one long scroll: they are
+ * Four sections behind a tab row rather than one long scroll: they are
  * used at different moments (a cert goes in once a quarter, a LeetCode
  * problem goes in daily) and stacking them would bury the frequent one
  * under the rare one.
  *
+ * The tabs use the app's own `.settings-tabs` convention rather than a
+ * bespoke one, at section scale with a count on each. They were four
+ * small pills indistinguishable from every other button on the page,
+ * which read as a filter row rather than as four places to be.
+ *
  * Everything is additive state:
- *   S.certs      [{ id, name, provider, status, date, expires, url }]
- *   S.cv         { summary, experience[], skills[], education[] }
- *   S.practice   { log: [...], snippets: [...] }
- * The CV master FILE is the exception and lives in Supabase Storage —
+ *   S.certs       [{ id, name, provider, status, date, expires, url }]
+ *   S.cv          the main CV — see lib/career/cv.js
+ *   S.cvVariants  copies tailored for a specific job
+ *   S.cvActive    which of those is open, or null for the main one
+ *   S.practice    { progress: {…}, log: [...], snippets: [...] }
+ * The uploaded CV FILE is the exception and lives in Supabase Storage —
  * see lib/career/cvFile.js for why, and for how it fails soft before
  * the bucket exists.
  */
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useMemo, useState } from 'react';
 import Icon from '../Icon';
-import { listCvFiles, uploadCv, cvOpenUrl, deleteCv } from '../../lib/career/cvFile';
 import PracticePanel from './PracticePanel';
+import CvEditor from './CvEditor';
+import { activeCv } from '../../lib/career/cv';
+import { ALL_PROBLEMS, progressOf } from '../../lib/career/problems';
 
 const uid = () => Math.random().toString(36).slice(2, 10) + Date.now().toString(36).slice(-4);
 const today = () => new Date().toISOString().slice(0, 10);
 
 const PANELS = [
-  { id: 'certs', label: 'Certifications', icon: 'shield' },
-  { id: 'cv', label: 'CV', icon: 'notebook-pen' },
-  { id: 'practice', label: 'Practice', icon: 'target' },
-  { id: 'library', label: 'Library', icon: 'archive' },
+  { id: 'certs', label: 'Certifications' },
+  { id: 'cv', label: 'CV' },
+  { id: 'practice', label: 'Practice' },
+  { id: 'library', label: 'Library' },
 ];
+
+/**
+ * The count beside each tab.
+ *
+ * These are the reason the row is worth its height: a tab strip that
+ * only says where you are is navigation, and one that also says how much
+ * is behind each door is navigation you can plan from. Deliberately
+ * cheap to compute — nothing here reaches past state already in memory.
+ */
+function panelCount(id, S) {
+  if (id === 'certs') {
+    const list = S.certs || [];
+    if (!list.length) return '';
+    const passed = list.filter(c => c.status === 'passed').length;
+    return `${passed}/${list.length}`;
+  }
+  if (id === 'cv') {
+    const n = activeCv(S).experience.length;
+    return n ? `${n} role${n === 1 ? '' : 's'}` : '';
+  }
+  if (id === 'practice') {
+    const solved = ALL_PROBLEMS.filter(p => progressOf(S, p.id).status === 'solved').length;
+    return `${solved}/${ALL_PROBLEMS.length}`;
+  }
+  if (id === 'library') {
+    const n = ((S.practice || {}).snippets || []).length;
+    return n ? String(n) : '';
+  }
+  return '';
+}
 
 export default function CareerTab({ S, update, userId }) {
   const [panel, setPanel] = useState('certs');
+  // `log` is a sub-screen of Practice, not a fifth section — the tab
+  // stays lit on Practice while you are in it.
+  const lit = panel === 'log' ? 'practice' : panel;
   return (
     <div className="upg-pane">
-      <div className="upg-subnav">
-        {PANELS.map(p => (
-          <button key={p.id} type="button"
-                  className={'upg-subtab' + (panel === p.id ? ' is-on' : '')}
-                  onClick={() => setPanel(p.id)}>
-            <Icon name={p.icon} size={13} /> {p.label}
-          </button>
-        ))}
+      {/* Section tabs — the app's tab convention at section scale, so
+          this page does not invent a second one. Same classes as
+          Settings and Track, which is also what gets it the readable
+          inactive colour and the narrow-viewport gutters for free. */}
+      <div className="settings-tabs career-tabs" role="tablist" aria-label="Career sections">
+        {PANELS.map(p => {
+          const n = panelCount(p.id, S);
+          return (
+            <button key={p.id} type="button" role="tab"
+                    aria-selected={lit === p.id}
+                    className={'settings-tab' + (lit === p.id ? ' settings-tab-active' : '')}
+                    onClick={() => setPanel(p.id)}>
+              {p.label}
+              {n && <span className="career-tab-n">{n}</span>}
+            </button>
+          );
+        })}
       </div>
       {panel === 'certs' && <Certifications S={S} update={update} />}
-      {panel === 'cv' && <CvPanel S={S} update={update} userId={userId} />}
+      {panel === 'cv' && <CvEditor S={S} update={update} userId={userId} />}
       {panel === 'practice' && (
         <PracticePanel S={S} update={update} onOpenLog={() => setPanel('log')} />
       )}
@@ -142,146 +193,6 @@ function Certifications({ S, update }) {
 }
 
 /* ── CV ──────────────────────────────────────────────────────────── */
-
-const EMPTY_CV = { summary: '', experience: [], skills: [], education: [] };
-
-function CvPanel({ S, update, userId }) {
-  const cv = useMemo(() => ({ ...EMPTY_CV, ...(S.cv || {}) }), [S.cv]);
-  const setCv = patch => update(prev => ({ ...prev, cv: { ...EMPTY_CV, ...(prev.cv || {}), ...patch, updatedAt: Date.now() } }));
-
-  const [files, setFiles] = useState([]);
-  const [fileMsg, setFileMsg] = useState('');
-  const [setupNeeded, setSetupNeeded] = useState(false);
-  const [busy, setBusy] = useState(false);
-  const inputRef = useRef(null);
-
-  useEffect(() => {
-    let alive = true;
-    (async () => {
-      const { files: f, error } = await listCvFiles(userId);
-      if (!alive) return;
-      if (error) { setSetupNeeded(error.setup); setFileMsg(error.message); }
-      else setFiles(f);
-    })();
-    return () => { alive = false; };
-  }, [userId]);
-
-  async function onPick(e) {
-    const file = e.target.files?.[0];
-    e.target.value = '';
-    if (!file) return;
-    setBusy(true); setFileMsg('');
-    const { error } = await uploadCv(userId, file);
-    if (error) { setSetupNeeded(error.setup); setFileMsg(error.message); }
-    else {
-      const { files: f } = await listCvFiles(userId);
-      setFiles(f); setFileMsg('Uploaded.'); setSetupNeeded(false);
-    }
-    setBusy(false);
-  }
-
-  async function open(name) {
-    const { url, error } = await cvOpenUrl(userId, name);
-    if (error) return setFileMsg(error.message);
-    if (url) window.open(url, '_blank', 'noopener');
-  }
-
-  async function drop(name) {
-    if (!window.confirm(`Delete ${name}? The in-app CV is untouched.`)) return;
-    const { error } = await deleteCv(userId, name);
-    if (error) return setFileMsg(error.message);
-    const { files: f } = await listCvFiles(userId);
-    setFiles(f);
-  }
-
-  const addRole = () => setCv({ experience: [...cv.experience, { id: uid(), role: '', org: '', from: '', to: '', bullets: [''] }] });
-  const setRole = (id, patch) => setCv({ experience: cv.experience.map(r => (r.id === id ? { ...r, ...patch } : r)) });
-  const dropRole = id => setCv({ experience: cv.experience.filter(r => r.id !== id) });
-
-  return (
-    <>
-      <div className="upg-card">
-        <div className="upg-card-head">
-          <h3>Master file</h3>
-          <button type="button" className="link-open-btn" disabled={busy} onClick={() => inputRef.current?.click()}>
-            {busy ? 'Uploading…' : 'Upload'}
-          </button>
-        </div>
-        <input ref={inputRef} type="file" hidden accept=".pdf,.doc,.docx,.txt,.md" onChange={onPick} />
-        {setupNeeded ? (
-          <div className="upg-setup">
-            <Icon name="triangle-alert" size={13} /> {fileMsg}
-            <div className="upg-fine">The editor below works regardless — only the file slot needs the bucket.</div>
-          </div>
-        ) : (
-          <>
-            {!files.length && <div className="upg-empty">No file uploaded. The editor below is the working copy.</div>}
-            <div className="upg-list">
-              {files.map(f => (
-                <div key={f.name} className="upg-file">
-                  <Icon name="notebook-pen" size={13} />
-                  <span className="upg-file-name">{f.name.replace(/^[\d-]+__/, '')}</span>
-                  <span className="upg-file-date">{(f.created_at || '').slice(0, 10)}</span>
-                  <button type="button" className="upg-textbtn" onClick={() => open(f.name)}>Open</button>
-                  <button type="button" className="upg-textbtn" onClick={() => drop(f.name)}>Delete</button>
-                </div>
-              ))}
-            </div>
-            {fileMsg && <div className="upg-fine">{fileMsg}</div>}
-          </>
-        )}
-      </div>
-
-      <div className="upg-card">
-        <div className="upg-card-head">
-          <h3>Working copy</h3>
-          <button type="button" className="upg-textbtn" onClick={() => window.print()}>Print / PDF</button>
-        </div>
-        <Field label="Summary">
-          <textarea rows={4} value={cv.summary} onChange={e => setCv({ summary: e.target.value })}
-                    placeholder="Two or three lines. What you do, what you're moving towards." />
-        </Field>
-        <Field label="Skills (comma separated)">
-          <input value={(cv.skills || []).join(', ')}
-                 onChange={e => setCv({ skills: e.target.value.split(',').map(s => s.trim()).filter(Boolean) })}
-                 placeholder="KQL, Sentinel, Python, Defender…" />
-        </Field>
-        <Field label="Education">
-          <input value={(cv.education || []).join(' · ')}
-                 onChange={e => setCv({ education: e.target.value.split('·').map(s => s.trim()).filter(Boolean) })}
-                 placeholder="Separate entries with ·" />
-        </Field>
-      </div>
-
-      <div className="upg-card">
-        <div className="upg-card-head">
-          <h3>Experience</h3>
-          <button type="button" className="link-open-btn" onClick={addRole}>+ Role</button>
-        </div>
-        {!cv.experience.length && <div className="upg-empty">No roles yet.</div>}
-        {cv.experience.map(r => (
-          <div key={r.id} className="upg-role">
-            <div className="upg-role-top">
-              <input className="upg-role-title" value={r.role} placeholder="Role"
-                     onChange={e => setRole(r.id, { role: e.target.value })} />
-              <input className="upg-role-org" value={r.org} placeholder="Organisation"
-                     onChange={e => setRole(r.id, { org: e.target.value })} />
-              <input className="upg-role-when" value={r.from} placeholder="From"
-                     onChange={e => setRole(r.id, { from: e.target.value })} />
-              <input className="upg-role-when" value={r.to} placeholder="To"
-                     onChange={e => setRole(r.id, { to: e.target.value })} />
-              <button type="button" className="upg-textbtn" onClick={() => dropRole(r.id)}>Remove</button>
-            </div>
-            <textarea rows={3} className="upg-role-bullets"
-                      value={(r.bullets || []).join('\n')}
-                      placeholder="One achievement per line — what changed because you were there."
-                      onChange={e => setRole(r.id, { bullets: e.target.value.split('\n') })} />
-          </div>
-        ))}
-      </div>
-    </>
-  );
-}
 
 /* ── Practice log ────────────────────────────────────────────────── */
 
