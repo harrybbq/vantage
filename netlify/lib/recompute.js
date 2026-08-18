@@ -12,6 +12,8 @@
  * See docs/RANKING_SYSTEM.md for the full algorithm and constraints.
  */
 
+const { VISION_XP } = require('./visionXp');
+
 // ── Constants (mirror derive.js) ─────────────────────────────────────────
 const DAY_MS = 86_400_000;
 const TIME_SPACING_MS = 7 * DAY_MS;
@@ -165,14 +167,32 @@ async function fetchMacroDays(userId, { supabaseUrl, serviceKey }) {
   }
 }
 
-function visionPoints(state /* , category */) {
-  // Server doesn't import the visions definitions module (separate
-  // module graph). Approximation: each unlocked vision = 8 pts / 4
-  // categories. Drift risk: if visions definitions get re-weighted the
-  // server lags by a constant factor until this file is updated.
+/**
+ * Vision points for one category — the same arithmetic as the client's
+ * `visionPoints` in src/lib/ratings/derive.js, reading the mirrored XP
+ * table in ./visionXp.js.
+ *
+ * What this replaced: every vision priced at a flat 8 xp, split four
+ * ways. The real catalogue runs 50–1000 xp and totals 5,100, so the
+ * server was scoring the whole set as 176 and reporting an OVR around
+ * half what the app showed the same user. That is the "leaderboard is
+ * stuck at the wrong number" bug — not staleness. See visionXp.js.
+ *
+ * A vision with no category counts a quarter toward each of the four,
+ * exactly as on the client. Today no vision declares one, so all of
+ * them land that way.
+ */
+function visionPoints(state, category) {
   const stamped = state.visions || {};
-  const count = Object.keys(stamped).length;
-  return (8 * count) / 4;
+  let points = 0;
+  for (const id of Object.keys(stamped)) {
+    const def = VISION_XP[id];
+    if (!def || !def.xp) continue;
+    if (def.category && def.category !== category) continue;
+    const weight = def.category ? 1 : 0.25;
+    points += (def.xp / 4) * weight;
+  }
+  return points;
 }
 
 // ── Public API ───────────────────────────────────────────────────────────

@@ -215,6 +215,14 @@ export const wheelZoom = (pxPerDay, deltaY) => clampZoom(pxPerDay * Math.exp(-de
  *  the next one, which is the trip the page mostly exists for. */
 export const TODAY_ANCHOR = 0.72;
 
+/** …and on the phone's vertical strip.
+ *  The same fraction does not survive the rotation. 28% of a 1300px
+ *  desktop rail is two months of runway; 28% of a 630px strip is one,
+ *  which put the next trip just past the bottom edge. 0.6 keeps today
+ *  in the lower half and brings both the last trip and the next one
+ *  onto the strip at the default scale. */
+export const TODAY_ANCHOR_V = 0.6;
+
 const PAD_BEFORE = 75;      // days of runway before the first trip
 const PAD_AFTER = 90;       // …and after the last
 
