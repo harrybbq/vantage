@@ -1,0 +1,402 @@
+/* ══ Group leagues ═════════════════════════════════════════════════════
+   Written against the theme tokens rather than the palette in the
+   mockup: the mockup is one theme and the app has two, so a hard-coded
+   #fdfaf3 would read as a hole punched in Dark OS. Only the division
+   colours and the four category colours are literal, because those are
+   identities — Emerald has to be green in both themes or it is not
+   Emerald. */
+
+.grp-wrap{ display:flex; flex-direction:column; gap:14px; }
+
+.grp-card{
+  border:var(--border-widget); border-radius:18px; background:var(--surface);
+  box-shadow:var(--accent-glow); padding:18px;
+  backdrop-filter:blur(20px) saturate(1.1);
+  -webkit-backdrop-filter:blur(20px) saturate(1.1);
+}
+
+/* A labelled rule — the section header used all over this page. */
+.grp-rule{ display:flex; align-items:center; gap:9px; margin-bottom:12px; }
+.grp-rule span{
+  font-family:var(--mono); font-size:9px; letter-spacing:1.6px;
+  text-transform:uppercase; color:var(--text-muted); white-space:nowrap;
+}
+.grp-rule i{ flex:1; height:1px; background:var(--border); }
+.grp-rule em{
+  font-family:var(--mono); font-size:8.5px; letter-spacing:1.2px; font-style:normal;
+  text-transform:uppercase; color:#c8970a; white-space:nowrap;
+}
+
+.grp-quiet{ font-size:12.5px; color:var(--text-muted); line-height:1.6; }
+.grp-quiet-pad{ padding:26px 18px; }
+.grp-quiet code{ font-family:var(--mono); font-size:11.5px; }
+.grp-error{
+  font-size:12.5px; color:rgb(220,60,60); padding:12px 14px;
+  border:1px solid rgba(220,60,60,.35); border-radius:12px; background:rgba(220,60,60,.06);
+}
+.grp-foot-note{
+  margin:12px 0 0; font-size:11.5px; line-height:1.6; color:var(--text-muted);
+}
+
+/* ── The hero: which group, and what kind of week ─────────────────── */
+.grp-hero-top{ display:flex; align-items:flex-start; gap:14px; }
+.grp-crest{
+  width:56px; height:56px; flex:none; border-radius:14px;
+  display:flex; align-items:center; justify-content:center;
+  font-family:var(--serif, var(--sans)); font-weight:700; font-size:21px; color:#fff;
+  background:linear-gradient(150deg, rgba(var(--em-rgb),.95), rgba(var(--em-rgb),.6));
+  box-shadow:0 6px 16px rgba(0,0,0,.22);
+}
+.grp-hero-id{ flex:1; min-width:0; }
+.grp-hero-name{
+  display:flex; align-items:center; gap:9px; flex-wrap:wrap;
+  font-size:22px; font-weight:700; letter-spacing:-.3px; color:var(--text);
+}
+.grp-hero-meta{
+  font-family:var(--mono); font-size:9.5px; letter-spacing:1.2px;
+  text-transform:uppercase; color:var(--text-muted); margin-top:4px;
+}
+.grp-hero-score{ text-align:right; flex:none; }
+.grp-hero-num{
+  font-size:38px; font-weight:800; line-height:1; letter-spacing:-1.2px; color:var(--em);
+}
+.grp-hero-lbl{
+  font-family:var(--mono); font-size:8px; letter-spacing:1.4px;
+  text-transform:uppercase; color:var(--text-muted); margin-top:4px;
+}
+
+/* ── Zone: up, down, or neither ───────────────────────────────────── */
+.grp-zone{
+  display:flex; align-items:center; gap:11px; margin-top:16px;
+  padding:11px 13px; border-radius:12px; border:1px solid var(--border);
+}
+.grp-zone.is-up{ border-color:rgba(var(--em-rgb),.42); background:rgba(var(--em-rgb),.09); }
+.grp-zone.is-down{ border-color:rgba(199,44,72,.4); background:rgba(199,44,72,.08); }
+.grp-zone-glyph{ font-size:14px; line-height:1; }
+.grp-zone.is-up .grp-zone-glyph, .grp-zone.is-up .grp-zone-posnum{ color:var(--em); }
+.grp-zone.is-down .grp-zone-glyph, .grp-zone.is-down .grp-zone-posnum{ color:rgb(199,44,72); }
+.grp-zone.is-flat .grp-zone-glyph, .grp-zone.is-flat .grp-zone-posnum{ color:var(--text-muted); }
+.grp-zone-body{ flex:1; min-width:0; }
+.grp-zone-title{ font-size:13px; font-weight:600; color:var(--text); }
+.grp-zone-note{ font-size:12px; color:var(--text-muted); margin-top:2px; line-height:1.45; }
+.grp-zone-pos{ text-align:right; flex:none; }
+.grp-zone-posnum{ font-size:21px; font-weight:700; line-height:1; }
+.grp-zone-poslbl{
+  font-family:var(--mono); font-size:8px; letter-spacing:1.3px;
+  text-transform:uppercase; color:var(--text-muted); margin-top:3px;
+}
+
+/* ── Where the growth came from ───────────────────────────────────── */
+.grp-split{ margin-top:16px; }
+.grp-split-bar{
+  display:flex; height:10px; border-radius:6px; overflow:hidden;
+  border:1px solid var(--border); background:rgba(127,127,127,.12);
+}
+.grp-split-bar span{ display:block; }
+/* Sized to their content, not stretched across the card: a 1fr grid on
+   a 1200px panel put 400px of nothing between "FITNESS" and its
+   number, which reads as two unrelated things rather than a label and
+   a value. */
+.grp-split-keys{ display:flex; flex-wrap:wrap; gap:8px 24px; margin-top:11px; }
+.grp-split-key{ display:flex; align-items:center; gap:7px; flex:0 0 auto; }
+.grp-split-key i{ width:9px; height:9px; flex:none; border-radius:3px; }
+.grp-split-key span{
+  font-family:var(--mono); font-size:9px; letter-spacing:1px;
+  text-transform:uppercase; color:var(--text-muted); white-space:nowrap;
+}
+.grp-split-key b{ font-family:var(--mono); font-size:12px; color:var(--text); }
+
+/* ── Podium ───────────────────────────────────────────────────────── */
+/* A podium, not three banners: capped so the first step stays a step.
+   Left-aligned rather than centred because everything else on the card
+   starts at the same edge. */
+.grp-podium{ display:flex; align-items:flex-end; gap:10px; max-width:420px; }
+.grp-pod{ flex:1; min-width:0; display:flex; flex-direction:column; align-items:center; gap:7px; }
+.grp-pod-av{
+  width:42px; height:42px; border-radius:50%; object-fit:cover;
+  display:flex; align-items:center; justify-content:center;
+  font-family:var(--mono); font-size:13px; color:#fff;
+}
+.grp-pod-av.is-p0{ box-shadow:0 0 0 3px rgba(212,175,55,.5); }
+.grp-pod-av.is-p1{ box-shadow:0 0 0 3px rgba(168,168,168,.5); }
+.grp-pod-av.is-p2{ box-shadow:0 0 0 3px rgba(184,115,46,.5); }
+.grp-pod-name{
+  font-size:12px; font-weight:600; color:var(--text); max-width:100%;
+  overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+}
+.grp-pod-bar{
+  width:100%; border-radius:10px 10px 0 0; padding:8px 4px 0;
+  display:flex; flex-direction:column; align-items:center; gap:2px;
+}
+.grp-pod-bar.is-p0{ height:92px; background:rgba(200,151,10,.10); border:1px solid rgba(200,151,10,.34); }
+.grp-pod-bar.is-p1{ height:74px; background:rgba(143,146,150,.10); border:1px solid rgba(143,146,150,.34); }
+.grp-pod-bar.is-p2{ height:60px; background:rgba(184,115,46,.10); border:1px solid rgba(184,115,46,.34); }
+.grp-pod-place{ font-size:19px; font-weight:800; line-height:1; }
+.grp-pod-bar.is-p0 .grp-pod-place{ color:#c8970a; }
+.grp-pod-bar.is-p1 .grp-pod-place{ color:#8f9296; }
+.grp-pod-bar.is-p2 .grp-pod-place{ color:#b8732e; }
+.grp-pod-climb{ font-family:var(--mono); font-size:13px; color:var(--em); }
+.grp-pod-coins{
+  font-family:var(--mono); font-size:8.5px; letter-spacing:1px;
+  text-transform:uppercase; color:#c8970a;
+}
+
+/* ── Members ──────────────────────────────────────────────────────── */
+.grp-members-head{ display:flex; align-items:center; gap:12px; }
+.grp-members-head .grp-rule{ flex:1; margin-bottom:0; }
+.grp-members{ padding-bottom:14px; }
+.grp-mrow{
+  display:grid; grid-template-columns:26px minmax(0,1fr) 54px minmax(0,1fr) 62px;
+  gap:11px; align-items:center; padding:9px 0;
+  border-bottom:1px solid var(--border);
+}
+.grp-mrow:last-of-type{ border-bottom:0; }
+.grp-mhead{
+  font-family:var(--mono); font-size:8.5px; letter-spacing:1.3px;
+  text-transform:uppercase; color:var(--text-muted); padding-top:12px;
+}
+.grp-mrow.is-self{
+  background:rgba(var(--em-rgb),.07);
+  box-shadow:inset 3px 0 0 var(--em);
+  border-radius:0 8px 8px 0; padding-left:8px; padding-right:8px;
+}
+.grp-mrank{ font-family:var(--mono); font-size:12px; color:var(--text-muted); }
+.grp-mrank.is-top{ color:#c8970a; }
+.grp-mwho{ display:flex; align-items:center; gap:8px; min-width:0; }
+.grp-mav{
+  width:26px; height:26px; flex:none; border-radius:50%; object-fit:cover;
+  display:flex; align-items:center; justify-content:center;
+  font-family:var(--mono); font-size:9px; color:#fff;
+}
+.grp-mname{
+  min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+  font-size:13px; color:var(--text);
+}
+.grp-tag{
+  font-family:var(--mono); font-size:7.5px; letter-spacing:1.1px; text-transform:uppercase;
+  padding:2px 6px; border-radius:4px; white-space:nowrap; flex:none;
+  color:var(--em); border:1px solid rgba(var(--em-rgb),.4); background:rgba(var(--em-rgb),.1);
+}
+.grp-tag.is-mvp{ color:#8a6a06; border-color:rgba(200,151,10,.42); background:rgba(200,151,10,.12); }
+.grp-tag.is-idle{ color:var(--text-muted); border-color:var(--border); background:transparent; }
+/* Hidden until you mean it. A row of twenty people each carrying a
+   permanent × is a page that looks like it is asking to be pruned. */
+.grp-kick{
+  flex:none; width:20px; height:20px; border-radius:6px; cursor:pointer;
+  opacity:0; transition:opacity .12s ease;
+  border:1px solid var(--border); background:transparent; color:var(--text-muted);
+  font-size:13px; line-height:1; display:flex; align-items:center; justify-content:center;
+}
+.grp-mrow:hover .grp-kick, .grp-kick:focus-visible{ opacity:1; }
+.grp-kick:hover{ color:rgb(199,44,72); border-color:rgba(199,44,72,.5); }
+/* No hover on a phone, so it is always there instead. */
+@media (hover:none){ .grp-kick{ opacity:1; } }
+.grp-movr{ font-family:var(--mono); font-size:12px; color:var(--text-muted); }
+.grp-mbar{ height:6px; border-radius:3px; background:rgba(127,127,127,.16); overflow:hidden; }
+.grp-mbar i{ display:block; height:100%; border-radius:3px; background:var(--em); }
+.grp-mbar i.is-top{ background:#c8970a; }
+.grp-num{ text-align:right; }
+.grp-mclimb{ font-family:var(--mono); font-size:14px; color:var(--em); }
+.grp-mclimb.is-idle{ color:var(--text-muted); }
+
+.grp-actions{ display:flex; gap:8px; justify-content:flex-end; }
+.grp-leave{ color:var(--text-muted); display:inline-flex; align-items:center; gap:6px; }
+.grp-leave:hover{ color:rgb(199,44,72); border-color:rgba(199,44,72,.4); }
+
+/* ── Divisions ────────────────────────────────────────────────────── */
+.grp-divchip.is-d1,  .grp-div-badge.is-d1,  .grp-table-crest.is-d1 { --dcol:#6d6486; }
+.grp-divchip.is-d2,  .grp-div-badge.is-d2,  .grp-table-crest.is-d2 { --dcol:#b3123c; }
+.grp-divchip.is-d3,  .grp-div-badge.is-d3,  .grp-table-crest.is-d3 { --dcol:#3aa6c9; }
+.grp-divchip.is-d4,  .grp-div-badge.is-d4,  .grp-table-crest.is-d4 { --dcol:#2563eb; }
+.grp-divchip.is-d5,  .grp-div-badge.is-d5,  .grp-table-crest.is-d5 { --dcol:#1a7a4a; }
+.grp-divchip.is-d6,  .grp-div-badge.is-d6,  .grp-table-crest.is-d6 { --dcol:#2a9e62; }
+.grp-divchip.is-d7,  .grp-div-badge.is-d7,  .grp-table-crest.is-d7 { --dcol:#c8970a; }
+.grp-divchip.is-d8,  .grp-div-badge.is-d8,  .grp-table-crest.is-d8 { --dcol:#8f9296; }
+.grp-divchip.is-d9,  .grp-div-badge.is-d9,  .grp-table-crest.is-d9 { --dcol:#b8732e; }
+.grp-divchip.is-d10, .grp-div-badge.is-d10, .grp-table-crest.is-d10{ --dcol:#8a8278; }
+
+.grp-div-badge{
+  font-family:var(--mono); font-size:9px; letter-spacing:1.3px; text-transform:uppercase;
+  padding:4px 10px; border-radius:999px; white-space:nowrap;
+  color:var(--dcol); border:1px solid var(--dcol); background:color-mix(in srgb, var(--dcol) 12%, transparent);
+}
+
+.grp-divrail{
+  display:flex; gap:6px; overflow-x:auto; padding-bottom:6px;
+  scrollbar-width:thin;
+}
+.grp-divrail::-webkit-scrollbar{ height:5px; }
+.grp-divrail::-webkit-scrollbar-thumb{ background:rgba(127,127,127,.3); border-radius:99px; }
+.grp-divchip{
+  flex:0 0 auto; min-width:118px; display:flex; flex-direction:column; align-items:flex-start; gap:5px;
+  padding:10px 13px; border-radius:12px; cursor:pointer; text-align:left;
+  border:1px solid var(--border); background:var(--surface); opacity:.72;
+}
+.grp-divchip.is-mine{ opacity:1; }
+.grp-divchip.is-active{ opacity:1; border-color:var(--dcol); background:color-mix(in srgb, var(--dcol) 10%, var(--surface)); }
+.grp-divchip-num{
+  font-family:var(--mono); font-size:8px; letter-spacing:1.4px;
+  text-transform:uppercase; color:var(--text-muted);
+}
+.grp-divchip-name{
+  display:flex; align-items:center; gap:7px;
+  font-size:13px; font-weight:600; color:var(--text);
+}
+.grp-divchip-name i{ width:10px; height:10px; border-radius:3px; background:var(--dcol); }
+.grp-divchip-meta{
+  font-family:var(--mono); font-size:8px; letter-spacing:1.1px;
+  text-transform:uppercase; color:var(--text-muted);
+}
+.grp-divchip.is-mine .grp-divchip-meta{ color:var(--em); }
+
+/* ── The division table ───────────────────────────────────────────── */
+.grp-table{ padding:0; overflow:hidden; }
+.grp-table-head{ display:flex; align-items:center; gap:12px; padding:16px 18px 12px; }
+.grp-table-crest{
+  width:32px; height:32px; flex:none; border-radius:9px; background:var(--dcol);
+  display:flex; align-items:center; justify-content:center; color:#fff; font-size:14px;
+}
+.grp-table-name{ font-size:19px; font-weight:700; letter-spacing:-.2px; color:var(--text); }
+.grp-table-sub{
+  font-family:var(--mono); font-size:8.5px; letter-spacing:1.2px;
+  text-transform:uppercase; color:var(--text-muted); margin-top:2px;
+}
+.grp-legend{
+  margin-left:auto; display:flex; gap:14px;
+  font-family:var(--mono); font-size:8.5px; letter-spacing:1.2px; text-transform:uppercase;
+}
+.grp-legend span{ display:inline-flex; align-items:center; gap:6px; }
+.grp-legend i{ width:9px; height:9px; border-radius:2px; background:currentColor; }
+.grp-legend .is-up{ color:var(--em); }
+.grp-legend .is-down{ color:rgb(199,44,72); }
+
+.grp-grow{
+  position:relative;
+  display:grid; grid-template-columns:52px minmax(0,1fr) 74px minmax(0,1fr) 78px;
+  gap:11px; align-items:center; padding:11px 18px;
+  border-bottom:1px solid var(--border);
+}
+.grp-ghead{
+  font-family:var(--mono); font-size:8.5px; letter-spacing:1.3px;
+  text-transform:uppercase; color:var(--text-muted); padding-top:6px; padding-bottom:6px;
+}
+.grp-grow.is-promoted{ background:rgba(var(--em-rgb),.06); box-shadow:inset 3px 0 0 var(--em); }
+.grp-grow.is-relegated{ background:rgba(199,44,72,.05); box-shadow:inset 3px 0 0 rgb(199,44,72); }
+.grp-grow.is-mine{ background:rgba(var(--em-rgb),.12); }
+.grp-grow.is-mine.is-relegated{ background:rgba(199,44,72,.12); }
+.grp-gpos{ display:flex; align-items:center; gap:6px; }
+.grp-gpos span{ font-family:var(--mono); font-size:14px; color:var(--text-muted); }
+.grp-gpos em{ font-style:normal; font-size:10px; }
+.grp-gpos em.is-up{ color:var(--em); }
+.grp-gpos em.is-down{ color:rgb(199,44,72); }
+.grp-grow.is-promoted .grp-gpos span{ color:var(--em); }
+.grp-grow.is-relegated .grp-gpos span{ color:rgb(199,44,72); }
+.grp-gname{ display:flex; align-items:center; gap:10px; min-width:0; }
+.grp-gcrest{
+  width:28px; height:28px; flex:none; border-radius:8px;
+  display:flex; align-items:center; justify-content:center;
+  font-size:11px; font-weight:700; color:#fff;
+}
+.grp-gtitle{
+  min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+  font-size:13.5px; color:var(--text);
+}
+.grp-grow.is-mine .grp-gtitle{ font-weight:600; }
+.grp-gmembers, .grp-gclimber{ font-size:12px; color:var(--text-muted); min-width:0;
+  overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.grp-gscore{ font-family:var(--mono); font-size:15px; color:var(--text); }
+.grp-grow.is-promoted .grp-gscore{ color:var(--em); }
+/* The score of a relegated group is NOT red. Every score on this table
+   is a positive number — how much the group grew — and painting +28
+   red says it went backwards. The rail down the edge and the arrow by
+   the position are what carry the zone. */
+.grp-table .grp-foot-note{ padding:13px 18px; margin:0; }
+
+/* ── Setup ────────────────────────────────────────────────────────── */
+.grp-intro p{ font-size:13px; line-height:1.65; color:var(--text-muted); margin:0 0 10px; }
+.grp-intro p:last-child{ margin-bottom:0; }
+.grp-intro strong{ color:var(--text); }
+.grp-setup{ display:grid; grid-template-columns:1fr 1fr; gap:14px; }
+.grp-field{ display:block; margin-bottom:12px; }
+.grp-field > span{
+  display:block; font-family:var(--mono); font-size:8.5px; letter-spacing:1.3px;
+  text-transform:uppercase; color:var(--text-muted); margin-bottom:6px;
+}
+.grp-field input{
+  width:100%; padding:9px 11px; border-radius:10px; font-size:13.5px;
+  border:1px solid var(--border); background:transparent; color:var(--text);
+  font-family:var(--sans);
+}
+.grp-field input:focus{ outline:none; border-color:rgba(var(--em-rgb),.55); }
+.grp-crests{ display:flex; gap:8px; }
+.grp-crest-pick{
+  width:26px; height:26px; border-radius:8px; cursor:pointer; border:2px solid transparent;
+}
+.grp-crest-pick.is-on{ border-color:var(--text); }
+
+/* ── Invite ───────────────────────────────────────────────────────── */
+.grp-invite-eyebrow{
+  font-family:var(--mono); font-size:9px; letter-spacing:2.2px;
+  text-transform:uppercase; color:var(--text-muted); margin-bottom:8px;
+}
+.grp-invite-title{ font-size:22px; font-weight:700; margin:0 0 6px; letter-spacing:-.3px; }
+.grp-invite-sub{ font-size:13px; color:var(--text-muted); line-height:1.6; margin:0 0 16px; }
+.grp-code{
+  display:flex; align-items:center; gap:10px; padding:12px 14px; border-radius:12px;
+  border:1px dashed rgba(var(--em-rgb),.4); background:rgba(var(--em-rgb),.06); margin-bottom:12px;
+}
+.grp-code-value{
+  flex:1; font-family:var(--mono); font-size:17px; letter-spacing:3px; color:var(--em);
+}
+.grp-invite-note{ font-size:11.5px; line-height:1.6; color:var(--text-muted); margin:0 0 16px; }
+.grp-invite-actions{ display:flex; gap:8px; justify-content:flex-end; }
+
+/* ── The section head and its clock ───────────────────────────────── */
+.lb-section-head{ display:flex; align-items:flex-end; justify-content:space-between; gap:16px; }
+.lb-clock{ text-align:right; flex:none; }
+.lb-clock-lbl, .lb-clock-sub{
+  font-family:var(--mono); font-size:8.5px; letter-spacing:1.4px;
+  text-transform:uppercase; color:var(--text-muted);
+}
+.lb-clock-num{ font-family:var(--mono); font-size:15px; color:var(--text); margin:3px 0; }
+.lb-clock.is-urgent .lb-clock-num{ color:rgb(199,44,72); }
+
+.lb-toptabs{ display:flex; gap:6px; flex-wrap:wrap; }
+.lb-toptab{
+  font-family:var(--mono); font-size:10px; letter-spacing:1.4px; text-transform:uppercase;
+  padding:9px 16px; border-radius:999px; cursor:pointer; white-space:nowrap;
+  border:1px solid var(--border); background:transparent; color:var(--text-muted);
+}
+.lb-toptab:hover{ color:var(--text); }
+.lb-toptab.is-active{ background:var(--em); border-color:var(--em); color:#fff; }
+
+/* ── Phone ────────────────────────────────────────────────────────── */
+@media (max-width:768px){
+  .grp-card{ padding:14px; border-radius:16px; }
+  .grp-hero-top{ gap:11px; }
+  .grp-crest{ width:44px; height:44px; font-size:17px; border-radius:12px; }
+  .grp-hero-name{ font-size:18px; gap:7px; }
+  .grp-hero-num{ font-size:28px; }
+  .grp-split-keys{ grid-template-columns:1fr 1fr; }
+  .grp-setup{ grid-template-columns:1fr; }
+
+  /* The members table drops OVR and the share bar: five columns in
+     360px is five columns nobody can read. Rank, who, and how much
+     they moved is the whole point of the row. */
+  .grp-mrow{ grid-template-columns:22px minmax(0,1fr) 52px; gap:9px; }
+  .grp-mrow > .grp-movr, .grp-mrow > .grp-mbar{ display:none; }
+  .grp-mhead > div:nth-child(3), .grp-mhead > div:nth-child(4){ display:none; }
+
+  /* The division table keeps position, group and score; members and
+     top climber move under the name. */
+  .grp-grow{ grid-template-columns:40px minmax(0,1fr) 62px; gap:9px; padding:10px 14px; }
+  .grp-grow > .grp-gmembers, .grp-grow > .grp-gclimber{ display:none; }
+  .grp-ghead > div:nth-child(3), .grp-ghead > div:nth-child(4){ display:none; }
+  .grp-table-head{ flex-wrap:wrap; padding:14px 14px 10px; }
+  .grp-legend{ margin-left:0; width:100%; }
+  .grp-table .grp-foot-note{ padding:12px 14px; }
+
+  .lb-section-head{ align-items:flex-start; }
+  .lb-clock-num{ font-size:13px; }
+  .lb-toptab{ flex:1; text-align:center; padding:9px 6px; font-size:9.5px; }
+}

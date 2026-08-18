@@ -145,3 +145,12 @@
 # update, not a merge.
 [functions."oura-cron"]
   schedule = "30 6 * * *"
+
+# settle-leagues closes the group week: scores every group, writes the
+# result, promotes and relegates, and records Monday's coin payouts.
+# 00:05 Monday UTC — before the 03:00 snapshot, so the week is measured
+# against last Monday's baseline rather than today's fresh one. Moving
+# either of these two crons without the other scores the week against
+# the wrong end of itself.
+[functions."settle-leagues"]
+  schedule = "5 0 * * 1"

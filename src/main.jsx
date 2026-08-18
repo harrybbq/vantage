@@ -6,6 +6,7 @@ import './hub-dark.css'
 import './theme-cream-pro.css'
 import './tutorial.css'
 import './holiday.css'
+import './groups.css'
 // Last on purpose: shop.css is the final word on .shop-* rules, which is
 // what the mobile shopping layout depends on. Don't reorder.
 import './shop.css'

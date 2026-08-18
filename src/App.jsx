@@ -45,6 +45,7 @@ import { useWhoopAutoSync } from './lib/whoopClient';
 import { useOuraAutoSync } from './lib/ouraClient';
 import { usePublishProfile } from './lib/friends/usePublishProfile';
 import { useRatings } from './hooks/useRatings';
+import { useCoinGrants } from './hooks/useCoinGrants';
 import BottomTabBar from './components/mobile/BottomTabBar';
 import MoreDrawer from './components/mobile/MoreDrawer';
 import MobileAppBar from './components/mobile/MobileAppBar';
@@ -318,6 +319,11 @@ function Board({ userId, userEmail, onSignOut }) {
   // count separately. TODO: thread real friendCount once F5 is fully
   // wired into the friends rail.
   useRatings(userId, S, update, 0);
+
+  // Monday's league winnings. The server records what is owed in
+  // coin_grants and the client credits itself once — coins live in the
+  // state JSON, which the server does not rewrite. See the hook.
+  useCoinGrants(userId, update, showCoinToast);
 
   // Which Settings tab an incoming navigation asked for, if any. The
   // nonce means two consecutive requests for the same tab both land —
