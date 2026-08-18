@@ -339,6 +339,23 @@
 .hol-key-dot{ width:8px; height:8px; border-radius:50%; display:inline-block; }
 .hol-key-dot.is-up{ background:var(--em); }
 .hol-key-dot.is-past{ background:var(--text-muted); }
+/* ── Zoom control ── */
+.hol-zoom{
+  display:inline-flex; align-items:center; gap:2px; flex:none;
+  border:1px solid var(--border); border-radius:999px; padding:2px;
+}
+.hol-zoom-btn{
+  width:22px; height:22px; border-radius:999px; cursor:pointer; line-height:1;
+  border:0; background:transparent; color:var(--text-muted); font-size:14px;
+  display:inline-flex; align-items:center; justify-content:center;
+}
+.hol-zoom-btn:hover:not(:disabled){ color:var(--text); background:rgba(127,127,127,.14); }
+.hol-zoom-btn:disabled{ opacity:.32; cursor:not-allowed; }
+.hol-zoom-level{
+  font-family:var(--mono); font-size:8.5px; letter-spacing:1.2px; text-transform:uppercase;
+  color:var(--text-muted); min-width:46px; text-align:center;
+}
+
 .hol-rail-jump{
   font-family:var(--mono); font-size:9px; letter-spacing:1.1px; text-transform:uppercase;
   padding:5px 11px; border-radius:999px; cursor:pointer;
@@ -346,7 +363,15 @@
 }
 .hol-rail-jump:hover{ color:var(--text); border-color:var(--text-muted); }
 
-.hol-rail-scroll{ overflow-x:auto; overflow-y:hidden; padding:0 18px 14px; scrollbar-width:thin; }
+/* Grab-to-pan. `overscroll-behavior-x:contain` stops a fast drag at the
+   end of the rail turning into the browser's back-swipe gesture. */
+.hol-rail-scroll{
+  overflow-x:auto; overflow-y:hidden; padding:0 18px 14px; scrollbar-width:thin;
+  cursor:grab; overscroll-behavior-x:contain; touch-action:pan-x;
+}
+.hol-rail-scroll.is-dragging{ cursor:grabbing; scroll-behavior:auto; }
+/* While panning, nothing inside should try to select or drag itself. */
+.hol-rail-scroll.is-dragging *{ user-select:none; pointer-events:none; }
 .hol-rail-scroll::-webkit-scrollbar{ height:6px; }
 .hol-rail-scroll::-webkit-scrollbar-thumb{ background:rgba(var(--em-rgb),.3); border-radius:99px; }
 .hol-rail-scroll::-webkit-scrollbar-track{ background:transparent; }
@@ -401,10 +426,48 @@
   background:transparent; border:0; padding:0; cursor:pointer;
   opacity:.86; transition:opacity .14s ease;
 }
+/* ── Three densities ──
+   Which one a stop gets is decided by railStops() from the actual gap
+   to its nearest neighbour, not by the zoom level — two trips can be
+   crowded at any zoom. The width shrinks with the tier so a stop's hit
+   area never reaches past the room it has. */
+.hol-stop.is-compact{ width:96px; }
+.hol-stop.is-dot{ width:22px; }
+/* These three widths ARE the FULL_GAP / COMPACT_GAP / DOT_GAP constants
+   in lib/holiday/timeline.js. A tier is only chosen when the gap is at
+   least this wide, which is what stops two stops overlapping; if you
+   change one, change the other. */
+.hol-stop.is-compact .hol-stop-name{ font-size:11px; max-width:92px; }
+.hol-stop.is-dot .hol-stop-name{ display:none; }
+/* The selected stop keeps its name at any density. It overflows the
+   22px box and takes no pointer events, so the hit area stays exactly
+   as wide as its gap allows. */
+.hol-stop.is-dot.is-named .hol-stop-name{
+  display:block; top:88px; pointer-events:none; white-space:nowrap;
+  max-width:none; font-size:11px; font-weight:600;
+}
+/* Compact and dot stops have nothing above the line, so their label
+   sits just under the dot instead of down in the date band. */
+.hol-stop.is-compact .hol-stop-name{ top:88px; }
+
+/* ── Cluster marker ──
+   Two or more trips too close together to be separate targets. Sits on
+   the track where they are, says how many, and zooms in when clicked. */
+.hol-cluster{
+  position:absolute; top:112px; transform:translate(-50%,-50%); z-index:2;
+  min-width:22px; height:22px; padding:0 6px; border-radius:999px; cursor:pointer;
+  display:inline-flex; align-items:center; justify-content:center;
+  border:2px solid var(--bg-raised, var(--surface));
+  background:var(--em); color:#fff;
+  font-family:var(--mono); font-size:10px; font-weight:700; line-height:1;
+  box-shadow:0 0 0 1px rgba(var(--em-rgb),.5);
+}
+.hol-cluster:hover{ filter:brightness(1.12); }
+.hol-cluster.is-sel{ box-shadow:0 0 0 4px rgba(var(--em-rgb),.22); }
 /* Absolutely placed so each part sits in its own band (see above). */
 .hol-stop > *{ position:absolute; left:50%; transform:translateX(-50%); }
 .hol-stop .hol-thumb{ top:0; }
-.hol-stop-name{ top:70px; }
+.hol-stop.is-full .hol-stop-name{ top:70px; }
 .hol-stop .hol-dot{ top:112px; transform:translate(-50%,-50%); }
 .hol-stop-when{ top:156px; }
 .hol-stop.is-past{ opacity:.52; }
@@ -447,10 +510,18 @@
 /* The track passes behind the dots, not through them. */
 .hol-stop .hol-dot, .hol-today{ z-index:2; }
 
-.hol-rail-nodates, .hol-undated{
+.hol-rail-nodates{
   font-family:var(--mono); font-size:10px; color:var(--text-muted); padding:14px 0;
 }
-.hol-undated{ display:flex; align-items:center; gap:8px; flex-wrap:wrap; padding:0 18px 14px; }
+.hol-rail-foot{
+  display:flex; align-items:center; gap:14px; flex-wrap:wrap;
+  padding:0 18px 14px; min-height:20px;
+}
+.hol-rail-hint{
+  font-family:var(--mono); font-size:8.5px; letter-spacing:1px;
+  text-transform:uppercase; color:var(--text-muted); opacity:.7;
+}
+.hol-undated{ display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin-left:auto; }
 .hol-undated-chip{
   padding:5px 11px; border-radius:999px; cursor:pointer; font-size:12px;
   border:1px solid var(--border); background:transparent; color:var(--text-muted);
