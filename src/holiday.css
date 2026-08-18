@@ -311,6 +311,24 @@
    hard-coding cream would have broken the dark themes outright. */
 .hol-planner{ display:flex; flex-direction:column; gap:18px; }
 
+/* ── Phone: the timeline is a spine down the left ────────────────────
+   Across the top it eats the whole first screen and pushes the pass —
+   the thing you actually came to read — below the fold. Down the side
+   it is a 100px strip you scrub with a thumb while the pass stays put,
+   which is the layout this section had before and the one that works.
+   The rail keeps everything it gained today: real date spacing, photo
+   bands the length of each trip, drag and zoom. */
+@media (max-width:768px){
+  .hol-planner{
+    display:grid; grid-template-columns:88px minmax(0,1fr);
+    column-gap:10px; row-gap:14px; align-items:start;
+  }
+  /* The spine spans every row, so it stays beside the pass AND the
+     destination brief under it. */
+  .hol-planner > .hol-rail-card{ grid-column:1; grid-row:1 / -1; }
+  .hol-planner > *:not(.hol-rail-card){ grid-column:2; min-width:0; }
+}
+
 /* ── The rail ────────────────────────────────────────────────────────
    Spans the whole page. It is the one element that gets better with
    width, so it breaks out of the 1100px column the rest of the section
@@ -330,8 +348,10 @@
   -webkit-backdrop-filter:blur(20px) saturate(1.1);
   overflow:hidden;
 }
+/* On a phone the card is a column of the planner grid, not a full-bleed
+   band, so the break-out formula is cancelled rather than re-tuned. */
 @media (max-width:768px){
-  .hol-rail-card{ --hol-nav: 0px; --hol-gutter: 14px; }
+  .hol-rail-card{ width:auto; margin-left:0; }
 }
 .hol-rail-card[data-transparent="true"]{
   background:transparent !important;
@@ -521,43 +541,89 @@
 .hol-undated-chip.is-sel{ color:var(--em); border-color:rgba(var(--em-rgb),.5); background:rgba(var(--em-rgb),.1); }
 
 /* ══ Vertical: the phone ══════════════════════════════════════════════
-   Same geometry rotated. Time runs down the page, the rail fills the
-   viewport height, and today sits near the bottom. Bands become tall
-   rather than wide, which suits a photo just as well. */
-.hol-rail-card.is-vertical{ display:flex; flex-direction:column; }
+   Same geometry rotated into a 100px spine beside the pass. Time runs
+   down it, today sits near the bottom, and each trip is a tall photo
+   band as long as the trip. Sticky, so scrolling the pass or the
+   destination brief leaves the timeline where your thumb left it. */
+.hol-rail-card.is-vertical{
+  display:flex; flex-direction:column;
+  position:sticky; top:8px;
+}
 .hol-rail-card.is-vertical .hol-rail-scroll{
   overflow-x:hidden; overflow-y:auto;
-  /* The page itself does not scroll behind this, so it takes a real
-     height rather than growing with its content. */
-  height:calc(100vh - 300px); min-height:320px;
+  /* A real height, not one that grows with content: the strip is a
+     scrubber, and the page scrolls the pass beside it. */
+  height:calc(100vh - 210px); min-height:300px;
 }
 .hol-rail-card.is-vertical .hol-rail-inner{ height:auto; width:100%; }
+/* The spine runs down the right of the strip, past above and upcoming
+   below — the desktop track's gradient, rotated. */
 .hol-rail-card.is-vertical .hol-rail-track{
-  left:auto; right:14px; top:0; bottom:0; width:2px; height:auto;
+  left:auto; right:11px; top:0; bottom:0; width:2px; height:auto;
   background:linear-gradient(180deg,
     rgba(127,127,127,.32) 0%, rgba(127,127,127,.32) 48%,
     rgba(var(--em-rgb),.45) 52%, rgba(var(--em-rgb),.45) 100%);
 }
+/* Month marks only, no labels: three letters beside a 62px photo is
+   the strip's whole width spent on saying "AUG". The pass names the
+   month you are looking at; years still get their label. */
 .hol-rail-card.is-vertical .hol-tick{
-  top:auto; left:auto; right:22px; transform:translateY(-50%);
-  flex-direction:row-reverse; align-items:center; gap:5px;
+  top:auto; left:auto; right:16px; transform:translateY(-50%);
+  flex-direction:row-reverse; align-items:center; gap:4px;
 }
-.hol-rail-card.is-vertical .hol-tick i{ width:8px; height:1px; }
-.hol-rail-card.is-vertical .hol-tick.is-year i{ width:14px; height:1px; }
+.hol-rail-card.is-vertical .hol-tick i{ width:6px; height:1px; }
+.hol-rail-card.is-vertical .hol-tick span{ display:none; }
+.hol-rail-card.is-vertical .hol-tick.is-year i{ width:11px; height:1px; }
+.hol-rail-card.is-vertical .hol-tick.is-year span{
+  display:block; font-size:7.5px; letter-spacing:.6px;
+  writing-mode:vertical-rl; text-orientation:mixed;
+}
 .hol-rail-card.is-vertical .hol-today{
-  top:auto; left:8px; right:8px; width:auto; height:1px;
+  top:auto; left:4px; right:4px; width:auto; height:1px;
 }
 .hol-rail-card.is-vertical .hol-today span{
   top:auto; left:auto; right:0; transform:translateY(-50%);
+  font-size:7px; letter-spacing:.9px; padding:1px 4px;
 }
 .hol-rail-card.is-vertical .hol-band{
-  top:auto; left:10px; right:44px; height:auto; width:auto;
-  align-items:flex-end;
+  top:auto; left:6px; right:26px; height:auto; width:auto;
+  align-items:flex-end; border-radius:7px;
 }
 .hol-rail-card.is-vertical .hol-band.is-nested{
   top:auto; height:auto;
-  left:calc(10px + var(--band-inset, 0px));
-  right:calc(44px + var(--band-inset, 0px));
+  left:calc(6px + var(--band-inset, 0px));
+  right:calc(26px + var(--band-inset, 0px));
+}
+/* A 62px-wide band holds a short name and nothing else. */
+.hol-rail-card.is-vertical .hol-band-label{ padding:4px 6px; }
+.hol-rail-card.is-vertical .hol-band-name{ font-size:10px; }
+.hol-rail-card.is-vertical .hol-band-when{ display:none; }
+
+/* ── The strip's chrome ──
+   A head built for a 1300px card does not fit in 100px. Zoom and Today
+   become two small buttons on one row, and the eyebrow, the rule and
+   the "drag to pan" hint go — on a phone you find out by dragging. */
+.hol-rail-card.is-vertical .hol-rail-head{
+  padding:8px 6px 6px; gap:5px; justify-content:center;
+}
+.hol-rail-card.is-vertical .hol-rail-eyebrow{ display:none; }
+.hol-rail-card.is-vertical .hol-zoom{ padding:1px; gap:0; }
+.hol-rail-card.is-vertical .hol-zoom-btn{ width:20px; height:20px; font-size:13px; }
+.hol-rail-card.is-vertical .hol-zoom-level{ display:none; }
+.hol-rail-card.is-vertical .hol-rail-jump{ padding:4px 8px; font-size:8px; letter-spacing:.8px; }
+.hol-rail-card.is-vertical .hol-rail-foot{ padding:6px 6px 8px; gap:6px; }
+.hol-rail-card.is-vertical .hol-rail-hint{ display:none; }
+/* Undated trips still need somewhere to be tapped. Stacked, full
+   width of the strip, under the timeline they have no place on. */
+.hol-rail-card.is-vertical .hol-undated{
+  margin-left:0; flex-direction:column; align-items:stretch; gap:5px; width:100%;
+}
+.hol-rail-card.is-vertical .hol-undated .hol-rail-eyebrow{
+  display:block; font-size:7.5px; letter-spacing:1px; text-align:center;
+}
+.hol-rail-card.is-vertical .hol-undated-chip{
+  padding:5px 6px; font-size:10.5px; text-align:center;
+  overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
 }
 /* Vertical: the bands already fill the width, so a name that will not
    fit inside one sits ON the rail as a chip at the band's leading edge

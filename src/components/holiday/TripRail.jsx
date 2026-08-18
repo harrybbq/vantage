@@ -25,7 +25,7 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useIsMobile } from '../../hooks/useIsMobile';
 import {
-  PX_PER_DAY, TODAY_ANCHOR, ZOOM_STEP, clampZoom, dayAt, daysUntil, fmt,
+  PX_PER_DAY, TODAY_ANCHOR, TODAY_ANCHOR_V, ZOOM_STEP, clampZoom, dayAt, daysUntil, fmt,
   nightsOf, railBands, railGeometry, railTicks, wheelZoom,
 } from '../../lib/holiday/timeline';
 
@@ -165,9 +165,9 @@ export default function TripRail({ trips, selectedId, onSelect, now = new Date()
   const goToToday = useCallback((smooth = true) => {
     const el = scroller.current;
     if (!el || !geo) return;
-    const target = Math.max(0, geo.today - el[axis.len] * TODAY_ANCHOR);
+    const target = Math.max(0, geo.today - el[axis.len] * (isMobile ? TODAY_ANCHOR_V : TODAY_ANCHOR));
     el.scrollTo({ [axis.start]: target, behavior: smooth ? 'smooth' : 'auto' });
-  }, [geo, axis.len, axis.start]);
+  }, [geo, axis.len, axis.start, isMobile]);
 
   /* Once per mount, and only AFTER the viewport has been measured.
      Placing on the first render used the 1200px guess; the real 1328
@@ -269,8 +269,13 @@ export default function TripRail({ trips, selectedId, onSelect, now = new Date()
             {/* Labels for bands too narrow to hold their own. Anchored to
                 the band's leading edge and packed into rows, with a
                 leader rule down onto the band so a name a row up is
-                still unambiguously that band's name. */}
-            {bands.filter(b => !b.labelInside).map(band => (
+                still unambiguously that band's name.
+
+                Not on the phone: the strip is 100px wide and a name
+                laid across it covers the photos either side of it. A
+                short trip there is a band you tap, and the pass beside
+                it says which one you tapped. */}
+            {!vertical && bands.filter(b => !b.labelInside).map(band => (
               <button
                 key={'l' + band.trip.id}
                 type="button"
