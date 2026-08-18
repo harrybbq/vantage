@@ -39,6 +39,19 @@ export default function BoardingPass({ trip, S, policy, onCycleStatus, onEdit, o
   const itin = (trip.items || []).length;
   const archived = c.tone === 'muted' && trip.from;
 
+  /*
+   * The trip's cover photo fills the stub, behind the text.
+   *
+   * Quotes and backslashes are stripped before it goes into a CSS
+   * url(): the value is user-typed and lands in a custom property, and
+   * an unescaped quote there would break the declaration rather than do
+   * anything useful. A broken photo just leaves the striped stub, which
+   * is what a trip with no photo gets anyway.
+   */
+  const photo = typeof trip.imageUrl === 'string' && trip.imageUrl.trim()
+    ? trip.imageUrl.trim().replace(/["\\]/g, '')
+    : '';
+
   return (
     <motion.div
       className="hol-pass"
@@ -49,7 +62,10 @@ export default function BoardingPass({ trip, S, policy, onCycleStatus, onEdit, o
       transition={{ duration: 0.28, ease: 'easeOut' }}
     >
       {/* ── Stub: which trip, and when ── */}
-      <div className="hol-pass-stub">
+      <div
+        className={`hol-pass-stub${photo ? ' has-photo' : ''}`}
+        style={photo ? { '--trip-photo': `url("${photo}")` } : undefined}
+      >
         <div className="hol-pass-top">
           <div>
             <div className="hol-pass-eyebrow">{archived ? 'Archived trip' : 'Boarding pass'}</div>

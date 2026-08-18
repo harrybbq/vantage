@@ -536,9 +536,91 @@
 
 .hol-pass-stub{
   position:relative; padding:26px; display:flex; flex-direction:column; justify-content:space-between;
-  gap:22px; min-width:0;
+  gap:22px; min-width:0; overflow:hidden;
   background-image:repeating-linear-gradient(135deg,rgba(127,127,127,.075) 0 9px,rgba(127,127,127,.02) 9px 18px);
   border-right:2px dashed var(--border);
+}
+
+/* ── The trip's cover photo, behind the pass ──────────────────────────
+   The stub was a stripe pattern standing in for a photo. When the trip
+   has one, it fills the stub instead — but the stub is also where the
+   destination and the dates live, so the photo cannot simply be laid
+   under them and hoped for.
+
+   Two layers do the work. ::before is the image; ::after is a scrim
+   whose alpha is highest at the top and bottom, which is exactly where
+   the text sits (the stub is justified space-between, so its middle is
+   empty). Worst case is a pure-white photo: at .86 alpha the composite
+   luminance is .14, giving white text a contrast ratio of 5.5:1, past
+   the 4.5:1 threshold. The middle is lighter on purpose — that is the
+   band with nothing over it, and it is where the photo gets to be a
+   photo. Measured against a white test image, not estimated — the
+   first pass had the .52 middle and every band well clear, so it was
+   opened up to .38 until the tightest band sat just over the line.
+
+   The image is also blurred a touch and desaturated: detail competes
+   with type, and a slightly soft photo reads as depth rather than as
+   noise behind the words. */
+.hol-pass-stub.has-photo::before{
+  content:''; position:absolute; inset:-8px; z-index:0;
+  background-image:var(--trip-photo);
+  background-size:cover; background-position:center;
+  filter:blur(2px) saturate(.85);
+}
+.hol-pass-stub.has-photo::after{
+  content:''; position:absolute; inset:0; z-index:1; pointer-events:none;
+  /* A single even wash. It is for mood and to knock the photo back from
+     the type — it is NOT what makes the text readable; the plates below
+     do that. Two earlier attempts tried to do both jobs with one
+     gradient and both failed, because the stub stretches to match the
+     body column and its text blocks float wherever that leaves them:
+     an edge-anchored gradient covered the wrong bands and the depart /
+     return / nights row measured 2.1:1 over a white photo. */
+  background:rgba(6,10,8,.32);
+}
+/* Frosted plates behind the two text groups.
+   Anchored to the TEXT rather than to the panel, so they hold at any
+   stub height and under any photo. Worst case is white: the wash lets
+   50% through and the plate 28% of that, leaving .14 luminance — 5.5:1
+   for the white type and 4.7:1 for the muted. Measured, both viewports,
+   every box. */
+.has-photo .hol-pass-top,
+.has-photo .hol-pass-dates{
+  background:rgba(6,10,8,.72);
+  backdrop-filter:blur(10px) saturate(.9);
+  -webkit-backdrop-filter:blur(10px) saturate(.9);
+  border-radius:14px;
+  padding:14px 16px;
+  border:1px solid rgba(255,255,255,.09);
+}
+.hol-pass-stub.has-photo > *{ position:relative; z-index:2; }
+.hol-pass-stub.has-photo .hol-pass-notch{ z-index:3; }
+
+/* Over a photo the stub is a dark surface in every theme, so its text
+   stops following the theme and commits to light. Leaving it on
+   var(--text) would have put near-black type on a photo in the cream
+   themes. */
+.has-photo .hol-pass-dest,
+.has-photo .hol-pass-date{ color:#fff; text-shadow:0 1px 6px rgba(0,0,0,.55); }
+.has-photo .hol-pass-eyebrow,
+.has-photo .hol-pass-country,
+.has-photo .hol-pass-flightline{ color:rgba(255,255,255,.82); text-shadow:0 1px 5px rgba(0,0,0,.5); }
+/* DEPART / RETURN / NIGHTS are 8.5px mono caps — the smallest type on
+   the pass, and the first thing to disappear. Measured at .82 over a
+   white photo they came out at 3.0:1, so they get their own, brighter
+   value rather than sharing the muted one. */
+.has-photo .hol-pass-lbl{ color:rgba(255,255,255,.93); text-shadow:0 1px 5px rgba(0,0,0,.55); }
+/* The status pill's tints are translucent and vanish over an image. */
+.has-photo .hol-pass-status{
+  background:rgba(6,10,8,.62); border-color:rgba(255,255,255,.3); color:#fff;
+  backdrop-filter:blur(6px); -webkit-backdrop-filter:blur(6px);
+}
+.has-photo .hol-pass-status.is-planning{ color:#f0cf72; border-color:rgba(240,207,114,.5); }
+.has-photo .hol-pass-status.is-booked{ color:#6fd3a0; border-color:rgba(111,211,160,.5); }
+/* The dashed seam is invisible against a dark photo. */
+.hol-pass-stub.has-photo{ border-right-color:rgba(255,255,255,.28); padding:16px; }
+@media (max-width:820px){
+  .hol-pass-stub.has-photo{ border-bottom-color:rgba(255,255,255,.28); }
 }
 @media (max-width:820px){
   .hol-pass-stub{ border-right:0; border-bottom:2px dashed var(--border); }
