@@ -11,7 +11,7 @@ import { tradingWidgetAvailable } from '../lib/trading/enabled';
 import { widgetReadiness } from '../lib/widgets/readiness';
 import { authFetch } from '../lib/authFetch';
 import {
-  emptyHolidayForm, HolidayTabBar, BasicsFields, ItineraryFields, BudgetFields,
+  emptyHolidayForm, HolidayTabBar, BasicsFields, ItineraryFields, BudgetFields, HOLIDAY_TABS,
 } from './holiday/HolidayFormTabs';
 
 /**
@@ -1146,9 +1146,13 @@ function AddHolidayModal({ openId, onClose, onAdd, S }) {
 
 // ── Edit Holiday ──
 function EditHolidayModal({ openId, onClose, holidays, onEdit, onDelete, S }) {
-  // openId format: 'editHolidayModal:${id}'
+  // openId format: 'editHolidayModal:${id}' — with an optional third
+  // segment naming the tab to land on, so the planner's "Itinerary"
+  // button opens the itinerary rather than the basics. The id is still
+  // segment 1, so every existing caller keeps working untouched.
   const isOpen = typeof openId === 'string' && openId.startsWith('editHolidayModal:');
   const holidayId = isOpen ? openId.split(':')[1] : null;
+  const wantTab = isOpen ? openId.split(':')[2] : null;
   const holiday = holidayId ? (holidays || []).find(h => h.id === holidayId) : null;
 
   const [form, setForm] = useState(emptyHolidayForm);
@@ -1172,7 +1176,7 @@ function EditHolidayModal({ openId, onClose, holidays, onEdit, onDelete, S }) {
         items: Array.isArray(holiday.items) ? holiday.items : [],
         savingsGoalId: holiday.savingsGoalId || '',
       });
-      setTab('basics');
+      setTab(HOLIDAY_TABS.some(t => t.key === wantTab) ? wantTab : 'basics');
     }
   }, [holidayId]);
 
