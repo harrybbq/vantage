@@ -1,226 +1,209 @@
 /**
  * The trip timeline.
  *
- * Horizontal on desktop, vertical on a phone — the same information laid
- * along whichever axis has the room.
+ * Horizontal across the page on desktop, vertical down it on a phone —
+ * the same geometry, mapped to whichever axis has the room.
  *
- * ── Why a timeline rather than a grid of cards ───────────────────────
- * The old page was a card per trip, newest first. A card grid answers
- * "what trips do I have"; it cannot answer "how long until the next one"
- * or "how big is the gap after Tokyo", which are the questions you
- * actually have when you look at a holiday planner. Stops are spaced by
- * REAL elapsed days, so the wait between two trips is drawn to scale and
- * an empty year looks like an empty year.
+ * ── Bands, not markers ───────────────────────────────────────────────
+ * Each trip is drawn as a band covering the dates it spans, filled with
+ * its own photo. Earlier versions used a fixed-width thumbnail on a dot,
+ * which meant two trips a week apart overlapped by 100px; shrinking them
+ * lost the photo and clustering them lost the trip. Bands make the
+ * collision impossible rather than managing it — two trips cannot share
+ * dates, so two bands cannot share pixels — and they put duration on
+ * screen for the first time. A weekend and a fortnight were the same
+ * dot; now one is seven times the width of the other.
  *
- * ── Panning and zoom ─────────────────────────────────────────────────
- * Spacing by real dates has a cost: two trips a week apart are 10px
- * apart at the default scale, and a stop is 132px wide. They piled up.
- *
- * Two things fix it together. Zoom changes the pixels per day, so you
- * can pull a crowded fortnight apart; and each stop renders at one of
- * three densities depending on how much room it actually has, so even
- * the widest zoom-out stays readable rather than becoming a heap.
- * railStops() decides the density — thumbnail, then name, then a bare
- * dot, giving things up in the order you would.
- *
- * Panning is a drag, because a horizontal scrollbar is a poor target and
- * a trackpad's horizontal gesture is not something every mouse has. A
- * drag under 4px is still a click, so tapping a stop keeps working.
+ * ── The controls ─────────────────────────────────────────────────────
+ * Drag to pan. Plain scroll wheel to zoom, toward the cursor, on a
+ * continuous scale rather than in notches so the gesture is smooth. The
+ * rail spans the whole page because it is the one element that gets
+ * better with width, and it opens with today about three-quarters
+ * across: flush right would put every upcoming trip off-screen,
+ * including the next one, which is the trip the page exists for.
  */
-import { useCallback, useEffect, useRef, useState } from 'react';
-import Icon from '../Icon';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useIsMobile } from '../../hooks/useIsMobile';
 import {
-  DEFAULT_ZOOM, ZOOM_LEVELS, dayAt, daysUntil, fmt, railGeometry, railStops, railTicks,
+  PX_PER_DAY, TODAY_ANCHOR, ZOOM_STEP, clampZoom, dayAt, daysUntil, fmt,
+  nightsOf, railBands, railGeometry, railTicks, wheelZoom,
 } from '../../lib/holiday/timeline';
 
-/** Is this trip behind us? Status OR dates, so a trip nobody remembered
- *  to mark completed still greys out once it is over. */
+/** Behind us? Status OR dates, so a trip nobody marked completed still
+ *  greys out once it is over. */
 const isPast = (trip, now) =>
   trip.status === 'completed' || (dayAt(trip.to || trip.from) && daysUntil(trip.to || trip.from, now) < 0);
 
-function Thumb({ trip, selected, past }) {
-  return (
-    <span
-      className={`hol-thumb${selected ? ' is-sel' : ''}${past ? ' is-past' : ''}`}
-      style={trip.imageUrl ? { backgroundImage: `url(${trip.imageUrl})` } : undefined}
-    >
-      {!trip.imageUrl && <span className="hol-thumb-ph">trip photo</span>}
-    </span>
-  );
-}
+const zoomLabel = px => {
+  const daysPerTick = 44 / px;
+  if (daysPerTick <= 2.5) return 'Days';
+  if (daysPerTick <= 16) return 'Weeks';
+  if (daysPerTick <= 70) return 'Months';
+  return 'Years';
+};
 
 export default function TripRail({ trips, selectedId, onSelect, now = new Date() }) {
   const isMobile = useIsMobile();
   const scroller = useRef(null);
-  const [zoom, setZoom] = useState(DEFAULT_ZOOM);
-  const geo = railGeometry(trips, now, ZOOM_LEVELS[zoom]);
+  const [zoom, setZoom] = useState(PX_PER_DAY);
+  // The viewport along the time axis — width on desktop, height on a
+  // phone. Feeds the geometry's padding so today can always reach its
+  // anchor instead of clamping against the end of the rail.
+  /* null until measured. A guessed default is worse than none: the
+     placement effect would run against it on the first commit, and the
+     real width arriving a frame later shifts every pixel on the rail —
+     which left today at 82% instead of 72%. */
+  const [viewport, setViewport] = useState(null);
 
-  /* ── Panning ──────────────────────────────────────────────────────
-     Pointer events rather than mouse, so a stylus and a trackpad drag
-     work the same way. The threshold is what keeps a click a click:
-     without it, the 1px of movement in any real press swallowed every
-     tap on a stop. */
+  const geo = railGeometry(trips, now, zoom, viewport || 0);
+  const bands = railBands(trips, geo, selectedId, { vertical: isMobile });
+  const ticks = railTicks(geo);
+  const undated = trips.filter(t => !dayAt(t.from));
+
+  /* Which axis the time runs along. Everything below is written once in
+     terms of `pos` (scrollLeft/scrollTop) and `len` (clientWidth/Height)
+     so the two orientations cannot drift apart. */
+  const axis = isMobile
+    ? { pos: 'scrollTop', len: 'clientHeight', client: 'clientY', start: 'top', size: 'height' }
+    : { pos: 'scrollLeft', len: 'clientWidth', client: 'clientX', start: 'left', size: 'width' };
+
+  const measured = useRef(false);
+  useLayoutEffect(() => {
+    const el = scroller.current;
+    if (!el) return;
+    const measure = () => {
+      const v = el[axis.len];
+      if (v) { measured.current = true; setViewport(prev => (prev === v ? prev : v)); }
+    };
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [axis.len]);
+
+  /* ── Pan ──────────────────────────────────────────────────────────
+     No "not from a button" guard: the bands ARE buttons and cover the
+     rail, so refusing to pan from one would mean the drag only worked
+     in the gaps. The 4px threshold is what keeps a click a click. */
   const drag = useRef(null);
   const [dragging, setDragging] = useState(false);
   const movedRef = useRef(false);
 
   function onPointerDown(e) {
-    /* Left button only. Note there is NO "not from a button" guard: the
-       stops ARE buttons and cover most of the rail, so refusing to pan
-       from one meant the drag only worked in the gaps. The zoom
-       controls live outside this scroller, so nothing needs protecting;
-       the 4px threshold below is what keeps a click a click. */
     if (e.button !== 0) return;
     const el = scroller.current;
     if (!el) return;
-    drag.current = { x: e.clientX, left: el.scrollLeft, id: e.pointerId, captured: false };
+    drag.current = { at: e[axis.client], pos: el[axis.pos], id: e.pointerId, captured: false };
     movedRef.current = false;
-    /* Deliberately NOT capturing the pointer here. Capture retargets the
-       pointerup to this element, and a click fires on the nearest common
-       ancestor of down and up — so capturing on every press meant the
-       click landed on the scroller and no stop was ever selectable.
-       Capture is taken below, only once a real drag has begun. */
+    /* Capture is NOT taken here. It retargets the pointerup, and a click
+       fires on the nearest common ancestor of down and up — capturing on
+       every press made every band unselectable. Taken below, once a real
+       drag has begun. */
   }
   function onPointerMove(e) {
     const d = drag.current, el = scroller.current;
     if (!d || !el) return;
-    const dx = e.clientX - d.x;
-    if (!movedRef.current && Math.abs(dx) > 4) {
+    const delta = e[axis.client] - d.at;
+    if (!movedRef.current && Math.abs(delta) > 4) {
       movedRef.current = true;
       setDragging(true);
-      // Now it is a pan, so keep the pointer even if it leaves the rail.
       el.setPointerCapture?.(e.pointerId);
       d.captured = true;
     }
-    if (movedRef.current) el.scrollLeft = d.left - dx;
+    if (movedRef.current) el[axis.pos] = d.pos - delta;
   }
-  function endDrag(e) {
+  function endDrag() {
     const el = scroller.current;
     if (drag.current?.captured && el) el.releasePointerCapture?.(drag.current.id);
     drag.current = null;
-    // Cleared on the next frame, so the click that follows this pointerup
-    // can still see that a drag happened and swallow itself.
+    // Next frame, so the click that follows this pointerup can still see
+    // that a drag happened and swallow itself.
     requestAnimationFrame(() => { movedRef.current = false; setDragging(false); });
   }
 
   /* ── Zoom ─────────────────────────────────────────────────────────
-     Anchored on the middle of the view. Without that, zooming walks
-     the rail sideways and you lose the thing you were looking at —
-     which is the difference between a zoom that feels like a lens and
-     one that feels like a jump cut. */
-  const zoomTo = useCallback(next => {
+     Anchored on a point: the cursor for a wheel, the middle for the
+     buttons. Whatever date is under that point stays under it, which is
+     the difference between a lens and a jump cut. */
+  const zoomAround = useCallback((nextPx, anchorOffset) => {
     const el = scroller.current;
-    const clamped = Math.max(0, Math.min(ZOOM_LEVELS.length - 1, next));
-    if (clamped === zoom) return;
-    if (!el || !geo) { setZoom(clamped); return; }
-    const centreDate = geo.dateAt(el.scrollLeft + el.clientWidth / 2);
-    setZoom(clamped);
-    // After the re-render, put that date back under the middle.
-    requestAnimationFrame(() => {
-      const g2 = railGeometry(trips, now, ZOOM_LEVELS[clamped]);
-      const el2 = scroller.current;
-      if (!g2 || !el2) return;
-      el2.scrollLeft = Math.max(0, g2.at(centreDate.getTime()) - el2.clientWidth / 2);
+    const next = clampZoom(nextPx);
+    setZoom(prev => {
+      if (Math.abs(next - prev) < 1e-6) return prev;
+      if (el && geo) {
+        const held = geo.dateAt(el[axis.pos] + anchorOffset);
+        // Re-place after paint, when the rail has its new length.
+        requestAnimationFrame(() => {
+          const g2 = railGeometry(trips, now, next, viewport || 0);
+          const el2 = scroller.current;
+          if (g2 && el2) el2[axis.pos] = Math.max(0, g2.at(held.getTime()) - anchorOffset);
+        });
+      }
+      return next;
     });
-  }, [zoom, geo, trips, now]);
+  }, [geo, trips, now, viewport, axis.pos]);
 
-  // Ctrl/⌘ + wheel is the zoom gesture every map and canvas uses.
-  // A bare wheel is left alone so the page keeps scrolling normally.
+  /* Plain wheel — no modifier, as asked. preventDefault only while the
+     pointer is over the rail, so the page scrolls normally everywhere
+     else. Non-passive, or preventDefault is ignored. */
   useEffect(() => {
     const el = scroller.current;
-    if (!el || isMobile) return;
+    if (!el) return;
     const onWheel = e => {
-      if (!e.ctrlKey && !e.metaKey) return;
+      const primary = isMobile ? e.deltaY : (Math.abs(e.deltaY) >= Math.abs(e.deltaX) ? e.deltaY : e.deltaX);
+      if (!primary) return;
       e.preventDefault();
-      zoomTo(zoom + (e.deltaY < 0 ? 1 : -1));
+      const r = el.getBoundingClientRect();
+      const offset = isMobile ? e.clientY - r.top : e.clientX - r.left;
+      zoomAround(wheelZoom(zoom, primary), offset);
     };
     el.addEventListener('wheel', onWheel, { passive: false });
     return () => el.removeEventListener('wheel', onWheel);
-  }, [zoom, zoomTo, isMobile]);
+  }, [zoom, zoomAround, isMobile]);
 
-  // Open centred on today. Once per mount, or scrolling by hand would
-  // keep snapping back.
-  const centred = useRef(false);
-  useEffect(() => {
-    if (isMobile || centred.current || !geo || !scroller.current) return;
-    centred.current = true;
-    centreOnToday(false);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isMobile, !!geo]);
-
-  function centreOnToday(smooth = true) {
+  /** Put today at its anchor. Also the "jump to today" action. */
+  const goToToday = useCallback((smooth = true) => {
     const el = scroller.current;
     if (!el || !geo) return;
-    el.scrollTo({ left: Math.max(0, geo.today - el.clientWidth / 2), behavior: smooth ? 'smooth' : 'auto' });
-  }
+    const target = Math.max(0, geo.today - el[axis.len] * TODAY_ANCHOR);
+    el.scrollTo({ [axis.start]: target, behavior: smooth ? 'smooth' : 'auto' });
+  }, [geo, axis.len, axis.start]);
 
-  /** A click that followed a drag is a pan, not a selection. */
-  const selectIfNotDragging = id => { if (!movedRef.current) onSelect(id); };
+  /* Once per mount, and only AFTER the viewport has been measured.
+     Placing on the first render used the 1200px guess; the real 1328
+     arrived a frame later, which moved every pixel on the rail and left
+     today at 82% instead of 72%. Depending on `viewport` waits for the
+     real number. */
+  const placed = useRef(false);
+  useEffect(() => {
+    if (placed.current || !geo || viewport == null || !scroller.current) return;
+    placed.current = true;
+    goToToday(false);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [!!geo, viewport]);
+
+  const select = id => { if (!movedRef.current) onSelect(id); };
 
   if (!trips.length) return null;
 
-  /* ── Phone: a vertical spine ── */
-  if (isMobile) {
-    let lastYear = null;
-    return (
-      <div className="hol-vrail">
-        <div className="hol-vrail-line" aria-hidden="true" />
-        {trips.map(trip => {
-          const year = dayAt(trip.from) ? dayAt(trip.from).getFullYear() : null;
-          const showYear = year && year !== lastYear;
-          if (year) lastYear = year;
-          const past = isPast(trip, now);
-          const sel = trip.id === selectedId;
-          return (
-            <div key={trip.id} className="hol-vrail-item">
-              {showYear && <div className="hol-vrail-year">{year}</div>}
-              <button
-                type="button"
-                className={`hol-vstop${sel ? ' is-sel' : ''}${past ? ' is-past' : ''}`}
-                aria-current={sel ? 'true' : undefined}
-                onClick={() => onSelect(trip.id)}
-              >
-                <span className={`hol-dot${sel ? ' is-sel' : ''}${past ? ' is-past' : ''}`} aria-hidden="true" />
-                <span className="hol-vstop-body">
-                  <Thumb trip={trip} selected={sel} past={past} />
-                  <span className="hol-vstop-name">{trip.dest || 'Untitled'}</span>
-                  <span className="hol-vstop-when">
-                    {trip.from ? fmt(trip.from, { day: 'numeric', month: 'short' }) : 'TBC'}
-                  </span>
-                </span>
-              </button>
-            </div>
-          );
-        })}
-      </div>
-    );
-  }
-
-  /* ── Desktop: a horizontal rail ── */
-  const ticks = railTicks(geo);
-  const stops = railStops(trips, geo, selectedId);
-  const undated = trips.filter(t => !dayAt(t.from));
+  const vertical = isMobile;
 
   return (
-    <div className="hol-rail-card" data-hub-module="holiday-rail" data-hub-module-label="Timeline">
+    <div className={`hol-rail-card${vertical ? ' is-vertical' : ''}`}
+         data-hub-module="holiday-rail" data-hub-module-label="Timeline">
       <div className="hol-rail-head">
         <span className="hol-rail-eyebrow">Timeline</span>
-        <span className="hol-rail-line" aria-hidden="true" />
-        <span className="hol-rail-key">
-          <span><i className="hol-key-dot is-up" />Upcoming</span>
-          <span><i className="hol-key-dot is-past" />Archived</span>
-        </span>
-
+        {!vertical && <span className="hol-rail-line" aria-hidden="true" />}
         <span className="hol-zoom" role="group" aria-label="Timeline zoom">
-          <button type="button" className="hol-zoom-btn" onClick={() => zoomTo(zoom - 1)}
-                  disabled={zoom === 0} aria-label="Zoom out">−</button>
-          <span className="hol-zoom-level" aria-live="polite">{zoomLabel(ZOOM_LEVELS[zoom])}</span>
-          <button type="button" className="hol-zoom-btn" onClick={() => zoomTo(zoom + 1)}
-                  disabled={zoom === ZOOM_LEVELS.length - 1} aria-label="Zoom in">+</button>
+          <button type="button" className="hol-zoom-btn"
+                  onClick={() => zoomAround(zoom / ZOOM_STEP, (scroller.current?.[axis.len] || 0) / 2)}
+                  aria-label="Zoom out">−</button>
+          <span className="hol-zoom-level" aria-live="polite">{zoomLabel(zoom)}</span>
+          <button type="button" className="hol-zoom-btn"
+                  onClick={() => zoomAround(zoom * ZOOM_STEP, (scroller.current?.[axis.len] || 0) / 2)}
+                  aria-label="Zoom in">+</button>
         </span>
-
-        <button type="button" className="hol-rail-jump" onClick={() => centreOnToday()}>Jump to today</button>
+        <button type="button" className="hol-rail-jump" onClick={() => goToToday()}>Today</button>
       </div>
 
       <div
@@ -232,74 +215,76 @@ export default function TripRail({ trips, selectedId, onSelect, now = new Date()
         onPointerCancel={endDrag}
       >
         {geo ? (
-          <div className="hol-rail-inner" style={{ width: geo.width + 'px' }}>
+          <div className="hol-rail-inner" style={{ [axis.size]: geo.width + 'px' }}>
             <div className="hol-rail-track" aria-hidden="true" />
 
             {ticks.map(t => (
-              <div key={t.key} className={`hol-tick${t.isYear ? ' is-year' : ''}`} style={{ left: t.left + 'px' }} aria-hidden="true">
+              <div key={t.key} className={`hol-tick${t.isYear ? ' is-year' : ''}`}
+                   style={{ [axis.start]: t.left + 'px' }} aria-hidden="true">
                 <i />
                 <span>{t.label}</span>
               </div>
             ))}
 
-            <div className="hol-today" style={{ left: geo.today + 'px' }} aria-hidden="true">
+            <div className="hol-today" style={{ [axis.start]: geo.today + 'px' }} aria-hidden="true">
               <span>Today</span>
             </div>
 
-            {stops.map(mark => {
-              /* A pile-up too tight to draw as separate targets. One
-                 marker with a count; clicking it zooms in, which pulls
-                 the trips apart — the move you were going to make. At
-                 the tightest zoom there is nowhere further to go, so it
-                 selects the first of them instead of doing nothing. */
-              if (mark.kind === 'cluster') {
-                const names = mark.trips.map(t => t.dest || 'Untitled').join(', ');
-                const anySel = mark.trips.some(t => t.id === selectedId);
-                return (
-                  <button
-                    key={'c' + mark.left}
-                    type="button"
-                    className={`hol-cluster${anySel ? ' is-sel' : ''}`}
-                    style={{ left: mark.left + 'px' }}
-                    title={`${mark.count} trips close together — ${names}. Click to zoom in.`}
-                    aria-label={`${mark.count} trips close together: ${names}. Zoom in to separate them.`}
-                    onClick={() => {
-                      if (movedRef.current) return;
-                      if (zoom < ZOOM_LEVELS.length - 1) zoomTo(zoom + 1);
-                      else onSelect(mark.trips[0].id);
-                    }}
-                  >{mark.count}</button>
-                );
-              }
-
-              const { trip, left, tier, showName } = mark;
-              const past = isPast(trip, now);
-              const sel = trip.id === selectedId;
+            {bands.map(band => {
+              const t = band.trip;
+              const past = isPast(t, now);
+              const nights = nightsOf(t);
+              const when = `${fmt(t.from, { day: 'numeric', month: 'short' })}${
+                nights ? ` · ${nights} night${nights === 1 ? '' : 's'}` : ''}`;
               return (
                 <button
-                  key={trip.id}
+                  key={t.id}
                   type="button"
-                  className={`hol-stop is-${tier}${showName ? ' is-named' : ''}${sel ? ' is-sel' : ''}${past ? ' is-past' : ''}`}
-                  style={{ left: left + 'px' }}
-                  aria-current={sel ? 'true' : undefined}
-                  /* The full label is on the button whatever the density,
-                     so a stop shown as a bare dot is still reachable and
-                     still says what it is. */
-                  title={`${trip.dest || 'Untitled'} — ${fmt(trip.from, { day: 'numeric', month: 'long', year: 'numeric' })}`}
-                  aria-label={`${trip.dest || 'Untitled'}, ${fmt(trip.from, { day: 'numeric', month: 'long', year: 'numeric' })}`}
-                  onClick={() => selectIfNotDragging(trip.id)}
+                  className={`hol-band${band.selected ? ' is-sel' : ''}${past ? ' is-past' : ''}${
+                    band.depth ? ' is-nested' : ''}`}
+                  style={{
+                    [axis.start]: band.start + 'px',
+                    [axis.size]: band.size + 'px',
+                    // A trip booked inside a longer one insets and draws
+                    // over it rather than disappearing underneath.
+                    ...(band.depth ? { '--band-inset': band.depth * 10 + 'px', zIndex: 3 + band.depth } : null),
+                    ...(t.imageUrl ? { '--band-photo': `url("${String(t.imageUrl).replace(/["\\]/g, '')}")` } : null),
+                  }}
+                  aria-current={band.selected ? 'true' : undefined}
+                  title={`${t.dest || 'Untitled'} — ${when}`}
+                  aria-label={`${t.dest || 'Untitled'}, ${when}`}
+                  onClick={() => select(t.id)}
                 >
-                  {tier === 'full' && <Thumb trip={trip} selected={sel} past={past} />}
-                  {(tier !== 'dot' || showName) && <span className="hol-stop-name">{trip.dest || 'Untitled'}</span>}
-                  <span className={`hol-dot${sel ? ' is-sel' : ''}${past ? ' is-past' : ''}`} aria-hidden="true" />
-                  {tier === 'full' && (
-                    <span className="hol-stop-when">
-                      {fmt(trip.from, { day: 'numeric', month: 'short' })} ’{String(dayAt(trip.from).getFullYear()).slice(2)}
+                  <span className="hol-band-scrim" aria-hidden="true" />
+                  {band.labelInside && (
+                    <span className="hol-band-label">
+                      <span className="hol-band-name">{t.dest || 'Untitled'}</span>
+                      <span className="hol-band-when">{when}</span>
                     </span>
                   )}
                 </button>
               );
             })}
+
+            {/* Labels for bands too narrow to hold their own. Anchored to
+                the band's leading edge and packed into rows, with a
+                leader rule down onto the band so a name a row up is
+                still unambiguously that band's name. */}
+            {bands.filter(b => !b.labelInside).map(band => (
+              <button
+                key={'l' + band.trip.id}
+                type="button"
+                className={`hol-band-out${band.selected ? ' is-sel' : ''}${isPast(band.trip, now) ? ' is-past' : ''}`}
+                style={{
+                  [axis.start]: band.outAt + 'px',
+                  '--out-row': band.outRow || 0,
+                  '--out-lead': (band.lead || 0) + 'px',
+                }}
+                onClick={() => select(band.trip.id)}
+                tabIndex={-1}
+                aria-hidden="true"
+              >{band.trip.dest || 'Untitled'}</button>
+            ))}
           </div>
         ) : (
           <div className="hol-rail-nodates">No trip has dates yet — add one and it lands on the timeline.</div>
@@ -307,7 +292,7 @@ export default function TripRail({ trips, selectedId, onSelect, now = new Date()
       </div>
 
       <div className="hol-rail-foot">
-        <span className="hol-rail-hint">Drag to pan · ⌘/Ctrl + scroll to zoom</span>
+        <span className="hol-rail-hint">Drag to pan · scroll to zoom</span>
         {undated.length > 0 && (
           <span className="hol-undated">
             <span className="hol-rail-eyebrow">No dates yet</span>
@@ -321,14 +306,4 @@ export default function TripRail({ trips, selectedId, onSelect, now = new Date()
       </div>
     </div>
   );
-}
-
-/** "1 day" / "1 week" per ~44px — a scale you can reason about, rather
- *  than a raw px-per-day figure nobody can picture. */
-function zoomLabel(pxPerDay) {
-  const daysPerTick = 44 / pxPerDay;
-  if (daysPerTick <= 5) return 'Days';
-  if (daysPerTick <= 20) return 'Weeks';
-  if (daysPerTick <= 75) return 'Months';
-  return 'Years';
 }
