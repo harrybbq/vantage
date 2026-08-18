@@ -40,8 +40,9 @@
  * keep both in lockstep when editing.
  */
 
-import { metVisionIds } from '../visions/derive';
-import { VISIONS_BY_ID } from '../visions/definitions';
+// Explicit .js — the pure-lib convention in this repo, so the module
+// stays runnable under plain node for the parity check in scripts/.
+import { VISIONS_BY_ID } from '../visions/definitions.js';
 
 const DAY_MS = 86_400_000;
 const TIME_SPACING_MS = 7 * DAY_MS;

@@ -24,6 +24,25 @@ const CORS = {
 
 const STALE_MS = 24 * 60 * 60 * 1000;
 const SNAPSHOT_MIN_AGE_MS = 6 * 24 * 60 * 60 * 1000; // ≥6 days = "weekly"
+
+/**
+ * The day the rating formula was corrected.
+ *
+ * Weekly climb is `today's OVR − the OVR we stored a week ago`, which
+ * only means anything if both were computed the same way. The server
+ * had been pricing every vision at a flat 8 xp against a catalogue
+ * running 50–1000, so correcting it moves most users up by several
+ * points at once. Comparing across that would have handed everyone a
+ * one-off climb they did not earn — in the same week the group league
+ * starts scoring on exactly that number.
+ *
+ * So snapshots from before the correction are not read. Climb shows as
+ * "—" until a week of comparable ones exists, which is the truthful
+ * answer to "how much did you move this week" when the ruler changed.
+ * The rows stay in the table; nothing is deleted. Once past
+ * this + 7 days the constant is inert and can go.
+ */
+const FORMULA_EPOCH_ISO = '2026-08-18T00:00:00.000Z';
 const GLOBAL_TOP_N = 100;
 const WEEKLY_CANDIDATE_POOL = 500; // wider net for weekly-climb candidates
 
@@ -63,7 +82,9 @@ async function fetchSnapshotOvrs(supabaseUrl, serviceKey, userIds) {
   const cutoffIso = new Date(Date.now() - SNAPSHOT_MIN_AGE_MS).toISOString();
   const inClause = `(${userIds.join(',')})`;
   const res = await sb(supabaseUrl, serviceKey,
-    `/rest/v1/rating_snapshots?user_id=in.${inClause}&snapshotted_at=lte.${cutoffIso}&select=user_id,ovr,snapshotted_at&order=snapshotted_at.desc`
+    `/rest/v1/rating_snapshots?user_id=in.${inClause}&snapshotted_at=lte.${cutoffIso}` +
+    `&snapshotted_at=gte.${FORMULA_EPOCH_ISO}` +
+    `&select=user_id,ovr,snapshotted_at&order=snapshotted_at.desc`
   );
   if (!res.ok) return new Map();
   const rows = await res.json();
