@@ -5457,7 +5457,11 @@ button:active:not(:disabled),
 .vitals-seg-btn:last-child { border-right: none; }
 .vitals-seg-btn.on { background: rgba(var(--em-rgb), .12); color: var(--em); font-weight: 700; }
 .vitals-chart-wrap { position: relative; }
-.vitals-chart { width: 100%; height: auto; display: block; touch-action: none; }
+/* Fixed height, measured width — the viewBox is set from the element's
+   own width so one SVG unit is one CSS pixel and nothing scales. With
+   `height:auto` and a fixed viewBox this chart grew to 620px tall on a
+   wide window and took the axis labels up with it. */
+.vitals-chart { width: 100%; height: 200px; display: block; touch-action: none; }
 .vitals-grid { stroke: var(--border); stroke-width: 1; }
 .vitals-tick { font-family: var(--mono); font-size: 10px; fill: var(--text-muted); }
 .vitals-line { fill: none; stroke: var(--em); stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
