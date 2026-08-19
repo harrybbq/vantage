@@ -8,6 +8,21 @@
 
 .grp-wrap{ display:flex; flex-direction:column; gap:14px; }
 
+/* ── The top row ──
+   The group's week on the left, who produced it on the right, as one
+   row of EQUAL height. They are two halves of the same sentence; the
+   first build stacked them, which pushed the podium below the fold on
+   a laptop and made them read as unrelated cards. 1.35fr / 1fr because
+   the left card carries three blocks and the right one carries three
+   bars. */
+.grp-top{
+  display:grid; grid-template-columns:minmax(0,1.35fr) minmax(0,1fr);
+  gap:14px; align-items:stretch;
+}
+@media (max-width:1000px){
+  .grp-top{ grid-template-columns:1fr; }
+}
+
 .grp-card{
   border:var(--border-widget); border-radius:18px; background:var(--surface);
   box-shadow:var(--accent-glow); padding:18px;
@@ -107,11 +122,23 @@
 .grp-split-key b{ font-family:var(--mono); font-size:12px; color:var(--text); }
 
 /* ── Podium ───────────────────────────────────────────────────────── */
-/* A podium, not three banners: capped so the first step stays a step.
-   Left-aligned rather than centred because everything else on the card
-   starts at the same edge. */
-.grp-podium{ display:flex; align-items:flex-end; gap:10px; max-width:420px; }
-.grp-pod{ flex:1; min-width:0; display:flex; flex-direction:column; align-items:center; gap:7px; }
+/* The card is a column so the bars can rest on a baseline just above
+   the note however tall the hero beside it turns out to be — which is
+   what makes the two cards read as one row rather than two stacked
+   things that happen to line up. */
+.grp-podium-card{ display:flex; flex-direction:column; }
+.grp-podium{
+  display:flex; align-items:flex-end; justify-content:center; gap:10px;
+  flex:1; min-height:132px;
+}
+/* Each step is a THIRD of the podium, whether or not three people
+   climbed. Sharing the space between however many there are turned a
+   group with one climber into a single gold banner half the card wide,
+   which is the shape of a trophy case, not a podium. */
+.grp-pod{
+  flex:0 0 clamp(74px, 30%, 118px); min-width:0;
+  display:flex; flex-direction:column; align-items:center; gap:7px;
+}
 .grp-pod-av{
   width:42px; height:42px; border-radius:50%; object-fit:cover;
   display:flex; align-items:center; justify-content:center;
@@ -128,9 +155,12 @@
   width:100%; border-radius:10px 10px 0 0; padding:8px 4px 0;
   display:flex; flex-direction:column; align-items:center; gap:2px;
 }
-.grp-pod-bar.is-p0{ height:92px; background:rgba(200,151,10,.10); border:1px solid rgba(200,151,10,.34); }
-.grp-pod-bar.is-p1{ height:74px; background:rgba(143,146,150,.10); border:1px solid rgba(143,146,150,.34); }
-.grp-pod-bar.is-p2{ height:60px; background:rgba(184,115,46,.10); border:1px solid rgba(184,115,46,.34); }
+/* The third step still has to hold three lines — place, climb, coins.
+   At 60px the coin line was clipped by two pixels, which reads as a
+   rendering fault rather than a short podium. 68 is the floor. */
+.grp-pod-bar.is-p0{ height:96px; background:rgba(200,151,10,.10); border:1px solid rgba(200,151,10,.34); }
+.grp-pod-bar.is-p1{ height:80px; background:rgba(143,146,150,.10); border:1px solid rgba(143,146,150,.34); }
+.grp-pod-bar.is-p2{ height:68px; background:rgba(184,115,46,.10); border:1px solid rgba(184,115,46,.34); }
 .grp-pod-place{ font-size:19px; font-weight:800; line-height:1; }
 .grp-pod-bar.is-p0 .grp-pod-place{ color:#c8970a; }
 .grp-pod-bar.is-p1 .grp-pod-place{ color:#8f9296; }

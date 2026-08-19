@@ -27,7 +27,9 @@ export default function DivisionBoard({ data, division, onPickDivision }) {
   const myGroupId = data?.group?.id ?? null;
   const shown = data?.division?.num ?? division;
   const nameOf = num => divisions.find(d => d.num === num)?.name || '—';
-  const settling = standings.some(g => g.zone !== 'held');
+  /* How many move comes from the server with the standings, so the
+     footnote cannot drift from what the settle actually does. */
+  const moved = standings[0]?.moved ?? 0;
 
   return (
     <div className="grp-wrap">
@@ -100,11 +102,11 @@ export default function DivisionBoard({ data, division, onPickDivision }) {
               </div>
             ))}
             <p className="grp-foot-note">
-              {settling
-                ? <>Top {3} promote to {nameOf(Math.max(1, shown - 1))} · bottom {3} drop to{' '}
+              {moved > 0
+                ? <>Top {moved} promote{shown === 1 ? '' : <> to {nameOf(shown - 1)}</>} · bottom {moved} drop to{' '}
                    {shown === 10 ? 'nowhere — Iron is the floor' : nameOf(shown + 1)} · everyone between holds.</>
-                : <>Nobody moves out of a division this small — promotion and relegation start once
-                   there are eight groups in it. The table still ranks.</>}
+                : <>Nobody moves out of a division this small — it takes three groups before one can
+                   go up and another down. The table still ranks.</>}
             </p>
           </>
         )}

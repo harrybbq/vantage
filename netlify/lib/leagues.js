@@ -43,14 +43,38 @@ const DIVISIONS = [
 ];
 
 const MAX_SEATS = 20;
-const PROMOTE_N = 3;
-const RELEGATE_N = 3;
 /** Paid to the top three climbers in each group every Monday. */
 const COIN_AWARD = [300, 200, 100];
-/** Below this many groups a division is too small to promote or relegate
- *  anyone: with four groups, "bottom three go down" is everyone but the
- *  winner, which is not a league, it is a cull. */
-const MIN_GROUPS_TO_SETTLE = 8;
+
+/* ── How many go up and down ──────────────────────────────────────────
+   Scaled to the size of the division rather than fixed at three, which
+   only made sense once a division was full.
+
+     1–2 groups   nobody moves. With two, "one up one down" is the whole
+                  division changing places every week for ever.
+     3–7          1 up, 1 down — the smallest arrangement where a middle
+                  exists to hold. At three that is exactly one of each.
+     8–12         2 up, 2 down
+     13+          3 up, 3 down, and no further: a league where a fifth of
+                  the table moves each week has no standings, it has
+                  weather.
+
+   Compounding one more each five groups keeps the proportion roughly
+   constant — about a fifth of a division moves in each direction —
+   while the floor and the cap keep both ends sane. */
+const MIN_GROUPS_TO_SETTLE = 3;
+const GROUPS_PER_EXTRA_MOVE = 5;
+const MAX_MOVED = 3;
+
+function movementFor(groupCount) {
+  if (!Number.isFinite(groupCount) || groupCount < MIN_GROUPS_TO_SETTLE) return 0;
+  const banded = Math.floor((groupCount - MIN_GROUPS_TO_SETTLE) / GROUPS_PER_EXTRA_MOVE) + 1;
+  /* Someone must always hold. Without this a future tweak to the bands
+     could promote and relegate the entire division in one week, which
+     is a shuffle rather than a result. */
+  const room = Math.floor((groupCount - 1) / 2);
+  return Math.max(0, Math.min(banded, MAX_MOVED, room));
+}
 
 /** Monday 00:00 UTC of the week containing `now`, as a Date. */
 function weekStart(now = new Date()) {
@@ -153,19 +177,20 @@ function groupScore(members) {
 function rankGroups(groups) {
   const sorted = groups.slice().sort((a, b) =>
     (b.score - a.score) || (new Date(a.createdAt) - new Date(b.createdAt)) || a.id.localeCompare(b.id));
-  const settling = sorted.length >= MIN_GROUPS_TO_SETTLE;
+  const moved = movementFor(sorted.length);
   return sorted.map((g, i) => {
     const position = i + 1;
-    const promoted = settling && position <= PROMOTE_N && g.division > 1;
-    const relegated = settling && position > sorted.length - RELEGATE_N && g.division < 10;
-    return { ...g, position, zone: promoted ? 'promoted' : relegated ? 'relegated' : 'held' };
+    const promoted = moved > 0 && position <= moved && g.division > 1;
+    const relegated = moved > 0 && position > sorted.length - moved && g.division < 10;
+    return { ...g, position, moved, zone: promoted ? 'promoted' : relegated ? 'relegated' : 'held' };
   });
 }
 
 const divisionName = num => (DIVISIONS.find(d => d.num === num) || DIVISIONS[9]).name;
 
 module.exports = {
-  DIVISIONS, MAX_SEATS, PROMOTE_N, RELEGATE_N, COIN_AWARD, MIN_GROUPS_TO_SETTLE, CATEGORIES,
+  DIVISIONS, MAX_SEATS, COIN_AWARD, MIN_GROUPS_TO_SETTLE, MAX_MOVED, GROUPS_PER_EXTRA_MOVE,
+  movementFor, CATEGORIES,
   weekStart, weekStartDate, sb, fetchBaselines, memberScore, groupScore, groupSplit,
   rankGroups, divisionName,
 };
