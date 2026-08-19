@@ -9,7 +9,7 @@
  * reachable without hovering. Line/marks wear the theme accent
  * (var(--em)); all text wears text tokens.
  */
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { supabase } from '../lib/supabase';
 import { parseHealthExport, applyHealthImport } from '../lib/appleHealth';
 import { syncWhoop } from '../lib/whoopClient';
@@ -41,7 +41,17 @@ const RANGES = [
 ];
 
 const DAY_MS = 86400000;
-const W = 640, H = 200, PAD_L = 44, PAD_R = 16, PAD_T = 14, PAD_B = 26;
+/* The chart is drawn at 1 SVG unit = 1 CSS pixel, with the width
+   measured rather than fixed. It used to be a fixed 640-wide viewBox
+   scaled by `width:100%`, which is fine in an 800px column and absurd
+   in a 2000px one: the aspect ratio is 3.2:1, so a full-width card made
+   a chart 620px tall that filled the screen. Scaling also blew up the
+   type — a 10px axis label rendered at 31px.
+
+   Measuring keeps the height at H whatever the window does, and keeps
+   every label the size it was designed at. */
+const BASE_W = 640, H = 200, PAD_L = 44, PAD_R = 16, PAD_T = 14, PAD_B = 26;
+const MIN_W = 160;
 
 function niceTicks(min, max) {
   if (min === max) { min -= 1; max += 1; }
@@ -545,6 +555,24 @@ export default function VitalsHistoryCard({ S, update }) {
   const [editDraft, setEditDraft] = useState('');
   const [extraDate, setExtraDate] = useState(null); // day pulled into the table via the date picker
   const svgRef = useRef(null);
+  const wrapRef = useRef(null);
+  // Falls back to BASE_W for the first paint and for any environment
+  // without a layout (tests, SSR) — never 0, which would collapse the
+  // scales to a division by zero.
+  const [W, setW] = useState(BASE_W);
+
+  useLayoutEffect(() => {
+    const el = wrapRef.current;
+    if (!el || typeof ResizeObserver === 'undefined') return;
+    const measure = () => {
+      const w = Math.round(el.clientWidth);
+      if (w >= MIN_W) setW(prev => (prev === w ? prev : w));
+    };
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
 
   // Show the wearable row when EITHER device is connected, or any
   // historical wearable value exists — disconnecting must never hide
@@ -620,11 +648,22 @@ export default function VitalsHistoryCard({ S, update }) {
   // Table always shows the vitals log (not the chart's metric source —
   // macro history reads as a chart, the table is the vitals record).
   const vitalsLog = S.vitalsLog || {};
+  /* Local date parts, not toISOString — that is UTC, and west of
+     Greenwich it names yesterday for most of the evening. */
+  const now = new Date();
+  const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+
   const tableRows = useMemo(() => {
-    const dates = new Set(Object.keys(vitalsLog).sort().reverse().slice(0, 10));
+    /* Today is always the first row, whether or not anything has been
+       logged into it. The table was built purely from days that already
+       had data, so on a fresh morning there was no row for today to tap
+       — you had to go through "Edit another day" to reach the day you
+       are actually in, which is the one case the picker exists to
+       AVOID. An empty row costs one line and is the whole entry point. */
+    const dates = new Set([todayStr, ...Object.keys(vitalsLog).sort().reverse().slice(0, 10)]);
     if (extraDate) dates.add(extraDate);
     return [...dates].sort().reverse().map(date => ({ date, ...(vitalsLog[date] || {}) }));
-  }, [vitalsLog, extraDate]);
+  }, [vitalsLog, extraDate, todayStr]);
 
   // ── Editing previous days ──
   // Any weight/sleep/rhr cell is tap-to-edit; committing writes the
@@ -685,8 +724,6 @@ export default function VitalsHistoryCard({ S, update }) {
       </button>
     );
   }
-  const today = new Date();
-  const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
   const addDayPicker = update ? (
     <div className="vitals-addday">
       <label className="vitals-addday-label">
@@ -768,7 +805,7 @@ export default function VitalsHistoryCard({ S, update }) {
       </div>
 
       {hasChart ? (
-        <div className="vitals-chart-wrap">
+        <div className="vitals-chart-wrap" ref={wrapRef}>
           <svg
             ref={svgRef}
             className="vitals-chart"
