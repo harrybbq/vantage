@@ -1,0 +1,450 @@
+/* ══ Track · Diet and Vitals ═══════════════════════════════════════════
+   Two panels that share a skeleton: a main column and a rail, swapped
+   left-to-right between them because each has a different "big thing".
+   Diet's is the day; Vitals' is the chart.
+
+   Written against theme tokens, not the mockup's cream palette — the
+   app has two themes and a hard-coded #fdfaf3 is a hole punched in Dark
+   OS. The metric colours ARE literal, because they are identities: Rest
+   HR has to be the same red on the tile, the chip and the chart.
+
+   ── Sizing ──
+   Every proportion here is bounded at BOTH ends. The lesson from the
+   Track calendar: a fixed height with a width that grows is only half a
+   rule, and at 2560px the half that is missing is the one that matters.
+   So the wrap caps its width, the rail is a clamp, and anything drawn
+   (rings, charts) is either a fixed-size SVG or measures itself. */
+
+.tv-wrap{
+  display:grid; gap:14px; align-items:start;
+  /* A day's food and a month of readings do not get better past this.
+     Centred so the space left over on a wide display is symmetrical. */
+  max-width:1560px; margin-inline:auto;
+}
+/* Diet leads with the day, so the rail sits on the right;
+   Vitals leads with the chart, so the rail sits on the left. */
+.tv-diet{ grid-template-columns:minmax(0,1fr) clamp(280px, 26%, 380px); }
+.tv-vitals{ grid-template-columns:clamp(280px, 25%, 360px) minmax(0,1fr); }
+.tv-vitals .tv-rail{ order:-1; }
+@media (max-width:1000px){
+  .tv-diet, .tv-vitals{ grid-template-columns:1fr; }
+  .tv-vitals .tv-rail{ order:0; }
+}
+.tv-main, .tv-rail{ display:flex; flex-direction:column; gap:14px; min-width:0; }
+
+.tv-card{
+  border:var(--border-widget); border-radius:18px; background:var(--surface);
+  box-shadow:var(--accent-glow); padding:18px; min-width:0;
+  backdrop-filter:blur(20px) saturate(1.1);
+  -webkit-backdrop-filter:blur(20px) saturate(1.1);
+}
+
+/* A labelled rule — the section header used throughout both panels. */
+.tv-rule{ display:flex; align-items:center; gap:9px; margin-bottom:14px; }
+.tv-rule > span{
+  font-family:var(--mono); font-size:9px; letter-spacing:1.7px;
+  text-transform:uppercase; color:var(--text-muted); white-space:nowrap;
+}
+.tv-rule > i{ flex:1; height:1px; background:var(--border); }
+.tv-rule > em{
+  font-family:var(--mono); font-size:8.5px; letter-spacing:1.2px; font-style:normal;
+  text-transform:uppercase; color:var(--text-muted); white-space:nowrap;
+}
+.tv-rule-bare{ margin-bottom:6px; }
+.tv-chip-btn{
+  font-family:var(--mono); font-size:8.5px; letter-spacing:1.2px; text-transform:uppercase;
+  padding:6px 11px; border-radius:999px; cursor:pointer; white-space:nowrap;
+  border:1px solid rgba(var(--em-rgb),.32); background:transparent; color:var(--em);
+}
+.tv-chip-btn:hover{ background:rgba(var(--em-rgb),.1); }
+
+.tv-note{
+  margin:12px 0 0; font-size:11.5px; line-height:1.6; color:var(--text-muted);
+}
+.tv-empty{
+  padding:22px 4px; text-align:center; font-size:12.5px; color:var(--text-muted); line-height:1.6;
+}
+.tv-empty-sm{ padding:14px 4px; font-size:12px; }
+
+.tv-ring-track{ fill:none; stroke:rgba(127,127,127,.18); }
+
+/* ══ Diet ══════════════════════════════════════════════════════════════ */
+
+.tv-energy{ display:flex; align-items:center; gap:24px; flex-wrap:wrap; }
+.tv-cal-ring{ position:relative; width:168px; height:168px; flex:none; }
+.tv-cal-ring svg{ display:block; width:168px; height:168px; }
+.tv-cal-mid{
+  position:absolute; inset:0; display:flex; flex-direction:column;
+  align-items:center; justify-content:center; gap:1px; pointer-events:none;
+}
+.tv-cal-num{ font-size:34px; font-weight:800; line-height:1; letter-spacing:-1.2px; color:var(--text); }
+.tv-cal-goal{ font-family:var(--mono); font-size:10px; letter-spacing:1.1px; color:var(--text-muted); }
+.tv-cal-left{
+  font-family:var(--mono); font-size:9px; letter-spacing:1.1px; text-transform:uppercase;
+  color:var(--em); margin-top:5px;
+}
+.tv-cal-left.is-over{ color:#c0563f; }
+
+.tv-energy-side{ flex:1; min-width:280px; display:flex; flex-direction:column; gap:12px; }
+/* Capped, not stretched. In a 1000px main column the three cards would
+   otherwise be 260px each around a 72px ring, which is a lot of card
+   for four short numbers — the same "1fr across a wide panel" mistake
+   the group split legend made. */
+.tv-macros{
+  display:grid; grid-template-columns:repeat(3,minmax(0,1fr));
+  gap:10px; max-width:620px;
+}
+.tv-macro{
+  display:flex; flex-direction:column; align-items:center; gap:6px;
+  padding:12px 8px; border-radius:13px; border:1px solid var(--border);
+  background:rgba(127,127,127,.05); min-width:0;
+}
+.tv-macro-ring{ position:relative; width:72px; height:72px; }
+.tv-macro-ring svg{ display:block; width:72px; height:72px; }
+.tv-macro-pct{
+  position:absolute; inset:0; display:flex; align-items:center; justify-content:center;
+  font-family:var(--mono); font-size:12px; color:var(--text);
+}
+.tv-macro-lbl{
+  font-family:var(--mono); font-size:8.5px; letter-spacing:1.4px;
+  text-transform:uppercase; color:var(--text-muted);
+}
+.tv-macro-val{ font-family:var(--mono); font-size:12px; color:var(--text); }
+.tv-macro-val em{ font-style:normal; color:var(--text-muted); }
+.tv-macro-note{
+  font-family:var(--mono); font-size:8px; letter-spacing:1px;
+  text-transform:uppercase; color:var(--text-muted); min-height:10px;
+}
+
+.tv-strip{
+  display:flex; align-items:center; gap:14px; flex-wrap:wrap;
+  padding:11px 14px; border-radius:12px; border:1px solid var(--border);
+  background:rgba(127,127,127,.05);
+}
+.tv-strip-cell{ display:flex; flex-direction:column; gap:1px; }
+.tv-strip-lbl{
+  font-family:var(--mono); font-size:8px; letter-spacing:1.3px;
+  text-transform:uppercase; color:var(--text-muted);
+}
+.tv-strip-val{ font-family:var(--mono); font-size:13px; color:var(--text); }
+.tv-strip-val.is-burn{ color:#d99114; }
+.tv-strip-arrow{ font-family:var(--mono); font-size:12px; color:var(--text-muted); }
+.tv-strip-sep{ width:1px; height:26px; background:var(--border); }
+
+.tv-log-btn{
+  width:100%; min-height:52px; border-radius:13px; border:0; cursor:pointer;
+  font-size:15px; font-weight:600; letter-spacing:.2px; color:#fff;
+  background:linear-gradient(180deg, rgba(var(--em-rgb),.92) 0%, var(--em) 100%);
+  box-shadow:0 1px 0 rgba(255,255,255,.18) inset, 0 6px 18px rgba(var(--em-rgb),.26);
+}
+.tv-log-btn:hover{ filter:brightness(1.07); }
+
+/* ── The day, as a timeline ── */
+.tv-timeline{ position:relative; padding-left:64px; }
+.tv-timeline::before{
+  content:''; position:absolute; left:57px; top:8px; bottom:8px; width:2px;
+  background:linear-gradient(180deg, transparent, rgba(var(--em-rgb),.32) 12%, rgba(var(--em-rgb),.32) 88%, transparent);
+}
+.tv-tl-row{ position:relative; padding-bottom:9px; }
+.tv-tl-row:last-child{ padding-bottom:0; }
+.tv-tl-time{
+  position:absolute; left:-64px; top:14px; width:48px; text-align:right;
+  font-family:var(--mono); font-size:11px; color:var(--text-muted);
+}
+.tv-tl-dot{
+  position:absolute; left:-11px; top:17px; width:10px; height:10px; border-radius:50%;
+  background:var(--em); border:2px solid var(--surface);
+}
+.tv-tl-card{
+  display:flex; align-items:center; gap:12px; min-width:0;
+  padding:10px 14px; border-radius:12px; border:1px solid var(--border);
+  background:rgba(127,127,127,.05);
+}
+.tv-tl-body{ flex:1; min-width:0; }
+.tv-tl-name{ display:flex; align-items:center; gap:8px; min-width:0; }
+.tv-tl-name > span{
+  font-size:13.5px; font-weight:600; color:var(--text);
+  overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+}
+.tv-tl-name > em{
+  flex:none; font-family:var(--mono); font-size:7.5px; letter-spacing:1.1px;
+  text-transform:uppercase; font-style:normal; padding:2px 6px; border-radius:4px;
+  color:var(--text-muted); border:1px solid var(--border); white-space:nowrap;
+}
+.tv-tl-macros{
+  display:flex; gap:12px; margin-top:4px; flex-wrap:wrap;
+  font-family:var(--mono); font-size:10px; color:var(--text-muted);
+}
+.tv-tl-kcal{ text-align:right; flex:none; }
+.tv-tl-kcal b{ display:block; font-family:var(--mono); font-size:15px; font-weight:400; color:var(--text); }
+.tv-tl-kcal em{
+  display:block; font-family:var(--mono); font-size:7.5px; letter-spacing:1.2px;
+  text-transform:uppercase; font-style:normal; color:var(--text-muted);
+}
+.tv-tl-x{
+  flex:none; width:28px; height:28px; border-radius:8px; cursor:pointer;
+  border:1px solid var(--border); background:transparent; color:var(--text-muted); font-size:12px;
+  opacity:0; transition:opacity .12s ease;
+}
+.tv-tl-row:hover .tv-tl-x, .tv-tl-x:focus-visible{ opacity:1; }
+.tv-tl-x:hover{ color:#c0563f; border-color:rgba(192,86,63,.45); }
+@media (hover:none){ .tv-tl-x{ opacity:1; } }
+
+/* ── The rail ── */
+.tv-recents{ display:flex; flex-direction:column; gap:6px; }
+.tv-recent{
+  display:flex; align-items:center; gap:10px; padding:9px 11px; border-radius:11px;
+  cursor:pointer; text-align:left; min-width:0;
+  border:1px solid var(--border); background:rgba(127,127,127,.05);
+}
+.tv-recent:hover{ border-color:rgba(var(--em-rgb),.4); background:rgba(var(--em-rgb),.07); }
+.tv-recent:disabled{ opacity:.55; cursor:default; }
+.tv-recent-tag{
+  width:28px; height:26px; flex:none; border-radius:8px;
+  display:flex; align-items:center; justify-content:center;
+  font-family:var(--mono); font-size:9px; color:var(--em);
+  border:1px solid rgba(var(--em-rgb),.28); background:rgba(var(--em-rgb),.08);
+}
+.tv-recent-body{ flex:1; min-width:0; display:flex; flex-direction:column; gap:2px; }
+.tv-recent-name{
+  font-size:13px; font-weight:500; color:var(--text);
+  overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+}
+.tv-recent-meta{
+  font-family:var(--mono); font-size:9px; color:var(--text-muted);
+  overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+}
+.tv-recent-kcal{ flex:none; font-family:var(--mono); font-size:12px; color:var(--text-muted); }
+.tv-recent-add{
+  flex:none; width:24px; height:24px; border-radius:7px;
+  display:flex; align-items:center; justify-content:center;
+  background:var(--em); color:#fff; font-size:13px; line-height:1;
+}
+
+.tv-week{ display:flex; align-items:flex-end; gap:7px; height:104px; }
+.tv-week-col{
+  flex:1; min-width:0; height:100%; display:flex; flex-direction:column;
+  align-items:center; justify-content:flex-end; gap:6px;
+}
+.tv-week-num{ font-family:var(--mono); font-size:8.5px; color:var(--text-muted); min-height:11px; }
+.tv-week-bar{
+  width:100%; border-radius:5px 5px 0 0; background:rgba(200,151,10,.55);
+  border:1px solid rgba(200,151,10,.5);
+}
+.tv-week-bar.is-on{ background:rgba(var(--em-rgb),.55); border-color:rgba(var(--em-rgb),.5); }
+.tv-week-bar.is-none{ background:rgba(127,127,127,.2); border-color:transparent; }
+.tv-week-day{
+  font-family:var(--mono); font-size:8px; letter-spacing:1px;
+  text-transform:uppercase; color:var(--text-muted);
+}
+.tv-week-col.is-today .tv-week-day{ color:var(--em); }
+.tv-week-key{
+  display:flex; align-items:center; gap:12px; margin-top:10px;
+  font-family:var(--mono); font-size:8.5px; letter-spacing:1.1px;
+  text-transform:uppercase; color:var(--text-muted);
+}
+.tv-week-key span{ display:inline-flex; align-items:center; gap:6px; }
+.tv-week-key i{ width:8px; height:8px; border-radius:2px; background:rgba(200,151,10,.7); }
+.tv-week-key .is-on{ color:var(--em); }
+.tv-week-key .is-on i{ background:currentColor; }
+
+/* ══ Vitals ════════════════════════════════════════════════════════════ */
+
+.tv-ready-top{ display:flex; align-items:center; gap:16px; }
+.tv-ring{ position:relative; width:112px; height:112px; flex:none; }
+.tv-ring svg{ display:block; width:112px; height:112px; }
+.tv-ring-arc{ fill:none; stroke:var(--ring-color); stroke-width:10; stroke-linecap:round; }
+.tv-ring-mid{
+  position:absolute; inset:0; display:flex; flex-direction:column;
+  align-items:center; justify-content:center; pointer-events:none;
+}
+.tv-ring-num{ font-size:30px; font-weight:800; line-height:1; color:var(--ring-color); }
+.tv-ring-state{
+  font-family:var(--mono); font-size:8px; letter-spacing:1.4px;
+  text-transform:uppercase; color:var(--text-muted); margin-top:3px;
+}
+.tv-ready-parts{ flex:1; min-width:0; display:flex; flex-direction:column; gap:9px; }
+.tv-part.is-off{ opacity:.5; }
+.tv-part-top{ display:flex; align-items:center; gap:7px; margin-bottom:4px; }
+.tv-part-lbl{
+  flex:1; min-width:0; font-family:var(--mono); font-size:8.5px; letter-spacing:1.2px;
+  text-transform:uppercase; color:var(--text-muted);
+  overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+}
+.tv-part-val{ font-family:var(--mono); font-size:10.5px; color:var(--text); }
+.tv-part-w{ font-family:var(--mono); font-size:8px; color:var(--text-muted); }
+.tv-part-bar{ height:5px; border-radius:3px; background:rgba(127,127,127,.18); overflow:hidden; }
+.tv-part-bar i{ display:block; height:100%; border-radius:3px; background:var(--em); }
+
+/* ── Today's tiles ──
+   Two columns at every width the rail is ever given. Fixed at two, not
+   auto-fit: a grid that reflows to three on a wide screen moves every
+   tile, and a tile you find by position is one you stop reading. */
+.tv-tiles{ display:grid; grid-template-columns:1fr 1fr; gap:7px; }
+.tv-tile{
+  display:flex; flex-direction:column; gap:5px; padding:11px; border-radius:12px;
+  cursor:pointer; text-align:left; min-width:0;
+  border:1px solid var(--border); background:rgba(127,127,127,.05);
+}
+.tv-tile:hover{ border-color:rgba(var(--em-rgb),.35); }
+.tv-tile.is-on{ border-color:var(--tile-color); background:color-mix(in srgb, var(--tile-color) 10%, transparent); }
+.tv-tile.is-locked{ opacity:.45; cursor:default; }
+.tv-tile-head{ display:flex; align-items:center; gap:6px; min-width:0; }
+.tv-tile-dot{ width:8px; height:8px; flex:none; border-radius:2px; background:var(--tile-color); }
+.tv-tile-lbl{
+  flex:1; min-width:0; font-family:var(--mono); font-size:8px; letter-spacing:1.2px;
+  text-transform:uppercase; color:var(--text-muted);
+  overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+}
+.tv-tile-src{
+  flex:none; font-family:var(--mono); font-size:7px; letter-spacing:.8px;
+  text-transform:uppercase; color:var(--text-muted);
+}
+.tv-tile-val{ display:flex; align-items:baseline; gap:4px; min-width:0; }
+.tv-tile-val b{ font-family:var(--mono); font-size:17px; font-weight:400; color:var(--text); }
+.tv-tile-val em{ font-family:var(--mono); font-size:9px; font-style:normal; color:var(--text-muted); }
+.tv-tile-stale{
+  font-family:var(--mono); font-size:7px; letter-spacing:.9px; text-transform:uppercase;
+  color:var(--text-muted); border:1px solid var(--border); border-radius:4px; padding:1px 4px;
+}
+.tv-tile-foot{ display:flex; align-items:center; gap:6px; min-width:0; }
+.tv-tile-foot svg{ display:block; width:100%; height:18px; min-width:0; }
+.tv-tile-trend{ flex:none; font-family:var(--mono); font-size:8.5px; color:var(--text-muted); }
+
+/* ── The chart ── */
+.tv-chart-head{ display:flex; align-items:flex-end; gap:14px; flex-wrap:wrap; margin-bottom:6px; }
+.tv-chart-now{ display:flex; align-items:baseline; gap:9px; flex-wrap:wrap; }
+.tv-chart-num{ font-size:36px; font-weight:800; line-height:1; letter-spacing:-1.1px; }
+.tv-chart-unit{ font-family:var(--mono); font-size:12px; color:var(--text-muted); }
+.tv-delta{
+  font-family:var(--mono); font-size:10px; letter-spacing:1px; text-transform:uppercase;
+  padding:3px 8px; border-radius:999px; white-space:nowrap;
+  color:var(--text-muted); border:1px solid var(--border);
+}
+.tv-delta.is-good{ color:var(--em); border-color:rgba(var(--em-rgb),.4); background:rgba(var(--em-rgb),.08); }
+.tv-delta.is-bad{ color:#c0563f; border-color:rgba(192,86,63,.4); background:rgba(192,86,63,.07); }
+.tv-ranges{ display:flex; gap:4px; margin-left:auto; }
+.tv-range{
+  font-family:var(--mono); font-size:9px; letter-spacing:1.1px; text-transform:uppercase;
+  padding:7px 12px; border-radius:999px; cursor:pointer;
+  border:1px solid var(--border); background:transparent; color:var(--text-muted);
+}
+.tv-range.is-on{ background:var(--em); border-color:var(--em); color:#fff; }
+
+.tv-chart-wrap{ position:relative; margin:6px 0 4px; }
+/* Fixed height, measured width — the viewBox follows the element so one
+   SVG unit is one CSS pixel and nothing scales. */
+.tv-chart{ display:block; width:100%; height:240px; touch-action:none; }
+.tv-grid{ stroke:var(--border); stroke-width:1; }
+.tv-axis{ font-family:var(--mono); font-size:9px; fill:var(--text-muted); }
+.tv-cross{ stroke:var(--text-muted); stroke-width:1; opacity:.5; }
+.tv-chart-empty{
+  height:240px; display:flex; align-items:center; justify-content:center;
+  font-size:12.5px; color:var(--text-muted); text-align:center; padding:0 20px;
+}
+.tv-tip{
+  position:absolute; top:4px; transform:translateX(-50%); pointer-events:none;
+  display:flex; flex-direction:column; align-items:center; gap:1px;
+  padding:5px 9px; border-radius:9px; white-space:nowrap;
+  border:1px solid var(--border); background:var(--surface);
+  box-shadow:0 6px 18px rgba(0,0,0,.2);
+}
+.tv-tip b{ font-family:var(--mono); font-size:12px; font-weight:400; color:var(--text); }
+.tv-tip span{ font-family:var(--mono); font-size:8px; letter-spacing:1px; text-transform:uppercase; color:var(--text-muted); }
+
+.tv-metric-chips{
+  display:flex; gap:5px; flex-wrap:wrap; padding-top:12px; margin-top:8px;
+  border-top:1px solid var(--border);
+}
+.tv-mchip{
+  display:inline-flex; align-items:center; gap:7px; cursor:pointer; white-space:nowrap;
+  font-family:var(--mono); font-size:9px; letter-spacing:1.1px; text-transform:uppercase;
+  padding:7px 12px; border-radius:999px;
+  border:1px solid var(--border); background:transparent; color:var(--text-muted);
+}
+.tv-mchip i{ width:8px; height:8px; border-radius:2px; background:var(--chip-color); }
+.tv-mchip.is-on{ color:var(--text); border-color:var(--chip-color); background:color-mix(in srgb, var(--chip-color) 12%, transparent); }
+.tv-mchip.is-locked{ opacity:.45; cursor:default; }
+.tv-mchip em{ font-style:normal; font-size:8px; color:var(--text-muted); }
+
+/* ── Correlations ── */
+.tv-corrs{ display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:12px; }
+@media (max-width:760px){ .tv-corrs{ grid-template-columns:1fr; } }
+.tv-corr{ padding:15px; border-radius:16px; }
+.tv-corr-r{ display:flex; align-items:baseline; gap:7px; margin-bottom:10px; flex-wrap:wrap; }
+.tv-corr-num{ font-size:22px; font-weight:800; line-height:1; }
+.tv-corr-strength{ font-size:11px; color:var(--text-muted); }
+.tv-scatter{ display:block; width:100%; height:72px; }
+.tv-corr-gap{ height:72px; display:flex; align-items:center; }
+.tv-corr-gap-bar{ width:100%; height:6px; border-radius:3px; background:rgba(127,127,127,.18); overflow:hidden; }
+.tv-corr-gap-bar i{ display:block; height:100%; background:rgba(var(--em-rgb),.5); border-radius:3px; }
+.tv-corr-read{ margin:9px 0 0; font-size:11.5px; line-height:1.5; color:var(--text-muted); }
+
+/* ── Entry modal ── */
+.tv-entry-eyebrow{
+  font-family:var(--mono); font-size:9px; letter-spacing:2px;
+  text-transform:uppercase; color:var(--text-muted); margin-bottom:6px;
+}
+.tv-entry-title{ font-size:22px; font-weight:700; margin:0 0 16px; letter-spacing:-.3px; }
+.tv-field{ display:block; margin-bottom:14px; }
+.tv-field-lbl{
+  display:block; font-family:var(--mono); font-size:8.5px; letter-spacing:1.3px;
+  text-transform:uppercase; color:var(--text-muted); margin-bottom:6px;
+}
+.tv-field-lbl em{ font-style:normal; color:var(--text-muted); opacity:.7; }
+.tv-field input{
+  width:100%; padding:10px 12px; border-radius:10px; font-size:15px;
+  border:1px solid var(--border); background:transparent; color:var(--text);
+  font-family:var(--mono);
+}
+.tv-field input:focus{ outline:none; border-color:rgba(var(--em-rgb),.55); }
+.tv-field-hint{ display:block; font-size:11px; color:var(--text-muted); margin-top:5px; }
+.tv-entry-error{
+  font-size:12.5px; color:rgb(220,60,60); padding:10px 12px; margin-bottom:12px;
+  border:1px solid rgba(220,60,60,.35); border-radius:10px; background:rgba(220,60,60,.06);
+}
+.tv-entry-actions{ display:flex; gap:8px; justify-content:flex-end; margin-top:16px; }
+
+/* ══ Phone ═════════════════════════════════════════════════════════════ */
+@media (max-width:768px){
+  .tv-card{ padding:14px; border-radius:16px; }
+  .tv-wrap{ gap:10px; }
+  .tv-main, .tv-rail{ gap:10px; }
+
+  /* The energy block stops being a ring beside a grid and becomes a ring
+     beside three bars — three 72px rings in 360px is three rings nobody
+     can read a number inside. */
+  .tv-energy{ gap:14px; }
+  .tv-cal-ring, .tv-cal-ring svg{ width:124px; height:124px; }
+  .tv-cal-num{ font-size:26px; }
+  .tv-energy-side{ min-width:0; flex:1 1 160px; }
+  .tv-macros{ grid-template-columns:1fr; gap:9px; }
+  .tv-macro{
+    flex-direction:row; align-items:center; gap:9px; padding:8px 10px; text-align:left;
+  }
+  .tv-macro-ring, .tv-macro-ring svg{ width:34px; height:34px; }
+  .tv-macro-pct{ font-size:9px; }
+  .tv-macro-lbl{ flex:1; min-width:0; }
+  .tv-macro-note{ display:none; }
+
+  /* Fibre, sugar and sodium are a reference, not a headline — they go
+     on a phone, where the strip would wrap to three lines. */
+  .tv-strip-sep ~ .tv-strip-cell{ display:none; }
+  .tv-strip-sep{ display:none; }
+
+  .tv-timeline{ padding-left:50px; }
+  .tv-timeline::before{ left:44px; }
+  .tv-tl-time{ left:-50px; width:36px; font-size:10px; }
+  .tv-tl-macros{ gap:9px; font-size:9px; }
+
+  .tv-tiles{ gap:6px; }
+  .tv-chart-num{ font-size:28px; }
+  .tv-chart{ height:200px; }
+  .tv-chart-empty{ height:200px; }
+  .tv-ranges{ margin-left:0; }
+}
+@media (max-width:400px){
+  /* Below this the two-column tile grid gives each tile 160px, which is
+     where the value and its unit start colliding with the source mark. */
+  .tv-tiles{ grid-template-columns:1fr; }
+}

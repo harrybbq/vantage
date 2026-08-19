@@ -17,17 +17,41 @@
  * Pure — no DOM, no React.
  */
 
+/* `dp` is decimal places for display and `goodHigh` says which
+   direction is the good one — null where there is no such thing. Both
+   added for the Track vitals panel; nothing else reads them, and they
+   are inert to every existing consumer. */
 export const VITAL_METRICS = [
   // Hand-enterable. Always available.
-  { key: 'weight',   label: 'Weight',   unit: 'kg',   src: 'vitals', color: 'var(--em)',   step: '0.1', max: 400 },
-  { key: 'sleep',    label: 'Sleep',    unit: 'h',    src: 'vitals', color: '#6b8afd',     step: '0.5', max: 24 },
-  { key: 'rhr',      label: 'Rest HR',  unit: 'bpm',  src: 'vitals', color: '#c0563f',     step: '1',   max: 250 },
+  { key: 'weight',   label: 'Weight',   unit: 'kg',   src: 'vitals', color: 'var(--em)',   step: '0.1', max: 400,   dp: 1, goodHigh: null },
+  { key: 'sleep',    label: 'Sleep',    unit: 'h',    src: 'vitals', color: '#6b8afd',     step: '0.5', max: 24,    dp: 1, goodHigh: true },
+  { key: 'rhr',      label: 'Rest HR',  unit: 'bpm',  src: 'vitals', color: '#c0563f',     step: '1',   max: 250,   dp: 0, goodHigh: false },
   // Wearable-fed.
-  { key: 'hrv',      label: 'HRV',      unit: 'ms',   src: 'whoop',  color: '#12a5a5',     step: '1',   max: 400 },
-  { key: 'recovery', label: 'Recovery', unit: '%',    src: 'whoop',  color: '#d4a017',     step: '1',   max: 100 },
-  { key: 'strain',   label: 'Strain',   unit: '',     src: 'whoop',  color: '#a855f7',     step: '0.1', max: 21 },
-  { key: 'burnKcal', label: 'Burn',     unit: 'kcal', src: 'whoop',  color: '#d99114',     step: '1',   max: 10000 },
+  { key: 'hrv',      label: 'HRV',      unit: 'ms',   src: 'whoop',  color: '#12a5a5',     step: '1',   max: 400,   dp: 0, goodHigh: true },
+  { key: 'recovery', label: 'Recovery', unit: '%',    src: 'whoop',  color: '#d4a017',     step: '1',   max: 100,   dp: 0, goodHigh: true },
+  { key: 'strain',   label: 'Strain',   unit: '',     src: 'whoop',  color: '#a855f7',     step: '0.1', max: 21,    dp: 1, goodHigh: null },
+  { key: 'burnKcal', label: 'Burn',     unit: 'kcal', src: 'whoop',  color: '#d99114',     step: '1',   max: 10000, dp: 0, goodHigh: true },
 ];
+
+/** Format a reading the way its metric wants to be read. */
+export function fmtMetric(v, m) {
+  if (v == null || !Number.isFinite(Number(v))) return '—';
+  const n = Number(v);
+  return m?.dp ? n.toFixed(m.dp) : Math.round(n).toLocaleString();
+}
+
+/** Where a reading came from, for the tile's corner. Both devices
+ *  reporting the same metric shows "2 src" rather than picking one —
+ *  a reconciliation UI for an overlap nobody asked for is not worth
+ *  building, but pretending there is only one source is a small lie. */
+export function sourceLabel(m, S) {
+  if (!m || m.src === 'vitals') return 'you';
+  const whoop = !!(S && S.whoopConnected), oura = !!(S && S.ouraConnected);
+  if (whoop && oura && m.key === 'hrv') return '2 src';
+  if (whoop) return 'whoop';
+  if (oura) return 'oura';
+  return '—';
+}
 
 export const metricByKey = key => VITAL_METRICS.find(m => m.key === key) || null;
 
