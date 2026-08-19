@@ -19,11 +19,11 @@ export const FREE_CAPS = {
   shopItems:    { limit: 50, label: 'shopping items' },
   trackers:     { limit: 5,  label: 'trackers' },
   // Feature gate — the "Our Apps" widget presets (FloorplanStudio,
-  // TubeLube, …) are a Pro bonus.
+  // …) are a Pro bonus.
   ourApps: {
     feature: true,
     label: 'Our Apps',
-    sub: 'Our Apps are a Pro bonus — add FloorplanStudio, TubeLube and more straight to your hub. Upgrade to unlock them, plus proactive coach nudges, the AI daily brief, and every cap removed.',
+    sub: 'Our Apps are a Pro bonus — add FloorplanStudio and more straight to your hub. Upgrade to unlock them, plus proactive coach nudges, the AI daily brief, and every cap removed.',
   },
   // Generic upgrade entry — used by surfaces that don't have a specific
   // cap to cite (the mobile More-drawer "Go Pro" chip, etc.). The

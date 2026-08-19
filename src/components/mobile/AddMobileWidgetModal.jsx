@@ -17,8 +17,8 @@ import { useSubscriptionContext } from '../../context/SubscriptionContext';
 import { backdropClose } from '../../utils/backdropClose';
 import { widgetReadiness } from '../../lib/widgets/readiness';
 
-// App-preset widget types (FloorplanStudio / TubeLube / …) — a Pro
-// bonus, so they're locked for free users in the picker below.
+// App-preset widget types (FloorplanStudio / …) — a Pro bonus, so
+// they're locked for free users in the picker below.
 const APP_PRESET_TYPES = new Set(APP_PRESETS.map(p => p.id));
 // Pro-gated widgets beyond the Our Apps presets. Body goal earns it:
 // it's the projection engine, not a view of data the user can already
@@ -34,7 +34,8 @@ export default function AddMobileWidgetModal({ openId, onClose, existingTypes, o
   const existing = new Set(existingTypes || []);
 
   // Built per-open (not module-level) so owner-only presets resolve
-  // against the signed-in account — TubeLube only lists for the owner.
+  // against the signed-in account rather than against whoever the app
+  // happened to be loaded for.
   const pickerOrder = [
     'recent-wins',
     'coin-history',

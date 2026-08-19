@@ -16,7 +16,7 @@ import { useState, useRef, useEffect, lazy, Suspense } from 'react';
 import { getTodayStr } from '../../utils/helpers';
 import { supabase } from '../../lib/supabase';
 import { currentWeightKg, dayBurn, ACTIVITIES, activityKcal, stepsKcal } from '../../lib/burn';
-import { APP_PRESETS, getAppPreset } from '../../data/appPresets';
+import { APP_PRESETS, getAppPreset, RETIRED_PRESETS } from '../../data/appPresets';
 import { fetchAppPreview } from '../../lib/appPreview';
 import { strikeState } from '../../lib/habits/strikes';
 import { SavingsPotsBody, SavingsProjectionBody } from '../savings/SavingsWidgets';
@@ -36,7 +36,7 @@ const TradingBody = TRADING_WIDGET_BUILD_EXCLUDED ? null : lazy(() => import('..
 import Icon from '../Icon';
 import { planDayFor, planGoalFor, planBadge } from '../../lib/plan/planDay';
 
-// App presets (FloorplanStudio / TubeLube / …) become mobile widget
+// App presets (FloorplanStudio / …) become mobile widget
 // types too — generated from the shared config so adding an app in one
 // place lights it up on both surfaces. A preset with no URL carries a
 // `requires` hint and renders as a "deploy first" stub.
@@ -503,10 +503,22 @@ function renderBody(widget, meta, S, update, navigate, userId, hasPro) {
       </div>
     );
   }
-  // App presets (FloorplanStudio / TubeLube / …) — render a static
-  // brand card straight from the shared config. No state, no fetch.
+  // App presets (FloorplanStudio / …) — render a static brand card
+  // straight from the shared config. No state, no fetch.
   const preset = getAppPreset(widget.type);
   if (preset) return <AppPresetBody preset={preset} />;
+  // A preset that has been retired since this widget was added. The
+  // widget stays in state — it is the user's, and deleting other
+  // people's data to tidy a list is not on — but it says what happened
+  // rather than sitting there blank under a raw id.
+  if (RETIRED_PRESETS[widget.type]) return (
+    <div className="m-widget-stub">
+      <div className="m-widget-stub-label">No longer available</div>
+      <div className="m-widget-stub-detail">
+        {RETIRED_PRESETS[widget.type]} has been removed. Long-press this card to delete it.
+      </div>
+    </div>
+  );
   switch (widget.type) {
     case 'trading':     return (TradingBody && tradingWidgetAvailable())
       ? <Suspense fallback={null}><TradingBody compact /></Suspense> : null;

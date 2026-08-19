@@ -1,43 +1,49 @@
 /**
- * Ratings derivation — FEATURE 5 Sprint 3.
+ * Ratings derivation — what the four numbers are made of.
  *
- * Pure function. Walks the user's state and returns 1-99 ratings
- * for Brain / Finance / Fitness / Social, plus a 1-99 OVR composite.
+ * Pure. Walks the user's state and returns 1-99 ratings for Brain,
+ * Finance, Fitness and Social, plus the OVR mean of the four.
  *
- * Composition (per playbook F5 Sprint 3):
+ * Each category sums points from its own sources, then
+ * `toRating` maps points to the scale as `1 + √(points × RATING_SCALE)`.
  *
- *   Brain    = IQ test 40% + Brain trackers 30% + Brain achievements 10% + Brain visions 20%
- *   Finance  = Savings 50% + Finance trackers 20% + Finance achievements 10% + Finance visions 20%
- *   Fitness  = Fitness trackers 40% + Health (deferred) 0% + Fitness achievements 10% + Fitness visions 50%
- *   Social   = Friend count 30% + Social achievements 10% + Days-active streak 40% + Social visions 20%
+ *   Brain    self-check · lifetime logged days · trackers (30d) ·
+ *            achievements · visions
+ *   Finance  the same, plus savings goals
+ *   Fitness  the same, plus vitals, activity burn and on-target macro days
+ *   Social   the same, plus friends and days active
  *
- *   OVR      = round((brain + finance + fitness + social) / 4)
+ * ── What changed on 2026-08-19, and why ──────────────────────────────
+ * An audit ran every one of these through the real code rather than
+ * this comment, and found the ladder ended long before the scale did:
+ * a committed year reached OVR 24, Brain, Finance and Social froze in
+ * the low twenties permanently, and OVR 99 — where Prestige unlocks —
+ * was unreachable by anyone, ever. Four things were wrong, and all four
+ * are addressed here and in visions/definitions.js:
  *
- *   All values floor at 1, ceiling at 99.
+ *   · No vision declared a category, so the single largest input paid
+ *     the same into all four ratings and the four numbers moved as one.
+ *     They are categorised now, and the twelve visions added alongside
+ *     give Brain and Social a ladder of their own — between them they
+ *     had none at all.
+ *   · Only Fitness had a source that accumulated for life. Every
+ *     category has one now: `categoryDayPoints`.
+ *   · Tracker points were uncapped in tracker COUNT, so owning more
+ *     checkboxes beat keeping better habits. Capped at TRACKER_CAP_N.
+ *   · The scale itself was calibrated for a game nobody could finish.
+ *     See RATING_SCALE.
  *
- * Anti-gaming (rules applied per playbook):
+ * ── Anti-gaming, unchanged ───────────────────────────────────────────
+ *   Achievements  count only if completed ≥7 days after being created,
+ *                 and taper by √ past the eighth.
+ *   Trackers      pay for logs, never for existing; and now cap.
+ *   Savings       goals under £10 are ignored, £25,000 counted total,
+ *                 and overshooting a goal does not multiply.
  *
- *   Rule 1 — Time-spaced achievements:
- *     an achievement only contributes points if
- *     `(completedAt - createdAt) >= 7 days`.
- *     Achievements without createdAt (legacy / seed) are considered
- *     legitimately old.
- *
- *   Rule 4 — Trackers need history, not creation:
- *     tracker contribution scales with log density × consistency ×
- *     age. A tracker with no logs is worth 0 regardless of how many
- *     the user creates.
- *
- *   Rule 5 — Savings caps + min target floor:
- *     savings goals with target < £10 don't count.
- *     Total counted savings across all goals capped at £25,000.
- *     Per-goal contribution = min(current, target) / target — overshooting
- *     doesn't multiply.
- *
- * Server-canonical recompute lives in
- * `netlify/functions/recompute-ratings.js` — same algorithm, same
- * weights. Drift between client and server = silent rating bug, so
- * keep both in lockstep when editing.
+ * The server re-derives all of this in netlify/lib/recompute.js because
+ * a number other people can see must not be computed on the machine of
+ * the person it flatters. `npm run check:parity` fails the build if the
+ * two ever disagree — which is what was missing when they last did.
  */
 
 // Explicit .js — the pure-lib convention in this repo, so the module
@@ -60,12 +66,30 @@ function ymd(d) {
 }
 
 /**
- * Map raw "rating points" to a 1-99 scale via sqrt so early progress
- * feels fast and the 90s feel earned. `k` tunes how much each "point"
- * is worth — bumped per-category so a moderately active user reaches
- * ~50 in their main category in roughly 60 days.
+ * How much a point is worth on the 1-99 scale.
+ *
+ * At 1 — where this sat until 2026-08-19 — the scale said 99 and the
+ * game ended at 42. A committed year landed on 24, three categories
+ * froze in the low twenties for good, and Prestige, which unlocks at
+ * OVR 99, could not be reached by anyone. Two thirds of the number the
+ * whole app is built around were decorative.
+ *
+ * 6 is set from the profiles, not picked: it puts a committed year near
+ * 57, three years near 72, and 99 within reach of someone who keeps it
+ * up for the better part of a decade. Early progress still moves fast —
+ * a first month reads 28 — because sqrt does that on its own.
+ *
+ * Changing this moves every rating on the leaderboard at once. If it
+ * changes again, bump FORMULA_EPOCH_ISO in get-leaderboard.js with it,
+ * or every user is handed a week's "climb" they did not earn.
  */
-function toRating(points, k = 1) {
+const RATING_SCALE = 6;
+
+/**
+ * Map raw "rating points" to the 1-99 scale via sqrt, so early progress
+ * feels fast and the 90s feel earned.
+ */
+function toRating(points, k = RATING_SCALE) {
   if (!Number.isFinite(points) || points <= 0) return 1;
   const r = 1 + Math.sqrt(points * k);
   return clamp(r);
@@ -111,6 +135,15 @@ function achievementPoints(S, category) {
  * 5-day-old tracker can't max out. A tracker with no logs in the
  * window adds 0 points regardless of creation.
  */
+/** Ceiling on what a category's trackers can contribute, in "trackers'
+ *  worth". Uncapped, points were 10 per tracker with no limit on how
+ *  many you own, so 160 Brain trackers ticked daily scored 41 against
+ *  the 21 a year of genuine effort produced. It was a grind rather than
+ *  an exploit — the same 160 ticked once are worth 8 — but it rewarded
+ *  the length of your list over the strength of your habit. Four is
+ *  above what anyone sensibly runs in one category. */
+const TRACKER_CAP_N = 4;
+
 function trackerPoints(S, category) {
   const trackers = (S.trackers || []).filter(t => t.category === category);
   if (!trackers.length) return 0;
@@ -131,7 +164,38 @@ function trackerPoints(S, category) {
     const density = hits / TRACKER_HISTORY_DAYS;
     total += density * 10;
   }
-  return total;
+  return Math.min(total, TRACKER_CAP_N * 10);
+}
+
+// ── Lifetime logged days, per category ────────────────────────────────────
+//
+// Fitness climbed for years because vitals, burn and macros pay 1.4
+// points a day forever. Brain, Finance and Social had nothing of the
+// kind: every source they owned was either a one-off number or a
+// rolling 30-day window that reset. So all three froze around 23 inside
+// the first year and stayed there — permanently, not for a while.
+//
+// This is the missing half: a day on which you logged anything in a
+// category is worth 0.4 points, for life, exactly as a day with a
+// vitals entry always has been. Consistency earns; the window measures
+// whether you are on it, this measures whether you have been at it.
+
+const CATEGORY_DAY_POINTS = 0.4;
+
+function categoryDayPoints(S, category) {
+  const ids = new Set((S.trackers || []).filter(t => t.category === category).map(t => t.id));
+  if (!ids.size) return 0;
+  const logs = S.logs || {};
+  let days = 0;
+  for (const key of Object.keys(logs)) {
+    const day = logs[key] || {};
+    for (const id of ids) {
+      const v = day[id];
+      const truthy = v !== false && v !== 0 && v != null && v !== '';
+      if (truthy) { days++; break; }
+    }
+  }
+  return days * CATEGORY_DAY_POINTS;
 }
 
 // ── Rule 5: savings points ─────────────────────────────────────────────────
@@ -276,12 +340,14 @@ export function deriveRatings(S, ctx = {}) {
 
   const brainPts =
     brainScorePoints(S) +
+    categoryDayPoints(S, 'brain') +
     trackerPoints(S, 'brain') * 1.0 +
     achievementPoints(S, 'brain') * 2.5 +
     visionPoints(S, 'brain');
 
   const financePts =
     financeScorePoints(S) +
+    categoryDayPoints(S, 'finance') +
     savingsPoints(S) +
     trackerPoints(S, 'finance') * 1.0 +
     achievementPoints(S, 'finance') * 2.5 +
@@ -289,6 +355,7 @@ export function deriveRatings(S, ctx = {}) {
 
   const fitnessPts =
     fitnessScorePoints(S) +
+    categoryDayPoints(S, 'fitness') +
     trackerPoints(S, 'fitness') * 1.2 +
     achievementPoints(S, 'fitness') * 2.5 +
     visionPoints(S, 'fitness') +
@@ -298,6 +365,7 @@ export function deriveRatings(S, ctx = {}) {
 
   const socialPts =
     socialSelfCheckPoints(S) +
+    categoryDayPoints(S, 'social') +
     socialPoints(S, friendCount) +
     achievementPoints(S, 'social') * 2.5 +
     visionPoints(S, 'social');
@@ -324,6 +392,7 @@ export function categoryBreakdown(S, category, ctx = {}) {
     case 'brain':
       return [
         { label: 'Brain self-check', points: brainScorePoints(S) },
+        { label: 'Days logged (lifetime)', points: categoryDayPoints(S, 'brain') },
         { label: 'Brain trackers',   points: trackerPoints(S, 'brain') * 1.0 },
         { label: 'Brain achievements', points: achievementPoints(S, 'brain') * 2.5 },
         { label: 'Brain visions',    points: visionPoints(S, 'brain') },
@@ -331,6 +400,7 @@ export function categoryBreakdown(S, category, ctx = {}) {
     case 'finance':
       return [
         { label: 'Finance self-check', points: financeScorePoints(S) },
+        { label: 'Days logged (lifetime)', points: categoryDayPoints(S, 'finance') },
         { label: 'Savings goals',    points: savingsPoints(S) },
         { label: 'Finance trackers', points: trackerPoints(S, 'finance') * 1.0 },
         { label: 'Finance achievements', points: achievementPoints(S, 'finance') * 2.5 },
@@ -339,6 +409,7 @@ export function categoryBreakdown(S, category, ctx = {}) {
     case 'fitness':
       return [
         { label: 'Fitness self-check', points: fitnessScorePoints(S) },
+        { label: 'Days logged (lifetime)', points: categoryDayPoints(S, 'fitness') },
         { label: 'Fitness trackers', points: trackerPoints(S, 'fitness') * 1.2 },
         { label: 'Fitness achievements', points: achievementPoints(S, 'fitness') * 2.5 },
         { label: 'Fitness visions',  points: visionPoints(S, 'fitness') },
@@ -349,6 +420,7 @@ export function categoryBreakdown(S, category, ctx = {}) {
     case 'social':
       return [
         { label: 'Social self-check', points: socialSelfCheckPoints(S) },
+        { label: 'Days logged (lifetime)', points: categoryDayPoints(S, 'social') },
         { label: 'Friends + activity', points: socialPoints(S, friendCount) },
         { label: 'Social achievements', points: achievementPoints(S, 'social') * 2.5 },
         { label: 'Social visions',   points: visionPoints(S, 'social') },

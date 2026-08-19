@@ -91,13 +91,25 @@ export function useVisions(S, update, showToast, onUnlock) {
       return { ...prev, visions: next };
     });
 
-    // Fire toasts AFTER scheduling the state update — `showToast` is
-    // synchronous and reaching for fresh state would race the update.
+    /* Fire toasts AFTER scheduling the state update — `showToast` is
+       synchronous and reaching for fresh state would race the update.
+
+       A burst is summarised rather than queued. Normally one vision
+       lands at a time, but a release that ADDS visions can meet several
+       of a long-standing user's milestones at once — the twelve
+       category visions added on 2026-08-19 could unlock together for
+       someone who has been logging for a year. Twelve stacked toasts is
+       the storm the backfill above exists to prevent; this is the same
+       courtesy for the steady state. */
     const fireToast = showToastRef.current;
+    const BURST = 3;
+    if (newIds.length > BURST && fireToast) {
+      fireToast(`✦ ${newIds.length} visions unlocked — see them in Visions`, true, 4200);
+    }
     for (const id of newIds) {
       toastedRef.current.add(id);
       const def = VISIONS_BY_ID[id];
-      if (def && fireToast) {
+      if (def && fireToast && newIds.length <= BURST) {
         // Re-uses CoinToast's "earn" affordance (haptic + green tint)
         // — feels right for a milestone unlock. Custom toast surface
         // can come later if visions deserve their own visual.

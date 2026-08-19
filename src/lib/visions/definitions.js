@@ -111,11 +111,39 @@ function holidaysCompleted(S) {
   return (S.holidays || []).filter(h => h.status === 'completed').length;
 }
 
+/**
+ * Days — ever, not in a window — on which any tracker of `category` was
+ * logged. The per-category equivalent of vitalsLogDays, and the thing
+ * the category visions below count.
+ *
+ * Lifetime on purpose. A rolling window measures whether you are on it
+ * this month; a lifetime count measures whether you have been at it,
+ * which is what a milestone should be about.
+ */
+function categoryLogDays(S, category) {
+  const ids = new Set((S.trackers || []).filter(t => t.category === category).map(t => t.id));
+  if (!ids.size) return 0;
+  const logs = S.logs || {};
+  let days = 0;
+  for (const key of Object.keys(logs)) {
+    const day = logs[key] || {};
+    for (const id of ids) {
+      const v = day[id];
+      if (v !== false && v !== 0 && v != null && v !== '') { days++; break; }
+    }
+  }
+  return days;
+}
+
+/** Has the category's self-check been taken? */
+const tookCheck = (S, key) => !!(S[key] && S[key].result);
+
 // ── definitions ───────────────────────────────────────────────────────
 export const VISIONS = [
   // Habit streaks — held a tracked habit clean for N days
   {
     id: 'streak-7',
+    category: 'fitness',
     title: 'Week One',
     desc: 'Held a habit clean for 7 days.',
     icon: '🌱',
@@ -124,6 +152,7 @@ export const VISIONS = [
   },
   {
     id: 'streak-30',
+    category: 'fitness',
     title: 'Thirty Strong',
     desc: 'Held a habit clean for 30 days.',
     icon: '🌳',
@@ -132,6 +161,7 @@ export const VISIONS = [
   },
   {
     id: 'streak-100',
+    category: 'fitness',
     title: 'Century',
     desc: 'Held a habit clean for 100 days.',
     icon: '💎',
@@ -204,6 +234,7 @@ export const VISIONS = [
   },
   {
     id: 'streak-365',
+    category: 'fitness',
     title: 'A Year Clean',
     desc: 'Held a habit clean for a full year.',
     icon: '🏅',
@@ -212,6 +243,7 @@ export const VISIONS = [
   },
   {
     id: 'habits-3',
+    category: 'fitness',
     title: 'Habit Stacker',
     desc: 'Tracking three habits at once.',
     icon: '🧱',
@@ -222,6 +254,7 @@ export const VISIONS = [
   // Savings milestones
   {
     id: 'savings-first',
+    category: 'finance',
     title: 'First Pot',
     desc: 'Completed your first savings goal.',
     icon: '🫙',
@@ -230,6 +263,7 @@ export const VISIONS = [
   },
   {
     id: 'savings-goals-3',
+    category: 'finance',
     title: 'Diversified',
     desc: 'Running three savings pots at once.',
     icon: '🗂️',
@@ -238,6 +272,7 @@ export const VISIONS = [
   },
   {
     id: 'savings-1k',
+    category: 'finance',
     title: 'Four Figures',
     desc: 'Saved £1,000 across your pots.',
     icon: '💷',
@@ -246,6 +281,7 @@ export const VISIONS = [
   },
   {
     id: 'savings-10k',
+    category: 'finance',
     title: 'Five Figures',
     desc: 'Saved £10,000 across your pots.',
     icon: '💰',
@@ -274,6 +310,7 @@ export const VISIONS = [
   // Tracking breadth — vitals & macros
   {
     id: 'vitals-7',
+    category: 'fitness',
     title: 'Body Aware',
     desc: 'Logged your vitals on seven days.',
     icon: '❤️',
@@ -282,6 +319,7 @@ export const VISIONS = [
   },
   {
     id: 'macros-7',
+    category: 'fitness',
     title: 'Macro Minded',
     desc: 'Logged your macros on seven days.',
     icon: '🥗',
@@ -306,6 +344,64 @@ export const VISIONS = [
     xp: 150,
     check: S => holidaysCompleted(S) >= 1,
   },
+  /* ── One ladder per category ────────────────────────────────────────
+     Added 2026-08-19, and the reason is worth keeping.
+
+     Every vision above this line was uncategorised, which meant each one
+     paid a quarter of its xp into all four ratings. So the four ratings
+     moved together no matter what a person actually did, and the largest
+     single input to all of them was identical. Categorising the ones
+     that clearly belong somewhere — habit streaks to Fitness, savings to
+     Finance — fixed that, and immediately exposed the other half of the
+     problem: there was not one Brain vision and not one Social vision in
+     the entire catalogue. Two of the four categories had nothing of
+     their own to earn.
+
+     These twelve are that: a self-check, a thirty-day and a hundred-day
+     milestone in each of the four. All of them count data the app
+     already keeps — no new state, no migration. The tracker ones count
+     lifetime days, not a rolling window, because a milestone should be
+     about having been at it rather than being on it this month. */
+
+  { id: 'check-brain',   category: 'brain',   title: 'Know Your Number',
+    desc: 'Took the Brain self-check.',       icon: '🧠', xp: 75,
+    check: S => tookCheck(S, 'brainScore') },
+  { id: 'brain-30',      category: 'brain',   title: 'Thirty Sharp',
+    desc: 'Logged a Brain tracker on thirty days.',  icon: '📖', xp: 200,
+    check: S => categoryLogDays(S, 'brain') >= 30 },
+  { id: 'brain-100',     category: 'brain',   title: 'Hundred Sharp',
+    desc: 'Logged a Brain tracker on a hundred days.', icon: '🎓', xp: 500,
+    check: S => categoryLogDays(S, 'brain') >= 100 },
+
+  { id: 'check-finance', category: 'finance', title: 'Books Open',
+    desc: 'Took the Finance self-check.',     icon: '📊', xp: 75,
+    check: S => tookCheck(S, 'financeScore') },
+  { id: 'finance-30',    category: 'finance', title: 'Thirty in the Black',
+    desc: 'Logged a Finance tracker on thirty days.', icon: '💷', xp: 200,
+    check: S => categoryLogDays(S, 'finance') >= 30 },
+  { id: 'finance-100',   category: 'finance', title: 'Hundred in the Black',
+    desc: 'Logged a Finance tracker on a hundred days.', icon: '🏦', xp: 500,
+    check: S => categoryLogDays(S, 'finance') >= 100 },
+
+  { id: 'check-fitness', category: 'fitness', title: 'Baseline Set',
+    desc: 'Took the Fitness self-check.',     icon: '🏃', xp: 75,
+    check: S => tookCheck(S, 'fitnessScore') },
+  { id: 'fitness-30',    category: 'fitness', title: 'Thirty Moved',
+    desc: 'Logged a Fitness tracker on thirty days.', icon: '💪', xp: 200,
+    check: S => categoryLogDays(S, 'fitness') >= 30 },
+  { id: 'fitness-100',   category: 'fitness', title: 'Hundred Moved',
+    desc: 'Logged a Fitness tracker on a hundred days.', icon: '🥇', xp: 500,
+    check: S => categoryLogDays(S, 'fitness') >= 100 },
+
+  { id: 'check-social',  category: 'social',  title: 'Taking Stock',
+    desc: 'Took the Social self-check.',      icon: '🫂', xp: 75,
+    check: S => tookCheck(S, 'socialScore') },
+  { id: 'social-30',     category: 'social',  title: 'Thirty Together',
+    desc: 'Logged a Social tracker on thirty days.',  icon: '☎️', xp: 200,
+    check: S => categoryLogDays(S, 'social') >= 30 },
+  { id: 'social-100',    category: 'social',  title: 'Hundred Together',
+    desc: 'Logged a Social tracker on a hundred days.', icon: '🎉', xp: 500,
+    check: S => categoryLogDays(S, 'social') >= 100 },
 ];
 
 // Quick lookup by ID for the runtime — keeps unlock detection O(n) per

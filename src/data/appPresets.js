@@ -14,8 +14,9 @@
  *
  * To add another app later: append one entry here. A preset with a
  * null `url` renders as a disabled "deploy first" slot until a URL is
- * filled in — that's how an undeployed local app (e.g. TubeLube) shows
- * intent without a dead link.
+ * filled in, so an app that is not live yet can show intent without a
+ * dead link. To remove one, delete its entry and name it in
+ * RETIRED_PRESETS at the bottom.
  *
  * Fields:
  *   id       stable key (also the mobile widget `type`)
@@ -40,23 +41,23 @@ export const APP_PRESETS = [
     tagline: 'Design floor plans',
     live: true,
   },
-  {
-    id: 'tubelube',
-    name: 'TubeLube',
-    // Runs locally for now. Deploy it (e.g. GitHub Pages, same as
-    // FloorplanStudio) and paste the public URL here to activate the
-    // preset on both desktop and mobile.
-    url: null,
-    icon: '🛢',
-    color: '#c0392b',
-    tagline: 'YouTube tools',
-    requires: 'Deploy TubeLube (e.g. GitHub Pages) and set its URL in src/data/appPresets.js.',
-    live: true, // activates the moment a URL is filled in
-    // Hidden from every picker except the owner's account — a
-    // personal tool, not a product surface (yet).
-    ownerOnly: true,
-  },
 ];
+
+/**
+ * Presets that used to be here.
+ *
+ * A widget already on someone's hub keeps its `type` after the preset
+ * behind it goes, and an unknown type renders as a card labelled with a
+ * raw id and nothing inside it. Naming the retired ones lets that card
+ * say what happened instead — see MobileWidget's stub. Removing a line
+ * from here does not delete anyone's widget; it only takes away the
+ * explanation.
+ */
+export const RETIRED_PRESETS = {
+  // Never deployed — it only ever rendered a "deploy first" slot, and
+  // owner-only at that. Removed 2026-08-19.
+  tubelube: 'TubeLube',
+};
 
 /** Look up a preset by its id. */
 export function getAppPreset(id) {
