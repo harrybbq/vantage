@@ -6,7 +6,8 @@ import { supabase } from '../lib/supabase';
 import { useNutrition } from '../hooks/useNutrition';
 import { getTodayStr } from '../utils/helpers';
 import FoodLogSheet from './FoodLogSheet';
-import FoodLogList from './FoodLogList';
+import DietPanel from './track/DietPanel';
+import { useFoodFrequency } from '../hooks/useFoodFrequency';
 import FoodSearch from './FoodSearch';
 import { backdropClose } from '../utils/backdropClose';
 import { planDayFor, planGoalFor, planBadge } from '../lib/plan/planDay';
@@ -279,7 +280,40 @@ export default function NutritionSection({ userId, S, selectedDate, calYear, cal
   const [showFoodSheet, setShowFoodSheet] = useState(false);
   const [showFoodSearch, setShowFoodSearch] = useState(false);
   const [foodPrefill, setFoodPrefill] = useState(null);
+  const [goalsOpen, setGoalsOpen] = useState(false);
   const goalHitRef = useRef({});
+
+  /* What gets eaten often, for the rail's one-tap list. Ranked by count
+     rather than recency — the thing you have had thirty times belongs
+     at the top whether or not it was yesterday. */
+  const freq = useFoodFrequency(userId);
+
+  /** Re-log a frequent food exactly as it was last logged. No sheet:
+      the whole point of the list is that it takes one tap. */
+  async function quickAdd(row) {
+    if (!userId || !row) return;
+    const { error } = await supabase.from('nutrition_log').insert({
+      user_id: userId,
+      log_date: date,
+      meal_type: row.meal_type || 'snack',
+      food_name: row.food_name,
+      brand: row.brand || null,
+      serving_g: row.serving_g,
+      calories: row.calories,
+      protein_g: row.protein_g,
+      carbs_g: row.carbs_g,
+      fat_g: row.fat_g,
+      fibre_g: row.fibre_g || 0,
+      sugar_g: row.sugar_g || 0,
+      sodium_mg: row.sodium_mg || 0,
+      additional_nutrients: row.additional_nutrients || {},
+      source: 'again',
+    });
+    if (error) { window.alert('Could not log that — try again.'); return; }
+    await recalcSummary(date);
+    reload();
+    freq.refresh();
+  }
 
   // Quick log from the hub Macros widget — it sets a one-shot flag and
   // navigates here; consume it and open the food search immediately.
@@ -358,8 +392,6 @@ export default function NutritionSection({ userId, S, selectedDate, calYear, cal
 
   const calMacro = macros.find(m => m.name === 'Calories');
   const calConsumed = summary?.calories || 0;
-  const calGoal = calMacro?.daily_goal || 2000;
-  const calRemaining = calGoal - calConsumed;
   const otherMacros = macros.filter(m => m.name !== 'Calories');
 
   async function handleSaveMacro(id, data) {
@@ -399,160 +431,115 @@ export default function NutritionSection({ userId, S, selectedDate, calYear, cal
 
   if (loading) return null;
 
+  /* Today's burn, for the ring inside the calorie ring. Same source the
+     fitness rating reads — S.burnLog, one array of activities per day. */
+  const burnToday = ((S?.burnLog || {})[date] || [])
+    .reduce((sum, a) => sum + (Number(a?.kcal) || 0), 0);
+
   return (
-    <div className="card" style={{ padding: '22px', marginTop: '16px' }}>
-      {/* Header */}
-      <div style={{ marginBottom: '16px' }}>
-        <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--text-xs)', color: 'var(--text-muted)', letterSpacing: '1.5px', textTransform: 'uppercase', marginBottom: '2px' }}>Nutrition</div>
-        <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: '8px' }}>
-          <div style={{ fontFamily: 'var(--serif)', fontSize: 'var(--text-xl)', fontWeight: 700, color: 'var(--em)' }}>Daily Macros</div>
-          <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--text-xs)', color: 'var(--text-muted)' }}>{formatDate(date)}</div>
-        </div>
-      </div>
-
-      {/* Where today's targets come from. The rota moves them by shift
-          AND by session, so a number that changed since yesterday needs
-          to say why — otherwise it reads as the app being unreliable. */}
-      {plan.active && (
-        <div className="nut-plan">
-          <span className="nut-plan-badge">{planBadge(plan)}</span>
-          {plan.targets.kcalDelta !== 0 && (
-            <span className={'nut-plan-d' + (plan.targets.kcalDelta > 0 ? ' is-up' : ' is-down')}>
-              {plan.targets.kcalDelta > 0 ? '+' : '\u2212'}{Math.abs(plan.targets.kcalDelta)} kcal
-            </span>
-          )}
-          <span className="nut-plan-why">
-            {plan.isRest
-              ? 'Rest day — the training days pay for this one'
-              : plan.isNight
-                ? 'Night shift at maintenance · session at 80%'
-                : `${plan.session} day`}
-          </span>
-        </div>
-      )}
-
-      {/* Calorie summary — donut ring (same language as the tracker
-          rings) + figures + the primary Log Food action beside it. */}
-      {calMacro && (() => {
-        const pct = Math.min(1, calGoal > 0 ? calConsumed / calGoal : 0);
-        const over = calRemaining < 0;
-        const R = 26, C = 2 * Math.PI * R;
-        return (
-          <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginBottom: '18px', flexWrap: 'wrap' }}>
-            <div style={{ position: 'relative', width: 64, height: 64, flexShrink: 0 }}>
-              <svg width="64" height="64" viewBox="0 0 64 64" aria-hidden="true">
-                <circle cx="32" cy="32" r={R} fill="none" stroke="var(--border)" strokeWidth="5" />
-                {pct > 0 && (
-                  <circle cx="32" cy="32" r={R} fill="none"
-                    stroke={over ? 'var(--amber)' : 'var(--em)'} strokeWidth="5"
-                    strokeDasharray={`${(pct * C).toFixed(1)} ${C.toFixed(1)}`}
-                    strokeLinecap="round" transform="rotate(-90 32 32)"
-                    style={{ transition: 'stroke-dasharray .5s var(--ease-out, ease-out)' }} />
-                )}
-              </svg>
-              <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', lineHeight: 1 }}>
-                <span style={{ fontFamily: 'var(--mono)', fontSize: '13px', fontWeight: 700, color: 'var(--text)', fontVariantNumeric: 'tabular-nums' }}>
-                  {Math.round(pct * 100)}%
-                </span>
-              </div>
-            </div>
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ display: 'flex', alignItems: 'baseline', gap: '7px', flexWrap: 'wrap' }}>
-                <span style={{ fontSize: 'var(--text-2xl)', fontWeight: 700, color: 'var(--text)', fontFamily: 'var(--serif)' }}>
-                  {Number(calConsumed).toLocaleString('en-GB', { maximumFractionDigits: 0 })}
-                </span>
-                <span style={{ fontSize: 'var(--text-sm)', color: 'var(--text-muted)', fontFamily: 'var(--mono)' }}>
-                  / {Number(calGoal).toLocaleString('en-GB', { maximumFractionDigits: 0 })} kcal
-                </span>
-              </div>
-              <div style={{ fontFamily: 'var(--mono)', fontSize: '11px', color: over ? 'var(--amber)' : 'var(--text-muted)', marginTop: '3px' }}>
-                {over
-                  ? `${Math.abs(Math.round(calRemaining)).toLocaleString()} kcal over`
-                  : `${Math.round(calRemaining).toLocaleString()} kcal remaining`}
-              </div>
-            </div>
-            <button
-              onClick={() => setShowFoodSearch(true)}
-              style={{ padding: '10px 18px', borderRadius: 'var(--radius-md)', border: 'none', background: 'var(--em)', color: '#fff', fontFamily: 'var(--sans)', fontSize: 'var(--text-sm)', fontWeight: 600, cursor: 'pointer', flexShrink: 0 }}>
-              + Log Food
-            </button>
-          </div>
-        );
-      })()}
-
-      {/* Macro bars */}
-      <div style={{ position: 'relative' }}>
-        {/* Calories bar */}
-        {calMacro && (
-          <>
-            {editingId === calMacro.id
-              ? <InlineEdit macro={calMacro} onSave={d => handleSaveMacro(calMacro.id, d)} onCancel={() => setEditingId(null)} />
-              : (
-                <div style={{ position: 'relative' }}>
-                  <MacroBar macro={calMacro} consumed={calConsumed} isCal index={0} onMenuClick={m => setMenuMacro(menuMacro?.id === m.id ? null : m)} />
-                  {menuMacro?.id === calMacro.id && (
-                    <MacroMenu macro={calMacro} onClose={() => setMenuMacro(null)}
-                      onEdit={() => { setEditingId(calMacro.id); setMenuMacro(null); }}
-                      onMoveUp={() => handleMove(calMacro, -1)} onMoveDown={() => handleMove(calMacro, 1)}
-                      onDelete={() => handleDeleteMacro(calMacro)}
-                      isFirst isLast={otherMacros.length === 0} />
-                  )}
-                </div>
-              )
-            }
-            {otherMacros.length > 0 && <div style={{ height: '1px', background: 'var(--border)', margin: '4px 0 14px' }} />}
-          </>
-        )}
-
-        {/* Other macro bars */}
-        {otherMacros.map((macro, i) => {
-          const consumed = getMacroValue(summary, macro);
-          return (
-            <div key={macro.id} style={{ position: 'relative' }}>
-              {editingId === macro.id
-                ? <InlineEdit macro={macro} onSave={d => handleSaveMacro(macro.id, d)} onCancel={() => setEditingId(null)} />
-                : (
-                  <>
-                    <MacroBar macro={macro} consumed={consumed} index={i + 1} onMenuClick={m => setMenuMacro(menuMacro?.id === m.id ? null : m)} />
-                    {menuMacro?.id === macro.id && (
-                      <MacroMenu macro={macro} onClose={() => setMenuMacro(null)}
-                        onEdit={() => { setEditingId(macro.id); setMenuMacro(null); }}
-                        onMoveUp={() => handleMove(macro, -1)} onMoveDown={() => handleMove(macro, 1)}
-                        onDelete={() => handleDeleteMacro(macro)}
-                        isFirst={i === 0} isLast={i === otherMacros.length - 1} />
-                    )}
-                  </>
-                )
-              }
-            </div>
-          );
-        })}
-
-        {/* Zero state */}
-        {!summary && macros.length > 0 && (
-          <div style={{ textAlign: 'center', padding: 'var(--space-3) 0', fontSize: 'var(--text-xs)', color: 'var(--text-muted)', fontFamily: 'var(--mono)' }}>
-            Nothing logged yet for {formatDate(date)}. Tap + to add your first meal.
-          </div>
-        )}
-
-        {/* Add macro button */}
-        <button onClick={() => setShowAddSheet(true)}
-          style={{ width: '100%', marginTop: '10px', padding: '8px', border: '1px dashed var(--border)', borderRadius: 'var(--radius-md)', background: 'transparent', color: 'var(--text-muted)', cursor: 'pointer', fontFamily: 'var(--sans)', fontSize: 'var(--text-sm)' }}>
-          + Add macro
-        </button>
-      </div>
-
-      {/* Food log list — Log Food lives in the calorie header now;
-          the list's own empty state also offers add. */}
-      <FoodLogList
-        logEntries={logEntries}
+    <div className="nut-wrap">
+      <DietPanel
+        S={S}
         date={date}
-        onAddFood={() => setShowFoodSearch(true)}
-        onDeleteEntry={async () => {
+        summary={summary}
+        logEntries={logEntries}
+        macros={macros}
+        burnKcal={burnToday}
+        recents={freq.items}
+        onLogFood={() => setShowFoodSearch(true)}
+        onOpenGoals={() => setGoalsOpen(o => !o)}
+        onQuickAdd={quickAdd}
+        onDeleteEntry={async (entry) => {
+          if (!window.confirm(`Remove ${entry.food_name}?`)) return;
+          await supabase.from('nutrition_log').delete().eq('id', entry.id);
           await recalcSummary(date);
           reload();
+          freq.refresh();
         }}
       />
+
+      {/* ── Goals ──
+          The macro targets and their editor, folded away by default.
+          They are a setting, not a reading: you change them a few times
+          a year and look at the rings every day. Opened from the chip on
+          the energy card. */}
+      {goalsOpen && (
+        <div className="card nut-goals">
+          <div className="tv-rule">
+            <span>Daily targets</span><i />
+            <em>{formatDate(date)}</em>
+          </div>
+
+          {plan.active && (
+            <div className="nut-plan">
+              <span className="nut-plan-badge">{planBadge(plan)}</span>
+              {plan.targets.kcalDelta !== 0 && (
+                <span className={'nut-plan-d' + (plan.targets.kcalDelta > 0 ? ' is-up' : ' is-down')}>
+                  {plan.targets.kcalDelta > 0 ? '+' : '\u2212'}{Math.abs(plan.targets.kcalDelta)} kcal
+                </span>
+              )}
+              <span className="nut-plan-why">
+                {plan.isRest
+                  ? 'Rest day — the training days pay for this one'
+                  : plan.isNight
+                    ? 'Night shift at maintenance · session at 80%'
+                    : `${plan.session} day`}
+              </span>
+            </div>
+          )}
+
+          <div style={{ position: 'relative' }}>
+            {calMacro && (
+              <>
+                {editingId === calMacro.id
+                  ? <InlineEdit macro={calMacro} onSave={d => handleSaveMacro(calMacro.id, d)} onCancel={() => setEditingId(null)} />
+                  : (
+                    <div style={{ position: 'relative' }}>
+                      <MacroBar macro={calMacro} consumed={calConsumed} isCal index={0} onMenuClick={m => setMenuMacro(menuMacro?.id === m.id ? null : m)} />
+                      {menuMacro?.id === calMacro.id && (
+                        <MacroMenu macro={calMacro} onClose={() => setMenuMacro(null)}
+                          onEdit={() => { setEditingId(calMacro.id); setMenuMacro(null); }}
+                          onMoveUp={() => handleMove(calMacro, -1)} onMoveDown={() => handleMove(calMacro, 1)}
+                          onDelete={() => handleDeleteMacro(calMacro)}
+                          isFirst isLast={otherMacros.length === 0} />
+                      )}
+                    </div>
+                  )
+                }
+                {otherMacros.length > 0 && <div style={{ height: '1px', background: 'var(--border)', margin: '4px 0 14px' }} />}
+              </>
+            )}
+
+            {otherMacros.map((macro, i) => {
+              const consumed = getMacroValue(summary, macro);
+              return (
+                <div key={macro.id} style={{ position: 'relative' }}>
+                  {editingId === macro.id
+                    ? <InlineEdit macro={macro} onSave={d => handleSaveMacro(macro.id, d)} onCancel={() => setEditingId(null)} />
+                    : (
+                      <>
+                        <MacroBar macro={macro} consumed={consumed} index={i + 1} onMenuClick={m => setMenuMacro(menuMacro?.id === m.id ? null : m)} />
+                        {menuMacro?.id === macro.id && (
+                          <MacroMenu macro={macro} onClose={() => setMenuMacro(null)}
+                            onEdit={() => { setEditingId(macro.id); setMenuMacro(null); }}
+                            onMoveUp={() => handleMove(macro, -1)} onMoveDown={() => handleMove(macro, 1)}
+                            onDelete={() => handleDeleteMacro(macro)}
+                            isFirst={i === 0} isLast={i === otherMacros.length - 1} />
+                        )}
+                      </>
+                    )
+                  }
+                </div>
+              );
+            })}
+
+            <button onClick={() => setShowAddSheet(true)}
+              style={{ width: '100%', marginTop: '10px', padding: '8px', border: '1px dashed var(--border)', borderRadius: 'var(--radius-md)', background: 'transparent', color: 'var(--text-muted)', cursor: 'pointer', fontFamily: 'var(--sans)', fontSize: 'var(--text-sm)' }}>
+              + Add macro
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Sheets */}
       <AnimatePresence>

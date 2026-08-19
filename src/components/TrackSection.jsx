@@ -11,6 +11,7 @@ import { recalcStreaks } from '../utils/streaks';
 import SectionHelp from './SectionHelp';
 import NutritionSection from './NutritionSection';
 import VitalsHistoryCard from './VitalsHistoryCard';
+import VitalsPanel from './track/VitalsPanel';
 import { BodyCard } from './widgets/LifeWidgets';
 
 function getWeekProgress(logs, trackerId, weeklyTarget) {
@@ -804,12 +805,16 @@ export default function TrackSection({ S, update, active, onOpenModal, onShowCoi
             : <div className="card" style={{ padding: '22px' }}><div className="settings-empty">Sign in to log nutrition.</div></div>
         )}
 
-        {/* ── VITALS ── vitals history + the body card that shares its
-            weight series. */}
+        {/* ── VITALS ──
+            Readiness, today's readings and the chart, with the body card
+            and the full history table underneath — the new panel is how
+            you read the week, the table is still how you correct a
+            typo from three weeks ago. */}
         {tab === 'vitals' && (
           <div className="track-vitals">
-            <VitalsHistoryCard S={S} update={update} />
+            <VitalsPanel S={S} update={update} />
             <BodyCard S={S} update={update} />
+            <VitalsHistoryCard S={S} update={update} />
           </div>
         )}
       </div>
