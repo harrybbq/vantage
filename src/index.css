@@ -7554,6 +7554,12 @@ div.m-hubdrawer-coach { cursor: default; display: flex; flex-direction: column; 
      grid is the tallest thing on the page and the list beside it was
      ending a third of the way down. */
   min-height:min(720px, calc(100vh - 210px));
+  /* A month grid does not get better past this. Everything else in the
+     app is full-bleed on purpose, but seven columns sharing 2400px
+     gives days a quarter of a metre wide and nothing to put in them.
+     Centred, so the space left over is symmetrical rather than a gap
+     stuck on one side. */
+  max-width:1600px; margin-inline:auto;
 }
 /* The SURFACE lives on the columns, not the shell.
    It was on the shell, which meant "transparent" could clear the shell's
@@ -7611,11 +7617,29 @@ div.m-hubdrawer-coach { cursor: default; display: flex; flex-direction: column; 
 
 /* The point of the whole change: cells with room in them. A month grid
    that has to carry a date, up to a few tracker dots and an event or
-   two cannot do it at 30px, so the cells stop being square and get a
-   minimum height instead. */
+   two cannot do it at 30px, so the cells stop being square.
+
+   They kept a FIXED height, though, which is only half a rule: the
+   width still grew with the window while the height did not, so on a
+   2560px display a day was 301px wide and 96 tall — a ratio of 3.1,
+   which stops reading as a day and starts reading as a row.
+
+   So the height scales with the window, between a floor that keeps the
+   room the fixed height was protecting and a ceiling that stops a wide
+   display turning the month into a wall. 6.6vw lands on 95px at 1440,
+   which is what the fixed height already was, so the common case is
+   unchanged.
+
+   NOT `aspect-ratio`, which is the obvious tool and the wrong one here:
+   combined with a min-height it also sets a minimum WIDTH, so seven
+   columns each demanded 111px and the grid overflowed its own panel
+   below about 1300px. A clamped min-height cannot feed back into the
+   width. */
 #track .track-main .cal-grid{ gap:5px; }
 #track .track-main .cal-cell{
-  aspect-ratio:auto; min-height:74px; border-radius:8px;
+  aspect-ratio:auto;
+  min-height:clamp(74px, 6.6vw, 132px);
+  border-radius:8px;
   align-items:flex-start; justify-content:flex-start;
   padding:6px 7px; gap:3px;
 }
@@ -7623,9 +7647,9 @@ div.m-hubdrawer-coach { cursor: default; display: flex; flex-direction: column; 
 #track .track-main .cal-dots{ margin-top:auto; max-width:100%; justify-content:flex-start; }
 #track .track-main .cal-dot{ width:5px; height:5px; }
 #track .track-main .cal-day-label{ font-size:10px; }
-@media (min-width:1200px){
-  #track .track-main .cal-cell{ min-height:96px; }
-}
+/* No min-height bump at 1200px any more — the ratio produces the same
+   96px there on its own, and a floor that high fought the ratio on the
+   way down. */
 @media (max-width:640px){
   #track .track-main .cal-cell{ min-height:52px; padding:4px; }
   #track .track-main .cal-date{ font-size:10px; }
