@@ -75,6 +75,11 @@ export default function GroupBoard({ data, onLeave, onRename, onRotateCode, onKi
   return (
     <>
       <div className="grp-wrap">
+        {/* The group and its podium sit side by side as one row of equal
+            height — the week's number on the left, who produced it on the
+            right. Stacked, the podium fell below the fold on a laptop and
+            the two halves of the same sentence read as separate cards. */}
+        <div className="grp-top">
         {/* ── The group, and its week ── */}
         <div className="grp-card grp-hero">
           <div className="grp-hero-top">
@@ -178,6 +183,7 @@ export default function GroupBoard({ data, onLeave, onRename, onRotateCode, onKi
             The top three climbers earn coins. An idle week pays nothing, however high the member's
             rating already is.
           </p>
+        </div>
         </div>
 
         {/* ── Members ── */}
