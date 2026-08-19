@@ -96,6 +96,22 @@ function* cases() {
   yield ['sub-£10 savings goals only', {
     savings: [{ id: 'a', target: 5, current: 5 }, { id: 'b', target: 9, current: 9 }],
   }, 0, 0];
+  // The two sources added in the 2026-08-19 rework, stressed on their
+  // own: a long log history (which the lifetime accumulator reads) and
+  // far more trackers than the cap allows.
+  yield ['ten years of logged days', {
+    trackers, logs: mkLogs(3650), visions: mkVisions(8),
+  }, 0, 0];
+  yield ['forty trackers in one category', {
+    trackers: Array.from({ length: 40 }, (_, i) => ({ id: 'b' + i, category: 'brain', type: 'boolean' })),
+    logs: (() => {
+      const l = {};
+      for (let i = 0; i < 30; i++) {
+        l[ymd(now - i * DAY)] = Object.fromEntries(Array.from({ length: 40 }, (_, k) => ['b' + k, true]));
+      }
+      return l;
+    })(),
+  }, 0, 0];
   yield ['maxed', {
     trackers, logs: mkLogs(30), visions: mkVisions(VISIONS.length), achievements: mkAchs(200),
     savings: [{ id: 'g', target: 25_000, current: 25_000 }],

@@ -42,7 +42,7 @@ const SNAPSHOT_MIN_AGE_MS = 6 * 24 * 60 * 60 * 1000; // ≥6 days = "weekly"
  * The rows stay in the table; nothing is deleted. Once past
  * this + 7 days the constant is inert and can go.
  */
-const FORMULA_EPOCH_ISO = '2026-08-18T00:00:00.000Z';
+const FORMULA_EPOCH_ISO = '2026-08-19T00:00:00.000Z';
 const GLOBAL_TOP_N = 100;
 const WEEKLY_CANDIDATE_POOL = 500; // wider net for weekly-climb candidates
 

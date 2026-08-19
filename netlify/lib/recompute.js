@@ -21,6 +21,7 @@ const SAVINGS_MIN_TARGET = 10;
 const SAVINGS_TOTAL_CAP = 25_000;
 const TRACKER_HISTORY_DAYS = 30;
 const FULL_CREDIT_N = 8;
+const TRACKER_CAP_N = 4;
 
 function clamp(n, lo = 1, hi = 99) {
   return Math.max(lo, Math.min(hi, Math.round(n)));
@@ -28,7 +29,11 @@ function clamp(n, lo = 1, hi = 99) {
 function ymd(ms) {
   return new Date(ms).toISOString().slice(0, 10);
 }
-function toRating(points, k = 1) {
+/* How much a point is worth on the 1-99 scale. Mirrors RATING_SCALE in
+   src/lib/ratings/derive.js — see the note there for why it is 6 and
+   what to bump alongside it. */
+const RATING_SCALE = 6;
+function toRating(points, k = RATING_SCALE) {
   if (!Number.isFinite(points) || points <= 0) return 1;
   return clamp(1 + Math.sqrt(points * k));
 }
@@ -65,7 +70,29 @@ function trackerPoints(state, category) {
     }
     total += (hits / TRACKER_HISTORY_DAYS) * 10;
   }
-  return total;
+  return Math.min(total, TRACKER_CAP_N * 10);
+}
+
+/* Lifetime days on which anything in the category was logged, at 0.4 a
+   day — the per-category equivalent of vitalsPoints, and what stops
+   Brain, Finance and Social freezing inside the first year. Mirrors
+   categoryDayPoints in derive.js. */
+const CATEGORY_DAY_POINTS = 0.4;
+
+function categoryDayPoints(state, category) {
+  const ids = new Set((state.trackers || []).filter(t => t.category === category).map(t => t.id));
+  if (!ids.size) return 0;
+  const logs = state.logs || {};
+  let days = 0;
+  for (const key of Object.keys(logs)) {
+    const day = logs[key] || {};
+    for (const id of ids) {
+      const v = day[id];
+      const truthy = v !== false && v !== 0 && v != null && v !== '';
+      if (truthy) { days++; break; }
+    }
+  }
+  return days * CATEGORY_DAY_POINTS;
 }
 
 function savingsPoints(state) {
@@ -205,17 +232,20 @@ function derivePoints(state, friendCount = 0, macroDays = 0) {
   return {
     brain:
       brainScorePoints(state) +
+      categoryDayPoints(state, 'brain') +
       trackerPoints(state, 'brain') * 1.0 +
       achievementPoints(state, 'brain') * 2.5 +
       visionPoints(state, 'brain'),
     finance:
       financeScorePoints(state) +
+      categoryDayPoints(state, 'finance') +
       savingsPoints(state) +
       trackerPoints(state, 'finance') * 1.0 +
       achievementPoints(state, 'finance') * 2.5 +
       visionPoints(state, 'finance'),
     fitness:
       fitnessScorePoints(state) +
+      categoryDayPoints(state, 'fitness') +
       trackerPoints(state, 'fitness') * 1.2 +
       achievementPoints(state, 'fitness') * 2.5 +
       visionPoints(state, 'fitness') +
@@ -224,6 +254,7 @@ function derivePoints(state, friendCount = 0, macroDays = 0) {
       macroPoints(macroDays),
     social:
       socialSelfCheckPoints(state) +
+      categoryDayPoints(state, 'social') +
       socialPoints(state, friendCount) +
       achievementPoints(state, 'social') * 2.5 +
       visionPoints(state, 'social'),
