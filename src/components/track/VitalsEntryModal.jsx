@@ -21,11 +21,36 @@ const FIELDS = [
 
 export default function VitalsEntryModal({ S, update, onClose }) {
   const today = ymd();
-  const existing = (S?.vitalsLog || {})[today] || {};
+  /* The date is editable, because correcting a reading from three weeks
+     ago used to live in the history table under this panel and that
+     table is gone. Capped at today: a weight for next Tuesday is a typo,
+     not a plan. */
+  const [date, setDate] = useState(today);
+  const existing = (S?.vitalsLog || {})[date] || {};
   const [draft, setDraft] = useState(() => Object.fromEntries(
     FIELDS.map(f => [f.key, existing[f.key] != null ? String(existing[f.key]) : '']),
   ));
   const [error, setError] = useState(null);
+
+  /* Moving the date reloads the fields from that day rather than
+     carrying today's numbers back onto it — which would silently
+     overwrite the day you went to look at. */
+  function pickDate(next) {
+    if (!next || next > today) return;
+    const day = (S?.vitalsLog || {})[next] || {};
+    setDate(next);
+    setError(null);
+    setDraft(Object.fromEntries(
+      FIELDS.map(f => [f.key, day[f.key] != null ? String(day[f.key]) : '']),
+    ));
+  }
+
+  const isToday = date === today;
+  const shift = days => {
+    const d = new Date(`${date}T12:00:00`);
+    d.setDate(d.getDate() + days);
+    pickDate(ymd(d));
+  };
 
   function save() {
     // Validate everything before writing anything — a modal that saves
@@ -45,11 +70,14 @@ export default function VitalsEntryModal({ S, update, onClose }) {
 
     update(prev => {
       const log = { ...(prev.vitalsLog || {}) };
-      const day = { ...(log[today] || {}) };
+      const day = { ...(log[date] || {}) };
       for (const [k, v] of Object.entries(next)) {
         if (v == null) delete day[k]; else day[k] = v;
       }
-      if (Object.keys(day).length) log[today] = day; else delete log[today];
+      /* Only the three fields above are touched. A day that also holds
+         synced HRV or recovery keeps them — this must never be a way to
+         wipe a wearable's readings by saving an empty form. */
+      if (Object.keys(day).length) log[date] = day; else delete log[date];
       return { ...prev, vitalsLog: log };
     });
     onClose();
@@ -58,8 +86,17 @@ export default function VitalsEntryModal({ S, update, onClose }) {
   return (
     <div className="modal-overlay open" {...backdropClose(onClose)}>
       <div className="modal tv-entry" style={{ maxWidth: 420 }}>
-        <div className="tv-entry-eyebrow">Today · {today}</div>
+        <div className="tv-entry-eyebrow">{isToday ? 'Today' : 'Backfilling'}</div>
         <h3 className="tv-entry-title">Enter readings</h3>
+
+        <div className="tv-entry-date">
+          <button type="button" className="tv-entry-step" onClick={() => shift(-1)}
+                  aria-label="Previous day">‹</button>
+          <input type="date" value={date} max={today}
+                 onChange={e => pickDate(e.target.value)} aria-label="Date" />
+          <button type="button" className="tv-entry-step" onClick={() => shift(1)}
+                  disabled={isToday} aria-label="Next day">›</button>
+        </div>
 
         {FIELDS.map(f => (
           <label key={f.key} className="tv-field">
