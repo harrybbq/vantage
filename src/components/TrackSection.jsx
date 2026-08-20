@@ -10,9 +10,7 @@ import { fireGoal, fireStreak7, fireStreak30 } from '../utils/confetti';
 import { recalcStreaks } from '../utils/streaks';
 import SectionHelp from './SectionHelp';
 import NutritionSection from './NutritionSection';
-import VitalsHistoryCard from './VitalsHistoryCard';
 import VitalsPanel from './track/VitalsPanel';
-import { BodyCard } from './widgets/LifeWidgets';
 
 function getWeekProgress(logs, trackerId, weeklyTarget) {
   const dateStr = getTodayStr();
@@ -806,17 +804,19 @@ export default function TrackSection({ S, update, active, onOpenModal, onShowCoi
         )}
 
         {/* ── VITALS ──
-            Readiness, today's readings and the chart, with the body card
-            and the full history table underneath — the new panel is how
-            you read the week, the table is still how you correct a
-            typo from three weeks ago. */}
-        {tab === 'vitals' && (
-          <div className="track-vitals">
-            <VitalsPanel S={S} update={update} />
-            <BodyCard S={S} update={update} />
-            <VitalsHistoryCard S={S} update={update} />
-          </div>
-        )}
+            The panel is the whole tab now. The Body card and the old
+            Vitals & Macros history card came out on 2026-08-19: both
+            displayed the same readings a second time, in a second
+            visual language, directly under the panel that already
+            shows them.
+
+            The one thing only the history table could do was correct a
+            reading from three weeks ago, so that moved into the entry
+            modal rather than going with it — the modal picks its date.
+            Neither component is deleted; BodyBody is still a hub widget
+            and VitalsHistoryCard still holds the Apple Health import,
+            which Settings reaches directly. */}
+        {tab === 'vitals' && <VitalsPanel S={S} update={update} />}
       </div>
 
       {/* Rendered OUTSIDE .track-layout on purpose. That element has a

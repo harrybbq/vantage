@@ -7667,10 +7667,9 @@ div.m-hubdrawer-coach { cursor: default; display: flex; flex-direction: column; 
 }
 
 /* Vitals tab — one column, both cards full width. */
-.track-vitals{ display:flex; flex-direction:column; gap:18px; }
-.track-vitals > .card, .track-vitals .vitals-card{
-  max-width:none !important; margin:0 !important; width:100%;
-}
+/* .track-vitals removed 2026-08-19 with the Body and Vitals & Macros
+   cards it existed to stack. The Vitals tab is one panel now, which
+   brings its own layout. */
 
 /* ── Events on a day ──────────────────────────────────────────────
    Rendered from S.calendarEvents. Nothing writes these yet — the

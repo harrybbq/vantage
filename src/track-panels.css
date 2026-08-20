@@ -385,7 +385,25 @@
   font-family:var(--mono); font-size:9px; letter-spacing:2px;
   text-transform:uppercase; color:var(--text-muted); margin-bottom:6px;
 }
-.tv-entry-title{ font-size:22px; font-weight:700; margin:0 0 16px; letter-spacing:-.3px; }
+.tv-entry-title{ font-size:22px; font-weight:700; margin:0 0 12px; letter-spacing:-.3px; }
+/* The date the readings belong to. Steppers either side because
+   correcting yesterday is the common case and a date picker is three
+   taps for it. */
+.tv-entry-date{
+  display:flex; align-items:center; gap:6px; margin-bottom:16px;
+}
+.tv-entry-date input{
+  flex:1; min-width:0; padding:9px 11px; border-radius:10px;
+  border:1px solid var(--border); background:transparent; color:var(--text);
+  font-family:var(--mono); font-size:13.5px;
+}
+.tv-entry-date input:focus{ outline:none; border-color:rgba(var(--em-rgb),.55); }
+.tv-entry-step{
+  width:34px; height:36px; flex:none; border-radius:10px; cursor:pointer;
+  border:1px solid var(--border); background:transparent; color:var(--text-muted); font-size:15px;
+}
+.tv-entry-step:hover:not(:disabled){ color:var(--em); border-color:rgba(var(--em-rgb),.45); }
+.tv-entry-step:disabled{ opacity:.35; cursor:default; }
 .tv-field{ display:block; margin-bottom:14px; }
 .tv-field-lbl{
   display:block; font-family:var(--mono); font-size:8.5px; letter-spacing:1.3px;
