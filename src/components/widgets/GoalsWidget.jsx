@@ -18,6 +18,7 @@ import { useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { bodyGoalPlan, refusalCopy, sessionsPerWeek, trainingCadence, trainingTrackers, summariseIntake } from '../../lib/body/goal';
 import { bmrKcal } from '../../lib/burn';
+import { useBootFill } from '../../hooks/useBootFill';
 import { useIntakeAverage } from '../../hooks/useIntakeAverage';
 import './GoalsWidget.css';
 
@@ -29,9 +30,13 @@ const money = n => '£' + Math.round(n).toLocaleString('en-GB');
 // ═══════════════════════════════════════════════════════════════════════
 
 export function GoalBar({ pct, accent = 'var(--em)', h = 4 }) {
+  // Fills from empty while the app boots; the value itself at every
+  // other moment, because useBootFill is 1 outside a boot.
+  const boot = useBootFill();
+  const w = Math.max(0, Math.min(100, pct)) * boot;
   return (
     <div className="gw-bar" style={{ height: h }}>
-      <div className="gw-bar-fill" style={{ width: `${Math.max(0, Math.min(100, pct))}%`, background: accent }} />
+      <div className="gw-bar-fill" style={{ width: `${w}%`, background: accent }} />
     </div>
   );
 }

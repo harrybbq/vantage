@@ -17,6 +17,7 @@
  */
 import { useState } from 'react';
 import { RATING_COLOURS, ratingShares } from '../../lib/ratings/palette';
+import { useBootFill } from '../../hooks/useBootFill';
 
 const VB = 132;              // viewBox units
 const R = 52;                // arc radius
@@ -50,6 +51,9 @@ export default function RatingsDonut({
   // Which arc is under the pointer or focus ring — used only to lift the
   // arc itself now, not to write anything.
   const [active, setActive] = useState(null);
+  // Each wedge winds on from its own start while the app boots. 1 — so
+  // the identity — at every other moment.
+  const boot = useBootFill();
   const shares = ratingShares(ratings, categories);
   const segments = donutSegments(shares);
   const colours = RATING_COLOURS[dark ? 'dark' : 'light'];
@@ -121,7 +125,7 @@ export default function RatingsDonut({
                 className="ratings-donut-arc"
                 stroke={colours[seg.id]}
                 strokeWidth={STROKE}
-                strokeDasharray={`${seg.length} ${C - seg.length}`}
+                strokeDasharray={`${seg.length * boot} ${C - seg.length * boot}`}
                 strokeDashoffset={-seg.offset}
                 strokeLinecap="butt"
                 pointerEvents="none"

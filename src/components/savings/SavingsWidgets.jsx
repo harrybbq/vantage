@@ -9,6 +9,7 @@
  */
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { PickList } from '../widgets/GoalsWidget';
+import { useBootFill } from '../../hooks/useBootFill';
 
 function money(n) {
   const neg = n < 0;
@@ -30,6 +31,9 @@ function toMonthly(amount, freq) {
 function Donut({ pct, color, label, sub }) {
   const R = 26, C = 2 * Math.PI * R, size = 68;
   const p = Math.max(0, Math.min(1, pct));
+  // Winds up from empty while the app boots; exactly `p` at every other
+  // moment in the app's life, because useBootFill is 1 outside a boot.
+  const boot = useBootFill();
   const done = p >= 1;
   return (
     <div className="sw-donut">
@@ -37,7 +41,7 @@ function Donut({ pct, color, label, sub }) {
         <circle cx={size / 2} cy={size / 2} r={R} fill="none" stroke="rgba(128,128,128,.22)" strokeWidth="5" />
         {p > 0 && (
           <circle cx={size / 2} cy={size / 2} r={R} fill="none" stroke={done ? 'var(--gold, #d4a017)' : color} strokeWidth="5"
-            strokeDasharray={`${(p * C).toFixed(1)} ${C.toFixed(1)}`} strokeLinecap="round"
+            strokeDasharray={`${(p * boot * C).toFixed(1)} ${C.toFixed(1)}`} strokeLinecap="round"
             transform={`rotate(-90 ${size / 2} ${size / 2})`} />
         )}
       </svg>
@@ -49,6 +53,8 @@ function Donut({ pct, color, label, sub }) {
 }
 
 export function SavingsPotsBody({ S, count = 1, picks, onSetCount, onSetPicks, navigate }) {
+  // Pots fill from empty as the app boots, and read true at all other times.
+  const boot = useBootFill();
   const goals = (S.savings || []).filter(g => (g.target || 0) > 0);
   const max = Math.max(1, goals.length);
   const [picking, setPicking] = useState(false);
@@ -113,9 +119,10 @@ export function SavingsPotsBody({ S, count = 1, picks, onSetCount, onSetPicks, n
   if (n === 1) {
     const g = shown[0];
     const pct = Math.max(0, Math.min(1, (g.current || 0) / (g.target || 1)));
+    const fillH = Math.max(2, pct * 100) * boot;
     return (
       <div className="sw-pot-fill" onClick={go} role={navigate ? 'link' : undefined} tabIndex={navigate ? 0 : undefined}>
-        <div className="sw-pot-fill-bar" style={{ height: `${Math.max(2, pct * 100)}%`, '--sw-fill': `${Math.max(2, pct * 100)}%`, background: pct >= 1 ? 'var(--gold, #d4a017)' : potColor(g, goals.indexOf(g)) }} />
+        <div className="sw-pot-fill-bar" style={{ height: `${fillH}%`, '--sw-fill': `${fillH}%`, background: pct >= 1 ? 'var(--gold, #d4a017)' : potColor(g, goals.indexOf(g)) }} />
         {stepper}
         <div className="sw-pot-fill-overlay">
           <span className="sw-pot-fill-name">{g.icon || '💰'} {g.name}</span>
@@ -135,9 +142,10 @@ export function SavingsPotsBody({ S, count = 1, picks, onSetCount, onSetPicks, n
       <div className="sw-fill-row">
         {shown.map(g => {
           const pct = Math.max(0, Math.min(1, (g.current || 0) / (g.target || 1)));
+          const fillH = Math.max(2, pct * 100) * boot;
           return (
             <div key={g.id} className="sw-pot-fill is-multi">
-              <div className="sw-pot-fill-bar" style={{ height: `${Math.max(2, pct * 100)}%`, '--sw-fill': `${Math.max(2, pct * 100)}%`, background: pct >= 1 ? 'var(--gold, #d4a017)' : potColor(g, goals.indexOf(g)) }} />
+              <div className="sw-pot-fill-bar" style={{ height: `${fillH}%`, '--sw-fill': `${fillH}%`, background: pct >= 1 ? 'var(--gold, #d4a017)' : potColor(g, goals.indexOf(g)) }} />
               <div className="sw-pot-fill-overlay">
                 <span className="sw-pot-fill-name">{g.icon || '💰'} {g.name}</span>
                 <span className="sw-pot-fill-pct">{Math.round(pct * 100)}%</span>

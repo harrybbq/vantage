@@ -16,38 +16,43 @@
  * checks the two have not drifted apart.
  */
 
-export const SPEED = 0.75;
+export const SPEED = 0.6;
 /** 1 / SPEED — what boot.css multiplies its authored delays by. */
 export const CSS_K = Number((1 / SPEED).toFixed(4));
 
 /** Desktop score. Wall-clock duration = total / SPEED. */
 export const DESKTOP = {
-  bg: [120, 1220],
-  grid: [240, 980],
-  sweep: [180, 1680],
-  rail: [380, 1180],
-  topbar: [560, 1000],
-  console: [300, 2900],
-  tile: 340,          // how long one wallpaper tile takes to arrive
-  tileFlicker: 300,
+  bg: [140, 1900],
+  grid: [260, 1300],
+  sweep: [200, 2200],
+  rail: [420, 1600],
+  topbar: [700, 1600],
+  console: [320, 3600],
+  /* The window the dials wind up over — it starts with the first panel
+     and finishes a beat before the score does, so the last needle to
+     settle is the last thing that moves. */
+  fill: [1150, 3600],
+  tile: 560,          // how long one wallpaper tile takes to arrive
+  tileFlicker: 460,
   cols: 8,
   rows: 5,
-  total: 3150,
+  total: 3900,
 };
 
 /** Mobile score — same shapes, retimed for a single column. */
 export const MOBILE = {
-  bg: [100, 1120],
-  grid: [220, 900],
-  sweep: [160, 1560],
-  rail: [600, 1200],   // the bottom tab bar
-  topbar: [420, 900],
-  console: [280, 2800],
-  tile: 320,
-  tileFlicker: 280,
+  bg: [120, 1800],
+  grid: [240, 1200],
+  sweep: [180, 2000],
+  rail: [640, 1600],   // the bottom tab bar
+  topbar: [460, 1200],
+  console: [300, 3500],
+  fill: [1000, 3500],
+  tile: 520,
+  tileFlicker: 440,
   cols: 4,
   rows: 7,
-  total: 3050,
+  total: 3800,
 };
 
 export const scoreFor = kind => (kind === 'mobile' ? MOBILE : DESKTOP);
@@ -116,6 +121,20 @@ export const STAGES = [
   'coach · daily brief',
   'hub · online',
 ];
+
+/**
+ * How full every dial, ring, arc and bar should be drawn at time t.
+ *
+ * Smoothstep rather than the ease-out the rest of the score uses. An
+ * ease-out sends a needle to nine-tenths in the first fifth of its
+ * window and then creeps, which reads as "already full, now twitching".
+ * Winding up wants the opposite shape: slow to break away, quickest
+ * through the middle, settling gently onto the real reading.
+ */
+export function fillAt(t, score) {
+  const p = seg(t, score.fill);
+  return p * p * (3 - 2 * p);
+}
 
 export function consoleAt(t, score) {
   const p = seg(t, score.console);

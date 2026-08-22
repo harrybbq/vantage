@@ -16,7 +16,7 @@
    speed.mjs fails the build if the two ever disagree.
    ═══════════════════════════════════════════════════════════════════ */
 
-html.vb-boot { --vb-k: 1.3333; }
+html.vb-boot { --vb-k: 1.6667; }
 
 /* Nothing plays for someone who asked for less motion. The hook already
    refuses to start the clock; this is the belt to that braces. */
@@ -31,28 +31,28 @@ html.vb-boot { --vb-k: 1.3333; }
 /* A CRT tube deciding whether it is on yet. */
 @keyframes vb-flick {
   0%   { opacity: 0 }
-  8%   { opacity: .9 }
-  12%  { opacity: .05 }
-  22%  { opacity: 1 }
-  28%  { opacity: .2 }
-  38%  { opacity: .95 }
-  46%  { opacity: .35 }
-  60%  { opacity: 1 }
-  72%  { opacity: .7 }
+  10%  { opacity: .5 }
+  17%  { opacity: .16 }
+  28%  { opacity: .68 }
+  37%  { opacity: .38 }
+  50%  { opacity: .84 }
+  62%  { opacity: .62 }
+  78%  { opacity: .95 }
+  88%  { opacity: .82 }
   100% { opacity: 1 }
 }
 
 /* The same flicker, arriving from 12px below. */
 @keyframes vb-panel {
-  0%   { opacity: 0;   transform: translateY(12px) }
-  8%   { opacity: .9 }
-  12%  { opacity: .05 }
-  22%  { opacity: 1 }
-  28%  { opacity: .2 }
-  38%  { opacity: .95 }
-  46%  { opacity: .35 }
-  60%  { opacity: 1 }
-  72%  { opacity: .7 }
+  0%   { opacity: 0;   transform: translateY(14px) }
+  10%  { opacity: .5 }
+  17%  { opacity: .16 }
+  28%  { opacity: .68 }
+  37%  { opacity: .38 }
+  50%  { opacity: .84 }
+  62%  { opacity: .62 }
+  78%  { opacity: .95 }
+  88%  { opacity: .82 }
   100% { opacity: 1;   transform: translateY(0) }
 }
 
@@ -60,20 +60,20 @@ html.vb-boot { --vb-k: 1.3333; }
    by script while it animates (the widgets canvas). */
 @keyframes vb-panel-flat {
   0%   { opacity: 0 }
-  8%   { opacity: .9 }
-  12%  { opacity: .05 }
-  22%  { opacity: 1 }
-  28%  { opacity: .2 }
-  38%  { opacity: .95 }
-  46%  { opacity: .35 }
-  60%  { opacity: 1 }
-  72%  { opacity: .7 }
+  10%  { opacity: .5 }
+  17%  { opacity: .16 }
+  28%  { opacity: .68 }
+  37%  { opacity: .38 }
+  50%  { opacity: .84 }
+  62%  { opacity: .62 }
+  78%  { opacity: .95 }
+  88%  { opacity: .82 }
   100% { opacity: 1 }
 }
 
 /* The accent edge a panel carries until its data has landed. */
 @keyframes vb-edge {
-  0%, 55% { box-shadow: 0 0 0 1px rgba(var(--em-rgb), .42), 0 0 20px rgba(var(--em-rgb), .16) }
+  0%, 62% { box-shadow: 0 0 0 1px rgba(var(--em-rgb), .42), 0 0 20px rgba(var(--em-rgb), .16) }
   100%    { box-shadow: 0 0 0 1px rgba(var(--em-rgb), 0),   0 0 20px rgba(var(--em-rgb), 0) }
 }
 
@@ -139,7 +139,7 @@ html.vb-boot { --vb-k: 1.3333; }
     rgba(var(--em-rgb), .18) 60%,
     rgba(var(--em-rgb), .55) 88%,
     transparent);
-  animation: vb-sweep-desktop calc(1500ms * var(--vb-k)) cubic-bezier(.4, 0, .5, 1) 1 both;
+  animation: vb-sweep-desktop calc(2000ms * var(--vb-k)) cubic-bezier(.4, 0, .5, 1) 1 both;
 }
 
 .vb-boot-console {
@@ -182,49 +182,49 @@ html.vb-boot { --vb-k: 1.3333; }
 /* ── Desktop: the chrome, then the panels, column by column ────────── */
 
 html.vb-boot #mainNav {
-  animation: vb-flick calc(700ms * var(--vb-k)) steps(11) both;
-  animation-delay: calc(380ms * var(--vb-k));
+  animation: vb-flick calc(1100ms * var(--vb-k)) linear both;
+  animation-delay: calc(420ms * var(--vb-k));
 }
 html.vb-boot #pageHeader {
-  animation: vb-flick calc(440ms * var(--vb-k)) steps(11) both;
-  animation-delay: calc(560ms * var(--vb-k));
+  animation: vb-flick calc(880ms * var(--vb-k)) linear both;
+  animation-delay: calc(700ms * var(--vb-k));
 }
 
 html.vb-boot .os-panel,
 html.vb-boot .hub-layout > *,
 html.vb-boot .hub-canvas-panel,
 html.vb-boot .hub-right-col {
-  animation: vb-panel calc(620ms * var(--vb-k)) cubic-bezier(.2, .7, .3, 1) both,
-             vb-edge  calc(760ms * var(--vb-k)) linear both;
-  animation-delay: calc(900ms * var(--vb-k));
+  animation: vb-panel calc(900ms * var(--vb-k)) cubic-bezier(.25, .6, .3, 1) both,
+             vb-edge  calc(1150ms * var(--vb-k)) linear both;
+  animation-delay: calc(1150ms * var(--vb-k));
 }
 
 /* Top row: identity, session, ledger. */
-html.vb-boot .hub-os-top > .os-panel:nth-child(1) { animation-delay: calc(900ms  * var(--vb-k)) }
-html.vb-boot .hub-os-top > .os-panel:nth-child(2) { animation-delay: calc(1020ms * var(--vb-k)) }
-html.vb-boot .hub-os-top > .os-panel:nth-child(3) { animation-delay: calc(1140ms * var(--vb-k)) }
+html.vb-boot .hub-os-top > .os-panel:nth-child(1) { animation-delay: calc(1150ms * var(--vb-k)) }
+html.vb-boot .hub-os-top > .os-panel:nth-child(2) { animation-delay: calc(1370ms * var(--vb-k)) }
+html.vb-boot .hub-os-top > .os-panel:nth-child(3) { animation-delay: calc(1590ms * var(--vb-k)) }
 
 /* Left column, then the canvas, then the right column. */
-html.vb-boot .hub-os-main > .os-col:first-of-type .os-col-inner > *:nth-child(1) { animation-delay: calc(1260ms * var(--vb-k)) }
-html.vb-boot .hub-os-main > .os-col:first-of-type .os-col-inner > *:nth-child(2) { animation-delay: calc(1380ms * var(--vb-k)) }
-html.vb-boot .hub-os-main > .os-col:last-of-type  .os-col-inner > *:nth-child(1) { animation-delay: calc(1620ms * var(--vb-k)) }
-html.vb-boot .hub-os-main > .os-col:last-of-type  .os-col-inner > *:nth-child(2) { animation-delay: calc(1740ms * var(--vb-k)) }
-html.vb-boot .hub-os-main > .os-col:last-of-type  .os-col-inner > *:nth-child(3) { animation-delay: calc(1860ms * var(--vb-k)) }
+html.vb-boot .hub-os-main > .os-col:first-of-type .os-col-inner > *:nth-child(1) { animation-delay: calc(1810ms * var(--vb-k)) }
+html.vb-boot .hub-os-main > .os-col:first-of-type .os-col-inner > *:nth-child(2) { animation-delay: calc(2030ms * var(--vb-k)) }
+html.vb-boot .hub-os-main > .os-col:last-of-type  .os-col-inner > *:nth-child(1) { animation-delay: calc(2250ms * var(--vb-k)) }
+html.vb-boot .hub-os-main > .os-col:last-of-type  .os-col-inner > *:nth-child(2) { animation-delay: calc(2470ms * var(--vb-k)) }
+html.vb-boot .hub-os-main > .os-col:last-of-type  .os-col-inner > *:nth-child(3) { animation-delay: calc(2690ms * var(--vb-k)) }
 
 /* The widgets canvas lays its children out from measured offsets, so it
    is the one panel that must not be moved while it arrives — a transform
    on an ancestor shifts every rect the canvas reads. Opacity only. */
 html.vb-boot .os-widgets {
   animation-name: vb-panel-flat, vb-edge;
-  animation-delay: calc(1500ms * var(--vb-k));
+  animation-delay: calc(2100ms * var(--vb-k));
 }
 
 /* Anything else the boot happens to open on — Track, Shop, Settings —
    gets one honest fade rather than a stagger written for a hub it is
    not looking at. */
 html.vb-boot .section > *:not(.hub-os):not(.hub-layout):not(.m-hub) {
-  animation: vb-panel calc(640ms * var(--vb-k)) cubic-bezier(.2, .7, .3, 1) both;
-  animation-delay: calc(1000ms * var(--vb-k));
+  animation: vb-panel calc(940ms * var(--vb-k)) cubic-bezier(.25, .6, .3, 1) both;
+  animation-delay: calc(1300ms * var(--vb-k));
 }
 
 /* ── Mobile ────────────────────────────────────────────────────────── */
@@ -233,7 +233,7 @@ html.vb-boot-mobile .vb-boot-grid { background-size: 39px 39px }
 html.vb-boot-mobile .vb-boot-sweep {
   height: 120px;
   animation-name: vb-sweep-mobile;
-  animation-duration: calc(1400ms * var(--vb-k));
+  animation-duration: calc(1850ms * var(--vb-k));
 }
 /* Clear of the tab bar, and full width — there is no room for a 210px
    stage label beside a progress bar on a phone, so the bar goes. */
@@ -254,17 +254,17 @@ html.vb-boot-mobile .vb-boot-stage {
 html.vb-boot-mobile .vb-boot-bar { display: none }
 
 html.vb-boot .m-appbar {
-  animation: vb-flick calc(480ms * var(--vb-k)) steps(11) both;
-  animation-delay: calc(420ms * var(--vb-k));
+  animation: vb-flick calc(840ms * var(--vb-k)) linear both;
+  animation-delay: calc(460ms * var(--vb-k));
 }
 html.vb-boot .m-tabs {
-  animation: vb-flick calc(600ms * var(--vb-k)) steps(11) both;
-  animation-delay: calc(600ms * var(--vb-k));
+  animation: vb-flick calc(1000ms * var(--vb-k)) linear both;
+  animation-delay: calc(640ms * var(--vb-k));
 }
 html.vb-boot .m-hub-hero {
-  animation: vb-panel calc(640ms * var(--vb-k)) cubic-bezier(.2, .7, .3, 1) both,
-             vb-edge  calc(780ms * var(--vb-k)) linear both;
-  animation-delay: calc(760ms * var(--vb-k));
+  animation: vb-panel calc(940ms * var(--vb-k)) cubic-bezier(.25, .6, .3, 1) both,
+             vb-edge  calc(1150ms * var(--vb-k)) linear both;
+  animation-delay: calc(1000ms * var(--vb-k));
 }
 
 /* The widget stack, one card at a time. Past the eighth the delay stops
@@ -272,15 +272,15 @@ html.vb-boot .m-hub-hero {
 html.vb-boot .m-widget-swipe,
 html.vb-boot .m-hub-first,
 html.vb-boot .m-widget-add {
-  animation: vb-panel calc(640ms * var(--vb-k)) cubic-bezier(.2, .7, .3, 1) both,
-             vb-edge  calc(780ms * var(--vb-k)) linear both;
-  animation-delay: calc(2200ms * var(--vb-k));
+  animation: vb-panel calc(940ms * var(--vb-k)) cubic-bezier(.25, .6, .3, 1) both,
+             vb-edge  calc(1150ms * var(--vb-k)) linear both;
+  animation-delay: calc(2780ms * var(--vb-k));
 }
-html.vb-boot .m-widget-swipe:nth-of-type(1) { animation-delay: calc(1050ms * var(--vb-k)) }
-html.vb-boot .m-widget-swipe:nth-of-type(2) { animation-delay: calc(1210ms * var(--vb-k)) }
-html.vb-boot .m-widget-swipe:nth-of-type(3) { animation-delay: calc(1370ms * var(--vb-k)) }
-html.vb-boot .m-widget-swipe:nth-of-type(4) { animation-delay: calc(1530ms * var(--vb-k)) }
-html.vb-boot .m-widget-swipe:nth-of-type(5) { animation-delay: calc(1690ms * var(--vb-k)) }
-html.vb-boot .m-widget-swipe:nth-of-type(6) { animation-delay: calc(1850ms * var(--vb-k)) }
-html.vb-boot .m-widget-swipe:nth-of-type(7) { animation-delay: calc(2010ms * var(--vb-k)) }
-html.vb-boot .m-widget-swipe:nth-of-type(n+8) { animation-delay: calc(2170ms * var(--vb-k)) }
+html.vb-boot .m-widget-swipe:nth-of-type(1) { animation-delay: calc(1350ms * var(--vb-k)) }
+html.vb-boot .m-widget-swipe:nth-of-type(2) { animation-delay: calc(1540ms * var(--vb-k)) }
+html.vb-boot .m-widget-swipe:nth-of-type(3) { animation-delay: calc(1730ms * var(--vb-k)) }
+html.vb-boot .m-widget-swipe:nth-of-type(4) { animation-delay: calc(1920ms * var(--vb-k)) }
+html.vb-boot .m-widget-swipe:nth-of-type(5) { animation-delay: calc(2110ms * var(--vb-k)) }
+html.vb-boot .m-widget-swipe:nth-of-type(6) { animation-delay: calc(2300ms * var(--vb-k)) }
+html.vb-boot .m-widget-swipe:nth-of-type(7) { animation-delay: calc(2490ms * var(--vb-k)) }
+html.vb-boot .m-widget-swipe:nth-of-type(n+8) { animation-delay: calc(2680ms * var(--vb-k)) }
