@@ -1579,20 +1579,35 @@ function RelapseModal({ openId, onClose, habits, onRelapse }) {
 
   const [when, setWhen] = useState(() => toLocalInput(new Date()));
   const [error, setError] = useState('');
+  // A datetime-local input has no seconds field, so reading it back
+  // gives a timestamp on the minute exactly. Left as-is that made every
+  // relapse start at :00.000 — which is why the habit cards all ticked
+  // their minute over in unison, however far apart the relapses were.
+  // Knowing whether the picker was actually touched is what lets us
+  // keep the real seconds when it wasn't.
+  const [touched, setTouched] = useState(false);
 
   // Reset input to "now" each time the modal opens for a different habit
   useEffect(() => {
     if (isOpen) {
       setWhen(toLocalInput(new Date()));
       setError('');
+      setTouched(false);
     }
   }, [habitId, isOpen]);
 
   function submit() {
     if (!habitId) return;
-    const ts = new Date(when).getTime();
-    if (isNaN(ts)) { setError('Please pick a valid time.'); return; }
+    const picked = new Date(when).getTime();
+    if (isNaN(picked)) { setError('Please pick a valid time.'); return; }
     const now = Date.now();
+    // Untouched means "it just happened", so the clock is the truth and
+    // we keep its full precision. A back-dated minute genuinely has no
+    // seconds in it, so it borrows the current sub-minute offset: still
+    // inside the minute the user chose (never later than now, since the
+    // picker caps at the current minute), but distinct per relapse, so
+    // two habits reset from the same minute keep their own second.
+    const ts = touched ? picked + (now % 60000) : now;
     if (ts > now) { setError('Relapse time can’t be in the future.'); return; }
     onRelapse(habitId, ts);
     onClose(openId);
@@ -1616,7 +1631,7 @@ function RelapseModal({ openId, onClose, habits, onRelapse }) {
             type="datetime-local"
             value={when}
             max={maxInput}
-            onChange={e => { setWhen(e.target.value); setError(''); }}
+            onChange={e => { setWhen(e.target.value); setTouched(true); setError(''); }}
           />
         </div>
         {error && <div style={{ fontSize: '12px', color: '#b92020', marginTop: '-6px', marginBottom: '8px' }}>{error}</div>}
