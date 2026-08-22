@@ -51,6 +51,7 @@ import MoreDrawer from './components/mobile/MoreDrawer';
 import MobileAppBar from './components/mobile/MobileAppBar';
 import { registerPushToken, handleIncomingPush } from './lib/push/handlers';
 import NotificationPermissionPrompt, { hasAskedPushPrePrompt } from './components/NotificationPermissionPrompt';
+import BootSequence from './components/BootSequence';
 
 const pageMotion = {
   initial: { opacity: 0, y: 14 },
@@ -657,6 +658,14 @@ function Board({ userId, userEmail, onSignOut }) {
           backgroundSize: 'cover', backgroundPosition: 'center',
         }} />
       )}
+
+      {/* Boot sequence. Rendered here, as the background layer's next
+          sibling, so its wallpaper tiles share that layer's paint order
+          and the section scrims below still tint them. It draws only
+          fixed, pointer-events:none layers on top of the app and adds
+          no layout of its own; it plays once per page load and returns
+          null for the rest of the session. */}
+      <BootSequence kind={isMobile ? 'mobile' : 'desktop'} background={currentBg} />
 
       {/* Overlays — only shown when a custom background is active */}
       <div id="hub-overlay" className={activeSection === 'hub' && currentBg ? 'visible' : ''}></div>

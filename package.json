@@ -5,9 +5,10 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "eslint . && npm run check:visions && npm run check:parity && vite build",
+    "build": "eslint . && npm run check:visions && npm run check:parity && npm run check:boot && vite build",
     "check:visions": "node scripts/check-vision-xp.mjs",
     "check:parity": "node scripts/check-ratings-parity.mjs",
+    "check:boot": "node scripts/check-boot-speed.mjs",
     "preview": "vite preview",
     "test": "vitest",
     "cap:sync": "VITE_NATIVE_BUILD=true npm run build && npx cap sync",
