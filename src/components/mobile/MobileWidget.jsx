@@ -14,6 +14,7 @@
  */
 import { useState, useRef, useEffect, lazy, Suspense } from 'react';
 import { getTodayStr } from '../../utils/helpers';
+import { useBootFill } from '../../hooks/useBootFill';
 import { supabase } from '../../lib/supabase';
 import { currentWeightKg, dayBurn, ACTIVITIES, activityKcal, stepsKcal } from '../../lib/burn';
 import { APP_PRESETS, getAppPreset, RETIRED_PRESETS } from '../../data/appPresets';
@@ -882,6 +883,7 @@ function BurnBody({ S, update, userId }) {
 function MacroRing({ label, consumed, goal, color, size = 52 }) {
   const R = (size - 8) / 2, C = 2 * Math.PI * R, c = size / 2;
   const pct = goal > 0 ? Math.min(1, consumed / goal) : 0;
+  const boot = useBootFill();
   const over = goal > 0 && consumed > goal;
   return (
     <div className="m-macro-ring" style={{ width: size }}>
@@ -889,7 +891,7 @@ function MacroRing({ label, consumed, goal, color, size = 52 }) {
         <circle cx={c} cy={c} r={R} fill="none" stroke="rgba(255,255,255,.10)" strokeWidth="4" />
         {pct > 0 && (
           <circle cx={c} cy={c} r={R} fill="none" stroke={over ? 'var(--gold, #d4a017)' : color} strokeWidth="4"
-            strokeDasharray={`${(pct * C).toFixed(1)} ${C.toFixed(1)}`} strokeLinecap="round"
+            strokeDasharray={`${(pct * boot * C).toFixed(1)} ${C.toFixed(1)}`} strokeLinecap="round"
             transform={`rotate(-90 ${c} ${c})`} />
         )}
       </svg>
@@ -900,6 +902,7 @@ function MacroRing({ label, consumed, goal, color, size = 52 }) {
 }
 
 function MacrosBody({ S, userId, navigate }) {
+  const boot = useBootFill();
   const today = getTodayStr();
   const { macros, summary, loaded } = useDaySummary(userId);
   // The plan, when it applies. Owner-only and inactive for everyone
@@ -959,12 +962,12 @@ function MacrosBody({ S, userId, navigate }) {
             <circle cx="38" cy="38" r={R} fill="none" stroke="rgba(255,255,255,.10)" strokeWidth="5" />
             {eatenPct > 0 && (
               <circle cx="38" cy="38" r={R} fill="none" stroke="var(--em)" strokeWidth="5"
-                strokeDasharray={`${(eatenPct * C).toFixed(1)} ${C.toFixed(1)}`} strokeLinecap="round"
+                strokeDasharray={`${(eatenPct * boot * C).toFixed(1)} ${C.toFixed(1)}`} strokeLinecap="round"
                 transform="rotate(-90 38 38)" />
             )}
             {burnedPct > 0 && (
               <circle cx="38" cy="38" r={R} fill="none" stroke={BURN_COLOR} strokeWidth="5"
-                strokeDasharray={`${(burnedPct * C).toFixed(1)} ${C.toFixed(1)}`} strokeLinecap="round"
+                strokeDasharray={`${(burnedPct * boot * C).toFixed(1)} ${C.toFixed(1)}`} strokeLinecap="round"
                 transform="rotate(-90 38 38)" opacity="0.9" />
             )}
           </svg>
@@ -1043,6 +1046,7 @@ function habitProgress(h, elapsed) {
   return { pct, label: next ? next.label : 'All milestones hit' };
 }
 function HabitsBody({ S, navigate }) {
+  const boot = useBootFill();
   const go = () => navigate && navigate('habits');
   // Tick once a second so the timers + bars stay live.
   const [, setTick] = useState(0);
@@ -1072,7 +1076,7 @@ function HabitsBody({ S, navigate }) {
               <span className="m-widget-habit-name">{h.name}</span>
               <span className={`m-widget-habit-time${struckCls}`}>{fmtElapsed(elapsed)}</span>
             </div>
-            <div className="m-widget-habit-bar"><div className="m-widget-habit-fill" style={{ width: `${pct}%` }} /></div>
+            <div className="m-widget-habit-bar"><div className="m-widget-habit-fill" style={{ width: `${pct * boot}%` }} /></div>
             {label && <div className="m-widget-habit-next">{label}</div>}
           </li>
         );
