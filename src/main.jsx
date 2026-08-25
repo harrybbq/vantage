@@ -8,6 +8,7 @@ import './tutorial.css'
 import './holiday.css'
 import './groups.css'
 import './track-panels.css'
+import './savings.css'
 import './boot.css'
 // Last on purpose: shop.css is the final word on .shop-* rules, which is
 // what the mobile shopping layout depends on. Don't reorder.
