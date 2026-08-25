@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "eslint . && npm run check:visions && npm run check:parity && npm run check:boot && vite build",
+    "build": "eslint . && npm run check:visions && npm run check:parity && npm run check:boot && npm run check:savings && vite build",
     "check:visions": "node scripts/check-vision-xp.mjs",
     "check:parity": "node scripts/check-ratings-parity.mjs",
     "check:boot": "node scripts/check-boot-speed.mjs",
@@ -15,7 +15,8 @@
     "cap:android": "VITE_NATIVE_BUILD=true npm run build && npx cap sync android && npx cap open android",
     "cap:ios": "VITE_NATIVE_BUILD=true npm run build && npx cap sync ios && npx cap open ios",
     "cap:icons": "npx capacitor-assets generate",
-    "lint": "eslint ."
+    "lint": "eslint .",
+    "check:savings": "node src/lib/savings/derive.test.mjs"
   },
   "dependencies": {
     "@capacitor/android": "^8.3.1",

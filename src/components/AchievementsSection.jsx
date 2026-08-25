@@ -3,7 +3,7 @@ import Icon from './Icon';
 import { motion } from 'framer-motion';
 import { fireAchievement } from '../utils/confetti';
 import SectionHelp from './SectionHelp';
-import SavingsList from './SavingsList';
+import SavingsBoard from './savings/SavingsBoard';
 import AchievementTree from './achievements/AchievementTree';
 import { useIsMobile } from '../hooks/useIsMobile';
 import { SubscriptionsManager } from './widgets/LifeWidgets';
@@ -989,7 +989,7 @@ export default function AchievementsSection({ S, update, active, onOpenModal, on
 
       {activeTab === 'savings' ? (
         <>
-          <SavingsList S={S} update={update} onOpenModal={onOpenModal} />
+          <SavingsBoard S={S} update={update} onOpenModal={onOpenModal} />
           {/* Recurring outgoings — the spending counterpart to the
               savings goals above; feeds the Subscriptions hub widget. */}
           <SubscriptionsManager S={S} update={update} />
