@@ -16,7 +16,7 @@
    speed.mjs fails the build if the two ever disagree.
    ═══════════════════════════════════════════════════════════════════ */
 
-html.vb-boot { --vb-k: 1.6667; }
+html.vb-boot { --vb-k: 1.25; }
 
 /* Nothing plays for someone who asked for less motion. The hook already
    refuses to start the clock; this is the belt to that braces. */

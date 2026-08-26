@@ -7,8 +7,10 @@
  * rather than by chasing delays around a stylesheet.
  *
  * SPEED scales the clock, exactly as the mock-ups did: t advances at
- * `elapsed * SPEED`, so a speed below 1 makes the boot longer. At 0.75
- * the desktop score's 3150ms runs for 4.2s of wall time.
+ * `elapsed * SPEED`, so a speed below 1 makes the boot LONGER and above
+ * it shorter. At 0.8 the desktop score's 3900ms (plus a 300ms tail) runs
+ * for 5.25s of wall time, and the mobile one for 5.1s. Changing this one
+ * number re-times the whole sequence; boot.css follows through CSS_K.
  *
  * The panel stagger is the one part that lives in CSS instead (boot.css
  * needs it for elements this module never sees), so the reciprocal is
@@ -16,7 +18,7 @@
  * checks the two have not drifted apart.
  */
 
-export const SPEED = 0.6;
+export const SPEED = 0.8;
 /** 1 / SPEED — what boot.css multiplies its authored delays by. */
 export const CSS_K = Number((1 / SPEED).toFixed(4));
 
