@@ -59,11 +59,29 @@ export function signedMonthly(item, m, now) {
   return (item.kind === 'income' ? 1 : -1) * toMonthly(item.amount, item.freq);
 }
 
-/** Monthly total routed into one pot, from every row that feeds it. */
-export function routedFor(items, goalId, m = 0, now) {
+/** The accounts a pot keeps its money in. */
+export function accountsForPot(accounts, goalId) {
+  if (!goalId) return [];
+  return (accounts || []).filter(a => a.goalId === goalId);
+}
+
+/**
+ * Monthly total routed into one pot.
+ *
+ * Two ways money reaches a pot: a row pointed straight at it, or a row
+ * pointed at a SAVINGS ACCOUNT that belongs to it — which is how one pot
+ * can be spread across an ISA and an instant saver and still know its
+ * own rate.
+ *
+ * Deduped by row id, because a row is allowed to name both the pot and
+ * an account belonging to that pot, and counting it twice would halve
+ * every ETA it touched.
+ */
+export function routedFor(items, goalId, accounts = [], m = 0, now) {
   if (!goalId) return 0;
+  const own = new Set(accountsForPot(accounts, goalId).map(a => a.id));
   return (items || [])
-    .filter(it => it.goalId === goalId && activeAt(it, m, now))
+    .filter(it => activeAt(it, m, now) && (it.goalId === goalId || (it.accountId && own.has(it.accountId))))
     .reduce((s, it) => s + toMonthly(it.amount, it.freq), 0);
 }
 
@@ -96,7 +114,7 @@ function asDate(iso) {
  * "behind" mean something. Without a target date there is no pace to be
  * behind of, so such a pot is never called behind; it is simply open.
  */
-export function derivePot(goal, items, now = new Date()) {
+export function derivePot(goal, items, accounts = [], now = new Date()) {
   const target = Number(goal.target) || 0;
   const current = Number(goal.current) || 0;
   const pct = target > 0 ? clamp01(current / target) : 0;
@@ -116,7 +134,7 @@ export function derivePot(goal, items, now = new Date()) {
     needed = monthsLeft > 0 ? left / monthsLeft : left;
   }
 
-  const routed = routedFor(items, goal.id, 0, now);
+  const routed = routedFor(items, goal.id, accounts, 0, now);
   const etaMonths = routed > 0 && left > 0 ? Math.ceil(left / routed) : null;
 
   const state = done ? 'funded'
@@ -124,7 +142,11 @@ export function derivePot(goal, items, now = new Date()) {
     : pct + 0.02 >= pace ? 'ontrack'
     : 'behind';
 
-  return { pct, done, pace, left, monthsLeft, needed, routed, etaMonths, state, targetDate, started, target, current };
+  return {
+    pct, done, pace, left, monthsLeft, needed, routed, etaMonths, state,
+    targetDate, started, target, current,
+    accounts: accountsForPot(accounts, goal.id),
+  };
 }
 
 /**
@@ -174,9 +196,9 @@ export function savingsSeries(accounts, items, horizon, now = new Date()) {
 }
 
 /** The headline numbers above the pots. */
-export function potTotals(goals, items, now = new Date()) {
+export function potTotals(goals, items, accounts = [], now = new Date()) {
   const list = goals || [];
-  const derived = list.map(g => ({ goal: g, d: derivePot(g, items, now) }));
+  const derived = list.map(g => ({ goal: g, d: derivePot(g, items, accounts, now) }));
   const saved = list.reduce((s, g) => s + (Number(g.current) || 0), 0);
   const target = list.reduce((s, g) => s + (Number(g.target) || 0), 0);
   const routed = derived.reduce((s, x) => s + x.d.routed, 0);
@@ -194,15 +216,76 @@ export function potTotals(goals, items, now = new Date()) {
 }
 
 /** Income, spend and net per month, for the flow header and segments. */
-export function flowTotals(items, now = new Date()) {
+export function flowTotals(items, goals = [], accounts = [], now = new Date()) {
   const list = items || [];
+  // Every account that belongs to some pot — money into one of those is
+  // money into a pot, even though the row never names the pot.
+  const potAccounts = new Set((accounts || []).filter(a => a.goalId).map(a => a.id));
   const income = list.filter(i => i.kind === 'income' && activeAt(i, 0, now))
     .reduce((s, i) => s + toMonthly(i.amount, i.freq), 0);
   const spend = list.filter(i => i.kind === 'expense' && activeAt(i, 0, now))
     .reduce((s, i) => s + toMonthly(i.amount, i.freq), 0);
-  const routed = list.filter(i => i.goalId && activeAt(i, 0, now))
+  const routed = list
+    .filter(i => activeAt(i, 0, now) && (i.goalId || (i.accountId && potAccounts.has(i.accountId))))
     .reduce((s, i) => s + toMonthly(i.amount, i.freq), 0);
   return { income, spend, net: income - spend, routed, rate: income > 0 ? routed / income : 0 };
+}
+
+/**
+ * The bands of the "where the month goes" bar.
+ *
+ * A FOLDER is one band, labelled with the folder's name and sized by
+ * everything inside it — the point of putting eight subscriptions in a
+ * folder called Subscriptions is to see one band called Subscriptions,
+ * not eight slivers. A row outside every folder is its own band.
+ *
+ * Bands come out in the order the rows are shown: loose rows first, then
+ * folders, so the bar reads left to right in the same order as the list
+ * under it.
+ *
+ * `share` is of income, which is what makes the leftover the honest
+ * remainder rather than a percentage of spending.
+ */
+export function flowSections(items, groups, now = new Date()) {
+  const list = (items || []).filter(i => i.kind === 'expense' && activeAt(i, 0, now));
+  const income = (items || [])
+    .filter(i => i.kind === 'income' && activeAt(i, 0, now))
+    .reduce((s, i) => s + toMonthly(i.amount, i.freq), 0);
+  const denom = Math.max(1, income);
+
+  const out = [];
+  for (const it of list) {
+    if (it.groupId) continue;
+    const amount = toMonthly(it.amount, it.freq);
+    out.push({
+      id: it.id,
+      kind: 'row',
+      label: it.label || 'Untitled',
+      amount,
+      share: amount / denom,
+      colour: it.color || null,
+      routed: !!(it.goalId || it.accountId),
+      count: 1,
+    });
+  }
+  for (const g of (groups || [])) {
+    const kids = list.filter(i => i.groupId === g.id);
+    const amount = kids.reduce((s, i) => s + toMonthly(i.amount, i.freq), 0);
+    // A folder with nothing in it is not a band — it would draw a zero
+    // width sliver and a legend entry for no money.
+    if (!kids.length) continue;
+    out.push({
+      id: g.id,
+      kind: 'group',
+      label: g.name || 'Folder',
+      amount,
+      share: amount / denom,
+      colour: g.color || null,
+      routed: kids.every(i => i.goalId || i.accountId),
+      count: kids.length,
+    });
+  }
+  return out;
 }
 
 /** Blended rate across accounts, weighted by balance. */
@@ -248,4 +331,17 @@ export function monthLabel(m, now = new Date()) {
 export const POT_PALETTE = ['#2fbf83', '#5b8cff', '#d0498f', '#12a5a5', '#d99114', '#7a4fd0', '#e05252', '#4dc485'];
 export function potColor(goal, index) {
   return goal?.color || POT_PALETTE[((index % POT_PALETTE.length) + POT_PALETTE.length) % POT_PALETTE.length];
+}
+
+/**
+ * The colours offered for a flow section. Deliberately the same set the
+ * pots use, so a section feeding a pot can be given that pot's colour and
+ * the bar and the vessels agree without anyone matching hex by eye.
+ */
+export const SECTION_PALETTE = POT_PALETTE;
+
+/** A section's drawn colour: chosen, else a stable one from its position. */
+export function sectionColor(section, index) {
+  if (section?.colour) return section.colour;
+  return SECTION_PALETTE[((index % SECTION_PALETTE.length) + SECTION_PALETTE.length) % SECTION_PALETTE.length];
 }

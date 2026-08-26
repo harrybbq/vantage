@@ -9,6 +9,7 @@ import {
   toMonthly, clamp01, activeAt, signedMonthly, routedFor, routedToAccount,
   monthsBetween, derivePot, last12Months, cashSeries, savingsSeries,
   potTotals, flowTotals, blendedApy, money, moneyK, monthLabel, potColor,
+  accountsForPot, flowSections, sectionColor,
 } from './derive.js';
 
 let n = 0;
@@ -54,10 +55,10 @@ const items = [
   { id: 'i4', kind: 'expense', amount: '99', freq: 'month', goalId: 'home', from: '2027-01' },
   { id: 'i5', kind: 'expense', amount: '400', freq: 'month', accountId: 'a1' },
 ];
-eq(routedFor(items, 'home', 0, NOW), 700, 'two live rows into one pot add up (600 + 1200/12)');
-eq(routedFor(items, 'home', 6, NOW), 799, 'and the future row joins when it starts');
-eq(routedFor(items, 'nope', 0, NOW), 0, 'an unknown pot gets nothing');
-eq(routedFor(items, null, 0, NOW), 0, 'so does no pot at all');
+eq(routedFor(items, 'home', [], 0, NOW), 700, 'two live rows into one pot add up (600 + 1200/12)');
+eq(routedFor(items, 'home', [], 6, NOW), 799, 'and the future row joins when it starts');
+eq(routedFor(items, 'nope', [], 0, NOW), 0, 'an unknown pot gets nothing');
+eq(routedFor(items, null, [], 0, NOW), 0, 'so does no pot at all');
 eq(routedToAccount(items, 'a1', 0, NOW), 400, 'account routing totals separately');
 
 // ── monthsBetween ──
@@ -69,7 +70,7 @@ const home = {
   id: 'home', name: 'First Home', target: 40000, current: 20000,
   targetDate: '2027-08-25', createdAt: '2025-08-25T00:00:00.000Z',
 };
-const d = derivePot(home, items, NOW);
+const d = derivePot(home, items, [], NOW);
 near(d.pct, 0.5, 'half saved');
 eq(d.done, false, 'not funded');
 eq(d.left, 20000, 'twenty thousand to go');
@@ -79,21 +80,21 @@ near(d.needed, 20000 / d.monthsLeft, 'needed is what is left over the months lef
 eq(d.routed, 700, 'routed comes from the flow rows');
 eq(d.etaMonths, Math.ceil(20000 / 700), 'and the ETA from that rate');
 
-const behind = derivePot({ ...home, current: 4000 }, items, NOW);
+const behind = derivePot({ ...home, current: 4000 }, items, [], NOW);
 eq(behind.state, 'behind', 'well short of pace is behind');
-const funded = derivePot({ ...home, current: 40000 }, items, NOW);
+const funded = derivePot({ ...home, current: 40000 }, items, [], NOW);
 eq(funded.state, 'funded', 'at target it is funded');
 eq(funded.etaMonths, null, 'a funded pot has no ETA');
 eq(funded.left, 0, 'and nothing left');
 
 // A pot with no target date has no pace to be behind of.
-const open = derivePot({ id: 'x', target: 1000, current: 10, createdAt: '2026-01-01' }, [], NOW);
+const open = derivePot({ id: 'x', target: 1000, current: 10, createdAt: '2026-01-01' }, [], [], NOW);
 eq(open.pace, null, 'no target date, no pace');
 eq(open.state, 'open', 'so it is open rather than behind — it was never promised a date');
 eq(open.etaMonths, null, 'and with nothing routed, no ETA');
 
 // Divide-by-zero guards.
-const zero = derivePot({ id: 'z', target: 0, current: 0 }, [], NOW);
+const zero = derivePot({ id: 'z', target: 0, current: 0 }, [], [], NOW);
 eq(zero.pct, 0, 'a pot with no target is 0%, not NaN');
 ok(Number.isFinite(zero.left), 'and its remainder is a number');
 
@@ -143,7 +144,7 @@ const goals = [
   { id: 'japan', target: 4800, current: 4800, targetDate: '2027-03-14', createdAt: '2025-10-01' },
   { id: 'kitchen', target: 12000, current: 100, targetDate: '2027-01-01', createdAt: '2026-01-01' },
 ];
-const t = potTotals(goals, items, NOW);
+const t = potTotals(goals, items, [], NOW);
 eq(t.saved, 24900, 'saved is the sum of currents');
 eq(t.target, 56800, 'target the sum of targets');
 eq(t.count, 3, 'three pots');
@@ -151,18 +152,91 @@ eq(t.doneCount, 1, 'one of them funded');
 eq(t.routed, 700 + 180, 'routed totals across pots');
 eq(t.behind, 1, 'the kitchen is behind');
 ok(t.next && t.next.goal.id === 'home', 'and the next to land is the one with the shortest ETA');
-eq(potTotals([], [], NOW).pct, 0, 'no pots is 0%, not NaN');
+eq(potTotals([], [], [], NOW).pct, 0, 'no pots is 0%, not NaN');
 
-const f = flowTotals([...flow, { id: 'r2', kind: 'expense', amount: '600', freq: 'month', goalId: 'home' }], NOW);
+const f = flowTotals([...flow, { id: 'r2', kind: 'expense', amount: '600', freq: 'month', goalId: 'home' }], [], [], NOW);
 eq(f.income, 3000, 'income totals');
 eq(f.spend, 2600, 'spend totals including routed');
 eq(f.net, 400, 'net is the difference');
 eq(f.routed, 600, 'routed is what feeds pots');
 near(f.rate, 0.2, 'and the saved rate is routed over income');
-eq(flowTotals([], NOW).rate, 0, 'no income means a 0 rate, not a divide by zero');
+eq(flowTotals([], [], [], NOW).rate, 0, 'no income means a 0 rate, not a divide by zero');
 
 near(blendedApy([{ balance: '1000', apy: '2' }, { balance: '3000', apy: '6' }]), 5, 'blended APY is balance-weighted');
 eq(blendedApy([]), 0, 'no accounts blends to zero');
+
+
+// ── An account can belong to a pot ───────────────────────────────────
+// Spreading one pot across two accounts, and still knowing its rate.
+const potAccounts = [
+  { id: 'isa', name: 'ISA', balance: '5000', apy: '5', goalId: 'home' },
+  { id: 'saver', name: 'Instant saver', balance: '2000', apy: '4', goalId: 'home' },
+  { id: 'other', name: 'Not for a pot', balance: '900', apy: '3' },
+];
+eq(accountsForPot(potAccounts, 'home').map(a => a.id), ['isa', 'saver'], 'both of the pot\'s accounts');
+eq(accountsForPot(potAccounts, 'japan'), [], 'and none for a pot that has none');
+eq(accountsForPot(potAccounts, null), [], 'a missing pot id asks for nothing');
+
+const viaAccounts = [
+  { id: 'x1', kind: 'expense', amount: '300', freq: 'month', accountId: 'isa' },
+  { id: 'x2', kind: 'expense', amount: '200', freq: 'month', accountId: 'saver' },
+  { id: 'x3', kind: 'expense', amount: '150', freq: 'month', accountId: 'other' },
+];
+eq(routedFor(viaAccounts, 'home', potAccounts, 0, NOW), 500,
+  'money into either of the pot\'s accounts counts toward the pot');
+eq(routedFor(viaAccounts, 'home', [], 0, NOW), 0,
+  'and without the link it counts toward nothing');
+
+// The trap: a row naming BOTH the pot and one of its accounts.
+const both = [{ id: 'b1', kind: 'expense', amount: '400', freq: 'month', goalId: 'home', accountId: 'isa' }];
+eq(routedFor(both, 'home', potAccounts, 0, NOW), 400,
+  'a row naming the pot AND its account is counted once, not twice — double counting would halve the ETA');
+
+const linkedPot = derivePot({ id: 'home', target: 10000, current: 0 }, viaAccounts, potAccounts, NOW);
+eq(linkedPot.routed, 500, 'the pot picks the rate up through its accounts');
+eq(linkedPot.etaMonths, 20, 'and dates itself from it');
+eq(linkedPot.accounts.map(a => a.id), ['isa', 'saver'], 'and knows which accounts they are');
+
+const linkedFlow = flowTotals(
+  [{ id: 'i', kind: 'income', amount: '2000', freq: 'month' }, ...viaAccounts],
+  [], potAccounts, NOW,
+);
+eq(linkedFlow.routed, 500, '"into pots" counts account-routed money too');
+
+// ── Flow sections ────────────────────────────────────────────────────
+const secItems = [
+  { id: 's1', kind: 'income', amount: '2000', freq: 'month' },
+  { id: 's2', kind: 'expense', amount: '500', freq: 'month' },                       // loose
+  { id: 's3', kind: 'expense', amount: '12', freq: 'month', groupId: 'subs' },
+  { id: 's4', kind: 'expense', amount: '8', freq: 'month', groupId: 'subs' },
+  { id: 's5', kind: 'expense', amount: '120', freq: 'year', groupId: 'subs' },       // £10/mo
+  { id: 's6', kind: 'expense', amount: '99', freq: 'month', groupId: 'empty-later' },
+  { id: 's7', kind: 'expense', amount: '50', freq: 'month', from: '2027-01' },       // not live
+];
+const secGroups = [
+  { id: 'subs', name: 'Subscriptions', color: '#5b8cff' },
+  { id: 'empty', name: 'Nothing in here' },
+  { id: 'empty-later', name: 'Holds one' },
+];
+const secs = flowSections(secItems, secGroups, NOW);
+eq(secs.length, 3, 'one loose row, two folders that hold something — the empty folder is not a band');
+eq(secs[0].label, 'Untitled', 'the loose row comes first, in row order');
+eq(secs[0].kind, 'row', 'and is a row band');
+const subs = secs.find(x => x.id === 'subs');
+eq(subs.label, 'Subscriptions', 'the folder is labelled with its own name');
+eq(subs.amount, 30, 'and totals everything inside it, whatever cadence each was entered at');
+eq(subs.count, 3, 'reporting how many rows it stands for');
+eq(subs.colour, '#5b8cff', 'keeping the colour the user chose');
+near(subs.share, 30 / 2000, 'its share is of income, not of spending');
+ok(!secs.some(x => x.id === 'empty'), 'an empty folder draws no band');
+ok(!secs.some(x => x.id === 's7'), 'and a row that has not started yet is not in the bar');
+eq(flowSections([], [], NOW), [], 'nothing in, nothing out');
+eq(flowSections(secItems, [], NOW).length, 1,
+  'with no folders at all, only the live loose row is a band');
+
+eq(sectionColor({ colour: '#123456' }, 3), '#123456', 'a chosen colour wins');
+eq(sectionColor({}, 0), sectionColor({}, 8), 'and the fallback palette wraps stably');
+ok(sectionColor({}, 0) !== sectionColor({}, 1), 'adjacent sections do not get the same colour');
 
 // ── Formatting ──
 eq(money(1234.56), '£1,235', 'money rounds and groups');
