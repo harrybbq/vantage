@@ -10,12 +10,13 @@
  * from anywhere.
  */
 import Icon from '../Icon';
-import { blendedApy, routedToAccount, money, POT_PALETTE } from '../../lib/savings/derive';
+import { blendedApy, routedToAccount, money, POT_PALETTE, potColor } from '../../lib/savings/derive';
 
 const uid = p => p + Date.now().toString(36) + Math.round(Math.random() * 1e4).toString(36);
 
 export default function AccountsPanel({ S, update, sav, horizon, items }) {
   const accounts = S.savingsAccounts || [];
+  const goals = S.savings || [];
   const total = accounts.reduce((s, a) => s + (parseFloat(a.balance) || 0), 0);
   const blended = blendedApy(accounts);
   const future = sav[sav.length - 1] || 0;
@@ -57,8 +58,14 @@ export default function AccountsPanel({ S, update, sav, horizon, items }) {
           const bal = parseFloat(a.balance) || 0;
           const apy = parseFloat(a.apy) || 0;
           const inflow = routedToAccount(items, a.id);
+          const potIdx = goals.findIndex(g => g.id === a.goalId);
+          const pot = potIdx >= 0 ? goals[potIdx] : null;
+          /* An account that belongs to a pot wears the pot's colour, so
+             the split bar above reads as "this much of my savings is the
+             house" rather than as three arbitrary stripes. */
+          const tint = pot ? potColor(pot, potIdx) : POT_PALETTE[i % POT_PALETTE.length];
           return (
-            <div key={a.id} className="sb-acc" style={{ '--pot': POT_PALETTE[i % POT_PALETTE.length] }}>
+            <div key={a.id} className={`sb-acc${pot ? ' is-forpot' : ''}`} style={{ '--pot': tint }}>
               <div className="sb-acc-top">
                 <span className="sb-acc-dot" aria-hidden="true" />
                 <input
@@ -93,6 +100,26 @@ export default function AccountsPanel({ S, update, sav, horizon, items }) {
                 <span className="sb-row-spacer" />
                 <span>+{money(bal * apy / 100)} interest/yr</span>
               </div>
+
+              {/* Saying an account is FOR a pot is what lets money routed
+                  here count toward that pot's rate and date, without the
+                  row ever naming the pot. One pot, several accounts. */}
+              {goals.length > 0 && (
+                <label className="sb-acc-forpot">
+                  <span className="sb-row-arrow">↳ for pot</span>
+                  <select
+                    value={a.goalId || ''}
+                    onChange={e => patch(a.id, 'goalId', e.target.value || null)}
+                    aria-label={`Which pot ${a.name || 'this account'} is for`}
+                  >
+                    <option value="">none — general savings</option>
+                    {goals.map(g => <option key={g.id} value={g.id}>{g.icon || '💰'} {g.name}</option>)}
+                  </select>
+                  {pot && inflow > 0 && (
+                    <span className="sb-acc-feeds">feeds {pot.name} {money(inflow)}/mo</span>
+                  )}
+                </label>
+              )}
             </div>
           );
         })}

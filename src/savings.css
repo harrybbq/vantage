@@ -130,12 +130,6 @@ html[data-theme="dark-os"] .sb-stat-val.is-bad { color: #e07a6b; }
 
 /* ── Pots ─────────────────────────────────────────────────────────── */
 
-.sb-pots-row {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(320px, 400px);
-  gap: 16px;
-  align-items: start;
-}
 /* Cash flow beside accounts, as in the mock-up. Spanning the page, a
    flow row's label field grew to ~660px on a wide display and pushed its
    own amount to the far edge. */
@@ -162,7 +156,11 @@ html[data-theme="dark-os"] .sb-stat-val.is-bad { color: #e07a6b; }
 .sb-legend i.is-behind  { background: #c0392b; }
 .sb-legend i.is-funded  { background: var(--gold); }
 
-.sb-vessels { display: flex; gap: 12px; align-items: stretch; }
+/* Wrapping, so the opened card can claim the full row and push the rest
+   onto the next line. A grid of fixed tracks could not do that without
+   re-declaring the template per selection. */
+.sb-vessels { display: flex; flex-wrap: wrap; gap: 12px; align-items: stretch; }
+.sb-vessel { flex: 1 1 0; }
 
 .sb-vessel {
   flex: 1;
@@ -275,64 +273,6 @@ html[data-theme="dark-os"] .sb-stat-val.is-bad { color: #e07a6b; }
 }
 .sb-add-pot:hover { border-color: var(--em); color: var(--em); }
 
-/* ── The opened pot ───────────────────────────────────────────────── */
-
-.sb-detail {
-  border: 1px solid var(--border);
-  border-radius: 18px;
-  overflow: hidden;
-  background: var(--surface);
-  min-width: 0;
-}
-.sb-detail-head {
-  position: relative;
-  height: 96px;
-  background:
-    linear-gradient(135deg, var(--pot), color-mix(in srgb, var(--pot) 55%, #000)) ,
-    var(--pot);
-  background-size: cover;
-  background-position: center;
-}
-.sb-detail-head-ink {
-  position: absolute;
-  left: 18px; right: 18px; bottom: 14px;
-  display: flex;
-  align-items: flex-end;
-  gap: 10px;
-  min-width: 0;
-  text-shadow: 0 1px 6px rgba(0, 0, 0, .45);
-}
-.sb-detail-icon { font-size: 19px; line-height: 1; flex: none; }
-.sb-detail-name {
-  font-family: var(--display);
-  font-size: clamp(18px, 1.7vw, 23px);
-  font-weight: 700;
-  color: #fff;
-  letter-spacing: -.3px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  flex: 1;
-  min-width: 0;
-}
-.sb-detail-pct {
-  font-family: var(--mono);
-  font-size: clamp(22px, 2.2vw, 30px);
-  color: #fff;
-  letter-spacing: -1.2px;
-  line-height: 1;
-  flex: none;
-}
-
-.sb-detail-state {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 11px 18px;
-  border-bottom: 1px solid var(--border);
-  background: rgba(128, 128, 128, .07);
-  flex-wrap: wrap;
-}
 .sb-detail-lamp {
   width: 9px; height: 9px;
   border-radius: 50%;
@@ -354,19 +294,7 @@ html[data-theme="dark-os"] .sb-stat-val.is-bad { color: #e07a6b; }
 .sb-detail-state.is-behind .sb-detail-state-label { color: #c0392b; }
 .sb-detail-state.is-funded .sb-detail-state-label { color: var(--gold); }
 .sb-detail-state.is-open   .sb-detail-state-label { color: var(--text-muted); }
-.sb-detail-state-why {
-  font-size: 11.5px;
-  color: var(--text-mid);
-  margin-left: auto;
-  text-align: right;
-  line-height: 1.35;
-}
 
-.sb-detail-body { padding: 16px 18px 18px; }
-.sb-detail-nums { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
-.sb-detail-cur { font-family: var(--mono); font-size: 24px; letter-spacing: -.6px; color: var(--text); }
-.sb-detail-target { font-family: var(--mono); font-size: 12px; color: var(--text-muted); }
-.sb-detail-gap { font-family: var(--mono); font-size: 11px; color: var(--text-mid); margin-left: auto; }
 .sb-detail-bar {
   position: relative;
   height: 9px;
@@ -480,9 +408,6 @@ html[data-theme="dark-os"] .sb-stat-val.is-bad { color: #e07a6b; }
 }
 .sb-ledger-date { font-family: var(--mono); font-size: 10px; color: var(--text-muted); flex: none; }
 .sb-ledger-empty { font-size: 12px; color: var(--text-muted); padding: 10px 0 14px; }
-.sb-detail-actions { display: flex; gap: 8px; }
-.sb-detail-actions .btn { flex: 1; }
-.sb-detail-actions .btn + .btn { flex: 0 0 auto; }
 
 /* ── Projection ───────────────────────────────────────────────────── */
 
@@ -1029,7 +954,7 @@ html[data-theme="dark-os"] .sb-stat-val.is-bad { color: #e07a6b; }
   .sb-vessel-pct { font-size: 17px; }
 
   .sb-detail-facts { grid-template-columns: 1fr 1fr; }
-  .sb-detail-state-why { margin-left: 0; text-align: left; width: 100%; }
+  
 
   /* The flow row stops pretending to be a table. The label takes its own
      line so a long one is readable, and the controls wrap under it
@@ -1046,6 +971,271 @@ html[data-theme="dark-os"] .sb-stat-val.is-bad { color: #e07a6b; }
   .sb-chart { height: 190px; }
   .sb-acc-top { gap: 8px; }
   .sb-acc-name { flex: 1 0 100%; order: -1; }
-  .sb-detail-actions .btn { min-height: 44px; }
+  
   .sb-add, .sb-undo { min-height: 42px; flex: 1 1 auto; }
 }
+
+/* ── The opened pot, in the slot the vessel had ───────────────────── */
+
+.sb-potcard {
+  flex: 2.4 1 260px;
+  min-width: 0;
+  border: 1px solid var(--pot);
+  border-radius: 15px;
+  background: var(--surface2, var(--surface));
+  box-shadow: 0 0 0 1px var(--pot);
+  padding: 10px 12px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+/* Expanded takes the whole row; the other vessels wrap under it. */
+.sb-potcard.is-expanded { flex: 1 1 100%; }
+
+.sb-potcard-top { display: flex; gap: 12px; align-items: stretch; min-width: 0; }
+.sb-potcard-tube {
+  position: relative;
+  flex: 0 0 46px;
+  border-radius: 10px;
+  overflow: hidden;
+  background: var(--surface-deep, rgba(128, 128, 128, .14));
+  border: 1px solid var(--border-lt, var(--border));
+  min-height: clamp(150px, 17vw, 224px);
+}
+.sb-potcard.is-expanded .sb-potcard-tube { flex: 0 0 60px; min-height: 190px; }
+
+.sb-potcard-body { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.sb-potcard-head { display: flex; align-items: center; gap: 7px; min-width: 0; }
+.sb-potcard-icon { font-size: 15px; line-height: 1; flex: none; }
+.sb-potcard-name {
+  font-family: var(--display);
+  font-size: clamp(15px, 1.4vw, 19px);
+  font-weight: 700;
+  color: var(--text);
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.sb-potcard-close {
+  width: 24px; height: 24px;
+  flex: none;
+  border-radius: 7px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.sb-potcard-close:hover { color: var(--text); border-color: var(--border-lt, var(--border)); }
+
+.sb-potcard-nums { display: flex; align-items: baseline; gap: 8px; margin-top: 8px; flex-wrap: wrap; }
+.sb-potcard-pct {
+  font-family: var(--mono);
+  font-size: clamp(20px, 2vw, 27px);
+  letter-spacing: -1px;
+  line-height: 1;
+  color: var(--pot);
+}
+.sb-potcard-cur { font-family: var(--mono); font-size: 15px; color: var(--text); }
+.sb-potcard-target { font-family: var(--mono); font-size: 11px; color: var(--text-muted); }
+
+.sb-potcard .sb-detail-bar { margin: 10px 0 10px; }
+
+.sb-potcard-state { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.sb-potcard-why { font-size: 11px; color: var(--text-mid); flex: 1 0 100%; }
+.sb-potcard.is-expanded .sb-potcard-why { flex: 1; }
+.sb-potcard-state.is-behind .sb-detail-lamp { background: #c0392b; box-shadow: 0 0 0 3px rgba(192, 57, 43, .18); }
+.sb-potcard-state.is-funded .sb-detail-lamp { background: var(--gold); box-shadow: 0 0 0 3px rgba(200, 151, 10, .2); }
+.sb-potcard-state.is-open .sb-detail-lamp { background: var(--text-muted); box-shadow: none; }
+.sb-potcard-state.is-behind .sb-detail-state-label { color: #c0392b; }
+.sb-potcard-state.is-funded .sb-detail-state-label { color: var(--gold); }
+.sb-potcard-state.is-open .sb-detail-state-label { color: var(--text-muted); }
+
+.sb-potcard-actions { display: flex; gap: 6px; margin-top: auto; padding-top: 10px; flex-wrap: wrap; }
+.sb-potcard-actions .btn { flex: 1 1 auto; min-width: 0; white-space: nowrap; }
+.sb-potcard-expand {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 1.1px;
+  text-transform: uppercase;
+  padding: 7px 11px;
+  border-radius: 9px;
+  cursor: pointer;
+  border: 1px solid var(--pot);
+  background: transparent;
+  color: var(--pot);
+  flex: none;
+}
+.sb-potcard-more { border-top: 1px solid var(--border); padding-top: 12px; }
+.sb-potcard-accounts { margin-bottom: 12px; }
+.sb-potcard-acclist { display: flex; gap: 8px; flex-wrap: wrap; }
+.sb-potcard-acc {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 7px;
+  font-size: 11.5px;
+  color: var(--text-mid);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 4px 11px;
+}
+.sb-potcard-acc b { font-family: var(--mono); font-size: 11.5px; color: var(--pot); font-weight: 400; }
+
+/* ── Named, coloured sections of the flow bar ─────────────────────── */
+
+.sb-segment {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  min-width: 0;
+}
+.sb-segment-tag {
+  font-family: var(--mono);
+  font-size: 9px;
+  letter-spacing: .6px;
+  white-space: nowrap;
+  overflow: hidden;
+  color: rgba(255, 255, 255, .92);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, .45);
+  padding: 0 4px;
+}
+.sb-segment.is-left .sb-segment-tag { color: var(--text-mid); text-shadow: none; }
+
+.sb-legend-rows {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 14px;
+  margin: -6px 0 14px;
+}
+.sb-legend-row {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11.5px;
+  color: var(--text-mid);
+  min-width: 0;
+}
+.sb-legend-row i { width: 9px; height: 9px; border-radius: 3px; flex: none; }
+.sb-legend-row em {
+  font-style: normal;
+  font-family: var(--mono);
+  font-size: 9px;
+  color: var(--text-muted);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 0 5px;
+}
+.sb-legend-row b { font-family: var(--mono); font-size: 11px; font-weight: 400; color: var(--text-muted); }
+
+.sb-swatch-wrap { position: relative; display: inline-flex; flex: none; }
+.sb-swatch {
+  width: 20px; height: 20px;
+  border-radius: 6px;
+  border: 1px solid var(--border-lt, var(--border));
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 10px;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+}
+.sb-swatches {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  z-index: 5;
+  display: flex;
+  gap: 4px;
+  padding: 6px;
+  border-radius: 10px;
+  border: 1px solid var(--border-lt, var(--border));
+  background: var(--bg-overlay, var(--surface2, var(--surface)));
+  box-shadow: var(--shadow-md, 0 6px 20px rgba(0, 0, 0, .35));
+}
+.sb-swatch-opt {
+  width: 18px; height: 18px;
+  border-radius: 5px;
+  border: 1px solid rgba(128, 128, 128, .35);
+  cursor: pointer;
+  padding: 0;
+  font-size: 10px;
+  line-height: 1;
+  color: var(--text-muted);
+}
+.sb-swatch-opt.is-on { outline: 2px solid var(--text); outline-offset: 1px; }
+.sb-swatch-opt.is-none { background: transparent; }
+
+/* ── An account that belongs to a pot ─────────────────────────────── */
+
+.sb-acc.is-forpot { border-color: color-mix(in srgb, var(--pot) 45%, transparent); }
+.sb-acc-forpot {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin-top: 9px;
+  padding-top: 9px;
+  border-top: 1px solid var(--border);
+  flex-wrap: wrap;
+}
+.sb-acc-forpot select {
+  font-size: 11.5px;
+  padding: 5px 7px;
+  border-radius: 7px;
+  border: 1px solid var(--border);
+  background: var(--surface-deep, rgba(128, 128, 128, .1));
+  color: var(--text);
+  cursor: pointer;
+  font-family: inherit;
+  max-width: 190px;
+}
+.sb-acc-feeds { font-family: var(--mono); font-size: 9.5px; color: var(--pot); }
+
+@media (max-width: 720px) {
+  /* On a phone the rail scrolls sideways — but an expanded card is
+     supposed to stretch, so the rail stops scrolling and wraps instead
+     while one is open. */
+  .sb-vessels.is-expanded {
+    overflow-x: visible;
+    flex-wrap: wrap;
+    margin: 0;
+    padding: 2px 0 8px;
+  }
+  .sb-potcard { flex: 0 0 240px; }
+  .sb-vessels.is-expanded .sb-potcard { flex: 1 1 100%; }
+  .sb-potcard-actions .btn { min-height: 40px; }
+  .sb-legend-rows { gap: 5px 10px; font-size: 11px; }
+  .sb-segment-tag { font-size: 8px; }
+}
+
+/* Expanded, the facts sit beside the tube: the top row was otherwise a
+   name and two numbers stretched across 1400px, while the detail piled
+   up underneath it. */
+.sb-potcard.is-expanded .sb-potcard-tube { flex: 0 0 84px; }
+.sb-potcard-factcol {
+  flex: 0 1 420px;
+  align-self: start;
+  margin-bottom: 0;
+}
+.sb-potcard.is-expanded .sb-potcard-body { flex: 1 1 340px; }
+
+@media (max-width: 900px) {
+  .sb-potcard-top { flex-wrap: wrap; }
+  .sb-potcard-factcol { flex: 1 1 100%; }
+}
+
+/* Expanded, the action row has ~900px to fill and a "+ Contribution"
+   button does not need it. Buttons keep their own size and sit together
+   at the left, under the numbers they act on. */
+.sb-potcard.is-expanded .sb-potcard-actions { justify-content: flex-start; }
+.sb-potcard.is-expanded .sb-potcard-actions .btn { flex: 0 0 auto; }

@@ -18,9 +18,48 @@
  */
 import { useRef, useState } from 'react';
 import Icon from '../Icon';
-import { toMonthly, money, potColor } from '../../lib/savings/derive';
+import {
+  toMonthly, money, potColor, flowSections, sectionColor, SECTION_PALETTE,
+} from '../../lib/savings/derive';
 
 const uid = p => p + Date.now().toString(36) + Math.round(Math.random() * 1e4).toString(36);
+
+/**
+ * Pick a colour for a section of the bar.
+ *
+ * Module scope, like FlowRow, so opening the palette does not rebuild
+ * the row that owns it. Offers the pot palette plus "no colour", which
+ * hands the section back to its position-derived default rather than
+ * leaving it stuck on whatever was last chosen.
+ */
+function ColorPicker({ value, onPick, label }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <span className="sb-swatch-wrap">
+      <button
+        type="button" className="sb-swatch" aria-label={label}
+        title={label} onClick={() => setOpen(o => !o)}
+        style={value ? { background: value } : undefined}
+      >{value ? '' : '◌'}</button>
+      {open && (
+        <span className="sb-swatches" role="listbox">
+          {SECTION_PALETTE.map(c => (
+            <button
+              key={c} type="button" role="option" aria-selected={value === c}
+              className={`sb-swatch-opt${value === c ? ' is-on' : ''}`}
+              style={{ background: c }} title={c}
+              onClick={() => { onPick(c); setOpen(false); }}
+            />
+          ))}
+          <button
+            type="button" className="sb-swatch-opt is-none" title="No colour"
+            onClick={() => { onPick(null); setOpen(false); }}
+          >◌</button>
+        </span>
+      )}
+    </span>
+  );
+}
 
 /**
  * One row, declared at module scope on purpose.
@@ -46,7 +85,10 @@ function FlowRow({
     return (
       <div
         className={`sb-row is-${it.kind}${routed ? ' is-routed' : ''}${hint}`}
-        style={potIdx >= 0 ? { '--pot': potColor(goals[potIdx], potIdx) } : undefined}
+        style={{
+          ...(potIdx >= 0 ? { '--pot': potColor(goals[potIdx], potIdx) } : null),
+          ...(it.color ? { '--pot': it.color } : null),
+        }}
         onDragOver={e => {
           if (!dragId.current || dragId.current === it.id) return;
           e.preventDefault(); e.stopPropagation();
@@ -181,6 +223,16 @@ function FlowRow({
           )}
 
           <span className="sb-row-spacer" />
+          {/* Only a loose expense is a band of its own — one inside a
+              folder is drawn as part of that folder's band, and giving it
+              a colour here would promise something the bar cannot keep. */}
+          {it.kind === 'expense' && !it.groupId && (
+            <ColorPicker
+              value={it.color || null}
+              label={`Colour for ${it.label || 'this row'}`}
+              onPick={c => updateItem(it.id, 'color', c)}
+            />
+          )}
           <span className="sb-row-tag">
             {it.freq === 'year' ? 'yearly' : it.freq === 'week' ? 'weekly' : routed ? 'routed' : it.kind}
             {hasWindow ? ' · timed' : ''}
@@ -285,9 +337,10 @@ export default function FlowEditor({ S, update, flow }) {
   const denom = Math.max(1, flow.income);
 
   const loose = items.filter(i => !i.groupId);
-  const segments = items
-    .filter(i => i.kind === 'expense')
-    .map(i => ({ id: i.id, label: i.label || 'Untitled', routed: !!i.goalId, w: toMonthly(i.amount, i.freq) / denom * 100 }));
+  /* One band per SECTION, not per row: a folder called Subscriptions is
+     one band called Subscriptions, sized by everything in it. Eight
+     slivers told you nothing the list below did not already say. */
+  const sections = flowSections(items, groups);
   const leftOver = Math.max(0, flow.net) / denom * 100;
 
   return (
@@ -306,12 +359,33 @@ export default function FlowEditor({ S, update, flow }) {
         </div>
       </div>
 
-      <div className="sb-segments" aria-hidden="true">
-        {segments.map(s => (
-          <div key={s.id} className={`sb-segment${s.routed ? ' is-routed' : ''}`}
-               style={{ flexBasis: `${s.w}%` }} title={`${s.label} — ${s.w.toFixed(0)}% of income`} />
+      <div className="sb-segments">
+        {sections.map((sec, i) => (
+          <div
+            key={sec.id}
+            className={`sb-segment${sec.kind === 'group' ? ' is-group' : ''}`}
+            style={{ flexBasis: `${sec.share * 100}%`, background: sectionColor(sec, i) }}
+            title={`${sec.label} — ${money(sec.amount)}/mo, ${Math.round(sec.share * 100)}% of income`}
+          >
+            <span className="sb-segment-tag">{sec.label}</span>
+          </div>
         ))}
-        <div className="sb-segment is-left" style={{ flexBasis: `${leftOver}%` }} title="Left over" />
+        <div className="sb-segment is-left" style={{ flexBasis: `${leftOver}%` }} title={`Left over — ${money(flow.net)}/mo`}>
+          <span className="sb-segment-tag">left over</span>
+        </div>
+      </div>
+
+      {/* The bands are named, so the bar needs a key — a colour with no
+          word beside it is a decoration, not a reading. */}
+      <div className="sb-legend-rows">
+        {sections.map((sec, i) => (
+          <span key={sec.id} className="sb-legend-row">
+            <i style={{ background: sectionColor(sec, i) }} />
+            {sec.label}
+            {sec.kind === 'group' && <em>{sec.count}</em>}
+            <b>{money(sec.amount)}</b>
+          </span>
+        ))}
       </div>
 
       <div
@@ -344,6 +418,11 @@ export default function FlowEditor({ S, update, flow }) {
                 </button>
                 <input className="sb-group-name" value={g.name}
                        onChange={e => renameGroup(g.id, e.target.value)} aria-label="Folder name" />
+                <ColorPicker
+                  value={g.color || null}
+                  label={`Colour for ${g.name || 'this folder'}`}
+                  onPick={c => setProj({ groups: groups.map(x => x.id === g.id ? { ...x, color: c } : x) })}
+                />
                 <span className="sb-group-count">{kids.length}</span>
                 <span className={`sb-group-total${total >= 0 ? ' is-in' : ''}`}>
                   {total >= 0 ? '+' : '−'}{money(Math.abs(total))}
