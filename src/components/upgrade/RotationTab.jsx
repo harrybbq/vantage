@@ -27,8 +27,9 @@ import {
 } from '../../lib/rotation/pattern';
 import {
   DAY_TYPE_LABEL, FLOOR_MACROS, NIGHT_LOAD_SCALE, STRETCH_GOAL,
-  exercisesFor, stretchesFor, targetsForDay,
+  exercisesFor, stretchesFor, targetsForDay, commuteForDay,
 } from '../../data/trainingProgramme';
+import { currentWeightKg } from '../../lib/burn';
 
 const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June',
   'July', 'August', 'September', 'October', 'November', 'December'];
@@ -51,7 +52,7 @@ const todayIso = () => {
  * and seeing one without the other is how the higher target starts
  * looking like a bug.
  */
-function TodayPanel({ overrides }) {
+function TodayPanel({ overrides, S }) {
   const iso = todayIso();
   const [y, m, d] = iso.split('-').map(Number);
   const day = resolveDay(y, m - 1, d, overrides);
@@ -65,6 +66,10 @@ function TodayPanel({ overrides }) {
   // Rest days fall through to the longer flow inside stretchesFor().
   const stretches = stretchesFor(day.session);
   const isNight = dayType === 'night_shift';
+  // Five miles on every shift day. Weight comes from the vitals log, and
+  // when there is none the distance is shown without a calorie figure
+  // rather than one invented from an assumed body weight.
+  const commute = commuteForDay(dayType, currentWeightKg(S || {}));
 
   return (
     <div className="upg-today">
@@ -106,6 +111,18 @@ function TodayPanel({ overrides }) {
           </>
         )}
       </div>
+
+      {/* The commute. It is on the rota, not in the burn log, so it can
+          be stated without being logged — and it is only ever shown on
+          the days it actually happens. */}
+      {commute && (
+        <div className="upg-commute">
+          <span className="upg-commute-icon" aria-hidden="true">&#8635;</span>
+          <span className="upg-commute-m">{commute.miles} miles</span>
+          <span className="upg-commute-w">by bike, to work and back &mdash; about {commute.minutes} min</span>
+          {commute.kcal != null && <span className="upg-commute-k">&asymp; {commute.kcal} kcal</span>}
+        </div>
+      )}
 
       <div className="upg-macros">
         {[
@@ -273,7 +290,7 @@ export default function RotationTab({ S, update, isMobile }) {
 
   return (
     <div className="upg-pane">
-      <TodayPanel overrides={overrides} />
+      <TodayPanel overrides={overrides} S={S} />
       <div className="upg-stats">
         {[
           { k: 'night', n: stats.night, label: 'Night shifts' },

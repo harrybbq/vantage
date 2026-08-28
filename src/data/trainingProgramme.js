@@ -24,6 +24,7 @@
  *
  * Pure data + pure helpers. No DOM, no React, no network.
  */
+import { ACTIVITIES, activityKcal } from '../lib/burn.js';
 
 /** Sessions, in the order the rota runs them. Mirrors SEQ in pattern.js. */
 export const SESSION_CODES = ['Push', 'Pull', 'Legs', 'Upper', 'Lower'];
@@ -225,6 +226,75 @@ export function assertNoBannedLifts(programme = PROGRAMME) {
     }
   }
   return bad;
+}
+
+/* ══════════════════════════════════════════════════════════════════════
+   The commute.
+   ══════════════════════════════════════════════════════════════════════
+
+   Five miles round trip by bike, every shift day. Reported 2026-08-25.
+
+   It is here rather than in the burn log because it is not an event
+   someone chooses to record — it is a property of the rota. It happens
+   on every shift and on no other day, so the app can know about it
+   without being told each time.
+
+   ── Why it matters more than the distance suggests ───────────────────
+   Training sits on positions 0–3 and 4 of each block: the four shift
+   days, then the first day off. So FOUR of the five sessions — Push,
+   Pull, Legs and Upper — land on a shift and carry the commute, and
+   Lower is the only one that does not. Rest days are the tail of the
+   off-block and carry none either, so they stay genuine rest.
+
+   That includes the Legs day, which is worth knowing: CARDIO_SESSIONS
+   below puts deliberate conditioning on upper days "so legs stay
+   fresh", and the commute quietly puts five miles on the legs anyway.
+   At this distance that is a note, not a problem.
+
+   ── What it is NOT ───────────────────────────────────────────────────
+   It does not touch DAY_TYPE_TARGETS. Those are a decision about how
+   much to eat and are the owner's to make; this only makes the burn
+   visible so the decision can be an informed one. See the estimate
+   against the day-shift target before changing either.
+*/
+
+/** The MET for cycling, taken from the burn log's own preset so the app
+ *  has exactly one number for it rather than two that can drift. */
+const CYCLE_MET = (ACTIVITIES.find(a => a.key === 'cycle') || {}).met || 7.5;
+
+export const COMMUTE = {
+  miles: 5,            // round trip, to work and back
+  mph: 12,             // self-selected commuting pace
+  met: CYCLE_MET,
+};
+
+/** Minutes in the saddle for one shift day's round trip. */
+export const commuteMinutes = () => (COMMUTE.miles / COMMUTE.mph) * 60;
+
+/**
+ * Estimated kcal for one day's commute at a given weight.
+ * Null when the weight is unknown — a calorie figure invented from an
+ * assumed body weight is worse than no figure.
+ */
+export function commuteKcal(weightKg) {
+  if (!weightKg || weightKg <= 0) return null;
+  return activityKcal(COMMUTE.met, weightKg, commuteMinutes());
+}
+
+/** Shift days carry the commute. Off days, leave and rest days do not. */
+export const commutesOn = dayType => dayType === 'day_shift' || dayType === 'night_shift';
+
+/**
+ * The commute for a day type, or null on a day without one.
+ * @returns {{miles,minutes,kcal}|null}
+ */
+export function commuteForDay(dayType, weightKg) {
+  if (!commutesOn(dayType)) return null;
+  return {
+    miles: COMMUTE.miles,
+    minutes: Math.round(commuteMinutes()),
+    kcal: commuteKcal(weightKg),
+  };
 }
 
 /** Night sessions: same sets and reps, 80% of the load. Maintenance. */
