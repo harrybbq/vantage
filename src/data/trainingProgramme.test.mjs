@@ -17,7 +17,9 @@ import {
   assertNoBannedLifts, cycleCarbBalance, carbDeltaFor, targetsForDay,
   exercisesFor, stretchesFor, targetsFor, DAY_TYPE_TARGETS, FLOOR_MACROS,
   NIGHT_LOAD_SCALE, KCAL_PER_CARB_G,
+  COMMUTE, commuteMinutes, commuteKcal, commutesOn, commuteForDay,
 } from './trainingProgramme.js';
+import { SEQ, TRAIN_POS, REST_POS } from '../lib/rotation/pattern.js';
 
 let n = 0;
 const ok = (c, m) => { assert.ok(c, m); n++; };
@@ -92,5 +94,35 @@ eq(targetsFor('nonsense'), DAY_TYPE_TARGETS.off, 'an unknown day type falls back
 ok(FLOOR_MACROS.has('protein') && FLOOR_MACROS.has('fat'), 'protein and fat are floors');
 ok(!FLOOR_MACROS.has('carbs'), 'carbs are not — they are the dial being turned');
 ok(NIGHT_LOAD_SCALE > 0 && NIGHT_LOAD_SCALE < 1, 'nights are lighter, same sets and reps');
+
+// ── The commute ──
+eq(COMMUTE.miles, 5, 'five miles round trip');
+eq(Math.round(commuteMinutes()), 25, 'about twenty-five minutes in the saddle');
+ok(commutesOn('day_shift') && commutesOn('night_shift'), 'it happens on every shift');
+ok(!commutesOn('off'), 'and not on an off day');
+eq(commuteForDay('off', 78), null, 'so an off day reports no commute at all');
+ok(commuteForDay('day_shift', 78).kcal > 0, 'a shift day reports one');
+
+// Heavier rider, more work — the estimate is not a fixed number.
+ok(commuteKcal(90) > commuteKcal(70), 'the estimate scales with body weight');
+eq(commuteKcal(null), null, 'and is withheld when the weight is unknown');
+eq(commuteKcal(0), null, 'rather than dividing something by nothing');
+eq(commuteForDay('day_shift', null).kcal, null, 'the day still reports the distance without it');
+eq(commuteForDay('day_shift', null).miles, 5, 'which is the part that is actually known');
+
+// ── Which sessions carry it ──
+// Training sits on the four shift days plus the first day off, so four
+// of the five sessions land on a shift. This is the fact that makes the
+// commute worth modelling at all rather than ignoring.
+const SHIFT_POS = new Set([0, 1, 2, 3, 8, 9, 10, 11]);
+const sessionAtPos = {};
+for (const [i, pos] of TRAIN_POS.slice(0, 5).entries()) sessionAtPos[SEQ[i]] = pos;
+const onShift = SEQ.filter(code => SHIFT_POS.has(sessionAtPos[code]));
+eq(onShift, ['Push', 'Pull', 'Legs', 'Upper'],
+  'four of the five sessions land on a shift day and carry the commute');
+ok(!SHIFT_POS.has(sessionAtPos.Lower),
+  'Lower is the only session on a day off — the one with no commute attached');
+ok([...REST_POS].every(pos => !SHIFT_POS.has(pos)),
+  'and no rest day is a shift day, so the rest days stay genuine rest');
 
 console.log(`training programme: ${n} assertions passed`);

@@ -917,3 +917,21 @@
   vertical-align: middle;
 }
 .upg-ex.is-optional .upg-ex-p { color: var(--text-muted); }
+
+/* The commute — a property of the rota rather than something logged, so
+   it sits with the day's numbers and only appears on shift days. */
+.upg-commute {
+  display: flex;
+  align-items: baseline;
+  gap: 9px;
+  flex-wrap: wrap;
+  padding: 9px 12px;
+  margin-bottom: 12px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: rgba(128, 128, 128, .05);
+}
+.upg-commute-icon { color: var(--em); font-size: 13px; line-height: 1; }
+.upg-commute-m { font-family: var(--mono); font-size: 13px; color: var(--text); }
+.upg-commute-w { font-size: 11.5px; color: var(--text-muted); flex: 1; min-width: 0; }
+.upg-commute-k { font-family: var(--mono); font-size: 11.5px; color: var(--em); }
