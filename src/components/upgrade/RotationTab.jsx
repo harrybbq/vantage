@@ -131,8 +131,13 @@ function TodayPanel({ overrides }) {
             {scale !== 1 && <span className="upg-exlist-scale">at {Math.round(scale * 100)}%</span>}
           </div>
           {exercises.map(ex => (
-            <div key={ex.name} className="upg-ex">
-              <span className="upg-ex-n">{ex.name}</span>
+            <div key={ex.name} className={`upg-ex${ex.optional ? ' is-optional' : ''}`}>
+              <span className="upg-ex-n">
+                {ex.name}
+                {/* "Sometimes" movements are part of the session when
+                    there is time, not a gap when they are missing. */}
+                {ex.optional && <em className="upg-ex-opt">sometimes</em>}
+              </span>
               <span className="upg-ex-p">{ex.sets} &times; {ex.reps}</span>
             </div>
           ))}

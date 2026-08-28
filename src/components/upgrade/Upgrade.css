@@ -899,3 +899,21 @@
   .cvdoc-role{ break-inside: avoid; page-break-inside: avoid; }
 }
 @page{ margin: 14mm; }
+
+/* A "sometimes" movement — done when there is time. Marked rather than
+   hidden, so the list is what the session IS and a missing one is not
+   read as a skipped line. */
+.upg-ex-opt {
+  font-family: var(--mono);
+  font-style: normal;
+  font-size: 8.5px;
+  letter-spacing: 1.2px;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 1px 7px;
+  margin-left: 8px;
+  vertical-align: middle;
+}
+.upg-ex.is-optional .upg-ex-p { color: var(--text-muted); }

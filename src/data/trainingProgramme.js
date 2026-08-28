@@ -29,50 +29,95 @@
 export const SESSION_CODES = ['Push', 'Pull', 'Legs', 'Upper', 'Lower'];
 
 /**
- * Prescribed work per session. `sets` × `reps` are the written
- * prescription; load is whatever the user is progressing at, which the
- * app records rather than dictates.
+ * The work per session.
+ *
+ * These are the exercises Harry ACTUALLY runs, supplied 2026-08-25, not
+ * the ones the written plan prescribed. Where the two differed the real
+ * one wins: a plan the app shows and the owner does not follow is a plan
+ * that quietly makes every other number in here wrong.
+ *
+ * What changed from the written prescription, and why it is fine:
+ *   · Barbell bench is gone from Push. Dips lead instead — same job,
+ *     and it keeps the bar off a mid-thoracic spine under treatment.
+ *   · Cable fly gone; chest is dips plus incline dumbbell press.
+ *   · Face pull became the cable archer pull, which is the same rear
+ *     delt work through a longer arc.
+ *   · Straight-arm pulldown became the cable bar pullover — the same
+ *     movement under a different name.
+ *   · Hyperextensions moved from Lower onto Legs, where they open the
+ *     session.
+ *
+ * `sets` and `reps` are carried over from the written plan for every
+ * movement that has an equivalent there; they are NOT what the owner
+ * reported, who gave exercises only. Treat them as the starting
+ * prescription and correct them rather than as a record of what was
+ * done. Load is whatever is being progressed, which the app records
+ * rather than dictates.
+ *
+ * `optional: true` marks the ones described as "sometimes" — they are
+ * part of the session when there is time, not a gap when they are
+ * missing, and the UI says so rather than showing a skipped line.
  */
 export const PROGRAMME = {
   Legs: [
-    { name: 'Hack squat / leg press', sets: 4, reps: '8–12' },
-    { name: 'Bulgarian split squat', sets: 3, reps: '10 per leg' },
+    { name: '45° hyperextension', sets: 4, reps: '12–15' },
     { name: 'Leg extension', sets: 3, reps: '12–15' },
-    { name: 'Lying leg curl', sets: 4, reps: '10–12' },
+    { name: 'Machine leg press', sets: 4, reps: '8–12' },
     { name: 'Standing calf raise', sets: 4, reps: '10–12' },
+    { name: 'Walking dumbbell lunge', sets: 3, reps: '10 per leg', optional: true },
+    { name: 'Ab crunch machine', sets: 3, reps: '12–15' },
   ],
   Push: [
-    { name: 'Barbell bench (rack, pins)', sets: 4, reps: '5–8' },
+    { name: 'Dip', sets: 4, reps: '6–10' },
     { name: 'Incline dumbbell press', sets: 3, reps: '8–10' },
-    { name: 'Weighted dip', sets: 3, reps: '6–10' },
-    { name: 'Lateral raise', sets: 4, reps: '12–15' },
-    { name: 'Cable fly', sets: 3, reps: '12–15' },
-    { name: 'Triceps pushdown', sets: 3, reps: '12–15' },
+    { name: 'Machine shoulder press', sets: 3, reps: '8–10' },
+    { name: 'Dumbbell lateral raise', sets: 4, reps: '12–15' },
+    { name: 'Single-arm cable triceps pushdown (cuff)', sets: 3, reps: '12–15 per arm' },
+    { name: 'Overhead cable bar extension', sets: 2, reps: '12–15', optional: true },
   ],
   Pull: [
-    { name: 'Pull-up, banded', sets: 4, reps: '4–6' },
-    { name: 'Lat pulldown, wide', sets: 4, reps: '8–10' },
-    { name: 'Chest-supported row', sets: 3, reps: '10–12' },
-    { name: 'Straight-arm pulldown', sets: 3, reps: '12–15' },
-    { name: 'Face pull', sets: 3, reps: '15–20' },
-    { name: 'Incline dumbbell curl', sets: 3, reps: '10–12' },
+    { name: 'Lat pulldown', sets: 4, reps: '8–10' },
+    { name: 'Single-arm cable row', sets: 3, reps: '10–12 per arm' },
+    { name: 'Cable bar pullover', sets: 3, reps: '12–15' },
+    { name: 'Cable archer pull (rear delt)', sets: 3, reps: '15–20' },
+    // 21s: seven in the top half, seven in the bottom half, seven full.
+    { name: 'Incline dumbbell curl, 21s', sets: 3, reps: '7 + 7 + 7' },
+    { name: 'Reverse EZ-bar curl', sets: 3, reps: '12–15' },
   ],
+  /**
+   * Lower did not exist. It is two of every ten sessions — a fifth of
+   * the training — and it lands on the first day off, the day with the
+   * most recovery behind it and the largest carb allowance (+45 g).
+   *
+   * Built to cover what Legs does not, rather than to repeat it:
+   *   · Legs is knee-extension and calves standing. This is hip
+   *     extension, knee FLEXION and calves seated.
+   *   · Knee-flexion hamstring work appeared nowhere in the whole split
+   *     before this. Hyperextensions train the hamstring as a hip
+   *     extensor only; the leg curl is the half that was missing.
+   *   · Nothing here loads a flexed or rotated spine. Hip thrust and
+   *     leg press are the heavy work and both keep the back supported.
+   * Proposed, not confirmed — swap freely.
+   */
   Lower: [
     { name: 'Hip thrust', sets: 4, reps: '8–12' },
     { name: 'Seated leg curl', sets: 4, reps: '10–12' },
-    { name: '45° hyperextension', sets: 4, reps: '12–15' },
     { name: 'Leg press, feet high', sets: 3, reps: '10–12' },
     { name: 'Reverse lunge', sets: 3, reps: '10 per leg' },
     { name: 'Seated calf raise', sets: 4, reps: '15' },
+    { name: 'Pallof press', sets: 3, reps: '12 per side' },
   ],
   Upper: [
-    { name: 'Lat pulldown, neutral', sets: 4, reps: '8–10' },
-    { name: 'Seated dumbbell press', sets: 3, reps: '8–10' },
-    { name: 'Seated cable row', sets: 3, reps: '10–12' },
-    { name: 'Lateral raise', sets: 5, reps: '12–15' },
-    { name: 'Rear delt fly', sets: 3, reps: '15–20' },
-    { name: 'Hammer curl', sets: 3, reps: '12–15' },
-    { name: 'Overhead triceps extension', sets: 2, reps: '12–15' },
+    { name: 'Dip', sets: 3, reps: '6–10' },
+    { name: 'Lat pulldown', sets: 4, reps: '8–10' },
+    { name: 'Wide-grip cable row', sets: 3, reps: '10–12' },
+    // Five sets, the most of any movement in the split. Medial delt is
+    // what shoulder width is made of, and width is the whole point of
+    // the taper — this is the session that carries it.
+    { name: 'Dumbbell lateral raise', sets: 5, reps: '12–15' },
+    { name: 'Cable archer pull (rear delt)', sets: 3, reps: '15–20' },
+    { name: 'Incline dumbbell curl, 21s', sets: 3, reps: '7 + 7 + 7' },
+    { name: 'Single-arm cable triceps pushdown (cuff)', sets: 3, reps: '12–15 per arm' },
   ],
 };
 
@@ -163,9 +208,12 @@ export const BANNED_LIFTS = [
 
 /**
  * @returns {string[]} offending "Session · Exercise" strings; empty when clean.
- * Called by the tests and by the rotation page in dev, so a bad edit
+ *
+ * Run by trainingProgramme.test.mjs, which the build runs, so a bad edit
  * fails loudly instead of putting a contraindicated lift in front of
- * someone under treatment for back pain.
+ * someone under treatment for back pain. It previously claimed to be
+ * called by the tests and by the rotation page and was called by
+ * neither — the guard had never once executed.
  */
 export function assertNoBannedLifts(programme = PROGRAMME) {
   const bad = [];
