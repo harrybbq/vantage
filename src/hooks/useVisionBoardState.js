@@ -1,6 +1,7 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { DEFAULT_STATE } from '../data/initialState';
 import { supabase } from '../lib/supabase';
+import { mergeState, sameValue } from '../lib/state/merge';
 
 // Keys that are only relevant to the current session — never persisted
 const TRANSIENT_KEYS = [
@@ -79,7 +80,10 @@ async function loadFromCloud(userId) {
   // which lets us cleanly distinguish "no row" from "request failed".
   const { data, error } = await supabase
     .from('user_data')
-    .select('state, photo')
+    // updated_at comes back so the client knows WHICH version it is
+    // editing. Without it every save was an unconditional overwrite and
+    // a second device's work vanished with no error anywhere.
+    .select('state, photo, updated_at')
     .eq('id', userId)
     .maybeSingle();
 
@@ -129,10 +133,13 @@ async function loadFromCloud(userId) {
 
   const state = addTransient({ ...DEFAULT_STATE, ...data.state });
   if (data.photo) state.profile = { ...state.profile, photo: data.photo };
-  return { kind: 'loaded', state };
+  // `raw` is the stored state without the defaults folded in — the exact
+  // thing the next write is compared against, so a merge base is what
+  // was actually saved rather than what the app filled in around it.
+  return { kind: 'loaded', state, updatedAt: data.updated_at || null, raw: data.state };
 }
 
-async function saveToCloud(userId, state, { allowEmpty = false, fromBackup = false } = {}) {
+async function saveToCloud(userId, state, { allowEmpty = false, fromBackup = false, baseUpdatedAt = null } = {}) {
   // A state descended from the local backup is missing the photo and
   // the backgrounds. Writing one replaces the real thing with the gap.
   // Only the explicit user-confirmed restore may do it knowingly.
@@ -183,12 +190,42 @@ async function saveToCloud(userId, state, { allowEmpty = false, fromBackup = fal
   };
   if (photo) row.photo = photo;
 
-  const { error } = await supabase.from('user_data').upsert(row);
+  // ── Compare-and-set ────────────────────────────────────────────────
+  // `baseUpdatedAt` is the version this client last saw. When it is
+  // known we UPDATE only if the row still carries it, so a client
+  // holding a stale copy cannot overwrite a newer one — it gets a
+  // conflict back and the caller merges instead. Unconditional upsert
+  // is kept only for the first write, where there is no version to
+  // compare against and nothing yet to lose.
+  if (baseUpdatedAt) {
+    const { data, error } = await supabase
+      .from('user_data')
+      .update(row)
+      .eq('id', userId)
+      .eq('updated_at', baseUpdatedAt)
+      .select('updated_at');
+    if (error) {
+      const e = new Error(error.message || 'Could not save your data.');
+      e.cause = error;
+      throw e;
+    }
+    if (!data || data.length === 0) {
+      // Nothing matched: either the row moved on under us, or it is
+      // gone. Either way this write must not be forced through.
+      const e = new Error('Someone else saved first — merging.');
+      e.code = 'CONFLICT';
+      throw e;
+    }
+    return data[0].updated_at || row.updated_at;
+  }
+
+  const { data, error } = await supabase.from('user_data').upsert(row).select('updated_at');
   if (error) {
     const e = new Error(error.message || 'Could not save your data.');
     e.cause = error;
     throw e;
   }
+  return (data && data[0] && data[0].updated_at) || row.updated_at;
 }
 
 // ── Anti-wipe content signals ───────────────────────────────────────────────
@@ -281,6 +318,57 @@ function writeBackup(userId, state) {
   }
 }
 
+/* ── The snapshot that outlives the page ────────────────────────────────
+ *
+ * The debounced save assumes the runtime lives another 1.5s. Close the
+ * tab or swipe the app away sooner and the edit only ever existed in
+ * memory. The pagehide flush starts a request, but a plain fetch is
+ * abandoned when the page is discarded, and the state is far too large
+ * for a keepalive body (64 KB) to carry.
+ *
+ * So on hide the pending state goes to localStorage SYNCHRONOUSLY —
+ * which does survive — together with the version it was based on. The
+ * next load merges it against whatever the cloud holds by then and
+ * writes the result. The edit lands late rather than never.
+ *
+ * Full state, not the slim backup: this one becomes the basis of a
+ * write, and the slim copy has no photo and no backgrounds.
+ */
+const PENDING_PREFIX = 'vb4_pending:';
+
+function writePending(userId, state, baseUpdatedAt) {
+  if (!userId || !state) return;
+  try {
+    localStorage.setItem(
+      PENDING_PREFIX + userId,
+      JSON.stringify({ ts: Date.now(), baseUpdatedAt: baseUpdatedAt || null, state: stripForSave(state) }),
+    );
+  } catch {
+    // Quota or serialisation failure. No worse off than before this
+    // existed, and never a reason to break the hide handler.
+  }
+}
+
+function readPending(userId) {
+  if (!userId) return null;
+  try {
+    const raw = localStorage.getItem(PENDING_PREFIX + userId);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    // Same shape check the loader uses — a pending snapshot missing
+    // `profile` is the partial-write shape and must never be replayed.
+    if (parsed?.state && typeof parsed.state === 'object' && 'profile' in parsed.state) return parsed;
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+function clearPending(userId) {
+  if (!userId) return;
+  try { localStorage.removeItem(PENDING_PREFIX + userId); } catch { /* nothing to do */ }
+}
+
 export function readBackup(userId) {
   if (!userId) return null;
   try {
@@ -356,6 +444,16 @@ export function useVisionBoardState(userId) {
   // True while a local edit is pending its debounced save — focus-refresh
   // skips while dirty so it never clobbers unsaved work.
   const dirtyRef = useRef(false);
+  // Which version of the row this client is editing, and the stored
+  // state that came with it. Together they are the merge base: without
+  // them a save is an unconditional overwrite of whatever another
+  // device did in the meantime.
+  const baseUpdatedAtRef = useRef(null);
+  const baseStateRef = useRef(null);
+  // Set if the compare-and-set predicate proves not to work at all.
+  const casBrokenRef = useRef(false);
+  // Set when a save had to merge, so the UI can say so once.
+  const [mergeNotice, setMergeNotice] = useState(null);
   // Latest unsaved state, so the background-flush handler can persist
   // it when the app is hidden before the 1.5s debounce fires. Without
   // this, an edit made just before locking the phone (e.g. logging a
@@ -422,6 +520,10 @@ export function useVisionBoardState(userId) {
           lastGoodMeaningfulRef.current = true;
           writeBackup(userId, result.state);
         }
+        // The version being edited from here on, and the stored state to
+        // measure later edits against.
+        baseUpdatedAtRef.current = result.updatedAt;
+        baseStateRef.current = result.raw;
         setS(result.state);
 
         // Discard anything queued against the OPTIMISTIC state.
@@ -450,6 +552,48 @@ export function useVisionBoardState(userId) {
         // change the user can no longer see.
         dirtyRef.current = false;
         pendingStateRef.current = null;
+
+        // ── Replay an edit the last session never got to save ────────
+        // A page killed inside the debounce window leaves its state in
+        // localStorage. Merge it against what the cloud holds NOW —
+        // which may already include another device's changes — and queue
+        // the result. Never adopted wholesale: it is one side of a merge
+        // like any other, and it is queued rather than written here so
+        // it goes out through the same conflict-aware path as every
+        // other save.
+        //
+        // Deliberately after the clear above: that block exists to
+        // discard anything built on the slim optimistic paint, and it
+        // would discard this too if this ran first.
+        const pending = readPending(userId);
+        if (pending) {
+          // The base is the cloud copy ONLY when the snapshot is known
+          // to have been taken against this exact version. Otherwise the
+          // common ancestor is unknown, and an empty base is the safe
+          // reading: every key looks changed on both sides, so the merge
+          // keeps both rather than letting a stale replay overwrite work
+          // another device has done since.
+          const mergeBase =
+            pending.baseUpdatedAt && pending.baseUpdatedAt === result.updatedAt
+              ? result.raw
+              : {};
+          const { state: merged, conflicts } = mergeState(mergeBase, pending.state, result.raw);
+          if (!sameValue(merged, result.raw)) {
+            const revived = addTransient({ ...DEFAULT_STATE, ...merged });
+            if (result.state.profile?.photo) {
+              revived.profile = { ...revived.profile, photo: result.state.profile.photo };
+            }
+            console.warn(
+              '[useVisionBoardState] Replaying an edit the previous session could not save.',
+              conflicts,
+            );
+            setS(revived);
+            dirtyRef.current = true;
+            pendingStateRef.current = revived;
+          } else {
+            clearPending(userId);
+          }
+        }
 
         loadingRef.current = false;
         setLoading(false);
@@ -485,7 +629,9 @@ export function useVisionBoardState(userId) {
         const local = readLocalStorage();
         const initial = local ?? addTransient({ ...DEFAULT_STATE });
         try {
-          await saveToCloud(userId, initial);
+          const firstAt = await saveToCloud(userId, initial);
+          baseUpdatedAtRef.current = firstAt;
+          baseStateRef.current = stripForSave(initial);
         } catch (e) {
           if (cancelled) return;
           setLoadError({
@@ -576,6 +722,8 @@ export function useVisionBoardState(userId) {
           lastGoodMeaningfulRef.current = true;
           writeBackup(userId, result.state);
         }
+        baseUpdatedAtRef.current = result.updatedAt;
+        baseStateRef.current = result.raw;
         setS(result.state);
       }
     }
@@ -583,13 +731,101 @@ export function useVisionBoardState(userId) {
     const onVisible = () => { if (document.visibilityState === 'visible') refresh(); };
     window.addEventListener('focus', refresh);
     document.addEventListener('visibilitychange', onVisible);
+
+    // Focus alone is not enough. A desktop tab left open on a second
+    // monitor never fires focus or visibilitychange, so it held whatever
+    // it loaded hours ago — and any edit then saved that stale snapshot
+    // over a phone's newer work. That is how two devices showed
+    // different OVR at the same moment. Poll while visible; the guards
+    // inside refresh() (dirty, loading, 8s throttle) still apply, so
+    // this can never interrupt someone mid-edit.
+    const poll = setInterval(refresh, 60000);
+
     return () => {
       cancelled = true;
+      clearInterval(poll);
       window.removeEventListener('focus', refresh);
       document.removeEventListener('visibilitychange', onVisible);
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [userId, loadError]);
+
+  /**
+   * The only place a save happens.
+   *
+   * Writes with compare-and-set. If another device got there first the
+   * write is refused, and rather than dropping either version we re-read
+   * the cloud, three-way merge against the version this client loaded,
+   * and write the result. The merged state is adopted on screen too —
+   * otherwise this device keeps showing its pre-merge view and the next
+   * save diverges again.
+   *
+   * ── The self-check ───────────────────────────────────────────────
+   * The predicate is `updated_at = <the value we were handed>`. That
+   * relies on the value round-tripping through PostgREST unchanged, and
+   * on nothing else rewriting the column. If it did NOT match we would
+   * conflict forever and never save at all, which is worse than the bug
+   * this fixes.
+   *
+   * So a conflict is diagnosed before it is trusted: re-read, and if the
+   * row still carries the very value we just failed to match on, then
+   * nobody else wrote and the mechanism itself is broken. In that case
+   * fall back to unconditional writes for the rest of the session and
+   * say so loudly. That is exactly today's behaviour — no protection,
+   * but no regression either — instead of an app that cannot save.
+   */
+  const persist = useCallback(async (uid, next, { allowEmpty = false } = {}) => {
+    const base = casBrokenRef.current ? null : baseUpdatedAtRef.current;
+
+    const accept = (savedAt, state) => {
+      baseUpdatedAtRef.current = savedAt;
+      baseStateRef.current = stripForSave(state);
+    };
+
+    try {
+      const savedAt = await saveToCloud(uid, next, { allowEmpty, baseUpdatedAt: base });
+      accept(savedAt, next);
+      return { ok: true };
+    } catch (err) {
+      if (err?.code !== 'CONFLICT') throw err;
+
+      const fresh = await loadFromCloud(uid);
+      if (fresh.kind !== 'loaded') throw err;   // ambiguous — never force
+
+      if (base && fresh.updatedAt && fresh.updatedAt === base) {
+        // The row never moved. The predicate is the problem.
+        casBrokenRef.current = true;
+        console.error(
+          '[useVisionBoardState] compare-and-set did not match an UNCHANGED row — the '
+          + 'updated_at predicate is not working. Falling back to unconditional writes for '
+          + 'this session: saving still works, cross-device protection is OFF.',
+        );
+        const savedAt = await saveToCloud(uid, next, { allowEmpty, baseUpdatedAt: null });
+        accept(savedAt, next);
+        return { ok: true, degraded: true };
+      }
+
+      // A genuine conflict: someone else really did write.
+      const { state: merged, conflicts } = mergeState(
+        baseStateRef.current, stripForSave(next), fresh.raw,
+      );
+      // stripForSave nulls the photo because it lives in its own column;
+      // the state the app holds must not carry that null back.
+      const onScreen = addTransient({ ...DEFAULT_STATE, ...merged });
+      const photo = next.profile?.photo || fresh.state.profile?.photo || null;
+      if (photo) onScreen.profile = { ...onScreen.profile, photo };
+
+      const savedAt = await saveToCloud(uid, onScreen, { allowEmpty, baseUpdatedAt: fresh.updatedAt });
+      accept(savedAt, onScreen);
+      setS(onScreen);
+      pendingStateRef.current = null;
+      if (conflicts.length) {
+        console.warn('[useVisionBoardState] Merged another device\'s changes:', conflicts);
+      }
+      setMergeNotice({ at: Date.now(), conflicts });
+      return { ok: true, merged: true, conflicts };
+    }
+  }, []);
 
   // ── Flush pending saves when the app is backgrounded ────────────────
   // The 1.5s debounce assumes the JS runtime survives long enough to
@@ -606,15 +842,20 @@ export function useVisionBoardState(userId) {
       const next = pendingStateRef.current;
       if (!uid || !next) return;
       if (loadError || loadingRef.current) return;
+      // Synchronously first. The request below is abandoned if the page
+      // is discarded before it completes; this is not, and the next load
+      // merges it in. Belt before braces, in that order deliberately.
+      writePending(uid, next, baseUpdatedAtRef.current);
       if (
         lastGoodMeaningfulRef.current &&
         !allowEmptyRef.current &&
         looksLikeFactoryDefault(next)
       ) return;
       clearTimeout(saveTimer.current);
-      saveToCloud(uid, next)
+      persist(uid, next)
         .then(() => {
           dirtyRef.current = false;
+          clearPending(uid);
           if (hasMeaningfulData(next)) writeBackup(uid, next);
         })
         .catch(() => { /* dirty stays set; debounce path retries on resume */ });
@@ -626,7 +867,7 @@ export function useVisionBoardState(userId) {
       document.removeEventListener('visibilitychange', onHide);
       window.removeEventListener('pagehide', flushPendingSave);
     };
-  }, [loadError]);
+  }, [loadError, persist]);
 
   const update = useCallback((updater) => {
     setS(prev => {
@@ -677,10 +918,11 @@ export function useVisionBoardState(userId) {
           return;
         }
 
-        saveToCloud(uid, next)
+        persist(uid, next)
           .then(() => {
             // Successful write is a new known-good snapshot.
             dirtyRef.current = false;
+            clearPending(uid);
             if (hasMeaningfulData(next)) writeBackup(uid, next);
           })
           .catch(err => {
@@ -690,7 +932,7 @@ export function useVisionBoardState(userId) {
 
       return next;
     });
-  }, [loadError]);
+  }, [loadError, persist]);
 
   function dismissMigrationBanner() {
     setJustMigrated(false);
@@ -719,7 +961,10 @@ export function useVisionBoardState(userId) {
       // otherwise block: a deliberate reset to factory defaults.
       allowEmptyRef.current = true;
       clearUserSeen(userIdRef.current);
-      await saveToCloud(userIdRef.current, fresh, { allowEmpty: true });
+      const freshAt = await saveToCloud(userIdRef.current, fresh, { allowEmpty: true });
+      baseUpdatedAtRef.current = freshAt;
+      baseStateRef.current = stripForSave(fresh);
+      clearPending(userIdRef.current);
       markUserSeen(userIdRef.current);
       lastGoodMeaningfulRef.current = false;
       setS(fresh);
@@ -755,7 +1000,10 @@ export function useVisionBoardState(userId) {
     delete restored.__slim;
     try {
       clearUserSeen(uid);
-      await saveToCloud(uid, restored, { fromBackup: true });
+      const restoredAt = await saveToCloud(uid, restored, { fromBackup: true });
+      baseUpdatedAtRef.current = restoredAt;
+      baseStateRef.current = stripForSave(restored);
+      clearPending(uid);
       markUserSeen(uid);
       lastGoodMeaningfulRef.current = hasMeaningfulData(restored);
       setS(restored);
@@ -775,5 +1023,10 @@ export function useVisionBoardState(userId) {
     loadError, retryLoad, startFresh,
     restoreFromBackup,
     hasBackup: () => hasBackup(userIdRef.current),
+    // Set when a save had to merge another device's changes. Nothing
+    // renders it yet; it is exposed so telling the user is a UI change
+    // rather than another trip through this file.
+    mergeNotice,
+    dismissMergeNotice: () => setMergeNotice(null),
   };
 }
