@@ -10,24 +10,10 @@
  * so and the rest of the leaderboard carries on.
  */
 import { useCallback, useEffect, useState } from 'react';
-import { supabase } from '../lib/supabase';
-
-const CACHE_TTL_MS = 45_000;
-const cache = new Map(); // division -> { ts, data }
-
-async function call(payload) {
-  const session = (await supabase.auth.getSession()).data?.session;
-  const token = session?.access_token;
-  if (!token) throw new Error('Not signed in.');
-  const res = await fetch('/.netlify/functions/groups', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-    body: JSON.stringify(payload),
-  });
-  const body = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(body.error || 'Something went wrong.');
-  return body;
-}
+// The transport and the cache live in lib/groups/api so a caller that
+// only wants to act — joining from an invite in a message thread —
+// can do it without mounting this hook and fetching a whole board.
+import { callGroups as call, boardCache as cache, CACHE_TTL_MS } from '../lib/groups/api';
 
 export function useGroups(division = null) {
   const key = String(division ?? 'mine');
