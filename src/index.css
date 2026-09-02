@@ -8011,3 +8011,76 @@ div.m-hubdrawer-coach { cursor: default; display: flex; flex-direction: column; 
 @media (min-width:769px){
   .shop-page{display:block;}
 }
+
+/* ── Clan invite in a message thread ─────────────────────────────────
+   An invite is an ordinary message whose body carries a join code, so
+   it sits in the same row as any other bubble and only the inside
+   differs. The code stays on screen either way: it IS the invite, and
+   it still works if the button does not. */
+.msg-invite{
+  max-width:78%;
+  border:1px solid var(--accent-line, rgba(128,128,128,.3));
+  border-radius:14px;
+  background:var(--surface2, var(--surface));
+  padding:11px 13px 9px;
+  position:relative;
+}
+.msg-invite.mine{ margin-left:auto; }
+.msg-invite-head{ display:flex; align-items:center; gap:7px; }
+.msg-invite-icon{ font-size:14px; line-height:1; color:var(--gold); }
+.msg-invite-title{
+  font-family:var(--display);
+  font-size:15px;
+  font-weight:700;
+  color:var(--text);
+  overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+}
+.msg-invite-sub{
+  font-size:11.5px;
+  color:var(--text-muted);
+  margin-top:3px;
+}
+.msg-invite-join{
+  display:block;
+  width:100%;
+  min-height:40px;
+  margin-top:10px;
+  border-radius:10px;
+  border:none;
+  cursor:pointer;
+  font-family:inherit;
+  font-size:13px;
+  font-weight:600;
+  color:#fff;
+  background:var(--em);
+}
+.msg-invite-join:disabled{ opacity:.6; cursor:default; }
+.msg-invite-done{
+  margin-top:10px;
+  font-family:var(--mono);
+  font-size:11.5px;
+  color:var(--em);
+}
+.msg-invite-err{
+  margin-top:9px;
+  font-size:11.5px;
+  color:#c0392b;
+  line-height:1.4;
+}
+.msg-invite-code{
+  margin-top:8px;
+  font-family:var(--mono);
+  font-size:10.5px;
+  letter-spacing:1px;
+  color:var(--text-muted);
+}
+.msg-invite-code b{ color:var(--text); font-weight:500; }
+.msg-invite .msg-time{ position:static; display:block; margin-top:6px; }
+
+/* A menu line that states a fact rather than offering an action. */
+.fc-menu-item.is-quiet{
+  color:var(--text-muted);
+  cursor:default;
+  font-size:12.5px;
+}
+.fc-menu-sep{ height:1px; background:var(--border); margin:4px 0; }

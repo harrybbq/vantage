@@ -4,6 +4,8 @@ import Icon from '../Icon';
 import { listThread, sendMessage, markThreadRead } from '../../lib/friends/messages';
 import { reportUser, blockUser } from '../../lib/friends/queries';
 import ReportFriendModal from './ReportFriendModal';
+import { ClanInviteMenuItem, ClanInviteBubble } from './ClanInvite';
+import { parseInvite } from '../../lib/friends/clanInvite';
 
 /**
  * MessagesModal — a 1:1 chat overlay with a single friend.
@@ -130,6 +132,30 @@ export default function MessagesModal({ open, userId, friend, onClose, onBlocked
     setSending(false);
   }
 
+  /**
+   * Send an already-composed body — the clan invite. Same optimistic
+   * bubble, same rollback, same error surface as a typed message; only
+   * the source of the text differs.
+   */
+  async function sendBody(text) {
+    if (!text || sending) return;
+    setSending(true);
+    stickRef.current = true;
+    const temp = { id: `tmp-${Date.now()}`, sender_id: userId, recipient_id: friendId, body: text, created_at: new Date().toISOString(), _pending: true };
+    sigRef.current = '';
+    setMessages(m => [...m, temp]);
+    try {
+      const saved = await sendMessage(userId, friendId, text);
+      setMessages(m => m.map(x => x.id === temp.id ? saved : x));
+    } catch (e) {
+      setMessages(m => m.filter(x => x.id !== temp.id));
+      setErrMsg(e.message || 'Could not send the invite.');
+      setStatus('ready');
+      window.setTimeout(() => setErrMsg(''), 4000);
+    }
+    setSending(false);
+  }
+
   // Close the ⋯ menu on any outside click.
   useEffect(() => {
     if (!menuOpen) return undefined;
@@ -209,6 +235,13 @@ export default function MessagesModal({ open, userId, friend, onClose, onBlocked
             ><Icon name="ellipsis" size={16} /></button>
             {menuOpen && (
               <div className="fc-menu" role="menu">
+                {/* Mounted only while the menu is open, which is what
+                    keeps the board fetch off the app's start-up path. */}
+                <ClanInviteMenuItem
+                  disabled={sending}
+                  onInvite={body => { setMenuOpen(false); sendBody(body); }}
+                />
+                <div className="fc-menu-sep" role="separator" />
                 <button
                   type="button"
                   role="menuitem"
@@ -241,14 +274,21 @@ export default function MessagesModal({ open, userId, friend, onClose, onBlocked
             const mine = m.sender_id === userId;
             const prev = messages[i - 1];
             const showDay = !prev || fmtDay(prev.created_at) !== fmtDay(m.created_at);
+            // An invite is an ordinary message whose body happens to
+            // carry a join code; anything else falls through unchanged.
+            const invite = parseInvite(m.body);
             return (
               <div key={m.id}>
                 {showDay && <div className="msg-daysep">{fmtDay(m.created_at)}</div>}
                 <div className={`msg-row ${mine ? 'mine' : 'theirs'}`}>
-                  <div className={`msg-bubble${m._pending ? ' pending' : ''}`}>
-                    {m.body}
-                    <span className="msg-time">{fmtTime(m.created_at)}</span>
-                  </div>
+                  {invite ? (
+                    <ClanInviteBubble invite={invite} mine={mine} time={fmtTime(m.created_at)} />
+                  ) : (
+                    <div className={`msg-bubble${m._pending ? ' pending' : ''}`}>
+                      {m.body}
+                      <span className="msg-time">{fmtTime(m.created_at)}</span>
+                    </div>
+                  )}
                 </div>
               </div>
             );

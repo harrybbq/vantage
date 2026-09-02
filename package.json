@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "eslint . && npm run check:visions && npm run check:parity && npm run check:boot && npm run check:savings && npm run check:training && npm run check:merge && vite build",
+    "build": "eslint . && npm run check:visions && npm run check:parity && npm run check:boot && npm run check:savings && npm run check:training && npm run check:merge && npm run check:invite && vite build",
     "check:visions": "node scripts/check-vision-xp.mjs",
     "check:parity": "node scripts/check-ratings-parity.mjs",
     "check:boot": "node scripts/check-boot-speed.mjs",
@@ -18,7 +18,8 @@
     "lint": "eslint .",
     "check:savings": "node src/lib/savings/derive.test.mjs",
     "check:training": "node src/data/trainingProgramme.test.mjs",
-    "check:merge": "node src/lib/state/merge.test.mjs"
+    "check:merge": "node src/lib/state/merge.test.mjs",
+    "check:invite": "node src/lib/friends/clanInvite.test.mjs"
   },
   "dependencies": {
     "@capacitor/android": "^8.3.1",
