@@ -239,6 +239,8 @@ export default function MessagesModal({ open, userId, friend, onClose, onBlocked
                     keeps the board fetch off the app's start-up path. */}
                 <ClanInviteMenuItem
                   disabled={sending}
+                  friendId={friendId}
+                  friendName={(friend.name || friend.handle || '').split(' ')[0]}
                   onInvite={body => { setMenuOpen(false); sendBody(body); }}
                 />
                 <div className="fc-menu-sep" role="separator" />
