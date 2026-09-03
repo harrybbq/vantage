@@ -13,15 +13,16 @@
 import { useState } from 'react';
 import { useGroups } from '../../hooks/useGroups';
 import { joinByCode } from '../../lib/groups/api';
-import { formatInvite } from '../../lib/friends/clanInvite';
+import { formatInvite, isClanMember } from '../../lib/friends/clanInvite';
 
 /**
  * The menu item. Renders only while the ⋯ menu is open, which is what
  * makes the board fetch lazy.
  */
-export function ClanInviteMenuItem({ onInvite, disabled }) {
+export function ClanInviteMenuItem({ onInvite, disabled, friendId, friendName }) {
   const { data, loading } = useGroups();
   const group = data?.group || null;
+  const already = isClanMember(data?.members, friendId);
 
   if (loading) {
     return <div className="fc-menu-item is-quiet" role="none">Checking your clan…</div>;
@@ -33,6 +34,17 @@ export function ClanInviteMenuItem({ onInvite, disabled }) {
     return (
       <div className="fc-menu-item is-quiet" role="none">
         Join a clan to invite friends
+      </div>
+    );
+  }
+
+  // Already in it. Offering the invite would send a code that works and
+  // then be refused by the server with "you are already in a group" —
+  // a worse way to find out than simply not being offered it.
+  if (already) {
+    return (
+      <div className="fc-menu-item is-quiet" role="none">
+        {friendName ? `${friendName} is` : 'Already'} in {group.name}
       </div>
     );
   }
@@ -100,10 +112,15 @@ export function ClanInviteBubble({ invite, mine, time }) {
       {state === 'joined' && <div className="msg-invite-done">Joined ✓</div>}
       {state === 'error' && <div className="msg-invite-err">{msg}</div>}
 
-      {/* The code stays visible either way: it is the invite, and it
-          still works if the button does not — pasted into the clan
-          screen, or used on another device. */}
-      <div className="msg-invite-code">code <b>{invite.code}</b></div>
+      {/* The button is the way in. The code is deliberately NOT shown:
+          it grants entry to the clan, and a card that displays it invites
+          being screenshotted onward to people who were never invited.
+          It reappears only if joining fails, as the manual way through. */}
+      {state === 'error' && (
+        <div className="msg-invite-code">
+          or enter <b>{invite.code}</b> on the Clan screen
+        </div>
+      )}
       {time && <span className="msg-time">{time}</span>}
     </div>
   );

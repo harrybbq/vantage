@@ -65,3 +65,23 @@ export function parseInvite(body) {
 
 /** True when this body is an invite. */
 export const isInvite = body => parseInvite(body) !== null;
+
+/**
+ * Is this person already in the clan?
+ *
+ * Lives here rather than beside the groups transport because it is a
+ * pure decision — "may I offer this invite" — and that module imports
+ * the Supabase client, which cannot be loaded outside a browser build.
+ *
+ * Offering an invite to an existing member would send a code that is
+ * perfectly valid and then have the server refuse it with "you are
+ * already in a group", which is a worse way to find out than simply not
+ * being offered it.
+ *
+ * Defensive about shape on purpose: `members` is whatever the board
+ * returned, and that is null while it is still loading.
+ */
+export function isClanMember(members, userId) {
+  if (!userId || !Array.isArray(members)) return false;
+  return members.some(m => m && m.userId === userId);
+}

@@ -5,7 +5,7 @@
  * it — which is the reason the code comes first.
  */
 import assert from 'node:assert/strict';
-import { formatInvite, parseInvite, isInvite, INVITE_PREFIX } from './clanInvite.js';
+import { formatInvite, parseInvite, isInvite, INVITE_PREFIX, isClanMember } from './clanInvite.js';
 
 let n = 0;
 const ok = (c, m) => { assert.ok(c, m); n++; };
@@ -73,6 +73,21 @@ const eq = (a, b, m) => { assert.deepEqual(a, b, m); n++; };
   const long = 'X'.repeat(32);
   eq(parseInvite(`${INVITE_PREFIX}${long} · Owls`).code, long, 'a 32-character code is accepted');
   eq(parseInvite(`${INVITE_PREFIX}${'X'.repeat(33)} · Owls`), null, 'a 33-character one is not');
+}
+
+// ── Who is already in ──
+// An invite offered to an existing member sends a code that works and is
+// then refused with "you are already in a group". Better not to offer it.
+{
+  const members = [{ userId: 'a', name: 'Amy' }, { userId: 'b', name: 'Ben' }];
+  ok(isClanMember(members, 'a'), 'a member is recognised');
+  ok(!isClanMember(members, 'zzz'), 'a non-member is not');
+  ok(!isClanMember(members, null), 'nobody is not a member');
+  ok(!isClanMember(members, undefined), 'and neither is undefined');
+  ok(!isClanMember(null, 'a'), 'a board still loading reports nobody rather than throwing');
+  ok(!isClanMember(undefined, 'a'), 'and so does a missing members list');
+  ok(!isClanMember([null, undefined, {}], 'a'), 'ragged rows do not throw');
+  ok(!isClanMember('not an array', 'a'), 'nor does the wrong type entirely');
 }
 
 console.log(`clan invite: ${n} assertions passed`);
