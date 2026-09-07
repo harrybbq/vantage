@@ -154,7 +154,11 @@ export function applyHealthImport(update, { vitals, steps }) {
       // Replace any prior imported-steps entry for the day (id prefix),
       // keep manual + other entries.
       const others = (burnLog[d] || []).filter(a => !String(a.id || '').startsWith('ah-steps-') && a.label !== 'Apple Health');
-      burnLog[d] = [...others, { id: 'ah-steps-' + d, label: `${n.toLocaleString('en-GB')} steps`, kcal }];
+      // `steps` is additive and new (2026-09): the count used to live
+      // only inside the label, so anything wanting the number had to
+      // parse English back out of it. Older entries still do — see
+      // stepsOn in lib/trackers/autoLog.js, which reads both.
+      burnLog[d] = [...others, { id: 'ah-steps-' + d, label: `${n.toLocaleString('en-GB')} steps`, kcal, steps: n }];
     }
     return { ...prev, vitalsLog, burnLog };
   });

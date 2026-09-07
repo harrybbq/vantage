@@ -14,6 +14,12 @@ export const DEFAULT_STATE = {
     { id: 't3', name: 'Amount Saved', type: 'number', unit: '£', goal: 500, color: '#c8970a', category: 'finance' },
   ],
   logs: {},
+  // Where a log entry came from, parallel to `logs`:
+  //   { [date]: { [trackerId]: sourceId | 'manual' } }
+  // A source id means a rule in lib/trackers/autoLog.js filled that cell
+  // from data already synced; 'manual' means the user decided it and no
+  // rule may touch it again. Absent = never automated, never touched.
+  logsAuto: {},
   shopItems: [],
   shopCategories: [],
   shopFilter: 'all',
@@ -101,6 +107,12 @@ export const DEFAULT_STATE = {
   // the linked achievement is auto-marked complete + its coin reward
   // fires. Same pipeline as the Achievements board.
   savings: [],
+  // Which finished months have been posted from the cash flow, and the
+  // month the feature started watching:
+  //   { from: 'YYYY-MM', months: { 'YYYY-MM': { ts, total, itemIds } } }
+  // `from` is what stops it back-posting months the user may already
+  // have entered by hand. See lib/savings/planPost.js.
+  planLedger: {},
   // ── Mobile widget stack (FEATURE 5 follow-up) ────────────────────
   // Vertical list rendered below the AI Coach on the mobile hub.
   // Each entry: { id, type, ...config }. Order = render order.

@@ -1872,8 +1872,12 @@ nav:hover .nav-tab-label{opacity:1;}
 .tracker-ring.is-done .tracker-ring-center{color:var(--em);}
 .tracker-row-main{flex:1;min-width:0;}
 .tracker-row-name{display:flex;align-items:center;gap:8px;min-width:0;}
-.tracker-row-label{font-weight:600;font-size:13px;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
-.tracker-row-todayval{font-family:var(--mono);font-size:9.5px;color:var(--em);flex-shrink:0;}
+/* The name outranks today's figure. It did not: the figure was
+   flex-shrink:0, so "8000 steps today" squeezed "Steps" down to "S".
+   Rare while numbers were typed by hand and four digits wide the moment
+   a step count fills itself in. */
+.tracker-row-label{font-weight:600;font-size:13px;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:4.5em;}
+.tracker-row-todayval{font-family:var(--mono);font-size:9.5px;color:var(--em);min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 .tracker-row-right{flex-shrink:0;text-align:right;}
 .tracker-row-frac{font-family:var(--mono);font-size:12px;font-weight:700;color:var(--text);font-variant-numeric:tabular-nums;}
 .tracker-row-frac span{font-weight:500;font-size:10px;color:var(--text-muted);}
@@ -1883,6 +1887,36 @@ nav:hover .nav-tab-label{opacity:1;}
 .tracker-row-coins{color:var(--gold);}
 .tracker-row-del{background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:11px;padding:4px;border-radius:4px;flex-shrink:0;opacity:.55;transition:opacity .15s,color .15s;}
 .tracker-row-del:hover{opacity:1;color:#c84040;}
+
+/* What fills a tracker in for you. Sits under the name at the width it
+   needs; the label can be a whole rule ("Strain reached 10"), so it
+   truncates rather than pushing the weekly fraction off the row. */
+.tracker-auto{display:inline-flex;align-items:center;gap:3px;max-width:100%;margin-top:3px;padding:1px 6px 1px 4px;border:1px solid var(--border);border-radius:20px;background:none;color:var(--text-muted);font-family:var(--mono);font-size:8.5px;letter-spacing:.2px;cursor:pointer;opacity:.7;transition:opacity .15s,color .15s,border-color .15s;}
+.tracker-auto svg{flex-shrink:0;}
+.tracker-auto span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.tracker-auto:hover{opacity:1;color:var(--text-mid);border-color:var(--text-muted);}
+.tracker-auto.is-on{opacity:1;color:var(--em);border-color:var(--em);}
+
+/* The marker on a cell a rule filled. */
+.log-auto{margin-left:6px;padding:0 5px;border-radius:20px;border:1px solid var(--em);color:var(--em);font-family:var(--mono);font-size:8.5px;letter-spacing:.4px;text-transform:uppercase;cursor:help;}
+
+/* Auto-fill picker */
+.af-modal{max-width:520px;}
+.af-lead{font-size:12.5px;color:var(--text-mid);line-height:1.6;margin:0 0 14px;}
+.af-list{display:flex;flex-direction:column;gap:6px;max-height:46vh;overflow-y:auto;-webkit-overflow-scrolling:touch;}
+.af-opt{display:flex;flex-direction:column;gap:2px;text-align:left;padding:9px 12px;border:1px solid var(--border);border-radius:10px;background:none;cursor:pointer;transition:border-color .15s,background .15s;}
+.af-opt:hover{border-color:var(--text-muted);}
+.af-opt.is-on{border-color:var(--em);background:var(--em-ghost);}
+.af-opt.is-dim{opacity:.55;}
+.af-opt-title{font-family:var(--sans);font-size:13px;font-weight:600;color:var(--text);}
+.af-opt-th{font-family:var(--mono);font-weight:500;color:var(--text-muted);}
+.af-opt-hint{font-family:var(--mono);font-size:10px;color:var(--text-muted);line-height:1.5;}
+.af-th{display:flex;align-items:center;gap:8px;margin-top:14px;}
+.af-th label{font-family:var(--mono);font-size:11px;color:var(--text-mid);}
+.af-th input{width:96px;padding:7px 9px;border:1px solid var(--border);border-radius:8px;background:transparent;color:var(--text);font-family:var(--sans);font-size:13px;outline:none;}
+.af-th-unit{font-family:var(--mono);font-size:11px;color:var(--text-muted);}
+.af-note{font-family:var(--mono);font-size:10.5px;color:var(--text-muted);line-height:1.6;margin:10px 0 0;}
+.af-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:18px;}
 
 /* Multi-select mode */
 .cal-multiselect-bar{display:flex;align-items:center;justify-content:space-between;padding:10px 14px;background:var(--em);border-radius:10px;margin-bottom:12px;gap:12px;}

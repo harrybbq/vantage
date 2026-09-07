@@ -5,6 +5,7 @@ import { getTodayStr, getWeekKey, countWeekLogs } from '../utils/helpers';
 import { recalcStreaks } from '../utils/streaks';
 import { fireGoal, fireStreak7, fireStreak30 } from '../utils/confetti';
 import { haptic } from '../hooks/useCapacitor';
+import { markManual } from '../lib/trackers/autoLog';
 
 // ── Long-press hook for number steppers ──────────────────────────────────
 function useLongPress(callback, delay = 120) {
@@ -220,6 +221,10 @@ export default function QuickLog({ S, update, onNavigateTrack, onShowCoinToast }
       else delete newLogs[today];
 
       let next = { ...prev, logs: newLogs };
+
+      // 1b. The cell is the user's now — no rule refills it, and the
+      // Track page stops crediting a device for a tick they made.
+      next = markManual(next, today, [trackerId]);
 
       // 2. Recalculate streaks
       const newStreaks = recalcStreaks(newLogs, prev.trackers || [], prev.streaks || {});

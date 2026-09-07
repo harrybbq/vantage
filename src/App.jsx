@@ -43,6 +43,7 @@ import { useIsMobile } from './hooks/useIsMobile';
 import { useVisions } from './lib/visions/useVisions';
 import { useWhoopAutoSync } from './lib/whoopClient';
 import { useOuraAutoSync } from './lib/ouraClient';
+import { useAutomations } from './hooks/useAutomations';
 import { usePublishProfile } from './lib/friends/usePublishProfile';
 import { useRatings } from './hooks/useRatings';
 import { useCoinGrants } from './hooks/useCoinGrants';
@@ -117,6 +118,10 @@ function Board({ userId, userEmail, onSignOut }) {
   // regains focus (throttled), so data stays fresh without visiting Track.
   useWhoopAutoSync(S, update);
   useOuraAutoSync(S, update);
+  // What the app can work out for itself: trackers filled from readings
+  // that already arrived, and renewal dates carried forward. Runs after
+  // the syncs above, writes nothing when there is nothing to write.
+  useAutomations(S, update, loading);
   // Owner admin edit modal — opened via right-click on OVR / coin chip
   // (handlers in PageHeader + MobileAppBar + RatingsPanel).
   const [adminEdit, setAdminEdit] = useState(null); // 'rating' | 'coins' | null
