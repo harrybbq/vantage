@@ -1239,3 +1239,94 @@ html[data-theme="dark-os"] .sb-stat-val.is-bad { color: #e07a6b; }
    at the left, under the numbers they act on. */
 .sb-potcard.is-expanded .sb-potcard-actions { justify-content: flex-start; }
 .sb-potcard.is-expanded .sb-potcard-actions .btn { flex: 0 0 auto; }
+
+/* ── The finished month, waiting to be posted ─────────────────────────
+   Deliberately marked out from the panels around it: it is the one
+   thing on the page asking for an answer rather than reporting a
+   number, and it disappears the moment it gets one. */
+
+.pp-card { border-color: var(--em); }
+.pp-total { text-align: right; }
+.pp-total strong {
+  display: block;
+  font-family: var(--sans);
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--em);
+  font-variant-numeric: tabular-nums;
+}
+
+.pp-rows { display: flex; flex-direction: column; gap: 6px; }
+
+.pp-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  transition: opacity .15s;
+}
+.pp-row.is-off { opacity: .45; }
+
+.pp-check {
+  flex: 0 0 auto;
+  width: 20px; height: 20px;
+  display: inline-flex; align-items: center; justify-content: center;
+  border: 1px solid var(--em);
+  border-radius: 6px;
+  background: var(--em);
+  color: #fff;
+  cursor: pointer;
+  padding: 0;
+}
+.pp-row.is-off .pp-check { background: none; color: transparent; border-color: var(--border); }
+
+.pp-row-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+.pp-row-label {
+  font-family: var(--sans);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.pp-row-dest {
+  font-family: var(--mono);
+  font-size: 9.5px;
+  color: var(--text-muted);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+
+.pp-amt { flex: 0 0 auto; display: flex; align-items: center; gap: 3px; }
+.pp-amt span { font-family: var(--mono); font-size: 11px; color: var(--text-muted); }
+.pp-amt input {
+  width: 88px;
+  padding: 6px 8px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text);
+  font-family: var(--sans);
+  font-size: 13px;
+  text-align: right;
+  outline: none;
+  font-variant-numeric: tabular-nums;
+}
+.pp-amt input:focus { border-color: var(--em); }
+
+.pp-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 14px; }
+
+/* A phone has no room for a label, a destination and a field on one
+   line, so the amount drops beneath the two lines it belongs to. */
+@media (max-width: 560px) {
+  .pp-row { flex-wrap: wrap; }
+  /* The tick stays beside the label it is about; only the amount drops
+     to its own line. Sending the label to a second row left the tick
+     floating alone above it, attached to nothing. */
+  .pp-row-main { flex: 1 1 120px; }
+  .pp-amt { flex: 1 0 100%; justify-content: flex-end; }
+  .pp-amt input { width: 104px; }
+  .pp-total { text-align: left; }
+  .pp-actions { flex-direction: column-reverse; }
+  .pp-actions .btn { width: 100%; }
+}

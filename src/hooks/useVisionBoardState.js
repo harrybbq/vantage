@@ -873,6 +873,15 @@ export function useVisionBoardState(userId) {
     setS(prev => {
       const next = typeof updater === 'function' ? updater(prev) : { ...prev, ...updater };
 
+      // An updater that returns the state it was given has nothing to
+      // save. syncWhoop already relied on this being true ("return prev
+      // UNCHANGED … even when WHOOP had returned exactly what we already
+      // had") — it wasn't: the dirty flag and the 1.5s save were set
+      // below regardless, so every focus still queued a write of the
+      // whole ~1MB blob. The automations run the same discipline and
+      // would have paid the same price.
+      if (next === prev) return prev;
+
       // Once this user is known to have real data, remember it so the
       // save guard below can refuse a regression to factory defaults.
       if (hasMeaningfulData(next)) lastGoodMeaningfulRef.current = true;

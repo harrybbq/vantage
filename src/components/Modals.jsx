@@ -10,6 +10,8 @@ import Icon from './Icon';
 import { tradingWidgetAvailable } from '../lib/trading/enabled';
 import { widgetReadiness } from '../lib/widgets/readiness';
 import { authFetch } from '../lib/authFetch';
+import { markManual } from '../lib/trackers/autoLog';
+import { addContribution } from '../lib/savings/contribute';
 import {
   emptyHolidayForm, HolidayTabBar, BasicsFields, ItineraryFields, BudgetFields, HOLIDAY_TABS,
 } from './holiday/HolidayFormTabs';
@@ -1817,44 +1819,12 @@ export default function Modals({ openModal, S, update, onClose, onOpen, onShowCo
     }));
   }
   function handleAddContribution(goalId, contribution) {
-    // Append contribution + recompute current. If the new total
-    // crosses the target AND a linked achievement exists AND it's
-    // not already completed, fire the achievement-complete pipeline
-    // so the user gets the same coin reward + vision check as
-    // completing it manually on the achievement board.
-    update(prev => {
-      const goals = prev.savings || [];
-      const goal = goals.find(g => g.id === goalId);
-      if (!goal) return prev;
-      const nextContribs = [contribution, ...(goal.contributions || [])];
-      const nextCurrent = nextContribs.reduce((sum, c) => sum + (c.amount || 0), 0);
-      const justHit = nextCurrent >= goal.target && goal.current < goal.target;
-
-      let next = {
-        ...prev,
-        savings: goals.map(g => g.id === goalId
-          ? { ...g, current: nextCurrent, contributions: nextContribs }
-          : g),
-      };
-
-      if (justHit && goal.achievementId) {
-        const linked = (prev.achievements || []).find(a => a.id === goal.achievementId);
-        if (linked && !linked.completed) {
-          next.achievements = (prev.achievements || []).map(a =>
-            a.id === goal.achievementId ? { ...a, completed: true } : a
-          );
-          // Fire the same coin-reward path as manual completion.
-          if (linked.coins && linked.coins > 0) {
-            next.coins = (prev.coins || 0) + linked.coins;
-            next.coinHistory = [
-              { type: 'earn', label: linked.name, amount: linked.coins, ts: Date.now() },
-              ...(prev.coinHistory || []),
-            ];
-          }
-        }
-      }
-      return next;
-    });
+    // Append + recompute + fire any linked achievement. The body moved
+    // to lib/savings/contribute.js when the monthly plan post became a
+    // second caller — two copies of "a pot crossed its target" would
+    // have drifted, and the copy that drifted would be the one that
+    // stopped paying the reward.
+    update(prev => addContribution(prev, goalId, contribution));
   }
 
   function handleDeleteAchievement(id) {
@@ -1883,7 +1853,12 @@ export default function Modals({ openModal, S, update, onClose, onOpen, onShowCo
       (prev.multiSelectedDays || []).forEach(key => {
         if (Object.keys(logs).length) newLogs[key] = { ...(newLogs[key] || {}), ...logs };
       });
-      return { ...prev, logs: newLogs, multiSelectMode: false, multiSelectedDays: [], _multiLogOpen: false };
+      let next = { ...prev, logs: newLogs, multiSelectMode: false, multiSelectedDays: [], _multiLogOpen: false };
+      // Applied by hand across several days — those cells belong to the
+      // user, whatever a wearable says about them later.
+      const ids = Object.keys(logs);
+      (prev.multiSelectedDays || []).forEach(key => { next = markManual(next, key, ids); });
+      return next;
     });
   }
   function handleAddShopItem(item) {

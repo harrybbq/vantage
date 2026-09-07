@@ -24,6 +24,7 @@ import { useIsMobile } from '../../hooks/useIsMobile';
 import ProjectionChart from './ProjectionChart';
 import FlowEditor from './FlowEditor';
 import AccountsPanel from './AccountsPanel';
+import PlanPostCard from './PlanPostCard';
 import {
   derivePot, last12Months, potTotals, flowTotals,
   cashSeries, savingsSeries, money, potColor, monthLabel,
@@ -430,7 +431,7 @@ export default function SavingsBoard({ S, update, onOpenModal }) {
             >{label}</button>
           ))}
         </div>
-        {tab === 'pots' && <>{headline}{potsSurface}</>}
+        {tab === 'pots' && <>{headline}<PlanPostCard S={S} update={update} />{potsSurface}</>}
         {tab === 'proj' && <>{chartEl}{flowEl}</>}
         {tab === 'acc' && accountsSurface}
       </div>
@@ -444,6 +445,8 @@ export default function SavingsBoard({ S, update, onOpenModal }) {
   return (
     <div className="sb">
       {headline}
+      {/* Above the pots, because it is about to change them. */}
+      <PlanPostCard S={S} update={update} />
       {potsSurface}
       {chartEl}
       <div className="sb-bottom-row">

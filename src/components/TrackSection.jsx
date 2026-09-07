@@ -11,6 +11,8 @@ import { recalcStreaks } from '../utils/streaks';
 import SectionHelp from './SectionHelp';
 import NutritionSection from './NutritionSection';
 import VitalsPanel from './track/VitalsPanel';
+import { markManual, isAutoFilled, autoProvenance, ruleLabel, ruleChip } from '../lib/trackers/autoLog';
+import AutoFillModal from './track/AutoFillModal';
 
 function getWeekProgress(logs, trackerId, weeklyTarget) {
   const dateStr = getTodayStr();
@@ -55,7 +57,7 @@ function TrackerRing({ tracker, count, target, doneToday, onClick }) {
   );
 }
 
-function TrackersList({ trackers, logs, streaks, onDelete, onOpenModal, update }) {
+function TrackersList({ trackers, logs, streaks, onDelete, onOpenModal, update, onOpenAuto }) {
   const today = getTodayStr();
   const todayLogs = logs?.[today] || {};
 
@@ -76,7 +78,10 @@ function TrackersList({ trackers, logs, streaks, onDelete, onOpenModal, update }
       if (Object.keys(dayLog).length) newLogs[today] = dayLog;
       else delete newLogs[today];
       const newStreaks = recalcStreaks(newLogs, prev.trackers || [], prev.streaks || {});
-      return { ...prev, logs: newLogs, streaks: newStreaks };
+      // The cell is now the user's. Without this an un-tick would be
+      // refilled by the next sync, and a re-tick would keep claiming it
+      // came from a device.
+      return markManual({ ...prev, logs: newLogs, streaks: newStreaks }, today, [t.id]);
     });
   }
 
@@ -124,6 +129,19 @@ function TrackersList({ trackers, logs, streaks, onDelete, onOpenModal, update }
                     <span className="tracker-row-todayval">{v}{t.unit ? ` ${t.unit}` : ''} today</span>
                   )}
                 </div>
+                {/* What fills this one in, and a way to change it. A
+                    tracker with no rule still shows the control — the
+                    feature is invisible otherwise, and it is the whole
+                    point of having synced the data. */}
+                <button
+                  type="button"
+                  className={`tracker-auto${ruleChip(t) ? ' is-on' : ''}`}
+                  onClick={() => onOpenAuto(t)}
+                  title={ruleLabel(t) ? `Filled in automatically — ${ruleLabel(t)}` : 'Fill this in from synced data'}
+                >
+                  <Icon name="zap" size={10} />
+                  <span>{ruleChip(t) || 'Auto-fill'}</span>
+                </button>
               </div>
               <div className="tracker-row-right">
                 {hasChallenge ? (
@@ -248,7 +266,9 @@ function DayTickMenu({ x, y, dates, trackers, logs, events, onClose, update, onA
         else delete newLogs[d];       // an empty day is no day, not {}
       }
       const streaks = recalcStreaks(newLogs, prev.trackers || [], prev.streaks || {});
-      return { ...prev, logs: newLogs, streaks };
+      let out = { ...prev, logs: newLogs, streaks };
+      for (const d of dates) out = markManual(out, d, [t.id]);
+      return out;
     });
   }
 
@@ -257,7 +277,12 @@ function DayTickMenu({ x, y, dates, trackers, logs, events, onClose, update, onA
       const newLogs = { ...prev.logs };
       for (const d of dates) delete newLogs[d];
       const streaks = recalcStreaks(newLogs, prev.trackers || [], prev.streaks || {});
-      return { ...prev, logs: newLogs, streaks };
+      // Clearing a day is a decision about every tracker on it, so no
+      // rule may quietly put any of them back tomorrow.
+      const ids = (prev.trackers || []).map(t => t.id);
+      let out = { ...prev, logs: newLogs, streaks };
+      for (const d of dates) out = markManual(out, d, ids);
+      return out;
     });
   }
 
@@ -452,10 +477,18 @@ function CalendarView({ S, update, onShowCoinToast, nutritionMonthData }) {
     update(prev => {
       // 1. Save the log entry
       const newLogs = { ...prev.logs };
+      const before = prev.logs?.[key] || {};
       if (Object.keys(logData).length) newLogs[key] = logData;
       else delete newLogs[key];
 
       let next = { ...prev, logs: newLogs };
+
+      // Only the cells this save actually CHANGED become the user's.
+      // Marking the whole day would mean that opening the panel to type
+      // one number froze every rule on that day — including the tick a
+      // wearable had not reported yet.
+      const changed = trackers.filter(t => before[t.id] !== logData[t.id]).map(t => t.id);
+      next = markManual(next, key, changed);
 
       // 2. Recalculate streaks
       const newStreaks = recalcStreaks(newLogs, prev.trackers || [], prev.streaks || {});
@@ -520,7 +553,8 @@ function CalendarView({ S, update, onShowCoinToast, nutritionMonthData }) {
     update(prev => {
       const newLogs = { ...prev.logs };
       delete newLogs[selectedKey];
-      return { ...prev, logs: newLogs, selectedLogDate: null };
+      const ids = (prev.trackers || []).map(t => t.id);
+      return markManual({ ...prev, logs: newLogs, selectedLogDate: null }, selectedKey, ids);
     });
   }
 
@@ -659,11 +693,16 @@ function CalendarView({ S, update, onShowCoinToast, nutritionMonthData }) {
             )}
             {trackers.map(t => {
               const dayLogs = logs[selectedKey] || {};
+              // Where a filled cell came from. A number the user cannot
+              // trace is a number they stop trusting, so anything a rule
+              // wrote says so and says what reading caused it.
+              const prov = isAutoFilled(S, selectedKey, t.id) ? autoProvenance(S, selectedKey, t.id) : null;
               return (
                 <div key={t.id} className="log-entry-row">
                   <label className="log-entry-label">
                     <div className="log-dot" style={{ background: t.color }}></div>
                     {t.name}
+                    {prov && <span className="log-auto" title={`${prov.text} — change it and it stays yours`}>auto</span>}
                   </label>
                   {t.type === 'boolean'
                     ? <input type="checkbox" className="log-checkbox" id={`log-${t.id}`} defaultChecked={dayLogs[t.id] === true} />
@@ -690,6 +729,8 @@ function CalendarView({ S, update, onShowCoinToast, nutritionMonthData }) {
 export default function TrackSection({ S, update, active, onOpenModal, onShowCoinToast, userId, requestedTab }) {
   const [nutritionMonthData, setNutritionMonthData] = useState({});
   const [tab, setTab] = useState('trackers');
+  // Which tracker's auto-fill rule is being edited, if any.
+  const [autoFor, setAutoFor] = useState(null);
 
   // Same right-click transparency the hub modules have, same store
   // (S.moduleTransparency) and same menu component — a second
@@ -776,6 +817,7 @@ export default function TrackSection({ S, update, active, onOpenModal, onShowCoi
                 onDelete={id => update(prev => ({ ...prev, trackers: prev.trackers.filter(t => t.id !== id) }))}
                 onOpenModal={onOpenModal}
                 update={update}
+                onOpenAuto={setAutoFor}
               />
             </aside>
             <div className="track-main"
@@ -825,6 +867,15 @@ export default function TrackSection({ S, update, active, onOpenModal, onShowCoi
           positioned relative to the panel instead of the viewport and
           landed off-screen the moment the panel was tall. */}
       {moduleMenu.menuNode}
+
+      {autoFor && (
+        <AutoFillModal
+          tracker={S.trackers.find(t => t.id === autoFor.id) || autoFor}
+          S={S}
+          update={update}
+          onClose={() => setAutoFor(null)}
+        />
+      )}
 
       {/* The Diet tab reports the month's nutrition totals up so the
           calendar can dot the days that have food logged. It only does

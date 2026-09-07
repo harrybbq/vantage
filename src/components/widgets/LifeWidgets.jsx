@@ -22,6 +22,7 @@
  */
 import { useMemo, useState } from 'react';
 import { getTodayStr } from '../../utils/helpers';
+import { toMonthly, nextRenewal, subsStats } from '../../lib/money/recurring';
 
 const mono = { fontFamily: 'var(--mono)' };
 const money = n => (n < 0 ? '−£' : '£') + Math.abs(Math.round(n * 100) / 100).toLocaleString('en-GB', { maximumFractionDigits: 2 });
@@ -254,38 +255,23 @@ export function BodyCard({ S, update }) {
 // SUBSCRIPTIONS — recurring outgoings, monthly burn, renewals
 // ═══════════════════════════════════════════════════════════════════════
 
-export function toMonthly(amount, freq) {
-  const v = parseFloat(amount) || 0;
-  if (freq === 'year') return v / 12;
-  if (freq === 'week') return v * 52 / 12;
-  return v;
-}
-
-/** Days until the next renewal, rolling the stored date forward by the
- *  cadence so a past date keeps producing the next occurrence. */
-export function nextRenewal(sub, from = new Date()) {
-  if (!sub.nextDate) return null;
-  const d = new Date(sub.nextDate + 'T12:00');
-  if (isNaN(d)) return null;
-  const roll = { week: dd => dd.setDate(dd.getDate() + 7), month: dd => dd.setMonth(dd.getMonth() + 1), year: dd => dd.setFullYear(dd.getFullYear() + 1) }[sub.freq || 'month'];
-  let guard = 0;
-  while (d < from && guard++ < 400) roll(d);
-  return d;
-}
-
-export function subsStats(S) {
-  const subs = S.subscriptions || [];
-  const monthly = subs.reduce((s, x) => s + toMonthly(x.amount, x.freq), 0);
-  const now = new Date();
-  const withDue = subs.map(x => ({ ...x, due: nextRenewal(x, now) }));
-  const upcoming = withDue.filter(x => x.due).sort((a, b) => a.due - b.due);
-  // Full list for the manager: dated ones by due date, undated last —
-  // a sub without a renewal date must still be listed (and removable).
-  const all = [...upcoming, ...withDue.filter(x => !x.due)];
-  return { subs, monthly, upcoming, all };
-}
+// The maths moved to lib/money/recurring.js when renewal dates started
+// carrying themselves forward: the roll that computes a display date and
+// the roll that persists one have to be the same roll. Re-exported so
+// nothing that imported them from here has to care.
+export { toMonthly, nextRenewal, subsStats };
 
 const daysUntil = due => Math.max(0, Math.ceil((due - new Date()) / 86400000));
+
+/** The last charge. A yearly bill's last and next fall on the same day
+ *  and month, so a bare "2 Mar" beside "renews 2 Mar" reads as one date
+ *  printed twice — the year is what makes it a different one. */
+function fmtCharged(iso, due) {
+  const d = new Date(iso + 'T12:00');
+  if (isNaN(d)) return iso;
+  const collides = due && due.getDate() === d.getDate() && due.getMonth() === d.getMonth();
+  return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', ...(collides ? { year: 'numeric' } : {}) });
+}
 const dueLabel = due => { const n = daysUntil(due); return n === 0 ? 'today' : n === 1 ? 'tomorrow' : `${n}d`; };
 
 export function SubscriptionsBody({ S, navigate }) {
@@ -390,6 +376,12 @@ export function SubscriptionsManager({ S, update }) {
                   <div style={{ ...mono, fontSize: 9.5, color: 'var(--text-muted)', marginTop: 1 }}>
                     {x.category || 'Other'} · {x.freq === 'week' ? 'weekly' : x.freq === 'year' ? 'yearly' : 'monthly'}
                     {x.due && <> · renews {x.due.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })} ({dueLabel(x.due)})</>}
+                    {/* The date now carries itself forward rather than
+                        rotting where it was typed, so it is worth saying
+                        when it last went out — a date that maintains
+                        itself silently is a date that changed while you
+                        were not looking. */}
+                    {x.lastCharged && <> · last {fmtCharged(x.lastCharged, x.due)}</>}
                   </div>
                 </div>
                 <span style={{ ...mono, fontSize: 12, fontWeight: 700, color: 'var(--text-mid)' }}>{money(parseFloat(x.amount) || 0)}</span>

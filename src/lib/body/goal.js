@@ -49,6 +49,7 @@ export const MAX_SAFE_LOSS_FRACTION = 0.01;  // 1% of bodyweight per week
 import { bmrKcal, currentWeightKg } from '../burn.js';
 import { blendedDailyKcal } from '../diet/plan.js';
 import { plannedSessionsPerWeek } from '../rotation/pattern.js';
+import { hasDeviceWorkout } from '../trackers/autoLog.js';
 
 /**
  * Planned sessions a week.
@@ -358,12 +359,10 @@ export function measuredBurn(S, days = 14) {
 export function deviceWorkoutDays(S) {
   const burn = (S && S.burnLog) || {};
   const out = new Set();
-  for (const d of Object.keys(burn)) {
-    const entries = burn[d] || [];
-    if (entries.some(e => /^(whoop|oura)-/.test(String(e.id || '')) && !/steps/i.test(String(e.id || '')))) {
-      out.add(d);
-    }
-  }
+  // The predicate lives in lib/trackers/autoLog.js, where a tracker rule
+  // asks the same question. Two copies would let the training plan and
+  // the calendar disagree about whether you trained that day.
+  for (const d of Object.keys(burn)) if (hasDeviceWorkout(S, d)) out.add(d);
   return out;
 }
 
