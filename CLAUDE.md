@@ -40,6 +40,24 @@ accounts, native build steps, and the security/scale work that has to
 land first. Update its status markers as things get done; it is the
 single source of truth for "what's left before launch".
 
+## Back burner: Open Banking (owner-only) — decided 2026-09-09
+Money is the one place left where the app asks for data it could sense.
+An Open Banking link (TrueLayer / Plaid / GoCardless) would do to
+savings and expenses what WHOOP did to calories burned: continuous,
+accurate, arriving unattended. **Owner-only, and not now** — the
+implications of shipping it in a public build are too heavy for release.
+Same constraint as the trading widget below: owner-gating is a UI gate,
+and a store reviewer sees the whole binary regardless. If it is ever
+built, it is web-only and absent from the native build until that is
+settled. Keep it in mind when touching the savings surfaces — do not
+design them in a way that would have to be unpicked — but do not build
+toward it.
+
+The cheaper pattern is already in use and should be preferred: DERIVE
+rather than sense. Subscriptions roll their own renewal dates forward;
+the monthly plan post proposes the finished month from the cash flow and
+takes one tap. Neither needs a bank.
+
 ## Possible future: trading P/L widget (owner-only)
 Owner is building a separate "sibling" app where AI agents trade stocks
 automatically — a "digital factory" of agents. That app owns:

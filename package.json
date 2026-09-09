@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "eslint . && npm run check:visions && npm run check:parity && npm run check:boot && npm run check:savings && npm run check:training && npm run check:merge && npm run check:invite && npm run check:autolog && npm run check:recurring && npm run check:planpost && vite build",
+    "build": "eslint . && npm run check:visions && npm run check:parity && npm run check:boot && npm run check:savings && npm run check:training && npm run check:merge && npm run check:invite && npm run check:autolog && npm run check:recurring && npm run check:planpost && npm run check:pathplayer && vite build",
     "check:visions": "node scripts/check-vision-xp.mjs",
     "check:parity": "node scripts/check-ratings-parity.mjs",
     "check:boot": "node scripts/check-boot-speed.mjs",
@@ -22,7 +22,8 @@
     "check:invite": "node src/lib/friends/clanInvite.test.mjs",
     "check:autolog": "node src/lib/trackers/autoLog.test.mjs",
     "check:recurring": "node src/lib/money/recurring.test.mjs",
-    "check:planpost": "node src/lib/savings/planPost.test.mjs"
+    "check:planpost": "node src/lib/savings/planPost.test.mjs",
+    "check:pathplayer": "node src/lib/achievements/pathPlayer.test.mjs"
   },
   "dependencies": {
     "@capacitor/android": "^8.3.1",

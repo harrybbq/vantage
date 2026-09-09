@@ -4,7 +4,8 @@ import { motion } from 'framer-motion';
 import { fireAchievement } from '../utils/confetti';
 import SectionHelp from './SectionHelp';
 import SavingsBoard from './savings/SavingsBoard';
-import AchievementTree from './achievements/AchievementTree';
+import PathPlayer from './achievements/PathPlayer';
+import { wouldCycle } from '../lib/achievements/pathPlayer';
 import { useIsMobile } from '../hooks/useIsMobile';
 import { SubscriptionsManager } from './widgets/LifeWidgets';
 import { VISIONS } from '../lib/visions/definitions';
@@ -715,6 +716,14 @@ export default function AchievementsSection({ S, update, active, onOpenModal, on
           connectingFrom: null,
         };
       }
+      // A goal cannot be its own prerequisite. Nothing enforced that, and
+      // the consequence was a chain nobody could ever finish plus a board
+      // that quietly dropped one of its own links to avoid hanging the
+      // layout. Refusing it here is cheaper than drawing around it.
+      if (wouldCycle(prev.connections, connectingFrom, targetId)) {
+        onShowCoinToast('That would loop back on itself', false);
+        return { ...prev, connectingFrom: null };
+      }
       const newConns = [...prev.connections, [connectingFrom, targetId]];
       const recalced = recalcLocks(prev.achievements, newConns);
       return { ...prev, connections: newConns, achievements: recalced, connectingFrom: null };
@@ -828,8 +837,16 @@ export default function AchievementsSection({ S, update, active, onOpenModal, on
     return achievements.map(a => a.id === dragHint.id ? { ...a, x: dragHint.x, y: dragHint.y } : a);
   }, [achievements, dragHint]);
 
+  // `is-player` compacts the chrome above the board on a phone. The
+  // player is a fixed frame rather than a scroller, so every pixel the
+  // toolbar takes is a pixel the goal card does not get — and 339 of the
+  // 732 available were going to a title, two buttons and a stats strip
+  // before the board began.
   return (
-    <section id="achievements" className={`section${active ? ' active' : ''}`}>
+    <section
+      id="achievements"
+      className={`section${active ? ' active' : ''}${isMobile && activeTab === 'goals' ? ' is-player' : ''}`}
+    >
       {/* Toolbar — eyebrow / title / hints / + New */}
       <div className="ach-toolbar">
         <motion.div
@@ -864,10 +881,14 @@ export default function AchievementsSection({ S, update, active, onOpenModal, on
             <span className="ach-hint-pill"><span className="ach-hint-key">★</span> complete</span>
           </div>
         )}
+        {/* One hint, not three. Stepping has arrows, linking has a
+            button and the map has "Expand" — those teach themselves.
+            Long-press does not, and it is the only way to delete a goal
+            on a phone, so it is the one worth a pill. Three pills wrapped
+            onto their own row and cost the card 40px of height. */}
         {isMobile && activeTab === 'goals' && (
           <div className="ach-toolbar-hints">
-            <span className="ach-hint-pill"><span className="ach-hint-key">Tap</span> edit</span>
-            <span className="ach-hint-pill"><span className="ach-hint-key">★</span> complete</span>
+            <span className="ach-hint-pill"><span className="ach-hint-key">Hold</span> actions</span>
           </div>
         )}
         {/* Visions belong next to achievements, not buried in Settings.
@@ -1000,17 +1021,16 @@ export default function AchievementsSection({ S, update, active, onOpenModal, on
            board — the one thing that cannot be read at 390px without
            pinching around it. Completing and editing route through the
            same handlers, so the two views can't drift. */
-        <div className="ach-tree-scroll">
-          <AchievementTree
-            achievements={liveAchievements}
-            connections={connections}
-            onComplete={handleToggleComplete}
-            onEdit={handleEdit}
-            onConnect={handleConnect}
-            connectingFrom={S.connectingFrom || null}
-            onCancelConnect={handleCancelConnect}
-          />
-        </div>
+        <PathPlayer
+          achievements={liveAchievements}
+          connections={connections}
+          onComplete={handleToggleComplete}
+          onEdit={handleEdit}
+          onConnect={handleConnect}
+          onDelete={handleDelete}
+          connectingFrom={S.connectingFrom || null}
+          onCancelConnect={handleCancelConnect}
+        />
       ) : (<>
 
       {/* Canvas — dot grid background, draggable nodes, SVG connections.
