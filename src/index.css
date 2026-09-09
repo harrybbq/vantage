@@ -1064,7 +1064,8 @@ nav:hover .nav-tab-label{opacity:1;}
     height: calc(100dvh - var(--m-appbar-h) - var(--m-tabs-h) - var(--m-safe-top) - var(--m-safe-bottom));
   }
   /* Last card clears the tab bar without the container losing height. */
-  #achievements .ach-tree-scroll{ padding-bottom: 28px; }
+  /* The player is a fixed frame; its own card body scrolls, so the
+     section needs no bottom padding of its own. */
 }
 
 /* ──────────────────────────────────────────────────────────────────
@@ -6826,122 +6827,6 @@ button:active:not(:disabled),
 .report-context-input:focus{ border-color:var(--em); }
 .report-context-input::placeholder{ color:var(--text-muted); }
 
-/* ══════════════════════════════════════════════════════════════════════
-   ACHIEVEMENT TREE (mobile)
-   The graph laid out as a column. Same states and colour language as the
-   desktop canvas — only the arrangement is derived rather than dragged.
-   ══════════════════════════════════════════════════════════════════════ */
-.ach-tree{position:relative;width:362px;max-width:100%;margin:0 auto;}
-.ach-tree-lines{position:absolute;inset:0;pointer-events:none;overflow:visible;}
-/* Casing under every line: where two cross, the one on top keeps a clean
-   edge instead of the pair merging into an ambiguous blob. */
-.ach-tree-edge-casing{fill:none;stroke:var(--ach-canvas-bg,var(--bg-base));stroke-width:5;}
-.ach-tree-edge-line{fill:none;stroke-width:2;stroke-linecap:round;}
-.ach-tree-edge.is-done .ach-tree-edge-line{stroke:var(--ach-conn-done,#d4af37);opacity:.85;}
-.ach-tree-edge.is-open .ach-tree-edge-line{stroke:var(--em);opacity:.75;}
-.ach-tree-edge.is-locked .ach-tree-edge-line{stroke:var(--ach-conn-locked,var(--text-muted));
-  opacity:.4;stroke-dasharray:5 4;}
-
-.ach-tree-node{position:absolute;}
-.ach-tree-card{width:100%;height:100%;display:flex;flex-direction:column;justify-content:center;gap:3px;
-  padding:8px 28px 8px 9px;border-radius:11px;border:1px solid var(--border);background:var(--surface);
-  text-align:left;cursor:pointer;font-family:var(--sans);overflow:hidden;box-sizing:border-box;}
-.ach-tree-name{font-size:11px;font-weight:700;line-height:1.2;color:var(--text);
-  display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;}
-.ach-tree-meta{font-family:var(--mono);font-size:8.5px;letter-spacing:.4px;color:var(--text-muted);
-  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
-.ach-tree-meta em{font-style:normal;}
-/* Sits in the card's top-right corner. 30px with a padded hit area
-   rather than a full-height rail — the width it used to take was what
-   forced layers to wrap. */
-.ach-tree-tick{position:absolute;top:5px;right:5px;width:26px;height:26px;border-radius:8px;
-  border:1px solid var(--border);background:var(--surface);color:var(--text-muted);cursor:pointer;
-  display:inline-flex;align-items:center;justify-content:center;padding:0;}
-.ach-tree-tick:disabled{opacity:.4;cursor:not-allowed;}
-
-.ach-tree-node.is-active .ach-tree-card{border-color:var(--em);box-shadow:inset 3px 0 0 var(--em);}
-.ach-tree-node.is-active .ach-tree-tick{border-color:var(--em);color:var(--em);}
-.ach-tree-node.is-completed .ach-tree-card{box-shadow:inset 3px 0 0 var(--gold,#d4af37);
-  border-color:rgba(212,175,55,.45);}
-.ach-tree-node.is-completed .ach-tree-tick{border-color:var(--gold,#d4af37);color:var(--gold,#d4af37);}
-.ach-tree-node.is-completed .ach-tree-name{color:var(--text);}
-.ach-tree-node.is-locked{opacity:.62;}
-.ach-tree-node.is-locked .ach-tree-name{color:var(--text-muted);}
-
-/* AND-junction: two or more prerequisites tie together before the goal,
-   so "all of these" is drawn rather than inferred from two arrows
-   happening to land on the same card. */
-.ach-tree-junction{position:absolute;display:flex;align-items:center;gap:6px;pointer-events:none;}
-.ach-tree-junction-bar{flex:1;height:1px;background:var(--em);opacity:.5;}
-.ach-tree-junction-chip{flex:none;font-family:var(--mono);font-size:7.5px;letter-spacing:1px;
-  text-transform:uppercase;color:var(--em);border:1px solid var(--em);border-radius:999px;
-  padding:1px 7px;background:var(--bg-base);opacity:.9;}
-
-.ach-tree-empty{padding:50px 20px;text-align:center;color:var(--text-muted);}
-.ach-tree-empty-icon{color:var(--em);margin-bottom:10px;}
-.ach-tree-empty-title{font-family:var(--serif);font-size:18px;color:var(--text);margin-bottom:4px;}
-.ach-tree-empty-sub{font-family:var(--mono);font-size:10px;}
-
-/* The tree scrolls vertically inside the same flex slot the canvas used,
-   so the toolbar, tabs and stats strip stay exactly where they were. */
-.ach-tree-scroll{flex:1;min-height:0;overflow-y:auto;overflow-x:hidden;
-  -webkit-overflow-scrolling:touch;padding:4px 0 24px;}
-
-/* ── Path groups ──────────────────────────────────────────────────────
-   Each independent path gets its own heading and its own layout. The
-   heading is what stops two unrelated chains from reading as one tree
-   with an implied ordering between them. */
-.ach-tree-group{margin:0 0 26px;}
-.ach-tree-group + .ach-tree-group{padding-top:20px;border-top:1px solid var(--line);}
-.ach-tree-group-head{width:362px;max-width:100%;margin:0 auto 14px;}
-.ach-tree-group-eyebrow{font-family:var(--mono);font-size:8px;letter-spacing:1.6px;
-  text-transform:uppercase;color:var(--em);}
-.ach-tree-group-title{font-family:var(--serif);font-size:15px;font-weight:600;
-  color:var(--text);margin:2px 0 0;line-height:1.25;}
-.ach-tree-group-sub{font-family:var(--mono);font-size:9px;letter-spacing:.4px;
-  color:var(--text-muted);margin:3px 0 0;}
-
-/* Goals on no path: a plain two-column grid. Deliberately NOT the
-   layered layout — running them through it is what made unlinked goals
-   masquerade as roots of a tree they had nothing to do with. */
-.ach-tree-loose{width:362px;max-width:100%;margin:0 auto;
-  display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;}
-.ach-tree-loose-card{position:relative;min-height:58px;}
-.ach-tree-loose-card .ach-tree-card{height:100%;}
-.ach-tree-loose-card.is-active .ach-tree-card{border-color:var(--em);box-shadow:inset 3px 0 0 var(--em);}
-.ach-tree-loose-card.is-completed .ach-tree-card{box-shadow:inset 3px 0 0 var(--gold,#d4af37);}
-.ach-tree-loose-card.is-completed .ach-tree-tick{border-color:var(--gold,#d4af37);color:var(--gold,#d4af37);}
-
-/* ── Link mode ────────────────────────────────────────────────────────
-   Reuses the desktop connect handler, so the rules are identical: tap
-   the prerequisite, tap what it unlocks, re-tap a linked pair to
-   remove it, tap the same goal twice to cancel. */
-.ach-tree-toolbar{width:362px;max-width:100%;margin:0 auto 12px;display:flex;justify-content:flex-end;}
-.ach-tree-linkbtn{display:inline-flex;align-items:center;gap:6px;min-height:34px;padding:0 12px;
-  border:1px solid var(--line);border-radius:9px;background:var(--bg-elev);color:var(--text-muted);
-  font-family:var(--mono);font-size:9.5px;letter-spacing:1px;text-transform:uppercase;cursor:pointer;}
-.ach-tree-linkbtn.is-on{border-color:var(--em);color:var(--em);}
-.ach-tree-linkbar{width:362px;max-width:100%;margin:0 auto 16px;padding:10px 12px;
-  border:1px solid var(--em);border-radius:10px;background:color-mix(in srgb,var(--em) 8%,transparent);
-  font-size:11.5px;line-height:1.4;color:var(--text);}
-.ach-tree-linkbar strong{font-weight:700;}
-.ach-tree-linkbar-hint{display:block;margin-top:4px;font-family:var(--mono);font-size:8.5px;
-  letter-spacing:.3px;color:var(--text-muted);}
-
-/* The goal picked as the prerequisite, and the ones a second tap would
-   REMOVE a link from — distinct, because "tap again" doing two opposite
-   things with one appearance is how you delete a link by accident. */
-.ach-tree-node.is-source .ach-tree-card,
-.ach-tree-loose-card.is-source .ach-tree-card{border-color:var(--em);border-width:2px;
-  background:color-mix(in srgb,var(--em) 12%,var(--bg-elev));}
-.ach-tree-node.is-unlink .ach-tree-card,
-.ach-tree-loose-card.is-unlink .ach-tree-card{border-style:dashed;border-color:var(--danger,#c0563f);}
-.ach-tree-node.is-unlink .ach-tree-meta,
-.ach-tree-loose-card.is-unlink .ach-tree-meta{color:var(--danger,#c0563f);}
-/* Locked goals stay dimmed for reading, but while linking they are
-   ordinary targets — a dimmed card you are being asked to tap reads as
-   disabled. */
-.ach-tree-wrap.is-linking .ach-tree-node.is-locked{opacity:1;}
 
 /* Connection casing — sits under every board line so crossings stay
    legible. Width tracks the widest visible stroke (2.5) plus a margin. */
@@ -8118,3 +8003,316 @@ div.m-hubdrawer-coach { cursor: default; display: flex; flex-direction: column; 
   font-size:12.5px;
 }
 .fc-menu-sep{ height:1px; background:var(--border); margin:4px 0; }
+
+/* ══════════════════════════════════════════════════════════════════════
+   ACHIEVEMENT PATH PLAYER (mobile)
+
+   Replaces the derived tree. The tree drew every path in full, one under
+   another — the desktop's job, done without the desktop's 1440px. This
+   plays one step at a time with the rest of the graph reachable but not
+   drawn: a rail of paths above, the step either side as single rows, and
+   a thumbnail that opens into the full map.
+
+   The whole thing is a fixed-height flex column inside the same slot the
+   tree used, so the toolbar and tabs above it do not move. Only the card
+   body scrolls; the rail, the step header, the CTA row and the map stay
+   put, which is what stops "where am I" from being a scroll position.
+   ══════════════════════════════════════════════════════════════════════ */
+
+.ppl{position:relative;flex:1;min-height:0;display:flex;flex-direction:column;gap:9px;padding-bottom:4px;}
+
+.ppl-empty{padding:50px 20px;text-align:center;color:var(--text-muted);}
+.ppl-empty-icon{color:var(--em);margin-bottom:10px;}
+.ppl-empty-title{font-family:var(--display);font-size:18px;color:var(--text);margin-bottom:4px;}
+.ppl-empty-sub{font-family:var(--mono);font-size:10px;}
+
+/* ── The rail: every path, and how far through each one you are ────── */
+.ppl-rail{flex:none;display:flex;gap:8px;overflow-x:auto;overflow-y:hidden;
+  padding:2px 2px 4px;scrollbar-width:none;-webkit-overflow-scrolling:touch;}
+.ppl-rail::-webkit-scrollbar{display:none;}
+.ppl-chip{flex:none;display:flex;align-items:center;gap:9px;min-height:52px;padding:8px 12px;
+  border:1px solid var(--border);border-radius:13px;background:var(--surface);
+  text-align:left;cursor:pointer;font-family:var(--sans);}
+.ppl-chip.is-on{border-color:var(--em);background:color-mix(in srgb,var(--em) 10%,var(--surface));}
+.ppl-chip.is-done.is-on{border-color:var(--gold,#d4af37);
+  background:color-mix(in srgb,var(--gold,#d4af37) 10%,var(--surface));}
+
+/* The ring is the path's completion. conic-gradient rather than an SVG
+   arc: one element, no viewBox to keep in step with the layout. */
+.ppl-ring{position:relative;flex:none;width:28px;height:28px;border-radius:50%;
+  display:flex;align-items:center;justify-content:center;
+  background:conic-gradient(var(--em) var(--deg,0deg),color-mix(in srgb,var(--text-muted) 22%,transparent) 0);}
+.ppl-chip.is-done .ppl-ring{background:conic-gradient(var(--gold,#d4af37) var(--deg,0deg),
+  color-mix(in srgb,var(--text-muted) 22%,transparent) 0);}
+.ppl-ring-in{width:21px;height:21px;border-radius:50%;background:var(--surface);
+  display:flex;align-items:center;justify-content:center;
+  font-family:var(--mono);font-size:8px;color:var(--em);font-variant-numeric:tabular-nums;}
+.ppl-chip.is-done .ppl-ring-in{color:var(--gold,#d4af37);}
+.ppl-chip-text{min-width:0;}
+.ppl-chip-title{display:block;font-size:12.5px;font-weight:500;color:var(--text);
+  white-space:nowrap;max-width:136px;overflow:hidden;text-overflow:ellipsis;}
+.ppl-chip-sub{display:block;margin-top:3px;font-family:var(--mono);font-size:8.5px;letter-spacing:1px;
+  text-transform:uppercase;color:var(--text-muted);white-space:nowrap;}
+.ppl-chip.is-on .ppl-chip-sub{color:var(--em);}
+.ppl-chip.is-done .ppl-chip-sub{color:var(--gold,#d4af37);}
+
+/* ── Step header ──────────────────────────────────────────────────── */
+.ppl-stage{flex:1;min-height:0;display:flex;flex-direction:column;}
+.ppl-steps{flex:none;display:flex;align-items:center;gap:9px;margin-bottom:8px;}
+.ppl-steps-label{font-family:var(--mono);font-size:8.5px;letter-spacing:1.6px;text-transform:uppercase;
+  color:var(--text-muted);white-space:nowrap;}
+.ppl-pips{flex:1;display:flex;gap:3px;align-items:center;min-width:0;}
+/* A pip is a step. Tappable, because on a five-step path jumping is
+   faster than swiping and the target is already on screen. */
+.ppl-pip{flex:1;height:5px;min-height:5px;border:none;border-radius:3px;cursor:pointer;padding:0;
+  background:color-mix(in srgb,var(--em) 32%,transparent);}
+.ppl-pip.is-completed{background:color-mix(in srgb,var(--gold,#d4af37) 55%,transparent);}
+.ppl-pip.is-locked{background:color-mix(in srgb,var(--text-muted) 28%,transparent);}
+.ppl-pip.is-here{background:var(--em);box-shadow:0 0 0 2px color-mix(in srgb,var(--em) 28%,transparent);}
+.ppl-pip.is-here.is-completed{background:var(--gold,#d4af37);
+  box-shadow:0 0 0 2px color-mix(in srgb,var(--gold,#d4af37) 28%,transparent);}
+.ppl-pip.is-here.is-locked{background:var(--text-muted);
+  box-shadow:0 0 0 2px color-mix(in srgb,var(--text-muted) 24%,transparent);}
+.ppl-linkbtn{display:inline-flex;align-items:center;gap:5px;min-height:32px;padding:0 10px;flex:none;
+  border:1px solid var(--border);border-radius:9px;background:transparent;color:var(--text-muted);
+  font-family:var(--mono);font-size:9px;letter-spacing:1.1px;text-transform:uppercase;cursor:pointer;}
+.ppl-linkbtn.is-on{border-color:var(--em);color:var(--em);
+  background:color-mix(in srgb,var(--em) 12%,transparent);}
+.ppl-linkbar{flex:none;margin-bottom:8px;padding:9px 12px;border-radius:12px;
+  border:1px solid color-mix(in srgb,var(--em) 40%,transparent);
+  background:color-mix(in srgb,var(--em) 8%,transparent);
+  font-size:12px;line-height:1.4;color:var(--text);}
+.ppl-linkbar-hint{display:block;margin-top:3px;font-size:10.5px;color:var(--text-muted);line-height:1.4;}
+
+/* ── The step before and after, and every "unlocks" row ───────────── */
+.ppl-row{display:flex;align-items:center;gap:9px;width:100%;min-height:44px;padding:9px 12px;
+  border:1px solid var(--border);border-radius:12px;background:var(--surface);
+  text-align:left;cursor:pointer;font-family:var(--sans);color:var(--text-muted);}
+.ppl-row-dot{width:8px;height:8px;border-radius:50%;flex:none;background:var(--em);}
+.ppl-row.is-completed .ppl-row-dot{background:var(--gold,#d4af37);}
+.ppl-row.is-locked .ppl-row-dot{background:var(--text-muted);}
+.ppl-row-name{flex:1;min-width:0;font-size:12.5px;color:var(--text-mid,var(--text));
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.ppl-row-state{font-family:var(--mono);font-size:9px;letter-spacing:1px;text-transform:uppercase;
+  color:var(--em);white-space:nowrap;}
+.ppl-row.is-completed .ppl-row-state{color:var(--gold,#d4af37);}
+.ppl-row.is-locked .ppl-row-state{color:var(--text-muted);}
+.ppl-stage > .ppl-row{flex:none;margin:0 6px;}
+.ppl-stage > .ppl-row:first-of-type{margin-bottom:6px;}
+.ppl-stage > .ppl-row:last-of-type{margin-top:6px;}
+
+/* ── The step you are on ──────────────────────────────────────────── */
+.ppl-card{flex:1;min-height:0;display:flex;flex-direction:column;overflow:hidden;
+  border:1px solid var(--border);border-radius:18px;background:var(--surface);
+  box-shadow:0 8px 24px rgba(0,0,0,.09);}
+.ppl-card.is-active{border-color:color-mix(in srgb,var(--em) 45%,transparent);}
+.ppl-card.is-completed{border-color:color-mix(in srgb,var(--gold,#d4af37) 45%,transparent);}
+.ppl-card-head{flex:none;padding:12px 15px 13px;border-bottom:1px solid var(--border);}
+.ppl-card.is-active .ppl-card-head{background:color-mix(in srgb,var(--em) 7%,transparent);}
+.ppl-card.is-completed .ppl-card-head{background:color-mix(in srgb,var(--gold,#d4af37) 7%,transparent);}
+.ppl-card-meta{display:flex;align-items:center;gap:8px;}
+.ppl-meta-gap{flex:1;}
+.ppl-state-dot{width:9px;height:9px;border-radius:50%;flex:none;background:var(--em);
+  box-shadow:0 0 0 3px color-mix(in srgb,var(--em) 18%,transparent);}
+.ppl-card.is-completed .ppl-state-dot{background:var(--gold,#d4af37);
+  box-shadow:0 0 0 3px color-mix(in srgb,var(--gold,#d4af37) 18%,transparent);}
+.ppl-card.is-locked .ppl-state-dot{background:var(--text-muted);box-shadow:none;}
+.ppl-state{font-family:var(--mono);font-size:9px;letter-spacing:1.7px;text-transform:uppercase;color:var(--em);}
+.ppl-card.is-completed .ppl-state{color:var(--gold,#d4af37);}
+.ppl-card.is-locked .ppl-state{color:var(--text-muted);}
+.ppl-cat{font-family:var(--mono);font-size:9px;letter-spacing:1.3px;text-transform:uppercase;color:var(--text-muted);}
+.ppl-coins{display:flex;align-items:center;gap:3px;font-family:var(--mono);font-size:10px;color:var(--gold,#d4af37);}
+/* The title block is the press target: tap edits, long-press opens the
+   sheet. A button so it is reachable without a pointer. */
+.ppl-card-title{display:block;width:100%;text-align:left;padding:9px 0 0;margin:0;
+  border:none;background:none;cursor:pointer;font-family:var(--sans);}
+.ppl-name{display:block;font-family:var(--display);font-size:24px;font-weight:700;letter-spacing:-.4px;
+  line-height:1.14;color:var(--text);text-wrap:pretty;}
+.ppl-desc{display:block;margin-top:6px;font-size:12.5px;line-height:1.5;color:var(--text-muted);text-wrap:pretty;}
+
+/* The bottom edge fades so a part-visible row reads as "more below"
+   rather than as something clipped: cut mid-glyph, "UNLOCKS · 1 goal"
+   looked like a rendering fault instead of a scroll affordance. */
+.ppl-card-body{flex:1;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:12px 15px 14px;
+  mask-image:linear-gradient(#000 calc(100% - 18px),transparent);
+  -webkit-mask-image:linear-gradient(#000 calc(100% - 18px),transparent);}
+.ppl-rule{display:flex;align-items:center;gap:8px;margin-bottom:8px;}
+.ppl-rule-label{font-family:var(--mono);font-size:8px;letter-spacing:1.6px;text-transform:uppercase;
+  color:var(--text-muted);white-space:nowrap;}
+.ppl-rule-line{flex:1;height:1px;background:var(--border);}
+.ppl-rule-count{font-family:var(--mono);font-size:9px;color:var(--text-muted);white-space:nowrap;}
+.ppl-rule-count.is-met{color:var(--gold,#d4af37);}
+.ppl-rule-count.is-short{color:var(--danger,#c0563f);}
+.ppl-reqs{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:14px;}
+.ppl-req{display:flex;align-items:center;gap:6px;min-height:36px;max-width:100%;padding:7px 10px;
+  border:1px solid var(--border);border-radius:9px;background:transparent;cursor:pointer;
+  font-family:var(--sans);font-size:11.5px;color:var(--text-mid,var(--text));}
+.ppl-req.is-done{border-color:color-mix(in srgb,var(--gold,#d4af37) 40%,transparent);
+  background:color-mix(in srgb,var(--gold,#d4af37) 10%,transparent);color:var(--gold,#d4af37);}
+.ppl-req-name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:190px;}
+.ppl-none{font-size:11.5px;color:var(--text-muted);margin:0 0 14px;}
+.ppl-unlocks{display:flex;flex-direction:column;gap:5px;}
+.ppl-end{display:flex;align-items:center;gap:8px;margin:0;padding:10px 12px;border-radius:11px;
+  border:1px dashed var(--border);font-size:11.5px;color:var(--text-muted);}
+.ppl-end span{color:var(--gold,#d4af37);}
+
+.ppl-card-foot{flex:none;display:flex;gap:7px;padding:11px 13px 13px;border-top:1px solid var(--border);}
+.ppl-nudge{width:44px;min-height:46px;flex:none;display:flex;align-items:center;justify-content:center;
+  border:1px solid var(--border);border-radius:12px;background:transparent;color:var(--text-muted);cursor:pointer;}
+.ppl-cta{flex:1;min-height:46px;border:none;border-radius:12px;cursor:pointer;
+  font-family:var(--sans);font-size:14px;font-weight:600;
+  background:var(--em);color:#fff;}
+.ppl-cta.is-completed{background:color-mix(in srgb,var(--gold,#d4af37) 18%,transparent);
+  color:var(--gold,#d4af37);}
+.ppl-cta.is-locked{background:color-mix(in srgb,var(--text-muted) 16%,transparent);
+  color:var(--text-muted);cursor:not-allowed;}
+.ppl-cta.is-link{background:color-mix(in srgb,var(--em) 16%,transparent);color:var(--em);}
+
+/* ── The thumbnail ────────────────────────────────────────────────── */
+.ppl-map{flex:none;display:flex;align-items:center;gap:11px;min-height:52px;padding:9px 12px;
+  border:1px solid var(--border);border-radius:13px;background:var(--surface);
+  text-align:left;cursor:pointer;font-family:var(--sans);}
+.ppl-map-svg{width:120px;height:34px;flex:none;overflow:visible;}
+.ppl-map-edge{stroke:color-mix(in srgb,var(--text-muted) 40%,transparent);stroke-width:1.2;fill:none;}
+.ppl-map-edge.is-done{stroke:var(--gold,#d4af37);stroke-width:1.8;}
+.ppl-map-node{fill:color-mix(in srgb,var(--em) 55%,transparent);}
+.ppl-map-node.is-completed{fill:var(--gold,#d4af37);}
+.ppl-map-node.is-locked{fill:transparent;stroke:var(--text-muted);stroke-width:1.2;}
+.ppl-map-node.is-here{fill:var(--em);stroke:var(--surface);stroke-width:2;}
+.ppl-map-node.is-here.is-completed{fill:var(--gold,#d4af37);}
+.ppl-map-node.is-here.is-locked{fill:var(--text-muted);}
+.ppl-map-text{flex:1;min-width:0;}
+.ppl-map-label{display:block;font-family:var(--mono);font-size:8.5px;letter-spacing:1.5px;
+  text-transform:uppercase;color:var(--text-muted);}
+.ppl-map-cap{display:block;margin-top:3px;font-size:11.5px;color:var(--text-mid,var(--text));
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.ppl-map-cta{font-family:var(--mono);font-size:9px;letter-spacing:1.2px;text-transform:uppercase;
+  color:var(--em);white-space:nowrap;flex:none;}
+
+/* ── Long-press sheet ─────────────────────────────────────────────── */
+@keyframes pplSheetUp{from{transform:translateY(18px);opacity:0}to{transform:translateY(0);opacity:1}}
+.ppl-sheet-scrim{position:fixed;inset:0;z-index:2400;background:rgba(0,0,0,.45);
+  display:flex;flex-direction:column;justify-content:flex-end;padding:14px;
+  padding-bottom:calc(14px + env(safe-area-inset-bottom));}
+.ppl-sheet{border-radius:18px;overflow:hidden;background:var(--surface);border:1px solid var(--border);
+  box-shadow:0 -8px 30px rgba(0,0,0,.3);animation:pplSheetUp .18s ease-out both;}
+.ppl-sheet-head{padding:13px 16px 11px;border-bottom:1px solid var(--border);}
+.ppl-sheet-eyebrow{display:block;font-family:var(--mono);font-size:8.5px;letter-spacing:1.6px;
+  text-transform:uppercase;color:var(--text-muted);margin-bottom:4px;}
+.ppl-sheet-name{display:block;font-size:15px;font-weight:600;color:var(--text);
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.ppl-sheet-items{display:flex;flex-direction:column;gap:1px;background:var(--border);}
+.ppl-sheet-item{display:flex;align-items:center;gap:11px;width:100%;min-height:50px;padding:0 16px;
+  border:none;background:var(--surface);color:var(--text);cursor:pointer;
+  font-family:var(--sans);font-size:14px;text-align:left;}
+.ppl-sheet-item:disabled{color:var(--text-muted);cursor:not-allowed;}
+.ppl-sheet-item.is-danger{color:var(--danger,#c0563f);}
+.ppl-sheet-cancel{width:100%;min-height:50px;border:none;border-top:1px solid var(--border);
+  background:var(--surface);color:var(--text-muted);cursor:pointer;
+  font-family:var(--sans);font-size:14px;font-weight:500;}
+
+/* ── The expanded map ─────────────────────────────────────────────── */
+/* Portalled to <body>, so it inherits the PAGE's tokens rather than the
+   board's. --bg-base is the page ground in both themes; --bg is not a
+   token this app has, and the dark fallback I first reached for painted
+   dark text on a dark panel over a cream app. */
+.ppl-big{position:fixed;inset:0;z-index:2400;background:var(--bg-base,#f8f4ec);
+  display:flex;flex-direction:column;padding-top:env(safe-area-inset-top);}
+.ppl-big-head{flex:none;display:flex;align-items:flex-start;gap:10px;padding:14px 14px 10px;}
+.ppl-big-titles{min-width:0;}
+.ppl-big-eyebrow{display:block;font-family:var(--mono);font-size:9px;letter-spacing:2.4px;
+  text-transform:uppercase;color:var(--text-muted);margin-bottom:3px;}
+.ppl-big-title{display:block;font-family:var(--display);font-size:20px;font-weight:700;color:var(--text);
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.ppl-big-close{flex:none;margin-left:auto;min-height:40px;}
+.ppl-big-sub{flex:none;margin:0;padding:0 14px 10px;font-size:12px;line-height:1.5;color:var(--text-muted);}
+.ppl-big-scroll{flex:1;min-height:0;overflow:auto;-webkit-overflow-scrolling:touch;
+  padding:0 14px calc(18px + env(safe-area-inset-bottom));}
+.ppl-big-canvas{position:relative;border:1px solid var(--border);border-radius:16px;
+  background:var(--surface);padding:14px 12px;}
+.ppl-big-svg{position:absolute;left:12px;top:14px;overflow:visible;pointer-events:none;}
+.ppl-big-nodes{position:relative;}
+.ppl-node{position:absolute;min-height:46px;padding:7px 9px;border-radius:12px;cursor:pointer;
+  text-align:left;border:1px solid var(--border);background:var(--surface);font-family:var(--sans);}
+.ppl-node.is-here{border-color:var(--em);box-shadow:0 0 0 1px var(--em);
+  background:color-mix(in srgb,var(--em) 10%,var(--surface));}
+.ppl-node.is-here.is-completed{border-color:var(--gold,#d4af37);box-shadow:0 0 0 1px var(--gold,#d4af37);
+  background:color-mix(in srgb,var(--gold,#d4af37) 10%,var(--surface));}
+.ppl-node.is-source{border-color:var(--em);border-width:2px;
+  background:color-mix(in srgb,var(--em) 14%,var(--surface));}
+.ppl-node-top{display:flex;align-items:center;gap:5px;}
+.ppl-node-dot{width:7px;height:7px;border-radius:50%;flex:none;background:var(--em);}
+.ppl-node.is-completed .ppl-node-dot{background:var(--gold,#d4af37);}
+.ppl-node.is-locked .ppl-node-dot{background:var(--text-muted);}
+.ppl-node-name{font-size:11.5px;font-weight:500;color:var(--text);
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.ppl-node.is-locked .ppl-node-name{color:var(--text-mid,var(--text));}
+.ppl-node-state{display:block;margin-top:4px;font-family:var(--mono);font-size:8.5px;letter-spacing:1px;
+  text-transform:uppercase;color:var(--em);}
+.ppl-node.is-completed .ppl-node-state{color:var(--gold,#d4af37);}
+.ppl-node.is-locked .ppl-node-state{color:var(--text-muted);}
+
+/* ── Toast ────────────────────────────────────────────────────────── */
+@keyframes pplRiseFade{0%{opacity:0;transform:translateY(6px)}22%{opacity:1}100%{opacity:0;transform:translateY(-22px)}}
+.ppl-toast{position:absolute;left:0;right:0;bottom:74px;z-index:6;text-align:center;pointer-events:none;
+  font-family:var(--mono);font-size:11px;color:var(--em);animation:pplRiseFade 2.2s ease-out both;}
+
+/* Locked goals stay dimmed for reading, but while linking they are
+   ordinary targets — a dimmed card you are being asked to tap reads as
+   disabled. Same rule the tree had, for the same reason. */
+.ppl.is-linking .ppl-row.is-locked,
+.ppl.is-linking .ppl-node.is-locked{opacity:1;}
+
+/* ── Room for the player ──────────────────────────────────────────────
+   The board is a fixed frame, not a scroller, so chrome above it is
+   subtracted from the goal card rather than scrolled past. On a 390×844
+   phone 339 of the 732 available pixels were going to a title, a hints
+   row, two buttons and a stats strip before the board began — 46% of the
+   screen, to say things the board itself says better.
+
+   Nothing is removed: the same title, the same buttons, the same stats.
+   They are simply laid out at the size a phone justifies. */
+#achievements.is-player .ach-toolbar{gap:9px;margin-bottom:9px;}
+/* The title gets the first row to itself. Sharing it with the buttons
+   squeezed "Achievement Board" onto two lines, which cost more height
+   than the row it was trying to save. */
+#achievements.is-player .ach-toolbar-title-wrap{flex:1 1 100%;min-width:0;}
+#achievements.is-player .eyebrow{font-size:8.5px;letter-spacing:2.4px;margin-bottom:1px;}
+#achievements.is-player .sec-title{font-size:22px;line-height:1.05;}
+/* Row two: the hints and the Visions count, which are both asides. + New
+   stays up with the title because it is the one thing on this screen you
+   might have come to press. Putting all three on row one wrapped
+   "Achievement Board" onto two lines and gave back the height saved. */
+/* Row two, left to right: what to hold, how many visions, and the one
+   button you might have come here to press. */
+#achievements.is-player .ach-toolbar-hints{order:3;flex:0 0 auto;gap:6px;}
+#achievements.is-player .ach-visions-btn{order:4;flex:0 0 auto;}
+#achievements.is-player .ach-toolbar .btn-primary{order:5;margin-left:auto;}
+#achievements.is-player .ach-visions-btn,
+#achievements.is-player .ach-toolbar .btn-primary{min-height:32px;height:32px;padding:0 11px;font-size:12px;}
+#achievements.is-player .ach-visions-count{font-size:10px;}
+#achievements.is-player .ach-tabs-row{gap:8px;margin-bottom:8px;}
+#achievements.is-player .ach-stats{padding:5px 0;gap:10px;}
+
+/* ── When the frame is short ──────────────────────────────────────────
+   A container query on the player's own height, not the viewport's: what
+   matters is the room LEFT after the toolbar, tabs and stats, which no
+   media query can see.
+
+   The step either side of you is context, and context is the first thing
+   to give up when the thing itself does not fit. The pips still show
+   where those steps are and still jump to them, so nothing becomes
+   unreachable — it stops being previewed. */
+.ppl{container-type:size;container-name:ppl;}
+@container ppl (max-height: 470px){
+  .ppl-stage > .ppl-row{display:none;}
+}
+@container ppl (max-height: 360px){
+  /* Shorter still — an iPhone SE with the keyboard-height address bar.
+     The card keeps its floor and the whole column scrolls rather than
+     the footer being clipped, which is the one thing that must never
+     happen: the CTA is the point of the screen. */
+  .ppl{overflow-y:auto;}
+  .ppl-card{flex:0 0 auto;min-height:300px;}
+  .ppl-map{flex:0 0 auto;}
+}
