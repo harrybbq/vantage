@@ -245,7 +245,7 @@ function FlowRow({
     );
   }
 
-export default function FlowEditor({ S, update, flow }) {
+export default function FlowEditor({ S, update, flow, bills = null }) {
   const proj = S.projection || {};
   const items = proj.items || [];
   const groups = proj.groups || [];
@@ -340,7 +340,7 @@ export default function FlowEditor({ S, update, flow }) {
   /* One band per SECTION, not per row: a folder called Subscriptions is
      one band called Subscriptions, sized by everything in it. Eight
      slivers told you nothing the list below did not already say. */
-  const sections = flowSections(items, groups);
+  const sections = flowSections(items, groups, new Date(), bills);
   const leftOver = Math.max(0, flow.net) / denom * 100;
 
   return (
@@ -350,7 +350,9 @@ export default function FlowEditor({ S, update, flow }) {
           <h3 className="sb-panel-title">Where the month goes</h3>
           <p className="sb-panel-sub">
             {money(flow.income)} in, {money(flow.spend)} out, {money(flow.net)} left over.
-            Edit a row and everything above re-reads it.
+            {flow.bills > 0
+              ? <> {money(flow.bills)} of what goes out is your Subscriptions &amp; Bills list, below.</>
+              : ' Edit a row and everything above re-reads it.'}
           </p>
         </div>
         <div className="sb-flow-rate">
@@ -363,9 +365,11 @@ export default function FlowEditor({ S, update, flow }) {
         {sections.map((sec, i) => (
           <div
             key={sec.id}
-            className={`sb-segment${sec.kind === 'group' ? ' is-group' : ''}`}
+            className={`sb-segment${sec.kind === 'group' ? ' is-group' : ''}${sec.kind === 'bills' ? ' is-bills' : ''}`}
             style={{ flexBasis: `${sec.share * 100}%`, background: sectionColor(sec, i) }}
-            title={`${sec.label} — ${money(sec.amount)}/mo, ${Math.round(sec.share * 100)}% of income`}
+            title={sec.kind === 'bills'
+              ? `Bills — ${money(sec.amount)}/mo across ${sec.count} recurring ${sec.count === 1 ? 'item' : 'items'}, ${Math.round(sec.share * 100)}% of income. Edit them in Subscriptions & Bills below.`
+              : `${sec.label} — ${money(sec.amount)}/mo, ${Math.round(sec.share * 100)}% of income`}
           >
             <span className="sb-segment-tag">{sec.label}</span>
           </div>
@@ -382,7 +386,7 @@ export default function FlowEditor({ S, update, flow }) {
           <span key={sec.id} className="sb-legend-row">
             <i style={{ background: sectionColor(sec, i) }} />
             {sec.label}
-            {sec.kind === 'group' && <em>{sec.count}</em>}
+            {(sec.kind === 'group' || sec.kind === 'bills') && <em>{sec.count}</em>}
             <b>{money(sec.amount)}</b>
           </span>
         ))}

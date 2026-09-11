@@ -8,6 +8,7 @@ import { GoalsBody, BodyGoalBody } from './widgets/GoalsWidget';
 import { RotationBody } from './widgets/RotationWidget';
 import { tradingWidgetAvailable, TRADING_WIDGET_BUILD_EXCLUDED } from '../lib/trading/enabled';
 import { isRetiredWidget } from '../lib/widgets/retired';
+import { applyRelapse } from '../lib/habits/relapse';
 import MarketBody from './widgets/MarketWidget';
 import NewsBody from './widgets/NewsWidget';
 import { reflow, MIN_W, MIN_H, SNAP_GAP as REFLOW_GAP } from '../lib/hub/reflow';
@@ -87,7 +88,7 @@ function habitsWidgetHtml(S) {
     const strikes = strikeState(h, now);
     const struckCls = strikes.state === 'struck' ? ' is-struck' : strikes.state === 'maxed' ? ' is-maxed' : '';
     return `<div class="hub-habit hub-row-go" data-go-to="habits" role="link" tabindex="0">
-      <div class="hub-habit-top"><span class="hub-habit-name">${escapeHtml(h.name)}</span><span class="hub-habit-time${struckCls}" data-habit-timer="${escapeHtml(h.id)}">${fmtHabitElapsed(elapsed)}</span></div>
+      <div class="hub-habit-top"><span class="hub-habit-name">${escapeHtml(h.name)}</span><span class="hub-habit-time${struckCls}" data-habit-timer="${escapeHtml(h.id)}">${fmtHabitElapsed(elapsed)}</span><button type="button" class="hub-habit-relapse" data-habit-relapse="${escapeHtml(h.id)}" title="Log a relapse, now" aria-label="Log a relapse for ${escapeHtml(h.name)}">↻</button></div>
       <div class="hub-habit-bar"><div class="hub-habit-fill" data-habit-bar="${escapeHtml(h.id)}" style="width:${pct}%"></div></div>
       ${next ? `<div class="hub-habit-next">${escapeHtml(next.label || '')}</div>` : ''}
     </div>`;
@@ -626,6 +627,63 @@ export default function HubSection({ S, update, active, onOpenModal, onOpenWaitl
     canvas.addEventListener('click', handler);
     return () => canvas.removeEventListener('click', handler);
   }, [active, onNavigate]);
+
+  /* Relapse, from the habit widget, without leaving the hub.
+     ──────────────────────────────────────────────────────────────────
+     A slip is the one habit event you want to record the moment it
+     happens, and the route to it was: notice the widget, click through
+     to Habits, find the card, click Relapse, confirm in a modal. So the
+     widget does it here.
+
+     It asks first — one click arms the button, the second logs it —
+     because a relapse restarts a timer somebody may have been watching
+     for months and re-arms the milestones that pay for it, and neither
+     comes back. The arming clears itself after four seconds so a
+     half-pressed button never sits there waiting to be leaned on.
+
+     Delegated, like the navigation above, because the widget body is an
+     HTML string rather than React. `stopPropagation` keeps the click
+     off the row's own "go to Habits" shortcut: having just logged the
+     thing, being thrown onto another page is not the reward.
+
+     Always NOW. Back-dating is real and stays where it was — the modal
+     on the Habits page, which has a time picker. This is the quick one. */
+  useEffect(() => {
+    if (!active) return undefined;
+    const canvas = canvasRef.current;
+    if (!canvas) return undefined;
+    let timer = 0;
+    /* The armed state lives on the BUTTON, not in a variable here. The
+       widget body is re-rendered from scratch whenever the state it
+       reads changes, which would leave a remembered id pointing at a
+       button that no longer looks armed — and the next click would log
+       a relapse with no "Sure?" ever shown. A class cannot survive that
+       re-render, which is exactly the property wanted. */
+    const disarmAll = () => {
+      clearTimeout(timer);
+      canvas.querySelectorAll('[data-habit-relapse].is-arming').forEach(b => {
+        b.classList.remove('is-arming');
+        b.textContent = '↻';
+      });
+    };
+    const handler = e => {
+      const btn = e.target.closest('[data-habit-relapse]');
+      if (!btn || !canvas.contains(btn)) { disarmAll(); return; }
+      e.stopPropagation();
+      e.preventDefault();
+      const armed = btn.classList.contains('is-arming');
+      disarmAll();
+      if (!armed) {
+        btn.classList.add('is-arming');
+        btn.textContent = 'Sure?';
+        timer = setTimeout(disarmAll, 4000);
+        return;
+      }
+      update(prev => applyRelapse(prev, btn.getAttribute('data-habit-relapse'), Date.now()));
+    };
+    canvas.addEventListener('click', handler, true);
+    return () => { clearTimeout(timer); canvas.removeEventListener('click', handler, true); };
+  }, [active, update]);
 
   // Pro-gated: the operator-console layout (HubOsLayout) renders for
   // EITHER dark-os OR cream-pro when the user has Pro. Free users

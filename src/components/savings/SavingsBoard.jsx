@@ -29,6 +29,7 @@ import {
   derivePot, last12Months, potTotals, flowTotals,
   cashSeries, savingsSeries, money, potColor, monthLabel,
 } from '../../lib/savings/derive';
+import { subsStats } from '../../lib/money/recurring';
 
 const HORIZONS = [{ m: 12, label: '1y' }, { m: 24, label: '2y' }, { m: 60, label: '5y' }];
 
@@ -270,14 +271,27 @@ export default function SavingsBoard({ S, update, onOpenModal }) {
   const horizon = proj.horizon || 12;
 
   const totals = useMemo(() => potTotals(goals, items, accounts), [goals, items, accounts]);
-  const flow = useMemo(() => flowTotals(items, goals, accounts), [items, goals, accounts]);
+  /* Subscriptions & Bills is its own store and its own panel further
+     down the page, but the money leaves the same account every month —
+     so it is part of where the month goes, and part of what is left. */
+  const bills = useMemo(() => {
+    const { monthly, subs } = subsStats({ subscriptions: S.subscriptions });
+    return { amount: monthly, count: subs.length };
+  }, [S.subscriptions]);
+  const flow = useMemo(
+    () => flowTotals(items, goals, accounts, new Date(), bills.amount),
+    [items, goals, accounts, bills.amount],
+  );
   /* Unset means "whatever is in the pots" rather than zero — carried
      over from the planner this replaces, where a blank field otherwise
      drew a cash line starting at the floor for everyone who had never
      opened it. */
   const hasCustomStart = proj.startBalance != null && proj.startBalance !== '';
   const startBalance = hasCustomStart ? proj.startBalance : totals.saved;
-  const cash = useMemo(() => cashSeries(startBalance, items, horizon), [startBalance, items, horizon]);
+  const cash = useMemo(
+    () => cashSeries(startBalance, items, horizon, new Date(), bills.amount),
+    [startBalance, items, horizon, bills.amount],
+  );
   const sav = useMemo(() => savingsSeries(accounts, items, horizon), [accounts, items, horizon]);
 
   // Funded pots sink to the end; otherwise the order is the user's own.
@@ -413,7 +427,7 @@ export default function SavingsBoard({ S, update, onOpenModal }) {
     />
   );
 
-  const flowEl = <FlowEditor S={S} update={update} flow={flow} />;
+  const flowEl = <FlowEditor S={S} update={update} flow={flow} bills={bills} />;
 
   const accountsSurface = (
     <AccountsPanel S={S} update={update} sav={sav} horizon={horizon} items={items} />

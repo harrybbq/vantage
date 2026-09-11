@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import AddMobileWidgetModal from './mobile/AddMobileWidgetModal';
 import { appPresetToLink, visibleAppPresets } from '../data/appPresets';
-import { periodStart } from '../lib/habits/strikes';
+import { applyRelapse } from '../lib/habits/relapse';
 import { useSubscriptionContext } from '../context/SubscriptionContext';
 import { backdropClose } from '../utils/backdropClose';
 import { useIsMobile } from '../hooks/useIsMobile';
@@ -1901,25 +1901,11 @@ export default function Modals({ openModal, S, update, onClose, onOpen, onShowCo
     update(prev => ({ ...prev, habits: (prev.habits || []).filter(h => h.id !== id) }));
   }
   function handleRelapseHabit(id, whenTs) {
-    // Every relapse restarts the timer — strikes are the period's
-    // planned allowance (e.g. 1 night a week), replenishing at the
-    // calendar boundary. The strike banks (so the card shows 1/1, not
-    // 0/1); counting + reset logic lives in src/lib/habits/strikes.js.
-    // We keep only current-period timestamps — older ones can never
-    // count again, so they're dead weight.
-    update(prev => ({
-      ...prev,
-      habits: (prev.habits || []).map(h => {
-        if (h.id !== id) return h;
-        const start = periodStart(h.strikesPeriod, Date.now());
-        const recent = [...(h.strikeTimes || []).filter(t => t >= start), whenTs];
-        return {
-          ...h, startTime: whenTs, strikeTimes: recent,
-          relapseCount: (h.relapseCount || 0) + 1,
-          milestones: (h.milestones || []).map(m => ({ ...m, awarded: false })),
-        };
-      }),
-    }));
+    // Restart the timer, bank the strike, re-arm the milestones — all of
+    // it in src/lib/habits/relapse.js, because the hub's habit widget
+    // logs relapses too now and two copies of those rules would drift
+    // the first time one of them changed.
+    update(prev => applyRelapse(prev, id, whenTs));
   }
 
   // Determine effective openId — _multiLogOpen overrides
