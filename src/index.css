@@ -6295,6 +6295,10 @@ button:active:not(:disabled),
   flex-shrink:0;
   font-family:var(--mono);
   font-size:8px;letter-spacing:1px;
+  /* One width for every rating, so the chips right-align AND the
+     message button that now sits beside them forms a straight column
+     rather than stepping in and out by the width of a digit. */
+  min-width:24px;text-align:center;
   padding:1px 5px;border-radius:3px;
   background:rgba(var(--em-rgb),.07);
   border:1px solid rgba(var(--em-rgb),.18);
@@ -6509,6 +6513,40 @@ button:active:not(:disabled),
   display:inline-flex; align-items:center; justify-content:center; flex-shrink:0;
 }
 .fc-row-unread + .fc-row-level{ margin-left:8px; }
+
+/* ── Message, straight from the row ───────────────────────────────────
+   Sits immediately left of the level chip, in the flex line rather than
+   floated over it, so nothing it appears next to has to move.
+
+   Hidden until the row is hovered or holds keyboard focus — but only
+   where hovering is a thing the pointer can do. On a touch screen there
+   is no hover state to enter, so the control would simply never appear;
+   `@media (hover: hover)` is what keeps it permanently visible there.
+   A row with something unread keeps it visible everywhere: there is a
+   message waiting, so the way to read it should not be conditional. */
+.fc-row-msg{
+  all:unset;
+  box-sizing:border-box;
+  flex-shrink:0;
+  display:inline-flex;align-items:center;justify-content:center;
+  width:26px;height:26px;
+  border-radius:7px;
+  color:var(--text-muted);
+  cursor:pointer;
+  transition:opacity .14s ease, color .14s ease, background .14s ease;
+}
+.fc-row-msg:hover{ color:var(--em); background:rgba(var(--em-rgb),.10); }
+.fc-row-msg:focus-visible{ color:var(--em); box-shadow:0 0 0 2px rgba(var(--em-rgb),.45); }
+.fc-row-msg + .fc-row-level{ margin-left:6px; }
+.fc-row-unread + .fc-row-msg{ margin-left:6px; }
+
+@media (hover: hover) {
+  .fc-row-msg{ opacity:0; }
+  .fc-row:hover .fc-row-msg,
+  .fc-row:focus-within .fc-row-msg,
+  .fc-row-selected .fc-row-msg,
+  .fc-row-has-unread .fc-row-msg{ opacity:1; }
+}
 
 /* Chat overlay */
 .msg-overlay{
