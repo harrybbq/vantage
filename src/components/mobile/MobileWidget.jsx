@@ -20,6 +20,7 @@ import { currentWeightKg, dayBurn, ACTIVITIES, activityKcal, stepsKcal } from '.
 import { APP_PRESETS, getAppPreset, RETIRED_PRESETS } from '../../data/appPresets';
 import { fetchAppPreview } from '../../lib/appPreview';
 import { strikeState } from '../../lib/habits/strikes';
+import { applyRelapse } from '../../lib/habits/relapse';
 import { SavingsPotsBody, SavingsProjectionBody } from '../savings/SavingsWidgets';
 import { BodyBody, SubscriptionsBody } from '../widgets/LifeWidgets';
 import { GoalsBody, BodyGoalBody } from '../widgets/GoalsWidget';
@@ -527,7 +528,7 @@ function renderBody(widget, meta, S, update, navigate, userId, hasPro) {
     case 'news':        return <NewsBody S={S} update={update} compact />;
     case 'recent-wins': return <RecentWinsBody S={S} />;
     case 'coin-history':return <CoinHistoryBody S={S} />;
-    case 'habits':      return <HabitsBody S={S} navigate={navigate} />;
+    case 'habits':      return <HabitsBody S={S} update={update} navigate={navigate} />;
     case 'holidays':    return <HolidaysBody S={S} navigate={navigate} />;
     case 'github':      return <GithubBody S={S} meta={meta} />;
     case 'linkedin':    return <LinkedinBody S={S} meta={meta} />;
@@ -1045,15 +1046,26 @@ function habitProgress(h, elapsed) {
   const pct = Math.max(0, Math.min(100, target ? (elapsed / target) * 100 : 100));
   return { pct, label: next ? next.label : 'All milestones hit' };
 }
-function HabitsBody({ S, navigate }) {
+function HabitsBody({ S, update, navigate }) {
   const boot = useBootFill();
   const go = () => navigate && navigate('habits');
   // Tick once a second so the timers + bars stay live.
   const [, setTick] = useState(0);
+  /* Which habit is mid-confirm. A relapse restarts a timer somebody may
+     have been watching for months and re-arms the milestones that pay
+     for it — one-way, both of them — so it asks. Two taps on the card
+     still beats a page change and a modal, which is the point. */
+  const [arming, setArming] = useState(null);
   useEffect(() => {
     const id = setInterval(() => setTick(t => t + 1), 1000);
     return () => clearInterval(id);
   }, []);
+  // Nobody leaves a half-pressed button lying around on purpose.
+  useEffect(() => {
+    if (!arming) return undefined;
+    const id = setTimeout(() => setArming(null), 4000);
+    return () => clearTimeout(id);
+  }, [arming]);
   const habits = (S.habits || [])
     .filter(h => h.startTime)
     .slice()
@@ -1075,6 +1087,23 @@ function HabitsBody({ S, navigate }) {
             <div className="m-widget-habit-top">
               <span className="m-widget-habit-name">{h.name}</span>
               <span className={`m-widget-habit-time${struckCls}`}>{fmtElapsed(elapsed)}</span>
+              {/* stopPropagation, not preventDefault: the whole row is a
+                  shortcut to the Habits page, and relapsing should not
+                  also navigate away from the thing you just did. */}
+              <button
+                type="button"
+                className={`m-habit-relapse${arming === h.id ? ' is-arming' : ''}`}
+                onClick={e => {
+                  e.stopPropagation();
+                  if (arming !== h.id) { setArming(h.id); return; }
+                  setArming(null);
+                  update(prev => applyRelapse(prev, h.id, Date.now()));
+                }}
+                title={arming === h.id ? 'Tap again to log it' : 'Log a relapse, now'}
+                aria-label={arming === h.id ? `Confirm relapse for ${h.name}` : `Log a relapse for ${h.name}`}
+              >
+                {arming === h.id ? 'Sure?' : <Icon name="rotate-ccw" size={12} />}
+              </button>
             </div>
             <div className="m-widget-habit-bar"><div className="m-widget-habit-fill" style={{ width: `${pct * boot}%` }} /></div>
             {label && <div className="m-widget-habit-next">{label}</div>}

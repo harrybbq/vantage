@@ -1109,6 +1109,17 @@ html[data-theme="dark-os"] .sb-stat-val.is-bad { color: #e07a6b; }
 }
 .sb-segment.is-left .sb-segment-tag { color: var(--text-mid); text-shadow: none; }
 
+/* Bills come from the Subscriptions & Bills list, not from a row under
+   the bar — the one band with nothing to drag, colour or reorder. The
+   hatch says so without a second legend explaining it. */
+.sb-segment.is-bills {
+  background-image: repeating-linear-gradient(
+    135deg,
+    rgba(255, 255, 255, .13) 0 5px,
+    rgba(255, 255, 255, 0) 5px 10px
+  );
+}
+
 .sb-legend-rows {
   display: flex;
   flex-wrap: wrap;

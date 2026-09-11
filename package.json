@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "eslint . && npm run check:visions && npm run check:parity && npm run check:boot && npm run check:savings && npm run check:training && npm run check:merge && npm run check:invite && npm run check:autolog && npm run check:recurring && npm run check:planpost && npm run check:pathplayer && npm run check:bootrun && npm run check:coins && npm run check:ledger && vite build",
+    "build": "eslint . && npm run check:visions && npm run check:parity && npm run check:boot && npm run check:savings && npm run check:training && npm run check:merge && npm run check:invite && npm run check:autolog && npm run check:recurring && npm run check:planpost && npm run check:pathplayer && npm run check:bootrun && npm run check:coins && npm run check:ledger && npm run check:relapse && vite build",
     "check:visions": "node scripts/check-vision-xp.mjs",
     "check:parity": "node scripts/check-ratings-parity.mjs",
     "check:boot": "node scripts/check-boot-speed.mjs",
@@ -26,7 +26,8 @@
     "check:pathplayer": "node src/lib/achievements/pathPlayer.test.mjs",
     "check:bootrun": "node src/lib/boot/run.test.mjs",
     "check:coins": "node src/lib/coins/daily.test.mjs",
-    "check:ledger": "node src/lib/coins/ledger.test.mjs"
+    "check:ledger": "node src/lib/coins/ledger.test.mjs",
+    "check:relapse": "node src/lib/habits/relapse.test.mjs"
   },
   "dependencies": {
     "@capacitor/android": "^8.3.1",

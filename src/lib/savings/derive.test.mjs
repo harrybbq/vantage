@@ -9,7 +9,7 @@ import {
   toMonthly, clamp01, activeAt, signedMonthly, routedFor, routedToAccount,
   monthsBetween, derivePot, last12Months, cashSeries, savingsSeries,
   potTotals, flowTotals, blendedApy, money, moneyK, monthLabel, potColor,
-  accountsForPot, flowSections, sectionColor,
+  accountsForPot, flowSections, sectionColor, BILLS_COLOUR,
 } from './derive.js';
 
 let n = 0;
@@ -132,6 +132,15 @@ const stopping = cashSeries('0', [{ id: 's', kind: 'income', amount: '100', freq
 eq(stopping[2], 200, 'it pays while it is live');
 eq(stopping[6], 200, 'and a row that has stopped paying stops adding');
 
+// Bills drain every month of the horizon: a subscription records an
+// amount and a cadence, never a term. Without this the chart would
+// climb by a "left over" the header beside it no longer agrees with.
+const billedCash = cashSeries('500', flow, 6, NOW, 200);
+eq(billedCash[0], 500, 'bills do not touch the opening balance');
+eq(billedCash[6], 500 + 6 * (1000 - 200), 'they come off every projected month');
+eq(cashSeries('500', flow, 6, NOW, 0), cash, 'nobody with no bills sees a different line');
+eq(cashSeries('500', flow, 6, NOW, -300), cash, 'and a negative total is ignored, not paid in');
+
 const accounts = [{ id: 'a1', name: 'Saver', balance: '1000', apy: '12' }];
 const sav = savingsSeries(accounts, [{ id: 'r', kind: 'expense', amount: '100', freq: 'month', accountId: 'a1' }], 12, NOW);
 eq(sav[0], 1000, 'savings start at the balance');
@@ -233,6 +242,42 @@ ok(!secs.some(x => x.id === 's7'), 'and a row that has not started yet is not in
 eq(flowSections([], [], NOW), [], 'nothing in, nothing out');
 eq(flowSections(secItems, [], NOW).length, 1,
   'with no folders at all, only the live loose row is a band');
+
+// ── Bills: a band from a store that is not the flow rows ─────────────
+// Subscriptions & Bills lives in S.subscriptions and has no row under
+// the bar. It is still money leaving every month, so leaving it out of
+// `spend` made "left over" the amount you have before your bills.
+{
+  const billed = flowTotals(secItems, [], [], NOW, 240);
+  const plain = flowTotals(secItems, [], [], NOW);
+  eq(billed.bills, 240, 'the bills total is reported on its own');
+  eq(billed.spend, plain.spend + 240, 'and counted as spending');
+  eq(billed.net, plain.net - 240, 'so what is left over is what is actually left');
+  eq(plain.bills, 0, 'no bills passed is no bills, not undefined');
+  eq(flowTotals(secItems, [], [], NOW, -50).bills, 0, 'a negative bill total is ignored, not added as income');
+  eq(flowTotals(secItems, [], [], NOW, 'lots').bills, 0, 'and so is one that is not a number');
+  near(billed.rate, plain.rate, 'the saved rate is routed over INCOME, so bills do not move it');
+}
+
+{
+  const withBills = flowSections(secItems, secGroups, NOW, { amount: 240, count: 6 });
+  const bills = withBills.find(x => x.id === '__bills');
+  ok(bills, 'bills draw a band of their own');
+  eq(bills.label, 'Bills', 'labelled Bills');
+  eq(bills.kind, 'bills', 'and marked as such, so the UI can tell it from a folder');
+  eq(bills.count, 6, 'carrying how many recurring items it stands for');
+  eq(bills.colour, BILLS_COLOUR, 'in a fixed colour — the band means the same thing on everyone\'s bar');
+  near(bills.share, 240 / 2000, 'its share is of income, like every other band');
+  eq(withBills[withBills.length - 1].id, '__bills',
+    'and it comes last: it is the one band with no row under the bar to line up with');
+  eq(withBills.length, secs.length + 1, 'every other band is untouched');
+
+  eq(flowSections(secItems, secGroups, NOW, { amount: 0, count: 0 }).length, secs.length,
+    'nobody with no bills gets an empty band');
+  eq(flowSections(secItems, secGroups, NOW, null).length, secs.length, 'and neither does a caller that passes none');
+  eq(flowSections(secItems, secGroups, NOW, { amount: -10, count: 2 }).length, secs.length,
+    'a negative total draws nothing rather than a backwards band');
+}
 
 eq(sectionColor({ colour: '#123456' }, 3), '#123456', 'a chosen colour wins');
 eq(sectionColor({}, 0), sectionColor({}, 8), 'and the fallback palette wraps stably');

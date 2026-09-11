@@ -166,12 +166,20 @@ export function last12Months(goal, now = new Date()) {
   return out;
 }
 
-/** Projected CASH at month m: what is left over, accumulated. */
-export function cashSeries(startBalance, items, horizon, now = new Date()) {
+/**
+ * Projected CASH at month m: what is left over, accumulated.
+ *
+ * `bills` drains every month of the horizon. It has no start or end date
+ * — a subscription row records an amount and a cadence, not a term — so
+ * it is the same flat monthly figure the bar uses. Without it the chart
+ * would climb by a "left over" the header no longer agrees with.
+ */
+export function cashSeries(startBalance, items, horizon, now = new Date(), bills = 0) {
   let bal = parseFloat(startBalance) || 0;
+  const drain = Math.max(0, Number(bills) || 0);
   const out = [bal];
   for (let m = 1; m <= horizon; m++) {
-    bal += (items || []).reduce((s, it) => s + signedMonthly(it, m, now), 0);
+    bal += (items || []).reduce((s, it) => s + signedMonthly(it, m, now), 0) - drain;
     out.push(bal);
   }
   return out;
@@ -215,20 +223,32 @@ export function potTotals(goals, items, accounts = [], now = new Date()) {
   };
 }
 
-/** Income, spend and net per month, for the flow header and segments. */
-export function flowTotals(items, goals = [], accounts = [], now = new Date()) {
+/**
+ * Income, spend and net per month, for the flow header and segments.
+ *
+ * `bills` is the monthly total of the Subscriptions & Bills list, which
+ * lives in its own store (`S.subscriptions`) and is not a flow row. It
+ * belongs in `spend` all the same: it is money leaving every month, and
+ * leaving it out made "left over" the amount you have left BEFORE your
+ * bills — a number that is always wrong and always flattering.
+ */
+export function flowTotals(items, goals = [], accounts = [], now = new Date(), bills = 0) {
   const list = items || [];
   // Every account that belongs to some pot — money into one of those is
   // money into a pot, even though the row never names the pot.
   const potAccounts = new Set((accounts || []).filter(a => a.goalId).map(a => a.id));
+  const billsMonthly = Math.max(0, Number(bills) || 0);
   const income = list.filter(i => i.kind === 'income' && activeAt(i, 0, now))
     .reduce((s, i) => s + toMonthly(i.amount, i.freq), 0);
   const spend = list.filter(i => i.kind === 'expense' && activeAt(i, 0, now))
-    .reduce((s, i) => s + toMonthly(i.amount, i.freq), 0);
+    .reduce((s, i) => s + toMonthly(i.amount, i.freq), 0) + billsMonthly;
   const routed = list
     .filter(i => activeAt(i, 0, now) && (i.goalId || (i.accountId && potAccounts.has(i.accountId))))
     .reduce((s, i) => s + toMonthly(i.amount, i.freq), 0);
-  return { income, spend, net: income - spend, routed, rate: income > 0 ? routed / income : 0 };
+  return {
+    income, spend, bills: billsMonthly, net: income - spend, routed,
+    rate: income > 0 ? routed / income : 0,
+  };
 }
 
 /**
@@ -243,10 +263,22 @@ export function flowTotals(items, goals = [], accounts = [], now = new Date()) {
  * folders, so the bar reads left to right in the same order as the list
  * under it.
  *
+ * BILLS is the exception to that, and comes last. The Subscriptions &
+ * Bills list is a store of its own rather than flow rows — there is no
+ * row under the bar to line up with — and it is the one band the user
+ * cannot drag, colour or reorder, so putting it at the end keeps the
+ * editable part of the bar reading in the order of the editable list.
+ * Pass `{ amount, count }`; anything at zero draws nothing.
+ *
  * `share` is of income, which is what makes the leftover the honest
  * remainder rather than a percentage of spending.
  */
-export function flowSections(items, groups, now = new Date()) {
+/** The bills band's id and colour, named so the UI can recognise it
+ *  without matching on a label the copy might change. */
+export const BILLS_SECTION_ID = '__bills';
+export const BILLS_COLOUR = '#8a8f98';
+
+export function flowSections(items, groups, now = new Date(), bills = null) {
   const list = (items || []).filter(i => i.kind === 'expense' && activeAt(i, 0, now));
   const income = (items || [])
     .filter(i => i.kind === 'income' && activeAt(i, 0, now))
@@ -283,6 +315,23 @@ export function flowSections(items, groups, now = new Date()) {
       colour: g.color || null,
       routed: kids.every(i => i.goalId || i.accountId),
       count: kids.length,
+    });
+  }
+
+  const billsAmount = Math.max(0, Number(bills && bills.amount) || 0);
+  if (billsAmount > 0) {
+    out.push({
+      id: BILLS_SECTION_ID,
+      kind: 'bills',
+      label: 'Bills',
+      amount: billsAmount,
+      share: billsAmount / denom,
+      // A fixed colour rather than one derived from position: this band
+      // means the same thing on everybody's bar, and it would otherwise
+      // change hue every time a flow row was added above it.
+      colour: BILLS_COLOUR,
+      routed: false,
+      count: Math.max(0, Number(bills && bills.count) || 0),
     });
   }
   return out;
