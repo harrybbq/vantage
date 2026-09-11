@@ -13,6 +13,7 @@ export default function FriendsPanelList({
   friends,
   selectedId,
   onSelect,
+  onMessage,
   onlineCount,
   offlineCount,
 }) {
@@ -46,6 +47,7 @@ export default function FriendsPanelList({
               friend={f}
               selected={f.id === selectedId}
               onClick={() => onSelect(f.id)}
+              onMessage={onMessage}
             />
           ))}
         </div>

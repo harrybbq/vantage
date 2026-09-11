@@ -147,6 +147,10 @@ export default function FriendsRail({ userId, onUpgrade }) {
       handle: f.handle,
       ovr: f.ratings_ovr || 1,
       online: !!f.online,
+      // The row has always been able to draw a real avatar; it was
+      // simply never handed one, so every row fell back to initials —
+      // and now the chat opened from a row would have done the same.
+      avatar_url: f.avatar_url || null,
       streak: 0,           // not in list view; row shows handle / last-seen instead
       streakHabit: null,
       lastSeenDays: f.lastSeenDays,
@@ -236,6 +240,7 @@ export default function FriendsRail({ userId, onUpgrade }) {
         friends={rows}
         selectedId={selectedId}
         onSelect={handleSelect}
+        onMessage={setMessageTarget}
         onlineCount={friends.onlineCount}
         offlineCount={friends.offlineCount}
       />

@@ -1,6 +1,7 @@
 /**
  * Single row in the compact Friends panel. Renders avatar + name + a
- * short status line + a small OVR chip (glow-tinted by prestige tier).
+ * short status line + a small OVR chip (glow-tinted by prestige tier),
+ * and — on hover — a message button immediately left of that chip.
  *
  * Status line precedence:
  *   1. Active streak (with flame) if streak > 0
@@ -8,7 +9,18 @@
  *   3. Handle as a fallback identifier
  *
  * Click-to-expand is wired by the parent — the row just emits onClick.
+ *
+ * ── Why the row is a div and not a button ────────────────────────────
+ * It was a <button>, which is the right element for "press this to open
+ * the card". But a button cannot legally contain another button, and the
+ * message control has to sit INSIDE the row: to the left of the level
+ * chip, in the same flex line, so it takes its place in the layout
+ * rather than being floated over whatever happens to be there. So the
+ * row carries the button role itself and handles Enter and Space, and
+ * the message button nests inside it legitimately.
  */
+import Icon from '../Icon';
+import { ovrTier } from '../../lib/ratings/tiers';
 
 const COLORS = ['#1a7a4a', '#2563eb', '#7c3aed', '#c2410c', '#0891b2', '#be185d', '#854d0e'];
 
@@ -22,22 +34,31 @@ function initials(name) {
   return name.split(' ').map(p => p[0]).join('').slice(0, 2).toUpperCase();
 }
 
-import { ovrTier } from '../../lib/ratings/tiers';
-
 function statusLine(friend) {
   if (friend.streak > 0) return `🔥 ${friend.streak}d`;
   if (friend.lastSeenDays != null) return `${friend.lastSeenDays}d ago`;
   return `@${friend.handle}`;
 }
 
-export default function FriendListRow({ friend, selected, onClick }) {
+export default function FriendListRow({ friend, selected, onClick, onMessage }) {
   const ovr = friend.ovr || 1;
   const prestige = ovrTier(ovr);
+  const unread = friend.unread > 0;
+
+  function onKeyDown(e) {
+    if (e.key !== 'Enter' && e.key !== ' ' && e.key !== 'Spacebar') return;
+    e.preventDefault();          // Space would otherwise scroll the panel
+    onClick();
+  }
+
   return (
-    <button
-      type="button"
-      className={`fc-row${selected ? ' fc-row-selected' : ''}`}
+    <div
+      className={`fc-row${selected ? ' fc-row-selected' : ''}${unread ? ' fc-row-has-unread' : ''}`}
+      role="button"
+      tabIndex={0}
+      aria-expanded={!!selected}
       onClick={onClick}
+      onKeyDown={onKeyDown}
     >
       <div className="fc-row-avatar-wrap">
         {friend.avatar_url ? (
@@ -65,7 +86,24 @@ export default function FriendListRow({ friend, selected, onClick }) {
           {friend.unread > 9 ? '9+' : friend.unread}
         </span>
       )}
+      {/* Straight to the conversation. Opening the card to reach its
+          Message button was two clicks and a card's worth of scrolling
+          for the thing people do most. stopPropagation because the row
+          underneath would otherwise also expand the card behind the
+          chat. */}
+      {onMessage && (
+        <button
+          type="button"
+          className="fc-row-msg"
+          title={`Message ${friend.name}`}
+          aria-label={`Message ${friend.name}`}
+          onClick={e => { e.stopPropagation(); onMessage(friend); }}
+          onKeyDown={e => e.stopPropagation()}
+        >
+          <Icon name="mail" size={13} />
+        </button>
+      )}
       <div className={`fc-row-level ovr-chip ovr-tier-${prestige.key}`} title={`OVR ${ovr} · ${prestige.label}`}>{ovr}</div>
-    </button>
+    </div>
   );
 }
