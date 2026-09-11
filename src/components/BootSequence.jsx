@@ -20,7 +20,7 @@ import { useBootSequence } from '../hooks/useBootSequence';
 import { tiles, consoleAt, seg } from '../lib/boot/score.js';
 
 export default function BootSequence({ kind, background }) {
-  const { t, running, score } = useBootSequence(kind);
+  const { t, running, score, boosted } = useBootSequence(kind);
   if (!running) return null;
 
   const cells = tiles(t, score);
@@ -79,6 +79,10 @@ export default function BootSequence({ kind, background }) {
             <span className="vb-boot-stage">{con.line}</span>
             <span className="vb-boot-bar"><i style={{ width: `${con.pct}%` }} /></span>
             <span className="vb-boot-pct">{con.pct}%</span>
+            {/* The only instruction on the screen, and it retires the
+                moment it is followed — a hint still telling you to do
+                the thing you just did is noise. */}
+            <span className="vb-boot-skip">{boosted ? 'skipping' : 'tap to skip'}</span>
           </div>
         </div>,
         document.body,

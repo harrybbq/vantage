@@ -23,8 +23,11 @@
  *   PEEKS    prerequisites collapse to a chip row, what a goal unlocks is
  *            a list — both tappable, so the graph stays navigable without
  *            ever being drawn in full.
- *   MAP      a 120×34 thumbnail with your position lit; tapping it opens
- *            the depth-laid graph where any node jumps the player.
+ *   MAP      a button in the step row, opening the depth-laid graph where
+ *            any node jumps the player. It is something you OPEN rather
+ *            than a strip that sits there: as a permanent band under the
+ *            card it ate the height the card needed and, on a short
+ *            phone, painted over the card's own body.
  *
  * Nothing here is a second implementation of a rule. Locking, ordering
  * and cycle-refusal all live in the pure module.
@@ -34,7 +37,7 @@ import { createPortal } from 'react-dom';
 import Icon from '../Icon';
 import {
   pathsOf, stepIndexFor, stateOf, parentsOf, childrenOf,
-  thumbLayout, mapLayout,
+  mapLayout,
 } from '../../lib/achievements/pathPlayer';
 
 const CATS = { finance: 'Finance', fitness: 'Fitness', brain: 'Brain', social: 'Social', general: 'General' };
@@ -160,7 +163,6 @@ export default function PathPlayer({
   const prev = path && idx > 0 ? path.queue[idx - 1] : null;
   const next = path && idx < path.queue.length - 1 ? path.queue[idx + 1] : null;
 
-  const thumb = thumbLayout(path, { currentId: cur ? cur.id : null });
   const menuGoal = menuId ? byId(menuId) : null;
   const canLink = achievements.length >= 2;
 
@@ -209,6 +211,19 @@ export default function PathPlayer({
               />
             ))}
           </div>
+          {/* The map is something you OPEN, not a strip that sits there.
+              As a permanent 54px band under the card it both ate the
+              height the card needed and, on a short phone, painted
+              straight over the card's own body. */}
+          <button
+            type="button"
+            className="ppl-mapbtn"
+            onClick={() => setBigMap(true)}
+            title={cur ? `Path map — you are on ${cur.name}` : 'Path map'}
+            aria-label="Open the path map"
+          >
+            <Icon name="compass" size={13} />
+          </button>
           {canLink && (
             <button
               type="button"
@@ -346,25 +361,6 @@ export default function PathPlayer({
 
         {next && <StepRow dir="down" ach={next} state={st(next)} onClick={() => goStep(idx + 1)} />}
       </div>
-
-      {/* ── Where you are, in the width of a business card ── */}
-      <button type="button" className="ppl-map" onClick={() => setBigMap(true)}>
-        <svg viewBox={thumb.viewBox} className="ppl-map-svg" aria-hidden="true">
-          {thumb.edges.map(e => (
-            <line key={e.key} x1={e.x1} y1={e.y1} x2={e.x2} y2={e.y2}
-              className={`ppl-map-edge${e.done ? ' is-done' : ''}`} strokeLinecap="round" />
-          ))}
-          {thumb.nodes.map(nd => (
-            <circle key={nd.id} cx={nd.x} cy={nd.y} r={nd.here ? 5 : 3.4}
-              className={`ppl-map-node is-${nd.state}${nd.here ? ' is-here' : ''}`} />
-          ))}
-        </svg>
-        <span className="ppl-map-text">
-          <span className="ppl-map-label">Path map</span>
-          <span className="ppl-map-cap">{cur ? `You are on ${cur.name}` : (path ? path.title : 'Nothing to map yet')}</span>
-        </span>
-        <span className="ppl-map-cta">Expand</span>
-      </button>
 
       {menuGoal && createPortal(
         <QuickActions

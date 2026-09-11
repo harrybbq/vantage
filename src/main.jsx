@@ -76,13 +76,14 @@ if ('serviceWorker' in navigator && import.meta.env.PROD) {
         // (no force flag) is enough — the SW we just activated will serve
         // the new index.html on the navigation request.
         //
-        // Tell the boot sequence to sit this one out. This reload lands
-        // two seconds in — right in the middle of it — so the app used to
-        // play the boot, cut it off, and play it again from the top every
-        // time a new version shipped. The app reloading itself is not the
-        // user opening the app. A reload the user asks for still gets the
-        // boot, because nothing sets this marker on that path.
-        try { sessionStorage.setItem('vb_boot_suppress', '1'); } catch { /* private mode */ }
+        // This reload lands two seconds in — right in the middle of the
+        // boot sequence — so the app used to play the boot, cut it off,
+        // and play it again from the top on every deploy. It used to be
+        // handled here, with a marker telling the next page to skip its
+        // boot; that could not work, because nothing decided which page
+        // consumed the marker (see lib/boot/run.js). The sequence now
+        // records when its run began and the reloaded page RESUMES it,
+        // so this reload needs to say nothing at all about the boot.
         console.info('[SW] new version active, reloading in 2s:', version);
         setTimeout(() => window.location.reload(), 2000);
       }

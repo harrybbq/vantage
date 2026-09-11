@@ -178,6 +178,15 @@ html.vb-boot { --vb-k: 1.25; }
 }
 .vb-boot-bar i { display: block; height: 100%; border-radius: 2px; background: rgb(var(--em-rgb)); }
 .vb-boot-pct { color: rgb(var(--em-rgb)); min-width: 32px; }
+/* Sits after the percentage, dimmer than everything else on the pill —
+   it is an offer, not a stage. */
+.vb-boot-skip {
+  margin-left: 10px;
+  padding-left: 10px;
+  border-left: 1px solid rgba(255, 255, 255, .14);
+  opacity: .55;
+  white-space: nowrap;
+}
 
 /* ── Desktop: the chrome, then the panels, column by column ────────── */
 
@@ -252,6 +261,10 @@ html.vb-boot-mobile .vb-boot-stage {
   white-space: nowrap;
 }
 html.vb-boot-mobile .vb-boot-bar { display: none }
+/* A phone's pill has room for the stage and one more thing. The offer is
+   worth more than the number, which the bar behind it already tells. */
+html.vb-boot-mobile .vb-boot-pct { display: none }
+html.vb-boot-mobile .vb-boot-skip { margin-left: 8px; padding-left: 8px; }
 
 html.vb-boot .m-appbar {
   animation: vb-flick calc(840ms * var(--vb-k)) linear both;
