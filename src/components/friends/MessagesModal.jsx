@@ -43,7 +43,7 @@ function fmtDay(iso) {
   } catch { return ''; }
 }
 
-export default function MessagesModal({ open, userId, friend, onClose, onBlocked }) {
+export default function MessagesModal({ open, userId, friend, onClose, onBlocked, inline = false }) {
   const [messages, setMessages] = useState([]);
   const [draft, setDraft] = useState('');
   const [status, setStatus] = useState('loading'); // loading | ready | error
@@ -209,9 +209,15 @@ export default function MessagesModal({ open, userId, friend, onClose, onBlocked
    * Rendering into <body> puts the overlay in the root stacking context
    * where its z-index means what it says, in every hub layout.
    */
-  return createPortal(
-    <div className="msg-overlay" onMouseDown={e => { if (e.target === e.currentTarget) onClose?.(); }}>
-      <div className="msg-modal" role="dialog" aria-label={`Messages with ${name}`}>
+  /* `inline` drops the portal and the backdrop and returns the modal's
+     own body, so the hub's friend panel can host the very same
+     conversation rather than growing a second one. Everything above
+     this line — the poll, the optimistic send, read receipts, report
+     and block — is shared by both, which is the point: two chats would
+     have drifted the first time either was touched. */
+  const body = (
+    <>
+      <div className={`msg-modal${inline ? ' msg-inline' : ''}`} role="dialog" aria-label={`Messages with ${name}`}>
         <div className="msg-head">
           <div className="msg-head-who">
             {friend.avatar_url
@@ -263,7 +269,11 @@ export default function MessagesModal({ open, userId, friend, onClose, onBlocked
               </div>
             )}
           </div>
-          <button type="button" className="msg-close" style={{ marginLeft: 0 }} onClick={() => onClose?.()} aria-label="Close"><Icon name="x" size={15} /></button>
+          {/* Inline, the panel hosting this has its own close a few
+              pixels away; two of them is one too many. */}
+          {!inline && (
+            <button type="button" className="msg-close" style={{ marginLeft: 0 }} onClick={() => onClose?.()} aria-label="Close"><Icon name="x" size={15} /></button>
+          )}
         </div>
 
         <div className="msg-scroll" ref={scrollRef} onScroll={onScroll}>
@@ -326,6 +336,14 @@ export default function MessagesModal({ open, userId, friend, onClose, onBlocked
           reportUser(userId, friendId, reason, [context, reportEvidence()].filter(Boolean).join(' — recent messages: '))}
         onClose={() => setReporting(false)}
       />
+    </>
+  );
+
+  if (inline) return body;
+
+  return createPortal(
+    <div className="msg-overlay" onMouseDown={e => { if (e.target === e.currentTarget) onClose?.(); }}>
+      {body}
     </div>,
     document.body
   );

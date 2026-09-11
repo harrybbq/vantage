@@ -240,6 +240,33 @@ export async function listPendingRequests(userId) {
   }));
 }
 
+/**
+ * How many friend requests are waiting, and nothing else.
+ *
+ * listPendingRequests above costs two round trips because it resolves
+ * the requesters' profiles for the list UI. The chrome bar only needs
+ * the number, and asks for it every minute, so it counts rows and stops
+ * there — `head: true` fetches no bodies at all.
+ *
+ * Fails to zero rather than throwing: a chip that cannot count is a chip
+ * that should not appear, and this runs on every page whether or not the
+ * social migrations have been applied.
+ */
+export async function countPendingRequests(userId) {
+  if (!userId) return 0;
+  try {
+    const { count, error } = await supabase
+      .from('friendships')
+      .select('requester_id', { count: 'exact', head: true })
+      .eq('addressee_id', userId)
+      .eq('status', 'pending');
+    if (error) return 0;
+    return count || 0;
+  } catch {
+    return 0;
+  }
+}
+
 /** Search by handle prefix. Calls the SECURITY DEFINER RPC so the
  *  results respect block lists without leaking blocker identity. */
 export async function searchByHandle(q) {

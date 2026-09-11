@@ -170,6 +170,143 @@ html[data-hub-os] #coinWallet .cw-label {
   color: var(--text-muted);
 }
 
+/* The chips that joined the chrome bar. It sets uppercase/letter-spacing
+   on itself, which is right for its labels and wrong for a menu of
+   controls, so the menu opts out. */
+html[data-hub-os] .header-weather {
+  background: none;
+  border: 1px solid var(--os-border-md);
+  border-radius: 4px;
+  padding: 3px 9px;
+  color: var(--text-mid);
+  text-transform: none;
+  letter-spacing: normal;
+}
+html[data-hub-os] .header-weather-temp,
+html[data-hub-os] .header-weather-time { font-size: 11px; color: var(--text); }
+html[data-hub-os] .header-weather-city { font-size: 10px; color: var(--text-muted); }
+html[data-hub-os] .header-weather-day { font-size: 8px; color: var(--text-muted); }
+html[data-hub-os] .header-weather-sep { background: var(--os-border-md); }
+
+html[data-hub-os] .header-requests {
+  border-radius: 4px;
+  padding: 3px 9px;
+  letter-spacing: normal;
+}
+
+html[data-hub-os] .header-bg-btn {
+  background: none;
+  border: 1px solid var(--os-border-md);
+  border-radius: 4px;
+  padding: 3px 7px 3px 9px;
+  color: var(--text-mid);
+}
+html[data-hub-os] .header-bg-btn:hover,
+html[data-hub-os] .header-bg-btn.is-open { border-color: var(--em); color: var(--em-light); }
+html[data-hub-os] .header-bg-menu {
+  background: var(--os-panel, #12140f);
+  border-color: var(--os-border-md);
+}
+
+html[data-hub-os] #coinWallet .cw-today { font-size: 9.5px; }
+
+/* ── The friend panel, over the widget canvas ──────────────────────────
+   The middle column is the widest thing on the page and the one part
+   nobody is reading while they look at a friend, so the friend takes it:
+   conversation on the left, profile on the right.
+
+   The layer is pointer-events:none while empty so the canvas underneath
+   is untouched — the panel inside it turns them back on. */
+/* The middle column is now a wrapper: the canvas panel, and a layer over
+   it for a selected friend. It is the grid item the 1fr track sizes, so
+   it has to fill that track and let its panel fill it in turn — a grid
+   item's default min-width of auto is what would otherwise let a wide
+   canvas push the whole column past its track. */
+html[data-hub-os] .os-mid {
+  position: relative;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+html[data-hub-os] .os-mid > .os-widgets { flex: 1; min-height: 0; }
+html[data-hub-os] .os-friend-slot {
+  position: absolute;
+  inset: 0;
+  z-index: 6;
+  pointer-events: none;
+  display: flex;
+}
+html[data-hub-os] .fr-panel {
+  pointer-events: auto;
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 18px 50px rgba(0, 0, 0, .55);
+  animation: frPanelIn .16s ease-out both;
+}
+@keyframes frPanelIn { from { opacity: 0; transform: translateY(6px) } to { opacity: 1; transform: none } }
+@media (prefers-reduced-motion: reduce) {
+  html[data-hub-os] .fr-panel { animation: none; }
+}
+
+html[data-hub-os] .fr-panel-close {
+  margin-left: 10px;
+  width: 20px; height: 20px;
+  display: inline-flex; align-items: center; justify-content: center;
+  border: 1px solid var(--os-border-md);
+  border-radius: 4px;
+  background: none;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+html[data-hub-os] .fr-panel-close:hover { color: var(--em-light); border-color: var(--em); }
+
+html[data-hub-os] .fr-panel-body {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 300px;
+}
+html[data-hub-os] .fr-panel-chat {
+  min-width: 0; min-height: 0;
+  display: flex;
+  border-right: 1px solid var(--os-border);
+}
+html[data-hub-os] .fr-panel-profile {
+  min-height: 0;
+  overflow-y: auto;
+  padding: 12px;
+}
+/* The conversation, unwrapped: no backdrop, no rounded floating box, no
+   width of its own — it fills the half it was given. */
+html[data-hub-os] .msg-inline {
+  flex: 1;
+  min-width: 0; min-height: 0;
+  max-width: none; max-height: none;
+  width: auto; height: auto;
+  border: none;
+  border-radius: 0;
+  box-shadow: none;
+  background: transparent;
+}
+/* The profile card is already inside a panel; a second frame around it
+   is a box in a box. */
+html[data-hub-os] .fr-panel-profile .fc-card {
+  border: none;
+  background: none;
+  padding: 0;
+}
+
+/* Narrow desktops cannot give the profile 300px and still leave a
+   conversation worth reading, so it stacks under instead. */
+@media (max-width: 1200px) {
+  html[data-hub-os] .fr-panel-body { grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 1fr) auto; }
+  html[data-hub-os] .fr-panel-chat { border-right: none; border-bottom: 1px solid var(--os-border); }
+  html[data-hub-os] .fr-panel-profile { max-height: 42%; }
+}
+
 /* ── 4. Sidebar — tightens existing <nav> ───────────────────────────────── */
 html[data-hub-os] nav {
   width: 48px;
