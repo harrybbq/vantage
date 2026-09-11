@@ -182,11 +182,8 @@ html[data-hub-os] .header-weather {
   text-transform: none;
   letter-spacing: normal;
 }
-html[data-hub-os] .header-weather-temp,
-html[data-hub-os] .header-weather-time { font-size: 11px; color: var(--text); }
+html[data-hub-os] .header-weather-temp { font-size: 11px; color: var(--text); }
 html[data-hub-os] .header-weather-city { font-size: 10px; color: var(--text-muted); }
-html[data-hub-os] .header-weather-day { font-size: 8px; color: var(--text-muted); }
-html[data-hub-os] .header-weather-sep { background: var(--os-border-md); }
 
 html[data-hub-os] .header-requests {
   border-radius: 4px;
@@ -209,6 +206,18 @@ html[data-hub-os] .header-bg-menu {
 }
 
 html[data-hub-os] #coinWallet .cw-today { font-size: 9.5px; }
+html[data-hub-os] #coinWallet.is-open { border-color: var(--gold-lt); }
+/* Squarer corners and no glass, to match the other chrome menus. The
+   text colours are NOT re-stated here: the chrome bar is near black in
+   both themes, so the base rules are already light on dark — restating
+   them in theme tokens is what made "Replace image" invisible in cream.
+   `--gold-lt` is the one token that means the same thing in both. */
+html[data-hub-os] .wallet-menu {
+  border-radius: 6px;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+html[data-hub-os] .wallet-menu-total b { color: var(--gold-lt); }
 
 /* ── The friend panel, over the widget canvas ──────────────────────────
    The middle column is the widest thing on the page and the one part
@@ -230,6 +239,23 @@ html[data-hub-os] .os-mid {
   flex-direction: column;
 }
 html[data-hub-os] .os-mid > .os-widgets { flex: 1; min-height: 0; }
+/* Seal the canvas's stacking order inside the canvas — but only while a
+   friend is actually open over it.
+
+   Click-to-front gives each widget wrapper an inline z-index from a
+   counter that only ever goes up (HubSection's topZRef, persisted to
+   S.widgetZ), so the twelfth widget you touched is sitting at 12 and any
+   fixed number the friend layer chose would eventually lose. That is not
+   a race worth entering. `isolation` makes the canvas one atom in
+   .os-mid's stacking context, and every wrapper inside is then ordered
+   against its siblings alone — so the slot's z-index 6 wins whatever the
+   counter has climbed to.
+
+   Scoped to :has(.fr-panel) because sealing the canvas also stops a
+   widget dragged past the panel's edge from painting over the rail
+   beside it. While a friend is up that is exactly what we want; the rest
+   of the time it would be a change nobody asked for. */
+html[data-hub-os] .os-mid:has(.fr-panel) > .os-widgets { isolation: isolate; }
 html[data-hub-os] .os-friend-slot {
   position: absolute;
   inset: 0;
