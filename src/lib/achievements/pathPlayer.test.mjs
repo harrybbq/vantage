@@ -10,7 +10,7 @@
 import assert from 'node:assert/strict';
 import {
   parentsOf, childrenOf, stateOf, isLocked, depths, queueFor,
-  pathsOf, stepIndexFor, wouldCycle, thumbLayout, mapLayout,
+  pathsOf, stepIndexFor, wouldCycle, mapLayout,
 } from './pathPlayer.js';
 
 let n = 0;
@@ -175,29 +175,6 @@ const byId = id => A.find(a => a.id === id);
   ok(!wouldCycle(C, 'home', 'guitar'), 'nor does extending a path onto a loose goal');
   ok(!wouldCycle(C, null, 'cc'), 'a missing end is not a cycle');
   ok(wouldCycle([['a', 'b'], ['b', 'c']], 'c', 'a'), 'a longer way round is still a way round');
-}
-
-// ── The thumbnail ──
-{
-  const money = pathsOf(A, C).find(p => p.ids.includes('dep'));
-  const t = thumbLayout(money, { currentId: 'dep' });
-  eq(t.nodes.length, 5, 'every goal is on the map');
-  eq(t.edges.length, 4, 'and every link');
-  eq(t.viewBox, '0 0 120 34', 'in the space a thumbnail has');
-  ok(t.nodes.every(nd => nd.x >= 0 && nd.x <= 120 && nd.y >= 0 && nd.y <= 34), 'nothing falls off it');
-  eq(t.nodes.filter(nd => nd.here).length, 1, 'exactly one node is lit as where you are');
-  eq(t.nodes.find(nd => nd.id === 'dep').here, true, 'and it is the step being played');
-
-  const roots = t.nodes.filter(nd => nd.id === 'cc' || nd.id === 'spend');
-  eq(roots[0].x, roots[1].x, 'goals at the same depth share a column');
-  ok(roots[0].y !== roots[1].y, 'and are spread down it');
-  ok(t.edges.find(e => e.key === 'cc-dep').done, 'a link out of a finished goal reads as done');
-  ok(!t.edges.find(e => e.key === 'dep-mip').done, 'and one out of an unfinished goal does not');
-
-  eq(thumbLayout(null).nodes, [], 'no path, no thumbnail');
-  const single = thumbLayout(pathsOf(A, C).find(p => p.ids.includes('guitar')));
-  eq(single.nodes.length, 1, 'a standalone goal is one dot');
-  eq(single.nodes[0].y, 17, 'centred rather than pinned to the top');
 }
 
 // ── The expanded map ──

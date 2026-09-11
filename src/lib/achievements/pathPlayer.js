@@ -154,10 +154,10 @@ export function stepIndexFor(path, step, touched, achievements) {
 /**
  * Would linking `from → to` close a loop?
  *
- * A goal that is its own prerequisite can never be completed, and
- * layoutTree already has to drop such an edge to avoid hanging. Refusing
- * it at the point it would be created is better than drawing a board
- * that quietly omits one of its own links.
+ * A goal that is its own prerequisite can never be completed, and the
+ * relaxation in `depths` only terminates because it is bounded. Refusing
+ * the edge at the point it would be created is better than drawing a
+ * board that quietly omits one of its own links.
  */
 export function wouldCycle(conns, from, to) {
   if (!from || !to) return false;
@@ -174,7 +174,7 @@ export function wouldCycle(conns, from, to) {
   return false;
 }
 
-/** Depth columns → x, siblings spread down y. Shared by both maps. */
+/** Depth columns → x, siblings spread down y. */
 function byDepth(ids, conns) {
   const d = depths(ids, conns);
   const cols = new Map();
@@ -184,42 +184,6 @@ function byDepth(ids, conns) {
     cols.get(k).push(id);
   }
   return { d, cols, maxD: Math.max(0, ...[...d.values()]) };
-}
-
-/**
- * The path as a thumbnail — the whole shape, and where you are in it, in
- * the width of a business card. The point is not to be readable; it is to
- * be recognisable, so the step you are on has somewhere to sit.
- */
-export function thumbLayout(path, { w = 120, h = 34, currentId = null } = {}) {
-  if (!path || !path.ids.length) return { nodes: [], edges: [], viewBox: `0 0 ${w} ${h}` };
-  const { cols, maxD } = byDepth(path.ids, path.conns);
-  const pos = new Map();
-  for (const [k, ids] of cols) {
-    ids.forEach((id, i) => {
-      const y = ids.length === 1 ? h / 2 : 6 + (h - 12) * (i / (ids.length - 1));
-      pos.set(id, { x: 6 + (w - 12) * (maxD ? k / maxD : 0), y });
-    });
-  }
-  const byId = id => path.queue.find(g => g.id === id);
-  const edges = (path.conns || [])
-    .filter(([f, t]) => pos.has(f) && pos.has(t))
-    .map(([f, t]) => {
-      const a = pos.get(f), b = pos.get(t);
-      const on = !!(byId(f) && byId(f).completed);
-      return { key: `${f}-${t}`, x1: a.x, y1: a.y, x2: b.x, y2: b.y, done: on };
-    });
-  const nodes = path.ids.filter(id => pos.has(id)).map(id => {
-    const g = byId(id);
-    return {
-      id,
-      x: pos.get(id).x,
-      y: pos.get(id).y,
-      here: currentId === id,
-      state: g ? (g.completed ? 'completed' : g.locked ? 'locked' : 'active') : 'locked',
-    };
-  });
-  return { nodes, edges, viewBox: `0 0 ${w} ${h}` };
 }
 
 /**
