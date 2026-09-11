@@ -232,18 +232,13 @@ nav:hover ~ #pageHeader{ left:200px; }
   color:rgba(255,255,255,.94);line-height:1;
 }
 .header-weather-temp{font-family:var(--mono);font-size:12px;font-weight:600;}
-/* Where the reading was taken, and the time it is there. 16° means
-   something different in Manchester in September than it does anywhere
-   else, and a temperature is only worth trusting if you can see where it
-   came from. */
+/* Where the reading was taken. 16° means something different in
+   Manchester in September than it does anywhere else, and a temperature
+   is only worth trusting if you can see where it came from. */
 .header-weather-city{font-family:var(--mono);font-size:11px;opacity:.8;
   max-width:11ch;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
-.header-weather-sep{width:1px;height:12px;background:rgba(255,255,255,.22);}
-.header-weather-time{font-family:var(--mono);font-size:12px;font-weight:600;
-  font-variant-numeric:tabular-nums;}
-.header-weather-day{font-family:var(--mono);font-size:9px;letter-spacing:1px;opacity:.65;}
 @media (max-width:900px){ .header-weather{display:none;} }
-@media (max-width:1180px){ .header-weather-city,.header-weather-day{display:none;} }
+@media (max-width:1180px){ .header-weather-city{display:none;} }
 
 /* ── Friend requests waiting ───────────────────────────────────────────
    Gold: the only chip in the bar asking for something rather than
@@ -283,12 +278,16 @@ nav:hover ~ #pageHeader{ left:200px; }
   text-transform:none;letter-spacing:normal;
 }
 .header-bg-label{font-family:var(--mono);font-size:8.5px;letter-spacing:1.8px;
-  text-transform:uppercase;color:var(--text-muted);}
+  text-transform:uppercase;color:rgba(255,255,255,.42);}
 .header-bg-row{display:flex;align-items:center;gap:8px;}
+/* Light on its own terms, not on the theme's: the chrome bar is near
+   black in BOTH themes, so this menu hangs off a dark surface either way
+   — and `var(--text)` is the cream theme's near-black, which made
+   "Replace image" invisible in exactly one of them. */
 .header-bg-replace{
   flex:1;min-height:34px;padding:0 12px;
-  border:1px solid var(--border);border-radius:9px;
-  background:transparent;color:var(--text);
+  border:1px solid rgba(255,255,255,.18);border-radius:9px;
+  background:transparent;color:rgba(255,255,255,.88);
   font-family:var(--sans);font-size:13px;cursor:pointer;
   transition:border-color .16s,background .16s;
 }
@@ -304,7 +303,7 @@ nav:hover ~ #pageHeader{ left:200px; }
 .header-bg-fx{display:flex;flex-direction:column;gap:5px;}
 .header-bg-fx-head{display:flex;align-items:baseline;justify-content:space-between;
   font-family:var(--mono);font-size:9.5px;letter-spacing:1.2px;text-transform:uppercase;
-  color:var(--text-muted);}
+  color:rgba(255,255,255,.42);}
 .header-bg-fx-head b{font-weight:700;color:var(--em);font-variant-numeric:tabular-nums;}
 /* The track is drawn rather than left to the UA: `accent-color` paints
    the fill and the thumb but leaves the empty half at the browser's
@@ -340,6 +339,79 @@ nav:hover ~ #pageHeader{ left:200px; }
 }
 #coinWallet .cw-today.is-up{color:var(--em);}
 #coinWallet .cw-today.is-down{color:#c0392b;}
+
+/* ── Wallet menu ───────────────────────────────────────────────────────
+   The last few coin movements, under the number they explain. The chip
+   is now the trigger, so the auto margin that pushed it to the right
+   edge of the bar moves up to the wrapper — left on the button it would
+   push the button inside a shrink-wrapped parent and do nothing. */
+.header-wallet{position:relative;margin-left:auto;flex-shrink:0;}
+#coinWallet.is-open{background:rgba(200,151,10,.28);}
+.wallet-menu{
+  position:absolute;top:calc(100% + 8px);right:0;z-index:220;
+  width:290px;padding:12px;
+  display:flex;flex-direction:column;gap:8px;
+  border-radius:10px;
+  background:rgba(16,16,18,.96);
+  border:1px solid rgba(200,151,10,.30);
+  box-shadow:0 18px 44px rgba(0,0,0,.5);
+  backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);
+  text-transform:none;letter-spacing:normal;
+}
+.wallet-menu-label{
+  font-family:var(--mono);font-size:8.5px;letter-spacing:1.8px;
+  text-transform:uppercase;color:rgba(255,255,255,.42);
+}
+.wallet-menu-total{display:flex;align-items:baseline;gap:6px;flex-wrap:wrap;}
+.wallet-menu-total b{
+  font-family:var(--mono);font-size:26px;font-weight:700;line-height:1;
+  color:var(--gold);letter-spacing:.5px;font-variant-numeric:tabular-nums;
+}
+.wallet-menu-total span{font-family:var(--mono);font-size:10px;color:rgba(255,255,255,.5);}
+.wallet-menu-today{margin-left:auto;font-weight:700;font-variant-numeric:tabular-nums;}
+.wallet-menu-today.is-up{color:var(--em);}
+.wallet-menu-today.is-down{color:#c0392b;}
+
+.wallet-menu-list{list-style:none;margin:0;padding:4px 0 0;display:flex;flex-direction:column;}
+.wallet-row{
+  display:flex;align-items:center;gap:8px;
+  padding:7px 0;
+  border-top:1px solid rgba(255,255,255,.07);
+  font-family:var(--mono);font-size:11px;
+}
+/* The description takes what is left after the time and the amount,
+   which are both fixed-width — so a long achievement name truncates
+   instead of wrapping the row to two lines or pushing the amount out. */
+.wallet-row-what{
+  flex:1;min-width:0;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+  color:rgba(255,255,255,.88);
+}
+.wallet-row-kind{color:rgba(255,255,255,.5);}
+.wallet-row-sep{color:rgba(255,255,255,.3);}
+.wallet-row-when{
+  flex-shrink:0;font-size:10px;color:rgba(255,255,255,.4);
+  font-variant-numeric:tabular-nums;
+}
+.wallet-row-amt{
+  flex-shrink:0;min-width:44px;text-align:right;
+  font-weight:700;font-variant-numeric:tabular-nums;
+}
+.wallet-row-amt.is-up{color:var(--em);}
+.wallet-row-amt.is-down{color:#c0392b;}
+
+.wallet-menu-empty{
+  font-family:var(--mono);font-size:11px;line-height:1.5;
+  color:rgba(255,255,255,.5);padding:6px 0;
+}
+.wallet-menu-all{
+  margin-top:2px;padding:7px 10px;
+  font-family:var(--mono);font-size:10px;letter-spacing:1px;text-transform:uppercase;
+  color:rgba(255,255,255,.7);
+  background:none;border:1px solid rgba(255,255,255,.16);border-radius:6px;
+  cursor:pointer;
+}
+.wallet-menu-all:hover{border-color:var(--em);color:var(--em);background:rgba(var(--em-rgb),.08);}
 nav{
   position:fixed;
   top:0;left:0;bottom:0;
@@ -2743,8 +2815,10 @@ nav:hover .nav-tab-label{opacity:1;}
   padding:5px 14px 5px 10px;
   cursor:pointer;
   transition:background .18s;
-  margin-left:auto;
   flex-shrink:0;
+  /* It is a <button> now (it opens a menu, so it had better be one).
+     Nothing about the look should change with it. */
+  font:inherit;color:inherit;text-align:left;
 }
 #coinWallet:hover{background:rgba(200,151,10,.25);}
 #coinWallet .cw-icon{font-size:16px;line-height:1;}

@@ -4,51 +4,34 @@ import Icon from './Icon';
 import { useWeather, weatherGlyph } from '../hooks/useWeather';
 import { usePendingCount } from '../lib/friends/usePendingCount';
 import { coinsTodayLabel } from '../lib/coins/daily';
+import { ledgerRows } from '../lib/coins/ledger';
 
 /**
- * Weather, where you are, and the time — one pill.
+ * Weather and where you are — one pill.
  *
- * It used to be the temperature alone, which is the least useful third
- * of it: 16° means something different in Manchester in September than
- * it does anywhere else, and a reading is only worth trusting if you can
- * see where it was taken. The clock earns its place for the same reason
- * the temperature does — it is the ambient half of "what is going on
- * right now", and the chrome bar is where you look for that.
+ * It used to be the temperature alone, which is the least useful half of
+ * it: 16° means something different in Manchester in September than it
+ * does anywhere else, and a reading is only worth trusting if you can
+ * see where it was taken.
+ *
+ * It carried a clock too, briefly. The Today panel already runs one, in
+ * a size you can read across a room and with a seconds hand — so the
+ * chip's was the same fact stated twice, the smaller one winning nothing
+ * and costing a timer on every page of the app.
  *
  * Own solid styling so module transparency never hides it; desktop-only
  * via CSS.
  */
 function WeatherChip({ enabled }) {
   const weather = useWeather(enabled);
-  const [now, setNow] = useState(() => new Date());
-
-  // Ticks on the minute it displays, not every second: a clock with no
-  // seconds hand has nothing to say 59 times out of 60. It re-aims after
-  // each tick rather than running a fixed 60s interval, so it cannot
-  // drift into updating halfway through a minute.
-  useEffect(() => {
-    let id;
-    const schedule = () => {
-      const d = new Date();
-      const ms = 60000 - (d.getSeconds() * 1000 + d.getMilliseconds());
-      id = setTimeout(() => { setNow(new Date()); schedule(); }, ms + 20);
-    };
-    schedule();
-    return () => clearTimeout(id);
-  }, []);
 
   if (!enabled || !weather || weather.tempC == null) return null;
   const g = weatherGlyph(weather.code, weather.isDay);
-  const hhmm = now.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
-  const day = now.toLocaleDateString('en-GB', { weekday: 'short' }).toUpperCase();
   return (
     <span className="header-weather" title={`${g.label}${weather.city ? ' · ' + weather.city : ''}`}>
       <Icon name={g.icon} size={15} />
       <span className="header-weather-temp">{weather.tempC}°</span>
       {weather.city && <span className="header-weather-city">{weather.city}</span>}
-      <span className="header-weather-sep" aria-hidden="true" />
-      <span className="header-weather-time">{hhmm}</span>
-      <span className="header-weather-day">{day}</span>
     </span>
   );
 }
@@ -168,6 +151,110 @@ function BackgroundMenu({ hasBg, fx, onChangeBg, onRemoveBg, onFx }) {
   );
 }
 
+/**
+ * The wallet, opened where the wallet is.
+ *
+ * Clicking the coin chip used to throw a full-screen modal into the
+ * middle of the page, dim everything behind it and wait to be dismissed
+ * — for the question "how did I get to 2,480?", which is a glance. The
+ * balance is in the top-right corner, so the answer belongs in the
+ * top-right corner: the last few movements, each with a time and a
+ * signed amount, directly under the number they explain.
+ *
+ * Six rows. The full ledger is still one button away and still the
+ * modal, because reading a year of transactions IS a sit-down job and a
+ * 280px menu is the wrong shape for it.
+ *
+ * Closing follows BackgroundMenu exactly — pointer down outside, or
+ * Escape — so the two menus in the bar behave the same way.
+ */
+function WalletMenu({ coins, coinHistory, today, onOpenFull, onContextMenu }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef(null);
+
+  useEffect(() => {
+    if (!open) return undefined;
+    const onDown = e => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); };
+    const onKey = e => { if (e.key === 'Escape') setOpen(false); };
+    document.addEventListener('pointerdown', onDown);
+    document.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('pointerdown', onDown);
+      document.removeEventListener('keydown', onKey);
+    };
+  }, [open]);
+
+  // Computed on open rather than on every header render: this reads a
+  // list that can run to thousands of entries, and the header re-renders
+  // on every section change, greeting tick and coin award.
+  const rows = open ? ledgerRows(coinHistory, new Date(), 6) : [];
+
+  return (
+    <div className="header-wallet" ref={ref}>
+      <button
+        type="button"
+        id="coinWallet"
+        className={open ? 'is-open' : undefined}
+        onClick={() => setOpen(o => !o)}
+        onContextMenu={onContextMenu ? e => { e.preventDefault(); onContextMenu(); } : undefined}
+        aria-expanded={open}
+        title={today
+          ? `Your coins — ${today} today. Click for recent activity`
+          : 'Your coins — click for recent activity'}
+      >
+        <span className="cw-icon"><Icon name="coin" size={13} /></span>
+        <div>
+          <div className="cw-amount" id="coinAmount">{(coins || 0).toLocaleString('en-GB')}</div>
+          <div className="cw-label">Coins</div>
+        </div>
+        {/* The balance is a fact about your whole history and so says
+            nothing about today. This does. Absent on a flat day rather
+            than reading "+0". */}
+        {today && (
+          <span className={`cw-today${today.startsWith('+') ? ' is-up' : ' is-down'}`}>{today}</span>
+        )}
+      </button>
+
+      {open && (
+        <div className="wallet-menu" role="dialog" aria-label="Wallet">
+          <div className="wallet-menu-label">Wallet</div>
+          <div className="wallet-menu-total">
+            <b>{(coins || 0).toLocaleString('en-GB')}</b>
+            <span>coins</span>
+            {today && (
+              <span className={`wallet-menu-today${today.startsWith('+') ? ' is-up' : ' is-down'}`}>{today} today</span>
+            )}
+          </div>
+
+          {rows.length === 0
+            ? <div className="wallet-menu-empty">Nothing yet — finish an achievement to earn your first coins.</div>
+            : (
+              <ul className="wallet-menu-list">
+                {rows.map(r => (
+                  <li key={r.key} className="wallet-row">
+                    <span className="wallet-row-what">
+                      <span className="wallet-row-kind">{r.kind}</span>
+                      <span className="wallet-row-sep"> · </span>
+                      <span className="wallet-row-label">{r.label}</span>
+                    </span>
+                    <span className="wallet-row-when">{r.when}</span>
+                    <span className={`wallet-row-amt${r.up ? ' is-up' : ' is-down'}`}>{r.amountLabel}</span>
+                  </li>
+                ))}
+              </ul>
+            )}
+
+          <button
+            type="button"
+            className="wallet-menu-all"
+            onClick={() => { setOpen(false); onOpenFull(); }}
+          >Full history</button>
+        </div>
+      )}
+    </div>
+  );
+}
+
 const SECTION_LABELS = {
   hub: 'Hub',
   achievements: 'Achievements',
@@ -257,26 +344,13 @@ export default function PageHeader({
       />
 
 
-      <div
-        id="coinWallet"
-        onClick={onOpenCoinHistory}
-        onContextMenu={onCoinContextMenu ? e => { e.preventDefault(); onCoinContextMenu(); } : undefined}
-        title={today
-          ? `Your coins — ${today} today. Click for history`
-          : 'Your coins — click for history'}
-      >
-        <span className="cw-icon"><Icon name="coin" size={13} /></span>
-        <div>
-          <div className="cw-amount" id="coinAmount">{(coins || 0).toLocaleString('en-GB')}</div>
-          <div className="cw-label">Coins</div>
-        </div>
-        {/* The balance is a fact about your whole history and so says
-            nothing about today. This does. Absent on a flat day rather
-            than reading "+0". */}
-        {today && (
-          <span className={`cw-today${today.startsWith('+') ? ' is-up' : ' is-down'}`}>{today}</span>
-        )}
-      </div>
+      <WalletMenu
+        coins={coins}
+        coinHistory={coinHistory}
+        today={today}
+        onOpenFull={onOpenCoinHistory}
+        onContextMenu={onCoinContextMenu}
+      />
     </div>
   );
 }
