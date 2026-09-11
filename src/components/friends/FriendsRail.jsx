@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import Icon from '../Icon';
 import FriendsPanelList from './FriendsPanelList';
 import FriendCard from './FriendCard';
@@ -7,6 +8,7 @@ import HandleClaimModal from './HandleClaimModal';
 import AddFriendModal from './AddFriendModal';
 import ReportFriendModal from './ReportFriendModal';
 import MessagesModal from './MessagesModal';
+import FriendPanel from './FriendPanel';
 import { useFriends } from '../../lib/friends/useFriends';
 import { getFriendPublicStats } from '../../lib/friends/queries';
 import { getUnreadCounts } from '../../lib/friends/messages';
@@ -23,8 +25,16 @@ import { useSubscriptionContext } from '../../context/SubscriptionContext';
  * The rail is intentionally graceful when the migrations haven't
  * been applied yet — useFriends absorbs the load error and the rail
  * shows an offline message instead of crashing.
+ *
+ * `panelSlot` is an element the host offers for the selected friend —
+ * on the OS hub, a layer over the widget canvas. Given one, the rail
+ * portals a FriendPanel into it (conversation + profile, side by side)
+ * instead of appending the card below itself. The rail keeps owning
+ * selection and the public_stats fetch either way; the host only lends
+ * a place to put it, which is why this is a DOM node rather than a
+ * dozen props threaded through the layout.
  */
-export default function FriendsRail({ userId, onUpgrade }) {
+export default function FriendsRail({ userId, onUpgrade, panelSlot = null }) {
   const { hasPro } = useSubscriptionContext();
   const friends = useFriends(userId, hasPro);
 
@@ -75,6 +85,36 @@ export default function FriendsRail({ userId, onUpgrade }) {
     setSelectedId(prev => (prev === id ? null : id));
   }
 
+  // Named rather than written inline on the card, because the friend
+  // panel offers the same two actions and two copies of "are you sure"
+  // would drift.
+  async function handleBlock(f) {
+    // Block is destructive — confirm via native dialog. The queries
+    // module also drops the friendship row in the same call, so the user
+    // is immediately removed from the list.
+    const ok = window.confirm(
+      `Block ${f.name}? They'll be removed from your friends and won't be able to find you again.`
+    );
+    if (!ok) return;
+    try {
+      await friends.block(f.id);
+      setSelectedId(null); // close the card since this friend is gone
+    } catch (e) {
+      window.alert(e.message || 'Could not block.');
+    }
+  }
+
+  async function handleUnfriend(f) {
+    const ok = window.confirm(`Remove ${f.name} from your friends?`);
+    if (!ok) return;
+    try {
+      await friends.unfriend(f.id);
+      setSelectedId(null);
+    } catch (e) {
+      window.alert(e.message || 'Could not unfriend.');
+    }
+  }
+
   // Picking a friend appends their card BELOW the list. On the OS hub
   // the rail lives in a pinned column that scrolls internally, so the
   // card can open entirely below that column's fold and the click reads
@@ -86,7 +126,7 @@ export default function FriendsRail({ userId, onUpgrade }) {
   // whole canvas lurches for no reason.
   const cardRef = useRef(null);
   useEffect(() => {
-    if (!selectedId) return undefined;
+    if (!selectedId || panelSlot) return undefined;
     // One frame later: the card mounts in its loading state first and
     // grows when public_stats land, so measuring immediately measures
     // the wrong box.
@@ -110,7 +150,33 @@ export default function FriendsRail({ userId, onUpgrade }) {
       }
     });
     return () => cancelAnimationFrame(id);
-  }, [selectedId, statsLoading]);
+  }, [selectedId, statsLoading, panelSlot]);
+
+  /* Click anywhere that is not the panel to put it away.
+   *
+   * A friend ROW is deliberately not "outside": clicking another friend
+   * while the panel is open should switch it to them, which is what the
+   * row's own handler does — so this bows out and lets it. Same for
+   * anything portalled on top of the panel (the report modal, a native
+   * confirm's backdrop), since those belong to it.
+   *
+   * pointerdown rather than click: a mousedown that starts inside the
+   * panel and ends outside it — selecting a message, dragging a slider
+   * — must not count as leaving.
+   */
+  useEffect(() => {
+    if (!selectedId || !panelSlot) return undefined;
+    const onDown = e => {
+      const t = e.target;
+      if (!(t instanceof Node)) return;
+      if (panelSlot.contains(t)) return;                 // the panel itself
+      if (t.closest && t.closest('.fc-row')) return;     // switching friends
+      if (t.closest && t.closest('.modal-overlay, .msg-overlay, .fc-menu')) return;
+      setSelectedId(null);
+    };
+    document.addEventListener('pointerdown', onDown);
+    return () => document.removeEventListener('pointerdown', onDown);
+  }, [selectedId, panelSlot]);
 
   // The selected friend assembled from the list row + their public_stats.
   // FriendCard expects a single `friend` prop, so we merge here rather
@@ -255,7 +321,7 @@ export default function FriendsRail({ userId, onUpgrade }) {
         <span style={{display:'inline-flex',alignItems:'center',gap:6}}><Icon name="plus" size={14} /> Add a friend</span>
       </button>
 
-      {selectedFriend && (
+      {selectedFriend && !panelSlot && (
         <div ref={cardRef} className="fc-card-slot">
           <FriendCard
             friend={selectedFriend}
@@ -264,33 +330,26 @@ export default function FriendsRail({ userId, onUpgrade }) {
             unread={unread[selectedFriend.id] || 0}
             onMessage={(f) => setMessageTarget(f)}
             onReport={(f) => setReportTarget(f)}
-            onBlock={async (f) => {
-              // Block is destructive — confirm via native dialog. The
-              // queries module also drops the friendship row in the same
-              // call, so the user is immediately removed from the list.
-              const ok = window.confirm(
-                `Block ${f.name}? They'll be removed from your friends and won't be able to find you again.`
-              );
-              if (!ok) return;
-              try {
-                await friends.block(f.id);
-                setSelectedId(null); // close the card since this friend is gone
-              } catch (e) {
-                window.alert(e.message || 'Could not block.');
-              }
-            }}
-            onUnfriend={async (f) => {
-              const ok = window.confirm(`Remove ${f.name} from your friends?`);
-              if (!ok) return;
-              try {
-                await friends.unfriend(f.id);
-                setSelectedId(null);
-              } catch (e) {
-                window.alert(e.message || 'Could not unfriend.');
-              }
-            }}
+            onBlock={handleBlock}
+            onUnfriend={handleUnfriend}
           />
         </div>
+      )}
+
+      {/* The selected friend, in the space the host lent us. */}
+      {selectedFriend && panelSlot && createPortal(
+        <FriendPanel
+          userId={userId}
+          friend={selectedFriend}
+          loading={statsLoading}
+          statsMissing={!selectedStats && !statsLoading}
+          onClose={() => setSelectedId(null)}
+          onBlocked={() => { setSelectedId(null); friends.refresh().catch(() => {}); }}
+          onReport={(f) => setReportTarget(f)}
+          onBlock={handleBlock}
+          onUnfriend={handleUnfriend}
+        />,
+        panelSlot,
       )}
 
       <AddFriendModal

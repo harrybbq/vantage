@@ -627,6 +627,15 @@ function Board({ userId, userEmail, onSignOut }) {
 
   const showBanner = !noBanner && (justMigrated || localDataExists);
   const currentBg = backgrounds[activeSection];
+  /* Dim and blur for the backdrop, per section for the same reason the
+     image is: a value that jumped when you changed page would read as a
+     bug. New key, defaults to nothing, so an account that has never
+     touched it looks exactly as it always has. */
+  const bgFx = { dim: 0, blur: 0, ...((S.bgFx || {})[activeSection] || {}) };
+  const setBgFx = next => update(prev => ({
+    ...prev,
+    bgFx: { ...(prev.bgFx || {}), [activeSection]: { dim: 0, blur: 0, ...next } },
+  }));
 
   return (
     <>
@@ -655,12 +664,28 @@ function Board({ userId, userEmail, onSignOut }) {
       {/* Hidden file input for background */}
       <input ref={bgInputRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={handleBgFileChange} />
 
-      {/* Custom background image for current section */}
+      {/* Custom background image for current section.
+          Blur is applied to the image layer and the layer is inset by
+          the blur radius: a filter samples past its own edges, so a
+          blurred box that stops at the viewport fades to transparent
+          along all four sides and shows the page ground through it.
+          Dim is a separate flat layer over the top rather than an
+          opacity on this one, so it works over the theme's own backdrop
+          when no image has been chosen. */}
       {currentBg && (
         <div style={{
-          position: 'fixed', inset: 0, zIndex: 0, pointerEvents: 'none',
+          position: 'fixed',
+          inset: bgFx.blur ? -(bgFx.blur * 2) : 0,
+          zIndex: 0, pointerEvents: 'none',
           backgroundImage: `url(${currentBg})`,
           backgroundSize: 'cover', backgroundPosition: 'center',
+          filter: bgFx.blur ? `blur(${bgFx.blur}px)` : undefined,
+        }} />
+      )}
+      {bgFx.dim > 0 && (
+        <div style={{
+          position: 'fixed', inset: 0, zIndex: 0, pointerEvents: 'none',
+          background: `rgba(0,0,0,${(bgFx.dim / 100).toFixed(3)})`,
         }} />
       )}
 
@@ -714,15 +739,24 @@ function Board({ userId, userEmail, onSignOut }) {
       )}
 
       {/* Fixed page header (desktop only — hidden via @media on mobile) */}
+      {/* `userId` is withheld on mobile: the chrome bar is hidden there,
+          and a hidden chip polling once a minute is a query nobody can
+          read. Mobile learns about friend requests from the Friends
+          section's own list. */}
       <PageHeader
         activeSection={activeSection}
         coins={S.coins || 0}
+        coinHistory={S.coinHistory}
         onOpenCoinHistory={() => handleOpenModal('coinHistoryModal')}
         profileName={S.profile?.name || ''}
         onChangeBg={handleChangeBgClick}
         onRemoveBg={currentBg ? handleRemoveBg : null}
         onCoinContextMenu={isOwner ? () => setAdminEdit('coins') : null}
         weatherEnabled={S.weatherEnabled !== false}
+        userId={isMobile ? null : userId}
+        onOpenRequests={() => navigate(isMobile ? 'friends' : 'hub')}
+        bgFx={bgFx}
+        onBgFx={setBgFx}
       />
 
       {/* Main sections */}

@@ -34,6 +34,11 @@ export const DEFAULT_STATE = {
   // Synced in state so they follow the account across devices (migrated
   // from the old device-local localStorage('vb4_bg')).
   backgrounds: {},
+  // Dim and blur for whatever is behind a section, keyed the same way
+  // the images are: { [section]: { dim: 0-80 (%), blur: 0-40 (px) } }.
+  // Absent means untouched, which is what every existing account looks
+  // like — the layer only renders when a value is non-zero.
+  bgFx: {},
   // Per-widget custom sizes { [widgetId]: { w, h } } set by dragging a
   // widget's resize grip. Cleared by the "Sort" action alongside
   // widgetPositions.

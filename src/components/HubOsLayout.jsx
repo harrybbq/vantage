@@ -428,13 +428,22 @@ export function OsTrackersPanel({ trackers, logs }) {
 // ── Panel: Widgets Canvas (reuses imperative canvas from HubSection) ──────
 // The actual imperative rendering is mounted by the parent via a ref. We
 // just provide the panel shell and let the parent stuff the canvas into it.
-export const OsWidgetsPanel = ({ canvasRef }) => (
-  <div className="os-panel os-widgets" data-hub-module="widgets" data-hub-module-label="Widgets">
-    <div className="os-panel-label">
-      <span className="os-panel-label-text">Widgets</span>
-      <span className="os-panel-label-right">Canvas</span>
+export const OsWidgetsPanel = ({ canvasRef, friendSlotRef }) => (
+  <div className="os-mid">
+    <div className="os-panel os-widgets" data-hub-module="widgets" data-hub-module-label="Widgets">
+      <div className="os-panel-label">
+        <span className="os-panel-label-text">Widgets</span>
+        <span className="os-panel-label-right">Canvas</span>
+      </div>
+      <div id="widgetCanvas" className="os-widgets-body hub-links-col" ref={canvasRef}></div>
     </div>
-    <div id="widgetCanvas" className="os-widgets-body hub-links-col" ref={canvasRef}></div>
+    {/* Where a selected friend goes. The canvas below it is left mounted
+        and laid out rather than swapped out: it is imperative, its
+        children are positioned from measured offsets, and unmounting it
+        to show a friend would mean re-measuring an invisible box on the
+        way back. The layer is pointer-events:none until something is
+        portalled into it. */}
+    <div className="os-friend-slot" ref={friendSlotRef} />
   </div>
 );
 
@@ -615,6 +624,9 @@ export default function HubOsLayout({
   const profile = S.profile || {};
   const ownHandle = useOwnHandle(userId);
   const mainRef = useRef(null);
+  /* State, not a ref: the rail portals into this node, so the render
+     that creates it has to be followed by one that can see it. */
+  const [friendSlot, setFriendSlot] = useState(null);
   useStickyColumnState(mainRef);
 
   // Right-click any panel → toggle its background transparency.
@@ -665,12 +677,13 @@ export default function HubOsLayout({
                 visible without scrolling the column past the ledger. Same
                 component as the cream hub, retinted via dark-os overrides
                 on the .fc-* classes in hub-dark.css. */}
-            <FriendsRail userId={userId} onUpgrade={onUpgrade} />
+            <FriendsRail userId={userId} onUpgrade={onUpgrade} panelSlot={friendSlot} />
           </div>
         </div>
 
-        {/* Middle: imperative widgets canvas */}
-        <OsWidgetsPanel canvasRef={canvasRef} />
+        {/* Middle: imperative widgets canvas, with the friend panel's
+            layer over it. */}
+        <OsWidgetsPanel canvasRef={canvasRef} friendSlotRef={setFriendSlot} />
 
         {/* Right col: quicklog, ai coach, optional cardio */}
         <div className="os-col">

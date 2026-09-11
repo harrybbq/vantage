@@ -1,7 +1,8 @@
 /**
  * Single row in the compact Friends panel. Renders avatar + name + a
  * short status line + a small OVR chip (glow-tinted by prestige tier),
- * and — on hover — a message button immediately left of that chip.
+ * and — on hover — a message button immediately left of that chip, with
+ * any unread count sitting on the button itself.
  *
  * Status line precedence:
  *   1. Active streak (with flame) if streak > 0
@@ -81,26 +82,31 @@ export default function FriendListRow({ friend, selected, onClick, onMessage }) 
         <div className="fc-row-name">{friend.name}</div>
         <div className="fc-row-status">{statusLine(friend)}</div>
       </div>
-      {friend.unread > 0 && (
-        <span className="fc-row-unread" title={`${friend.unread} unread message${friend.unread === 1 ? '' : 's'}`}>
-          {friend.unread > 9 ? '9+' : friend.unread}
-        </span>
-      )}
       {/* Straight to the conversation. Opening the card to reach its
           Message button was two clicks and a card's worth of scrolling
           for the thing people do most. stopPropagation because the row
           underneath would otherwise also expand the card behind the
-          chat. */}
+          chat.
+
+          The unread count rides ON the button rather than sitting beside
+          it: the number and the way to act on it are the same thought,
+          and a row with something waiting keeps the button visible
+          (below), so the count is never hidden with it. */}
       {onMessage && (
         <button
           type="button"
           className="fc-row-msg"
-          title={`Message ${friend.name}`}
-          aria-label={`Message ${friend.name}`}
+          title={unread
+            ? `${friend.unread} unread message${friend.unread === 1 ? '' : 's'} from ${friend.name}`
+            : `Message ${friend.name}`}
+          aria-label={unread
+            ? `Message ${friend.name}, ${friend.unread} unread`
+            : `Message ${friend.name}`}
           onClick={e => { e.stopPropagation(); onMessage(friend); }}
           onKeyDown={e => e.stopPropagation()}
         >
           <Icon name="mail" size={13} />
+          {unread && <span className="fc-row-unread">{friend.unread > 9 ? '9+' : friend.unread}</span>}
         </button>
       )}
       <div className={`fc-row-level ovr-chip ovr-tier-${prestige.key}`} title={`OVR ${ovr} · ${prestige.label}`}>{ovr}</div>
