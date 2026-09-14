@@ -139,8 +139,13 @@ export default function RatingsDonut({
           sits under it is the prestige level, or — while an arc is being
           hovered or focused — that arc's name, which is what stands in
           for colour on a ramped palette. */}
-      <text className="ratings-donut-ovr" x={mid} y={mid + (sub ? 0 : 4)}
-            textAnchor="middle" dominantBaseline="middle">{ovr}</text>
+      {/* A null OVR means the caller has nothing true to show yet — the
+          state on screen is the local backup and the cloud copy is
+          still in the air. An em dash for a moment, never a number
+          that is about to change. */}
+      <text className={`ratings-donut-ovr${ovr == null ? ' is-settling' : ''}`}
+            x={mid} y={mid + (sub ? 0 : 4)}
+            textAnchor="middle" dominantBaseline="middle">{ovr == null ? '—' : ovr}</text>
       {sub && (
         <text className="ratings-donut-sub" x={mid} y={mid + 22} textAnchor="middle">{sub}</text>
       )}

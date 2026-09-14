@@ -26,7 +26,7 @@ const CLIENT_DEBOUNCE_MS = 1500;
 const SERVER_DEBOUNCE_MS = 30_000;
 const MACRO_DAYS_TTL_MS = 5 * 60_000;
 
-export function useRatings(userId, S, update, friendCount = 0) {
+export function useRatings(userId, S, update, friendCount = 0, hydrated = true) {
   const clientTimerRef = useRef(null);
   const serverTimerRef = useRef(null);
   const lastClientSigRef = useRef(null);
@@ -62,6 +62,13 @@ export function useRatings(userId, S, update, friendCount = 0) {
 
   useEffect(() => {
     if (!S) return;
+    /* Nothing is recomputed against the local backup. It is a slimmed
+       copy painted for speed while the cloud answers, and deriving a
+       rating from it means writing a number from an incomplete picture
+       — then correcting it a moment later. That correction is what the
+       user sees, and from the outside it is indistinguishable from the
+       app losing their progress. */
+    if (!hydrated) return;
     // Cheap signature: anything that affects rating points. Listed
     // explicitly so log-only ticks (which DO affect tracker points
     // through density) trigger recompute, but every state mutation
@@ -138,5 +145,5 @@ export function useRatings(userId, S, update, friendCount = 0) {
       clearTimeout(serverTimerRef.current);
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [S, userId, friendCount]);
+  }, [S, userId, friendCount, hydrated]);
 }

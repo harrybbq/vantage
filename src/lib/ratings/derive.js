@@ -74,16 +74,34 @@ function ymd(d) {
  * OVR 99, could not be reached by anyone. Two thirds of the number the
  * whole app is built around were decorative.
  *
- * 6 is set from the profiles, not picked: it puts a committed year near
- * 57, three years near 72, and 99 within reach of someone who keeps it
- * up for the better part of a decade. Early progress still moves fast —
- * a first month reads 28 — because sqrt does that on its own.
+ * 6 was set from the profiles rather than picked, and it was better
+ * than 1. It was still too slow in the middle.
  *
- * Changing this moves every rating on the leaderboard at once. If it
- * changes again, bump FORMULA_EPOCH_ISO in get-leaderboard.js with it,
- * or every user is handed a week's "climb" they did not earn.
+ * ── 2026-09-14: 6 → 8 ────────────────────────────────────────────────
+ * Simulated against a committed profile — trackers in all four
+ * categories logged six days a week, vitals and burn daily, a dozen
+ * real achievements, a part-funded pot, twelve friends — the ladder ran
+ * like this:
+ *
+ *            OVR at 6mo    avg days per level, OVR 28-45
+ *   was            29                21.5
+ *   now            37                11.7
+ *
+ * Three weeks of daily logging for one point is not a ladder, it is a
+ * wait. Two people reported it as "stuck", which is the correct reading
+ * of a number that does not move.
+ *
+ * What it does NOT do is hand out the top: 99 still takes about seven
+ * years of the same commitment (was ~9), which is the "better part of a
+ * decade" this was calibrated for in the first place. The sqrt keeps
+ * early progress fast and the 90s earned.
+ *
+ * Changing this moves every rating on the leaderboard at once — which
+ * is why FORMULA_EPOCH_ISO in get-leaderboard.js is bumped with it, so
+ * nobody is handed a week's "climb" they did not earn. Every user's
+ * number rises by the same proportion, so the order is unchanged.
  */
-const RATING_SCALE = 6;
+const RATING_SCALE = 8;
 
 /**
  * Map raw "rating points" to the 1-99 scale via sqrt, so early progress
@@ -180,7 +198,13 @@ function trackerPoints(S, category) {
 // vitals entry always has been. Consistency earns; the window measures
 // whether you are on it, this measures whether you have been at it.
 
-const CATEGORY_DAY_POINTS = 0.4;
+// 0.4 → 0.6 on 2026-09-14, alongside RATING_SCALE. Fitness has three
+// lifetime accruals of its own (vitals, burn, macros) worth 1.4 a day
+// on top of this; Brain, Finance and Social have this line and nothing
+// else. So the category that measured itself automatically climbed
+// three times faster than the three you have to show up for, and since
+// OVR is the mean of the four, the three slow ones set the pace.
+const CATEGORY_DAY_POINTS = 0.6;
 
 function categoryDayPoints(S, category) {
   const ids = new Set((S.trackers || []).filter(t => t.category === category).map(t => t.id));

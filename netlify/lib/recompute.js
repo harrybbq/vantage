@@ -30,9 +30,12 @@ function ymd(ms) {
   return new Date(ms).toISOString().slice(0, 10);
 }
 /* How much a point is worth on the 1-99 scale. Mirrors RATING_SCALE in
-   src/lib/ratings/derive.js — see the note there for why it is 6 and
-   what to bump alongside it. */
-const RATING_SCALE = 6;
+   src/lib/ratings/derive.js — see the note there for why it is 8, what
+   the simulation said, and what to bump alongside it. This copy exists
+   because a number other people can see must not be computed on the
+   machine of the person it flatters; `npm run check:parity` fails the
+   build if the two ever disagree. */
+const RATING_SCALE = 8;
 function toRating(points, k = RATING_SCALE) {
   if (!Number.isFinite(points) || points <= 0) return 1;
   return clamp(1 + Math.sqrt(points * k));
@@ -73,11 +76,11 @@ function trackerPoints(state, category) {
   return Math.min(total, TRACKER_CAP_N * 10);
 }
 
-/* Lifetime days on which anything in the category was logged, at 0.4 a
+/* Lifetime days on which anything in the category was logged, at 0.6 a
    day — the per-category equivalent of vitalsPoints, and what stops
    Brain, Finance and Social freezing inside the first year. Mirrors
    categoryDayPoints in derive.js. */
-const CATEGORY_DAY_POINTS = 0.4;
+const CATEGORY_DAY_POINTS = 0.6;
 
 function categoryDayPoints(state, category) {
   const ids = new Set((state.trackers || []).filter(t => t.category === category).map(t => t.id));
