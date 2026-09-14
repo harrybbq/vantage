@@ -8577,3 +8577,44 @@ div.m-hubdrawer-coach { cursor: default; display: flex; flex-direction: column; 
   .ppl-rail{padding-bottom:2px;}
   .ppl-chip{min-height:46px;padding:6px 11px;}
 }
+
+/* ── Foods people added themselves ─────────────────────────────────────
+   Two opt-ins, both unticked, both plainly worded: one to publish a
+   food you typed in, one to see foods other people typed in. Neither is
+   a footnote, so neither is set in footnote type. */
+.fs-community{
+  display:flex; align-items:flex-start; gap:9px;
+  padding:9px 11px; margin-bottom:10px; flex-shrink:0;
+  border:1px solid var(--border); border-radius:var(--radius-md);
+  cursor:pointer;
+}
+.fs-community input{ margin-top:2px; accent-color:var(--em); flex:none; }
+/* One flex child, not two: the label and its sentence stack, and only
+   the pair as a whole sits beside the tick box. */
+.fs-community-text{ min-width:0; }
+.fs-community-label{ font-size:var(--text-sm); color:var(--text); font-weight:600; display:block; }
+.fs-community-sub{
+  display:block; margin-top:2px;
+  font-size:var(--text-xs); line-height:1.45; color:var(--text-muted);
+}
+/* A number somebody typed in and a number off a packet are not the same
+   claim. The badge is on every community row, not only the first. */
+.fs-tag-community{
+  flex:none;
+  font-family:var(--mono); font-size:8.5px; letter-spacing:.7px; text-transform:uppercase;
+  padding:2px 5px; border-radius:5px;
+  color:var(--text-muted); background:rgba(128,128,128,.16);
+}
+
+.fls-share{
+  display:flex; align-items:flex-start; gap:9px;
+  padding:10px 11px; margin-top:10px;
+  border:1px solid var(--border); border-radius:var(--radius-md);
+  cursor:pointer;
+}
+.fls-share input{ margin-top:2px; accent-color:var(--em); flex:none; }
+.fls-share b{ display:block; font-size:var(--text-sm); font-weight:600; color:var(--text); }
+.fls-share em{
+  display:block; margin-top:2px; font-style:normal;
+  font-size:var(--text-xs); line-height:1.45; color:var(--text-muted);
+}

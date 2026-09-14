@@ -935,3 +935,46 @@
 .upg-commute-m { font-family: var(--mono); font-size: 13px; color: var(--text); }
 .upg-commute-w { font-size: 11.5px; color: var(--text-muted); flex: 1; min-width: 0; }
 .upg-commute-k { font-family: var(--mono); font-size: 11.5px; color: var(--em); }
+
+/* ── Review: group pictures waiting on a person ───────────────────────
+   Deliberately plain. This is a queue that should be empty most of the
+   time, and the picture is the only thing on the row worth looking at. */
+.upg-review { display: flex; flex-direction: column; gap: 10px; }
+.upg-review-head { display: flex; align-items: flex-start; gap: 12px; }
+.upg-review-title { font-size: 15px; font-weight: 600; color: var(--text); }
+.upg-review-sub {
+  margin: 4px 0 0; max-width: 62ch;
+  font-size: 12px; line-height: 1.5; color: var(--text-muted);
+}
+.upg-review-empty { font-size: 12.5px; color: var(--text-muted); padding: 10px 0; }
+.upg-review-error {
+  font-family: var(--mono); font-size: 11px; color: rgb(199, 44, 72);
+  padding: 8px 10px; border: 1px solid rgba(199, 44, 72, .35); border-radius: 8px;
+}
+.upg-review-row {
+  display: flex; align-items: center; gap: 12px;
+  padding: 10px; border: 1px solid var(--border); border-radius: 12px;
+}
+/* Shown far larger than the 40px it will be drawn at in public. A
+   decision about whether something is fit to show strangers should not
+   be made from a thumbnail. */
+.upg-review-img {
+  width: 96px; height: 96px; flex: none;
+  border-radius: 12px; object-fit: cover; display: block;
+  background: rgba(128, 128, 128, .12);
+}
+.upg-review-meta { flex: 1; min-width: 0; }
+.upg-review-name { font-size: 14px; font-weight: 600; color: var(--text); }
+.upg-review-when {
+  font-family: var(--mono); font-size: 9.5px; letter-spacing: 1px;
+  text-transform: uppercase; color: var(--text-muted); margin-top: 3px;
+}
+.upg-review-note { font-size: 12px; color: var(--text-mid); margin-top: 6px; }
+.upg-review-acts { display: flex; flex-direction: column; gap: 6px; flex: none; }
+.upg-review-no { color: rgb(199, 44, 72); border-color: rgba(199, 44, 72, .4); }
+
+@media (max-width: 560px) {
+  .upg-review-row { flex-wrap: wrap; }
+  .upg-review-acts { flex-direction: row; width: 100%; }
+  .upg-review-acts .btn { flex: 1; }
+}

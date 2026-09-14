@@ -15,11 +15,29 @@ async function searchByBarcode(barcode) {
   return json.products || [];
 }
 
-async function searchByName(query) {
-  const res = await authFetch(`/.netlify/functions/food-search?mode=name&q=${encodeURIComponent(query)}`);
+async function searchByName(query, community) {
+  const res = await authFetch(
+    `/.netlify/functions/food-search?mode=name&q=${encodeURIComponent(query)}${community ? '&community=1' : ''}`
+  );
   const json = await res.json();
   if (!res.ok) throw new Error(json.error || 'Search failed');
   return json.products || [];
+}
+
+/* Whether to include foods other users added.
+ *
+ * Off until asked for: these are strangers' words in a list you are
+ * scanning quickly, and nobody should be handed them without turning
+ * them on. Remembered per device in localStorage rather than in the
+ * state blob — it is a preference about how a list looks on the screen
+ * in front of you, which is exactly what localStorage is for, and it
+ * costs nothing if the read fails. */
+const COMMUNITY_KEY = 'vb4_food_community';
+function readCommunityPref() {
+  try { return localStorage.getItem(COMMUNITY_KEY) === '1'; } catch { return false; }
+}
+function writeCommunityPref(on) {
+  try { localStorage.setItem(COMMUNITY_KEY, on ? '1' : '0'); } catch { /* private mode */ }
 }
 
 export default function FoodSearch({ onSelectFood, onClose, onOpenModal, savedMeals = [], onDeleteMeal, userId }) {
@@ -32,6 +50,7 @@ export default function FoodSearch({ onSelectFood, onClose, onOpenModal, savedMe
 
   const [query, setQuery] = useState('');
   const [results, setResults] = useState([]);
+  const [community, setCommunity] = useState(readCommunityPref);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [recent, setRecent] = useState([]);
@@ -100,6 +119,17 @@ export default function FoodSearch({ onSelectFood, onClose, onOpenModal, savedMe
     return () => document.removeEventListener('keydown', esc);
   }, [onClose]);
 
+  /* Flipping the toggle re-runs the search there and then rather than
+     waiting for the next keystroke — the whole point of the switch is to
+     see what it changes about the list you are looking at. */
+  function toggleCommunity() {
+    const next = !community;
+    setCommunity(next);
+    writeCommunityPref(next);
+    const q = query.trim();
+    if (q.length >= 2) doSearch(q, next);
+  }
+
   function handleQueryChange(val) {
     setQuery(val);
     setError('');
@@ -108,10 +138,10 @@ export default function FoodSearch({ onSelectFood, onClose, onOpenModal, savedMe
     debounceRef.current = setTimeout(() => doSearch(val.trim()), 500);
   }
 
-  async function doSearch(q) {
+  async function doSearch(q, communityOverride) {
     setLoading(true);
     try {
-      const res = await searchByName(q);
+      const res = await searchByName(q, communityOverride ?? community);
       if (res.length === 0) setError('No results found. Try a different search or add manually.');
       setResults(res);
     } catch (e) {
@@ -345,6 +375,20 @@ export default function FoodSearch({ onSelectFood, onClose, onOpenModal, savedMe
             {/* Attribution + the units note. "per 100g" used to repeat on
                 every single row; saying it once here buys back a chip's
                 width on each result. */}
+            {/* Foods people here typed in themselves. Off by default —
+                see readCommunityPref. Its own row rather than squeezed
+                into the attribution line: it changes what the list
+                contains, which is not a footnote. */}
+            <label className="fs-community">
+              <input type="checkbox" checked={community} onChange={toggleCommunity} />
+              <span className="fs-community-text">
+                <span className="fs-community-label">Show user additions</span>
+                <span className="fs-community-sub">
+                  Foods other people added by hand, for what the databases miss
+                </span>
+              </span>
+            </label>
+
             <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: '10px', flexWrap: 'wrap', fontSize: '10px', color: 'var(--text-muted)', fontFamily: 'var(--mono)', marginBottom: '10px', flexShrink: 0 }}>
               <span>Data: Open Food Facts (openfoodfacts.org) — CC BY-SA</span>
               {results.length > 0 && (
@@ -373,7 +417,13 @@ export default function FoodSearch({ onSelectFood, onClose, onOpenModal, savedMe
                   style={{ width: '100%', display: 'flex', alignItems: 'center', gap: '11px', padding: '10px 12px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border)', background: 'transparent', cursor: 'pointer', textAlign: 'left', marginBottom: '6px', fontFamily: 'var(--sans)' }}>
                   <BrandMark brand={item.brand} name={item.food_name} image={item.image} size={38} />
                   <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontWeight: 600, fontSize: 'var(--text-sm)', color: 'var(--text)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{item.food_name || '—'}</div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', minWidth: 0 }}>
+                      <span style={{ fontWeight: 600, fontSize: 'var(--text-sm)', color: 'var(--text)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{item.food_name || '—'}</span>
+                      {/* Badged, always. A number somebody typed in and a
+                          number off a packet are not the same claim, and
+                          the list should not present them as one. */}
+                      {item.source === 'community' && <span className="fs-tag-community">Added by a user</span>}
+                    </div>
                     <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px', marginTop: '2px', minWidth: 0 }}>
                       {item.brand && (
                         <span style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)', flexShrink: 1, minWidth: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{item.brand}</span>

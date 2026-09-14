@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "eslint . && npm run check:visions && npm run check:parity && npm run check:boot && npm run check:savings && npm run check:training && npm run check:merge && npm run check:invite && npm run check:autolog && npm run check:recurring && npm run check:planpost && npm run check:pathplayer && npm run check:bootrun && npm run check:coins && npm run check:ledger && npm run check:relapse && npm run check:ladder && vite build",
+    "build": "eslint . && npm run check:visions && npm run check:parity && npm run check:boot && npm run check:savings && npm run check:training && npm run check:merge && npm run check:invite && npm run check:autolog && npm run check:recurring && npm run check:planpost && npm run check:pathplayer && npm run check:bootrun && npm run check:coins && npm run check:ledger && npm run check:relapse && npm run check:ladder && npm run check:crest && npm run check:foods && vite build",
     "check:visions": "node scripts/check-vision-xp.mjs",
     "check:parity": "node scripts/check-ratings-parity.mjs",
     "check:boot": "node scripts/check-boot-speed.mjs",
@@ -28,7 +28,9 @@
     "check:coins": "node src/lib/coins/daily.test.mjs",
     "check:ledger": "node src/lib/coins/ledger.test.mjs",
     "check:relapse": "node src/lib/habits/relapse.test.mjs",
-    "check:ladder": "node src/lib/ratings/ladder.test.mjs"
+    "check:ladder": "node src/lib/ratings/ladder.test.mjs",
+    "check:crest": "node src/lib/groups/crestImage.test.mjs",
+    "check:foods": "node src/lib/diet/contribute.test.mjs"
   },
   "dependencies": {
     "@capacitor/android": "^8.3.1",

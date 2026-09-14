@@ -62,6 +62,55 @@
   background:linear-gradient(150deg, rgba(var(--em-rgb),.95), rgba(var(--em-rgb),.6));
   box-shadow:0 6px 16px rgba(0,0,0,.22);
 }
+/* ── The picture, where a group has set one ───────────────────────────
+   The crest was always initials on a colour; a picture simply fills the
+   same square. Everything about the size and the corner stays, so a
+   group that never sets one looks exactly as it did. */
+.grp-crest{ position:relative; overflow:hidden; padding:0; border:none; }
+.grp-crest-img{ width:100%; height:100%; object-fit:cover; display:block; }
+.grp-crest-initials{ line-height:1; }
+
+/* The column is the width of the picture until there is something to
+   say about it, and then it is the width of the sentence. A 190px
+   status note negatively offset out of a 56px gutter was the first
+   attempt; it ran off the left edge of the card. */
+.grp-crest-edit{
+  display:flex; flex-direction:column; align-items:flex-start; gap:6px;
+  flex:none; width:56px;
+}
+.grp-crest-edit:has(.grp-crest-note){ width:180px; }
+.grp-crest.is-editable{ cursor:pointer; font:inherit; color:#fff; }
+.grp-crest.is-editable:disabled{ cursor:progress; }
+.grp-crest.is-busy{ opacity:.6; }
+/* The camera badge sits in the corner rather than over the whole tile:
+   a full-cover overlay on hover hides the thing you are deciding
+   whether to replace. */
+.grp-crest-overlay{
+  position:absolute; right:0; bottom:0;
+  width:20px; height:20px; border-radius:7px 0 0 0;
+  display:flex; align-items:center; justify-content:center;
+  background:rgba(0,0,0,.55); color:#fff;
+  opacity:0; transition:opacity .15s;
+}
+.grp-crest.is-editable:hover .grp-crest-overlay,
+.grp-crest.is-editable:focus-visible .grp-crest-overlay{ opacity:1; }
+@media (hover:none){ .grp-crest-overlay{ opacity:.9; } }
+
+.grp-crest-clear{
+  white-space:nowrap;
+  font-family:var(--mono); font-size:9px; letter-spacing:.6px;
+  background:none; border:none; padding:0; cursor:pointer;
+  color:var(--text-muted); text-decoration:underline;
+}
+.grp-crest-clear:hover{ color:rgb(199,44,72); }
+/* Wider than the 56px column it sits under — the status is a sentence,
+   not a label, and wrapping it into a 56px gutter makes it unreadable. */
+.grp-crest-note{
+  font-family:var(--mono); font-size:9.5px; line-height:1.45;
+}
+.grp-crest-note.is-wait{ color:var(--text-muted); }
+.grp-crest-note.is-bad{ color:rgb(199,44,72); }
+
 .grp-hero-id{ flex:1; min-width:0; }
 .grp-hero-name{
   display:flex; align-items:center; gap:9px; flex-wrap:wrap;
@@ -326,7 +375,9 @@
   width:28px; height:28px; flex:none; border-radius:8px;
   display:flex; align-items:center; justify-content:center;
   font-size:11px; font-weight:700; color:#fff;
+  overflow:hidden;
 }
+.grp-gcrest-img{ width:100%; height:100%; object-fit:cover; display:block; }
 .grp-gtitle{
   min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
   font-size:13.5px; color:var(--text);

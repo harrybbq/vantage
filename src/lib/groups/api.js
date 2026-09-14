@@ -39,6 +39,23 @@ export async function callGroups(payload) {
  * whether the group has a seat left, and whether the joiner is already
  * in a group — so this sends the code and reports back what it says.
  */
+/**
+ * The review queue, for whoever is allowed to see it.
+ *
+ * Owner-gated on the SERVER against the email the auth server returns —
+ * `useIsOwner` decides whether to render the surface and decides nothing
+ * else. A non-owner calling this gets the same answer as a bad token.
+ */
+export async function crestQueue() {
+  return callGroups({ action: 'crestQueue' });
+}
+
+export async function decideCrest(groupId, verdict, note) {
+  const out = await callGroups({ action: 'crestDecide', groupId, verdict, note });
+  clearGroupsCache();
+  return out;
+}
+
 export async function joinByCode(code) {
   const out = await callGroups({ action: 'join', code: String(code || '').trim() });
   clearGroupsCache();
