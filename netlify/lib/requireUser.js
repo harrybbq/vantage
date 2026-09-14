@@ -46,9 +46,14 @@ async function requireUser(event, CORS) {
       headers: { apikey, Authorization: `Bearer ${jwt}` },
     });
     if (!res.ok) return fail(401, 'session expired — sign in again');
-    const userId = (await res.json())?.id;
+    const me = await res.json();
+    const userId = me?.id;
     if (!userId) return fail(401, 'session expired — sign in again');
-    return { userId };
+    // The email comes back on the same call, so an owner-gated endpoint
+    // does not need a second round trip to ask who this is. It is the
+    // verified address from the auth server, not anything the client
+    // said about itself.
+    return { userId, email: String(me?.email || '').toLowerCase() };
   } catch {
     return fail(503, 'could not verify session');
   }

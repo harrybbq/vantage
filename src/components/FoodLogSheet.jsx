@@ -2,6 +2,7 @@ import { useState, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import Icon from './Icon';
 import { supabase } from '../lib/supabase';
+import { contributionProblem, toContribution } from '../lib/diet/contribute';
 import { backdropClose } from '../utils/backdropClose';
 
 const MEAL_TYPES = ['breakfast', 'lunch', 'dinner', 'snack'];
@@ -121,6 +122,28 @@ export default function FoodLogSheet({ userId, logDate, onClose, onSaved, prefil
     setForm(f => ({ ...f, [key]: val }));
   }
 
+  /* Adding the food to the shared database, for the next person who
+     searches for it.
+     ────────────────────────────────────────────────────────────────
+     Unticked, always. Logging your lunch is a private act and this is a
+     publishing one; a default-on box would mean everyone who ever typed
+     a panel in had published it without deciding to. The box only
+     appears when the entry is worth sharing — an empty panel or a food
+     called "lunch" helps nobody search for anything, so rather than
+     offering it and then refusing, it is simply not offered. */
+  const [share, setShare] = useState(false);
+  const shareProblem = contributionProblem(form);
+
+  async function contributeIfAsked() {
+    if (!share || shareProblem || !userId) return;
+    const row = toContribution(form, userId);
+    if (!row) return;
+    // Never fails the log. The food IS saved; the sharing is a bonus,
+    // and the commonest failure is the unique index rejecting a food
+    // somebody already added — which is the system working.
+    try { await supabase.from('food_contributions').insert(row); } catch { /* already there, or not set up */ }
+  }
+
   async function handleSave() {
     // `?? ''` throughout: the guard above used to be the only thing
     // standing between a null field and a TypeError thrown AFTER
@@ -165,6 +188,7 @@ export default function FoodLogSheet({ userId, logDate, onClose, onSaved, prefil
       err = { message: 'timeout' };
     }
     if (err) { setError('Couldn’t save — check your connection and try again.'); return; }
+    await contributeIfAsked();
     onSaved?.();
     onClose();
     } catch (e) {
@@ -300,6 +324,19 @@ export default function FoodLogSheet({ userId, logDate, onClose, onSaved, prefil
             style={{ width: '100%', marginTop: '6px', padding: '10px', borderRadius: 'var(--radius-md)', border: '1px dashed var(--border)', background: 'transparent', color: savedMeal ? 'var(--em)' : 'var(--text-muted)', cursor: 'pointer', fontFamily: 'var(--mono)', fontSize: '11px', letterSpacing: '1px', textTransform: 'uppercase', transition: 'color .15s' }}>
             {savedMeal ? 'Saved to your meals' : 'Save as a meal for later'}
           </button>
+        )}
+
+        {/* Share it, for whoever searches for it next. Only offered
+            when the entry would actually be worth finding — see
+            contributionProblem. */}
+        {userId && !shareProblem && (
+          <label className="fls-share">
+            <input type="checkbox" checked={share} onChange={e => setShare(e.target.checked)} />
+            <span>
+              <b>Add to the shared food database</b>
+              <em>Other users searching for this will find it. Your name is not attached.</em>
+            </span>
+          </label>
         )}
 
         {/* Action buttons */}

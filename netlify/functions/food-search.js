@@ -33,6 +33,60 @@ const UA = 'Vantage/1.0 (https://vantagevision.netlify.app)';
 const { requireUser, underLimit, tooMany } = require('../lib/requireUser');
 const { searchUSDA, searchFatSecret } = require('../lib/foodSources');
 
+/**
+ * Foods people here added themselves.
+ *
+ * A fifth source, and the only one whose gaps we can actually do
+ * anything about — the local bakery and the gym's protein bar are never
+ * going to be in Open Food Facts, and somebody has already typed the
+ * panel in to log it.
+ *
+ * OFF by default and only queried when the client asks (`&community=1`),
+ * because these are strangers' words and nobody should be handed them
+ * without turning them on. Hidden entries — three reports takes one out
+ * of search — are not selected at all.
+ *
+ * `contributed_by` is deliberately NOT in the select list. What somebody
+ * eats, and what they were prepared to type in at 9pm, is not a thing to
+ * publish beside their name; the column exists for moderation.
+ */
+async function searchCommunity(q, env) {
+  if (!env.supabaseUrl || !env.serviceKey) return [];
+  // PostgREST's `ilike` wants the wildcards in the value, and a comma or
+  // a paren in a filter value is what ends the filter — so anything that
+  // could reshape the query goes.
+  const term = String(q).replace(/[%,()*]/g, ' ').trim().slice(0, 60);
+  if (term.length < 2) return [];
+  const url = `${env.supabaseUrl}/rest/v1/food_contributions` +
+    `?status=eq.visible&name=ilike.*${encodeURIComponent(term)}*` +
+    '&select=id,name,brand,serving_g,serving_unit,calories,protein_g,carbs_g,fat_g,fibre_g,sugar_g,sodium_mg' +
+    '&order=created_at.desc&limit=12';
+  const res = await fetch(url, {
+    headers: { apikey: env.serviceKey, Authorization: `Bearer ${env.serviceKey}` },
+  });
+  // The table may simply not exist yet — that is "no community results",
+  // not a failed search.
+  if (!res.ok) return [];
+  const rows = await res.json();
+  return rows.map(r => ({
+    food_name: r.name || '',
+    brand: r.brand || '',
+    barcode: '',
+    image: '',
+    serving_g: Number(r.serving_g) || 100,
+    serving_unit: r.serving_unit === 'ml' ? 'ml' : 'g',
+    calories: Number(r.calories) || 0,
+    protein_g: Number(r.protein_g) || 0,
+    carbs_g: Number(r.carbs_g) || 0,
+    fat_g: Number(r.fat_g) || 0,
+    fibre_g: Number(r.fibre_g) || 0,
+    sugar_g: Number(r.sugar_g) || 0,
+    sodium_mg: Number(r.sodium_mg) || 0,
+    source: 'community',
+    contributionId: r.id,
+  })).filter(p => p.food_name.trim());
+}
+
 // Warm-instance cache. Repeat searches (typing, back-and-forth) hit
 // memory instead of three upstreams. Short TTL — food data barely
 // moves, but a stale-feeling search is worse than one extra call.
@@ -253,7 +307,7 @@ function mergeResults(lists, q) {
 const FIELDS = 'product_name,brands,code,nutriments,serving_quantity,serving_quantity_unit,quantity,categories,image_small_url,image_front_small_url';
 const PAGE_SIZE = 40;
 
-async function searchByName(q, page = 1) {
+async function searchByName(q, page = 1, opts = {}) {
   // Both endpoints, in parallel, merged. They rank differently —
   // Search-a-licious by relevance, the legacy CGI by scan popularity —
   // so running only one (the old fallback-on-failure behaviour) meant
@@ -296,7 +350,15 @@ async function searchByName(q, page = 1) {
   const deadline = new Promise(resolve =>
     setTimeout(() => resolve('deadline'), BUDGET_MS));
 
-  const tracked = [relevance, popularity, usda, fatsecret].map(settle);
+  /* Community entries go FIRST in the merge order. The merge keeps the
+     first copy of a duplicate, and if somebody here has typed a fuller
+     panel for a food the big databases carry as a bare name, theirs is
+     the one worth showing. */
+  const community = opts.community
+    ? searchCommunity(q, { supabaseUrl: env.SUPABASE_URL, serviceKey: env.SUPABASE_SERVICE_ROLE_KEY }).catch(() => [])
+    : Promise.resolve([]);
+
+  const tracked = [community, relevance, popularity, usda, fatsecret].map(settle);
   const done = [];
   await Promise.race([
     Promise.all(tracked.map(async (p, i) => { done[i] = await p; })),
@@ -329,19 +391,20 @@ exports.handler = async (event) => {
   if (!underLimit('food', auth.userId, 40)) return tooMany(CORS);
 
 
-  const { mode = 'name', q = '', page = '1' } = event.queryStringParameters || {};
+  const { mode = 'name', q = '', page = '1', community = '' } = event.queryStringParameters || {};
+  const wantCommunity = community === '1' || community === 'true';
   const pageNum = Math.min(10, Math.max(1, parseInt(page, 10) || 1));
   if (!q.trim()) {
     return { statusCode: 400, headers: CORS, body: JSON.stringify({ error: 'q is required' }) };
   }
 
   try {
-    const key = `${mode}:${q.trim().toLowerCase()}:${pageNum}`;
+    const key = `${mode}:${q.trim().toLowerCase()}:${pageNum}:${wantCommunity ? 'c' : ''}`;
     let products = cacheGet(key);
     if (!products) {
       products = mode === 'barcode'
         ? await searchByBarcode(q.trim())
-        : await searchByName(q.trim(), pageNum);
+        : await searchByName(q.trim(), pageNum, { community: wantCommunity });
       cacheSet(key, products);
     }
     // `hasMore` lets the client offer "Load more" without guessing.

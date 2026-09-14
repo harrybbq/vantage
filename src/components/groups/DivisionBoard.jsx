@@ -88,8 +88,12 @@ export default function DivisionBoard({ data, division, onPickDivision }) {
                   {g.zone === 'relegated' && <em className="is-down">▼</em>}
                 </div>
                 <div className="grp-gname">
-                  <span className="grp-gcrest" style={{ background: g.crestColor || crestColor(g.name) }}>
-                    {initials(g.name)}
+                  <span className="grp-gcrest" style={g.crestImage ? undefined : { background: g.crestColor || crestColor(g.name) }}>
+                    {/* Only ever an approved picture — the function does
+                        not send any other kind to a division table. */}
+                    {g.crestImage
+                      ? <img className="grp-gcrest-img" src={g.crestImage} alt="" />
+                      : initials(g.name)}
                   </span>
                   <span className="grp-gtitle">{g.name}</span>
                   {g.id === myGroupId && <span className="grp-tag">You</span>}

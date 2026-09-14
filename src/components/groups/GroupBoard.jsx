@@ -17,6 +17,7 @@
 import { useState } from 'react';
 import Icon from '../Icon';
 import InviteModal from './InviteModal';
+import GroupCrest from './GroupCrest';
 
 const CATS = [
   { id: 'fitness', label: 'Fitness', color: '#1a7a4a' },
@@ -52,7 +53,7 @@ const ZONE = {
   },
 };
 
-export default function GroupBoard({ data, onLeave, onRename, onRotateCode, onKick, busy }) {
+export default function GroupBoard({ data, onLeave, onRename, onRotateCode, onKick, onSetCrest, onRemoveCrest, busy }) {
   const [inviteOpen, setInviteOpen] = useState(false);
   const group = data?.group;
   const members = data?.members || [];
@@ -83,9 +84,17 @@ export default function GroupBoard({ data, onLeave, onRename, onRotateCode, onKi
         {/* ── The group, and its week ── */}
         <div className="grp-card grp-hero">
           <div className="grp-hero-top">
-            <div className="grp-crest" style={group.crestColor ? { background: group.crestColor } : undefined}>
-              {initials(group.name)}
-            </div>
+            <GroupCrest
+              name={group.name}
+              color={group.crestColor}
+              image={group.crestImage}
+              status={group.crestStatus}
+              note={group.crestNote}
+              canEdit={!!group.isOwner && !!onSetCrest}
+              onSet={onSetCrest}
+              onRemove={onRemoveCrest}
+              busy={busy}
+            />
             <div className="grp-hero-id">
               <div className="grp-hero-name">
                 {group.name}

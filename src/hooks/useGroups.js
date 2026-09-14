@@ -61,5 +61,11 @@ export function useGroups(division = null) {
     renameGroup: (name, crestColor) => act({ action: 'rename', name, crestColor }),
     rotateCode: () => act({ action: 'rotateCode' }),
     kickMember: userId => act({ action: 'kick', userId }),
+    /* The picture. `image` is the data URL from toCrestDataUrl; the
+       server screens it and answers with the status it landed in, so
+       the leader is told "waiting" or "not approved, because…" in the
+       same breath as the upload rather than on a later refresh. */
+    setCrest: image => act({ action: 'setCrest', image }),
+    removeCrest: () => act({ action: 'removeCrest' }),
   };
 }

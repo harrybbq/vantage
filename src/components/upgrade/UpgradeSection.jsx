@@ -28,12 +28,17 @@ import SectionHelp from '../SectionHelp';
 import RotationTab from './RotationTab';
 import DietTab from './DietTab';
 import CareerTab from './CareerTab';
+import ReviewTab from './ReviewTab';
 import './Upgrade.css';
 
 const TABS = [
   { id: 'rotation', label: 'Rotation' },
   { id: 'diet', label: 'Diet' },
   { id: 'career', label: 'Career' },
+  // Not personal planning like the other three — this one moderates
+  // something other people can see. Its data lives on the server and
+  // the server re-checks who is asking; the tab is only the door.
+  { id: 'review', label: 'Review' },
 ];
 
 export default function UpgradeSection({ S, update, active, isOwner, userId }) {
@@ -66,6 +71,7 @@ export default function UpgradeSection({ S, update, active, isOwner, userId }) {
               { term: 'Rotation', def: 'The 16-day cycle with training on it. Tap a day to swap or book leave.' },
               { term: 'Diet', def: 'Macro targets and the build they are aimed at.' },
               { term: 'Career', def: 'Certifications, CV, and LeetCode and KQL practice.' },
+              { term: 'Review', def: 'Group pictures the automatic screen could not decide. Normally empty.' },
             ]}
           />
         </div>
@@ -88,6 +94,7 @@ export default function UpgradeSection({ S, update, active, isOwner, userId }) {
       {tab === 'rotation' && <RotationTab S={S} update={update} isMobile={isMobile} />}
       {tab === 'diet' && <DietTab S={S} update={update} userId={userId} isMobile={isMobile} />}
       {tab === 'career' && <CareerTab S={S} update={update} userId={userId} isMobile={isMobile} />}
+      {tab === 'review' && <ReviewTab />}
     </section>
   );
 }

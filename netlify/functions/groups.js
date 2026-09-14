@@ -22,6 +22,7 @@
  */
 
 const { requireUser, underLimit, tooMany } = require('../lib/requireUser');
+const { screenImage, parseDataUrl } = require('../lib/imageModeration');
 const {
   MAX_SEATS, DIVISIONS, sb, fetchBaselines, memberScore, groupScore, groupSplit, rankGroups,
   divisionName, weekStartDate, COIN_AWARD,
@@ -60,7 +61,8 @@ const isHex = v => typeof v === 'string' && /^#[0-9a-fA-F]{6}$/.test(v);
 async function myGroup(userId, env) {
   const res = await sb(env.supabaseUrl, env.serviceKey,
     `/rest/v1/group_members?user_id=eq.${userId}&select=role,joined_at,group_id,` +
-    `groups(id,name,crest_color,invite_code,owner_id,division,created_at)`
+    `groups(id,name,crest_color,invite_code,owner_id,division,created_at,` +
+    `crest_image,crest_status,crest_note)`
   );
   if (res.status === 404 || res.status === 400) return { setup: false };
   if (!res.ok) throw new Error('membership read failed');
@@ -110,7 +112,8 @@ async function membersOf(groupId, env) {
  */
 async function divisionStandings(division, env) {
   const gRes = await sb(env.supabaseUrl, env.serviceKey,
-    `/rest/v1/groups?division=eq.${division}&select=id,name,crest_color,division,created_at,owner_id`);
+    `/rest/v1/groups?division=eq.${division}` +
+    `&select=id,name,crest_color,division,created_at,owner_id,crest_image,crest_status`);
   if (!gRes.ok) throw new Error('division read failed');
   const groups = await gRes.json();
   if (!groups.length) return [];
@@ -137,6 +140,12 @@ async function divisionStandings(division, env) {
     const top = mine.slice().sort((a, b) => b.counted - a.counted)[0];
     return {
       id: g.id, name: g.name, crestColor: g.crest_color || null,
+      /* Only an APPROVED picture goes out on a division table. A
+         pending or rejected one is the group's own business and is
+         returned to its own members by the `group` block below —
+         never here, where it would be exactly the public exposure the
+         review exists to prevent. */
+      crestImage: g.crest_status === 'approved' ? (g.crest_image || null) : null,
       division: g.division, createdAt: g.created_at,
       members: mine.length, score: groupScore(mine),
       topClimber: top && top.counted > 0 ? { name: top.name, climb: top.climb } : null,
@@ -253,7 +262,8 @@ async function leaveGroup(userId, env) {
   return json(200, { ok: true });
 }
 
-/** Owner-only edits: rename, recolour, rotate the code, remove someone. */
+/** Owner-only edits: rename, recolour, the group picture, rotate the
+ *  code, remove someone. "Owner" here means the group's leader. */
 async function ownerAction(userId, action, body, env) {
   const mine = await myGroup(userId, env);
   if (!mine.setup) return json(200, { ok: true, setup: false });
@@ -281,6 +291,55 @@ async function ownerAction(userId, action, body, env) {
     return json(200, { ok: true, code: (await res.json())[0]?.invite_code });
   }
 
+  if (action === 'setCrest') {
+    const img = parseDataUrl(body.image);
+    if (!img.ok) return fail(400, img.error);
+
+    /* Stored pending FIRST, then screened. If the screening call hangs
+       or the function is killed mid-flight, the picture exists in the
+       one state that is safe to exist in — visible to the group, not to
+       anyone else — rather than being lost or, worse, live. */
+    const stamp = new Date().toISOString();
+    const stored = await sb(env.supabaseUrl, env.serviceKey, `/rest/v1/groups?id=eq.${group.id}`, {
+      method: 'PATCH', headers: { Prefer: 'return=minimal' },
+      body: JSON.stringify({
+        crest_image: img.dataUrl,
+        crest_status: 'pending',
+        crest_note: null,
+        crest_updated_at: stamp,
+        crest_reviewed_at: null,
+      }),
+    });
+    if (!stored.ok) return fail(500, 'Could not save the picture.');
+
+    const verdict = await screenImage(img.base64, img.mediaType, process.env.ANTHROPIC_API_KEY);
+    if (verdict.decision !== 'pending') {
+      await sb(env.supabaseUrl, env.serviceKey, `/rest/v1/groups?id=eq.${group.id}`, {
+        method: 'PATCH', headers: { Prefer: 'return=minimal' },
+        body: JSON.stringify({
+          crest_status: verdict.decision,
+          crest_note: verdict.reason || null,
+        }),
+      });
+    }
+    return json(200, {
+      ok: true,
+      crestStatus: verdict.decision === 'pending' ? 'pending' : verdict.decision,
+      crestNote: verdict.reason || null,
+    });
+  }
+
+  if (action === 'removeCrest') {
+    const res = await sb(env.supabaseUrl, env.serviceKey, `/rest/v1/groups?id=eq.${group.id}`, {
+      method: 'PATCH', headers: { Prefer: 'return=minimal' },
+      body: JSON.stringify({
+        crest_image: null, crest_status: 'none', crest_note: null,
+        crest_updated_at: null, crest_reviewed_at: null,
+      }),
+    });
+    return res.ok ? json(200, { ok: true, crestStatus: 'none' }) : fail(500, 'Could not remove the picture.');
+  }
+
   if (action === 'kick') {
     const target = String(body.userId || '');
     if (!/^[0-9a-f-]{36}$/i.test(target)) return fail(400, 'No such member.');
@@ -291,6 +350,67 @@ async function ownerAction(userId, action, body, env) {
   }
 
   return fail(400, 'unknown action');
+}
+
+/**
+ * The review queue, and the decision that sticks.
+ *
+ * Screening on upload is a first pass and it is wrong sometimes in both
+ * directions — a crest refused for a cartoon skull, a photograph nobody
+ * should be hosting waved through. A person has to be able to overturn
+ * either, and their decision is the one that stands: `crest_reviewed_at`
+ * records that somebody looked, and the screening never runs again on
+ * that picture.
+ *
+ * Gated on the verified email from the auth server, SERVER-side. The
+ * `useIsOwner` hook is a UI gate and nothing more — the leaderboard
+ * forgery is the standing reminder of the difference.
+ *
+ * A non-owner gets the same answer as a bad token, deliberately:
+ * "forbidden, and yes this endpoint exists" is a map for somebody
+ * looking for the admin surface.
+ */
+async function moderationAction(auth, action, body, env) {
+  const owners = (process.env.OWNER_EMAIL || process.env.VITE_OWNER_EMAIL || '')
+    .split(',').map(v => v.trim().toLowerCase()).filter(Boolean);
+  if (!owners.length || !auth.email || !owners.includes(auth.email)) return fail(403, 'forbidden');
+
+  if (action === 'crestQueue') {
+    const res = await sb(env.supabaseUrl, env.serviceKey,
+      '/rest/v1/groups?crest_status=eq.pending&order=crest_updated_at.asc&limit=40' +
+      '&select=id,name,division,crest_image,crest_status,crest_note,crest_updated_at');
+    if (res.status === 404 || res.status === 400) return json(200, { ok: true, setup: false, queue: [] });
+    if (!res.ok) return fail(500, 'Could not read the queue.');
+    const rows = await res.json();
+    return json(200, {
+      ok: true,
+      setup: true,
+      queue: rows.map(g => ({
+        id: g.id, name: g.name, division: g.division,
+        image: g.crest_image || null,
+        note: g.crest_note || null,
+        uploadedAt: g.crest_updated_at,
+      })),
+    });
+  }
+
+  // crestDecide
+  const id = String(body.groupId || '');
+  if (!/^[0-9a-f-]{36}$/i.test(id)) return fail(400, 'No such group.');
+  const verdict = body.verdict === 'approved' ? 'approved' : body.verdict === 'rejected' ? 'rejected' : null;
+  if (!verdict) return fail(400, 'Approve or reject.');
+
+  const patch = {
+    crest_status: verdict,
+    crest_note: verdict === 'rejected'
+      ? (String(body.note || '').slice(0, 120) || 'Does not meet the picture guidelines.')
+      : null,
+    crest_reviewed_at: new Date().toISOString(),
+  };
+  const res = await sb(env.supabaseUrl, env.serviceKey, `/rest/v1/groups?id=eq.${id}`, {
+    method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify(patch),
+  });
+  return res.ok ? json(200, { ok: true }) : fail(500, 'Could not record that decision.');
 }
 
 // ── Handler ──────────────────────────────────────────────────────────
@@ -317,8 +437,12 @@ exports.handler = async (event) => {
     if (action === 'create') return await createGroup(userId, body, env);
     if (action === 'join')   return await joinGroup(userId, body, env);
     if (action === 'leave')  return await leaveGroup(userId, env);
-    if (action === 'rename' || action === 'rotateCode' || action === 'kick') {
+    if (action === 'rename' || action === 'rotateCode' || action === 'kick'
+        || action === 'setCrest' || action === 'removeCrest') {
       return await ownerAction(userId, action, body, env);
+    }
+    if (action === 'crestQueue' || action === 'crestDecide') {
+      return await moderationAction(auth, action, body, env);
     }
 
     // ── board ──
@@ -359,6 +483,13 @@ exports.handler = async (event) => {
         id: group.id,
         name: group.name,
         crestColor: group.crest_color || null,
+        /* Your own group's picture, whatever state it is in — you
+           uploaded it, and hiding it from you while it waits is how
+           "why is my crest not showing" becomes a support question
+           with no answer on screen. */
+        crestImage: group.crest_image || null,
+        crestStatus: group.crest_status || 'none',
+        crestNote: group.crest_note || null,
         division: group.division,
         divisionName: divisionName(group.division),
         // The code is only ever handed to someone already inside.

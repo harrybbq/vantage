@@ -73,6 +73,12 @@ export default function GroupsTab({ view }) {
       onRename={name => act(() => g.renameGroup(name))}
       onRotateCode={() => g.rotateCode()}
       onKick={id => act(() => g.kickMember(id))}
+      /* Not wrapped in `act`: the crest control does its own busy
+         state and shows its own error next to the picture, which is
+         where the person is looking. An alert() for "that is a GIF"
+         is a lot of ceremony for a file picker. */
+      onSetCrest={image => g.setCrest(image)}
+      onRemoveCrest={() => act(() => g.removeCrest())}
     />
   );
 }
