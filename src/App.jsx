@@ -108,7 +108,7 @@ const MODAL_CAPS = {
 
 function Board({ userId, userEmail, onSignOut }) {
   const {
-    S, update, loading, justMigrated, dismissMigrationBanner,
+    S, update, loading, hydrated, justMigrated, dismissMigrationBanner,
     loadError, retryLoad, startFresh, restoreFromBackup, hasBackup,
   } = useVisionBoardState(userId);
   const { atLimit } = useTierLimits();
@@ -121,7 +121,10 @@ function Board({ userId, userEmail, onSignOut }) {
   // What the app can work out for itself: trackers filled from readings
   // that already arrived, and renewal dates carried forward. Runs after
   // the syncs above, writes nothing when there is nothing to write.
-  useAutomations(S, update, loading);
+  // `hydrated`, not `loading`: `loading` goes false on the optimistic
+  // paint, so this used to run its pass against the local backup and
+  // have the result thrown away when the cloud copy landed.
+  useAutomations(S, update, !hydrated);
   // Owner admin edit modal — opened via right-click on OVR / coin chip
   // (handlers in PageHeader + MobileAppBar + RatingsPanel).
   const [adminEdit, setAdminEdit] = useState(null); // 'rating' | 'coins' | null
@@ -324,7 +327,7 @@ function Board({ userId, userEmail, onSignOut }) {
   // import we pass 0 here; the social-rating component reads friend
   // count separately. TODO: thread real friendCount once F5 is fully
   // wired into the friends rail.
-  useRatings(userId, S, update, 0);
+  useRatings(userId, S, update, 0, hydrated);
 
   // Monday's league winnings. The server records what is owed in
   // coin_grants and the client credits itself once — coins live in the

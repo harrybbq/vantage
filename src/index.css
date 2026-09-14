@@ -5090,6 +5090,10 @@ button:active:not(:disabled),
   .ratings-donut-arc { transition: none; }
 }
 
+/* Waiting on the cloud copy. Dimmed and set in the normal weight so it
+   reads as an absence rather than a very small score. */
+.ratings-donut-ovr.is-settling { opacity: .35; font-style: normal; }
+.ovr-chip.is-settling { opacity: .5; }
 .ratings-donut-ovr {
   font-family: var(--serif, Georgia, serif);
   font-style: italic;

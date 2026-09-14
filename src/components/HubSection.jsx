@@ -423,6 +423,13 @@ function ProfileCard({ profile, S, update, handle, onSaveName, onSaveTagline, on
   // — which is refreshed by useRatings on a 1.5s debounce. Falls back
   // to 1 if no rating computed yet (fresh user) so the chip never
   // shows an empty value.
+  //
+  // `__slim` brands the copy painted from the local backup while the
+  // cloud answers. The rating inside it is last session's, and showing
+  // it means printing a number that corrects itself a moment later —
+  // which from the outside looks exactly like losing progress. A dash
+  // for half a second says "not yet" instead of saying something wrong.
+  const settling = !!S?.__slim;
   const ovr = S?.ratings?.ovr || 1;
   const prestige = ovrTier(ovr);
   return (
@@ -455,12 +462,14 @@ function ProfileCard({ profile, S, update, handle, onSaveName, onSaveTagline, on
             />
             {handle && <span className="profile-handle" title={`@${handle}`}>@{handle}</span>}
             <span
-              className={`profile-level-badge ovr-chip ovr-tier-${prestige.key}`}
-              title={visionState
-                ? `OVR ${ovr}/99 · ${prestige.label} tier · ${visionState.unlockedCount}/${visionState.totalCount} visions unlocked`
-                : `OVR ${ovr}/99 · ${prestige.label} tier`}
+              className={`profile-level-badge ovr-chip ovr-tier-${settling ? 'starting' : prestige.key}${settling ? ' is-settling' : ''}`}
+              title={settling
+                ? 'Loading your rating…'
+                : visionState
+                  ? `OVR ${ovr}/99 · ${prestige.label} tier · ${visionState.unlockedCount}/${visionState.totalCount} visions unlocked`
+                  : `OVR ${ovr}/99 · ${prestige.label} tier`}
             >
-              OVR {ovr}
+              OVR {settling ? '—' : ovr}
             </span>
           </div>
           <input

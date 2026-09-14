@@ -306,6 +306,69 @@ function slimForBackup(state) {
   return s;
 }
 
+/* ── The two heavy pictures, cached on their own ───────────────────────
+ *
+ * The backup above drops the wallpaper and the profile photo because
+ * together they can be megabytes and the state blob is already about
+ * one. That is the right call for the backup — but it is also why a
+ * returning user's board painted with no wallpaper and a grey avatar
+ * for the few hundred milliseconds before the cloud copy landed, and
+ * then visibly dressed itself. The board looked broken and then looked
+ * fixed, every single boot.
+ *
+ * So they live in their own key, written AFTER the state backup and in
+ * their own try/catch: if the quota rejects the pictures, the data
+ * backup — the one that actually protects anything — is already safely
+ * written. Over the cap we skip them entirely rather than write half a
+ * wallpaper.
+ *
+ * Nothing here is a source of truth. It is a copy of what the cloud is
+ * about to send, kept only so the first paint matches the second.
+ */
+const VISUALS_PREFIX = 'vb4_visuals:';
+/* Roughly 2.5 MB of JSON. localStorage is about 5 MB per origin and the
+ * state backup takes ~1 MB of it, so this leaves room to spare — and a
+ * board with a wallpaper bigger than this has bigger problems. */
+const VISUALS_MAX_CHARS = 2_500_000;
+
+function writeVisuals(userId, state) {
+  if (!userId) return;
+  try {
+    const photo = state?.profile?.photo || null;
+    const backgrounds = state?.backgrounds || {};
+    if (!photo && !Object.keys(backgrounds).length) {
+      localStorage.removeItem(VISUALS_PREFIX + userId);
+      return;
+    }
+    const raw = JSON.stringify({ ts: Date.now(), photo, backgrounds });
+    if (raw.length > VISUALS_MAX_CHARS) {
+      // Too big to cache. Drop any older copy rather than leave a
+      // wallpaper on screen that is no longer the user's.
+      localStorage.removeItem(VISUALS_PREFIX + userId);
+      return;
+    }
+    localStorage.setItem(VISUALS_PREFIX + userId, raw);
+  } catch {
+    // Quota, serialisation, private mode — the pictures are a nicety.
+  }
+}
+
+function readVisuals(userId) {
+  if (!userId) return null;
+  try {
+    const raw = localStorage.getItem(VISUALS_PREFIX + userId);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (!parsed || typeof parsed !== 'object') return null;
+    return {
+      photo: typeof parsed.photo === 'string' ? parsed.photo : null,
+      backgrounds: (parsed.backgrounds && typeof parsed.backgrounds === 'object') ? parsed.backgrounds : {},
+    };
+  } catch {
+    return null;
+  }
+}
+
 function writeBackup(userId, state) {
   if (!userId) return;
   try {
@@ -316,6 +379,9 @@ function writeBackup(userId, state) {
   } catch {
     // Quota or serialization failure — non-fatal; backup is optional.
   }
+  // Second, and separately: a quota failure here must not cost us the
+  // backup above.
+  writeVisuals(userId, state);
 }
 
 /* ── The snapshot that outlives the page ────────────────────────────────
@@ -416,6 +482,20 @@ export function clearLocalStorageData() {
 export function useVisionBoardState(userId) {
   const [S, setS] = useState(addTransient({ ...DEFAULT_STATE }));
   const [loading, setLoading] = useState(true);
+  /* `loading` and `hydrated` are not the same question, and conflating
+   * them is what put a wrong OVR on screen.
+   *
+   * `loading` asks "can the user do anything yet" — it goes false the
+   * moment the local backup is painted, which is the whole point of
+   * having a backup.
+   *
+   * `hydrated` asks "is what you are looking at the cloud's copy" — it
+   * goes true only when the round trip has resolved, whatever the
+   * outcome. Anything that displays a FIGURE derived from state should
+   * wait for this one: a rating that reads 31 and then corrects itself
+   * to 29 is worse than one that takes half a second to appear, because
+   * the user has no way to know which of the two was the lie. */
+  const [hydrated, setHydrated] = useState(false);
   const [justMigrated, setJustMigrated] = useState(false);
   // loadError is null on success, otherwise an object the UI can use
   // to render an error screen. Specifically:
@@ -469,6 +549,7 @@ export function useVisionBoardState(userId) {
     async function init() {
       setLoading(true);
       loadingRef.current = true;
+      setHydrated(false);
       setLoadError(null);
 
       // ── Optimistic boot from the local backup ───────────────────────
@@ -486,6 +567,16 @@ export function useVisionBoardState(userId) {
       const backup = readBackup(userId);
       if (backup && backup.state) {
         const optimistic = addTransient({ ...DEFAULT_STATE, ...backup.state });
+        // Put the wallpaper and the avatar back. They are cached apart
+        // from the state (see writeVisuals) precisely so this paint can
+        // have them — without it the board arrives undressed and dresses
+        // itself a moment later, which reads as a bug because it looks
+        // exactly like one.
+        const visuals = readVisuals(userId);
+        if (visuals) {
+          if (visuals.photo) optimistic.profile = { ...optimistic.profile, photo: visuals.photo };
+          if (Object.keys(visuals.backgrounds).length) optimistic.backgrounds = visuals.backgrounds;
+        }
         if (hasMeaningfulData(optimistic)) lastGoodMeaningfulRef.current = true;
         setS(optimistic);
         setLoading(false); // interactive now; cloud reconciles in the background
@@ -675,7 +766,11 @@ export function useVisionBoardState(userId) {
       }
     }
 
-    init();
+    // Whatever init decides — loaded, no row, empty, or a network
+    // failure — the question "have we heard back from the cloud yet"
+    // is answered the moment it returns. Set here rather than at each
+    // of init's six exits so a future seventh cannot forget.
+    init().finally(() => { if (!cancelled) setHydrated(true); });
     return () => { cancelled = true; };
   // reloadKey lets the user retry without unmounting the whole app.
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -1002,6 +1097,15 @@ export function useVisionBoardState(userId) {
     const backup = readBackup(uid);
     if (!backup || !backup.state) return false;
     const restored = addTransient({ ...DEFAULT_STATE, ...backup.state });
+    // The wallpaper and the avatar are cached beside the backup rather
+    // than inside it. A restore that wrote nulls over them while they
+    // sat in localStorage would be throwing away recoverable data at
+    // the exact moment the user came here to recover some.
+    const visuals = readVisuals(uid);
+    if (visuals) {
+      if (visuals.photo) restored.profile = { ...restored.profile, photo: visuals.photo };
+      if (Object.keys(visuals.backgrounds).length) restored.backgrounds = visuals.backgrounds;
+    }
     // Drop the marker: this restore is the user's explicit decision, and
     // from here on the state is simply their live state. Leaving it set
     // would brand everything derived from it and block every future
@@ -1028,7 +1132,7 @@ export function useVisionBoardState(userId) {
   }
 
   return {
-    S, update, loading, justMigrated, dismissMigrationBanner,
+    S, update, loading, hydrated, justMigrated, dismissMigrationBanner,
     loadError, retryLoad, startFresh,
     restoreFromBackup,
     hasBackup: () => hasBackup(userIdRef.current),

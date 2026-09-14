@@ -86,6 +86,13 @@ function tier(score) {
 }
 
 export default function RatingsPanel({ S, update, compact = false }) {
+  /* `__slim` brands the copy painted from the local backup while the
+     cloud round trip is still out. Its ratings are last session's, and
+     printing one that corrects itself half a second later is how a
+     working app comes to look like a broken one — the user has no way
+     to tell which of the two numbers was the lie. So the ledger says
+     nothing until it can say something true. */
+  const settling = !!S?.__slim;
   const r = S?.ratings || {};
   const ovr = r.ovr || 1;
   // OVR glow band (Bronze…Ruby) — distinct from the prestige LEVEL
@@ -103,11 +110,14 @@ export default function RatingsPanel({ S, update, compact = false }) {
   const byId = Object.fromEntries(CATEGORIES.map(c => [c.id, c]));
   // One computation of the shares, used by the ring and the legend, so
   // the two can never disagree about a number.
-  const shares = ratingShares(r, CATEGORIES);
+  // Same source as the donut, including while settling — a ring drawn
+  // from nothing beside a key full of last session's numbers would be
+  // two different answers to one question.
+  const shares = ratingShares(settling ? {} : r, CATEGORIES);
   const [prestigeError, setPrestigeError] = useState(null);
   // CTA shows on the local OVR hitting 99; the endpoint re-checks the
   // CANONICAL profiles.ratings_ovr, so a gamed local value gets a 400.
-  const canPrestige = ovr >= 99 && prestigeLevel < PRESTIGE_MAX && !!update;
+  const canPrestige = !settling && ovr >= 99 && prestigeLevel < PRESTIGE_MAX && !!update;
 
   async function handlePrestigeUp() {
     if (prestiging) return;
@@ -216,8 +226,8 @@ export default function RatingsPanel({ S, update, compact = false }) {
         <div className="ratings-ledger-donut-wrap" data-admin-target="rating">
           <RatingsDonut
             categories={CATEGORIES}
-            ratings={r}
-            ovr={ovr}
+            ratings={settling ? {} : r}
+            ovr={settling ? null : ovr}
             tier={glow}
             prestigeLabel={prestigeLevel > 0 ? `PRESTIGE ${toRoman(prestigeLevel)}` : ''}
             dark={dark}
@@ -228,8 +238,10 @@ export default function RatingsPanel({ S, update, compact = false }) {
               Not drawn — the donut says it in the tint, and a visible
               repeat is what we just removed. */}
           <span className="sr-only">
-            Overall rating {ovr} of 99 — {glow.label}
-            {prestigeLevel > 0 ? `, prestige ${toRoman(prestigeLevel)}` : ''}
+            {settling ? 'Loading your overall rating' : <>
+              Overall rating {ovr} of 99 — {glow.label}
+              {prestigeLevel > 0 ? `, prestige ${toRoman(prestigeLevel)}` : ''}
+            </>}
           </span>
         </div>
 
@@ -273,7 +285,9 @@ export default function RatingsPanel({ S, update, compact = false }) {
                   type="button"
                   className="ratings-legend-row"
                   onClick={() => setActiveBreakdown(s.id)}
-                  aria-label={`${c.label} ${s.value} of 99, ${Math.round(s.share * 100)} percent of your rating — open breakdown`}
+                  aria-label={settling
+                    ? `${c.label} — loading`
+                    : `${c.label} ${s.value} of 99, ${Math.round(s.share * 100)} percent of your rating — open breakdown`}
                 >
                   {/* Same number as the arc wears. The palette is a ramp,
                       so neighbouring slices are meant to resemble each
@@ -285,8 +299,8 @@ export default function RatingsPanel({ S, update, compact = false }) {
                   <span className="ratings-legend-chip" aria-hidden="true"
                         style={{ background: donutColours[s.id] }} />
                   <span className="ratings-legend-label">{c.label}</span>
-                  <span className="ratings-legend-share">{Math.round(s.share * 100)}%</span>
-                  <span className="ratings-legend-score">{s.value}</span>
+                  <span className="ratings-legend-share">{settling ? '' : `${Math.round(s.share * 100)}%`}</span>
+                  <span className="ratings-legend-score">{settling ? '—' : s.value}</span>
                 </button>
               </li>
             );
