@@ -16,6 +16,7 @@
  * The row shows the first line always; the rest sits on a second line so
  * a plain "Rent, £1,250, monthly" stays a plain one-line row.
  */
+import { useSegTip } from './SegTip';
 import { useRef, useState } from 'react';
 import Icon from '../Icon';
 import {
@@ -341,6 +342,7 @@ export default function FlowEditor({ S, update, flow, bills = null }) {
      one band called Subscriptions, sized by everything in it. Eight
      slivers told you nothing the list below did not already say. */
   const sections = flowSections(items, groups, new Date(), bills);
+  const segTip = useSegTip();
   const leftOver = Math.max(0, flow.net) / denom * 100;
 
   return (
@@ -367,17 +369,31 @@ export default function FlowEditor({ S, update, flow, bills = null }) {
             key={sec.id}
             className={`sb-segment${sec.kind === 'group' ? ' is-group' : ''}${sec.kind === 'bills' ? ' is-bills' : ''}`}
             style={{ flexBasis: `${sec.share * 100}%`, background: sectionColor(sec, i) }}
-            title={sec.kind === 'bills'
-              ? `Bills — ${money(sec.amount)}/mo across ${sec.count} recurring ${sec.count === 1 ? 'item' : 'items'}, ${Math.round(sec.share * 100)}% of income. Edit them in Subscriptions & Bills below.`
-              : `${sec.label} — ${money(sec.amount)}/mo, ${Math.round(sec.share * 100)}% of income`}
+            {...segTip.bind({
+              label: sec.label,
+              value: `${money(sec.amount)}/mo`,
+              sub: sec.kind === 'group' || sec.kind === 'bills'
+                ? `${Math.round(sec.share * 100)}% of income · ${sec.count} ${sec.count === 1 ? 'item' : 'items'}`
+                : `${Math.round(sec.share * 100)}% of income`,
+              col: sectionColor(sec, i),
+            })}
           >
             <span className="sb-segment-tag">{sec.label}</span>
           </div>
         ))}
-        <div className="sb-segment is-left" style={{ flexBasis: `${leftOver}%` }} title={`Left over — ${money(flow.net)}/mo`}>
+        <div
+          className="sb-segment is-left"
+          style={{ flexBasis: `${leftOver}%` }}
+          {...segTip.bind({
+            label: 'Left over',
+            value: `${money(Math.max(0, flow.net))}/mo`,
+            sub: `${Math.round(leftOver)}% of income`,
+          })}
+        >
           <span className="sb-segment-tag">left over</span>
         </div>
       </div>
+      {segTip.node}
 
       {/* The bands are named, so the bar needs a key — a colour with no
           word beside it is a decoration, not a reading. */}

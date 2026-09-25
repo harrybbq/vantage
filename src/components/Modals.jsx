@@ -3,6 +3,7 @@ import { supabase } from '../lib/supabase';
 import AddMobileWidgetModal from './mobile/AddMobileWidgetModal';
 import { appPresetToLink, visibleAppPresets } from '../data/appPresets';
 import { applyRelapse } from '../lib/habits/relapse';
+import PrimePicker from './widgets/prime/PrimePicker';
 import { useSubscriptionContext } from '../context/SubscriptionContext';
 import { backdropClose } from '../utils/backdropClose';
 import { useIsMobile } from '../hooks/useIsMobile';
@@ -76,14 +77,14 @@ function ImageField({ label, value, onChange, max = 900, placeholder }) {
   );
 }
 
-function Modal({ id, openId, onClose, children, style }) {
+function Modal({ id, openId, onClose, children, style, className = '' }) {
   return (
     <div
       className={`modal-overlay${openId === id ? ' open' : ''}`}
       id={id}
       {...backdropClose(() => onClose(id))}
     >
-      <div className="modal" style={style}>
+      <div className={`modal ${className}`} style={style}>
         {children}
       </div>
     </div>
@@ -103,27 +104,25 @@ function Modal({ id, openId, onClose, children, style }) {
  * it — and tapping it goes to the page that fills it in rather than
  * adding a card whose only possible state is an empty state.
  */
-function HubWidgetTile({ type, icon, title, sub, S, onClose, onAdd, onNavigate }) {
+function HubWidgetTile({ type, icon, title, sub, S, onClose, onAdd, onNavigate, locked, onLocked }) {
   const { ready, need, where } = widgetReadiness(type, S);
   return (
     <button
-      className="btn btn-ghost"
-      title={ready ? `Add ${title} to your hub` : need}
-      style={{
-        padding: '16px', display: 'flex', flexDirection: 'column',
-        alignItems: 'center', gap: '6px', borderRadius: '12px', height: 'auto',
-        opacity: ready ? 1 : 0.6,
-      }}
+      type="button"
+      className={`aw-tile${ready && !locked ? '' : ' is-dim'}`}
+      title={locked ? `${title} is a Pro feature — upgrade to add it` : ready ? `Add ${title} to your hub` : need}
       onClick={() => {
         onClose('addLinkModal');
+        if (locked) { onLocked?.(); return; }
         if (!ready) { if (where) onNavigate?.(where); return; }
         onAdd(type);
       }}
     >
-      <Icon name={icon} size={22} strokeWidth={1.75} />
-      <span style={{ fontWeight: 700, fontSize: '13px', color: 'var(--text)' }}>{title}</span>
-      <span style={{ fontSize: '11px', color: ready ? 'var(--text-muted)' : 'var(--em)' }}>
-        {ready ? sub : need}
+      {locked && <span className="aw-lock" aria-hidden="true">🔒</span>}
+      <span className="aw-tile-icon"><Icon name={icon} size={17} strokeWidth={1.75} /></span>
+      <span className="aw-tile-t">{title}</span>
+      <span className={`aw-tile-s${ready || locked ? '' : ' is-need'}`}>
+        {locked ? 'Pro feature' : ready ? sub : need}
       </span>
     </button>
   );
@@ -137,129 +136,94 @@ function AddLinkModal({ openId, onClose, onSwitchModal, onAddApp, onAddHubWidget
     onClose('addLinkModal');
     onSwitchModal('paywall:ourApps');
   }
+  const tile = { S, onClose, onAdd: onAddHubWidget, onNavigate };
   return (
-    <Modal id="addLinkModal" openId={openId} onClose={onClose}>
+    <Modal id="addLinkModal" openId={openId} onClose={onClose} className="aw-modal">
       <h3>Add Widget</h3>
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '6px' }}>
-        <button className="btn btn-ghost" style={{ padding: '16px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px', borderRadius: '12px', height: 'auto' }}
-          onClick={() => onSwitchModal('addLinkOnlyModal')}>
-          <Icon name="link" size={22} strokeWidth={1.75} />
-          <span style={{ fontWeight: 700, fontSize: '13px', color: 'var(--text)' }}>Default Link</span>
-          <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>URL bookmark or GitHub profile</span>
+
+      {/* Primes first, and in their own style — see PrimePicker. The
+          standalone Savings pots / Projection / Subscriptions / Habits /
+          Holidays tiles are gone from here because a prime shows each of
+          them as a block. Hubs that already have one keep it. */}
+      {openId === 'addLinkModal' && (
+        <PrimePicker
+          S={S}
+          widgets={S.hubWidgets || []}
+          onAdd={w => { onClose('addLinkModal'); onAddHubWidget(w); }}
+        />
+      )}
+
+      <span className="aw-section-lbl">Widgets</span>
+      <div className="aw-grid">
+        <button type="button" className="aw-tile" onClick={() => onSwitchModal('addLinkOnlyModal')}>
+          <span className="aw-tile-icon"><Icon name="link" size={17} strokeWidth={1.75} /></span>
+          <span className="aw-tile-t">Link</span>
+          <span className="aw-tile-s">URL bookmark or GitHub profile</span>
         </button>
-        <HubWidgetTile type="habits" icon="flame" title="Habits" sub="Longest streaks · live timers"
-          S={S} onClose={onClose} onAdd={onAddHubWidget} onNavigate={onNavigate} />
-        <HubWidgetTile type="holidays" icon="plane" title="Holidays" sub="Closest upcoming trips"
-          S={S} onClose={onClose} onAdd={onAddHubWidget} onNavigate={onNavigate} />
-        <HubWidgetTile type="leaderboard" icon="trophy" title="Leaderboard" sub="Top friends, at a glance"
-          S={S} onClose={onClose} onAdd={onAddHubWidget} onNavigate={onNavigate} />
-        <HubWidgetTile type="vitals" icon="activity" title="Vitals" sub="Weight · sleep · resting HR"
-          S={S} onClose={onClose} onAdd={onAddHubWidget} onNavigate={onNavigate} />
-        <HubWidgetTile type="macros" icon="pie-chart" title="Macros" sub="% rings · net calories"
-          S={S} onClose={onClose} onAdd={onAddHubWidget} onNavigate={onNavigate} />
-        <HubWidgetTile type="calories" icon="zap" title="Calories Burned" sub="Activity burn · net intake"
-          S={S} onClose={onClose} onAdd={onAddHubWidget} onNavigate={onNavigate} />
-        <HubWidgetTile type="goals" icon="target" title="Goals" sub="Pin any goal · progress"
-          S={S} onClose={onClose} onAdd={onAddHubWidget} onNavigate={onNavigate} />
+        <HubWidgetTile type="vitals" icon="activity" title="Vitals" sub="Weight · sleep · resting HR" {...tile} />
+        <HubWidgetTile type="macros" icon="pie-chart" title="Macros" sub="% rings · net calories" {...tile} />
+        <HubWidgetTile type="calories" icon="zap" title="Calories Burned" sub="Activity burn · net intake" {...tile} />
+        <HubWidgetTile type="goals" icon="target" title="Goals" sub="Pin any goal · progress" {...tile} />
         {/* Body goal is Pro. Locked tiles stay clickable and route to
-            the paywall — the same treatment the Our Apps presets get,
-            rather than a dead control that doesn't explain itself. */}
-        <button className="btn btn-ghost" title={hasPro ? 'Add Body Goal to your hub' : 'Body Goal is a Pro feature — upgrade to add it'}
-          style={{ padding: '16px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px', borderRadius: '12px', height: 'auto', position: 'relative', opacity: hasPro ? 1 : 0.6 }}
-          onClick={() => { if (!hasPro) { onClose('addLinkModal'); onSwitchModal('paywall:generic'); return; } onClose('addLinkModal'); onAddHubWidget('body-goal'); }}>
-          {!hasPro && (
-            <span style={{ position: 'absolute', top: 8, right: 8, fontSize: 11, lineHeight: 1, color: 'var(--gold, #c8970a)' }}>🔒</span>
-          )}
-          <Icon name="target" size={22} strokeWidth={1.75} />
-          <span style={{ fontWeight: 700, fontSize: '13px', color: 'var(--text)' }}>Body Goal</span>
-          <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>{hasPro ? 'Target weight · plan' : 'Pro feature'}</span>
-        </button>
-        <HubWidgetTile type="savings-pots" icon="piggy-bank" title="Savings Pots" sub="1 bar or 4 donuts"
-          S={S} onClose={onClose} onAdd={onAddHubWidget} onNavigate={onNavigate} />
-        <HubWidgetTile type="savings-projection" icon="trending-up" title="Projection" sub="Net · balance trend"
-          S={S} onClose={onClose} onAdd={onAddHubWidget} onNavigate={onNavigate} />
+            the paywall rather than being a dead control. */}
+        <HubWidgetTile type="body-goal" icon="target" title="Body Goal" sub="Target weight · plan" {...tile}
+          locked={!hasPro} onLocked={() => onSwitchModal('paywall:generic')} />
+        <HubWidgetTile type="leaderboard" icon="trophy" title="Leaderboard" sub="Top friends, at a glance" {...tile} />
+        <HubWidgetTile type="market" icon="trending-up" title="Market" sub="Delayed quotes" {...tile} />
+        <HubWidgetTile type="news" icon="newspaper" title="News" sub="Today’s headlines" {...tile} />
         {/* Owner-only AND web-only. tradingWidgetAvailable() is false in
             native builds, so this never reaches an app-store reviewer. */}
-        <HubWidgetTile type="market" icon="trending-up" title="Market" sub="Delayed quotes"
-          S={S} onClose={onClose} onAdd={onAddHubWidget} onNavigate={onNavigate} />
-        <HubWidgetTile type="news" icon="newspaper" title="News" sub="Today’s headlines"
-          S={S} onClose={onClose} onAdd={onAddHubWidget} onNavigate={onNavigate} />
         {tradingWidgetAvailable() && typeof window !== 'undefined' && window.__vantageOwner && (
-        <HubWidgetTile type="trading" icon="trending-up" title="Trading" sub="Agents · P/L"
-          S={S} onClose={onClose} onAdd={onAddHubWidget} onNavigate={onNavigate} />
+          <HubWidgetTile type="trading" icon="trending-up" title="Trading" sub="Agents · P/L" {...tile} />
         )}
-        {/* The Rotation tile stood here. Retired 2026-08-16 — see
-            lib/widgets/retired.js. The rotation PAGE is untouched. */}
-        {/* Body widget retired — the Goals and Body Goal widgets both
-            cover the weight trend. Existing hubs keep theirs. */}
-        <HubWidgetTile type="subscriptions" icon="repeat" title="Subscriptions" sub="Monthly burn · renewals"
-          S={S} onClose={onClose} onAdd={onAddHubWidget} onNavigate={onNavigate} />
+        {/* Rotation retired 2026-08-16, Body retired later — see
+            lib/widgets/retired.js. Existing hubs keep theirs. */}
       </div>
 
       {/* Our Apps — one-click presets for our own apps, a Pro bonus.
-          Free users see them locked (PRO badge → paywall). For Pro
-          users, a preset with no URL yet (not deployed) renders
-          disabled with its deploy hint instead. */}
-      <div style={{
-        display: 'flex', alignItems: 'center', gap: 8,
-        margin: '14px 0 8px',
-      }}>
-        <span style={{
-          fontFamily: 'var(--mono)', fontSize: 10, letterSpacing: 1.6,
-          textTransform: 'uppercase', color: 'var(--text-muted)',
-        }}>Our Apps</span>
+          Free users see them locked (→ paywall). For Pro users, a preset
+          with no URL yet renders disabled with its deploy hint. */}
+      <span className="aw-section-lbl" style={{ marginTop: 16, display: 'flex', alignItems: 'center', gap: 8 }}>
+        Our Apps
         <span style={{
           fontFamily: 'var(--mono)', fontSize: 8.5, fontWeight: 700,
           letterSpacing: 1, padding: '1px 6px', borderRadius: 4,
           background: 'rgba(200,151,10,.14)', color: 'var(--gold, #c8970a)',
           border: '1px solid rgba(200,151,10,.30)',
         }}>PRO</span>
-      </div>
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+      </span>
+      <div className="aw-grid">
         {visibleAppPresets().map(preset => {
-          // For Pro users: enabled unless the app isn't deployed yet.
-          // For free users: always locked (clicking opens the paywall).
           const notDeployed = !preset.url;
           const locked = !hasPro;
-          const dim = locked || notDeployed;
           const title = locked
             ? `${preset.name} is a Pro bonus — upgrade to add it`
             : notDeployed ? preset.requires : `Add ${preset.name} to your hub`;
           return (
             <button
               key={preset.id}
-              className="btn btn-ghost"
+              type="button"
+              className={`aw-tile${locked || notDeployed ? ' is-dim' : ''}`}
               // Locked tiles stay clickable (→ paywall); only an
               // undeployed app for a Pro user is truly disabled.
               disabled={!locked && notDeployed}
               title={title}
-              style={{
-                padding: '16px', display: 'flex', flexDirection: 'column',
-                alignItems: 'center', gap: '6px', borderRadius: '12px', height: 'auto',
-                position: 'relative',
-                opacity: dim ? 0.6 : 1,
-                cursor: (!locked && notDeployed) ? 'not-allowed' : 'pointer',
-              }}
+              style={{ cursor: (!locked && notDeployed) ? 'not-allowed' : 'pointer' }}
               onClick={() => {
                 if (locked) { openPaywall(); return; }
                 if (!notDeployed) onAddApp(preset);
               }}
             >
-              {locked && (
-                <span style={{
-                  position: 'absolute', top: 8, right: 8,
-                  fontSize: 11, lineHeight: 1, color: 'var(--gold, #c8970a)',
-                }}>🔒</span>
-              )}
-              <span style={{
-                width: 36, height: 36, borderRadius: 9,
+              {locked && <span className="aw-lock" aria-hidden="true">🔒</span>}
+              <span className="aw-tile-icon" style={{
+                width: 24, height: 24, borderRadius: 7,
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
-                fontSize: 18, lineHeight: 1,
+                fontSize: 13, lineHeight: 1,
                 background: preset.color + '1a',
                 border: '1px solid ' + preset.color + '55',
               }}>{preset.icon}</span>
-              <span style={{ fontWeight: 700, fontSize: '13px', color: 'var(--text)' }}>{preset.name}</span>
-              <span style={{ fontSize: '11px', color: 'var(--text-muted)', textAlign: 'center' }}>
+              <span className="aw-tile-t">{preset.name}</span>
+              <span className="aw-tile-s">
                 {locked ? 'Pro bonus tool' : notDeployed ? 'Deploy first to enable' : preset.tagline}
               </span>
             </button>
@@ -360,11 +324,118 @@ function CategoryPicker({ value, onChange }) {
   );
 }
 
-function AddAchievementModal({ openId, onClose, onAdd }) {
-  const [form, setForm] = useState({ name: '', desc: '', icon: '', coins: '', category: 'general' });
+/**
+ * "Link a tracker" on an achievement — see lib/achievements/trackerLink.
+ *
+ * Two ways to count, because people mean two different things by the
+ * same sentence: WEEKLY is the goal exactly as said ("5 times a week,
+ * for 4 weeks" — a missed week resets it); COUNT is the forgiving one
+ * ("20 sessions, whenever"). The one-line summary under the fields reads
+ * the choice back in words, so what the tracker will count is never a
+ * guess.
+ *
+ * `value` is the form's link draft: null (not linked) or
+ * { trackerId, mode, perWeek, weeks, count }.
+ */
+function TrackerLinkFields({ trackers = [], value, onChange, relinking }) {
+  const list = trackers.filter(t => t && t.id);
+  const on = !!(value && value.trackerId);
+  const t = on ? list.find(x => x.id === value.trackerId) : null;
+  const set = patch => onChange({ ...(value || {}), ...patch });
+  const num = (v, lo, hi) => (v === '' ? '' : Math.min(hi, Math.max(lo, Math.round(Number(v) || lo))));
+  const summary = !on ? null
+    : !t ? 'That tracker no longer exists — pick another.'
+    : value.mode === 'count'
+      ? `Completes after ${value.count || '…'} ${t.name} logs, in any pattern.`
+      : `Completes after ${value.weeks || '…'} weeks in a row of ${value.perWeek || '…'}× ${t.name} a week. A missed week starts the run again.`;
+  return (
+    <div className="fg ach-link">
+      <label>Count it with a tracker</label>
+      {list.length === 0 ? (
+        <div className="ach-link-empty">Add a tracker in Track first — then it can fill this in for you.</div>
+      ) : (
+        <>
+          <select
+            value={on ? value.trackerId : ''}
+            onChange={e => {
+              const id = e.target.value;
+              if (!id) { onChange(null); return; }
+              const tr = list.find(x => x.id === id);
+              onChange({
+                mode: value?.mode || 'weekly',
+                perWeek: value?.perWeek || Number(tr?.weeklyTarget) || 3,
+                weeks: value?.weeks || 4,
+                count: value?.count || 20,
+                trackerId: id,
+              });
+            }}
+          >
+            <option value="">Not linked — I’ll tick it myself</option>
+            {list.map(tr => <option key={tr.id} value={tr.id}>{tr.name}</option>)}
+          </select>
+          {on && (
+            <>
+              <div className="ach-link-modes" role="radiogroup" aria-label="How to count">
+                {[['weekly', 'Weekly goal', 'Strict — every week counts'], ['count', 'Simple count', 'Wiggle room — any pattern']].map(([m, name, sub]) => (
+                  <button
+                    key={m} type="button" role="radio" aria-checked={value.mode === m}
+                    className={`ach-link-mode${value.mode === m ? ' is-on' : ''}`}
+                    onClick={() => set({ mode: m })}
+                  >
+                    <span className="ach-link-mode-t">{name}</span>
+                    <span className="ach-link-mode-s">{sub}</span>
+                  </button>
+                ))}
+              </div>
+              {value.mode === 'count' ? (
+                <div className="ach-link-row">
+                  <input type="number" min="1" max="1000" inputMode="numeric" value={value.count ?? ''}
+                         onChange={e => set({ count: num(e.target.value, 1, 1000) })} aria-label="Total logs" />
+                  <span>logs in total</span>
+                </div>
+              ) : (
+                <div className="ach-link-row">
+                  <input type="number" min="1" max="7" inputMode="numeric" value={value.perWeek ?? ''}
+                         onChange={e => set({ perWeek: num(e.target.value, 1, 7) })} aria-label="Times per week" />
+                  <span>× a week, for</span>
+                  <input type="number" min="1" max="52" inputMode="numeric" value={value.weeks ?? ''}
+                         onChange={e => set({ weeks: num(e.target.value, 1, 52) })} aria-label="Weeks in a row" />
+                  <span>weeks</span>
+                </div>
+              )}
+              <div className="ach-link-sum">
+                {summary} {relinking ? 'Counting starts from today.' : 'Counting starts when you create it.'}
+              </div>
+            </>
+          )}
+        </>
+      )}
+    </div>
+  );
+}
+
+/** A form draft → the stored link, stamping `since` the first time (or
+ *  when what is being counted changes — a new rule is a fresh start). */
+function linkForSave(draft, prevLink, now = Date.now()) {
+  if (!draft || !draft.trackerId) return null;
+  const clean = {
+    trackerId: draft.trackerId,
+    mode: draft.mode === 'count' ? 'count' : 'weekly',
+    perWeek: Math.min(7, Math.max(1, Number(draft.perWeek) || 3)),
+    weeks: Math.min(52, Math.max(1, Number(draft.weeks) || 4)),
+    count: Math.min(1000, Math.max(1, Number(draft.count) || 20)),
+  };
+  const same = prevLink && prevLink.trackerId === clean.trackerId && prevLink.mode === clean.mode;
+  return { ...clean, since: same && prevLink.since ? prevLink.since : now };
+}
+
+function AddAchievementModal({ openId, onClose, onAdd, trackers }) {
+  const [form, setForm] = useState({ name: '', desc: '', icon: '', coins: '', category: 'general', link: null });
   function submit() {
     if (!form.name) return;
+    const link = linkForSave(form.link, null);
     onAdd({
+      ...(link ? { link } : {}),
       id: 'a' + Date.now(),
       name: form.name,
       desc: form.desc,
@@ -376,7 +447,7 @@ function AddAchievementModal({ openId, onClose, onAdd }) {
       category: form.category || 'general',
       createdAt: Date.now(),
     });
-    setForm({ name: '', desc: '', icon: '', coins: '', category: 'general' });
+    setForm({ name: '', desc: '', icon: '', coins: '', category: 'general', link: null });
     onClose('addAchievementModal');
   }
   return (
@@ -405,6 +476,7 @@ function AddAchievementModal({ openId, onClose, onAdd }) {
       </div>
       <div className="fg"><label>⬡ Coin Reward on Completion</label><input type="number" placeholder="e.g. 50" min="0" max={MAX_ACH_COINS} value={form.coins} onChange={e => setForm(f => ({ ...f, coins: e.target.value }))} /><span style={{ fontFamily: 'var(--mono)', fontSize: '10px', color: 'var(--text-muted)', marginTop: '4px', display: 'block' }}>Max {MAX_ACH_COINS.toLocaleString()} ⬡ per achievement.</span></div>
       <CategoryPicker value={form.category} onChange={v => setForm(f => ({ ...f, category: v }))} />
+      <TrackerLinkFields trackers={trackers} value={form.link} onChange={link => setForm(f => ({ ...f, link }))} />
       {/* The spacing rule, stated at the moment it starts applying.
           Hiding it made the rating feel arbitrary to anyone who noticed
           their completions weren't moving it. */}
@@ -422,14 +494,14 @@ function AddAchievementModal({ openId, onClose, onAdd }) {
 }
 
 // ── Edit Achievement ──
-function EditAchievementModal({ openId, onClose, achievements, onEdit, onDelete }) {
+function EditAchievementModal({ openId, onClose, achievements, onEdit, onDelete, trackers }) {
   // openId format: 'editAchievementModal:${id}'. Mirrors EditHabitModal
   // — keeps the parsing pattern consistent across edit modals.
   const isOpen = typeof openId === 'string' && openId.startsWith('editAchievementModal:');
   const achId = isOpen ? openId.split(':')[1] : null;
   const ach = achId ? (achievements || []).find(a => a.id === achId) : null;
 
-  const [form, setForm] = useState({ name: '', desc: '', icon: '', coins: '', category: 'general' });
+  const [form, setForm] = useState({ name: '', desc: '', icon: '', coins: '', category: 'general', link: null });
 
   // Sync form when the target achievement changes (i.e. modal opens
   // for a new id). Don't sync on every render — that wipes user edits.
@@ -441,6 +513,7 @@ function EditAchievementModal({ openId, onClose, achievements, onEdit, onDelete 
         icon: ach.icon || '',
         coins: ach.coins != null ? String(ach.coins) : '',
         category: ach.category || 'general',
+        link: ach.link && ach.link.trackerId ? { ...ach.link } : null,
       });
     }
   }, [achId]);
@@ -455,6 +528,8 @@ function EditAchievementModal({ openId, onClose, achievements, onEdit, onDelete 
       icon: form.icon || ach.icon || '🏆',
       coins: clampCoins(form.coins),
       category: form.category || 'general',
+      // null clears it — an unlinked achievement goes back to a manual tick.
+      link: linkForSave(form.link, ach.link),
     });
     onClose(openId);
   }
@@ -491,6 +566,14 @@ function EditAchievementModal({ openId, onClose, achievements, onEdit, onDelete 
       </div>
       <div className="fg"><label>⬡ Coin Reward on Completion</label><input type="number" min="0" max={MAX_ACH_COINS} value={form.coins} onChange={e => setForm(f => ({ ...f, coins: e.target.value }))} /><span style={{ fontFamily: 'var(--mono)', fontSize: '10px', color: 'var(--text-muted)', marginTop: '4px', display: 'block' }}>Max {MAX_ACH_COINS.toLocaleString()} ⬡ per achievement.</span></div>
       <CategoryPicker value={form.category} onChange={v => setForm(f => ({ ...f, category: v }))} />
+      {!ach.completed && (
+        <TrackerLinkFields
+          trackers={trackers}
+          value={form.link}
+          onChange={link => setForm(f => ({ ...f, link }))}
+          relinking={!(ach.link && form.link && ach.link.trackerId === form.link.trackerId && ach.link.mode === form.link.mode)}
+        />
+      )}
       {ach.completed && (
         <div style={{
           padding: '10px 12px', borderRadius: '8px', marginBottom: '12px',
@@ -1840,11 +1923,13 @@ export default function Modals({ openModal, S, update, onClose, onOpen, onShowCo
   function handleAddTracker(tracker) {
     update(prev => ({ ...prev, trackers: [...prev.trackers, tracker] }));
   }
-  function handleAddHubWidget(type) {
-    // Desktop content widgets (habits / holidays) added to the canvas.
+  function handleAddHubWidget(spec) {
+    // A type string for a standalone widget, or `{ type, blocks }` for a
+    // prime card added with a starting layout.
+    const w = typeof spec === 'string' ? { type: spec } : spec;
     update(prev => ({
       ...prev,
-      hubWidgets: [...(prev.hubWidgets || []), { id: 'hw' + Date.now(), type }],
+      hubWidgets: [...(prev.hubWidgets || []), { ...w, id: 'hw' + Date.now() }],
     }));
   }
   function handleMultiLogSave(logs) {
@@ -1925,8 +2010,8 @@ export default function Modals({ openModal, S, update, onClose, onOpen, onShowCo
       />
       <AddLinkOnlyModal openId={effectiveOpen} onClose={onClose} onAdd={handleAddLink} />
       <CoinHistoryModal openId={effectiveOpen} onClose={onClose} coins={S.coins || 0} coinHistory={S.coinHistory || []} />
-      <AddAchievementModal openId={effectiveOpen} onClose={onClose} onAdd={handleAddAchievement} />
-      <EditAchievementModal openId={effectiveOpen} onClose={onClose} achievements={S.achievements} onEdit={handleEditAchievement} onDelete={handleDeleteAchievement} />
+      <AddAchievementModal openId={effectiveOpen} onClose={onClose} onAdd={handleAddAchievement} trackers={S.trackers} />
+      <EditAchievementModal openId={effectiveOpen} onClose={onClose} achievements={S.achievements} onEdit={handleEditAchievement} onDelete={handleDeleteAchievement} trackers={S.trackers} />
       <AddSavingsGoalModal openId={effectiveOpen} onClose={onClose} achievements={S.achievements} onAdd={handleAddSavingsGoal} />
       <AddContributionModal openId={effectiveOpen} onClose={onClose} savings={S.savings} onAdd={handleAddContribution} />
       <EditSavingsGoalModal openId={effectiveOpen} onClose={onClose} savings={S.savings} achievements={S.achievements} onEdit={handleEditSavingsGoal} onDelete={handleDeleteSavingsGoal} />

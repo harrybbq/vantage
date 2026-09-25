@@ -16,6 +16,7 @@ import { tradingWidgetAvailable } from '../../lib/trading/enabled';
 import { useSubscriptionContext } from '../../context/SubscriptionContext';
 import { backdropClose } from '../../utils/backdropClose';
 import { widgetReadiness } from '../../lib/widgets/readiness';
+import PrimePicker from '../widgets/prime/PrimePicker';
 
 // App-preset widget types (FloorplanStudio / …) — a Pro bonus, so
 // they're locked for free users in the picker below.
@@ -36,11 +37,12 @@ export default function AddMobileWidgetModal({ openId, onClose, existingTypes, o
   // Built per-open (not module-level) so owner-only presets resolve
   // against the signed-in account rather than against whoever the app
   // happened to be loaded for.
+  // Recent wins / Coin history / Habits / Holidays / Savings pots /
+  // Projection / Subscriptions are no longer offered here: each is a
+  // block on a prime card above (Achievements, Habits, Holidays,
+  // Savings). Their META and render cases stay, so a stack that already
+  // has one keeps a working card.
   const pickerOrder = [
-    'recent-wins',
-    'coin-history',
-    'habits',
-    'holidays',
     // Mobile parity for the desktop hub widgets.
     'github',
     'linkedin',
@@ -56,9 +58,6 @@ export default function AddMobileWidgetModal({ openId, onClose, existingTypes, o
     // silently turn into something else.
     'macros',
     'calories',
-    'savings-pots',
-    'savings-projection',
-    'subscriptions',
     'market',
     'news',
     'mail',
@@ -98,16 +97,16 @@ export default function AddMobileWidgetModal({ openId, onClose, existingTypes, o
     >
       <div className="modal" style={{ maxWidth: 420 }}>
         <h3>Add Widget</h3>
-        <p style={{
-          fontFamily: 'var(--mono)', fontSize: 11, color: 'var(--text-muted)',
-          margin: '0 0 16px', lineHeight: 1.65,
-        }}>
-          Widgets stack below AI Coach. Pick one to add — you can remove
-          any with the × in its top-right corner. Anything that needs
-          data first says so; tapping it takes you where to enter it.
-        </p>
 
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+        <PrimePicker
+          compact
+          S={S}
+          widgets={S.mobileWidgets || []}
+          onAdd={w => { onAdd({ ...w, id: 'w' + Date.now() }); onClose('addMobileWidgetModal'); }}
+        />
+
+        <span className="aw-section-lbl">Widgets</span>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
           {pickerOrder.map(type => {
             const meta = WIDGET_META[type];
             if (!meta) return null;
@@ -128,9 +127,9 @@ export default function AddMobileWidgetModal({ openId, onClose, existingTypes, o
                 disabled={alreadyAdded}
                 style={{
                   display: 'flex', alignItems: 'center', gap: 12,
-                  padding: '12px 14px', borderRadius: 10,
+                  padding: '9px 12px', borderRadius: 10,
                   border: '1px solid var(--border)',
-                  background: alreadyAdded ? 'transparent' : 'var(--card, rgba(255,255,255,0.04))',
+                  background: 'transparent',
                   color: 'var(--text)', textAlign: 'left',
                   cursor: alreadyAdded ? 'not-allowed' : 'pointer',
                   opacity: alreadyAdded ? 0.5 : (!ready || proLocked) ? 0.75 : 1,

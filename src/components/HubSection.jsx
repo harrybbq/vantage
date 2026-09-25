@@ -1,4 +1,4 @@
-import { useEffect, useRef, useCallback, lazy, Suspense } from 'react';
+import { useEffect, useRef, useCallback, useState, lazy, Suspense } from 'react';
 import { createRoot } from 'react-dom/client';
 import { motion } from 'framer-motion';
 import { VitalsBody, BurnBody, MacrosBody } from './mobile/MobileWidget';
@@ -14,6 +14,9 @@ import NewsBody from './widgets/NewsWidget';
 import { reflow, MIN_W, MIN_H, SNAP_GAP as REFLOW_GAP } from '../lib/hub/reflow';
 import { rescaleLayout, rebaseLayout } from '../lib/hub/rescale';
 import { observeShape } from '../lib/hub/shape';
+import { primeOf, withBlocks, withBlockOpts } from '../lib/hub/primeBlocks';
+import { PrimeFit } from './widgets/prime/PrimeCard';
+import { PrimeEditorPopover } from './widgets/prime/PrimeEditor';
 const TradingBody = TRADING_WIDGET_BUILD_EXCLUDED ? null : lazy(() => import('./widgets/TradingWidget'));
 import { timeAgo } from '../utils/helpers';
 import AiCoachWidget from './AiCoachWidget';
@@ -544,7 +547,43 @@ export default function HubSection({ S, update, active, onOpenModal, onOpenWaitl
   function setHubWidgetPicks(id, picks) {
     update(prev => ({ ...prev, hubWidgets: (prev.hubWidgets || []).map(w => w.id === id ? { ...w, picks } : w) }));
   }
+  /* ── Prime cards ────────────────────────────────────────────────────
+     Every change goes through one functional patch of that ONE widget,
+     so a block reorder can never write over the rest of the list (or a
+     concurrent edit from another device, which the merge sees as a
+     change to a single entry). */
+  function patchHubWidget(id, fn) {
+    update(prev => ({ ...prev, hubWidgets: (prev.hubWidgets || []).map(w => (w.id === id ? fn(w) : w)) }));
+  }
+  function removeHubWidget(id) {
+    update(prev => ({
+      ...prev,
+      hubWidgets: (prev.hubWidgets || []).filter(w => w.id !== id),
+      widgetPositions: (() => { const p = { ...prev.widgetPositions }; delete p[id]; return p; })(),
+    }));
+  }
+  const [primeEdit, setPrimeEdit] = useState(null); // { id, rect } | null
+  const closePrimeEdit = useCallback(() => setPrimeEdit(null), []);
+  const onPrimeAct = useCallback(act => {
+    if (act?.kind === 'relapse') update(prev => applyRelapse(prev, act.id, Date.now()));
+  }, [update]);
+
   function reactWidgetEl(hw) {
+    if (primeOf(hw)) {
+      return (
+        <PrimeFit
+          widget={hw}
+          S={S}
+          onEdit={e => {
+            const r = e.currentTarget.closest('.widget-wrapper')?.getBoundingClientRect()
+              || e.currentTarget.getBoundingClientRect();
+            setPrimeEdit(cur => (cur && cur.id === hw.id ? null : { id: hw.id, rect: r }));
+          }}
+          onDelete={() => removeHubWidget(hw.id)}
+          onAct={onPrimeAct}
+        />
+      );
+    }
     switch (hw.type) {
       case 'vitals':   return <VitalsBody S={S} update={update} picks={hw.picks}
         onSetPicks={p => setHubWidgetPicks(hw.id, p)} />;
@@ -1112,11 +1151,19 @@ export default function HubSection({ S, update, active, onOpenModal, onOpenWaitl
   const renderCanvas = useCallback(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
-    // Tear down React islands before wiping their DOM.
-    for (const [, { root, stopShape }] of reactRootsRef.current) {
+    // Tear down React islands before wiping their DOM. The observers stop
+    // now; the roots unmount on the next task. renderCanvas runs inside
+    // this component's effects, i.e. while React is committing, and an
+    // island unmounted synchronously from there is a root torn down
+    // mid-render — React warns once per island per rebuild, and the
+    // island's own cleanup can run against a half-committed tree.
+    const dying = [...reactRootsRef.current.values()];
+    for (const { stopShape } of dying) {
       try { stopShape?.(); } catch { /* already gone */ }
-      try { root.unmount(); } catch { /* already gone */ }
     }
+    setTimeout(() => dying.forEach(({ root }) => {
+      try { root.unmount(); } catch { /* already gone */ }
+    }), 0);
     reactRootsRef.current.clear();
 
     // ── Preserve the caret across the rebuild ──
@@ -1260,7 +1307,7 @@ export default function HubSection({ S, update, active, onOpenModal, onOpenWaitl
       if (hasPositions) {
         const pos = layoutPositions[hw.id];
         wrapper.style.cssText = `position:absolute;min-width:280px;max-width:360px;width:300px;user-select:none;left:${pos ? pos.x : 40}px;top:${pos ? pos.y : 40}px;`;
-        if (!pos) unplaced.push({ id: hw.id, wrapper });
+        if (!pos) unplaced.push({ id: hw.id, wrapper, prime: !!primeOf(hw) });
       }
 
       const island = document.createElement('div');
@@ -1290,6 +1337,30 @@ export default function HubSection({ S, update, active, onOpenModal, onOpenWaitl
         body:          { eyebrow: 'WIDGET · BODY', icon: '◍', title: 'Body',          sub: '7-day avg · goal',      body: () => `<div data-react-widget="body"></div>` },
         subscriptions: { eyebrow: 'WIDGET · BILLS', icon: '↻', title: 'Subscriptions', sub: 'Monthly burn · renewals', body: () => `<div data-react-widget="subscriptions"></div>` },
       };
+      /* A prime card draws its own title row and count chip; the island
+         keeps only the drag grip every canvas widget shares. A card with
+         no saved size gets one — the packer fits blocks INTO a box, and
+         an auto-height wrapper would hand it a height of nothing. */
+      if (primeOf(hw)) {
+        island.classList.add('prime-island');
+        island.innerHTML = `
+          <div class="widget-drag-handle" data-drag="${escapeHtml(hw.id)}"><span></span></div>
+          <div data-react-widget="prime"></div>
+        `;
+        const saved = layoutSizes[hw.id] || {};
+        if (!saved.w) wrapper.style.width = '440px';
+        if (!saved.h) wrapper.style.height = '330px';
+        wrapper.appendChild(island);
+        canvas.appendChild(wrapper);
+        makeDraggable(wrapper, hw.id);
+        makeResizable(wrapper, hw.id, layoutSizes);
+        const root = createRoot(island.querySelector('[data-react-widget]'));
+        root.render(reactWidgetElRef.current(hw));
+        const stopShape = observeShape(wrapper);
+        reactRootsRef.current.set(hw.id, { root, type: hw.type, stopShape });
+        return;
+      }
+
       const meta = META[hw.type] || META.habits;
       const { eyebrow, icon, title, sub } = meta;
       const body = meta.body();
@@ -1393,18 +1464,24 @@ export default function HubSection({ S, update, active, onOpenModal, onOpenWaitl
 
         const newPos = {}, newSizes = {};
         for (const u of live) {
+          // A prime card takes two columns: its blocks are laid out side
+          // by side from ~440px, and one column (~230px on a laptop) would
+          // leave it a stack of one-line facts on arrival.
+          const span = u.prime && cols >= 2 ? 2 : 1;
+          const bottomOf = c => Math.max(...colBottom.slice(c, c + span));
           let c = 0;
-          for (let i = 1; i < cols; i++) if (colBottom[i] < colBottom[c]) c = i;
-          const x = c * (colW + AUTO_GAP), y = colBottom[c];
+          for (let i = 1; i <= cols - span; i++) if (bottomOf(i) < bottomOf(c)) c = i;
+          const w = span * colW + (span - 1) * AUTO_GAP;
+          const x = c * (colW + AUTO_GAP), y = bottomOf(c);
           u.wrapper.style.left = x + 'px';
           u.wrapper.style.top = y + 'px';
-          u.wrapper.style.width = colW + 'px';
-          colBottom[c] = y + u.wrapper.offsetHeight + AUTO_GAP;
+          u.wrapper.style.width = w + 'px';
+          for (let k = c; k < c + span; k++) colBottom[k] = y + u.wrapper.offsetHeight + AUTO_GAP;
           newPos[u.id] = { x, y };
           // Width only. Pinning the height here would freeze the widget
           // at whatever its body happened to measure one frame after
           // mount, which for the async widgets is a loading skeleton.
-          newSizes[u.id] = { ...(S.widgetSizes || {})[u.id], w: colW };
+          newSizes[u.id] = { ...(S.widgetSizes || {})[u.id], w };
         }
         growCanvas(canvas);
         update(prev => ({
@@ -1465,6 +1542,19 @@ export default function HubSection({ S, update, active, onOpenModal, onOpenWaitl
     }), 0);
   }, []);
 
+  const primeEditing = primeEdit && (S.hubWidgets || []).find(w => w.id === primeEdit.id);
+  const primeEditorNode = primeEditing && primeOf(primeEditing) ? (
+    <PrimeEditorPopover
+      widget={primeEditing}
+      anchorRect={primeEdit.rect}
+      pots={(S.savings || []).map(g => ({ id: g.id, name: g.name }))}
+      onSet={ids => patchHubWidget(primeEditing.id, w => withBlocks(w, ids))}
+      onOpts={(blockId, patch) => patchHubWidget(primeEditing.id, w => withBlockOpts(w, blockId, patch))}
+      onTitle={t => patchHubWidget(primeEditing.id, w => ({ ...w, title: t }))}
+      onClose={closePrimeEdit}
+    />
+  ) : null;
+
   // ── Operator-console layout — both themes, every tier ────────────────
   if (isOsLayout) {
     return (
@@ -1485,6 +1575,7 @@ export default function HubSection({ S, update, active, onOpenModal, onOpenWaitl
           userId={userId}
           onUpgrade={onUpgrade}
         />
+        {primeEditorNode}
       </section>
     );
   }
@@ -1542,6 +1633,7 @@ export default function HubSection({ S, update, active, onOpenModal, onOpenWaitl
       <AiCoachWidget S={S} update={update} onOpenWaitlist={onOpenWaitlist} onCoachAct={onCoachAct} />
       <CoachBriefPanel S={S} update={update} onCoachAct={onCoachAct} userId={userId} />
       {moduleMenu.menuNode}
+      {primeEditorNode}
     </section>
   );
 }

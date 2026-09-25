@@ -5,6 +5,8 @@ import { fireAchievement } from '../utils/confetti';
 import SectionHelp from './SectionHelp';
 import SavingsBoard from './savings/SavingsBoard';
 import PathPlayer from './achievements/PathPlayer';
+import LinkProgress from './achievements/LinkProgress';
+import { linkProgressMap } from '../lib/achievements/trackerLink';
 import { wouldCycle } from '../lib/achievements/pathPlayer';
 import { useIsMobile } from '../hooks/useIsMobile';
 import { SubscriptionsManager } from './widgets/LifeWidgets';
@@ -212,6 +214,7 @@ function AchNode({
   connectingFrom, zoom = 1,
   onDragCommit, onDragMove,
   onComplete, onConnect, onDelete, onEdit,
+  prog,
 }) {
   // rAF-coalesced live-move reporting so connection lines follow the
   // node smoothly during a drag (committed to state only on release).
@@ -380,6 +383,7 @@ function AchNode({
             {/* Completed, but inside the spacing window, so it is paying
                 coins without moving the rating. Saying so on the card is
                 the only place a user would ever find that out. */}
+            {!ach.completed && <LinkProgress prog={prog} />}
             {creditStatus.state === 'too-soon' && (
               <div className="ach-credit-note" title={`Completed within ${creditStatus.spacingDays} days of being created, so it does not count toward your rating.`}>
                 Rating credit in {creditStatus.daysLeft}d
@@ -402,8 +406,8 @@ function AchNode({
         <div className="ach-actions">
           <button
             type="button"
-            className="ach-btn ach-btn-complete"
-            title={ach.completed ? 'Mark as not completed' : 'Mark complete'}
+            className={`ach-btn ach-btn-complete${prog?.met && !ach.completed ? ' is-ready' : ''}`}
+            title={ach.completed ? 'Mark as not completed' : prog?.met ? 'Goal met — claim it' : 'Mark complete'}
             onClick={e => { e.stopPropagation(); onComplete(ach.id); }}
           ><Icon name="star" size={14} /></button>
           <button
@@ -438,6 +442,12 @@ export default function AchievementsSection({ S, update, active, onOpenModal, on
   // Rating credit, shown rather than hidden — see achievementCreditState.
   const credit = achievementCreditState(S);
   const connections = S.connections || [];
+  // What each linked tracker has counted. Derived from the logs every
+  // time (never stored), so unticking a day in Track takes it back.
+  const linkProg = useMemo(
+    () => linkProgressMap(achievements, S.trackers, S.logs),
+    [achievements, S.trackers, S.logs],
+  );
   const connectingFrom = S.connectingFrom || null;
 
   const [zoom, setZoom] = useState(1);
@@ -1030,6 +1040,7 @@ export default function AchievementsSection({ S, update, active, onOpenModal, on
           onDelete={handleDelete}
           connectingFrom={S.connectingFrom || null}
           onCancelConnect={handleCancelConnect}
+          linkProg={linkProg}
         />
       ) : (<>
 
@@ -1094,6 +1105,7 @@ export default function AchievementsSection({ S, update, active, onOpenModal, on
               onConnect={handleConnect}
               onDelete={handleDelete}
               onEdit={handleEdit}
+              prog={linkProg[ach.id]}
             />
           ))}
 

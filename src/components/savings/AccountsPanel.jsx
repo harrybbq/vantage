@@ -11,20 +11,38 @@
  */
 import Icon from '../Icon';
 import { blendedApy, routedToAccount, money, POT_PALETTE, potColor } from '../../lib/savings/derive';
+import { accountBalance, accountsTotal, settleAccount } from '../../lib/savings/interest';
 
 const uid = p => p + Date.now().toString(36) + Math.round(Math.random() * 1e4).toString(36);
 
 export default function AccountsPanel({ S, update, sav, horizon, items }) {
   const accounts = S.savingsAccounts || [];
   const goals = S.savings || [];
-  const total = accounts.reduce((s, a) => s + (parseFloat(a.balance) || 0), 0);
+  // Today's balances — interest to date included (lib/savings/interest).
+  const total = accountsTotal(accounts);
   const blended = blendedApy(accounts);
   const future = sav[sav.length - 1] || 0;
 
   const setAccounts = fn => update(prev => ({ ...prev, savingsAccounts: fn(prev.savingsAccounts || []) }));
   const addAccount = () => setAccounts(a => [...a, { id: uid('a'), name: '', balance: '', apy: '' }]);
   const patch = (id, key, val) => setAccounts(a => a.map(x => x.id === id ? { ...x, [key]: val } : x));
+  /* Typing a balance says "this is what it holds TODAY", so the interest
+     clock restarts from now. A new rate applies from now too: what was
+     earned at the old one is folded in first rather than re-priced. */
+  const setBalance = (id, val) => setAccounts(a => a.map(x => x.id === id ? { ...x, balance: val, balanceAt: Date.now() } : x));
+  const setApy = (id, val) => setAccounts(a => a.map(x => x.id === id ? { ...settleAccount(x, 0), apy: val } : x));
   const remove = id => setAccounts(a => a.filter(x => x.id !== id));
+  /* List order is the order a completed pot draws on the ticked
+     accounts, so it has to be something you can set. */
+  const move = (id, dir) => setAccounts(a => {
+    const i = a.findIndex(x => x.id === id);
+    const j = i + dir;
+    if (i < 0 || j < 0 || j >= a.length) return a;
+    const next = a.slice();
+    [next[i], next[j]] = [next[j], next[i]];
+    return next;
+  });
+  const drainOrder = accounts.filter(a => a.drainable).map(a => a.id);
 
   return (
     <div className="sb-panel sb-accounts">
@@ -45,7 +63,7 @@ export default function AccountsPanel({ S, update, sav, horizon, items }) {
             <div
               key={a.id}
               style={{
-                width: `${total > 0 ? (parseFloat(a.balance) || 0) / total * 100 : 0}%`,
+                width: `${total > 0 ? accountBalance(a).balance / total * 100 : 0}%`,
                 background: POT_PALETTE[i % POT_PALETTE.length],
               }}
             />
@@ -55,7 +73,8 @@ export default function AccountsPanel({ S, update, sav, horizon, items }) {
 
       <div className="sb-acc-list">
         {accounts.map((a, i) => {
-          const bal = parseFloat(a.balance) || 0;
+          const acc = accountBalance(a);
+          const bal = acc.balance;
           const apy = parseFloat(a.apy) || 0;
           const inflow = routedToAccount(items, a.id);
           const potIdx = goals.findIndex(g => g.id === a.goalId);
@@ -76,16 +95,24 @@ export default function AccountsPanel({ S, update, sav, horizon, items }) {
                   <i>£</i>
                   <input
                     type="number" inputMode="decimal" placeholder="0" aria-label="Balance"
-                    value={a.balance ?? ''} onChange={e => patch(a.id, 'balance', e.target.value)}
+                    value={a.balance ?? ''} onChange={e => setBalance(a.id, e.target.value)}
                   />
                 </span>
                 <span className="sb-acc-field is-apy">
                   <input
                     type="number" inputMode="decimal" step="0.1" placeholder="0" aria-label="Interest rate"
-                    value={a.apy ?? ''} onChange={e => patch(a.id, 'apy', e.target.value)}
+                    value={a.apy ?? ''} onChange={e => setApy(a.id, e.target.value)}
                   />
                   <i>% APY</i>
                 </span>
+                {accounts.length > 1 && (
+                  <span className="sb-acc-order">
+                    <button type="button" onClick={() => move(a.id, -1)} disabled={i === 0}
+                            aria-label={`Move ${a.name || 'account'} up`}><Icon name="chevron-up" size={12} /></button>
+                    <button type="button" onClick={() => move(a.id, 1)} disabled={i === accounts.length - 1}
+                            aria-label={`Move ${a.name || 'account'} down`}><Icon name="chevron-down" size={12} /></button>
+                  </span>
+                )}
                 <button type="button" className="sb-acc-del" onClick={() => remove(a.id)} aria-label="Remove account">
                   <Icon name="x" size={13} />
                 </button>
@@ -100,6 +127,35 @@ export default function AccountsPanel({ S, update, sav, horizon, items }) {
                 <span className="sb-row-spacer" />
                 <span>+{money(bal * apy / 100)} interest/yr</span>
               </div>
+              {/* What the rate has actually done. The input above holds the
+                  figure as it was typed; this is the account today. */}
+              {apy > 0 && acc.base > 0 && (
+                <div className="sb-acc-accrued">
+                  {acc.earned >= 0.01 ? (
+                    <>
+                      <b>{money(bal, { pence: true })}</b> today
+                      <span className="sb-acc-sep" />
+                      <span className="is-earned">+{money(acc.earned, { pence: true })}</span> interest since{' '}
+                      {new Date(acc.since).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}
+                    </>
+                  ) : (
+                    <>Interest compounds daily from {new Date(acc.since).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}</>
+                  )}
+                </div>
+              )}
+
+              {/* Completing a pot draws on ticked accounts only, top of
+                  the list first — the number says where this one falls. */}
+              <label className={`sb-acc-drain${a.drainable ? ' is-on' : ''}`}>
+                <input
+                  type="checkbox" checked={!!a.drainable}
+                  onChange={e => patch(a.id, 'drainable', e.target.checked)}
+                />
+                <span>Pays out completed pots</span>
+                {a.drainable && drainOrder.length > 1 && (
+                  <span className="sb-acc-drain-n">{drainOrder.indexOf(a.id) + 1} of {drainOrder.length}</span>
+                )}
+              </label>
 
               {/* Saying an account is FOR a pot is what lets money routed
                   here count toward that pot's rate and date, without the

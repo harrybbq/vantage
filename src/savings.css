@@ -1341,3 +1341,117 @@ html[data-theme="dark-os"] .sb-stat-val.is-bad { color: #e07a6b; }
   .pp-actions { flex-direction: column-reverse; }
   .pp-actions .btn { width: 100%; }
 }
+
+/* ── Band popup (where the month goes) ───────────────────────────────
+   Shared by the savings page and the Savings prime card. Rendered on
+   <body>, so it sits above whatever clips the bar it describes. */
+.seg-tip {
+  position: fixed;
+  z-index: 700;
+  transform: translate(-50%, -100%);
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 96px;
+  max-width: 260px;
+  padding: 7px 10px 8px;
+  border-radius: 9px;
+  background: var(--surface, #fff);
+  border: 1px solid var(--border);
+  box-shadow: 0 10px 26px rgba(0, 0, 0, .22);
+  pointer-events: none;
+  animation: seg-tip-in .12s ease-out;
+}
+.seg-tip.is-below { transform: translate(-50%, 0); }
+@keyframes seg-tip-in { from { opacity: 0; margin-top: 3px; } to { opacity: 1; margin-top: 0; } }
+@media (prefers-reduced-motion: reduce) { .seg-tip { animation: none; } }
+.seg-tip-label {
+  display: flex; align-items: center; gap: 6px;
+  font-family: var(--mono);
+  font-size: var(--text-xs, 10px);
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.seg-tip-label i { width: 7px; height: 7px; border-radius: 2px; flex: none; }
+.seg-tip-value { font-family: var(--sans); font-size: var(--text-base, 14px); font-weight: 700; color: var(--text); }
+.seg-tip-sub { font-size: var(--text-xs, 11px); color: var(--text-mid); white-space: nowrap; }
+[data-seg] { cursor: default; outline: none; }
+[data-seg]:focus-visible { box-shadow: inset 0 0 0 2px var(--text); }
+.sb-segment[data-seg]:hover, .pv-seg-bar > [data-seg]:hover { filter: brightness(1.12); }
+
+/* Today's balance with interest — under the account's typed figure. */
+.sb-acc-accrued {
+  display: flex; align-items: center; flex-wrap: wrap; gap: 4px 8px;
+  margin-top: 6px;
+  font-family: var(--mono);
+  font-size: 10.5px;
+  color: var(--text-muted);
+}
+.sb-acc-accrued b { color: var(--text); font-weight: 700; }
+.sb-acc-accrued .is-earned { color: var(--em); font-weight: 700; }
+
+/* ── Completing a pot ────────────────────────────────────────────────── */
+.sb-complete-btn.is-ready { border-color: var(--gold, #c8970a); color: var(--gold, #c8970a); }
+.sb-complete {
+  margin-top: 10px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: rgba(128, 128, 128, .06);
+  display: flex; flex-direction: column; gap: 8px;
+}
+.sb-complete-head { font-size: 13px; color: var(--text); }
+.sb-complete-list { display: flex; flex-direction: column; gap: 4px; }
+.sb-complete-row {
+  display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: 10px; align-items: baseline;
+  font-size: 12px;
+}
+.sb-complete-name { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--text); }
+.sb-complete-take { font-family: var(--mono); color: var(--danger, #c0392b); font-weight: 700; }
+.sb-complete-after { font-family: var(--mono); font-size: 11px; color: var(--text-muted); }
+.sb-complete-note { margin: 0; font-size: 11.5px; line-height: 1.5; color: var(--text-mid); }
+.sb-complete-note.is-short { color: var(--gold, #c8970a); }
+/* Wraps and shares the width: on a phone the pot card's text column is
+   ~150px, and two fixed buttons right-aligned spilled out of the left. */
+.sb-complete-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; }
+.sb-complete-actions .btn { flex: 1 1 auto; min-width: 0; max-width: 100%; }
+@media (min-width: 561px) { .sb-complete-actions .btn { flex: 0 0 auto; } }
+
+.sb-done { margin-top: 12px; display: flex; flex-direction: column; gap: 6px; }
+.sb-done-row {
+  display: flex; align-items: center; gap: 8px; min-width: 0;
+  padding: 7px 10px; border-radius: 9px; border: 1px dashed var(--border);
+  font-size: 12px;
+}
+.sb-done-name { font-weight: 600; color: var(--text); white-space: nowrap; }
+.sb-done-meta { flex: 1; min-width: 0; font-family: var(--mono); font-size: 10.5px; color: var(--text-muted);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sb-done-undo {
+  flex: none; height: 24px; padding: 0 10px; border-radius: 12px;
+  border: 1px solid var(--border); background: transparent; color: var(--text-mid);
+  font-size: 11px; cursor: pointer; white-space: nowrap;
+}
+.sb-done-undo:hover { border-color: var(--em); color: var(--em); }
+.sb-done-undo.is-arming { background: var(--em); border-color: var(--em); color: #fff; }
+
+/* Accounts: drain tick + order arrows */
+.sb-acc-order { display: inline-flex; flex-direction: column; gap: 1px; flex: none; }
+.sb-acc-order button {
+  width: 20px; height: 14px; padding: 0; display: flex; align-items: center; justify-content: center;
+  border: none; background: transparent; color: var(--text-mid); cursor: pointer; border-radius: 3px;
+}
+.sb-acc-order button:disabled { opacity: .25; cursor: default; }
+.sb-acc-order button:not(:disabled):hover { color: var(--em); background: rgba(var(--em-rgb), .08); }
+.sb-acc-drain {
+  display: flex; align-items: center; gap: 7px; margin-top: 7px;
+  font-size: 11.5px; color: var(--text-muted); cursor: pointer; width: fit-content;
+}
+.sb-acc-drain input { accent-color: var(--em); margin: 0; }
+.sb-acc-drain.is-on { color: var(--text); }
+.sb-acc-drain-n { font-family: var(--mono); font-size: 10px; color: var(--em); }
+@media (max-width: 560px) {
+  .sb-complete-row { grid-template-columns: minmax(0, 1fr) auto; }
+  .sb-complete-after { grid-column: 1 / -1; }
+}

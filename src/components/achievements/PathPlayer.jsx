@@ -34,6 +34,7 @@
  */
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
+import LinkProgress from './LinkProgress';
 import Icon from '../Icon';
 import {
   pathsOf, stepIndexFor, stateOf, parentsOf, childrenOf,
@@ -52,6 +53,7 @@ export default function PathPlayer({
   onDelete,
   connectingFrom = null,
   onCancelConnect,
+  linkProg = {},
 }) {
   const [pathKey, setPathKey] = useState(null);
   const [step, setStep] = useState(0);
@@ -283,6 +285,7 @@ export default function PathPlayer({
               <span className="ppl-name">{cur ? cur.name : 'No goals yet'}</span>
               {cur?.desc && <span className="ppl-desc">{cur.desc}</span>}
             </button>
+            {cur && !cur.completed && <LinkProgress prog={linkProg[cur.id]} claim="tap Mark complete to claim it" />}
           </div>
 
           <div className="ppl-card-body">
