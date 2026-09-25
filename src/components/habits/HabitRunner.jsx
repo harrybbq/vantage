@@ -152,7 +152,9 @@ function ikLimb(ctx, ox, oy, tx, ty, l1, l2, bend) {
 
 const L1 = 7.5, L2 = 6.5, A1 = 6.5, A2 = 5.5;
 
-function drawRunner(ctx, x, groundY, colour, pose) {
+/* Exported so the Habits prime card's mini runner draws the SAME figure
+   as this lane — one gait model, not two that drift apart. */
+export function drawRunner(ctx, x, groundY, colour, pose) {
   const { mode, p, t: tRaw, amp = 0.85, gait = 1, land = 0, shadow, ob } = pose;
   const t = clamp01(tRaw);
   let yOff = 0, crouch = 0, rot = 0, lean = 0, pitch = null;

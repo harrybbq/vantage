@@ -946,43 +946,12 @@ html[data-theme="dark-os"] {
 .qf-search:hover { color: var(--em); }
 
 /* ── Habit runner at the bar tip ─────────────────────────────────────
-   The bars thicken when a runner rides them, so the figure has a lane
-   rather than being balanced on a 6px line. */
-.pv-barsL.has-runner .pv-barL { height: 42px; gap: 6px; }
-/* Isolated, and the track made opaque: the runner inverts only what is
-   INSIDE the bar, and every pixel of it has something solid to invert —
-   the fill before the tip, the track after it. It is sized to sit
-   wholly within the bar so no part of it floats over nothing. */
-.pv-trackwrap { position: relative; display: block; flex: none; isolation: isolate; }
-.pv-barsL.has-runner .pv-track {
-  display: block; height: 14px; border-radius: 7px;
-  background: color-mix(in srgb, var(--text) 13%, var(--surface, #131311));
-}
-.pv-runner {
-  position: absolute; top: 50%;
-  width: 10.5px; height: 14px;
-  transform: translate(-50%, -50%);
-  mix-blend-mode: difference;       /* the inverse of whatever it is over */
-  pointer-events: none;
-}
-.pv-runner svg { width: 100%; height: 100%; display: block; overflow: visible; }
-.pv-runner .pv-runner-body { transform-box: view-box; transform-origin: 6px 12px; }
-.pv-runner .pv-runner-leg { transform-box: view-box; transform-origin: 5.6px 9px; }
-.pv-runner .pv-runner-arm { transform-box: view-box; transform-origin: 6.1px 5.4px; }
-
-@media (prefers-reduced-motion: no-preference) {
-  .pv-runner .pv-runner-leg.a, .pv-runner .pv-runner-arm.b { animation: pvr-swing var(--pvr-t, .7s) ease-in-out infinite alternate; }
-  .pv-runner .pv-runner-leg.b, .pv-runner .pv-runner-arm.a { animation: pvr-swing var(--pvr-t, .7s) ease-in-out infinite alternate-reverse; }
-  .pv-runner .pv-runner-body { animation: pvr-bob calc(var(--pvr-t, .7s) / 2) ease-in-out infinite alternate; }
-}
-@keyframes pvr-swing { from { transform: rotate(calc(var(--pvr-a, 26deg) * -1)); } to { transform: rotate(var(--pvr-a, 26deg)); } }
-@keyframes pvr-bob { from { transform: translateY(0) rotate(var(--pvr-lean, 0deg)); } to { transform: translateY(var(--pvr-bob, -.5px)) rotate(var(--pvr-lean, 0deg)); } }
-/* Pace: cadence, swing and lean together, so posture and speed agree. */
-.pv-runner.is-walk  { --pvr-t: .9s;  --pvr-a: 16deg; --pvr-bob: -.3px; --pvr-lean: 0deg; }
-.pv-runner.is-brisk { --pvr-t: .7s;  --pvr-a: 22deg; --pvr-bob: -.5px; --pvr-lean: 3deg; }
-.pv-runner.is-jog   { --pvr-t: .52s; --pvr-a: 30deg; --pvr-bob: -.8px; --pvr-lean: 6deg; }
-.pv-runner.is-run   { --pvr-t: .4s;  --pvr-a: 38deg; --pvr-bob: -1.1px; --pvr-lean: 10deg; }
-@media (prefers-reduced-motion: reduce) {
-  .pv-runner .pv-runner-leg.a { transform: rotate(-20deg); }
-  .pv-runner .pv-runner-leg.b { transform: rotate(20deg); }
-}
+   Bars thicken to 18px when a runner rides them so the figure has a
+   lane; rows grow to match. The figure itself is MiniRunner (canvas,
+   the Habits page runner's own drawing). */
+.pv-barsL.has-runner .pv-barL { height: 48px; gap: 6px; }
+/* Isolated so the runner's `difference` blend inverts only the bar. */
+.pv-trackwrap { position: relative; display: block; flex: none; isolation: isolate; --pvr-w: 15px; }
+.pv-barsL.has-runner .pv-track { display: block; height: 18px; border-radius: 9px; }
+.pv-runner-slot { position: absolute; top: 0; bottom: 0; width: var(--pvr-w); display: flex; justify-content: flex-end; pointer-events: none; }
+.pv-runner { display: block; flex: none; mix-blend-mode: difference; }

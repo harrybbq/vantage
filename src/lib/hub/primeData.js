@@ -567,15 +567,6 @@ function nextMilestone(h, now) {
   return { next: ms.find(m => m.duration > el) || null, elapsed: el, last: ms[ms.length - 1] || null };
 }
 
-/** Walk under a day, brisk to 4, jog to 7, run after — the Habits page
- *  runner's stage ladder (habits/HabitRunner), reduced to four paces. */
-function paceFor(days) {
-  if (days >= 7) return 'run';
-  if (days >= 4) return 'jog';
-  if (days >= 1) return 'brisk';
-  return 'walk';
-}
-
 const habitBlocks = {
   timers(S) {
     const list = (S.habits || []).filter(h => h.startTime);
@@ -596,9 +587,9 @@ const habitBlocks = {
       .map((it, i) => ({
         ...it,
         act: { kind: 'relapse', id: shown[i].id, name: shown[i].name || 'Habit' },
-        // The little runner at the tip of the bar; its pace follows the
-        // same ladder as the Habits page runner (walk → jog → run).
-        runner: { pace: paceFor((now - shown[i].startTime) / 86400000) },
+        // The little runner at the tip of the bar. Days clean drive its
+        // gait through the Habits page runner's own stage ladder.
+        runner: { days: Math.max(0, (now - shown[i].startTime) / 86400000) },
       }));
     const longest = list.reduce((a, b) => ((now - a.startTime) > (now - b.startTime) ? a : b));
     return { d: { items }, s: { fl: 'LONGEST', fv: `${longest.name} ${elapsed(now - longest.startTime)}` } };

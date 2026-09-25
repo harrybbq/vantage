@@ -19,6 +19,7 @@
  */
 import { memo, useEffect, useState } from 'react';
 import { useSegTip } from '../../savings/SegTip';
+import MiniRunner from './MiniRunner';
 
 /**
  * The one control a view may carry: an action on a row, asked twice.
@@ -116,33 +117,6 @@ function BarsM({ d, onAct }) {
     </div>
   );
 }
-/**
- * A stick figure running at the tip of a habit's bar.
- *
- * Drawn white with mix-blend-mode: difference, so every pixel shows the
- * INVERSE of what is under it — over the bar it is the bar's colour
- * inverted, past the tip it stands out against the empty track, and it
- * straddles the boundary without ever vanishing into either. Limbs swing
- * from hip and shoulder; `pace` sets the cadence. Reduced motion holds a
- * mid-stride pose.
- */
-function Runner({ pct, pace }) {
-  return (
-    <span className={`pv-runner is-${pace}`} style={{ left: `min(max(${pct}%, 6px), calc(100% - 6px))` }} aria-hidden="true">
-      <svg viewBox="0 0 12 16">
-        <g className="pv-runner-body" fill="none" stroke="#fff" strokeWidth="1.6" strokeLinecap="round">
-          <circle cx="6.6" cy="2.4" r="1.7" fill="#fff" stroke="none" />
-          <path d="M6.3 4.4 L5.6 9" />
-          <g className="pv-runner-arm a"><path d="M6.1 5.4 L4 7.6" /></g>
-          <g className="pv-runner-arm b"><path d="M6.1 5.4 L8.1 7.3" /></g>
-          <g className="pv-runner-leg a"><path d="M5.6 9 L4.2 12.2 L3.2 15" /></g>
-          <g className="pv-runner-leg b"><path d="M5.6 9 L7.4 12 L8.8 14.8" /></g>
-        </g>
-      </svg>
-    </span>
-  );
-}
-
 function BarsL({ d, onAct }) {
   const running = d.items.some(p => p.runner);
   return (
@@ -157,7 +131,11 @@ function BarsL({ d, onAct }) {
           {p.runner ? (
             <span className="pv-trackwrap">
               <span className="pv-track"><span className="pv-fill" style={{ width: `${p.pct}%`, background: p.col }} /></span>
-              <Runner pct={p.pct} pace={p.runner.pace} />
+              {/* Right edge on the tip: the whole figure on the filled
+                  part. A bar too short to hold him puts him at its start. */}
+              <span className="pv-runner-slot" style={{ left: `max(calc(${p.pct}% - var(--pvr-w) - 1px), 1px)` }}>
+                <MiniRunner days={p.runner.days} height={18} />
+              </span>
             </span>
           ) : (
             <span className="pv-track"><span className="pv-fill" style={{ width: `${p.pct}%`, background: p.col }} /></span>
