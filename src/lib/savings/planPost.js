@@ -37,6 +37,7 @@
  *
  * Pure. No React, no network.
  */
+import { settleAccount } from './interest.js';
 import { toMonthly, activeAt } from './derive.js';
 import { addContribution } from './contribute.js';
 
@@ -132,8 +133,11 @@ export function proposePlanPosts(S, month, now = new Date()) {
     if (!(amount > 0)) continue;
     const account = it.accountId ? byAccount.get(it.accountId) : null;
     const goalId = it.goalId || (account && account.goalId) || null;
-    const goal = goalId ? byGoal.get(goalId) : null;
-    if (!goal && !account) continue;        // routed at something deleted
+    // A completed pot takes no more contributions; money routed through
+    // an account still lands in the account.
+    const hit = goalId ? byGoal.get(goalId) : null;
+    const goal = hit && !hit.completedAt ? hit : null;
+    if (!goal && !account) continue;        // routed at something deleted or finished
     out.push({
       itemId: it.id,
       label: it.label || 'Untitled',
@@ -165,7 +169,7 @@ export const contributionId = (month, itemId) => `plan-${month}-${itemId}`;
  *
  * Returns `prev` unchanged if the month has already been decided.
  */
-export function applyPlanPosts(prev, month, rows) {
+export function applyPlanPosts(prev, month, rows, now = Date.now()) {
   if (!month || decided(prev, month)) return prev;
 
   const ts = stampFor(month);
@@ -197,9 +201,11 @@ export function applyPlanPosts(prev, month, rows) {
       const accounts = next.savingsAccounts || [];
       const idx = accounts.findIndex(a => a.id === row.accountId);
       if (idx >= 0) {
-        const acc = accounts[idx];
         const nextAccounts = accounts.slice();
-        nextAccounts[idx] = { ...acc, balance: Math.round(((Number(acc.balance) || 0) + amount) * 100) / 100 };
+        // Interest earned so far is folded in before the deposit, and the
+        // clock restarts — so the new money earns from today, not from
+        // whenever the balance was last typed (see savings/interest).
+        nextAccounts[idx] = settleAccount(accounts[idx], amount, now);
         next = { ...next, savingsAccounts: nextAccounts };
         touched = true;
       }

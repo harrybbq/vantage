@@ -124,7 +124,7 @@ const state = (over = {}) => ({
 {
   const S = armPlanLedger(state(), new Date(2026, 7, 1));
   const rows = proposePlanPosts(S, AUG, NOW);
-  const after = applyPlanPosts(S, AUG, rows);
+  const after = applyPlanPosts(S, AUG, rows, NOW.getTime());
 
   const g1 = after.savings.find(g => g.id === 'g1');
   eq(g1.current, 5350, 'the pot took both the row aimed at it and the row aimed at its ISA');
@@ -146,15 +146,15 @@ const state = (over = {}) => ({
 // ── Never twice ──
 {
   const S = armPlanLedger(state(), new Date(2026, 7, 1));
-  const once = applyPlanPosts(S, AUG, proposePlanPosts(S, AUG, NOW));
+  const once = applyPlanPosts(S, AUG, proposePlanPosts(S, AUG, NOW), NOW.getTime());
   eq(duePlanMonth(once, NOW), null, 'a decided month stops being asked about');
-  const twice = applyPlanPosts(once, AUG, proposePlanPosts(once, AUG, NOW));
+  const twice = applyPlanPosts(once, AUG, proposePlanPosts(once, AUG, NOW), NOW.getTime());
   ok(twice === once, 'and a second post is refused outright');
 
   // Belt and braces: even with the ledger entry removed, the deterministic
   // contribution id stops the same money landing again.
   const scrubbed = { ...once, planLedger: { from: once.planLedger.from, months: {} } };
-  const again = applyPlanPosts(scrubbed, AUG, proposePlanPosts(scrubbed, AUG, NOW));
+  const again = applyPlanPosts(scrubbed, AUG, proposePlanPosts(scrubbed, AUG, NOW), NOW.getTime());
   eq(again.savings.find(g => g.id === 'g1').current, 5350,
     'the pot does not take the same contribution ids twice');
   eq(contributionId(AUG, 'i2'), 'plan-2026-08-i2', 'because the id is derived, not random');
@@ -164,7 +164,7 @@ const state = (over = {}) => ({
 {
   const S = armPlanLedger(state(), new Date(2026, 7, 1));
   const edited = [{ ...proposePlanPosts(S, AUG, NOW)[0], amount: 100 }];
-  const after = applyPlanPosts(S, AUG, edited);
+  const after = applyPlanPosts(S, AUG, edited, NOW.getTime());
   eq(after.savings.find(g => g.id === 'g1').current, 5100, 'what was confirmed is what was posted');
   eq(after.planLedger.months[AUG].itemIds, ['i2'], 'and the dropped rows stayed dropped');
 }
@@ -187,7 +187,7 @@ const state = (over = {}) => ({
     achievements: [{ id: 'ach1', name: 'Deposit saved', completed: false, coins: 500 }],
     projection: { items: [{ id: 'i2', kind: 'expense', label: 'To deposit', amount: 250, freq: 'month', goalId: 'g1' }] },
   }), new Date(2026, 7, 1));
-  const after = applyPlanPosts(S, AUG, proposePlanPosts(S, AUG, NOW));
+  const after = applyPlanPosts(S, AUG, proposePlanPosts(S, AUG, NOW), NOW.getTime());
   eq(after.achievements[0].completed, true, 'the linked achievement fires');
   eq(after.coins, 500, 'and pays exactly what completing it by hand pays');
 }

@@ -7,6 +7,8 @@
  *   SavingsProjectionBody — net/month + resize-aware chart with date
  *                           axis and Cash / Savings line toggles
  */
+import { balanceNow, monthlyRate } from '../../lib/savings/interest';
+import { livePots } from '../../lib/savings/completePot';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { PickList } from '../widgets/GoalsWidget';
 import { useBootFill } from '../../hooks/useBootFill';
@@ -55,7 +57,7 @@ function Donut({ pct, color, label, sub }) {
 export function SavingsPotsBody({ S, count = 1, picks, onSetCount, onSetPicks, navigate }) {
   // Pots fill from empty as the app boots, and read true at all other times.
   const boot = useBootFill();
-  const goals = (S.savings || []).filter(g => (g.target || 0) > 0);
+  const goals = livePots(S.savings).filter(g => (g.target || 0) > 0);
   const max = Math.max(1, goals.length);
   const [picking, setPicking] = useState(false);
 
@@ -209,7 +211,7 @@ export function SavingsProjectionBody({ S, navigate }) {
   const items = proj.items || [];
   const accounts = S.savingsAccounts || [];
   const hasAccounts = accounts.length > 0;
-  const savedTotal = (S.savings || []).reduce((s, g) => s + (g.current || 0), 0);
+  const savedTotal = livePots(S.savings).reduce((s, g) => s + (g.current || 0), 0);
   const start = (proj.startBalance != null && proj.startBalance !== '') ? (parseFloat(proj.startBalance) || 0) : savedTotal;
 
   // Which lines are plotted — never lets the last one be switched off.
@@ -254,8 +256,8 @@ export function SavingsProjectionBody({ S, navigate }) {
 
   const savingsSeries = useMemo(() => {
     if (!hasAccounts) return null;
-    const cur = accounts.map(a => parseFloat(a.balance) || 0);
-    const rate = accounts.map(a => (parseFloat(a.apy) || 0) / 1200);
+    const cur = accounts.map(a => balanceNow(a));
+    const rate = accounts.map(a => monthlyRate(a.apy));
     const addAt = (accId, m) => items.reduce((s, it) => s + ((it.accountId === accId && activeAt(it, m)) ? toMonthly(it.amount, it.freq) : 0), 0);
     const out = [cur.reduce((s, b) => s + b, 0)];
     for (let m = 1; m <= horizon; m++) {

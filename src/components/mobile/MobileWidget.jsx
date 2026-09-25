@@ -36,6 +36,9 @@ import NewsBody from '../widgets/NewsWidget';
 // Dead branch when the flag is set, so the chunk is never emitted.
 const TradingBody = TRADING_WIDGET_BUILD_EXCLUDED ? null : lazy(() => import('../widgets/TradingWidget'));
 import Icon from '../Icon';
+import { PRIMES, primeOf, blocksOf, withBlocks, withBlockOpts } from '../../lib/hub/primeBlocks';
+import { PrimeFit } from '../widgets/prime/PrimeCard';
+import { PrimeEditorSheet } from '../widgets/prime/PrimeEditor';
 import { planDayFor, planGoalFor, planBadge } from '../../lib/plan/planDay';
 
 // App presets (FloorplanStudio / …) become mobile widget
@@ -195,7 +198,21 @@ export default function MobileWidget({ widget, S, update, onRemove, navigate, us
   // No height bands here: mobile cards are auto-height, so a short card
   // is short because its content is, not because the user shrank it.
   useEffect(() => observeShape(bodyRef.current, { heightBands: false }), []);
-  const meta = WIDGET_META[widget.type] || { label: widget.type, eyebrow: '?', icon: '·' };
+  // A prime (or a legacy savings card read as one) takes its chrome from
+  // the prime registry: its own name, icon and section colour.
+  const primeKey = primeOf(widget);
+  const P = primeKey ? PRIMES[primeKey] : null;
+  const meta = P
+    ? { label: `${P.name} card`, eyebrow: widget.title ? `${P.name} · ${widget.title}` : P.name,
+        icon: P.glyph, svg: P.icon, accent: P.col }
+    : (WIDGET_META[widget.type] || { label: widget.type, eyebrow: '?', icon: '·' });
+  const [editing, setEditing] = useState(false);
+  function patchSelf(fn) {
+    update(prev => ({
+      ...prev,
+      mobileWidgets: (prev.mobileWidgets || []).map(w => (w.id === widget.id ? fn(w) : w)),
+    }));
+  }
 
   // Brand-tinted icon chip when the type carries an `accent` (the new
   // GitHub / LinkedIn widgets). Falls back to the default
@@ -455,10 +472,39 @@ export default function MobileWidget({ widget, S, update, onRemove, navigate, us
           <div className="m-widget-head">
             <span className="m-widget-icon m-widget-chip" style={chipStyle}>{meta.svg ? <Icon name={meta.svg} size={16} /> : meta.icon}</span>
             <span className="m-widget-eyebrow">// {meta.eyebrow}</span>
+            {P && (
+              <button
+                type="button"
+                className="prime-count"
+                onClick={() => setEditing(true)}
+                /* The card starts a 450ms hold-to-lift on touchstart;
+                   reaching for the chip must open the editor, not pick
+                   the card up. */
+                onTouchStart={e => e.stopPropagation()}
+                onPointerDown={e => e.stopPropagation()}
+                aria-label={`Edit which blocks ${P.name} shows`}
+              >
+                {blocksOf(widget).length} <span aria-hidden="true">▾</span>
+              </button>
+            )}
           </div>
-          <div className="m-widget-body">
-            {renderBody(widget, meta, S, update, navigate, userId, hasPro)}
-          </div>
+          {P ? (
+            <div className="m-widget-body is-prime">
+              <PrimeFit
+                auto
+                head={false}
+                widget={widget}
+                S={S}
+                onAct={act => {
+                  if (act?.kind === 'relapse') update(prev => applyRelapse(prev, act.id, Date.now()));
+                }}
+              />
+            </div>
+          ) : (
+            <div className="m-widget-body">
+              {renderBody(widget, meta, S, update, navigate, userId, hasPro)}
+            </div>
+          )}
         </div>
       </div>
 
@@ -466,11 +512,20 @@ export default function MobileWidget({ widget, S, update, onRemove, navigate, us
       {menu && (
         <div
           className="hub-module-menu"
-          style={{ left: Math.min(menu.x, window.innerWidth - 230), top: Math.min(menu.y, window.innerHeight - 150) }}
+          style={{ left: Math.min(menu.x, window.innerWidth - 230), top: Math.min(menu.y, window.innerHeight - (P ? 196 : 150)) }}
           onPointerDown={e => e.stopPropagation()}
           role="menu"
         >
           <div className="hub-module-menu-head">{meta.label}</div>
+          {P && (
+            <button
+              type="button"
+              className="hub-module-menu-row"
+              onClick={() => { setMenu(null); setEditing(true); }}
+            >
+              <span className="hub-module-menu-label">Edit blocks…</span>
+            </button>
+          )}
           <button
             type="button"
             className="hub-module-menu-row"
@@ -491,6 +546,17 @@ export default function MobileWidget({ widget, S, update, onRemove, navigate, us
             <span className="hub-module-menu-label" style={{ color: 'rgb(214,69,69)' }}>Delete widget</span>
           </button>
         </div>
+      )}
+
+      {P && editing && (
+        <PrimeEditorSheet
+          widget={widget}
+          pots={(S.savings || []).map(g => ({ id: g.id, name: g.name }))}
+          onSet={ids => patchSelf(w => withBlocks(w, ids))}
+          onOpts={(blockId, patch) => patchSelf(w => withBlockOpts(w, blockId, patch))}
+          onTitle={t => patchSelf(w => ({ ...w, title: t }))}
+          onClose={() => setEditing(false)}
+        />
       )}
     </>
   );

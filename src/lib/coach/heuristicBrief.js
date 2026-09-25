@@ -62,7 +62,7 @@ function vitalsLoggedToday(S) {
 function closestSaving(S) {
   let best = null;
   for (const g of (S.savings || [])) {
-    if (!(g.target > 0) || (g.current || 0) >= g.target) continue;
+    if (g.completedAt || !(g.target > 0) || (g.current || 0) >= g.target) continue;
     const pct = (g.current || 0) / g.target;
     if (!best || pct > best.pct) best = { name: g.name, pct, remaining: g.target - (g.current || 0) };
   }

@@ -1,0 +1,853 @@
+/* ── Prime widgets ────────────────────────────────────────────────────
+   One card per section, whose blocks the user picks and orders.
+
+   Everything here is positioned by the packer (src/lib/hub/pack.js): the
+   slot rects are written as inline left/top/width/height, and these rules
+   only style what goes inside them. No rule here may set a block's height
+   — that is the engine's job, and a stylesheet fighting it is how a card
+   ends up with a scrollbar it was never meant to have.
+
+   Sizes come from the --text-* scale. The audit found 95% of the app's
+   font sizes bypassing it; new work does not add to that.
+
+   ── The token aliases at the top ───────────────────────────────────
+   --danger, --line, --bg and --border-strong are referenced by four
+   existing widget stylesheets (Market, Trading, News, Goals) and were
+   defined NOWHERE, so every rule in them has been rendering on its
+   literal fallback — invisible to the accent and to dark mode. Aliasing
+   them once here fixes those four files as a side effect, which is why
+   they live in this file rather than being invented for it. */
+:root {
+  --danger: #c0392b;
+  --line: var(--border);
+  --border-strong: var(--border);
+  --border-soft: var(--border-lt, var(--border));
+  --bg: var(--bg-base);
+  --bg-elev: var(--bg-raised, var(--surface));
+  --on-em: #fff;
+  --em-on: #fff;
+  --card-bg: var(--surface);
+}
+html[data-theme="dark-os"] {
+  /* Softer red on a near-black ground: #c0392b reads as brown there. */
+  --danger: #e0796a;
+}
+
+/* ── The card ─────────────────────────────────────────────────────── */
+.prime-card {
+  position: relative;
+  overflow: hidden;
+  container-type: size;
+}
+/* The header is the drag handle on desktop and the title row everywhere. */
+.prime-head {
+  position: absolute;
+  left: 0; right: 0; top: 0;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 8px 0 10px;
+  box-sizing: border-box;
+}
+.prime-chip {
+  width: 20px; height: 20px;
+  flex: none;
+  border-radius: 6px;
+  display: flex; align-items: center; justify-content: center;
+  box-sizing: border-box;
+}
+.prime-name {
+  flex: 1;
+  min-width: 0;
+  font-family: var(--mono);
+  font-size: var(--text-xs);
+  letter-spacing: 1.4px;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.prime-count {
+  flex: none;
+  display: inline-flex; align-items: center; gap: 4px;
+  height: 22px;
+  padding: 0 8px;
+  border-radius: 11px;
+  border: 1px solid var(--border);
+  background: var(--surface2, var(--surface));
+  font-family: var(--mono);
+  font-size: var(--text-xs);
+  color: var(--text-mid);
+  cursor: pointer;
+}
+.prime-count:hover { border-color: var(--em); color: var(--em); }
+.prime-count:focus-visible { outline: 2px solid var(--em); outline-offset: 2px; }
+
+/* A slot. The engine owns its rect; this owns its clipping and its own
+   container so a Body can respond to the space it was given — the Body
+   is styled FROM the slot's query, never from its own, which is the
+   gotcha this codebase has hit before. */
+.prime-slot {
+  position: absolute;
+  container-type: size;
+  overflow: hidden;
+  box-sizing: border-box;
+  padding-right: 2px;
+}
+.prime-card.is-live .prime-slot { transition: none; }
+.prime-slot {
+  transition: left .22s ease, top .22s ease, width .22s ease, height .22s ease;
+}
+@media (prefers-reduced-motion: reduce) {
+  .prime-slot { transition: none; }
+}
+
+/* Slot guides — a debug affordance, off unless asked for. */
+.prime-guide {
+  position: absolute;
+  border: 1px dashed rgba(192, 57, 43, .55);
+  border-radius: 6px;
+  pointer-events: none;
+  box-sizing: border-box;
+}
+.prime-guide span {
+  position: absolute;
+  left: 4px; top: -9px;
+  height: 10px;
+  padding: 0 4px;
+  border-radius: 3px;
+  background: rgba(192, 57, 43, .9);
+  color: #fff;
+  font-family: var(--mono);
+  font-size: 8px;
+  line-height: 10px;
+  white-space: nowrap;
+}
+
+/* ── Shared block furniture ───────────────────────────────────────── */
+.pv { height: 100%; }
+.pv-eyebrow {
+  font-family: var(--mono);
+  font-size: var(--text-xs);
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.pv-dim { color: var(--text-mid); font-weight: 400; }
+.pv-grow { flex: 1; min-width: 0; }
+.pv-track {
+  flex: 1;
+  height: 6px;
+  border-radius: 3px;
+  background: var(--well, rgba(128,128,128,.14));
+  overflow: hidden;
+}
+.pv-fill { display: block; height: 100%; }
+
+/* ── hero ─────────────────────────────────────────────────────────── */
+.pv-hero { display: flex; flex-direction: column; justify-content: center; gap: 3px; }
+.pv-hero-big {
+  font-family: var(--display, var(--serif, Georgia, serif));
+  font-weight: 800;
+  /* Scales with the slot, not the card: a hero in a header band and a
+     hero in a tall column are different sizes of the same idea. */
+  font-size: clamp(26px, min(42cqh, 16cqw), 62px);
+  line-height: 1;
+  letter-spacing: -1px;
+  white-space: nowrap;
+}
+.pv-hero-sub {
+  font-size: var(--text-xs);
+  color: var(--text-mid);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.pv-hero-sub b { color: var(--em); font-weight: 600; }
+
+.pv-heroM { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.pv-heroM-big {
+  font-family: var(--display, var(--serif, Georgia, serif));
+  font-weight: 800;
+  font-size: 26px;
+  line-height: 1;
+  letter-spacing: -.6px;
+  white-space: nowrap;
+}
+.pv-heroM-side {
+  flex: none;
+  display: flex; flex-direction: column;
+  text-align: right;
+  font-size: var(--text-xs);
+  color: var(--text-mid);
+  line-height: 1.35;
+  white-space: nowrap;
+}
+.pv-heroM-side b { color: var(--em); font-weight: 600; }
+
+/* ── vessels ──────────────────────────────────────────────────────── */
+.pv-vessels { display: flex; gap: 6px; }
+.pv-vessel {
+  flex: 1;
+  min-width: 0;
+  position: relative;
+  border-radius: 8px;
+  background: var(--well, rgba(128,128,128,.14));
+  overflow: hidden;
+}
+.pv-vessel-fill {
+  position: absolute;
+  left: 0; right: 0; bottom: 0;
+  transition: height .3s ease;
+}
+@media (prefers-reduced-motion: reduce) { .pv-vessel-fill { transition: none; } }
+.pv-vessel-body {
+  position: absolute;
+  inset: 0;
+  padding: 7px 7px 6px;
+  display: flex; flex-direction: column; justify-content: space-between;
+}
+.pv-vessel-name {
+  font-size: var(--text-xs);
+  font-weight: 600;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.pv-vessel-foot { display: flex; flex-direction: column; }
+.pv-vessel-pct {
+  font-family: var(--display, var(--serif, Georgia, serif));
+  font-weight: 800;
+  font-size: clamp(15px, 13cqh, 26px);
+  line-height: 1;
+}
+.pv-vessel-cur {
+  font-family: var(--mono);
+  font-size: var(--text-xs);
+  color: var(--text-mid);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+
+/* ── bars ─────────────────────────────────────────────────────────── */
+/* Centred as a group, not spread: a compact list can be handed more
+   height than its rows need, and space-between flung two rows to
+   opposite edges of the slot. */
+.pv-barsM { display: flex; flex-direction: column; justify-content: center; gap: 9px; }
+.pv-barM { display: flex; align-items: center; gap: 8px; height: 14px; }
+.pv-barM-name {
+  width: 30%;
+  font-size: var(--text-xs);
+  font-weight: 500;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.pv-barM-pct {
+  width: 32px; text-align: right;
+  font-family: var(--mono); font-size: var(--text-xs); color: var(--text-mid);
+}
+
+.pv-barsL { display: flex; flex-direction: column; }
+.pv-barL {
+  flex: none;
+  height: 34px;
+  box-sizing: border-box;
+  display: flex; flex-direction: column; justify-content: center; gap: 5px;
+  border-top: 1px solid var(--border);
+}
+.pv-barL-top { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+.pv-barL-name {
+  min-width: 0;
+  font-size: var(--text-sm);
+  font-weight: 500;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.pv-barL-right { flex: none; font-family: var(--mono); font-size: var(--text-xs); color: var(--text-mid); }
+.pv-barL .pv-track { flex: none; }
+
+/* ── chart ────────────────────────────────────────────────────────── */
+.pv-chart { display: flex; flex-direction: column; gap: 4px; }
+.pv-chart-head { display: flex; justify-content: space-between; align-items: flex-end; gap: 8px; }
+.pv-chart-head-r { text-align: right; }
+.pv-chart-v { font-size: var(--text-base); font-weight: 600; }
+.pv-chart-plot { flex: 1; min-height: 0; position: relative; border-bottom: 1px solid var(--border); }
+.pv-chart-plot svg { position: absolute; inset: 0 0 14px 0; width: 100%; height: calc(100% - 14px); }
+.pv-chart-axis {
+  position: absolute;
+  left: 0; right: 0; bottom: 1px;
+  display: flex; justify-content: space-between;
+  font-family: var(--mono); font-size: var(--text-xs); color: var(--text-muted);
+}
+
+.pv-spark { display: flex; align-items: center; gap: 10px; }
+.pv-spark-l { flex: none; line-height: 1.3; }
+.pv-spark-v { font-size: var(--text-sm); font-weight: 600; }
+.pv-spark-s { font-family: var(--mono); font-size: var(--text-xs); color: var(--text-mid); }
+.pv-spark svg { flex: 1; min-width: 0; height: 80%; }
+
+/* ── lists ────────────────────────────────────────────────────────── */
+.pv-list { display: flex; flex-direction: column; }
+.pv-list-head {
+  flex: none;
+  height: 22px;
+  display: flex; justify-content: space-between; align-items: center; gap: 8px;
+}
+.pv-list-headR { flex: none; font-size: var(--text-sm); font-weight: 600; }
+.pv-row {
+  flex: none;
+  box-sizing: border-box;
+  display: flex; align-items: center; gap: 8px;
+  height: 24px;
+  border-top: 1px solid var(--border);
+}
+.pv-row-n {
+  flex: 1; min-width: 0;
+  font-size: var(--text-sm);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.pv-row-m { flex: none; font-family: var(--mono); font-size: var(--text-xs); color: var(--text-muted); }
+.pv-row-v { flex: none; min-width: 48px; text-align: right; font-size: var(--text-sm); font-weight: 500; }
+
+.pv-check { gap: 9px; }
+.pv-tick {
+  flex: none;
+  width: 14px; height: 14px;
+  box-sizing: border-box;
+  border-radius: 4px;
+  border: 1.5px solid var(--border);
+  color: #fff;
+  font-size: 9px; line-height: 11px; text-align: center;
+}
+
+.pv-heat-head { flex: none; height: 22px; display: flex; align-items: center; }
+.pv-heat-day {
+  width: 18px; text-align: center;
+  font-family: var(--mono); font-size: var(--text-xs); color: var(--text-muted);
+}
+.pv-heat-row { height: 22px; }
+.pv-heat-cell { width: 18px; display: flex; justify-content: center; }
+.pv-heat-cell i { width: 12px; height: 12px; border-radius: 3px; display: block; }
+
+/* ── compact summaries ────────────────────────────────────────────── */
+.pv-dots { display: flex; align-items: center; gap: 10px; }
+.pv-dots-row { flex: none; display: flex; gap: 4px; }
+.pv-dots-row i {
+  width: 12px; height: 12px;
+  box-sizing: border-box;
+  border-radius: 6px;
+  border: 1.5px solid var(--border);
+  display: block;
+}
+.pv-dots-text { flex: 1; min-width: 0; line-height: 1.3; }
+.pv-dots-t { font-size: var(--text-sm); font-weight: 600; white-space: nowrap; }
+.pv-dots-s {
+  font-size: var(--text-xs); color: var(--text-mid);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+
+.pv-tiles { display: flex; gap: 6px; }
+.pv-tile {
+  flex: 1; min-width: 0;
+  padding: 5px 8px;
+  border-radius: 7px;
+  background: var(--surface2, var(--surface));
+  border: 1px solid var(--border);
+  display: flex; flex-direction: column; justify-content: center;
+}
+.pv-tile-t {
+  font-size: var(--text-xs); color: var(--text-mid);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.pv-tile-v { font-size: var(--text-sm); font-weight: 600; }
+
+.pv-stat { display: flex; flex-direction: column; justify-content: center; line-height: 1.3; }
+.pv-stat-big { font-size: var(--text-sm); font-weight: 600; white-space: nowrap; }
+.pv-stat-sub { font-weight: 400; font-size: var(--text-xs); color: var(--text-mid); }
+.pv-stat-line {
+  font-size: var(--text-xs); color: var(--text-mid);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+
+/* ── segmented ────────────────────────────────────────────────────── */
+.pv-seg { display: flex; flex-direction: column; justify-content: center; gap: 6px; }
+.pv-seg-head {
+  display: flex; justify-content: space-between;
+  font-family: var(--mono); font-size: var(--text-xs);
+  letter-spacing: 1.2px; text-transform: uppercase; color: var(--text-muted);
+}
+/* flex: none — in a slot that is short by a line, flexbox would
+   otherwise shrink the one element with no content (the bar itself)
+   to nothing and keep the labels. */
+.pv-seg-head, .pv-segM-head { flex: none; }
+.pv-seg-bar { flex: none; display: flex; height: 9px; border-radius: 5px; overflow: hidden; gap: 2px; }
+.pv-seg-bar-sm { height: 7px; border-radius: 4px; }
+.pv-seg-key { display: flex; flex-wrap: wrap; gap: 3px 12px; }
+.pv-seg-key span {
+  display: flex; align-items: center; gap: 5px;
+  font-size: var(--text-xs); color: var(--text-mid);
+}
+.pv-seg-key i { width: 7px; height: 7px; border-radius: 2px; }
+.pv-segM { display: flex; flex-direction: column; justify-content: center; gap: 5px; }
+.pv-segM-head { display: flex; justify-content: space-between; font-size: var(--text-xs); color: var(--text-mid); }
+.pv-segM-head b { color: var(--em); }
+
+/* ── proposal card ────────────────────────────────────────────────── */
+.pv-card {
+  box-sizing: border-box;
+  padding: 8px 10px;
+  border-radius: 9px;
+  background: rgba(200, 151, 10, .08);
+  border: 1px solid rgba(200, 151, 10, .3);
+  display: flex; flex-direction: column; justify-content: center; gap: 5px;
+}
+.pv-card-top { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+.pv-card-eyebrow {
+  font-family: var(--mono); font-size: var(--text-xs);
+  letter-spacing: 1.4px; text-transform: uppercase; color: var(--gold);
+}
+.pv-card-right { font-size: var(--text-xs); color: var(--text-mid); }
+.pv-card-title { font-size: var(--text-sm); font-weight: 600; }
+.pv-card-chips { display: flex; flex-wrap: wrap; gap: 4px; }
+.pv-card-chip {
+  font-size: var(--text-xs);
+  padding: 2px 7px;
+  border-radius: 9px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  color: var(--text);
+}
+.pv-card-chip.is-ghost { border-style: dashed; color: var(--text-mid); }
+.pv-cardM {
+  box-sizing: border-box;
+  padding: 0 10px;
+  border-radius: 9px;
+  background: rgba(200, 151, 10, .08);
+  border: 1px solid rgba(200, 151, 10, .3);
+  display: flex; align-items: center; justify-content: space-between; gap: 8px;
+}
+.pv-cardM-t {
+  font-size: var(--text-sm); font-weight: 600;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.pv-cardM-r { font-family: var(--mono); font-size: var(--text-xs); color: var(--gold); }
+
+/* ── fact ─────────────────────────────────────────────────────────── */
+.pv-fact {
+  display: flex; align-items: center; justify-content: space-between; gap: 8px;
+  padding: 0 9px;
+  background: var(--surface2, var(--surface));
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  box-sizing: border-box;
+}
+.pv-fact-l {
+  flex: none;
+  font-family: var(--mono); font-size: var(--text-xs);
+  letter-spacing: 1.2px; text-transform: uppercase; color: var(--text-muted);
+}
+.pv-fact-v {
+  min-width: 0;
+  font-size: var(--text-sm); font-weight: 600;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.pv-fact-v b { color: var(--em); }
+
+/* ── The editor ───────────────────────────────────────────────────────
+   One set of rules, two presentations: a popover beside the count chip
+   on desktop, a bottom sheet on a phone. The rows are the same rows —
+   only the touch targets and the container differ. */
+.pe-lbl {
+  font-family: var(--mono);
+  font-size: var(--text-xs);
+  letter-spacing: 1.4px;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+.pe-group { display: flex; flex-direction: column; gap: 4px; }
+.pe-title {
+  height: 32px;
+  padding: 0 10px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--surface2, var(--surface));
+  color: var(--text);
+  font-family: var(--sans);
+  font-size: var(--text-sm);
+  outline: none;
+}
+.pe-title:focus-visible { border-color: var(--em); box-shadow: 0 0 0 3px rgba(var(--em-rgb), .16); }
+
+.pe-presets { display: flex; flex-wrap: wrap; gap: 5px; }
+.pe-preset {
+  height: 24px;
+  padding: 0 9px;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--text-mid);
+  font-family: var(--sans);
+  font-size: var(--text-xs);
+  font-weight: 500;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.pe-preset:hover { border-color: var(--em); color: var(--em); }
+.pe-preset.is-on { background: var(--em); border-color: var(--em); color: #fff; }
+.pe-preset:focus-visible { outline: 2px solid var(--em); outline-offset: 2px; }
+
+.pe-row {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  height: 34px;
+  border-top: 1px solid var(--border);
+  background: none;
+  width: 100%;
+  text-align: left;
+  color: var(--text);
+  font-family: var(--sans);
+  padding: 0;
+}
+.pe-row.is-sheet { height: 50px; gap: 10px; }
+.pe-row-off { border-left: 0; border-right: 0; border-bottom: 0; cursor: pointer; color: var(--text-mid); }
+.pe-row-off:hover { color: var(--text); }
+.pe-row-off:focus-visible { outline: 2px solid var(--em); outline-offset: -2px; }
+
+.pe-tick {
+  width: 16px; height: 16px;
+  flex: none;
+  box-sizing: border-box;
+  border-radius: 4px;
+  border: 1.5px solid var(--border);
+  background: transparent;
+  color: #fff;
+  font-size: 10px;
+  line-height: 13px;
+  text-align: center;
+  padding: 0;
+  cursor: pointer;
+}
+.pe-row.is-sheet .pe-tick { width: 20px; height: 20px; line-height: 17px; font-size: 12px; }
+.pe-tick.is-on { background: var(--em); border-color: var(--em); }
+.pe-tick:disabled { cursor: default; opacity: .55; }
+.pe-tick:focus-visible { outline: 2px solid var(--em); outline-offset: 2px; }
+
+.pe-n { width: 10px; font-family: var(--mono); font-size: var(--text-xs); color: var(--text-muted); }
+.pe-name {
+  flex: 1; min-width: 0;
+  font-size: var(--text-sm);
+  font-weight: 500;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.pe-row.is-sheet .pe-name { font-size: var(--text-base); }
+.pe-arrow {
+  width: 22px; height: 22px;
+  flex: none;
+  border-radius: 5px;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--text-mid);
+  font-size: 10px;
+  cursor: pointer;
+  padding: 0;
+}
+.pe-row.is-sheet .pe-arrow { width: 40px; height: 40px; font-size: 15px; border: none; }
+.pe-arrow:disabled { opacity: .3; cursor: default; }
+.pe-arrow:not(:disabled):hover { border-color: var(--em); color: var(--em); }
+.pe-arrow:focus-visible { outline: 2px solid var(--em); outline-offset: 2px; }
+
+.pe-allon { font-size: var(--text-xs); color: var(--text-muted); }
+
+.pe-done {
+  height: 26px;
+  padding: 0 14px;
+  border-radius: 13px;
+  border: none;
+  background: var(--em);
+  color: #fff;
+  font-family: var(--sans);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  cursor: pointer;
+}
+.pe-done.is-big { height: 34px; padding: 0 16px; border-radius: 17px; font-size: var(--text-sm); }
+.pe-done:focus-visible { outline: 2px solid var(--em); outline-offset: 2px; }
+
+/* ── Desktop popover ──────────────────────────────────────────────── */
+.pe-pop {
+  position: fixed;
+  z-index: 620;
+  border-radius: 12px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  box-shadow: 0 18px 40px rgba(0, 0, 0, .18);
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  max-height: min(420px, calc(100vh - 24px));
+  overflow-y: auto;
+}
+.pe-pop-head { display: flex; align-items: center; justify-content: space-between; }
+
+/* ── Mobile sheet ─────────────────────────────────────────────────── */
+.pe-sheet-wrap {
+  position: fixed;
+  inset: 0;
+  z-index: 620;
+  background: rgba(0, 0, 0, .34);
+  display: flex;
+  align-items: flex-end;
+}
+.pe-sheet {
+  width: 100%;
+  max-height: 72vh;
+  display: flex;
+  flex-direction: column;
+  border-radius: 20px 20px 0 0;
+  background: var(--surface);
+  box-shadow: 0 -12px 34px rgba(0, 0, 0, .3);
+  padding: 8px 16px calc(16px + env(safe-area-inset-bottom, 0px));
+  box-sizing: border-box;
+}
+.pe-grab {
+  align-self: center;
+  width: 36px; height: 4px;
+  border-radius: 2px;
+  background: var(--border);
+  margin-bottom: 8px;
+}
+.pe-sheet-head {
+  flex: none;
+  display: flex; align-items: center; justify-content: space-between;
+  padding-bottom: 8px;
+}
+.pe-sheet-title {
+  display: inline-flex; align-items: center; gap: 7px;
+  font-size: var(--text-base);
+  font-weight: 600;
+}
+.pe-sheet-body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding-bottom: 8px;
+}
+
+/* ── Card chrome added for the hubs ───────────────────────────────── */
+.prime-del {
+  flex: none;
+  width: 22px; height: 22px;
+  border-radius: 11px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 11px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0;
+  opacity: 0;
+  transition: opacity .15s;
+}
+.prime-card:hover .prime-del,
+.prime-del:focus-visible { opacity: 1; }
+.prime-del:hover { color: var(--danger); border-color: var(--border); }
+.prime-del:focus-visible { outline: 2px solid var(--em); outline-offset: 2px; }
+@media (hover: none) { .prime-del { opacity: 1; } }
+
+/* The row action (habit relapse). Small on purpose — it sits in a bar
+   row's title line and must not push the elapsed time off it. */
+.pv-act {
+  flex: none;
+  height: 18px;
+  min-width: 18px;
+  margin-left: 6px;
+  padding: 0 5px;
+  border-radius: 9px;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--text-muted);
+  font-family: var(--mono);
+  font-size: var(--text-xs);
+  line-height: 16px;
+  cursor: pointer;
+}
+.pv-act:hover { border-color: var(--danger); color: var(--danger); }
+.pv-act.is-arming { background: var(--danger); border-color: var(--danger); color: #fff; }
+.pv-act:focus-visible { outline: 2px solid var(--em); outline-offset: 1px; }
+.pv-barM .pv-act { margin-left: 4px; }
+
+/* Pot picks under a Pots row in the editor. */
+.pe-rowwrap { display: flex; flex-direction: column; }
+.pe-picks { display: flex; flex-wrap: wrap; gap: 4px; padding: 0 0 8px 33px; }
+.pe-pick {
+  height: 22px;
+  padding: 0 8px;
+  border-radius: 11px;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--text-mid);
+  font-family: var(--sans);
+  font-size: var(--text-xs);
+  cursor: pointer;
+  max-width: 140px;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.pe-pick.is-on { background: rgba(var(--em-rgb), .12); border-color: var(--em); color: var(--em); }
+.pe-pick:focus-visible { outline: 2px solid var(--em); outline-offset: 2px; }
+
+/* ── Mounting ─────────────────────────────────────────────────────── */
+/* Fills its host; the card inside is sized from this box. */
+.prime-fit { position: relative; width: 100%; height: 100%; min-height: 0; }
+.prime-fit.is-auto { height: auto; }
+
+/* Desktop canvas: the island gives up its padding and header — the
+   prime draws its own title row, and the packer's 12px inset is the
+   card's padding. Only the thin drag grip stays, shared with every
+   other widget so the canvas has one way to move things. */
+#widgetCanvas .link-island.prime-island { padding: 0; }
+#widgetCanvas [data-react-widget] > .prime-fit { flex: 1; min-height: 0; height: auto; }
+#widgetCanvas .link-island.prime-island .prime-card { background: transparent; }
+
+/* Mobile stack: the card's own chrome already has the title row, so
+   the prime renders headless and the body loses its padding (the packer
+   supplies it). The count chip joins the host's head row. */
+.m-widget-head .prime-count { margin-left: auto; }
+.m-widget-body.is-prime { padding: 0; }
+
+/* ── Prime cards in the Add Widget pickers ────────────────────────────
+   Deliberately unlike the standalone tiles beneath them: a live preview
+   of the card, drawn in the prime's own colour, with its starting layout
+   chosen right there. The standalones are a quiet compact grid; the
+   primes are the thing the picker is FOR. */
+.pp { display: flex; flex-direction: column; gap: 10px; margin-bottom: 18px; }
+.pp-head { display: flex; flex-direction: column; gap: 2px; }
+.pp-eyebrow {
+  font-family: var(--mono);
+  font-size: var(--text-xs);
+  letter-spacing: 1.6px;
+  text-transform: uppercase;
+  color: var(--em);
+  font-weight: 700;
+}
+.pp-sub { font-size: var(--text-xs); color: var(--text-muted); }
+.pp-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.pp-grid.is-compact { grid-template-columns: 1fr; }
+
+.pp-tile {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  border-radius: 14px;
+  padding: 1.5px;                       /* the gradient edge */
+  background: linear-gradient(150deg, var(--pp-col), rgba(0, 0, 0, 0) 55%, color-mix(in srgb, var(--pp-col) 45%, transparent));
+  box-shadow: 0 6px 22px color-mix(in srgb, var(--pp-col) 14%, transparent);
+  min-width: 0;
+}
+.pp-tile > * { position: relative; }
+.pp-tile::before {
+  content: "";
+  position: absolute;
+  inset: 1.5px;
+  border-radius: 12.5px;
+  background: linear-gradient(180deg, color-mix(in srgb, var(--pp-col) 9%, var(--surface)) 0%, var(--surface) 60%);
+}
+.pp-preview {
+  overflow: hidden;
+  border-radius: 12.5px 12.5px 0 0;
+  border-bottom: 1px solid color-mix(in srgb, var(--pp-col) 22%, var(--border));
+  background: color-mix(in srgb, var(--pp-col) 5%, var(--bg-raised, var(--surface)));
+  pointer-events: none;
+}
+.pp-preview-inner { width: 400px; transform-origin: 0 0; }
+.pp-body { display: flex; flex-direction: column; gap: 8px; padding: 10px 12px 12px; }
+.pp-title { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.pp-chip {
+  width: 24px; height: 24px; flex: none;
+  border-radius: 7px;
+  display: flex; align-items: center; justify-content: center;
+  color: var(--pp-col);
+  background: color-mix(in srgb, var(--pp-col) 14%, transparent);
+  border: 1px solid color-mix(in srgb, var(--pp-col) 38%, transparent);
+}
+.pp-name { font-family: var(--sans); font-size: var(--text-base); font-weight: 700; color: var(--text); }
+.pp-count {
+  margin-left: auto;
+  font-family: var(--mono);
+  font-size: var(--text-xs);
+  color: var(--pp-col);
+  white-space: nowrap;
+}
+.pp-blurb { margin: 0; font-size: var(--text-xs); line-height: 1.45; color: var(--text-muted); }
+.pp-presets { display: flex; flex-wrap: wrap; gap: 5px; }
+.pp-preset {
+  height: 24px;
+  padding: 0 9px;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--text-mid);
+  font-family: var(--sans);
+  font-size: var(--text-xs);
+  font-weight: 500;
+  cursor: pointer;
+}
+.pp-preset:hover { border-color: var(--pp-col); color: var(--pp-col); }
+.pp-preset.is-on {
+  border-color: var(--pp-col);
+  color: var(--pp-col);
+  background: color-mix(in srgb, var(--pp-col) 12%, transparent);
+}
+.pp-preset:focus-visible, .pp-add:focus-visible { outline: 2px solid var(--pp-col); outline-offset: 2px; }
+.pp-add {
+  height: 34px;
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  border-radius: 9px;
+  border: none;
+  background: var(--pp-col);
+  color: #fff;
+  font-family: var(--sans);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  cursor: pointer;
+}
+.pp-add:hover { filter: brightness(1.08); }
+
+/* ── The standalone widgets, below the primes ─────────────────────── */
+.aw-section-lbl {
+  display: block;
+  margin: 4px 0 8px;
+  font-family: var(--mono);
+  font-size: var(--text-xs);
+  letter-spacing: 1.6px;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+.aw-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.aw-tile {
+  position: relative;
+  display: flex; flex-direction: column; align-items: flex-start; gap: 3px;
+  padding: 10px 11px;
+  min-width: 0;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--text);
+  text-align: left;
+  cursor: pointer;
+  font-family: var(--sans);
+}
+.aw-tile:hover { border-color: var(--em); }
+.aw-tile:focus-visible { outline: 2px solid var(--em); outline-offset: 2px; }
+.aw-tile.is-dim { opacity: .6; }
+.aw-tile-icon { color: var(--text-mid); margin-bottom: 2px; }
+.aw-tile-t { font-size: var(--text-sm); font-weight: 600; }
+.aw-tile-s {
+  font-size: var(--text-xs); color: var(--text-muted); line-height: 1.35;
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+}
+.aw-tile-s.is-need { color: var(--em); }
+.aw-lock { position: absolute; top: 7px; right: 8px; font-size: 10px; }
+@media (max-width: 560px) { .aw-grid { grid-template-columns: 1fr 1fr; } .pp-grid { grid-template-columns: 1fr; } }
+
+/* A modal holding live previews needs the room; the default is sized
+   for a form. Scrolls inside so the backdrop stays tappable. */
+.modal.aw-modal { width: 720px; }

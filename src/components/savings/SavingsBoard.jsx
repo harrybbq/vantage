@@ -18,7 +18,9 @@
  * place £ amounts are rendered. The coach snapshot, public_stats and
  * anything a friend can see get counts and names, never balances.
  */
-import { useMemo, useState } from 'react';
+import { balanceNow } from '../../lib/savings/interest';
+import { planPotCompletion, completePot, undoCompletePot, livePots } from '../../lib/savings/completePot';
+import { useEffect, useMemo, useState } from 'react';
 import Icon from '../Icon';
 import { useIsMobile } from '../../hooks/useIsMobile';
 import ProjectionChart from './ProjectionChart';
@@ -92,7 +94,92 @@ function Vessel({ goal, d, colour, selected, onSelect }) {
  * The split exists because the summary has to fit beside its neighbours.
  * Everything the old side panel showed is still here, one click deeper.
  */
-function PotCard({ goal, d, colour, expanded, onToggleExpand, onCollapse, achievement, onOpenModal }) {
+/**
+ * The confirm step for completing a pot: exactly what comes out of which
+ * account, before anything does. See lib/savings/completePot.
+ */
+function CompleteConfirm({ plan, onConfirm, onCancel }) {
+  if (!plan) return null;
+  const none = plan.drainable === 0;
+  return (
+    <div className="sb-complete" role="dialog" aria-label={`Complete ${plan.goal.name}`}>
+      <div className="sb-complete-head">
+        Complete <b>{plan.goal.name}</b>{plan.amount > 0 ? <> — {money(plan.amount)} spent</> : null}
+      </div>
+      {plan.amount > 0 && (none ? (
+        <p className="sb-complete-note">
+          No accounts are ticked to pay out completed pots, so no balance will change.
+          Tick them under Accounts (“Pays out completed pots”) and they are drawn on in list order.
+        </p>
+      ) : (
+        <>
+          <div className="sb-complete-list">
+            {plan.draws.map(d => (
+              <div key={d.id} className="sb-complete-row">
+                <span className="sb-complete-name">{d.name}</span>
+                <span className="sb-complete-take">−{money(d.take, { pence: true })}</span>
+                <span className="sb-complete-after">{money(d.before)} → {money(d.after)}</span>
+              </div>
+            ))}
+          </div>
+          {plan.short > 0 && (
+            <p className="sb-complete-note is-short">
+              Your ticked accounts hold {money(plan.covered)} — {money(plan.short, { pence: true })} short.
+              They will be emptied; the rest is not taken from anywhere.
+            </p>
+          )}
+        </>
+      ))}
+      <div className="sb-complete-actions">
+        <button type="button" className="btn btn-sm" onClick={onCancel}>Cancel</button>
+        <button type="button" className="btn btn-primary btn-sm" onClick={onConfirm}>Complete pot</button>
+      </div>
+    </div>
+  );
+}
+
+/** Completed pots: what they cost, where it came from, and Undo. */
+function CompletedStrip({ goals, accounts, onUndo }) {
+  const [armed, setArmed] = useState(null);
+  useEffect(() => {
+    if (!armed) return undefined;
+    const t = setTimeout(() => setArmed(null), 4000);
+    return () => clearTimeout(t);
+  }, [armed]);
+  if (!goals.length) return null;
+  const nameOf = id => (accounts.find(a => a.id === id) || {}).name || 'a deleted account';
+  return (
+    <div className="sb-done">
+      <div className="sb-eyebrow">Completed</div>
+      {goals.map(g => {
+        const from = (g.drained || []).map(d => nameOf(d.accountId));
+        const back = (g.drained || []).reduce((s, d) => s + (Number(d.amount) || 0), 0);
+        return (
+          <div key={g.id} className="sb-done-row">
+            <span className="sb-done-icon" aria-hidden="true">{g.icon || '💰'}</span>
+            <span className="sb-done-name">{g.name}</span>
+            <span className="sb-done-meta">
+              {money(g.completedAmount ?? g.current)} · {new Date(g.completedAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
+              {from.length ? ` · from ${from.join(', ')}` : ''}
+            </span>
+            <button
+              type="button"
+              className={`sb-done-undo${armed === g.id ? ' is-arming' : ''}`}
+              onClick={() => {
+                if (armed !== g.id) { setArmed(g.id); return; }
+                setArmed(null);
+                onUndo(g.id);
+              }}
+            >{armed === g.id ? (back > 0 ? `Put ${money(back)} back?` : 'Reopen?') : 'Undo'}</button>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function PotCard({ goal, d, colour, expanded, onToggleExpand, onCollapse, achievement, onOpenModal, planComplete, onComplete }) {
+  const [confirming, setConfirming] = useState(false);
   const bars = useMemo(() => (expanded ? last12Months(goal) : []), [goal, expanded]);
   const barMax = Math.max(...bars.map(Math.abs), 1);
   const avg = bars.reduce((s, v) => s + v, 0) / 12;
@@ -176,7 +263,20 @@ function PotCard({ goal, d, colour, expanded, onToggleExpand, onCollapse, achiev
                     onClick={() => onOpenModal('addContributionModal:' + goal.id)}>+ Contribution</button>
             <button type="button" className="btn btn-sm"
                     onClick={() => onOpenModal('editSavingsGoalModal:' + goal.id)}>Edit</button>
+            {onComplete && (
+              <button type="button" className={`btn btn-sm sb-complete-btn${d.done ? ' is-ready' : ''}`}
+                      onClick={() => setConfirming(c => !c)} aria-expanded={confirming}>
+                <Icon name="check" size={13} /> Complete
+              </button>
+            )}
           </div>
+          {confirming && (
+            <CompleteConfirm
+              plan={planComplete()}
+              onCancel={() => setConfirming(false)}
+              onConfirm={() => { setConfirming(false); onComplete(); }}
+            />
+          )}
         </div>
 
         {expanded && (
@@ -204,7 +304,7 @@ function PotCard({ goal, d, colour, expanded, onToggleExpand, onCollapse, achiev
                 {d.accounts.map(a => (
                   <span key={a.id} className="sb-potcard-acc">
                     {a.name || 'Account'}
-                    <b>{money(parseFloat(a.balance) || 0)}</b>
+                    <b>{money(balanceNow(a))}</b>
                   </span>
                 ))}
               </div>
@@ -295,8 +395,10 @@ export default function SavingsBoard({ S, update, onOpenModal }) {
   const sav = useMemo(() => savingsSeries(accounts, items, horizon), [accounts, items, horizon]);
 
   // Funded pots sink to the end; otherwise the order is the user's own.
+  // Completed (spent) pots leave the vessels for the strip below them.
   const ordered = useMemo(() => {
-    const withIdx = goals.map((g, i) => ({ g, i, d: derivePot(g, items, accounts) }));
+    const withIdx = goals.map((g, i) => ({ g, i, d: derivePot(g, items, accounts) }))
+      .filter(x => !x.g.completedAt);
     return withIdx.sort((a, b) => (a.d.done ? 1 : 0) - (b.d.done ? 1 : 0) || a.i - b.i);
   }, [goals, items, accounts]);
 
@@ -374,7 +476,7 @@ export default function SavingsBoard({ S, update, onOpenModal }) {
           <span><i className="is-funded" />funded</span>
         </div>
       </div>
-      {ordered.length ? (
+      {livePots(goals).length ? (
         /* The opened pot takes over its own slot rather than a panel off
            to one side, so the thing you clicked is the thing that
            changed. Expanded it takes the whole row and the rest wrap
@@ -392,6 +494,11 @@ export default function SavingsBoard({ S, update, onOpenModal }) {
                   ? (S.achievements || []).find(a => a.id === g.achievementId)
                   : null}
                 onOpenModal={onOpenModal}
+                planComplete={() => planPotCompletion(S, g.id)}
+                onComplete={() => {
+                  update(prev => completePot(prev, g.id, Date.now()));
+                  setSelId(null); setExpanded(false);
+                }}
               />
             ) : (
               <Vessel
@@ -408,6 +515,11 @@ export default function SavingsBoard({ S, update, onOpenModal }) {
       <button type="button" className="sb-add-pot" onClick={() => onOpenModal('addSavingsGoalModal')}>
         <Icon name="plus" size={14} /> New goal
       </button>
+      <CompletedStrip
+        goals={goals.filter(g => g.completedAt).sort((a, b) => b.completedAt - a.completedAt)}
+        accounts={accounts}
+        onUndo={id => update(prev => undoCompletePot(prev, id, Date.now()))}
+      />
     </div>
   );
 

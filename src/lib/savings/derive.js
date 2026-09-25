@@ -13,8 +13,10 @@
  *   S.projection      {items,groups,horizon,startBalance}
  *   S.projection.items[{id,kind,label,amount,freq,goalId,accountId,
  *                       groupId,from,until,payDay}]
- *   S.savingsAccounts [{id,name,balance,apy}]
+ *   S.savingsAccounts [{id,name,balance,apy,balanceAt}]
+ *     `balance` is as of `balanceAt`; today's figure is interest.js.
  */
+import { balanceNow, monthlyRate } from './interest.js';
 
 /** A row's amount expressed per month, whatever cadence it is entered at. */
 export function toMonthly(amount, freq) {
@@ -191,8 +193,12 @@ export function cashSeries(startBalance, items, horizon, now = new Date(), bills
  */
 export function savingsSeries(accounts, items, horizon, now = new Date()) {
   const list = accounts || [];
-  const bal = list.map(a => parseFloat(a.balance) || 0);
-  const rate = list.map(a => (parseFloat(a.apy) || 0) / 1200);
+  // From today's balance (interest to date included), stepping at the
+  // monthly rate that compounds to the APY — apy/12 compounded monthly
+  // overshoots it (4.1% became 4.18% a year).
+  const at = now instanceof Date ? now.getTime() : Number(now) || Date.now();
+  const bal = list.map(a => balanceNow(a, at));
+  const rate = list.map(a => monthlyRate(a.apy));
   const out = [bal.reduce((s, v) => s + v, 0)];
   for (let m = 1; m <= horizon; m++) {
     for (let i = 0; i < bal.length; i++) {
@@ -205,7 +211,8 @@ export function savingsSeries(accounts, items, horizon, now = new Date()) {
 
 /** The headline numbers above the pots. */
 export function potTotals(goals, items, accounts = [], now = new Date()) {
-  const list = goals || [];
+  // A completed pot has been spent; its money is not "in pots" any more.
+  const list = (goals || []).filter(g => g && !g.completedAt);
   const derived = list.map(g => ({ goal: g, d: derivePot(g, items, accounts, now) }));
   const saved = list.reduce((s, g) => s + (Number(g.current) || 0), 0);
   const target = list.reduce((s, g) => s + (Number(g.target) || 0), 0);
@@ -338,11 +345,11 @@ export function flowSections(items, groups, now = new Date(), bills = null) {
 }
 
 /** Blended rate across accounts, weighted by balance. */
-export function blendedApy(accounts) {
+export function blendedApy(accounts, now = Date.now()) {
   const list = accounts || [];
-  const total = list.reduce((s, a) => s + (parseFloat(a.balance) || 0), 0);
+  const total = list.reduce((s, a) => s + balanceNow(a, now), 0);
   if (total <= 0) return 0;
-  return list.reduce((s, a) => s + (parseFloat(a.balance) || 0) * (parseFloat(a.apy) || 0), 0) / total;
+  return list.reduce((s, a) => s + balanceNow(a, now) * (parseFloat(a.apy) || 0), 0) / total;
 }
 
 // ── Formatting ───────────────────────────────────────────────────────
