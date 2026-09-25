@@ -331,6 +331,103 @@ function CardM({ d }) {
   );
 }
 
+
+/* ── rings: the macro donuts ─────────────────────────────────────────
+   The calorie ring shows eaten in the accent with the part burned off
+   repainted teal over its start, so the net reads at a glance; the
+   macro rings are % of goal, gold once over. Same reading as the Macros
+   widget these came from. Sized from the slot (cqh/cqw), never from a
+   measurement. */
+function Ring({ pct, col, stroke = 4, children, className = '', burn = 0, burnCol }) {
+  const R = 16 - stroke / 2;
+  const C = 2 * Math.PI * R;
+  const p = pct == null ? 0 : Math.max(0, Math.min(100, pct)) / 100;
+  const b = Math.max(0, Math.min(p, burn / 100));
+  const over = pct != null && pct > 100;
+  return (
+    <span className={`pv-ring ${className}`}>
+      <svg viewBox="0 0 32 32" aria-hidden="true">
+        <circle cx="16" cy="16" r={R} fill="none" stroke="var(--border)" strokeWidth={stroke} />
+        {p > 0 && (
+          <circle cx="16" cy="16" r={R} fill="none" stroke={over ? 'var(--gold)' : col} strokeWidth={stroke}
+                  strokeDasharray={`${(p * C).toFixed(2)} ${C.toFixed(2)}`} strokeLinecap="round" transform="rotate(-90 16 16)" />
+        )}
+        {b > 0 && (
+          <circle cx="16" cy="16" r={R} fill="none" stroke={burnCol} strokeWidth={stroke} opacity=".9"
+                  strokeDasharray={`${(b * C).toFixed(2)} ${C.toFixed(2)}`} strokeLinecap="round" transform="rotate(-90 16 16)" />
+        )}
+      </svg>
+      <span className="pv-ring-in">{children}</span>
+    </span>
+  );
+}
+
+function LogFood({ act, onAct }) {
+  if (!act || !onAct) return null;
+  return (
+    <button
+      type="button"
+      className="pv-logfood"
+      title="Log food"
+      aria-label="Log food"
+      onPointerDown={e => e.stopPropagation()}
+      onTouchStart={e => e.stopPropagation()}
+      onClick={e => { e.stopPropagation(); onAct(act); }}
+    >+</button>
+  );
+}
+
+function RingsL({ d, onAct }) {
+  const c = d.cal || {};
+  return (
+    <div className="pv pv-rings">
+      <div className="pv-rings-cal">
+        {/* Log food rides on the calorie ring: it scales with it and can
+            never land on a macro label, at any card size. */}
+        <span className="pv-rings-calwrap">
+          <Ring pct={c.pct} col="var(--em)" stroke={3.4} burn={c.burnPct} burnCol={c.burnCol} className="is-cal">
+            <b>{c.net != null ? c.net.toLocaleString('en-GB') : c.pct != null ? `${c.pct}%` : '—'}</b>
+            <small>{c.net != null ? 'net' : 'kcal'}</small>
+          </Ring>
+          <LogFood act={d.act} onAct={onAct} />
+        </span>
+        {c.eaten != null ? (
+          <div className="pv-rings-key">
+            <span><i style={{ background: 'var(--em)' }} />eaten {Math.round(c.eaten).toLocaleString('en-GB')}</span>
+            <span><i style={{ background: c.burnCol }} />burned {Math.round(c.burned).toLocaleString('en-GB')}</span>
+            <span className="pv-dim">goal {Math.round(c.goal).toLocaleString('en-GB')}</span>
+          </div>
+        ) : (
+          <div className="pv-rings-key"><span className="pv-dim">{d.empty ? 'Nothing logged today' : 'of today’s calorie goal'}</span></div>
+        )}
+      </div>
+      <div className="pv-rings-macros">
+        {d.rings.map(r => (
+          <span className="pv-rings-m" key={r.n}>
+            <Ring pct={r.pct} col={r.col}><b>{r.pct != null ? `${r.pct}%` : '–'}</b></Ring>
+            <span className="pv-rings-n">{r.n}{r.v ? <span className="pv-dim"> {r.v}</span> : null}</span>
+          </span>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function RingsM({ d }) {
+  const c = d.cal || {};
+  const all = [{ n: 'Kcal', pct: c.pct, col: 'var(--em)' }, ...d.rings];
+  return (
+    <div className="pv pv-ringsM">
+      {all.map(r => (
+        <span className="pv-ringsM-i" key={r.n}>
+          <Ring pct={r.pct} col={r.col} stroke={4.5} />
+          <span className="pv-ringsM-t"><b>{r.pct != null ? `${r.pct}%` : '–'}</b><span className="pv-ringsM-n">{r.n}</span></span>
+        </span>
+      ))}
+    </div>
+  );
+}
+
 /* ── fact: one line, fixed height, always available ────────────────────
    This is the level that makes the whole system honest. Because every
    block can become one of these, a block the user ticked is never
@@ -352,6 +449,7 @@ const VIEWS = {
   dotsM: DotsM, tilesM: TilesM, statM: StatM,
   segL: SegL, segM: SegM,
   cardL: CardL, cardM: CardM,
+  ringsL: RingsL, ringsM: RingsM,
   fact: Fact,
 };
 

@@ -30,6 +30,8 @@ import { livePots } from '../savings/completePot.js';
 import { strikeState } from '../habits/strikes.js';
 import { coinsToday } from '../coins/daily.js';
 import { ledgerRows } from '../coins/ledger.js';
+import { dayBurn } from '../burn.js';
+import { planDayFor, planGoalFor } from '../plan/planDay.js';
 
 /* ── Small shared shapes ──────────────────────────────────────────── */
 
@@ -656,12 +658,158 @@ const habitBlocks = {
   },
 };
 
+
+/* ── Nutrition ─────────────────────────────────────────────────────
+   `ext` is { macros, summary, loaded } from lib/diet/daySummary: the
+   user's macro goals and today's totals from the nutrition tables. The
+   history is S.macroHistory — { 'YYYY-MM-DD': { cal, pro, carb, fat } }
+   as % of that day's goal, written by the Track page. */
+
+const ORANGE = { col: '#e07a2f', fillCol: 'rgba(224,122,47,.12)', lvc: 'var(--text)' };
+const BURN_COL = '#12a5a5';
+const MACRO_ROWS = [
+  ['Protein', 'protein_g', 'pro', '#5b8cff'],
+  ['Carbs', 'carbs_g', 'carb', '#d99114'],
+  ['Fat', 'fat_g', 'fat', '#d0498f'],
+];
+const kcal = n => `${Math.round(n).toLocaleString('en-GB')}`;
+
+/** Today's figures, from the fetch when there is one, else from the
+ *  history entry the Track page wrote (percentages only). */
+function today(S, ext) {
+  const day = ymd(Date.now());
+  const hist = (S.macroHistory || {})[day] || null;
+  const { activity, whoopTotal } = dayBurn(S, day);
+  // Same burn figure the Calories Burned widget shows, so they agree.
+  const burned = whoopTotal != null ? whoopTotal : activity;
+  const fromWhoop = whoopTotal != null;
+  const macros = (ext && ext.macros) || [];
+  const live = !!(ext && ext.loaded && macros.length);
+  if (live) {
+    const plan = planDayFor(day, S);
+    const goalOf = name => {
+      const m = macros.find(x => x.name === name);
+      return m ? (planGoalFor(plan, name) ?? m.daily_goal) || 0 : 0;
+    };
+    const sum = ext.summary || {};
+    const calGoal = goalOf('Calories') || 2000;
+    const eaten = Number(sum.calories) || 0;
+    const rings = MACRO_ROWS
+      .filter(([name]) => macros.some(m => m.name === name))
+      .map(([name, field, , col]) => {
+        const goal = goalOf(name);
+        const got = Number(sum[field]) || 0;
+        const m = macros.find(x => x.name === name);
+        return { n: name, pct: goal > 0 ? Math.round((got / goal) * 100) : null, v: `${Math.round(got)}g`, col: (m && m.color) || col };
+      });
+    return { live, day, eaten, calGoal, burned, fromWhoop, net: Math.round(eaten - burned), rings,
+             calPct: calGoal > 0 ? Math.round((eaten / calGoal) * 100) : 0 };
+  }
+  // Fallback: percentages from today's history entry, or nothing yet.
+  const rings = MACRO_ROWS.map(([name, , key, col]) => ({
+    n: name, pct: hist && hist[key] != null ? hist[key] : null, v: '', col,
+  }));
+  return { live: false, day, eaten: null, calGoal: null, burned, fromWhoop, net: null, rings,
+           calPct: hist && hist.cal != null ? hist.cal : null };
+}
+
+const nutritionBlocks = {
+  rings(S, _o, ext) {
+    const t = today(S, ext);
+    const burnPct = t.live && t.calGoal ? Math.round((t.burned / t.calGoal) * 100) : 0;
+    const any = t.calPct != null || t.rings.some(r => r.pct != null);
+    return {
+      d: {
+        cal: { pct: t.calPct, burnPct, net: t.net, eaten: t.eaten, burned: t.burned, goal: t.calGoal, burnCol: BURN_COL },
+        rings: t.rings,
+        empty: !any,
+        act: { kind: 'logfood', name: 'food' },
+      },
+      s: { fl: 'MACROS', fv: t.calPct != null ? `${t.calPct}% kcal${t.rings[0] && t.rings[0].pct != null ? ` · P ${t.rings[0].pct}%` : ''}` : 'nothing logged' },
+    };
+  },
+
+  net(S, _o, ext) {
+    const t = today(S, ext);
+    if (!t.live) {
+      return {
+        d: { label: 'NET CALORIES', big: t.calPct != null ? `${t.calPct}%` : '—',
+             subA: '', sub: t.calPct != null ? ' of your calorie goal today' : ' nothing logged yet today',
+             r1A: '', r1: t.calPct != null ? 'of goal' : 'nothing logged', r2: '' },
+        s: { fl: 'NET', fv: t.calPct != null ? `${t.calPct}% of goal` : '—' },
+      };
+    }
+    const left = t.calGoal - t.eaten;
+    return {
+      d: { label: 'NET CALORIES', big: kcal(t.net),
+           subA: `${kcal(t.eaten)} eaten`, sub: ` · ${kcal(t.burned)} burned · goal ${kcal(t.calGoal)}`,
+           r1A: kcal(t.eaten), r1: ` eaten · ${kcal(t.burned)} burned`,
+           r2: left >= 0 ? `${kcal(left)} kcal left` : `${kcal(-left)} kcal over` },
+      s: { fl: 'NET', fvA: kcal(t.net), fv: ' kcal' },
+    };
+  },
+
+  burned(S) {
+    const day = ymd(Date.now());
+    const { bmr, activity, whoopTotal } = dayBurn(S, day);
+    const fromWhoop = whoopTotal != null;
+    const burned = fromWhoop ? whoopTotal : activity;
+    const acts = (S.burnLog && S.burnLog[day]) || [];
+    const rows = fromWhoop
+      ? [{ n: 'WHOOP, all day', m: 'measured', mc: BURN_COL, v: `${kcal(whoopTotal)} kcal` }]
+      : acts.slice(0, 6).map(a => ({ n: a.label || 'Activity', m: '', mc: 'var(--text-muted)', v: `${kcal(a.kcal || 0)} kcal` }));
+    if (!rows.length) rows.push({ n: 'No activity logged today', m: '', mc: 'var(--text-muted)', v: '' });
+    return {
+      d: {
+        head: 'BURNED TODAY', headR: kcal(burned), headRs: ' kcal', rows,
+        big: kcal(burned), bigSub: 'kcal burned',
+        line: fromWhoop ? 'Measured by WHOOP, all day' : bmr ? `Plus ~${kcal(bmr)} resting (not counted)` : 'Activity only',
+      },
+      s: { fl: 'BURNED', fvA: kcal(burned), fv: ' kcal' },
+    };
+  },
+
+  week(S) {
+    const hist = S.macroHistory || {};
+    const days = 14;
+    const vals = [];
+    const pro = [];
+    for (let i = days - 1; i >= 0; i--) {
+      const h = hist[ymd(Date.now() - i * 86400000)];
+      vals.push(h && h.cal != null ? Number(h.cal) : null);
+      pro.push(h && h.pro != null ? Number(h.pro) : null);
+    }
+    const logged = vals.filter(v => v != null);
+    if (logged.length < 2) {
+      return { d: { ll: 'CALORIES · 14 DAYS', lv: '—', rl: 'PROTEIN AVG', rv: '—', mx: -1,
+                    ax0: '14d ago', ax1: '', ax2: 'today', v1: '—', v2: 'log a few days to see a trend',
+                    ...ORANGE, ...series([0, 0]) },
+               s: { fl: '14 DAYS', fv: 'not enough logged' } };
+    }
+    const avg = Math.round(logged.reduce((a, b) => a + b, 0) / logged.length);
+    const pl = pro.filter(v => v != null);
+    const pAvg = pl.length ? Math.round(pl.reduce((a, b) => a + b, 0) / pl.length) : null;
+    const onTarget = logged.filter(v => v >= 85 && v <= 110).length;
+    // Unlogged days are drawn at the average rather than as zero: a day
+    // you did not log is not a day you ate nothing.
+    const filled = vals.map(v => (v == null ? avg : v));
+    return {
+      d: { ll: 'CALORIES · 14 DAYS', lv: `${avg}%`, rl: 'PROTEIN AVG', rv: pAvg != null ? `${pAvg}%` : '—',
+           mx: -1, ax0: '14d ago', ax1: `${onTarget} of ${logged.length} on target`, ax2: 'today',
+           v1: `${avg}% avg`, v2: `${onTarget}/${logged.length} days on target`,
+           ...ORANGE, ...series(filled) },
+      s: { fl: '14 DAYS', fvA: `${avg}%`, fv: ' of goal, avg' },
+    };
+  },
+};
+
 const ADAPTERS = {
   savings: savingsBlocks,
   trackers: trackerBlocks,
   achievements: achievementBlocks,
   holidays: holidayBlocks,
   habits: habitBlocks,
+  nutrition: nutritionBlocks,
 };
 
 /**
@@ -671,11 +819,11 @@ const ADAPTERS = {
  * habit with no milestones — degrades that ONE block to a dash instead
  * of blanking the whole card and taking the hub with it.
  */
-export function blockData(prime, id, S, opts) {
+export function blockData(prime, id, S, opts, ext) {
   const fn = ADAPTERS[prime]?.[id];
   if (!fn) return { d: {}, s: { fl: id.slice(0, 7).toUpperCase(), fv: '—' } };
   try {
-    return fn(S || {}, opts || {});
+    return fn(S || {}, opts || {}, ext || null);
   } catch (e) {
     if (typeof console !== 'undefined') console.warn(`[prime] ${prime}.${id} failed`, e);
     return { d: {}, s: { fl: id.slice(0, 7).toUpperCase(), fv: '—' } };

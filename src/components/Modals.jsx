@@ -4,6 +4,7 @@ import AddMobileWidgetModal from './mobile/AddMobileWidgetModal';
 import { appPresetToLink, visibleAppPresets } from '../data/appPresets';
 import { applyRelapse } from '../lib/habits/relapse';
 import PrimePicker from './widgets/prime/PrimePicker';
+import { isSuperseded } from '../lib/hub/primeBlocks';
 import { useSubscriptionContext } from '../context/SubscriptionContext';
 import { backdropClose } from '../utils/backdropClose';
 import { useIsMobile } from '../hooks/useIsMobile';
@@ -106,6 +107,9 @@ function Modal({ id, openId, onClose, children, style, className = '' }) {
  */
 function HubWidgetTile({ type, icon, title, sub, S, onClose, onAdd, onNavigate, locked, onLocked }) {
   const { ready, need, where } = widgetReadiness(type, S);
+  // Hidden, not removed: a prime card now shows this widget's data (see
+  // SUPERSEDED in lib/hub/primeBlocks). Hubs that have one keep it.
+  if (isSuperseded(type)) return null;
   return (
     <button
       type="button"
@@ -128,7 +132,7 @@ function HubWidgetTile({ type, icon, title, sub, S, onClose, onAdd, onNavigate, 
   );
 }
 
-function AddLinkModal({ openId, onClose, onSwitchModal, onAddApp, onAddHubWidget, S = {}, onNavigate }) {
+function AddLinkModal({ openId, onClose, onSwitchModal, onAddApp, onAddHubWidget, S = {}, onNavigate, userId }) {
   // Our Apps presets are a Pro bonus. Free users see them locked with
   // a PRO badge; clicking routes to the paywall instead of adding.
   const { hasPro } = useSubscriptionContext();
@@ -148,6 +152,7 @@ function AddLinkModal({ openId, onClose, onSwitchModal, onAddApp, onAddHubWidget
       {openId === 'addLinkModal' && (
         <PrimePicker
           S={S}
+          userId={userId}
           widgets={S.hubWidgets || []}
           onAdd={w => { onClose('addLinkModal'); onAddHubWidget(w); }}
         />
@@ -2005,6 +2010,7 @@ export default function Modals({ openModal, S, update, onClose, onOpen, onShowCo
         onSwitchModal={onOpen}
         onAddApp={preset => { handleAddLink(appPresetToLink(preset)); onClose('addLinkModal'); }}
         onAddHubWidget={handleAddHubWidget}
+        userId={userId}
         S={S}
         onNavigate={onNavigate}
       />
@@ -2022,6 +2028,7 @@ export default function Modals({ openModal, S, update, onClose, onOpen, onShowCo
         onAdd={handleAddMobileWidget}
         onUpgrade={() => onOpen('paywall:ourApps')}
         S={S}
+        userId={userId}
         onNavigate={onNavigate}
       />
       <AddTrackerModal openId={effectiveOpen} onClose={onClose} onAdd={handleAddTracker} />

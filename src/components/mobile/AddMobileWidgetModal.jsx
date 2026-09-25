@@ -17,6 +17,7 @@ import { useSubscriptionContext } from '../../context/SubscriptionContext';
 import { backdropClose } from '../../utils/backdropClose';
 import { widgetReadiness } from '../../lib/widgets/readiness';
 import PrimePicker from '../widgets/prime/PrimePicker';
+import { isSuperseded } from '../../lib/hub/primeBlocks';
 
 // App-preset widget types (FloorplanStudio / …) — a Pro bonus, so
 // they're locked for free users in the picker below.
@@ -28,7 +29,7 @@ const APP_PRESET_TYPES = new Set(APP_PRESETS.map(p => p.id));
 const PRO_WIDGET_TYPES = new Set(['body-goal']);
 const isProWidget = type => APP_PRESET_TYPES.has(type) || PRO_WIDGET_TYPES.has(type);
 
-export default function AddMobileWidgetModal({ openId, onClose, existingTypes, onAdd, onUpgrade, S = {}, onNavigate }) {
+export default function AddMobileWidgetModal({ openId, onClose, existingTypes, onAdd, onUpgrade, S = {}, onNavigate, userId }) {
   const { hasPro } = useSubscriptionContext();
   const isOpen = openId === 'addMobileWidgetModal';
   if (!isOpen) return null;
@@ -66,7 +67,10 @@ export default function AddMobileWidgetModal({ openId, onClose, existingTypes, o
     ...(tradingWidgetAvailable() && (typeof window !== 'undefined' && window.__vantageOwner) ? ['trading'] : []),
     // 'rotation' stood here. Retired 2026-08-16 — see
     // lib/widgets/retired.js. The page it read from is untouched.
-  ];
+  ]
+    // Hidden, not removed: a prime card now shows this data (SUPERSEDED
+    // in lib/hub/primeBlocks). Stacks that already have one keep it.
+    .filter(type => !isSuperseded(type));
 
   function pick(type) {
     // Pro-gated widgets — route free users to the paywall rather than
@@ -101,6 +105,7 @@ export default function AddMobileWidgetModal({ openId, onClose, existingTypes, o
         <PrimePicker
           compact
           S={S}
+          userId={userId}
           widgets={S.mobileWidgets || []}
           onAdd={w => { onAdd({ ...w, id: 'w' + Date.now() }); onClose('addMobileWidgetModal'); }}
         />

@@ -15,7 +15,7 @@
 import { useState, useRef, useEffect, lazy, Suspense } from 'react';
 import { getTodayStr } from '../../utils/helpers';
 import { useBootFill } from '../../hooks/useBootFill';
-import { supabase } from '../../lib/supabase';
+import { useDaySummary } from '../../lib/diet/daySummary';
 import { currentWeightKg, dayBurn, ACTIVITIES, activityKcal, stepsKcal } from '../../lib/burn';
 import { APP_PRESETS, getAppPreset, RETIRED_PRESETS } from '../../data/appPresets';
 import { fetchAppPreview } from '../../lib/appPreview';
@@ -495,8 +495,13 @@ export default function MobileWidget({ widget, S, update, onRemove, navigate, us
                 head={false}
                 widget={widget}
                 S={S}
+                userId={userId}
                 onAct={act => {
                   if (act?.kind === 'relapse') update(prev => applyRelapse(prev, act.id, Date.now()));
+                  if (act?.kind === 'logfood') {
+                    try { sessionStorage.setItem('vb_quicklog_food', '1'); } catch { /* ignore */ }
+                    navigate && navigate('diet');
+                  }
                 }}
               />
             </div>
@@ -799,31 +804,8 @@ function VitalsSparkline({ series }) {
   );
 }
 
-// ── Nutrition day summary (shared by Burn + Macros widgets) ──
-// Light direct fetch of today's macros + summary — deliberately NOT
-// useNutrition (which seeds defaults, loads log entries and month
-// data a hub widget doesn't need).
-function useDaySummary(userId) {
-  const [data, setData] = useState({ macros: [], summary: null, loaded: false });
-  useEffect(() => {
-    if (!userId) { setData(d => ({ ...d, loaded: true })); return undefined; }
-    let live = true;
-    (async () => {
-      try {
-        const today = getTodayStr();
-        const [{ data: macros }, { data: summary }] = await Promise.all([
-          supabase.from('nutrition_macros').select('*').eq('user_id', userId).order('display_order', { ascending: true }),
-          supabase.from('nutrition_daily_summary').select('*').eq('user_id', userId).eq('log_date', today).maybeSingle(),
-        ]);
-        if (live) setData({ macros: macros || [], summary: summary || null, loaded: true });
-      } catch {
-        if (live) setData({ macros: [], summary: null, loaded: true });
-      }
-    })();
-    return () => { live = false; };
-  }, [userId]);
-  return data;
-}
+// Today's macros + summary come from lib/diet/daySummary — one cached
+// request shared by these widgets and the Nutrition prime.
 
 // ── Calories Burned — Phase 1 (docs/FEATURES.md) ──
 function BurnBody({ S, update, userId }) {

@@ -22,6 +22,7 @@ import { useLayoutEffect, useRef, useState } from 'react';
 import Icon from '../../Icon';
 import { PRIMES, PRIME_IDS, primeOf, primeType } from '../../../lib/hub/primeBlocks';
 import PrimeCard from './PrimeCard';
+import { useDaySummary } from '../../../lib/diet/daySummary';
 
 /* The preview is rendered at a real card size and scaled down, so it is
    the actual packer output rather than a drawing of it. */
@@ -34,9 +35,10 @@ const BLURB = {
   achievements: 'Next unlock, coins, recent wins, the path ahead',
   holidays: 'Countdown, itinerary, budget, packing',
   habits: 'Streak timers with relapse, milestones, strikes',
+  nutrition: 'Macro rings, net calories, calories burned, 14-day trend',
 };
 
-function Preview({ keyId, blocks, S }) {
+function Preview({ keyId, blocks, S, ext }) {
   const ref = useRef(null);
   const [k, setK] = useState(0.5);
   useLayoutEffect(() => {
@@ -55,6 +57,7 @@ function Preview({ keyId, blocks, S }) {
         <PrimeCard
           widget={{ id: 'preview-' + keyId, type: primeType(keyId), blocks }}
           S={S}
+          ext={ext}
           width={PREVIEW_W}
           height={PREVIEW_H}
         />
@@ -63,7 +66,7 @@ function Preview({ keyId, blocks, S }) {
   );
 }
 
-function PrimeTile({ keyId, S, count, onAdd, compact }) {
+function PrimeTile({ keyId, S, count, onAdd, compact, ext }) {
   const P = PRIMES[keyId];
   const [preset, setPreset] = useState(0);
   const blocks = P.presets[preset][1];
@@ -72,7 +75,7 @@ function PrimeTile({ keyId, S, count, onAdd, compact }) {
       className={`pp-tile${compact ? ' is-compact' : ''}`}
       style={{ '--pp-col': P.col }}
     >
-      <Preview keyId={keyId} blocks={blocks} S={S} />
+      <Preview keyId={keyId} blocks={blocks} S={S} ext={ext} />
       <div className="pp-body">
         <div className="pp-title">
           <span className="pp-chip" aria-hidden="true"><Icon name={P.icon} size={14} /></span>
@@ -108,7 +111,9 @@ function PrimeTile({ keyId, S, count, onAdd, compact }) {
  * @param widgets  the hub's current widget list — for the per-prime count
  * @param onAdd    ({ type, blocks }) → void; the caller adds the id
  */
-export default function PrimePicker({ S, widgets = [], onAdd, compact = false }) {
+export default function PrimePicker({ S, widgets = [], onAdd, compact = false, userId = null }) {
+  // The Nutrition preview shows today's real rings; shared cached fetch.
+  const day = useDaySummary(userId);
   const counts = {};
   widgets.forEach(w => {
     const k = primeOf(w);
@@ -122,7 +127,8 @@ export default function PrimePicker({ S, widgets = [], onAdd, compact = false })
       </header>
       <div className={`pp-grid${compact ? ' is-compact' : ''}`}>
         {PRIME_IDS.map(k => (
-          <PrimeTile key={k} keyId={k} S={S} count={counts[k] || 0} onAdd={onAdd} compact={compact} />
+          <PrimeTile key={k} keyId={k} S={S} count={counts[k] || 0} onAdd={onAdd} compact={compact}
+                     ext={k === 'nutrition' ? day : null} />
         ))}
       </div>
     </section>

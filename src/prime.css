@@ -851,3 +851,47 @@ html[data-theme="dark-os"] {
 /* A modal holding live previews needs the room; the default is sized
    for a form. Scrolls inside so the backdrop stays tappable. */
 .modal.aw-modal { width: 720px; }
+
+/* ── rings (Nutrition) ─────────────────────────────────────────────── */
+.pv-ring { position: relative; display: inline-grid; place-items: center; flex: none; aspect-ratio: 1; }
+.pv-ring svg { width: 100%; height: 100%; display: block; }
+.pv-ring-in { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; line-height: 1.05; text-align: center; }
+.pv-ring-in b { font-family: var(--mono); font-weight: 500; color: var(--text); font-variant-numeric: tabular-nums; }
+.pv-ring-in small { font-family: var(--mono); font-size: 9px; letter-spacing: 1px; text-transform: uppercase; color: var(--text-muted); }
+
+.pv-rings { display: flex; align-items: center; gap: 12px; position: relative; }
+.pv-rings-cal { display: flex; align-items: center; gap: 10px; min-width: 0; flex: none; }
+.pv-rings-cal .pv-ring-in b { font-size: clamp(11px, 9cqh, 17px); }
+.pv-rings-key { display: flex; flex-direction: column; gap: 3px; font-size: var(--text-xs); color: var(--text-mid); white-space: nowrap; }
+.pv-rings-key i { display: inline-block; width: 7px; height: 7px; border-radius: 2px; margin-right: 5px; }
+.pv-rings-macros { flex: 1; min-width: 0; display: flex; justify-content: space-around; gap: 6px; }
+.pv-rings-m { display: flex; flex-direction: column; align-items: center; gap: 4px; min-width: 0; }
+.pv-rings-m .pv-ring { width: min(100cqh - 30px, 15cqw, 76px); }
+.pv-rings-m .pv-ring-in b { font-size: clamp(9px, 5.5cqh, 12.5px); }
+.pv-rings-n { font-size: var(--text-xs); color: var(--text-mid); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+/* Narrow slot: the key would squeeze the macro rings to nothing. */
+@container (max-width: 380px) { .pv-rings-key { display: none; } }
+@container (max-width: 250px) { .pv-rings-cal { display: none; } }
+.pv-rings-calwrap { position: relative; display: inline-flex; flex: none; }
+.pv-rings-calwrap > .pv-ring { width: min(100cqh - 6px, 36cqw, 132px); }
+.pv-logfood {
+  position: absolute; right: -2px; bottom: -2px;
+  width: 24px; height: 24px; padding: 0; border-radius: 12px;
+  display: grid; place-items: center;
+  border: 1px solid var(--em); background: var(--em); color: #fff;
+  font: 600 15px/1 var(--sans); cursor: pointer;
+  box-shadow: 0 0 0 2px var(--surface, #131311);
+}
+.pv-logfood:hover { filter: brightness(1.1); }
+.pv-logfood:focus-visible { outline: 2px solid var(--em); outline-offset: 2px; }
+@container (max-height: 64px) { .pv-logfood { display: none; } }
+
+/* Compact: four small rings, the figure under each. The percentage is
+   the point, so it never hides; only the macro name goes when narrow. */
+.pv-ringsM { display: flex; align-items: center; justify-content: space-around; gap: 6px; }
+.pv-ringsM-i { display: flex; flex-direction: column; align-items: center; gap: 3px; min-width: 0; }
+.pv-ringsM-i .pv-ring { width: min(100cqh - 20px, 34px); }
+.pv-ringsM-t { font-size: 10.5px; color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+.pv-ringsM-t b { font-family: var(--mono); color: var(--text); font-weight: 500; }
+.pv-ringsM-n { margin-left: 3px; }
+@container (max-width: 230px) { .pv-ringsM-n { display: none; } }

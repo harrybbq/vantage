@@ -142,6 +142,32 @@ export const PRIMES = {
       relapses: B('Relapses', 'chart', 104, 50, ['chartL', 'sparkM'], { grow: 3 }),
     },
   },
+  /* Nutrition reads two places: today's totals and goals come from the
+     nutrition tables (the host passes them in as `ext`, fetched once and
+     shared — see lib/diet/daySummary), and the day-by-day history from
+     S.macroHistory, which the Track page already keeps. With no fetch
+     (the picker preview, a signed-out session) the rings fall back to
+     today's history entry, so they still draw. */
+  nutrition: {
+    name: 'Nutrition',
+    icon: 'utensils',
+    glyph: '◑',
+    col: '#e07a2f',
+    section: 'diet',
+    def: ['rings', 'net', 'week'],
+    presets: [
+      ['Today', ['rings', 'net', 'burned']],
+      ['Rings', ['rings']],
+      ['Trend', ['week', 'rings']],
+      ['Energy', ['net', 'burned', 'week']],
+    ],
+    blocks: {
+      rings:  B('Macro rings', 'gauge', 96, 62, ['ringsL', 'ringsM'], { grow: 1, max: 176 }),
+      net:    B('Net calories', 'hero', 66, 42, ['heroL', 'heroM']),
+      burned: B('Calories burned', 'list', 84, 44, ['listL', 'statM'], { grow: 1, max: 120, row: 24 }),
+      week:   B('Last 14 days', 'chart', 104, 50, ['chartL', 'sparkM'], { grow: 3 }),
+    },
+  },
 };
 
 export const PRIME_IDS = Object.keys(PRIMES);
@@ -177,6 +203,29 @@ export const LEGACY = {
      away from every hub that already has one. They keep rendering as
      they always have; the prime versions are there for new cards. */
 };
+
+/**
+ * Standalone widget types a prime now covers, and which prime.
+ *
+ * The Add Widget pickers HIDE these — they are not deleted, and a hub
+ * that already has one keeps rendering it exactly as before. The ones
+ * also in LEGACY are additionally drawn as their prime; the rest keep
+ * their own body, because they carry things a block does not (the
+ * Macros widget's tap-through, Calories Burned's activity entry, the
+ * habit widget's live timers).
+ */
+export const SUPERSEDED = {
+  'savings-pots': 'savings',
+  'savings-projection': 'savings',
+  'subscriptions': 'savings',
+  'habits': 'habits',
+  'holidays': 'holidays',
+  'recent-wins': 'achievements',
+  'coin-history': 'achievements',
+  'macros': 'nutrition',
+  'calories': 'nutrition',
+};
+export const isSuperseded = type => Object.prototype.hasOwnProperty.call(SUPERSEDED, type);
 
 /** The prime a stored widget renders as, or null if it is not one. */
 export function primeOf(widget) {
