@@ -6,39 +6,7 @@ import CameraScanner from './CameraScanner';
 import { supabase } from '../lib/supabase';
 import { backdropClose } from '../utils/backdropClose';
 import { useSubscriptionContext } from '../context/SubscriptionContext';
-import { authFetch } from '../lib/authFetch';
-
-async function searchByBarcode(barcode) {
-  const res = await authFetch(`/.netlify/functions/food-search?mode=barcode&q=${encodeURIComponent(barcode)}`);
-  const json = await res.json();
-  if (!res.ok) throw new Error(json.error || 'Lookup failed');
-  return json.products || [];
-}
-
-async function searchByName(query, community) {
-  const res = await authFetch(
-    `/.netlify/functions/food-search?mode=name&q=${encodeURIComponent(query)}${community ? '&community=1' : ''}`
-  );
-  const json = await res.json();
-  if (!res.ok) throw new Error(json.error || 'Search failed');
-  return json.products || [];
-}
-
-/* Whether to include foods other users added.
- *
- * Off until asked for: these are strangers' words in a list you are
- * scanning quickly, and nobody should be handed them without turning
- * them on. Remembered per device in localStorage rather than in the
- * state blob — it is a preference about how a list looks on the screen
- * in front of you, which is exactly what localStorage is for, and it
- * costs nothing if the read fails. */
-const COMMUNITY_KEY = 'vb4_food_community';
-function readCommunityPref() {
-  try { return localStorage.getItem(COMMUNITY_KEY) === '1'; } catch { return false; }
-}
-function writeCommunityPref(on) {
-  try { localStorage.setItem(COMMUNITY_KEY, on ? '1' : '0'); } catch { /* private mode */ }
-}
+import { searchByBarcode, searchByName, readCommunityPref, writeCommunityPref } from '../lib/diet/foodSearch';
 
 export default function FoodSearch({ onSelectFood, onClose, onOpenModal, savedMeals = [], onDeleteMeal, userId }) {
   // Camera scanning (barcode + AI identify) is a Pro feature — matches
