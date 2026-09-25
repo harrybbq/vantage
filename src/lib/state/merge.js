@@ -69,7 +69,7 @@ function isIdArray(v) {
     && v.every(x => x && typeof x === 'object' && !Array.isArray(x) && typeof x.id === 'string' && x.id);
 }
 
-function mergeIdArrays(base, local, remote, path, conflicts) {
+function mergeIdArrays(base, local, remote, path, conflicts, tieBreak) {
   const byId = list => new Map((list || []).map(x => [x.id, x]));
   const b = byId(base);
   const l = byId(local);
@@ -92,7 +92,7 @@ function mergeIdArrays(base, local, remote, path, conflicts) {
     const rv = r.get(id);
 
     if (lv && rv) {
-      out.push(merge(bv, lv, rv, `${path}[${id}]`, conflicts));
+      out.push(merge(bv, lv, rv, `${path}[${id}]`, conflicts, tieBreak));
       continue;
     }
     // Present on one side only: either just added there, or deleted
@@ -111,7 +111,7 @@ function mergeIdArrays(base, local, remote, path, conflicts) {
  * @param conflicts collects human-readable notes about rule 5 and about
  *   deletions that were declined; the caller decides whether to report.
  */
-function merge(base, local, remote, path, conflicts) {
+function merge(base, local, remote, path, conflicts, tieBreak) {
   // Both sides already agree. Nothing to reconcile whatever the base
   // was, and reporting it as a conflict would cry wolf on the common
   // case of two devices being handed the same edit.
@@ -134,7 +134,7 @@ function merge(base, local, remote, path, conflicts) {
       const inR = Object.prototype.hasOwnProperty.call(remote, k);
       const inB = Object.prototype.hasOwnProperty.call(b, k);
 
-      if (inL && inR) { out[k] = merge(b[k], local[k], remote[k], `${path}.${k}`, conflicts); continue; }
+      if (inL && inR) { out[k] = merge(b[k], local[k], remote[k], `${path}.${k}`, conflicts, tieBreak); continue; }
 
       const value = inL ? local[k] : remote[k];
       if (!inB) { out[k] = value; continue; }              // newly added on one side
@@ -146,9 +146,30 @@ function merge(base, local, remote, path, conflicts) {
   }
 
   if (isIdArray(local) && isIdArray(remote)) {
-    return mergeIdArrays(base, local, remote, path, conflicts);
+    return mergeIdArrays(base, local, remote, path, conflicts, tieBreak);
   }
 
+  /* Last resort: a scalar, or a ragged array, that both sides moved and
+     no rule above can reconcile.
+
+     WHICH side wins is decided by the caller, and it is not a detail.
+     With a known common ancestor, `local` is what the person at this
+     screen just did and deserves to win. With NO common ancestor it is
+     the opposite: the only way we get here without a base is a snapshot
+     replayed from an earlier session, which is older than the cloud copy
+     by construction — so taking local silently rolls the account back to
+     whenever that device was last open.
+
+     That is not hypothetical. A snapshot left by a desktop killed
+     mid-debounce was replayed days later and took local for every scalar
+     underneath habits: four relapses recorded on the phone in between
+     were undone, the counters went DOWN, and a savings pot was left
+     reading £1,002 less than the sum of its own contributions — because
+     the contributions merged by id and the total did not. */
+  if (tieBreak === 'remote') {
+    conflicts.push(`${path}: changed on both devices — kept the cloud's value`);
+    return remote;
+  }
   conflicts.push(`${path}: changed on both devices — kept this device's value`);
   return local;
 }
@@ -158,16 +179,29 @@ function merge(base, local, remote, path, conflicts) {
  * from.
  *
  * @param {object|null} base   the state as this client loaded it. Null
- *   or missing means no common ancestor is known, in which case every
- *   key looks changed on both sides and the deep-merge rules apply —
- *   which errs toward keeping everything, the safe direction.
+ *   or missing means no common ancestor is known — see `tieBreak`,
+ *   which is not optional in that case.
+ * @param {object} [opts]
+ * @param {'local'|'remote'} [opts.tieBreak='local']  who wins a value
+ *   both sides changed that no rule can reconcile. Pass 'remote'
+ *   whenever `base` is unknown.
+ *
+ * ── Why an unknown base is the dangerous input, not the safe one ─────
+ * The old comment here called an empty base "the safe reading: every
+ * key looks changed on both sides, so the merge keeps both". The first
+ * half is true and the second does not follow. Objects and id-arrays do
+ * keep both — but the LEAVES underneath them still fall through to the
+ * last-resort rule, and that rule took local. So an empty base did not
+ * keep both: it handed every number and string in the state to whichever
+ * device was doing the merging, however old its copy was.
  * @returns {{state: object, conflicts: string[]}}
  */
-export function mergeState(base, local, remote) {
+export function mergeState(base, local, remote, opts = {}) {
   const conflicts = [];
   const b = isPlainObject(base) ? base : {};
   const l = isPlainObject(local) ? local : {};
   const r = isPlainObject(remote) ? remote : {};
-  const state = merge(b, l, r, '', conflicts);
+  const tieBreak = opts.tieBreak === 'remote' ? 'remote' : 'local';
+  const state = merge(b, l, r, '', conflicts, tieBreak);
   return { state, conflicts };
 }

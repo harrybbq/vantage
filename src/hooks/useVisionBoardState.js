@@ -659,16 +659,31 @@ export function useVisionBoardState(userId) {
         const pending = readPending(userId);
         if (pending) {
           // The base is the cloud copy ONLY when the snapshot is known
-          // to have been taken against this exact version. Otherwise the
-          // common ancestor is unknown, and an empty base is the safe
-          // reading: every key looks changed on both sides, so the merge
-          // keeps both rather than letting a stale replay overwrite work
-          // another device has done since.
-          const mergeBase =
-            pending.baseUpdatedAt && pending.baseUpdatedAt === result.updatedAt
-              ? result.raw
-              : {};
-          const { state: merged, conflicts } = mergeState(mergeBase, pending.state, result.raw);
+          // to have been taken against this exact version.
+          //
+          // When it is not, the common ancestor is unknown, and the
+          // merge has to be told who wins a value it cannot reconcile.
+          // It must be the CLOUD. A replayed snapshot is older than the
+          // cloud copy by construction — the cloud has been written
+          // since, which is why the versions no longer match — so
+          // letting this device win every scalar rolls the account back
+          // to whenever it was last open.
+          //
+          // That is the 2026-09-25 incident: a desktop killed
+          // mid-debounce days earlier replayed its snapshot, and four
+          // relapses recorded on the phone in between were undone. The
+          // counters went DOWN, tracker streaks lost a week, and a
+          // savings pot ended up reading £1,002 less than the sum of its
+          // own contributions — the contributions merged by id and the
+          // total did not.
+          const known =
+            pending.baseUpdatedAt && pending.baseUpdatedAt === result.updatedAt;
+          const { state: merged, conflicts } = mergeState(
+            known ? result.raw : {},
+            pending.state,
+            result.raw,
+            { tieBreak: known ? 'local' : 'remote' },
+          );
           if (!sameValue(merged, result.raw)) {
             const revived = addTransient({ ...DEFAULT_STATE, ...merged });
             if (result.state.profile?.photo) {
