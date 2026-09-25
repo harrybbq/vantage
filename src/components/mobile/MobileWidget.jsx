@@ -39,6 +39,7 @@ import Icon from '../Icon';
 import { PRIMES, primeOf, blocksOf, withBlocks, withBlockOpts } from '../../lib/hub/primeBlocks';
 import { PrimeFit } from '../widgets/prime/PrimeCard';
 import { PrimeEditorSheet } from '../widgets/prime/PrimeEditor';
+import QuickFoodMenu from '../widgets/prime/QuickFoodMenu';
 import { planDayFor, planGoalFor, planBadge } from '../../lib/plan/planDay';
 
 // App presets (FloorplanStudio / …) become mobile widget
@@ -207,6 +208,7 @@ export default function MobileWidget({ widget, S, update, onRemove, navigate, us
         icon: P.glyph, svg: P.icon, accent: P.col }
     : (WIDGET_META[widget.type] || { label: widget.type, eyebrow: '?', icon: '·' });
   const [editing, setEditing] = useState(false);
+  const [foodMenu, setFoodMenu] = useState(null);
   function patchSelf(fn) {
     update(prev => ({
       ...prev,
@@ -498,10 +500,7 @@ export default function MobileWidget({ widget, S, update, onRemove, navigate, us
                 userId={userId}
                 onAct={act => {
                   if (act?.kind === 'relapse') update(prev => applyRelapse(prev, act.id, Date.now()));
-                  if (act?.kind === 'logfood') {
-                    try { sessionStorage.setItem('vb_quicklog_food', '1'); } catch { /* ignore */ }
-                    navigate && navigate('diet');
-                  }
+                  if (act?.kind === 'logfood') setFoodMenu(cur => (cur ? null : { rect: act.rect || null }));
                 }}
               />
             </div>
@@ -551,6 +550,20 @@ export default function MobileWidget({ widget, S, update, onRemove, navigate, us
             <span className="hub-module-menu-label" style={{ color: 'rgb(214,69,69)' }}>Delete widget</span>
           </button>
         </div>
+      )}
+
+      {foodMenu && (
+        <QuickFoodMenu
+          anchorRect={foodMenu.rect}
+          userId={userId}
+          update={update}
+          onClose={() => setFoodMenu(null)}
+          onSearch={() => {
+            setFoodMenu(null);
+            try { sessionStorage.setItem('vb_quicklog_food', '1'); } catch { /* ignore */ }
+            navigate && navigate('diet');
+          }}
+        />
       )}
 
       {P && editing && (

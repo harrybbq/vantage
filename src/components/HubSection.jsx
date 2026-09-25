@@ -14,9 +14,11 @@ import NewsBody from './widgets/NewsWidget';
 import { reflow, MIN_W, MIN_H, SNAP_GAP as REFLOW_GAP } from '../lib/hub/reflow';
 import { rescaleLayout, rebaseLayout } from '../lib/hub/rescale';
 import { observeShape } from '../lib/hub/shape';
+import { matchEdge } from '../lib/hub/edgeMatch';
 import { primeOf, withBlocks, withBlockOpts } from '../lib/hub/primeBlocks';
 import { PrimeFit } from './widgets/prime/PrimeCard';
 import { PrimeEditorPopover } from './widgets/prime/PrimeEditor';
+import QuickFoodMenu from './widgets/prime/QuickFoodMenu';
 const TradingBody = TRADING_WIDGET_BUILD_EXCLUDED ? null : lazy(() => import('./widgets/TradingWidget'));
 import { timeAgo } from '../utils/helpers';
 import AiCoachWidget from './AiCoachWidget';
@@ -248,6 +250,43 @@ function bestSnap(wrapper, rect, canvasW) {
   return null;
 }
 
+/* ── Edge auto-scroll while dragging ─────────────────────────────────
+   Carry a widget to the top or bottom of the visible canvas and the view
+   creeps in that direction for as long as you hold it there, faster the
+   deeper into the edge band you go. Without it, moving a widget further
+   than one screen meant dropping it, scrolling, and picking it up again.
+
+   It only runs in the direction you are dragging (a widget grabbed near
+   the top of the screen does not start scrolling the moment you touch
+   it), and stops the instant you move out of the band or let go. */
+const EDGE_BAND = 64;        // px from the visible edge where it starts
+const EDGE_MAX = 10;         // px per frame at the very edge (~600px/s)
+const EDGE_MIN = 1.5;        // px per frame just inside the band
+
+/** The element that actually scrolls the canvas: the nearest ancestor
+ *  that scrolls vertically, else the page. */
+function scrollParentOf(el) {
+  for (let n = el && el.parentElement; n && n !== document.body; n = n.parentElement) {
+    const oy = getComputedStyle(n).overflowY;
+    if ((oy === 'auto' || oy === 'scroll' || oy === 'overlay') && n.scrollHeight > n.clientHeight + 1) return n;
+  }
+  return document.scrollingElement || document.documentElement;
+}
+function isPageScroller(sc) {
+  return sc === document.scrollingElement || sc === document.documentElement || sc === document.body;
+}
+/** Visible top/bottom of the scroller, in viewport coordinates. */
+function viewBandOf(sc) {
+  if (isPageScroller(sc)) return { top: 0, bottom: window.innerHeight };
+  const r = sc.getBoundingClientRect();
+  return { top: Math.max(0, r.top), bottom: Math.min(window.innerHeight, r.bottom) };
+}
+/** Speed for a point `depth` px into the band (0 = at its inner edge). */
+function edgeSpeed(depth) {
+  const t = Math.max(0, Math.min(1, depth / EDGE_BAND));
+  return EDGE_MIN + (EDGE_MAX - EDGE_MIN) * t * t;   // eased: gentle at first
+}
+
 function useWidgetDrag(canvasRef, S, update, snapRef) {
   const makeDraggable = useCallback((wrapper, linkId) => {
     const handle = wrapper.querySelector('[data-drag]');
@@ -259,6 +298,9 @@ function useWidgetDrag(canvasRef, S, update, snapRef) {
     handle.addEventListener('pointerdown', e => {
       // Ignore non-primary buttons (right-click etc.).
       if (e.button !== undefined && e.button !== 0) return;
+      // Never start a move while this widget is being resized — a second
+      // pointer on the handle mid-resize would run both gestures.
+      if (wrapper.dataset.resizing) return;
       e.preventDefault();
       const canvas = canvasRef.current;
       if (!canvas) return;
@@ -295,6 +337,22 @@ function useWidgetDrag(canvasRef, S, update, snapRef) {
           }));
         }
       }
+
+      // Auto-scroll bookkeeping. Positions are pointer-minus-offset, so
+      // any distance the view has scrolled since pointerdown is added
+      // back in — otherwise the widget would stay pinned to the screen
+      // while the canvas slid away underneath it.
+      const scroller = scrollParentOf(canvas);
+      // The page sets `scroll-behavior: smooth` on <html>, which turns
+      // every per-frame nudge below into its own smooth animation — the
+      // view crawled at a tenth of the intended speed and lagged the
+      // widget. Instant for the length of the gesture, restored on drop.
+      const prevBehavior = scroller.style.scrollBehavior;
+      scroller.style.scrollBehavior = 'auto';
+      const scroll0 = scroller.scrollTop;
+      const startClientY = e.clientY;
+      let lastX = e.clientX, lastY = e.clientY;
+      let autoRaf = 0;
 
       // Cache layout values up-front — onMove ran getBoundingClientRect /
       // offsetWidth every frame before, forcing a relayout on each move.
@@ -364,13 +422,61 @@ function useWidgetDrag(canvasRef, S, update, snapRef) {
         if (need > liveFloor) { liveFloor = need; canvas.style.minHeight = need + 'px'; }
         pending = null;
       }
+      function posAt(cx, cy) {
+        const scrolled = scroller.scrollTop - scroll0;
+        return {
+          x: Math.max(0, Math.min(cx - startX, maxX)),
+          y: Math.max(0, cy - startY + scrolled),
+        };
+      }
+      /** Signed px/frame to scroll now: negative up, positive down, 0 none. */
+      function autoVelocity() {
+        const band = viewBandOf(scroller);
+        const r = wrapper.getBoundingClientRect();
+        // Up: the widget's top edge (the grip is there, so it is also
+        // where the pointer is) has entered the top band.
+        if (lastY < startClientY - 4 && scroller.scrollTop > 0) {
+          const depth = band.top + EDGE_BAND - r.top;
+          if (depth > 0) return -edgeSpeed(depth);
+        }
+        // Down: its bottom edge — or the pointer, for a widget taller
+        // than the view, whose bottom is off-screen from the start.
+        if (lastY > startClientY + 4) {
+          const tall = r.height > (band.bottom - band.top) - EDGE_BAND * 2;
+          const edge = tall ? lastY : r.bottom;
+          const depth = edge - (band.bottom - EDGE_BAND);
+          if (depth > 0) return edgeSpeed(depth);
+        }
+        return 0;
+      }
+      function autoTick() {
+        autoRaf = 0;
+        const v = autoVelocity();
+        if (!v) return;
+        const before = scroller.scrollTop;
+        // Going down at the very bottom there is nothing to scroll into
+        // yet: the plane only grows as the widget moves, and the widget
+        // only moves as the view scrolls. Extend the plane first; the
+        // re-measure on drop trims it back to what the layout needs.
+        if (v > 0 && before + scroller.clientHeight >= scroller.scrollHeight - 1) {
+          liveFloor += Math.ceil(v);
+          canvas.style.minHeight = liveFloor + 'px';
+        }
+        scroller.scrollTop = before + v;
+        if (scroller.scrollTop === before && v < 0) return;   // hit the top
+        pending = posAt(lastX, lastY);
+        flush();
+        autoRaf = requestAnimationFrame(autoTick);
+      }
       function onMove(ev) {
-        const nx = Math.max(0, Math.min(ev.clientX - startX, maxX));
-        const ny = Math.max(0, ev.clientY - startY);
-        pending = { x: nx, y: ny };
+        lastX = ev.clientX; lastY = ev.clientY;
+        pending = posAt(lastX, lastY);
         if (!rafId) rafId = requestAnimationFrame(flush);
+        if (!autoRaf && autoVelocity()) autoRaf = requestAnimationFrame(autoTick);
       }
       function onUp() {
+        if (autoRaf) { cancelAnimationFrame(autoRaf); autoRaf = 0; }
+        scroller.style.scrollBehavior = prevBehavior;
         if (rafId) { cancelAnimationFrame(rafId); flush(); }
         if (island) island.classList.remove('dragging-active');
         // Same snap on drop, so a dragged widget aligns with the ones it
@@ -564,15 +670,20 @@ export default function HubSection({ S, update, active, onOpenModal, onOpenWaitl
   }
   const [primeEdit, setPrimeEdit] = useState(null); // { id, rect } | null
   const closePrimeEdit = useCallback(() => setPrimeEdit(null), []);
+  const [foodMenu, setFoodMenu] = useState(null);   // { rect } | null
   const onPrimeAct = useCallback(act => {
     if (act?.kind === 'relapse') update(prev => applyRelapse(prev, act.id, Date.now()));
+    // The small recent-foods menu; full search stays on the diet page.
+    if (act?.kind === 'logfood') setFoodMenu(cur => (cur ? null : { rect: act.rect || null }));
+  }, [update]);
+  const closeFoodMenu = useCallback(() => setFoodMenu(null), []);
+  const openFoodSearch = useCallback(() => {
     // Same hand-off the Macros widget uses: NutritionSection reads the
     // flag on mount and opens the food search.
-    if (act?.kind === 'logfood') {
-      try { sessionStorage.setItem('vb_quicklog_food', '1'); } catch { /* ignore */ }
-      onNavigate && onNavigate('diet');
-    }
-  }, [update, onNavigate]);
+    setFoodMenu(null);
+    try { sessionStorage.setItem('vb_quicklog_food', '1'); } catch { /* ignore */ }
+    onNavigate && onNavigate('diet');
+  }, [onNavigate]);
 
   function reactWidgetEl(hw) {
     if (primeOf(hw)) {
@@ -1066,8 +1177,44 @@ export default function HubSection({ S, update, active, onOpenModal, onOpenWaitl
           const rightAnchor = startLeft + wrapper.offsetWidth; // for 'l'
           const bottomAnchor = startTop + wrapper.offsetHeight; // for 't'
           try { grip.setPointerCapture(e.pointerId); } catch { /* ignore */ }
+          wrapper.dataset.resizing = '1';   // the drag handle checks this
           activeSideRef.current = side;
           armSnap(); // every direction reflows now, not just rightward
+
+          // Snap drag OFF: near-miss edge matching (lib/hub/edgeMatch).
+          // Neighbours are read once here, not every frame; nothing else
+          // moves while one widget is being resized with snap off.
+          const peers = snapRef?.current ? null
+            : [...(canvasRef.current?.querySelectorAll('.widget-wrapper') || [])]
+                .filter(w2 => w2 !== wrapper && w2.offsetWidth > 0)
+                .map(w2 => ({ x: w2.offsetLeft, y: w2.offsetTop, w: w2.offsetWidth, h: w2.offsetHeight }));
+          let guideEl = null;
+          function showGuide(g) {
+            if (!g) { if (guideEl) guideEl.hidden = true; return; }
+            if (!guideEl) {
+              guideEl = document.createElement('div');
+              guideEl.className = 'edge-guide';
+              canvasRef.current?.appendChild(guideEl);
+            }
+            guideEl.hidden = false;
+            guideEl.classList.toggle('is-y', g.axis === 'y');
+            guideEl.style.cssText = g.axis === 'x'
+              ? `left:${g.at}px;top:${g.from}px;height:${g.to - g.from}px;width:0;`
+              : `top:${g.at}px;left:${g.from}px;width:${g.to - g.from}px;height:0;`;
+          }
+          function matchNearMiss() {
+            if (!peers) return;
+            const raw = { x: wrapper.offsetLeft, y: wrapper.offsetTop, w: wrapper.offsetWidth, h: wrapper.offsetHeight };
+            const { rect, guide } = matchEdge(raw, side, peers, { minW, minH });
+            if (rect !== raw) {
+              if (rect.y !== raw.y) wrapper.style.top = rect.y + 'px';
+              if (rect.x !== raw.x) wrapper.style.left = rect.x + 'px';
+              if (rect.w !== raw.w) wrapper.style.width = rect.w + 'px';
+              if (rect.h !== raw.h) wrapper.style.height = rect.h + 'px';
+            }
+            showGuide(guide);
+          }
+
           function mv(ev) {
             if (side === 'l') {
               const newLeft = Math.max(0, Math.min(ev.clientX - canvasRect().left, rightAnchor - minW));
@@ -1079,9 +1226,10 @@ export default function HubSection({ S, update, active, onOpenModal, onOpenWaitl
               // Mirror of 'l': the bottom edge is anchored and the top
               // travels, so height is derived rather than measured from
               // the pointer. bottomAnchor is captured once, so anything
-              // that moves the widget mid-gesture would inflate the
-              // height — the handle is inert while this rail exists, and
-              // the clamp is the second line of defence.
+              // that moved the widget mid-gesture would inflate the
+              // height — the drag handle refuses to start while
+              // data-resizing is set, and the clamp is the second line
+              // of defence.
               const newTop = Math.max(0, Math.min(ev.clientY - canvasRect().top, bottomAnchor - minH));
               wrapper.style.top = newTop + 'px';
               // No canvas-height cap. It was defence against the drag and
@@ -1101,10 +1249,13 @@ export default function HubSection({ S, update, active, onOpenModal, onOpenWaitl
                 cv.style.minHeight = need + 'px';
               }
             }
+            matchNearMiss();
           }
           function up() {
             document.removeEventListener('pointermove', mv);
             document.removeEventListener('pointerup', up);
+            if (guideEl) { guideEl.remove(); guideEl = null; }
+            delete wrapper.dataset.resizing;
             commitResize();
             growCanvas(canvasRef.current);
           }
@@ -1122,17 +1273,13 @@ export default function HubSection({ S, update, active, onOpenModal, onOpenWaitl
       // pointerdown — so the height grew as the drag carried the widget
       // upward, ending as tall as the canvas. Making the two gestures
       // mutually exclusive removes that combination entirely.
-      addGrip('l'); addGrip('r'); addGrip('b');
+      // All four edges, in both modes. The top rail is a thin strip above
+      // the drag handle (see .widget-resize-t), so the handle stays live
+      // and a widget can always be moved from its bar.
+      addGrip('l'); addGrip('r'); addGrip('b'); addGrip('t');
+      wrapper.classList.remove('has-top-grip');
       const dragHandle = wrapper.querySelector('[data-drag]');
-      if (snapRef?.current) {
-        addGrip('t');
-        wrapper.classList.add('has-top-grip');
-        if (dragHandle) dragHandle.style.pointerEvents = 'none';
-      } else {
-        wrapper.querySelector('.widget-resize-t')?.remove();
-        wrapper.classList.remove('has-top-grip');
-        if (dragHandle) dragHandle.style.pointerEvents = '';
-      }
+      if (dragHandle) dragHandle.style.pointerEvents = '';
     }
   // S.hubSnap, not just snapRef: the ref's identity never changes, so
   // with only the ref in here the top grip was created (or removed)
@@ -1561,6 +1708,10 @@ export default function HubSection({ S, update, active, onOpenModal, onOpenWaitl
       onClose={closePrimeEdit}
     />
   ) : null;
+  const foodMenuNode = foodMenu ? (
+    <QuickFoodMenu anchorRect={foodMenu.rect} userId={userId} update={update}
+                   onSearch={openFoodSearch} onClose={closeFoodMenu} />
+  ) : null;
 
   // ── Operator-console layout — both themes, every tier ────────────────
   if (isOsLayout) {
@@ -1583,6 +1734,7 @@ export default function HubSection({ S, update, active, onOpenModal, onOpenWaitl
           onUpgrade={onUpgrade}
         />
         {primeEditorNode}
+        {foodMenuNode}
       </section>
     );
   }
@@ -1641,6 +1793,7 @@ export default function HubSection({ S, update, active, onOpenModal, onOpenWaitl
       <CoachBriefPanel S={S} update={update} onCoachAct={onCoachAct} userId={userId} />
       {moduleMenu.menuNode}
       {primeEditorNode}
+      {foodMenuNode}
     </section>
   );
 }

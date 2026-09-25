@@ -35,7 +35,7 @@ const BLURB = {
   achievements: 'Next unlock, coins, recent wins, the path ahead',
   holidays: 'Countdown, itinerary, budget, packing',
   habits: 'Streak timers with relapse, milestones, strikes',
-  nutrition: 'Macro rings, net calories, calories burned, 14-day trend',
+  nutrition: 'Macro rings, net calories, burn, weight and vitals',
 };
 
 function Preview({ keyId, blocks, S, ext }) {
