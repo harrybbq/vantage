@@ -18,7 +18,7 @@
  * routes, in the same sheets. This is a new way of reading the day, not
  * a new way of writing it.
  */
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { planDayFor, planGoalFor, planBadge } from '../../lib/plan/planDay';
 import { ymd } from '../../lib/vitals/readiness';
 
@@ -46,9 +46,33 @@ const minsOf = e => {
   return Number.isFinite(h) ? h * 60 + m : -1;
 };
 
+/** A number that counts to its new value (650ms, ease-out) instead of
+ *  jumping — so a log from the panel visibly lands on the ring. */
+function useCountUp(value) {
+  const [shown, setShown] = useState(value);
+  const prev = useRef(value);
+  useEffect(() => {
+    const from = prev.current;
+    prev.current = value;
+    const still = typeof window !== 'undefined' && window.matchMedia
+      && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (from === value || still) { setShown(value); return undefined; }
+    let raf = 0;
+    const t0 = performance.now();
+    const step = t => {
+      const k = Math.min(1, (t - t0) / 650);
+      setShown(from + (value - from) * (1 - Math.pow(1 - k, 3)));
+      if (k < 1) raf = requestAnimationFrame(step);
+    };
+    raf = requestAnimationFrame(step);
+    return () => cancelAnimationFrame(raf);
+  }, [value]);
+  return shown;
+}
+
 export default function DietPanel({
   S, date, summary, logEntries, macros, burnKcal, recents = [],
-  onLogFood, onDeleteEntry, onQuickAdd, onOpenGoals,
+  onLogFood, onDeleteEntry, onQuickAdd, onOpenGoals, freshId = null,
 }) {
   const [busy, setBusy] = useState(null);
   const day = date || ymd();
@@ -69,6 +93,7 @@ export default function DietPanel({
     sugar_g: num(summary?.sugar_g),
     sodium_mg: num(summary?.sodium_mg),
   };
+  const shownKcal = useCountUp(eaten.kcal);
   const calGoal = goalOf('Calories');
   const left = calGoal - eaten.kcal;
   const calPct = calGoal > 0 ? Math.min(1.35, eaten.kcal / calGoal) : 0;
@@ -144,7 +169,7 @@ export default function DietPanel({
                   transform="rotate(-90 84 84)" />
               </svg>
               <div className="tv-cal-mid">
-                <div className="tv-cal-num">{kcal(eaten.kcal)}</div>
+                <div className="tv-cal-num">{kcal(shownKcal)}</div>
                 <div className="tv-cal-goal">/ {kcal(calGoal)} kcal</div>
                 <div className={`tv-cal-left${left < 0 ? ' is-over' : ''}`}>
                   {calGoal <= 0 ? 'no goal set' : left >= 0 ? `${kcal(left)} left` : `${kcal(-left)} over`}
@@ -222,7 +247,7 @@ export default function DietPanel({
           ) : (
             <div className="tv-timeline">
               {timeline.map(e => (
-                <div key={e.id} className="tv-tl-row">
+                <div key={e.id} className={`tv-tl-row${freshId && e.id === freshId ? ' is-fresh' : ''}`}>
                   <span className="tv-tl-time">{timeOf(e)}</span>
                   <span className="tv-tl-dot" aria-hidden="true" />
                   <div className="tv-tl-card">

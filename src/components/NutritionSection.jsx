@@ -9,6 +9,8 @@ import FoodLogSheet from './FoodLogSheet';
 import DietPanel from './track/DietPanel';
 import { useFoodFrequency } from '../hooks/useFoodFrequency';
 import FoodSearch from './FoodSearch';
+import LogFoodPanel from './diet/LogFoodPanel';
+import { useSubscriptionContext } from '../context/SubscriptionContext';
 import { backdropClose } from '../utils/backdropClose';
 import { planDayFor, planGoalFor, planBadge } from '../lib/plan/planDay';
 import { FLOOR_MACROS } from '../data/trainingProgramme';
@@ -256,6 +258,21 @@ function AddMacroSheet({ onClose, onSave }) {
   );
 }
 
+/** Desktop is where the docked Log food panel lives; below this the
+ *  phone bottom sheet (FoodSearch + FoodLogSheet) is unchanged. */
+const DESKTOP_QUERY = '(min-width: 1024px)';
+function useDesktop() {
+  const [on, setOn] = useState(() => typeof window !== 'undefined' && !!window.matchMedia && window.matchMedia(DESKTOP_QUERY).matches);
+  useEffect(() => {
+    if (!window.matchMedia) return undefined;
+    const mq = window.matchMedia(DESKTOP_QUERY);
+    const fn = () => setOn(mq.matches);
+    mq.addEventListener ? mq.addEventListener('change', fn) : mq.addListener(fn);
+    return () => (mq.removeEventListener ? mq.removeEventListener('change', fn) : mq.removeListener(fn));
+  }, []);
+  return on;
+}
+
 // ── Main NutritionSection ────────────────────────────────────────────────
 export default function NutritionSection({ userId, S, selectedDate, calYear, calMonth, onShowCoinToast, onMonthDataReady, onOpenModal, update }) {
   const date = selectedDate || getTodayStr();
@@ -282,6 +299,27 @@ export default function NutritionSection({ userId, S, selectedDate, calYear, cal
   const [foodPrefill, setFoodPrefill] = useState(null);
   const [goalsOpen, setGoalsOpen] = useState(false);
   const goalHitRef = useRef({});
+  const desktop = useDesktop();
+  const { hasPro } = useSubscriptionContext();
+  const canUseCamera = hasPro || (typeof window !== 'undefined' && !!window.__vantageOwner);
+  const [freshId, setFreshId] = useState(null);
+
+  /* Saved meals — one set of writes for both the phone sheet and the
+     desktop panel. Re-saving a meal by the same name replaces the old
+     template rather than piling up copies. */
+  const saveMeal = meal => update?.(prev => {
+    const others = (prev.savedMeals || []).filter(m => m.name.trim().toLowerCase() !== meal.name.trim().toLowerCase());
+    return { ...prev, savedMeals: [...others, meal] };
+  });
+  const deleteMeal = id => update?.(prev => ({ ...prev, savedMeals: (prev.savedMeals || []).filter(m => m.id !== id) }));
+  /** Undo of a delete: back where it was, unless it has been re-added since. */
+  const restoreMeal = (meal, index) => update?.(prev => {
+    const list = prev.savedMeals || [];
+    if (list.some(m => m.id === meal.id)) return prev;
+    const next = list.slice();
+    next.splice(Math.max(0, Math.min(index, next.length)), 0, meal);
+    return { ...prev, savedMeals: next };
+  });
 
   /* What gets eaten often, for the rail's one-tap list. Ranked by count
      rather than recency — the thing you have had thirty times belongs
@@ -447,6 +485,7 @@ export default function NutritionSection({ userId, S, selectedDate, calYear, cal
         burnKcal={burnToday}
         recents={freq.items}
         onLogFood={() => setShowFoodSearch(true)}
+        freshId={freshId}
         onOpenGoals={() => setGoalsOpen(o => !o)}
         onQuickAdd={quickAdd}
         onDeleteEntry={async (entry) => {
@@ -546,13 +585,42 @@ export default function NutritionSection({ userId, S, selectedDate, calYear, cal
         {showAddSheet && <AddMacroSheet onClose={() => setShowAddSheet(false)} onSave={handleAddMacro} />}
       </AnimatePresence>
 
-      {showFoodSearch && (
+      {desktop && (
+        <LogFoodPanel
+          open={showFoodSearch}
+          onOpen={() => setShowFoodSearch(true)}
+          onClose={() => setShowFoodSearch(false)}
+          userId={userId}
+          date={date}
+          today={getTodayStr()}
+          savedMeals={S?.savedMeals || []}
+          onSaveMeal={saveMeal}
+          onDeleteMeal={deleteMeal}
+          onRestoreMeal={restoreMeal}
+          totals={summary || {}}
+          goals={{
+            calories: calMacro?.daily_goal,
+            protein: macros.find(m => m.name === 'Protein')?.daily_goal,
+            carbs: macros.find(m => m.name === 'Carbs')?.daily_goal,
+            fat: macros.find(m => m.name === 'Fat')?.daily_goal,
+          }}
+          canUseCamera={canUseCamera}
+          onLogged={({ id }) => {
+            reload();
+            freq.refresh();
+            setFreshId(id || null);
+            setTimeout(() => setFreshId(null), 1400);
+          }}
+        />
+      )}
+
+      {!desktop && showFoodSearch && (
         <FoodSearch
           onClose={() => setShowFoodSearch(false)}
           onOpenModal={onOpenModal}
           userId={userId}
           savedMeals={S?.savedMeals || []}
-          onDeleteMeal={(id) => update?.(prev => ({ ...prev, savedMeals: (prev.savedMeals || []).filter(m => m.id !== id) }))}
+          onDeleteMeal={deleteMeal}
           onSelectFood={(prefill) => {
             setShowFoodSearch(false);
             setFoodPrefill(prefill || null);
@@ -566,12 +634,7 @@ export default function NutritionSection({ userId, S, selectedDate, calYear, cal
           userId={userId}
           logDate={date}
           prefill={foodPrefill}
-          onSaveMeal={(meal) => update?.(prev => {
-            // De-dupe by name (case-insensitive) — re-saving an edited
-            // meal replaces the old template rather than piling up.
-            const others = (prev.savedMeals || []).filter(m => m.name.trim().toLowerCase() !== meal.name.trim().toLowerCase());
-            return { ...prev, savedMeals: [...others, meal] };
-          })}
+          onSaveMeal={saveMeal}
           onClose={() => { setShowFoodSheet(false); setFoodPrefill(null); }}
           onSaved={() => { recalcSummary(date); reload(); }}
         />

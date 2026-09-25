@@ -20,6 +20,7 @@
  */
 import { supabase } from '../supabase';
 import { refreshDaySummary } from './daySummary';
+import { mealForTime } from './logMath';
 
 const RECENT_TTL = 60_000;
 let recentCache = { userId: null, at: 0, items: null };
@@ -38,10 +39,10 @@ export function dedupeRecent(rows, limit = 8) {
   return out;
 }
 
-export async function fetchRecentFoods(userId, { force = false } = {}) {
+export async function fetchRecentFoods(userId, { force = false, limit = 8 } = {}) {
   if (!userId) return [];
   if (!force && recentCache.userId === userId && recentCache.items && Date.now() - recentCache.at < RECENT_TTL) {
-    return recentCache.items;
+    return recentCache.items.slice(0, limit);
   }
   const { data, error } = await supabase
     .from('nutrition_log')
@@ -51,17 +52,16 @@ export async function fetchRecentFoods(userId, { force = false } = {}) {
     .order('id', { ascending: false })
     .limit(60);
   if (error) throw error;
-  const items = dedupeRecent(data || []);
+  // Cache the longest list anyone asks for; shorter callers slice it.
+  const items = dedupeRecent(data || [], 15);
   recentCache = { userId, at: Date.now(), items };
-  return items;
+  return items.slice(0, limit);
 }
 
-/** Breakfast before 11, lunch to 3, dinner 5 to 10, a snack otherwise. */
-export function mealForHour(h) {
-  if (h >= 4 && h < 11) return 'breakfast';
-  if (h >= 11 && h < 15) return 'lunch';
-  if (h >= 17 && h < 22) return 'dinner';
-  return 'snack';
+/** The meal a log defaults to by the clock — one rule for the hub menu
+ *  and the Track page panel (lib/diet/logMath). */
+export function mealForHour(h, m = 0) {
+  return mealForTime(h, m);
 }
 
 const ymd = d => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
@@ -89,27 +89,39 @@ export function rowFor(userId, food, mealType, day = ymd(new Date())) {
   };
 }
 
-const withTimeout = (p, ms = 12000) => Promise.race([
-  p, new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), ms)),
+/** An error that says what actually happened, for the UI to show as is. */
+function failure(res, what) {
+  const code = res && res.status ? ` ${res.status}` : '';
+  const msg = res && res.error && res.error.message ? ` (${res.error.message})` : '';
+  return new Error(`The server returned${code || ' an error'}${msg} while ${what}.`);
+}
+const withTimeout = (p, ms) => Promise.race([
+  p, new Promise((_, reject) => setTimeout(() => reject(new Error(`No answer from the server within ${Math.round(ms / 1000)} seconds.`)), ms)),
 ]);
 
 /**
- * Log one food for today. Resolves to the fresh day summary.
- * Throws on failure, so the menu can say so and offer a retry.
+ * Insert one log row and bring that day's summary up to date. The one
+ * round trip every logging surface makes (hub menu, Track page panel).
+ *
+ * Resolves to { id, day, summary }; rejects with an Error whose message
+ * names the real failure — a status code or a timeout — so the caller
+ * can show it and offer a retry with nothing the user typed lost.
  */
-export async function quickLogFood(userId, food, mealType) {
-  const day = ymd(new Date());
-  const ins = await withTimeout(supabase.from('nutrition_log').insert(rowFor(userId, food, mealType, day)));
-  if (ins && ins.error) throw ins.error;
+export async function logFoodEntry(userId, row, { timeoutMs = 8000 } = {}) {
+  const day = row.log_date;
+  const ins = await withTimeout(supabase.from('nutrition_log').insert(row).select('id'), timeoutMs);
+  if (ins && ins.error) throw failure(ins, 'saving it');
+  const id = Array.isArray(ins && ins.data) && ins.data[0] ? ins.data[0].id : null;
 
   // Recompute the day's summary exactly as the diet page does.
-  const { data: rows, error } = await withTimeout(supabase
+  const sel = await withTimeout(supabase
     .from('nutrition_log')
     .select('calories,protein_g,carbs_g,fat_g,fibre_g,sugar_g,sodium_mg')
     .eq('user_id', userId)
-    .eq('log_date', day));
-  if (error) throw error;
-  const sum = (rows || []).reduce((a, r) => ({
+    .eq('log_date', day), timeoutMs);
+  if (sel && sel.error) throw failure(sel, 'updating the day total');
+  const rows = (sel && sel.data) || [];
+  const sum = rows.reduce((a, r) => ({
     calories: a.calories + (r.calories || 0),
     protein_g: a.protein_g + (r.protein_g || 0),
     carbs_g: a.carbs_g + (r.carbs_g || 0),
@@ -119,14 +131,25 @@ export async function quickLogFood(userId, food, mealType) {
     sodium_mg: a.sodium_mg + (r.sodium_mg || 0),
   }), { calories: 0, protein_g: 0, carbs_g: 0, fat_g: 0, fibre_g: 0, sugar_g: 0, sodium_mg: 0 });
   const up = await withTimeout(supabase.from('nutrition_daily_summary').upsert({
-    user_id: userId, log_date: day, ...sum, entry_count: (rows || []).length, updated_at: new Date().toISOString(),
-  }, { onConflict: 'user_id,log_date' }));
-  if (up && up.error) throw up.error;
+    user_id: userId, log_date: day, ...sum, entry_count: rows.length, updated_at: new Date().toISOString(),
+  }, { onConflict: 'user_id,log_date' }), timeoutMs);
+  if (up && up.error) throw failure(up, 'updating the day total');
 
   recentCache = { userId: null, at: 0, items: null };
   refreshDaySummary(userId);
-  return { day, summary: sum };
+  return { id, day, summary: sum };
 }
+
+/**
+ * Log one food for today, again. Resolves to the fresh day summary.
+ * Throws on failure, so the menu can say so and offer a retry.
+ */
+export async function quickLogFood(userId, food, mealType) {
+  const day = ymd(new Date());
+  const { summary } = await logFoodEntry(userId, rowFor(userId, food, mealType, day), { timeoutMs: 12000 });
+  return { day, summary };
+}
+
 
 /**
  * Today's S.macroHistory entry from a summary and the macro goals — the
