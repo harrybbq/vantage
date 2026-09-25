@@ -31,6 +31,7 @@ import { makePacker } from '../../../lib/hub/pack';
 import { PRIMES, blocksOf, blockOpts, primeOf } from '../../../lib/hub/primeBlocks';
 import { blockData } from '../../../lib/hub/primeData';
 import { BlockView } from './PrimeViews';
+import { useDaySummary } from '../../../lib/diet/daySummary';
 
 /** Two packers per prime, built once — `makePacker` closes over the
  *  block registry, which never changes at runtime. The headless one is
@@ -53,6 +54,7 @@ export default function PrimeCard({
   onDelete,
   onAct,                  // row actions (habit relapse); absent = no buttons
   onHeight,
+  ext = null,             // data a prime reads from outside S (Nutrition: today's totals)
   className = '',
 }) {
   const key = primeOf(widget);
@@ -70,9 +72,9 @@ export default function PrimeCard({
   const payloads = useMemo(() => {
     if (!key) return {};
     const out = {};
-    ids.forEach(id => { out[id] = blockData(key, id, S, blockOpts(widget, id)); });
+    ids.forEach(id => { out[id] = blockData(key, id, S, blockOpts(widget, id), ext); });
     return out;
-  }, [key, ids, S, widget]);
+  }, [key, ids, S, widget, ext]);
 
   /* Mobile reports the height it needs so the stack can size the card.
      In an effect, not in render: calling a parent's setter mid-render is
@@ -166,8 +168,14 @@ export default function PrimeCard({
  * drops the slot transitions so a resize drag tracks the pointer
  * instead of trailing a quarter-second behind it.
  */
-export function PrimeFit({ auto = false, ...rest }) {
+export function PrimeFit({ auto = false, userId = null, ...rest }) {
   const ref = useRef(null);
+  // Only a Nutrition card fetches; everything else is drawn from S. The
+  // fetch is shared and cached (lib/diet/daySummary), so a Nutrition card
+  // beside the old Macros widget still costs one request.
+  const nutrition = primeOf(rest.widget) === 'nutrition';
+  const day = useDaySummary(nutrition ? userId : null);
+  const ext = nutrition ? day : null;
   const [box, setBox] = useState(null);
   const [live, setLive] = useState(false);
 
@@ -199,7 +207,7 @@ export function PrimeFit({ auto = false, ...rest }) {
   return (
     <div ref={ref} className={`prime-fit${auto ? ' is-auto' : ''}`}>
       {box && box.w > 0 && (
-        <PrimeCard {...rest} width={box.w} height={auto ? null : Math.max(0, box.h)} live={live} />
+        <PrimeCard {...rest} ext={ext} width={box.w} height={auto ? null : Math.max(0, box.h)} live={live} />
       )}
     </div>
   );

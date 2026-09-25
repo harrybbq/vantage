@@ -566,7 +566,13 @@ export default function HubSection({ S, update, active, onOpenModal, onOpenWaitl
   const closePrimeEdit = useCallback(() => setPrimeEdit(null), []);
   const onPrimeAct = useCallback(act => {
     if (act?.kind === 'relapse') update(prev => applyRelapse(prev, act.id, Date.now()));
-  }, [update]);
+    // Same hand-off the Macros widget uses: NutritionSection reads the
+    // flag on mount and opens the food search.
+    if (act?.kind === 'logfood') {
+      try { sessionStorage.setItem('vb_quicklog_food', '1'); } catch { /* ignore */ }
+      onNavigate && onNavigate('diet');
+    }
+  }, [update, onNavigate]);
 
   function reactWidgetEl(hw) {
     if (primeOf(hw)) {
@@ -581,6 +587,7 @@ export default function HubSection({ S, update, active, onOpenModal, onOpenWaitl
           }}
           onDelete={() => removeHubWidget(hw.id)}
           onAct={onPrimeAct}
+          userId={userId}
         />
       );
     }
