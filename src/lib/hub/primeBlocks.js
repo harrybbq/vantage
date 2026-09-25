@@ -136,7 +136,7 @@ export const PRIMES = {
       ['Accountability', ['relapses', 'strikes', 'timers']],
     ],
     blocks: {
-      timers:   B('Streak timers', 'list', 116, 76, ['barsL', 'barsM'], { grow: 1, max: 168, row: 42 }),
+      timers:   B('Streak timers', 'list', 130, 76, ['barsL', 'barsM'], { grow: 1, max: 192, row: 48 }),
       next:     B('Next milestone', 'hero', 66, 42, ['heroL', 'heroM']),
       strikes:  B('Strikes left', 'list', 94, 44, ['listL', 'statM'], { grow: 1, max: 118, row: 24 }),
       relapses: B('Relapses', 'chart', 104, 50, ['chartL', 'sparkM'], { grow: 3 }),
