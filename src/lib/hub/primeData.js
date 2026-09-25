@@ -32,6 +32,7 @@ import { coinsToday } from '../coins/daily.js';
 import { ledgerRows } from '../coins/ledger.js';
 import { dayBurn } from '../burn.js';
 import { planDayFor, planGoalFor } from '../plan/planDay.js';
+import { VITAL_METRICS, fmtMetric } from '../vitals/metrics.js';
 
 /* ── Small shared shapes ──────────────────────────────────────────── */
 
@@ -566,6 +567,15 @@ function nextMilestone(h, now) {
   return { next: ms.find(m => m.duration > el) || null, elapsed: el, last: ms[ms.length - 1] || null };
 }
 
+/** Walk under a day, brisk to 4, jog to 7, run after — the Habits page
+ *  runner's stage ladder (habits/HabitRunner), reduced to four paces. */
+function paceFor(days) {
+  if (days >= 7) return 'run';
+  if (days >= 4) return 'jog';
+  if (days >= 1) return 'brisk';
+  return 'walk';
+}
+
 const habitBlocks = {
   timers(S) {
     const list = (S.habits || []).filter(h => h.startTime);
@@ -583,7 +593,13 @@ const habitBlocks = {
     }))
       // The relapse button, same as the standalone widget's: the card
       // host decides whether to honour it (it needs `update`).
-      .map((it, i) => ({ ...it, act: { kind: 'relapse', id: shown[i].id, name: shown[i].name || 'Habit' } }));
+      .map((it, i) => ({
+        ...it,
+        act: { kind: 'relapse', id: shown[i].id, name: shown[i].name || 'Habit' },
+        // The little runner at the tip of the bar; its pace follows the
+        // same ladder as the Habits page runner (walk → jog → run).
+        runner: { pace: paceFor((now - shown[i].startTime) / 86400000) },
+      }));
     const longest = list.reduce((a, b) => ((now - a.startTime) > (now - b.startTime) ? a : b));
     return { d: { items }, s: { fl: 'LONGEST', fv: `${longest.name} ${elapsed(now - longest.startTime)}` } };
   },
@@ -766,6 +782,78 @@ const nutritionBlocks = {
         line: fromWhoop ? 'Measured by WHOOP, all day' : bmr ? `Plus ~${kcal(bmr)} resting (not counted)` : 'Activity only',
       },
       s: { fl: 'BURNED', fvA: kcal(burned), fv: ' kcal' },
+    };
+  },
+
+  weight(S) {
+    const log = S.vitalsLog || {};
+    const days = 30;
+    const pts = [];
+    for (let i = days - 1; i >= 0; i--) {
+      const v = log[ymd(Date.now() - i * 86400000)]?.weight;
+      if (v != null && Number.isFinite(Number(v))) pts.push(Number(v));
+    }
+    if (pts.length < 2) {
+      const last = pts[0];
+      return { d: { ll: 'WEIGHT · 30 DAYS', lv: last != null ? `${last.toFixed(1)} kg` : '—', rl: 'CHANGE', rv: '—', mx: -1,
+                    ax0: '30d ago', ax1: '', ax2: 'today', v1: last != null ? `${last.toFixed(1)} kg` : '—',
+                    v2: 'log weight a few times to see a trend', ...GREEN, ...series([0, 0]) },
+               s: { fl: 'WEIGHT', fv: last != null ? `${last.toFixed(1)} kg` : 'none logged' } };
+    }
+    const first = pts[0], last = pts[pts.length - 1];
+    const ch = last - first;
+    const chTxt = `${ch > 0 ? '+' : ch < 0 ? '−' : ''}${Math.abs(ch).toFixed(1)} kg`;
+    return {
+      d: { ll: 'WEIGHT · 30 DAYS', lv: `${last.toFixed(1)} kg`, rl: 'CHANGE', rv: chTxt,
+           mx: -1, ax0: '30d ago', ax1: `${pts.length} readings`, ax2: 'today',
+           v1: `${last.toFixed(1)} kg`, v2: `${chTxt} in 30 days`, ...GREEN, lvc: 'var(--text)', ...series(pts) },
+      s: { fl: 'WEIGHT', fvA: `${last.toFixed(1)} kg`, fv: ` · ${chTxt}` },
+    };
+  },
+
+  vitals(S) {
+    const log = S.vitalsLog || {};
+    const keys = Object.keys(log).sort();
+    const latest = key => {
+      for (let i = keys.length - 1; i >= 0; i--) {
+        const v = log[keys[i]] && log[keys[i]][key];
+        if (v != null && Number.isFinite(Number(v))) return { v: Number(v), day: keys[i] };
+      }
+      return null;
+    };
+    const avg7 = key => {
+      const vals = [];
+      for (let i = 0; i < 7; i++) {
+        const v = log[ymd(Date.now() - i * 86400000)]?.[key];
+        if (v != null && Number.isFinite(Number(v))) vals.push(Number(v));
+      }
+      return vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : null;
+    };
+    const shown = VITAL_METRICS
+      .filter(m => ['weight', 'sleep', 'rhr', 'recovery', 'hrv', 'strain'].includes(m.key))
+      .map(m => ({ m, last: latest(m.key) }))
+      .filter(x => x.last)
+      .slice(0, 5);
+    if (!shown.length) {
+      return { d: { head: 'VITALS', headR: '', headRs: '', rows: [{ n: 'Nothing logged yet', m: '', mc: 'var(--text-muted)', v: 'Track → Vitals' }],
+                    tiles: [{ t: 'VITALS', v: '—' }] },
+               s: { fl: 'VITALS', fv: 'none logged' } };
+    }
+    const unit = m => (m.unit ? (m.unit === '%' ? '%' : ` ${m.unit}`) : '');
+    const today = ymd(Date.now());
+    const rows = shown.map(({ m, last }) => {
+      const a = avg7(m.key);
+      return {
+        n: m.label,
+        m: a != null ? `7d ${fmtMetric(a, m)}` : '',
+        mc: 'var(--text-muted)',
+        v: `${fmtMetric(last.v, m)}${unit(m)}${last.day === today ? '' : ' ·'}`,
+      };
+    });
+    return {
+      d: { head: 'VITALS', headR: '', headRs: 'latest · 7-day avg', rows,
+           tiles: shown.slice(0, 3).map(({ m, last }) => ({ t: m.label.toUpperCase(), v: `${fmtMetric(last.v, m)}${unit(m)}` })) },
+      s: { fl: 'VITALS', fv: shown.slice(0, 2).map(({ m, last }) => `${fmtMetric(last.v, m)}${unit(m)}`).join(' · ') },
     };
   },
 

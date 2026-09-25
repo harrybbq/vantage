@@ -116,9 +116,37 @@ function BarsM({ d, onAct }) {
     </div>
   );
 }
-function BarsL({ d, onAct }) {
+/**
+ * A stick figure running at the tip of a habit's bar.
+ *
+ * Drawn white with mix-blend-mode: difference, so every pixel shows the
+ * INVERSE of what is under it — over the bar it is the bar's colour
+ * inverted, past the tip it stands out against the empty track, and it
+ * straddles the boundary without ever vanishing into either. Limbs swing
+ * from hip and shoulder; `pace` sets the cadence. Reduced motion holds a
+ * mid-stride pose.
+ */
+function Runner({ pct, pace }) {
   return (
-    <div className="pv pv-barsL">
+    <span className={`pv-runner is-${pace}`} style={{ left: `min(max(${pct}%, 6px), calc(100% - 6px))` }} aria-hidden="true">
+      <svg viewBox="0 0 12 16">
+        <g className="pv-runner-body" fill="none" stroke="#fff" strokeWidth="1.6" strokeLinecap="round">
+          <circle cx="6.6" cy="2.4" r="1.7" fill="#fff" stroke="none" />
+          <path d="M6.3 4.4 L5.6 9" />
+          <g className="pv-runner-arm a"><path d="M6.1 5.4 L4 7.6" /></g>
+          <g className="pv-runner-arm b"><path d="M6.1 5.4 L8.1 7.3" /></g>
+          <g className="pv-runner-leg a"><path d="M5.6 9 L4.2 12.2 L3.2 15" /></g>
+          <g className="pv-runner-leg b"><path d="M5.6 9 L7.4 12 L8.8 14.8" /></g>
+        </g>
+      </svg>
+    </span>
+  );
+}
+
+function BarsL({ d, onAct }) {
+  const running = d.items.some(p => p.runner);
+  return (
+    <div className={`pv pv-barsL${running ? ' has-runner' : ''}`}>
       {d.items.map((p, i) => (
         <div className="pv-barL" key={p.n + i}>
           <div className="pv-barL-top">
@@ -126,7 +154,14 @@ function BarsL({ d, onAct }) {
             <span className="pv-barL-right">{p.r}</span>
             {p.act && onAct ? <ActButton act={p.act} onAct={onAct} /> : null}
           </div>
-          <span className="pv-track"><span className="pv-fill" style={{ width: `${p.pct}%`, background: p.col }} /></span>
+          {p.runner ? (
+            <span className="pv-trackwrap">
+              <span className="pv-track"><span className="pv-fill" style={{ width: `${p.pct}%`, background: p.col }} /></span>
+              <Runner pct={p.pct} pace={p.runner.pace} />
+            </span>
+          ) : (
+            <span className="pv-track"><span className="pv-fill" style={{ width: `${p.pct}%`, background: p.col }} /></span>
+          )}
         </div>
       ))}
     </div>
@@ -372,7 +407,7 @@ function LogFood({ act, onAct }) {
       aria-label="Log food"
       onPointerDown={e => e.stopPropagation()}
       onTouchStart={e => e.stopPropagation()}
-      onClick={e => { e.stopPropagation(); onAct(act); }}
+      onClick={e => { e.stopPropagation(); onAct({ ...act, rect: e.currentTarget.getBoundingClientRect() }); }}
     >+</button>
   );
 }

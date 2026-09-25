@@ -37,8 +37,23 @@ function load(userId, day) {
     }
   })();
   cache.set(key, { at: 0, data: null, promise });
-  promise.then(data => cache.set(key, { at: Date.now(), data, promise: null }));
+  // Only if this is still the request on file — a refresh that landed
+  // mid-flight must not be overwritten by the answer it replaced.
+  promise.then(data => { if (cache.get(key)?.promise === promise) cache.set(key, { at: Date.now(), data, promise: null }); });
   return promise;
+}
+
+/* Everything mounted that shows today's figures, so a quick log from one
+   card can refresh all of them (and the old Macros widget) at once. */
+const listeners = new Set();
+
+/**
+ * Drop the cached day and have every mounted caller refetch. Called after
+ * a log from the hub, so the rings move the moment the food is added.
+ */
+export function refreshDaySummary(userId) {
+  for (const key of [...cache.keys()]) if (key.startsWith(`${userId}|`)) cache.delete(key);
+  listeners.forEach(fn => fn(userId));
 }
 
 /** Synchronous peek, so a card mounted after the first fetch paints full. */
@@ -58,7 +73,12 @@ export function useDaySummary(userId) {
     if (!userId) { setData(d => (d.loaded ? d : { ...d, loaded: true })); return undefined; }
     let live = true;
     load(userId, day).then(d => { if (live) setData(d); });
-    return () => { live = false; };
+    const onRefresh = uid => {
+      if (uid !== userId) return;
+      load(userId, day).then(d => { if (live) setData(d); });
+    };
+    listeners.add(onRefresh);
+    return () => { live = false; listeners.delete(onRefresh); };
   }, [userId, day]);
   return data;
 }

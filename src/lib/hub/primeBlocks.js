@@ -136,7 +136,7 @@ export const PRIMES = {
       ['Accountability', ['relapses', 'strikes', 'timers']],
     ],
     blocks: {
-      timers:   B('Streak timers', 'list', 102, 76, ['barsL', 'barsM'], { grow: 1, max: 136, row: 34 }),
+      timers:   B('Streak timers', 'list', 116, 76, ['barsL', 'barsM'], { grow: 1, max: 168, row: 42 }),
       next:     B('Next milestone', 'hero', 66, 42, ['heroL', 'heroM']),
       strikes:  B('Strikes left', 'list', 94, 44, ['listL', 'statM'], { grow: 1, max: 118, row: 24 }),
       relapses: B('Relapses', 'chart', 104, 50, ['chartL', 'sparkM'], { grow: 3 }),
@@ -160,12 +160,17 @@ export const PRIMES = {
       ['Rings', ['rings']],
       ['Trend', ['week', 'rings']],
       ['Energy', ['net', 'burned', 'week']],
+      ['Body', ['rings', 'weight', 'vitals']],
     ],
     blocks: {
       rings:  B('Macro rings', 'gauge', 96, 62, ['ringsL', 'ringsM'], { grow: 1, max: 176 }),
       net:    B('Net calories', 'hero', 66, 42, ['heroL', 'heroM']),
       burned: B('Calories burned', 'list', 84, 44, ['listL', 'statM'], { grow: 1, max: 120, row: 24 }),
       week:   B('Last 14 days', 'chart', 104, 50, ['chartL', 'sparkM'], { grow: 3 }),
+      // Vitals sit here because they are what the food is FOR — weight
+      // moves with intake, sleep and recovery with how you fuel.
+      weight: B('Weight trend', 'chart', 104, 50, ['chartL', 'sparkM'], { grow: 3 }),
+      vitals: B('Vitals', 'list', 94, 44, ['listL', 'tilesM'], { grow: 1, max: 142, row: 24 }),
     },
   },
 };
@@ -224,6 +229,7 @@ export const SUPERSEDED = {
   'coin-history': 'achievements',
   'macros': 'nutrition',
   'calories': 'nutrition',
+  'vitals': 'nutrition',
 };
 export const isSuperseded = type => Object.prototype.hasOwnProperty.call(SUPERSEDED, type);
 
