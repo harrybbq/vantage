@@ -267,4 +267,99 @@ function clientSave(cloud, client) {
   ok(!res.conflict, 'a null base writes unconditionally — nothing exists yet to lose');
 }
 
+// ── The 2026-09-25 incident: a replay with no common ancestor ────────
+//
+// A desktop killed inside the debounce window leaves a snapshot in
+// localStorage. Days later it is opened and the snapshot replays. Its
+// stored version no longer matches the cloud, so there is no common
+// ancestor — and the merge was called with an empty base, on the
+// reasoning that "every key looks changed on both sides, so it keeps
+// both".
+//
+// Objects and id-arrays do keep both. The LEAVES underneath them fell
+// through to the last-resort rule, which took local. So an empty base
+// handed every number in the state to whichever device happened to be
+// doing the merge, however old its copy was: four relapses recorded on
+// the phone in between were undone, the counters went DOWN, tracker
+// streaks lost a week, and a savings pot was left reading £1,002 less
+// than the sum of its own contributions — because the contributions
+// merged by id and the total did not.
+{
+  const habit = (relapseCount, startTime) => ({
+    id: 'h-flan', name: 'Flannagan', relapseCount, startTime,
+    strikesPeriod: 'week', strikeTimes: [], milestones: [],
+  });
+  // Self-consistent on both sides: `current` always equals the ledger.
+  const pot = (contribs) => ({
+    id: 'sv1', name: 'House',
+    current: contribs.reduce((t, c) => t + c.amount, 0),
+    contributions: contribs,
+  });
+  const older = [{ id: 'c1', amount: 17400 }, { id: 'c2', amount: 1592 }];
+  const newer = [...older, { id: 'c3', amount: 1002 }];
+
+  const stale = {                       // the desktop, last open days ago
+    habits: [habit(61, 1_758_000_000_000)],
+    savings: [pot(older)],
+    streaks: { t1: { best: 5, current: 1, lastDate: '2026-09-18' } },
+    coins: 45,
+  };
+  const cloud = {                       // everything done on the phone since
+    habits: [habit(65, 1_758_700_000_000)],
+    savings: [pot(newer)],
+    streaks: { t1: { best: 5, current: 1, lastDate: '2026-09-24' } },
+    coins: 85,
+  };
+
+  // What shipped, reproduced.
+  const was = mergeState({}, stale, cloud).state;
+  eq(was.habits[0].relapseCount, 61, 'REPRO: the stale device wins the counter…');
+  ok(was.habits[0].relapseCount < cloud.habits[0].relapseCount,
+    'REPRO: …so a count of things that HAPPENED goes down, which it cannot');
+  eq(was.streaks.t1.lastDate, '2026-09-18', 'REPRO: and the streak loses a week');
+  ok(was.savings[0].current !== was.savings[0].contributions.reduce((t, c) => t + c.amount, 0),
+    'REPRO: and the pot disagrees with its own ledger — the contributions merged, the total did not');
+
+  // The fix: with no common ancestor, the cloud wins what cannot be
+  // reconciled. The replayed snapshot is older by construction.
+  const now = mergeState({}, stale, cloud, { tieBreak: 'remote' });
+  const h = now.state.habits[0];
+  const g = now.state.savings[0];
+  eq(h.relapseCount, 65, 'the four relapses survive the replay');
+  eq(h.startTime, 1_758_700_000_000, 'and so does the timer they reset');
+  eq(now.state.streaks.t1.lastDate, '2026-09-24', 'the streak keeps its week');
+  eq(now.state.coins, 85, 'and the coins earned in between are still there');
+  eq(g.current, g.contributions.reduce((t, c) => t + c.amount, 0),
+    'the pot total and its ledger come from the same side, so they agree');
+  eq(g.contributions.length, 3, 'with the contribution added in between kept');
+  ok(now.conflicts.length > 0, 'and every one of those is reported rather than swallowed');
+  ok(now.conflicts.every(c => /cloud/.test(c) || /kept/.test(c)),
+    'saying which side won, so a notice can tell the user the truth');
+}
+
+{
+  // The other direction is unchanged: with a KNOWN ancestor, the person
+  // at this screen wins a genuine conflict. That is the whole reason
+  // rule 5 exists and the fix must not quietly reverse it.
+  const base   = { note: 'a', coins: 10 };
+  const local  = { note: 'b', coins: 10 };
+  const remote = { note: 'c', coins: 10 };
+  eq(mergeState(base, local, remote).state.note, 'b',
+    'a known base still keeps what this device just typed');
+  eq(mergeState(base, local, remote, { tieBreak: 'local' }).state.note, 'b',
+    'and saying so explicitly changes nothing');
+}
+
+{
+  // An unreconcilable value only ONE side moved is not a tie, so the
+  // tie-break must not touch it — otherwise 'remote' would throw away
+  // every edit made on this device since the snapshot.
+  const stale  = { note: 'edited here', untouched: 7 };
+  const cloud  = { note: 'original',    untouched: 7 };
+  const out = mergeState({}, stale, cloud, { tieBreak: 'remote' });
+  eq(out.state.untouched, 7, 'a value both sides agree on is never a conflict');
+  eq(out.state.note, 'original',
+    'with no ancestor, a differing value IS a tie — there is no way to know who moved it');
+}
+
 console.log(`state merge: ${n} assertions passed (including the two-device simulation)`);
