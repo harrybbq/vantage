@@ -18,6 +18,8 @@ export const KEYS = {
   certs: 'career.certs',
   companies: 'career.companies',
   status: 'career.status',
+  applications: 'career.applications',
+  brief: 'career.brief',
 };
 
 const isObj = v => v && typeof v === 'object' && !Array.isArray(v);
@@ -126,9 +128,24 @@ function status(d, errs) {
   }
 }
 
+function applications(d, errs) {
+  const STAGES = ['watching', 'applied', 'screen', 'interview', 'offer'];
+  list(errs, d, 'applications', (a, p) => {
+    if (!isObj(a)) return errs.push(`${p}: must be an object`);
+    if (!isStr(a.company) && !isStr(a.companyId)) errs.push(`${p}: needs company or companyId`);
+    if (!STAGES.includes(a.stage)) errs.push(`${p}.stage: one of ${STAGES.join(', ')}`);
+    if (a.salary != null && !isNum(a.salary)) errs.push(`${p}.salary: a number (£/year)`);
+    if (a.commuteMin != null && !isNum(a.commuteMin)) errs.push(`${p}.commuteMin: a number of minutes`);
+    if (a.next != null && (!isObj(a.next) || (a.next.due != null && a.next.due !== '' && !/^\d{4}-\d{2}-\d{2}$/.test(a.next.due)))) errs.push(`${p}.next.due: YYYY-MM-DD`);
+    if (!isUrlish(a.url)) errs.push(`${p}.url: a full https:// link`);
+    if (a.events != null && !Array.isArray(a.events)) errs.push(`${p}.events: must be a list`);
+  });
+  ids(errs, d, 'applications');
+}
+
 const CHECKS = {
   [KEYS.plan]: plan, [KEYS.money]: money, [KEYS.certs]: certs,
-  [KEYS.companies]: companies, [KEYS.status]: status,
+  [KEYS.companies]: companies, [KEYS.status]: status, [KEYS.applications]: applications,
 };
 
 /** → [] when valid, otherwise readable errors (first 20). */

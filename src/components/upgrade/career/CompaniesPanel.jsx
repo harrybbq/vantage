@@ -20,6 +20,8 @@ import { useMemo, useState } from 'react';
 import JsonDrawer from './JsonDrawer';
 import { KEYS } from '../../../lib/career/schema';
 import { salaryGuard, salaryVerdict, orderCompanies, salaryLabel } from '../../../lib/career/companies';
+import { STAGE_LABEL, isOpen } from '../../../lib/career/pipeline';
+import { todayIso } from './careerData';
 
 const VERDICT = { meets: 'meets target', spans: 'can reach target', floor: 'under target', below: 'below floor', unknown: '' };
 const BASIS = { company: 'company data', market: 'market rate', 'pay-scale': 'pay scale' };
@@ -27,7 +29,7 @@ const BASIS = { company: 'company data', market: 'market rate', 'pay-scale': 'pa
 const lowOf = v => { const m = /^(\d+)/.exec(String(v || '')); return m ? Number(m[1]) : 999; };
 const fitsGuardrail = v => lowOf(v) <= 30;
 
-export default function CompaniesPanel({ oc, isMobile }) {
+export default function CompaniesPanel({ oc, isMobile, goTo }) {
   const list = useMemo(() => oc.data[KEYS.companies] || [], [oc.data]);
   const plan = useMemo(() => oc.data[KEYS.plan] || {}, [oc.data]);
   const guardrails = plan.guardrails || [];
@@ -37,6 +39,20 @@ export default function CompaniesPanel({ oc, isMobile }) {
   const [order, setOrder] = useState('listed');
   const guard = useMemo(() => salaryGuard(plan), [plan]);
   const [editing, setEditing] = useState(false);
+  const apps = useMemo(() => oc.data[KEYS.applications] || [], [oc.data]);
+  const inPipe = id => apps.find(a => a.companyId === id && isOpen(a));
+  // "Watch" sends a company to the Pipeline's first column.
+  const watch = c => oc.save(KEYS.applications, [...apps, {
+    id: 'a' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
+    companyId: c.id, company: c.name, role: (c.salary && c.salary.role) || '', stage: 'watching',
+    events: [{ at: todayIso(), stage: 'watching', note: 'Watching' }],
+  }]);
+  const WatchBtn = ({ c }) => {
+    const a = inPipe(c.id);
+    return a
+      ? <button type="button" className="cp-watch is-in" onClick={() => goTo && goTo('pipeline')}>{STAGE_LABEL[a.stage]} ↗</button>
+      : <button type="button" className="cp-watch" onClick={() => watch(c)}>+ Watch</button>;
+  };
 
   // Picking an area sorts by commute from it unless an explicit order is chosen.
   const rows = useMemo(() => {
@@ -91,7 +107,7 @@ export default function CompaniesPanel({ oc, isMobile }) {
 
       {isMobile ? (
         <div className="cp-co-cards">
-          {rows.map(c => <CompanyCard key={c.id} c={c} area={area} areas={AREAS} guard={guard} />)}
+          {rows.map(c => <CompanyCard key={c.id} c={c} area={area} areas={AREAS} guard={guard} watch={<WatchBtn c={c} />} />)}
         </div>
       ) : (
         <div className="cp-table-wrap cp-card is-flush">
@@ -120,7 +136,7 @@ export default function CompaniesPanel({ oc, isMobile }) {
                     </td>
                   ))}
                   <td><span className="cp-best">{c.bestAreas}</span></td>
-                  <td><Verified c={c} /></td>
+                  <td><Verified c={c} /><WatchBtn c={c} /></td>
                 </tr>
               ))}
             </tbody>
@@ -186,7 +202,7 @@ function Difficulty({ d }) {
   );
 }
 
-function CompanyCard({ c, area, areas: AREAS, guard }) {
+function CompanyCard({ c, area, areas: AREAS, guard, watch }) {
   return (
     <article className="cp-co-card">
       <div className="cp-co-top">
@@ -211,6 +227,7 @@ function CompanyCard({ c, area, areas: AREAS, guard }) {
         ))}
       </div>
       <span className="cp-best">Best from: {c.bestAreas}</span>
+      {watch}
     </article>
   );
 }

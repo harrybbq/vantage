@@ -321,7 +321,6 @@ html[data-theme="cream-pro"]{
   .hv-item{min-height:40px;}
   .hv-more em{display:none;}
 }
-}
 
 /* Someone who asked for less motion gets the jump, not the glide —
    scroll-behavior is set globally on <html>, so it needs unsetting. */
