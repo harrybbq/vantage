@@ -20,6 +20,7 @@
 import { memo, useEffect, useState } from 'react';
 import { useSegTip } from '../../savings/SegTip';
 import MiniRunner from './MiniRunner';
+import { MiniWorld } from '../../holiday/WorldMap';
 
 /**
  * The one control a view may carry: an action on a row, asked twice.
@@ -441,6 +442,20 @@ function RingsM({ d }) {
   );
 }
 
+/* ── map: countries visited, with the count on a row beneath ───────── */
+function MapL({ d }) {
+  return (
+    <div className="pv pv-map">
+      <div className="pv-map-art"><MiniWorld fills={d.fills} /></div>
+      <div className="pv-map-foot">
+        <span className="pv-map-big">{d.big}</span>
+        <span className="pv-map-sub">{d.bigSub}</span>
+        {d.next ? <span className="pv-map-next">{d.next}</span> : null}
+      </div>
+    </div>
+  );
+}
+
 /* ── fact: one line, fixed height, always available ────────────────────
    This is the level that makes the whole system honest. Because every
    block can become one of these, a block the user ticked is never
@@ -463,6 +478,7 @@ const VIEWS = {
   segL: SegL, segM: SegM,
   cardL: CardL, cardM: CardM,
   ringsL: RingsL, ringsM: RingsM,
+  mapL: MapL,
   fact: Fact,
 };
 

@@ -114,12 +114,14 @@ export const PRIMES = {
       ['Countdown', ['countdown', 'itinerary', 'budget']],
       ['Budget', ['budget', 'countdown', 'trips']],
       ['All trips', ['trips', 'countdown']],
+      ['Passport', ['visited', 'countdown', 'trips']],
     ],
     blocks: {
       countdown: B('Countdown', 'hero', 66, 42, ['heroL', 'heroM']),
       itinerary: B('Itinerary', 'list', 94, 44, ['listL', 'statM'], { grow: 1, max: 142, row: 24 }),
       budget:    B('Budget vs saved', 'list', 102, 76, ['barsL', 'barsM'], { grow: 1, max: 136, row: 34 }),
       trips:     B('All trips', 'list', 94, 44, ['listL', 'statM'], { grow: 1, max: 118, row: 24 }),
+      visited:   B('Countries visited', 'chart', 112, 42, ['mapL', 'heroM'], { grow: 2, max: 190 }),
     },
   },
 

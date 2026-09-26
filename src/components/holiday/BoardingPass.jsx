@@ -17,7 +17,8 @@
  * budget, savings, itinerary count, notes, and the travel-policy flag —
  * because removing a working feature to fit a layout is not a redesign.
  */
-import { motion } from 'framer-motion';
+import { useEffect, useRef, useState } from 'react';
+import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import Icon from '../Icon';
 import { COUNTRY_BY_ISO, countryForTrip } from '../../lib/holiday/destinations';
 import { levelFor, POLICY_LEVELS } from '../../lib/holiday/policy';
@@ -27,8 +28,57 @@ import { countdown, fmt, nightsOf, STATUS_LABEL, tripRef } from '../../lib/holid
 const TONE_FOR_LEVEL = { restricted: 'red', notify: 'amber', cleared: 'green' };
 const money = n => '£' + Math.round(n).toLocaleString();
 
-export default function BoardingPass({ trip, S, policy, onCycleStatus, onEdit, onItinerary, now = new Date() }) {
-  if (!trip) return null;
+/**
+ * The countdown number, counting up to its value as the pass lands.
+ * Starts 18 short rather than at zero: a trip 240 days out should land,
+ * not spin. Words ("Today", "—") and reduced motion just show the value.
+ */
+function CountRoll({ value }) {
+  const reduce = useReducedMotion();
+  const n = /^\d+$/.test(String(value)) ? Number(value) : null;
+  const [shown, setShown] = useState(n == null || reduce ? value : Math.max(0, n - 18));
+  const raf = useRef(0);
+  useEffect(() => {
+    if (n == null || reduce) { setShown(value); return undefined; }
+    const from = Math.max(0, n - 18), t0 = performance.now();
+    const step = t => {
+      const k = Math.min(1, (t - t0) / 600);
+      setShown(Math.round(from + (n - from) * (1 - Math.pow(1 - k, 3))));
+      if (k < 1) raf.current = requestAnimationFrame(step);
+    };
+    raf.current = requestAnimationFrame(step);
+    return () => cancelAnimationFrame(raf.current);
+  }, [value, n, reduce]);
+  return <div className="hol-count-big">{shown}</div>;
+}
+
+/* Swapping trips is a ticket change: the old pass drops away (160ms,
+   accelerating) and the new one slides down into place on a light
+   spring. `mode="wait"` so the two never overlap in the grid. */
+const PASS_IN = { opacity: 1, y: 0, transition: { type: 'tween', duration: 0.32, ease: [0.32, 1.28, 0.5, 1] } };
+const PASS_OUT = { opacity: 0, y: 14, transition: { duration: 0.16, ease: [0.4, 0, 1, 1] } };
+
+export default function BoardingPass(props) {
+  const reduce = useReducedMotion();
+  if (!props.trip) return null;
+  return (
+    <AnimatePresence mode="wait">
+      <motion.div
+        key={props.trip.id}
+        className="hol-pass"
+        data-hub-module="holiday-pass"
+        data-hub-module-label="Trip"
+        initial={reduce ? false : { opacity: 0, y: -18 }}
+        animate={PASS_IN}
+        exit={reduce ? undefined : PASS_OUT}
+      >
+        <PassFace {...props} />
+      </motion.div>
+    </AnimatePresence>
+  );
+}
+
+function PassFace({ trip, S, policy, onCycleStatus, onEdit, onItinerary, now = new Date() }) {
 
   const iso2 = countryForTrip(trip);
   const country = COUNTRY_BY_ISO[iso2]?.name || '';
@@ -53,14 +103,7 @@ export default function BoardingPass({ trip, S, policy, onCycleStatus, onEdit, o
     : '';
 
   return (
-    <motion.div
-      className="hol-pass"
-      data-hub-module="holiday-pass"
-      data-hub-module-label="Trip"
-      initial={{ opacity: 0, y: 12 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.28, ease: 'easeOut' }}
-    >
+    <>
       {/* ── Stub: which trip, and when ── */}
       <div
         className={`hol-pass-stub${photo ? ' has-photo' : ''}`}
@@ -106,7 +149,7 @@ export default function BoardingPass({ trip, S, policy, onCycleStatus, onEdit, o
       {/* ── Body: what state it is in ── */}
       <div className="hol-pass-body">
         <div className={`hol-count is-${c.tone}`}>
-          <div className="hol-count-big">{c.big}</div>
+          <CountRoll value={c.big} />
           <div>
             <div className="hol-count-unit">{c.unit}</div>
             <div className="hol-count-note">{c.note}</div>
@@ -170,6 +213,6 @@ export default function BoardingPass({ trip, S, policy, onCycleStatus, onEdit, o
           </button>
         </div>
       </div>
-    </motion.div>
+    </>
   );
 }

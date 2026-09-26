@@ -33,6 +33,8 @@ import { ledgerRows } from '../coins/ledger.js';
 import { dayBurn } from '../burn.js';
 import { planDayFor, planGoalFor } from '../plan/planDay.js';
 import { VITAL_METRICS, fmtMetric } from '../vitals/metrics.js';
+import { visitedCountries, countryForTrip, ALL_COUNTRIES } from '../holiday/destinations.js';
+import { upcomingNew, visitedSummary } from '../holiday/visited.js';
 
 /* ── Small shared shapes ──────────────────────────────────────────── */
 
@@ -555,6 +557,33 @@ const holidayBlocks = {
            big: `${list.length}`, bigSub: list.length === 1 ? 'trip' : 'trips',
            line: next ? `Next: ${next.n} in ${next.v}` : `${list.length} on the board` },
       s: { fl: 'TRIPS', fv: `${list.length}${next ? ` · ${next.n}` : ''}` },
+    };
+  },
+
+  /* The Visited tab's map, small: been in gold, a new country a planned
+     trip is heading to in the accent. */
+  visited(S) {
+    const visited = visitedCountries(S);
+    const upcoming = upcomingNew(S.holidays, visited, countryForTrip, new Date());
+    const sum = visitedSummary(visited, ALL_COUNTRIES.length, upcoming);
+    const fills = {};
+    for (const iso2 of Object.keys(upcoming)) fills[iso2] = 'upcoming';
+    for (const iso2 of Object.keys(visited)) fills[iso2] = 'accent';
+    const soon = Object.values(upcoming)
+      .map(u => u.next)
+      .filter(Boolean)
+      .sort((a, b) => String(a.from || '9999').localeCompare(String(b.from || '9999')))[0];
+    const nextLine = sum.upcoming
+      ? `+${sum.upcoming} on the way${soon && soon.dest ? ` · ${soon.dest}` : ''}`
+      : sum.count ? '' : 'Tick where you’ve been in Holidays';
+    return {
+      d: {
+        fills, label: 'COUNTRIES VISITED',
+        big: `${sum.count}`, bigSub: `countries · ${sum.pct}% of the world`, next: nextLine,
+        r1A: `${sum.pct}%`, r1: ' of the world',
+        r2: nextLine || `${sum.count} of ${sum.total}`,
+      },
+      s: { fl: 'VISITED', fvA: `${sum.count}`, fv: ` countries${sum.upcoming ? ` · +${sum.upcoming}` : ''}` },
     };
   },
 };

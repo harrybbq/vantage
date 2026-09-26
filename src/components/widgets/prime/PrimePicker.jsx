@@ -33,7 +33,7 @@ const BLURB = {
   savings: 'Total, pots, runway, bills, accounts, where the month goes',
   trackers: 'Today’s ticks, streaks, weekly targets, a heatmap',
   achievements: 'Next unlock, coins, recent wins, the path ahead',
-  holidays: 'Countdown, itinerary, budget, packing',
+  holidays: 'Countdown, itinerary, budget, countries visited',
   habits: 'Streak timers with relapse, milestones, strikes',
   nutrition: 'Macro rings, net calories, burn, weight and vitals',
 };
