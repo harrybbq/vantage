@@ -1,58 +1,71 @@
 /**
- * Career tab — certifications, CV, and deliberate practice.
+ * Career tab — the plan (timeline, money, certs, companies), the CV, and
+ * deliberate practice.
  *
- * Four sections behind a tab row rather than one long scroll: they are
- * used at different moments (a cert goes in once a quarter, a LeetCode
- * problem goes in daily) and stacking them would bury the frequent one
- * under the rare one.
+ * Sections behind a tab row rather than one long scroll: they are used at
+ * different moments (the plan monthly, a LeetCode problem daily) and
+ * stacking them would bury the frequent one under the rare one.
  *
- * The tabs use the app's own `.settings-tabs` convention rather than a
- * bespoke one, at section scale with a count on each. They were four
- * small pills indistinguishable from every other button on the page,
- * which read as a filter row rather than as four places to be.
+ * ── Where the data lives ──
+ * The PLAN panels (Plan, Money, Certs, Companies) read owner content
+ * fetched at runtime from Supabase (lib/owner/ownerContent) — salary,
+ * savings and house figures must never be in the public bundle, and the
+ * UI owner gate is not an access control. Row-level security is.
  *
- * Everything is additive state:
- *   S.certs       [{ id, name, provider, status, date, expires, url }]
+ * Everything else is additive user state, as before:
+ *   S.certs       the old cert log — merged INTO the roadmap once (copied,
+ *                 never deleted; see career/CertRoadmap)
  *   S.cv          the main CV — see lib/career/cv.js
  *   S.cvVariants  copies tailored for a specific job
  *   S.cvActive    which of those is open, or null for the main one
  *   S.practice    { progress: {…}, log: [...], snippets: [...] }
- * The uploaded CV FILE is the exception and lives in Supabase Storage —
- * see lib/career/cvFile.js for why, and for how it fails soft before
- * the bucket exists.
+ * The uploaded CV FILE lives in Supabase Storage — see lib/career/cvFile.js.
  */
 import { useMemo, useState } from 'react';
-import Icon from '../Icon';
 import PracticePanel from './PracticePanel';
 import CvEditor from './CvEditor';
+import { Field, Sheet } from './UpgSheet';
+import OwnerGate from './career/OwnerGate';
+import PlanPanel from './career/PlanPanel';
+import MoneyPanel from './career/MoneyPanel';
+import CertRoadmap from './career/CertRoadmap';
+import CompaniesPanel from './career/CompaniesPanel';
+import { useOwnerContent } from '../../lib/owner/ownerContent';
+import { KEYS } from '../../lib/career/schema';
+import { statusOf } from '../../lib/career/planTimeline';
 import { activeCv } from '../../lib/career/cv';
 import { ALL_PROBLEMS, progressOf } from '../../lib/career/problems';
+import './career/career-plan.css';
 
 const uid = () => Math.random().toString(36).slice(2, 10) + Date.now().toString(36).slice(-4);
 const today = () => new Date().toISOString().slice(0, 10);
 
 const PANELS = [
-  { id: 'certs', label: 'Certifications' },
+  { id: 'plan', label: 'Plan' },
+  { id: 'money', label: 'Money' },
+  { id: 'certs', label: 'Certs' },
+  { id: 'companies', label: 'Companies' },
   { id: 'cv', label: 'CV' },
   { id: 'practice', label: 'Practice' },
   { id: 'library', label: 'Library' },
 ];
 
 /**
- * The count beside each tab.
- *
- * These are the reason the row is worth its height: a tab strip that
- * only says where you are is navigation, and one that also says how much
- * is behind each door is navigation you can plan from. Deliberately
- * cheap to compute — nothing here reaches past state already in memory.
+ * The count beside each tab: navigation you can plan from. Cheap — only
+ * state already in memory. Plan panels show nothing until content loads.
  */
-function panelCount(id, S) {
-  if (id === 'certs') {
-    const list = S.certs || [];
-    if (!list.length) return '';
-    const passed = list.filter(c => c.status === 'passed').length;
-    return `${passed}/${list.length}`;
+function panelCount(id, S, oc) {
+  const d = oc.state === 'ready' ? oc.data : {};
+  if (id === 'plan' && d[KEYS.plan]) {
+    const items = d[KEYS.plan].items || [];
+    const done = items.filter(it => statusOf(it, d[KEYS.status]) === 'done').length;
+    return `${done}/${items.length}`;
   }
+  if (id === 'certs' && d[KEYS.certs]) {
+    const list = d[KEYS.certs];
+    return `${list.filter(c => c.completed || c.status === 'passed').length}/${list.length}`;
+  }
+  if (id === 'companies' && d[KEYS.companies]) return String(d[KEYS.companies].filter(c => !c.excluded).length);
   if (id === 'cv') {
     const n = activeCv(S).experience.length;
     return n ? `${n} role${n === 1 ? '' : 's'}` : '';
@@ -68,20 +81,17 @@ function panelCount(id, S) {
   return '';
 }
 
-export default function CareerTab({ S, update, userId }) {
-  const [panel, setPanel] = useState('certs');
-  // `log` is a sub-screen of Practice, not a fifth section — the tab
-  // stays lit on Practice while you are in it.
+export default function CareerTab({ S, update, userId, isMobile }) {
+  const [panel, setPanel] = useState('plan');
+  const [scenarioId, setScenarioId] = useState(null);
+  const oc = useOwnerContent('career.');
+  // `log` is a sub-screen of Practice, not a section of its own.
   const lit = panel === 'log' ? 'practice' : panel;
   return (
     <div className="upg-pane">
-      {/* Section tabs — the app's tab convention at section scale, so
-          this page does not invent a second one. Same classes as
-          Settings and Track, which is also what gets it the readable
-          inactive colour and the narrow-viewport gutters for free. */}
       <div className="settings-tabs career-tabs" role="tablist" aria-label="Career sections">
         {PANELS.map(p => {
-          const n = panelCount(p.id, S);
+          const n = panelCount(p.id, S, oc);
           return (
             <button key={p.id} type="button" role="tab"
                     aria-selected={lit === p.id}
@@ -93,7 +103,22 @@ export default function CareerTab({ S, update, userId }) {
           );
         })}
       </div>
-      {panel === 'certs' && <Certifications S={S} update={update} />}
+      {panel === 'plan' && (
+        <OwnerGate oc={oc} need={KEYS.plan}>
+          <PlanPanel oc={oc} isMobile={isMobile} scenarioId={scenarioId} setScenarioId={setScenarioId} />
+        </OwnerGate>
+      )}
+      {panel === 'money' && (
+        <OwnerGate oc={oc} need={KEYS.money}>
+          <MoneyPanel oc={oc} S={S} isMobile={isMobile} scenarioId={scenarioId} setScenarioId={setScenarioId} />
+        </OwnerGate>
+      )}
+      {panel === 'certs' && (
+        <OwnerGate oc={oc} need={KEYS.certs}><CertRoadmap oc={oc} S={S} /></OwnerGate>
+      )}
+      {panel === 'companies' && (
+        <OwnerGate oc={oc} need={KEYS.companies}><CompaniesPanel oc={oc} isMobile={isMobile} /></OwnerGate>
+      )}
       {panel === 'cv' && <CvEditor S={S} update={update} userId={userId} />}
       {panel === 'practice' && (
         <PracticePanel S={S} update={update} onOpenLog={() => setPanel('log')} />
@@ -101,94 +126,6 @@ export default function CareerTab({ S, update, userId }) {
       {panel === 'log' && <PracticeLog S={S} update={update} onBack={() => setPanel('practice')} />}
       {panel === 'library' && <SnippetLibrary S={S} update={update} />}
     </div>
-  );
-}
-
-/* ── Certifications ──────────────────────────────────────────────── */
-
-const CERT_STATUS = [
-  { id: 'planned', label: 'Planned' },
-  { id: 'studying', label: 'Studying' },
-  { id: 'booked', label: 'Booked' },
-  { id: 'passed', label: 'Passed' },
-];
-
-function Certifications({ S, update }) {
-  const certs = useMemo(() => S.certs || [], [S.certs]);
-  const [draft, setDraft] = useState(null);
-
-  const save = next => update(prev => ({ ...prev, certs: next }));
-  const upsert = c => save(certs.some(x => x.id === c.id) ? certs.map(x => (x.id === c.id ? c : x)) : [...certs, c]);
-  const remove = id => save(certs.filter(x => x.id !== id));
-
-  // Expiry is the whole reason to track a cert you already hold, so it
-  // leads rather than hiding in a detail row.
-  const withExpiry = certs.map(c => {
-    if (!c.expires) return { ...c, daysLeft: null };
-    const days = Math.round((new Date(c.expires + 'T12:00') - Date.now()) / 86400000);
-    return { ...c, daysLeft: days };
-  });
-  const order = { studying: 0, booked: 1, planned: 2, passed: 3 };
-  const sorted = [...withExpiry].sort((a, b) => (order[a.status] ?? 9) - (order[b.status] ?? 9));
-
-  return (
-    <>
-      <div className="upg-card-head upg-head-row">
-        <h3>Certifications</h3>
-        <button type="button" className="link-open-btn"
-                onClick={() => setDraft({ id: uid(), name: '', provider: '', status: 'planned', date: '', expires: '', url: '' })}>
-          + Add
-        </button>
-      </div>
-
-      {!sorted.length && <div className="upg-empty">Nothing tracked yet. Add the one you&apos;re working towards.</div>}
-
-      <div className="upg-list">
-        {sorted.map(c => (
-          <div key={c.id} className={`upg-cert is-${c.status}`}>
-            <div className="upg-cert-main">
-              <div className="upg-cert-name">
-                {c.url ? <a href={c.url} target="_blank" rel="noreferrer noopener">{c.name || 'Untitled'}</a> : (c.name || 'Untitled')}
-              </div>
-              <div className="upg-cert-meta">
-                {c.provider && <span>{c.provider}</span>}
-                {c.date && <span>{c.status === 'passed' ? 'Passed' : 'Target'} {c.date}</span>}
-                {c.daysLeft != null && (
-                  <span className={c.daysLeft < 0 ? 'is-bad' : c.daysLeft < 90 ? 'is-warn' : ''}>
-                    {c.daysLeft < 0 ? `Expired ${-c.daysLeft}d ago` : `Expires in ${c.daysLeft}d`}
-                  </span>
-                )}
-              </div>
-            </div>
-            <span className={`upg-badge is-${c.status}`}>{CERT_STATUS.find(s => s.id === c.status)?.label || c.status}</span>
-            <button type="button" className="upg-textbtn" onClick={() => setDraft(c)}>Edit</button>
-          </div>
-        ))}
-      </div>
-
-      {draft && (
-        <Sheet title={certs.some(c => c.id === draft.id) ? 'Edit certification' : 'Add certification'}
-               onClose={() => setDraft(null)}
-               onDelete={certs.some(c => c.id === draft.id) ? () => { remove(draft.id); setDraft(null); } : null}
-               onSave={() => { upsert(draft); setDraft(null); }}>
-          <Field label="Name"><input value={draft.name} onChange={e => setDraft({ ...draft, name: e.target.value })} placeholder="SC-200, AZ-900…" /></Field>
-          <Field label="Provider"><input value={draft.provider} onChange={e => setDraft({ ...draft, provider: e.target.value })} placeholder="Microsoft, CompTIA…" /></Field>
-          <Field label="Status">
-            <div className="upg-chipset">
-              {CERT_STATUS.map(s => (
-                <button key={s.id} type="button" className={'upg-opt' + (draft.status === s.id ? ' is-on' : '')}
-                        onClick={() => setDraft({ ...draft, status: s.id })}>{s.label}</button>
-              ))}
-            </div>
-          </Field>
-          <Field label={draft.status === 'passed' ? 'Date passed' : 'Target date'}>
-            <input type="date" value={draft.date} onChange={e => setDraft({ ...draft, date: e.target.value })} />
-          </Field>
-          <Field label="Expires"><input type="date" value={draft.expires} onChange={e => setDraft({ ...draft, expires: e.target.value })} /></Field>
-          <Field label="Link"><input value={draft.url} onChange={e => setDraft({ ...draft, url: e.target.value })} placeholder="Exam page or credential" /></Field>
-        </Sheet>
-      )}
-    </>
   );
 }
 
@@ -386,29 +323,5 @@ function SnippetLibrary({ S, update }) {
         </Sheet>
       )}
     </>
-  );
-}
-
-/* ── Shared bits ─────────────────────────────────────────────────── */
-
-function Field({ label, children }) {
-  return <label className="upg-field"><span className="upg-field-lbl">{label}</span>{children}</label>;
-}
-
-function Sheet({ title, children, onClose, onSave, onDelete }) {
-  return (
-    <div className="modal-overlay open" onClick={onClose} role="presentation">
-      <div className="modal upg-sheet" onClick={e => e.stopPropagation()} role="dialog" aria-modal="true">
-        <div className="upg-day-head">
-          <div className="upg-day-date">{title}</div>
-          <button type="button" className="link-del-btn" onClick={onClose} aria-label="Close">✕</button>
-        </div>
-        <div className="upg-sheet-body">{children}</div>
-        <div className="upg-day-actions">
-          {onDelete && <button type="button" className="upg-textbtn" onClick={onDelete}>Delete</button>}
-          <button type="button" className="link-open-btn" onClick={onSave}>Save</button>
-        </div>
-      </div>
-    </div>
   );
 }

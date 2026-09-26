@@ -25,6 +25,7 @@
  * up to today is folded in before anything is taken out.
  */
 import { balanceNow, settleAccount } from './interest.js';
+import { withSnapshot } from './history.js';
 
 const pence = v => Math.round((Number(v) || 0) * 100) / 100;
 
@@ -60,7 +61,7 @@ export function completePot(prev, goalId, now = Date.now()) {
   const plan = planPotCompletion(prev, goalId, now);
   if (!plan) return prev;
   const takes = new Map(plan.draws.map(d => [d.id, d.take]));
-  return {
+  return withSnapshot({
     ...prev,
     savingsAccounts: (prev.savingsAccounts || []).map(a =>
       (takes.has(a.id) ? settleAccount(a, -takes.get(a.id), now) : a)),
@@ -70,7 +71,7 @@ export function completePot(prev, goalId, now = Date.now()) {
       completedAmount: plan.amount,
       drained: plan.draws.map(d => ({ accountId: d.id, amount: d.take })),
     } : g)),
-  };
+  }, now);
 }
 
 /**
@@ -85,12 +86,12 @@ export function undoCompletePot(prev, goalId, now = Date.now()) {
   for (const d of (goal.drained || [])) {
     if (d && d.accountId) back.set(d.accountId, pence((back.get(d.accountId) || 0) + (Number(d.amount) || 0)));
   }
-  return {
+  return withSnapshot({
     ...prev,
     savingsAccounts: (prev.savingsAccounts || []).map(a =>
       (back.has(a.id) ? settleAccount(a, back.get(a.id), now) : a)),
     savings: (prev.savings || []).map(g => (g.id === goalId
       ? { ...g, completedAt: null, completedAmount: null, drained: null }
       : g)),
-  };
+  }, now);
 }
