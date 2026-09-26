@@ -37,7 +37,7 @@ export function salaryGuard(plan) {
  * Where a salary range sits against the guardrails.
  *   'meets'  the whole range is at or above the target
  *   'spans'  the range reaches the target but starts below it
- *   'floor'  above the floor, below the target
+ *   'floor'  under the target (and not wholly below the floor)
  *   'below'  tops out under the floor
  *   'unknown' no estimate
  */

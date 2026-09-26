@@ -21,7 +21,7 @@ import JsonDrawer from './JsonDrawer';
 import { KEYS } from '../../../lib/career/schema';
 import { salaryGuard, salaryVerdict, orderCompanies, salaryLabel } from '../../../lib/career/companies';
 
-const VERDICT = { meets: 'meets target', spans: 'can reach target', floor: 'above floor', below: 'below floor', unknown: '' };
+const VERDICT = { meets: 'meets target', spans: 'can reach target', floor: 'under target', below: 'below floor', unknown: '' };
 const BASIS = { company: 'company data', market: 'market rate', 'pay-scale': 'pay scale' };
 
 const lowOf = v => { const m = /^(\d+)/.exec(String(v || '')); return m ? Number(m[1]) : 999; };
