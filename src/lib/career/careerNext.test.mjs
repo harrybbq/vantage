@@ -10,34 +10,37 @@ const t = (name, fn) => { fn(); n++; };
 /* pacing */
 const mk = shifts => shifts.split('').map((s, i) => ({ iso: `2026-10-${String(i + 1).padStart(2, '0')}`, dow: i % 7, holiday: false,
   shift: { O: 'off', D: 'day', N: 'night', L: 'leave' }[s] }));
-t('hoursFor: off and leave get perOff, day gets afterDay, night none, holiday none', () => {
-  assert.equal(hoursFor({ shift: 'off' }, { perOff: 2 }), 2);
-  assert.equal(hoursFor({ shift: 'leave' }, { perOff: 2 }), 2);
-  assert.equal(hoursFor({ shift: 'day' }, { afterDay: 0.75 }), 0.75);
-  assert.equal(hoursFor({ shift: 'night' }, { perOff: 2 }), 0);
-  assert.equal(hoursFor({ shift: 'off', holiday: true }, { perOff: 2 }), 0);
+t('hoursFor: study on shifts; off, leave and holidays stay free', () => {
+  assert.equal(hoursFor({ shift: 'day' }, { perShift: 2 }), 2);
+  assert.equal(hoursFor({ shift: 'night' }, { perShift: 2 }), 2);
+  assert.equal(hoursFor({ shift: 'off' }, { perShift: 2 }), 0);
+  assert.equal(hoursFor({ shift: 'leave' }, { perShift: 2 }), 0);
+  assert.equal(hoursFor({ shift: 'day', holiday: true }, { perShift: 2 }), 0);
+  assert.equal(hoursFor({ shift: 'night' }, { perShift: 2, nights: false }), 0);
+  assert.equal(hoursFor({ shift: 'day' }, { perShift: 2, days: false }), 0);
 });
-t('planStudy fills off days until covered and names the ready day', () => {
-  const p = planStudy(mk('DDOOOONNOO'), { remaining: 7, perOff: 2, examIso: '2026-10-10' });
-  assert.deepEqual(p.cal.map(d => d.hours), [0, 0, 2, 2, 2, 1, 0, 0, 0, 0]);
-  assert.equal(p.readyIso, '2026-10-06');
+t('planStudy fills shifts until covered and names the ready day', () => {
+  const p = planStudy(mk('DDOOOONNOO'), { remaining: 7, perShift: 2, examIso: '2026-10-10' });
+  assert.deepEqual(p.cal.map(d => d.hours), [2, 2, 0, 0, 0, 0, 2, 1, 0, 0]);
+  assert.equal(p.readyIso, '2026-10-08');
   assert.equal(p.sessions, 4);
-  assert.equal(p.status, 'ok');
-  assert.equal(p.spare, 4);
+  assert.equal(p.status, 'tight');
+  assert.equal(p.spare, 2);
 });
-t('planStudy: after-day-shift hours bring it forward', () => {
-  const p = planStudy(mk('DDOOOONNOO'), { remaining: 7, perOff: 2, afterDay: 1, examIso: '2026-10-10' });
-  assert.equal(p.readyIso, '2026-10-05');
+t('planStudy: nights off pushes the ready day back', () => {
+  const p = planStudy(mk('DDOOOONNDD'), { remaining: 7, perShift: 2, nights: false, examIso: '2026-10-20' });
+  assert.equal(p.readyIso, '2026-10-10');
+  assert.equal(p.status, 'ok');
 });
 t('planStudy: nothing on or after the exam day, late if not covered', () => {
-  const p = planStudy(mk('DDOOOONNOO'), { remaining: 20, perOff: 2, examIso: '2026-10-06' });
+  const p = planStudy(mk('DDDDDDNNOO'), { remaining: 20, perShift: 2, examIso: '2026-10-06' });
   assert.equal(p.status, 'late');
   assert.equal(p.readyIso, null);
   assert.equal(p.cal[5].hours, 0);
   assert.equal(p.cal[5].exam, true);
 });
-t('planStudy: tight when ready within 3 days of the exam; done when nothing is left', () => {
-  assert.equal(planStudy(mk('DDOOOONNOO'), { remaining: 8, perOff: 2, examIso: '2026-10-08' }).status, 'tight');
+t('planStudy: ok with room to spare; done when nothing is left; no-exam without a date', () => {
+  assert.equal(planStudy(mk('DDDDOOOO'), { remaining: 4, perShift: 2, examIso: '2026-10-08' }).status, 'ok');
   assert.equal(planStudy(mk('DDOO'), { remaining: 0, examIso: '2026-10-04' }).status, 'done');
   assert.equal(planStudy(mk('DDOO'), { remaining: 2 }).status, 'no-exam');
 });

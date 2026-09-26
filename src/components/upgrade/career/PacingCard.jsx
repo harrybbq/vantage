@@ -3,7 +3,8 @@
  * (lib/career/pacing), with the exam-ready date that falls out of it.
  *
  * Settings are stored on the cert itself in owner content:
- *   hoursLogged, pacing { perOff, afterDay }, examDate (when booked)
+ *   hoursLogged, pacing { perShift, days, nights }, examDate (when booked)
+ * Study sits on shifts (day and night, each switchable); days off stay free.
  * so the plan survives a reload and the Brief reads the same numbers.
  * Slider moves save after a short pause rather than on every step.
  */
@@ -49,8 +50,8 @@ export default function PacingCard({ oc, S, certs }) {
   }
   const setPace = (k, v) => {
     setDraft(d => ({ ...(d || {}), [k]: v }));
-    const pacing = { perOff: settings.perOff, afterDay: !!settings.afterDay, ...(cert.pacing || {}), [k]: v };
-    patchCert({ pacing }, { debounce: k === 'perOff' });
+    const pacing = { perShift: settings.perShift, days: settings.days, nights: settings.nights, [k]: v };
+    patchCert({ pacing }, { debounce: k === 'perShift' });
   };
   const logHours = h => patchCert({ hoursLogged: Math.max(0, Math.round((settings.hoursLogged + h) * 10) / 10) });
 
@@ -70,7 +71,7 @@ export default function PacingCard({ oc, S, certs }) {
     <section className="cp-pace">
       <div className="cp-sechead">
         <div>
-          <span className="cp-eyebrow">// certs · study plan laid over the 16-day rotation</span>
+          <span className="cp-eyebrow">// certs · study on shift, days off stay free</span>
           <h3 className="cp-title">{headline}</h3>
         </div>
         <span className={`cp-flag is-${plan.status}`}>{flag}</span>
@@ -100,13 +101,17 @@ export default function PacingCard({ oc, S, certs }) {
             <button type="button" className="is-undo" onClick={() => logHours(-0.5)} aria-label="Remove half an hour">−</button>
           </div>
           <label className="cp-slider">
-            <span>Hours per off day<b>{s.perOff} h</b></span>
-            <input type="range" min="1" max="4" step="0.5" value={s.perOff}
-                   onChange={e => setPace('perOff', Number(e.target.value))} />
+            <span>Hours per shift<b>{s.perShift} h</b></span>
+            <input type="range" min="0.5" max="4" step="0.5" value={s.perShift}
+                   onChange={e => setPace('perShift', Number(e.target.value))} />
           </label>
-          <button type="button" role="switch" aria-checked={!!s.afterDay} className="cp-switch"
-                  onClick={() => setPace('afterDay', !s.afterDay)}>
-            Also 45 min after day shifts <i className={s.afterDay ? 'is-on' : ''} />
+          <button type="button" role="switch" aria-checked={s.days} className="cp-switch"
+                  onClick={() => setPace('days', !s.days)}>
+            Study on day shifts <i className={s.days ? 'is-on' : ''} />
+          </button>
+          <button type="button" role="switch" aria-checked={s.nights} className="cp-switch"
+                  onClick={() => setPace('nights', !s.nights)}>
+            Study on night shifts <i className={s.nights ? 'is-on' : ''} />
           </button>
           <label className="cp-slider is-date">
             <span>Exam booked for</span>
@@ -118,7 +123,7 @@ export default function PacingCard({ oc, S, certs }) {
           <div className="cp-pace-calhead">
             <span className="cp-eyebrow">// next eight weeks</span>
             <span className="cp-key-sq is-study">study</span>
-            <span className="cp-key-sq is-night">night</span>
+            <span className="cp-key-sq is-off">off</span>
             <span className="cp-key-sq is-ready">ready</span>
             <span className="cp-key-sq is-exam">exam</span>
           </div>

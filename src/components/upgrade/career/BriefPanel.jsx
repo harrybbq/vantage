@@ -128,7 +128,7 @@ export default function BriefPanel({ oc, S, scenarioId, goTo }) {
               );
             })}
           </div>
-          <p className="cp-muted">Study sits on off days{pacing.settings && pacing.settings.afterDay ? ' and after day shifts' : ''}; night weeks get nothing. Miss a session and the plan moves it to the next free slot.</p>
+          <p className="cp-muted">Study sits on {pacing.settings ? [pacing.settings.days && 'day', pacing.settings.nights && 'night'].filter(Boolean).join(' and ') || 'no' : 'day and night'} shifts; days off stay free. Miss a session and the plan moves it to the next shift.</p>
           <div className="cp-week-stats">
             <div><span>Last week</span><b className={lw && lw.done >= lw.total ? 'is-ok' : ''}>{lw ? `${lw.done} / ${lw.total}` : '—'}</b></div>
             <div><span>Study this week</span><b>{studyThisWeek ? `${studyThisWeek} h` : '—'}</b></div>

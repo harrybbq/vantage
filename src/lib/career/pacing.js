@@ -1,10 +1,10 @@
 /**
  * Study pacing: a cert's remaining hours laid over the real rotation.
  *
- * Off days (and booked leave) get `perOff` hours; day shifts optionally
- * get `afterDay` hours; night shifts get nothing — the same rule the
- * Upgrade section already runs training on. Holiday blocks are skipped:
- * nobody studies for an exam on a beach. The first day the running total
+ * Study happens DURING shifts: each day shift and night shift gets
+ * `perShift` hours (either kind can be switched off); off days, booked
+ * leave and holiday blocks get none — the days off stay free.
+ * (Before 26 Sep it was the other way round: off days only.) The first day the running total
  * covers what is left is the exam-ready date, and it is compared with the
  * exam date so "on pace" is a date, not a feeling.
  *
@@ -37,11 +37,11 @@ export function studyDays(fromIso, n, { overrides = {}, holidayDays = new Set() 
 }
 
 /** Hours a day can take. */
-export function hoursFor(day, { perOff = 2.5, afterDay = 0 } = {}) {
+export function hoursFor(day, { perShift = 1.5, days = true, nights = true } = {}) {
   if (day.holiday) return 0;
-  if (day.shift === 'off' || day.shift === 'leave') return perOff;
-  if (day.shift === 'day') return afterDay;
-  return 0;                                  // night, unknown
+  if (day.shift === 'day') return days ? perShift : 0;
+  if (day.shift === 'night') return nights ? perShift : 0;
+  return 0;                                  // off, leave, unknown
 }
 
 /**
@@ -52,7 +52,7 @@ export function hoursFor(day, { perOff = 2.5, afterDay = 0 } = {}) {
  *   'tight' ready 0–2 days before · 'late' not ready by the exam ·
  *   'no-exam' no exam date to compare with (readyIso may still be set)
  */
-export function planStudy(days, { remaining, perOff = 2.5, afterDay = 0, examIso = null } = {}) {
+export function planStudy(days, { remaining, perShift = 1.5, days: onDays = true, nights = true, examIso = null } = {}) {
   let left = Math.max(0, Number(remaining) || 0);
   let readyIso = left === 0 ? (days[0] && days[0].iso) || null : null;
   let sessions = 0;
@@ -60,7 +60,7 @@ export function planStudy(days, { remaining, perOff = 2.5, afterDay = 0, examIso
     const exam = !!examIso && d.iso === examIso;
     let hours = 0;
     if (left > 0 && (!examIso || d.iso < examIso)) {
-      hours = Math.min(left, hoursFor(d, { perOff, afterDay }));
+      hours = Math.min(left, hoursFor(d, { perShift, days: onDays, nights }));
       if (hours > 0) {
         left = Math.round((left - hours) * 100) / 100;
         sessions++;

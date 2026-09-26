@@ -529,3 +529,9 @@ html:not([data-theme="cream-pro"]) .cp-ring > div { background: var(--surface, #
   .cp-clock:nth-child(2n) { border-right: 0; }
   .cp-clock b { font-size: 24px; }
 }
+/* Study now sits on shifts: a studied shift is the solid green day. */
+.cp-cal7-day.has-study.is-day, .cp-cal7-day.has-study.is-night { background: var(--em); }
+.cp-cal7-day.has-study.is-day .cp-cal7-top, .cp-cal7-day.has-study.is-night .cp-cal7-top { color: rgba(255,255,255,.8); }
+.cp-cal7-day.has-study.is-day .cp-cal7-h, .cp-cal7-day.has-study.is-night .cp-cal7-h { color: #fff; }
+.cp-cal7-day.is-off, .cp-cal7-day.is-leave { background: rgba(127,127,127,.03); }
+.cp-key-sq.is-off::before { background: rgba(127,127,127,.12); }

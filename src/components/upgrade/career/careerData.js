@@ -16,12 +16,16 @@ export const todayIso = () => {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 };
 
-/** Pacing settings for a cert, with defaults. */
-export const paceOf = cert => ({
-  perOff: Number.isFinite(cert && cert.pacing && cert.pacing.perOff) ? cert.pacing.perOff : 2.5,
-  afterDay: cert && cert.pacing && cert.pacing.afterDay ? 0.75 : 0,
-  hoursLogged: Math.max(0, Number(cert && cert.hoursLogged) || 0),
-});
+/** Pacing settings for a cert, with defaults: study on every shift. */
+export const paceOf = cert => {
+  const p = (cert && cert.pacing) || {};
+  return {
+    perShift: Number.isFinite(p.perShift) ? p.perShift : 1.5,
+    days: p.days !== false,
+    nights: p.nights !== false,
+    hoursLogged: Math.max(0, Number(cert && cert.hoursLogged) || 0),
+  };
+};
 
 /**
  * The paced cert and its plan, from the Monday of this week so a calendar
@@ -43,7 +47,7 @@ export function usePacing(S, certs, pickId) {
     const settings = paceOf(cert);
     const remaining = Math.max(0, Number(cert.studyHours) - settings.hoursLogged);
     const future = all.map(d => (d.iso < today ? { ...d, holiday: true, past: true } : d));   // no hours before today
-    const plan = planStudy(future, { remaining, perOff: settings.perOff, afterDay: settings.afterDay, examIso });
+    const plan = planStudy(future, { remaining, perShift: settings.perShift, days: settings.days, nights: settings.nights, examIso });
     return { cert, eligible, plan, examIso, monIso, today, settings, remaining };
   }, [certs, pickId, overrides, blocks]);
 }
