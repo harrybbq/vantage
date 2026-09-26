@@ -16,6 +16,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Field, Sheet } from '../UpgSheet';
 import JsonDrawer from './JsonDrawer';
+import PacingCard from './PacingCard';
 import { KEYS } from '../../../lib/career/schema';
 import { examCollisions } from '../../../lib/career/planTimeline';
 import { monthLabel, isMonth } from '../../../lib/career/money';
@@ -84,7 +85,8 @@ export default function CertRoadmap({ oc, S }) {
 
   return (
     <div className="cp">
-      <header className="cp-head">
+      <PacingCard oc={oc} S={S} certs={certs} />
+      <header className="cp-head cp-sechead">
         <div>
           <span className="cp-eyebrow">// certification roadmap</span>
           <h3 className="cp-title">{active.length} ahead · {done.length} done</h3>

@@ -10,27 +10,57 @@
  * The candidate areas and the location notes are DATA (career.plan →
  * areas, locationNotes), not code: where someone plans to live is exactly
  * the kind of thing that must not ship in the public bundle.
+ *
+ * Each employer can carry a difficulty rating (1 very achievable – 5 very
+ * hard, with the reason) and a base-salary estimate with its source and
+ * basis; the salary is coloured against the floor and target from the
+ * guardrails (lib/career/companies).
  */
 import { useMemo, useState } from 'react';
 import JsonDrawer from './JsonDrawer';
 import { KEYS } from '../../../lib/career/schema';
+import { salaryGuard, salaryVerdict, orderCompanies, salaryLabel } from '../../../lib/career/companies';
+import { STAGE_LABEL, isOpen } from '../../../lib/career/pipeline';
+import { todayIso } from './careerData';
+
+const VERDICT = { meets: 'meets target', spans: 'can reach target', floor: 'under target', below: 'below floor', unknown: '' };
+const BASIS = { company: 'company data', market: 'market rate', 'pay-scale': 'pay scale' };
 
 const lowOf = v => { const m = /^(\d+)/.exec(String(v || '')); return m ? Number(m[1]) : 999; };
 const fitsGuardrail = v => lowOf(v) <= 30;
 
-export default function CompaniesPanel({ oc, isMobile }) {
+export default function CompaniesPanel({ oc, isMobile, goTo }) {
   const list = useMemo(() => oc.data[KEYS.companies] || [], [oc.data]);
-  const plan = oc.data[KEYS.plan] || {};
+  const plan = useMemo(() => oc.data[KEYS.plan] || {}, [oc.data]);
   const guardrails = plan.guardrails || [];
   const AREAS = plan.areas || [];
   const notes = plan.locationNotes || [];
   const [area, setArea] = useState('');
+  const [order, setOrder] = useState('listed');
+  const guard = useMemo(() => salaryGuard(plan), [plan]);
   const [editing, setEditing] = useState(false);
+  const apps = useMemo(() => oc.data[KEYS.applications] || [], [oc.data]);
+  const inPipe = id => apps.find(a => a.companyId === id && isOpen(a));
+  // "Watch" sends a company to the Pipeline's first column.
+  const watch = c => oc.save(KEYS.applications, [...apps, {
+    id: 'a' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
+    companyId: c.id, company: c.name, role: (c.salary && c.salary.role) || '', stage: 'watching',
+    events: [{ at: todayIso(), stage: 'watching', note: 'Watching' }],
+  }]);
+  const WatchBtn = ({ c }) => {
+    const a = inPipe(c.id);
+    return a
+      ? <button type="button" className="cp-watch is-in" onClick={() => goTo && goTo('pipeline')}>{STAGE_LABEL[a.stage]} ↗</button>
+      : <button type="button" className="cp-watch" onClick={() => watch(c)}>+ Watch</button>;
+  };
 
+  // Picking an area sorts by commute from it unless an explicit order is chosen.
   const rows = useMemo(() => {
     const live = list.filter(c => !c.excluded);
-    return area ? [...live].sort((a, b) => lowOf(a.commute?.[area]) - lowOf(b.commute?.[area])) : live;
-  }, [list, area]);
+    return orderCompanies(live, order !== 'listed' ? order : area || 'listed', lowOf);
+  }, [list, area, order]);
+  const meets = rows.filter(c => ['meets', 'spans'].includes(salaryVerdict(c.salary, guard))).length;
+  const rated = rows.some(c => c.difficulty || c.salary);
   const excluded = list.filter(c => c.excluded);
   const verified = list.filter(c => c.verified && !c.excluded).length;
 
@@ -39,7 +69,7 @@ export default function CompaniesPanel({ oc, isMobile }) {
       <header className="cp-head">
         <div>
           <span className="cp-eyebrow">// target companies</span>
-          <h3 className="cp-title">{rows.length} employers · {verified} verified</h3>
+          <h3 className="cp-title">{rows.length} employers · {verified} verified{rated ? ` · ${meets} can reach the target` : ''}</h3>
         </div>
         <button type="button" className="upg-textbtn cp-edit" onClick={() => setEditing(true)}>Edit data</button>
       </header>
@@ -65,9 +95,19 @@ export default function CompaniesPanel({ oc, isMobile }) {
         </div>
       </section>
 
+      {rated && (
+        <div className="cp-filters" role="radiogroup" aria-label="Order">
+          <span className="cp-sub cp-order-lbl">Order</span>
+          {[['listed', area ? 'By commute' : 'As listed'], ['easiest', 'Easiest first'], ['salary', 'Highest salary']].map(([id, label]) => (
+            <button key={id} type="button" role="radio" aria-checked={order === id}
+                    className={`cp-chip is-plain${order === id ? ' is-on' : ''}`} onClick={() => setOrder(id)}>{label}</button>
+          ))}
+        </div>
+      )}
+
       {isMobile ? (
         <div className="cp-co-cards">
-          {rows.map(c => <CompanyCard key={c.id} c={c} area={area} areas={AREAS} />)}
+          {rows.map(c => <CompanyCard key={c.id} c={c} area={area} areas={AREAS} guard={guard} watch={<WatchBtn c={c} />} />)}
         </div>
       ) : (
         <div className="cp-table-wrap cp-card is-flush">
@@ -75,6 +115,7 @@ export default function CompaniesPanel({ oc, isMobile }) {
             <thead>
               <tr>
                 <th>Company</th><th>Roles · clearance</th>
+                {rated && <><th>Est. salary</th><th>Difficulty</th></>}
                 {AREAS.map(a => <th key={a.id} className={`is-num${area === a.id ? ' is-area' : ''}`}>{a.label.split(' /')[0]}</th>)}
                 <th>Best from</th><th>Status</th>
               </tr>
@@ -88,13 +129,14 @@ export default function CompaniesPanel({ oc, isMobile }) {
                     {c.fit && <span className="cp-fit">{c.fit}</span>}
                   </td>
                   <td><span>{c.roles}</span><span className="cp-sub">{c.clearance}</span></td>
+                  {rated && <><td><Salary s={c.salary} guard={guard} /></td><td><Difficulty d={c.difficulty} /></td></>}
                   {AREAS.map(a => (
                     <td key={a.id} className={`is-num${area === a.id ? ' is-area' : ''}${fitsGuardrail(c.commute?.[a.id]) ? ' is-ok' : ''}`}>
                       {c.commute?.[a.id] || '—'}
                     </td>
                   ))}
                   <td><span className="cp-best">{c.bestAreas}</span></td>
-                  <td><Verified c={c} /></td>
+                  <td><Verified c={c} /><WatchBtn c={c} /></td>
                 </tr>
               ))}
             </tbody>
@@ -103,7 +145,9 @@ export default function CompaniesPanel({ oc, isMobile }) {
       )}
       <div className="upg-fine">
         Commute: estimated minutes by public transport at peak, door to door. Green = within the ~30 min guardrail.
-        No vacancies are listed — check each careers page.
+        {rated && <> Salary: estimated base pay for the role shown, from the source named on each (hover it); not an offer.
+        Difficulty: 1 very achievable – 5 very hard, for your profile.</>}
+        {' '}No vacancies are listed — check each careers page.
       </div>
 
       {excluded.length > 0 && (
@@ -127,7 +171,38 @@ function Verified({ c }) {
     : <span className="cp-ver" title={c.notes || ''}>Unverified</span>;
 }
 
-function CompanyCard({ c, area, areas: AREAS }) {
+/** Base-salary estimate, coloured against the guardrails, with its basis and source. */
+function Salary({ s, guard }) {
+  if (!s) return <span className="cp-sub">—</span>;
+  const v = salaryVerdict(s, guard);
+  return (
+    <span className={`cp-sal is-${v}`} title={[s.role, s.source && `Source: ${s.source}`, s.asOf && `as of ${s.asOf}`].filter(Boolean).join(' · ')}>
+      <b>{salaryLabel(s)}</b>
+      <span className="cp-sub">
+        {VERDICT[v]}{s.basis ? ` · ${BASIS[s.basis] || s.basis}` : ''}
+        {s.url && <> · <a href={s.url} target="_blank" rel="noreferrer noopener">source ↗</a></>}
+      </span>
+      {s.role && <span className="cp-sub">{s.role}</span>}
+    </span>
+  );
+}
+
+/** Five pips, with the reason under them. */
+function Difficulty({ d }) {
+  if (!d || !Number.isFinite(d.score)) return <span className="cp-sub">—</span>;
+  const label = ['', 'Very achievable', 'Achievable', 'Moderate', 'Hard', 'Very hard'][d.score] || '';
+  return (
+    <span className={`cp-diff is-${d.score}`}>
+      <span className="cp-pips" role="img" aria-label={`Difficulty ${d.score} of 5, ${label.toLowerCase()}`}>
+        {[1, 2, 3, 4, 5].map(i => <i key={i} className={i <= d.score ? 'is-on' : ''} />)}
+        <b>{label}</b>
+      </span>
+      {d.why && <span className="cp-sub cp-diff-why">{d.why}</span>}
+    </span>
+  );
+}
+
+function CompanyCard({ c, area, areas: AREAS, guard, watch }) {
   return (
     <article className="cp-co-card">
       <div className="cp-co-top">
@@ -138,6 +213,12 @@ function CompanyCard({ c, area, areas: AREAS }) {
       <span>{c.roles}</span>
       <span className="cp-sub">{c.clearance}</span>
       {c.fit && <span className="cp-fit">{c.fit}</span>}
+      {(c.salary || c.difficulty) && (
+        <div className="cp-co-rate">
+          <Salary s={c.salary} guard={guard} />
+          <Difficulty d={c.difficulty} />
+        </div>
+      )}
       <div className="cp-co-commute">
         {AREAS.map(a => (
           <span key={a.id} className={`${area === a.id ? 'is-area' : ''}${fitsGuardrail(c.commute?.[a.id]) ? ' is-ok' : ''}`}>
@@ -146,6 +227,7 @@ function CompanyCard({ c, area, areas: AREAS }) {
         ))}
       </div>
       <span className="cp-best">Best from: {c.bestAreas}</span>
+      {watch}
     </article>
   );
 }

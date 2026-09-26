@@ -1,6 +1,6 @@
 /**
- * Career tab — the plan (timeline, money, certs, companies), the CV, and
- * deliberate practice.
+ * Career tab — the brief, the plan (timeline, money, certs, companies,
+ * pipeline), and deliberate practice.
  *
  * Sections behind a tab row rather than one long scroll: they are used at
  * different moments (the plan monthly, a LeetCode problem daily) and
@@ -15,25 +15,26 @@
  * Everything else is additive user state, as before:
  *   S.certs       the old cert log — merged INTO the roadmap once (copied,
  *                 never deleted; see career/CertRoadmap)
- *   S.cv          the main CV — see lib/career/cv.js
- *   S.cvVariants  copies tailored for a specific job
- *   S.cvActive    which of those is open, or null for the main one
  *   S.practice    { progress: {…}, log: [...], snippets: [...] }
- * The uploaded CV FILE lives in Supabase Storage — see lib/career/cvFile.js.
+ *
+ * The CV tab was removed (26 Sep). Its data — S.cv, S.cvVariants,
+ * S.cvActive and any uploaded file in Storage — is left exactly where it
+ * was; nothing reads or writes it now, and nothing deleted it.
  */
 import { useMemo, useState } from 'react';
 import PracticePanel from './PracticePanel';
-import CvEditor from './CvEditor';
 import { Field, Sheet } from './UpgSheet';
 import OwnerGate from './career/OwnerGate';
 import PlanPanel from './career/PlanPanel';
 import MoneyPanel from './career/MoneyPanel';
 import CertRoadmap from './career/CertRoadmap';
 import CompaniesPanel from './career/CompaniesPanel';
+import PipelinePanel from './career/PipelinePanel';
+import BriefPanel from './career/BriefPanel';
+import { isOpen } from '../../lib/career/pipeline';
 import { useOwnerContent } from '../../lib/owner/ownerContent';
 import { KEYS } from '../../lib/career/schema';
 import { statusOf } from '../../lib/career/planTimeline';
-import { activeCv } from '../../lib/career/cv';
 import { ALL_PROBLEMS, progressOf } from '../../lib/career/problems';
 import './career/career-plan.css';
 
@@ -41,11 +42,12 @@ const uid = () => Math.random().toString(36).slice(2, 10) + Date.now().toString(
 const today = () => new Date().toISOString().slice(0, 10);
 
 const PANELS = [
+  { id: 'brief', label: 'Brief' },
   { id: 'plan', label: 'Plan' },
   { id: 'money', label: 'Money' },
   { id: 'certs', label: 'Certs' },
   { id: 'companies', label: 'Companies' },
-  { id: 'cv', label: 'CV' },
+  { id: 'pipeline', label: 'Pipeline' },
   { id: 'practice', label: 'Practice' },
   { id: 'library', label: 'Library' },
 ];
@@ -66,9 +68,9 @@ function panelCount(id, S, oc) {
     return `${list.filter(c => c.completed || c.status === 'passed').length}/${list.length}`;
   }
   if (id === 'companies' && d[KEYS.companies]) return String(d[KEYS.companies].filter(c => !c.excluded).length);
-  if (id === 'cv') {
-    const n = activeCv(S).experience.length;
-    return n ? `${n} role${n === 1 ? '' : 's'}` : '';
+  if (id === 'pipeline' && d[KEYS.applications]) {
+    const n = d[KEYS.applications].filter(a => isOpen(a) && a.stage !== 'watching').length;
+    return n ? String(n) : '';
   }
   if (id === 'practice') {
     const solved = ALL_PROBLEMS.filter(p => progressOf(S, p.id).status === 'solved').length;
@@ -81,14 +83,14 @@ function panelCount(id, S, oc) {
   return '';
 }
 
-export default function CareerTab({ S, update, userId, isMobile }) {
-  const [panel, setPanel] = useState('plan');
+export default function CareerTab({ S, update, isMobile }) {
+  const [panel, setPanel] = useState('brief');
   const [scenarioId, setScenarioId] = useState(null);
   const oc = useOwnerContent('career.');
   // `log` is a sub-screen of Practice, not a section of its own.
   const lit = panel === 'log' ? 'practice' : panel;
   return (
-    <div className="upg-pane">
+    <div className="upg-pane career-pane">
       <div className="settings-tabs career-tabs" role="tablist" aria-label="Career sections">
         {PANELS.map(p => {
           const n = panelCount(p.id, S, oc);
@@ -103,6 +105,11 @@ export default function CareerTab({ S, update, userId, isMobile }) {
           );
         })}
       </div>
+      {panel === 'brief' && (
+        <OwnerGate oc={oc}>
+          <BriefPanel oc={oc} S={S} scenarioId={scenarioId} goTo={setPanel} />
+        </OwnerGate>
+      )}
       {panel === 'plan' && (
         <OwnerGate oc={oc} need={KEYS.plan}>
           <PlanPanel oc={oc} isMobile={isMobile} scenarioId={scenarioId} setScenarioId={setScenarioId} />
@@ -117,9 +124,11 @@ export default function CareerTab({ S, update, userId, isMobile }) {
         <OwnerGate oc={oc} need={KEYS.certs}><CertRoadmap oc={oc} S={S} /></OwnerGate>
       )}
       {panel === 'companies' && (
-        <OwnerGate oc={oc} need={KEYS.companies}><CompaniesPanel oc={oc} isMobile={isMobile} /></OwnerGate>
+        <OwnerGate oc={oc} need={KEYS.companies}><CompaniesPanel oc={oc} isMobile={isMobile} goTo={setPanel} /></OwnerGate>
       )}
-      {panel === 'cv' && <CvEditor S={S} update={update} userId={userId} />}
+      {panel === 'pipeline' && (
+        <OwnerGate oc={oc}><PipelinePanel oc={oc} isMobile={isMobile} /></OwnerGate>
+      )}
       {panel === 'practice' && (
         <PracticePanel S={S} update={update} onOpenLog={() => setPanel('log')} />
       )}

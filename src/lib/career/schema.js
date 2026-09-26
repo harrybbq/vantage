@@ -18,6 +18,8 @@ export const KEYS = {
   certs: 'career.certs',
   companies: 'career.companies',
   status: 'career.status',
+  applications: 'career.applications',
+  brief: 'career.brief',
 };
 
 const isObj = v => v && typeof v === 'object' && !Array.isArray(v);
@@ -105,6 +107,16 @@ function companies(d, errs) {
     if (!isObj(c) || !isStr(c.name)) return errs.push(`${p}.name: required`);
     if (!isUrlish(c.careersUrl)) errs.push(`${p}.careersUrl: a full https:// link`);
     if (c.verifiedOn != null && c.verifiedOn !== '' && !/^\d{4}-\d{2}-\d{2}$/.test(c.verifiedOn)) errs.push(`${p}.verifiedOn: YYYY-MM-DD`);
+    if (c.difficulty != null) {
+      const d = c.difficulty;
+      if (!isObj(d) || !Number.isInteger(d.score) || d.score < 1 || d.score > 5) errs.push(`${p}.difficulty.score: a whole number 1–5`);
+    }
+    if (c.salary != null) {
+      const sal = c.salary;
+      if (!isObj(sal) || !isNum(sal.low) || !isNum(sal.high)) errs.push(`${p}.salary: needs low and high (numbers, £/year)`);
+      else if (sal.low > sal.high) errs.push(`${p}.salary: low is above high`);
+      if (isObj(sal) && !isUrlish(sal.url)) errs.push(`${p}.salary.url: a full https:// link`);
+    }
   });
   ids(errs, d, 'companies');
 }
@@ -116,9 +128,24 @@ function status(d, errs) {
   }
 }
 
+function applications(d, errs) {
+  const STAGES = ['watching', 'applied', 'screen', 'interview', 'offer'];
+  list(errs, d, 'applications', (a, p) => {
+    if (!isObj(a)) return errs.push(`${p}: must be an object`);
+    if (!isStr(a.company) && !isStr(a.companyId)) errs.push(`${p}: needs company or companyId`);
+    if (!STAGES.includes(a.stage)) errs.push(`${p}.stage: one of ${STAGES.join(', ')}`);
+    if (a.salary != null && !isNum(a.salary)) errs.push(`${p}.salary: a number (£/year)`);
+    if (a.commuteMin != null && !isNum(a.commuteMin)) errs.push(`${p}.commuteMin: a number of minutes`);
+    if (a.next != null && (!isObj(a.next) || (a.next.due != null && a.next.due !== '' && !/^\d{4}-\d{2}-\d{2}$/.test(a.next.due)))) errs.push(`${p}.next.due: YYYY-MM-DD`);
+    if (!isUrlish(a.url)) errs.push(`${p}.url: a full https:// link`);
+    if (a.events != null && !Array.isArray(a.events)) errs.push(`${p}.events: must be a list`);
+  });
+  ids(errs, d, 'applications');
+}
+
 const CHECKS = {
   [KEYS.plan]: plan, [KEYS.money]: money, [KEYS.certs]: certs,
-  [KEYS.companies]: companies, [KEYS.status]: status,
+  [KEYS.companies]: companies, [KEYS.status]: status, [KEYS.applications]: applications,
 };
 
 /** → [] when valid, otherwise readable errors (first 20). */
