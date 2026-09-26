@@ -15,8 +15,10 @@
  * dot; now one is seven times the width of the other.
  *
  * ── The controls ─────────────────────────────────────────────────────
- * Drag to pan. Plain scroll wheel to zoom, toward the cursor, on a
- * continuous scale rather than in notches so the gesture is smooth. The
+ * Drag to pan, and let go mid-drag to fling. Sideways swipe or
+ * Shift+wheel pans; pinch or the plain wheel zooms, toward the cursor,
+ * gliding rather than stepping (lib/holiday/railMotion). At full zoom
+ * the wheel goes back to the page. Arrows, + − and T from the keys. The
  * rail spans the whole page because it is the one element that gets
  * better with width, and it opens with today about three-quarters
  * across: flush right would put every upcoming trip off-screen,
@@ -26,8 +28,11 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react
 import { useIsMobile } from '../../hooks/useIsMobile';
 import {
   PX_PER_DAY, TODAY_ANCHOR, TODAY_ANCHOR_V, ZOOM_STEP, clampZoom, dayAt, daysUntil, fmt,
-  nightsOf, railBands, railGeometry, railTicks, wheelZoom,
+  nightsOf, railBands, railGeometry, railTicks,
 } from '../../lib/holiday/timeline';
+import {
+  classifyWheel, zoomTarget, atZoomLimit, approachZoom, approach, releaseVelocity, glideStep,
+} from '../../lib/holiday/railMotion';
 
 /** Behind us? Status OR dates, so a trip nobody marked completed still
  *  greys out once it is over. */
@@ -81,10 +86,117 @@ export default function TripRail({ trips, selectedId, onSelect, now = new Date()
     return () => ro.disconnect();
   }, [axis.len]);
 
-  /* ── Pan ──────────────────────────────────────────────────────────
+  const reducedMotion = () => typeof window !== 'undefined' && window.matchMedia
+    && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  /* The geometry the DOM is showing right now, for turning a scroll
+     position back into a date between renders. */
+  const geoRef = useRef(geo);
+  geoRef.current = geo;
+  const maxPos = () => {
+    const el = scroller.current;
+    return el ? Math.max(0, (isMobile ? el.scrollHeight : el.scrollWidth) - el[axis.len]) : 0;
+  };
+
+  /* ── Motion loops ─────────────────────────────────────────────────
+     Three things can move the rail on their own: a fling gliding after
+     the pointer lets go, a pan easing to a target (keys, a mouse notch,
+     Today), and a zoom easing to a target. Any new input stops the
+     first two, so the rail never fights the hand that is on it. */
+  const glide = useRef({ raf: 0, v: 0, last: 0 });
+  const pan = useRef({ raf: 0, target: 0, last: 0 });
+  const za = useRef({ raf: 0, z: zoom, target: zoom, tau: 60, last: 0 });
+  const anchor = useRef(null);        // { ms, offset } — the date held under a point while zooming
+
+  function stopGlide() { cancelAnimationFrame(glide.current.raf); glide.current.raf = 0; glide.current.v = 0; }
+  function stopPan() { cancelAnimationFrame(pan.current.raf); pan.current.raf = 0; }
+
+  function glideFrame(t) {
+    const g = glide.current, el = scroller.current;
+    if (!el || !g.v) { g.raf = 0; return; }
+    const dt = Math.max(0, Math.min(48, t - g.last)); g.last = Math.max(g.last, t);
+    const step = glideStep(g.v, dt);
+    el[axis.pos] = el[axis.pos] - step.dist;
+    g.v = step.v;
+    // Hit an end: stop rather than keep pushing against it.
+    const pos = el[axis.pos];
+    if (!g.v || (g.v > 0 && pos <= 0) || (g.v < 0 && pos >= maxPos() - 0.5)) { g.raf = 0; g.v = 0; return; }
+    g.raf = requestAnimationFrame(glideFrame);
+  }
+
+  /** Ease the scroll position to `target` (clamped to the rail). */
+  const panTo = useCallback(target => {
+    const el = scroller.current;
+    if (!el) return;
+    stopGlide();
+    const tgt = Math.max(0, Math.min(maxPos(), target));
+    if (reducedMotion()) { stopPan(); el[axis.pos] = tgt; return; }
+    pan.current.target = tgt;
+    if (pan.current.raf) return;
+    pan.current.last = performance.now();
+    const frame = t => {
+      const pa = pan.current, e2 = scroller.current;
+      if (!e2) { pa.raf = 0; return; }
+      const dt = Math.max(0, Math.min(48, t - pa.last)); pa.last = Math.max(pa.last, t);
+      const next = approach(e2[axis.pos], pa.target, dt, 90);
+      e2[axis.pos] = next;
+      pa.raf = next === pa.target ? 0 : requestAnimationFrame(frame);
+    };
+    pan.current.raf = requestAnimationFrame(frame);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [axis.pos, axis.len, isMobile]);
+  const panBy = useCallback(dist => {
+    const el = scroller.current;
+    if (!el) return;
+    const from = pan.current.raf ? pan.current.target : el[axis.pos];
+    panTo(from + dist);
+  }, [panTo, axis.pos]);
+
+  /* ── Zoom ─────────────────────────────────────────────────────────
+     Anchored on a point: the cursor for a wheel or pinch, the middle
+     for the buttons and keys. The date under that point stays under it.
+
+     The scroll position is corrected in a layout effect — after React
+     has laid the rail out at its new length, BEFORE the browser paints.
+     It used to be corrected a frame later, so every zoom step painted
+     one frame at the wrong position and the view flickered between two
+     places as you scrolled. */
+  const zoomTo = useCallback((nextPx, anchorOffset, tau = 60) => {
+    const el = scroller.current, g = geoRef.current;
+    if (!el || !g) return;
+    stopGlide(); stopPan();
+    anchor.current = { ms: g.dateAt(el[axis.pos] + anchorOffset).getTime(), offset: anchorOffset };
+    const target = clampZoom(nextPx);
+    const z = za.current;
+    z.target = target;
+    z.tau = reducedMotion() ? 0 : tau;
+    if (z.raf) return;
+    z.last = performance.now();
+    const frame = t => {
+      const q = za.current;
+      const dt = Math.max(0, Math.min(48, t - q.last)); q.last = Math.max(q.last, t);
+      q.z = q.tau ? approachZoom(q.z, q.target, dt, q.tau) : q.target;
+      q.raf = q.z === q.target ? 0 : requestAnimationFrame(frame);
+      setZoom(q.z);
+    };
+    z.raf = requestAnimationFrame(frame);
+  }, [axis.pos]);
+
+  useLayoutEffect(() => {
+    const a = anchor.current, el = scroller.current;
+    if (!a || !el || !geo) return;
+    el[axis.pos] = Math.max(0, geo.at(a.ms) - a.offset);
+    if (!za.current.raf) anchor.current = null;
+  }, [zoom, geo, axis.pos]);
+
+  useEffect(() => () => { stopGlide(); stopPan(); cancelAnimationFrame(za.current.raf); }, []);
+
+  /* ── Pan by dragging ──────────────────────────────────────────────
      No "not from a button" guard: the bands ARE buttons and cover the
      rail, so refusing to pan from one would mean the drag only worked
-     in the gaps. The 4px threshold is what keeps a click a click. */
+     in the gaps. The 4px threshold is what keeps a click a click.
+     Let go while moving and the rail carries on and slows, like a list
+     on a phone; press again to catch it. */
   const drag = useRef(null);
   const [dragging, setDragging] = useState(false);
   const movedRef = useRef(false);
@@ -93,8 +205,11 @@ export default function TripRail({ trips, selectedId, onSelect, now = new Date()
     if (e.button !== 0) return;
     const el = scroller.current;
     if (!el) return;
-    drag.current = { at: e[axis.client], pos: el[axis.pos], id: e.pointerId, captured: false };
-    movedRef.current = false;
+    // Catching a glide is a stop, not a click on whatever is under it.
+    const caught = !!glide.current.raf || !!pan.current.raf;
+    stopGlide(); stopPan();
+    drag.current = { at: e[axis.client], pos: el[axis.pos], id: e.pointerId, captured: false, samples: [{ t: e.timeStamp, x: e[axis.client] }] };
+    movedRef.current = caught;
     /* Capture is NOT taken here. It retargets the pointerup, and a click
        fires on the nearest common ancestor of down and up — capturing on
        every press made every band unselectable. Taken below, once a real
@@ -104,70 +219,86 @@ export default function TripRail({ trips, selectedId, onSelect, now = new Date()
     const d = drag.current, el = scroller.current;
     if (!d || !el) return;
     const delta = e[axis.client] - d.at;
-    if (!movedRef.current && Math.abs(delta) > 4) {
+    if (!d.captured && Math.abs(delta) > 4) {
       movedRef.current = true;
       setDragging(true);
       el.setPointerCapture?.(e.pointerId);
       d.captured = true;
     }
-    if (movedRef.current) el[axis.pos] = d.pos - delta;
+    d.samples.push({ t: e.timeStamp, x: e[axis.client] });
+    if (d.samples.length > 12) d.samples.shift();
+    if (d.captured) el[axis.pos] = d.pos - delta;
   }
-  function endDrag() {
-    const el = scroller.current;
-    if (drag.current?.captured && el) el.releasePointerCapture?.(drag.current.id);
+  function endDrag(e) {
+    const el = scroller.current, d = drag.current;
+    if (d?.captured && el) el.releasePointerCapture?.(d.id);
+    if (d?.captured && e && e.type === 'pointerup' && !reducedMotion()) {
+      const v = releaseVelocity(d.samples, e.timeStamp);
+      if (Math.abs(v) > 0.15) {
+        glide.current.v = v;
+        glide.current.last = performance.now();
+        glide.current.raf = requestAnimationFrame(glideFrame);
+      }
+    }
     drag.current = null;
     // Next frame, so the click that follows this pointerup can still see
     // that a drag happened and swallow itself.
     requestAnimationFrame(() => { movedRef.current = false; setDragging(false); });
   }
 
-  /* ── Zoom ─────────────────────────────────────────────────────────
-     Anchored on a point: the cursor for a wheel, the middle for the
-     buttons. Whatever date is under that point stays under it, which is
-     the difference between a lens and a jump cut. */
-  const zoomAround = useCallback((nextPx, anchorOffset) => {
-    const el = scroller.current;
-    const next = clampZoom(nextPx);
-    setZoom(prev => {
-      if (Math.abs(next - prev) < 1e-6) return prev;
-      if (el && geo) {
-        const held = geo.dateAt(el[axis.pos] + anchorOffset);
-        // Re-place after paint, when the rail has its new length.
-        requestAnimationFrame(() => {
-          const g2 = railGeometry(trips, now, next, viewport || 0);
-          const el2 = scroller.current;
-          if (g2 && el2) el2[axis.pos] = Math.max(0, g2.at(held.getTime()) - anchorOffset);
-        });
-      }
-      return next;
-    });
-  }, [geo, trips, now, viewport, axis.pos]);
-
-  /* Plain wheel — no modifier, as asked. preventDefault only while the
-     pointer is over the rail, so the page scrolls normally everywhere
-     else. Non-passive, or preventDefault is ignored. */
+  /* ── Wheel ────────────────────────────────────────────────────────
+     Sideways trackpad swipes and Shift+wheel pan; pinch zooms; a plain
+     wheel zooms (as asked) — except at the limit in that direction,
+     where it goes back to the page. The rail is the full width of the
+     page, so without that a wheel over it could never scroll past it.
+     Non-passive, or preventDefault is ignored. */
   useEffect(() => {
     const el = scroller.current;
-    if (!el) return;
+    if (!el) return undefined;
     const onWheel = e => {
-      const primary = isMobile ? e.deltaY : (Math.abs(e.deltaY) >= Math.abs(e.deltaX) ? e.deltaY : e.deltaX);
-      if (!primary) return;
+      const w = classifyWheel(e);
+      if (!w.kind) return;
+      if (w.kind === 'pan') {
+        if (isMobile) return;
+        e.preventDefault();
+        stopGlide();
+        if (w.notched) panBy(w.delta * 1.6);
+        else { stopPan(); el[axis.pos] += w.delta; }
+        return;
+      }
+      const base = za.current.raf ? za.current.target : zoom;
+      if (w.kind === 'zoom' && atZoomLimit(base, w.delta)) return;   // hand it to the page
       e.preventDefault();
       const r = el.getBoundingClientRect();
       const offset = isMobile ? e.clientY - r.top : e.clientX - r.left;
-      zoomAround(wheelZoom(zoom, primary), offset);
+      zoomTo(zoomTarget(base, w.delta, w.kind === 'pinch'), offset, w.notched ? 60 : 0);
     };
     el.addEventListener('wheel', onWheel, { passive: false });
     return () => el.removeEventListener('wheel', onWheel);
-  }, [zoom, zoomAround, isMobile]);
+  }, [zoom, zoomTo, panBy, isMobile, axis.pos]);
 
   /** Put today at its anchor. Also the "jump to today" action. */
   const goToToday = useCallback((smooth = true) => {
     const el = scroller.current;
     if (!el || !geo) return;
     const target = Math.max(0, geo.today - el[axis.len] * (isMobile ? TODAY_ANCHOR_V : TODAY_ANCHOR));
-    el.scrollTo({ [axis.start]: target, behavior: smooth ? 'smooth' : 'auto' });
-  }, [geo, axis.len, axis.start, isMobile]);
+    if (smooth) panTo(target);
+    else el[axis.pos] = target;
+  }, [geo, axis.len, axis.pos, isMobile, panTo]);
+
+  /* ── Keys ─────────────────────────────────────────────────────────
+     The rail takes focus. Arrows pan a third of the view, + and − zoom
+     about the middle, T (or Home) goes to today. */
+  function onKeyDown(e) {
+    const el = scroller.current;
+    if (!el || e.metaKey || e.ctrlKey || e.altKey) return;
+    const len = el[axis.len];
+    const back = isMobile ? 'ArrowUp' : 'ArrowLeft', fwd = isMobile ? 'ArrowDown' : 'ArrowRight';
+    if (e.key === back || e.key === fwd) { e.preventDefault(); panBy((e.key === fwd ? 1 : -1) * len * 0.33); }
+    else if (e.key === '+' || e.key === '=') { e.preventDefault(); zoomTo((za.current.raf ? za.current.target : zoom) * ZOOM_STEP, len / 2); }
+    else if (e.key === '-' || e.key === '_') { e.preventDefault(); zoomTo((za.current.raf ? za.current.target : zoom) / ZOOM_STEP, len / 2); }
+    else if (e.key === 't' || e.key === 'T' || e.key === 'Home') { e.preventDefault(); goToToday(); }
+  }
 
   /* Once per mount, and only AFTER the viewport has been measured.
      Placing on the first render used the 1200px guess; the real 1328
@@ -196,11 +327,11 @@ export default function TripRail({ trips, selectedId, onSelect, now = new Date()
         {!vertical && <span className="hol-rail-line" aria-hidden="true" />}
         <span className="hol-zoom" role="group" aria-label="Timeline zoom">
           <button type="button" className="hol-zoom-btn"
-                  onClick={() => zoomAround(zoom / ZOOM_STEP, (scroller.current?.[axis.len] || 0) / 2)}
+                  onClick={() => zoomTo((za.current.raf ? za.current.target : zoom) / ZOOM_STEP, (scroller.current?.[axis.len] || 0) / 2)}
                   aria-label="Zoom out">−</button>
           <span className="hol-zoom-level" aria-live="polite">{zoomLabel(zoom)}</span>
           <button type="button" className="hol-zoom-btn"
-                  onClick={() => zoomAround(zoom * ZOOM_STEP, (scroller.current?.[axis.len] || 0) / 2)}
+                  onClick={() => zoomTo((za.current.raf ? za.current.target : zoom) * ZOOM_STEP, (scroller.current?.[axis.len] || 0) / 2)}
                   aria-label="Zoom in">+</button>
         </span>
         <button type="button" className="hol-rail-jump" onClick={() => goToToday()}>Today</button>
@@ -213,6 +344,12 @@ export default function TripRail({ trips, selectedId, onSelect, now = new Date()
         onPointerMove={onPointerMove}
         onPointerUp={endDrag}
         onPointerCancel={endDrag}
+        onKeyDown={onKeyDown}
+        tabIndex={0}
+        role="group"
+        aria-label={vertical
+          ? 'Trip timeline. Up and down arrows pan, plus and minus zoom, T goes to today.'
+          : 'Trip timeline. Left and right arrows pan, plus and minus zoom, T goes to today.'}
       >
         {geo ? (
           <div className="hol-rail-inner" style={{ [axis.size]: geo.width + 'px' }}>
@@ -297,7 +434,9 @@ export default function TripRail({ trips, selectedId, onSelect, now = new Date()
       </div>
 
       <div className="hol-rail-foot">
-        <span className="hol-rail-hint">Drag to pan · scroll to zoom</span>
+        <span className="hol-rail-hint">
+          {vertical ? 'Drag to pan · scroll to zoom' : 'Drag or swipe to pan · scroll or pinch to zoom · ← → + − T'}
+        </span>
         {undated.length > 0 && (
           <span className="hol-undated">
             <span className="hol-rail-eyebrow">No dates yet</span>

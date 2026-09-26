@@ -394,7 +394,9 @@
 .hol-rail-scroll{
   position:relative; cursor:grab;
   overflow-x:auto; overflow-y:hidden;
-  overscroll-behavior:contain; scrollbar-width:none;
+  /* x only: contain on both axes also stopped a vertical wheel reaching
+     the page, so a rail at full zoom-out still trapped the page scroll. */
+  overscroll-behavior-x:contain; scrollbar-width:none;
 }
 .hol-rail-scroll::-webkit-scrollbar{ display:none; }
 .hol-rail-scroll.is-dragging{ cursor:grabbing; }
@@ -858,3 +860,6 @@
   .hol-pass-ref{ flex:1 0 100%; order:-1; margin-bottom:2px; }
   .hol-pass-foot .hol-btn{ flex:1; }
 }
+
+/* The rail takes keyboard focus (arrows, + −, T). */
+.hol-rail-scroll:focus-visible { outline: 2px solid var(--em); outline-offset: 3px; border-radius: 8px; }

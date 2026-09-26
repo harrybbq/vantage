@@ -116,9 +116,21 @@ export function countdown(trip, now = new Date()) {
   };
 }
 
+/* One Intl.DateTimeFormat per set of options, reused. toLocaleDateString
+   builds a fresh formatter on every call (~80µs against ~1µs), and the
+   timeline formats ~80 dates per frame while it zooms — that alone was
+   about 6ms of every frame. */
+const FORMATTERS = new Map();
+export function formatter(opts) {
+  const key = opts ? JSON.stringify(opts) : '';
+  let f = FORMATTERS.get(key);
+  if (!f) { f = new Intl.DateTimeFormat('en-GB', opts); FORMATTERS.set(key, f); }
+  return f;
+}
+
 export function fmt(iso, opts) {
   const d = dayAt(iso);
-  return d ? d.toLocaleDateString('en-GB', opts) : '';
+  return d ? formatter(opts).format(d) : '';
 }
 
 /**
@@ -448,7 +460,7 @@ export function railTicks(geo) {
       out.push({
         key: `${y}-${m}`,
         left: geo.at(ms),
-        label: isYear ? String(y) : new Date(ms).toLocaleDateString('en-GB', { month: 'short' }).toUpperCase(),
+        label: isYear ? String(y) : formatter({ month: 'short' }).format(new Date(ms)).toUpperCase(),
         isYear,
       });
     }

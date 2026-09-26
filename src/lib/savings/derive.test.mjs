@@ -171,7 +171,7 @@ eq(f.routed, 600, 'routed is what feeds pots');
 near(f.rate, 0.2, 'and the saved rate is routed over income');
 eq(flowTotals([], [], [], NOW).rate, 0, 'no income means a 0 rate, not a divide by zero');
 
-near(blendedApy([{ balance: '1000', apy: '2' }, { balance: '3000', apy: '6' }]), 5, 'blended APY is balance-weighted');
+near(blendedApy([{ balance: '1000', apy: '2' }, { balance: '3000', apy: '6' }], NOW.getTime()), 5, 'blended APY is balance-weighted');
 eq(blendedApy([]), 0, 'no accounts blends to zero');
 
 
