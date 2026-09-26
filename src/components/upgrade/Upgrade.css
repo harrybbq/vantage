@@ -978,3 +978,126 @@
   .upg-review-acts { flex-direction: row; width: 100%; }
   .upg-review-acts .btn { flex: 1; }
 }
+
+/* ══ Rotation, reworked (26 Sep) ════════════════════════════════════
+   Today reads as two lists side by side; the next sixteen days get a
+   strip of their own; the calendar pages three months at a time with
+   cells big enough to read. */
+.upg-today-lists { display: grid; grid-template-columns: 1fr; gap: 14px; }
+@media (min-width: 900px) {
+  .upg-today-lists { grid-template-columns: 1.1fr 1fr; gap: 22px; align-items: start; }
+  .upg-today-lists > .upg-stretch { margin-top: 0; padding-top: 0; border-top: 0; }
+}
+
+.upg-next-row { display: grid; grid-template-columns: repeat(16, minmax(0, 1fr)); gap: 5px; }
+@media (max-width: 1100px) { .upg-next-row { grid-template-columns: repeat(8, minmax(0, 1fr)); } }
+@media (max-width: 520px) { .upg-next-row { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+.upg-next-day {
+  display: flex; flex-direction: column; align-items: flex-start; gap: 2px; min-width: 0;
+  padding: 7px 7px 8px; border-radius: 9px; border: 1px solid var(--border); background: transparent;
+  color: var(--text); cursor: pointer; text-align: left; font-family: inherit; position: relative;
+  transition: border-color .12s ease, transform .12s ease;
+}
+.upg-next-day:hover { border-color: var(--em); transform: translateY(-1px); }
+.upg-next-day:focus-visible { outline: 2px solid var(--em); outline-offset: 2px; }
+.upg-next-day.is-night { background: rgba(107,138,253,.13); border-color: rgba(107,138,253,.4); }
+.upg-next-day.is-day { background: rgba(217,145,20,.13); border-color: rgba(217,145,20,.38); }
+.upg-next-day.is-leave { background: rgba(var(--em-rgb),.16); border-color: var(--em); }
+.upg-next-day.is-holiday { box-shadow: inset 0 0 0 1px rgba(200,151,10,.6); }
+.upg-next-day.has-cardio { box-shadow: inset 0 -3px 0 0 #12a5a5; }
+.upg-next-day.is-today { outline: 2px solid var(--em); outline-offset: -2px; }
+.upg-next-day.is-edited::after { content: ''; position: absolute; top: 6px; right: 6px; width: 5px; height: 5px; border-radius: 50%; background: var(--gold, #c8970a); }
+.upg-next-dow { font-family: var(--mono); font-size: 9px; letter-spacing: 1px; text-transform: uppercase; color: var(--text-muted); }
+.upg-next-day.is-today .upg-next-dow { color: var(--em); }
+.upg-next-dt { font-family: var(--mono); font-size: 17px; font-weight: 700; line-height: 1.1; }
+.upg-next-chip { font-family: var(--mono); font-size: 9.5px; font-weight: 700; color: var(--text-muted); }
+.upg-next-day.is-night .upg-next-chip { color: #8a94d8; }
+.upg-next-day.is-day .upg-next-chip { color: #d99114; }
+.upg-next-day.is-leave .upg-next-chip { color: var(--em); }
+.upg-next-sess { font-size: 11px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+.upg-next-sess.is-rest { color: var(--text-muted); font-weight: 400; }
+
+.upg-pager { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.upg-pager-btn { width: 32px; height: 32px; border-radius: 9px; border: 1px solid var(--border); background: transparent;
+  color: var(--text); font-size: 17px; line-height: 1; cursor: pointer; }
+.upg-pager-btn:hover:not(:disabled) { border-color: var(--em); color: var(--em); }
+.upg-pager-btn:disabled { opacity: .35; cursor: default; }
+.upg-pager-lbl { font-family: var(--display); font-size: 18px; font-weight: 700; min-width: 10ch; }
+.upg-pager-of { margin-left: auto; font-family: var(--mono); font-size: 10px; color: var(--text-muted); }
+
+/* Three months across: each cell roughly twice the old size, so the
+   date, the shift and the session all read without squinting. */
+.upg-months.is-paged { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
+.upg-months.is-paged.is-mobile { grid-template-columns: 1fr; }
+@media (max-width: 900px) { .upg-months.is-paged:not(.is-mobile) { grid-template-columns: 1fr; } }
+.upg-months.is-paged .upg-month { padding: 14px; }
+.upg-months.is-paged .upg-month h3 { font-family: var(--display); font-size: 17px; font-weight: 700; margin-bottom: 10px; }
+.upg-months.is-paged .upg-grid, .upg-months.is-paged .upg-dow { gap: 4px; }
+.upg-months.is-paged .upg-cell { aspect-ratio: auto; min-height: 48px; padding: 5px; }
+.upg-months.is-paged .upg-dt { font-size: 12px; }
+.upg-months.is-paged .upg-chip { font-size: 9px; }
+.upg-months.is-paged .upg-sess { font-size: 9px; }
+.upg-months.is-paged .upg-dow span { font-size: 9.5px; }
+.upg-months.is-paged.is-mobile .upg-cell { min-height: 46px; }
+/* A phone month is seven 40px columns: the session goes to three letters
+   ("Pus", "Upp") rather than an ellipsis that leaves two. */
+.upg-months.is-paged.is-mobile .upg-sess > span { display: none; }
+.upg-months.is-paged.is-mobile .upg-sess::after { content: attr(data-short); }
+
+/* ══ Diet, reworked (26 Sep) ════════════════════════════════════════
+   The build card gains the trend it was missing; macros read in full
+   ink with where the calories come from; the reasoning folds away. */
+.upg-build .upg-card-head h3, .upg-macro-grid + * h3, .upg-notes-h { font-family: var(--display); }
+.upg-build .upg-card-head h3 { font-size: 18px; font-weight: 700; }
+.upg-trend { margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--border); }
+.upg-trend-head { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; margin-bottom: 6px; }
+.upg-trend-lbl { font-family: var(--mono); font-size: 9.5px; letter-spacing: 1.4px; text-transform: uppercase; color: var(--text-muted); }
+.upg-pace { font-family: var(--mono); font-size: 11px; font-weight: 700; padding: 3px 9px; border-radius: 999px;
+  border: 1px solid var(--border); color: var(--text); }
+.upg-pace em { font-style: normal; font-weight: 400; color: var(--text-muted); }
+.upg-pace.is-on, .upg-pace.is-there { border-color: rgba(var(--em-rgb), .55); color: var(--em); }
+.upg-pace.is-slow { border-color: rgba(217,145,20,.55); color: #d99114; }
+.upg-pace.is-wrong { border-color: color-mix(in srgb, var(--danger, #e0796a) 60%, transparent); color: var(--danger, #e0796a); }
+.upg-trend-chart { position: relative; width: 100%; }
+.upg-trend-chart svg { display: block; overflow: visible; }
+.upg-trend-grid { stroke: var(--border); stroke-width: 1; }
+.upg-trend-axis { fill: var(--text-muted); font-family: var(--mono); font-size: 9.5px; }
+.upg-trend-target { stroke: var(--text-muted); stroke-width: 1; stroke-dasharray: 4 4; }
+.upg-trend-tlbl { fill: var(--text-muted); font-family: var(--mono); font-size: 9.5px; }
+.upg-trend-line { fill: none; stroke: var(--em); stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
+.upg-trend-dot { fill: var(--em); stroke: var(--surface, #131311); stroke-width: 2; }
+.upg-trend-cross { stroke: var(--text-muted); stroke-width: 1; }
+.upg-trend-tip { position: absolute; top: 0; pointer-events: none; display: flex; flex-direction: column; gap: 1px;
+  padding: 6px 9px; border-radius: 8px; border: 1px solid var(--border); background: var(--surface, #131311);
+  font-family: var(--mono); font-size: 11px; color: var(--text); box-shadow: 0 6px 18px rgba(0,0,0,.28); }
+.upg-trend-tip span { color: var(--text-muted); font-size: 10px; }
+.upg-trend-empty { margin-top: 12px; }
+
+.upg-macro.is-accent { border-left-color: var(--em); }
+.upg-mv.is-kcal { color: var(--em); font-size: 16px; }
+.upg-mk { color: var(--text); display: inline-flex; align-items: center; gap: 7px; }
+.upg-mdot { width: 8px; height: 8px; border-radius: 2px; display: inline-block; }
+.upg-mshare { font-style: normal; font-family: var(--mono); font-size: 10px; color: var(--text-muted); }
+.upg-mbar { display: flex; height: 6px; border-radius: 3px; overflow: hidden; gap: 2px; margin-bottom: 10px; }
+.upg-mbar i { display: block; height: 100%; border-radius: 2px; }
+@media (max-width: 640px) { .upg-macro-grid { grid-template-columns: 1fr; } .upg-figs { grid-template-columns: 1fr 1fr; } }
+
+.upg-split-cell { flex: 1 0 46px; }
+.upg-split-sess { font-size: 9px; text-transform: uppercase; white-space: nowrap; }
+
+.upg-notes { padding: 0; }
+.upg-notes summary { list-style: none; cursor: pointer; display: flex; align-items: baseline; gap: 12px; padding: 14px 16px; }
+.upg-notes summary::-webkit-details-marker { display: none; }
+.upg-notes-h { font-family: var(--mono) !important; font-size: 10px; letter-spacing: 1.4px; text-transform: uppercase; color: var(--text-muted); }
+.upg-notes-h::after { content: ' ▸'; }
+.upg-notes[open] .upg-notes-h::after { content: ' ▾'; }
+.upg-notes-body { padding: 0 16px 14px; display: flex; flex-direction: column; gap: 10px; }
+.upg-notes-body p { margin: 0; font-size: 13px; line-height: 1.6; color: var(--text-muted); max-width: 80ch; }
+.upg-notes-body b { color: var(--text); font-weight: 600; }
+.upg-mv { color: var(--text); }
+/* Phone: the sixteen-day split wraps to four rows of four instead of a
+   strip you have to scroll to see the second half of. */
+@media (max-width: 640px) {
+  .upg-split-row { flex-wrap: wrap; overflow: visible; }
+  .upg-split-cell { flex: 1 0 calc(25% - 3px); }
+}
