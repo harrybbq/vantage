@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import Icon from '../Icon';
 import WorldMap from './WorldMap';
 import { visitedCountries, visitedPct, countryForTrip, ALL_COUNTRIES, COUNTRY_BY_ISO } from '../../lib/holiday/destinations';
@@ -29,13 +29,73 @@ import { fmt } from '../../lib/holiday/timeline';
  * are tinted in the accent green — the map shows where you are about to
  * add, not only where you have. They are not counted as visited until
  * the trip is marked Completed.
+ *
+ * ── Motion (approved from the Visited Motion Preview, 26 Sep) ────────
+ *   arrival  — the count rolls up, the bars fill, the map inks in west
+ *              to east and the list settles in behind it. Once a mount.
+ *   stamp    — marking a country thumps it down with a ring (WorldMap
+ *              `stamp`), rolls the count and pops the new list row.
+ *   fly      — picking a region flies the map to it and dims the rest.
+ *   breathe  — coming-up countries glow slowly (CSS).
+ *   card     — the country card rises; its text swaps in place.
+ *   unfold   — "Add somewhere else" cascades the rows in.
+ * All of it stands down under prefers-reduced-motion.
  */
+
+/* Map framing per region, as [lonW, latN, lonE, latS]. Hand-set rather
+   than derived: Oceania's Pacific islands straddle the date line, and a
+   bounding box of Russia would put all of Europe in a corner. */
+const REGION_VIEW = {
+  Africa: [-20, 38, 55, -36],
+  Americas: [-170, 72, -30, -56],
+  Asia: [25, 56, 150, -11],
+  Europe: [-25, 71, 45, 34],
+  Oceania: [110, 0, 180, -48],
+  Antarctic: [-70, -40, 180, -60],
+};
+
+const reduced = () => typeof window !== 'undefined' && window.matchMedia
+  && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+/** A number that rolls to its new value: from 0 on first mount (the
+ *  arrival), from the old value after (a stamp). */
+function RollNumber({ value }) {
+  const [shown, setShown] = useState(() => (reduced() ? value : 0));
+  const from = useRef(reduced() ? value : 0);
+  useEffect(() => {
+    if (reduced()) { setShown(value); from.current = value; return undefined; }
+    const a = from.current, ms = a === 0 ? 700 : 400, t0 = performance.now();
+    let raf = 0;
+    const step = t => {
+      const k = Math.min(1, (t - t0) / ms);
+      const v = Math.round(a + (value - a) * (1 - Math.pow(1 - k, 3)));
+      setShown(v);
+      from.current = v;
+      if (k < 1) raf = requestAnimationFrame(step);
+    };
+    raf = requestAnimationFrame(step);
+    return () => cancelAnimationFrame(raf);
+  }, [value]);
+  return <b>{shown}</b>;
+}
+
 export default function VisitedTab({ S, update }) {
   const [region, setRegion] = useState('all');
   const [picked, setPicked] = useState(null);
   // Not persisted: a way of looking at the list for a moment, not a setting.
   const [query, setQuery] = useState('');
   const [showRest, setShowRest] = useState(false);
+  // Motion state. `arriving` scopes the arrival cascade to the first
+  // moments of the mount; `stamp` is bumped to thump a country on the map.
+  const [arriving, setArriving] = useState(() => !reduced());
+  const [stamp, setStamp] = useState(null);
+  const [justAdded, setJustAdded] = useState(null);
+  const [unfolding, setUnfolding] = useState(false);
+  useEffect(() => {
+    if (!arriving) return undefined;
+    const tm = setTimeout(() => setArriving(false), 1600);
+    return () => clearTimeout(tm);
+  }, [arriving]);
 
   const visited = useMemo(() => visitedCountries(S), [S]);
   const isoList = useMemo(() => Object.keys(visited), [visited]);
@@ -78,6 +138,11 @@ export default function VisitedTab({ S, update }) {
     // A country earned by a completed trip can't be un-ticked here —
     // it belongs to the trip, and the trip is the source of truth.
     if (entry && entry.trips.length) { setPicked(iso2); return; }
+    if (!entry) {
+      const c = COUNTRY_BY_ISO[iso2];
+      setStamp(st => ({ iso2, lat: c.lat, lon: c.lon, n: (st?.n || 0) + 1 }));
+      setJustAdded(iso2);
+    } else if (justAdded === iso2) setJustAdded(null);
     update(prev => {
       const cur = prev.visitedExtra || [];
       const next = cur.includes(iso2) ? cur.filter(c => c !== iso2) : [...cur, iso2];
@@ -94,14 +159,28 @@ export default function VisitedTab({ S, update }) {
   const narrowed = !!query.trim() || region !== 'all';
   const restOpen = showRest || narrowed;
 
-  const item = (c, isBeen) => {
+  const highlight = useMemo(() => (region === 'all' ? null
+    : new Set(ALL_COUNTRIES.filter(c => c.region === region).map(c => c.iso2))), [region]);
+  const focus = region === 'all' ? null : REGION_VIEW[region] || null;
+
+  function unfold() {
+    setShowRest(true);
+    if (!reduced()) {
+      setUnfolding(true);
+      setTimeout(() => setUnfolding(false), 900);
+    }
+  }
+
+  const item = (c, isBeen, i) => {
     const v = visited[c.iso2];
     const next = !isBeen && upcoming[c.iso2];
     return (
       <button
         key={c.iso2}
         type="button"
-        className={`hv-item${isBeen ? ' is-been' : ''}${next ? ' is-next' : ''}${picked === c.iso2 ? ' is-picked' : ''}`}
+        className={`hv-item${isBeen ? ' is-been' : ''}${next ? ' is-next' : ''}${picked === c.iso2 ? ' is-picked' : ''}${
+          isBeen && justAdded === c.iso2 ? ' is-stamped' : ''}`}
+        style={{ '--i': Math.min(i, 40) }}
         onClick={() => toggleManual(c.iso2)}
         title={v?.trips.length ? 'From a completed trip' : isBeen ? 'Tap to remove' : 'Tap to mark visited'}
       >
@@ -114,13 +193,13 @@ export default function VisitedTab({ S, update }) {
   };
 
   return (
-    <div className="hol-visited">
+    <div className={`hol-visited${arriving ? ' is-arriving' : ''}`}>
       {/* ── 1. The count ── */}
       <section className="hv-summary">
         <div className="hv-headline">
           <span className="hv-eyebrow">Countries visited</span>
           <div className="hv-big">
-            <b>{count}</b>
+            <RollNumber value={count} />
             <span>of {ALL_COUNTRIES.length}</span>
           </div>
           <div className="hv-world" aria-hidden="true"><i style={{ width: `${Math.min(100, pct)}%` }} /></div>
@@ -134,9 +213,10 @@ export default function VisitedTab({ S, update }) {
         </div>
 
         <div className="hv-regions" role="group" aria-label="Filter by region">
-          {byRegion.map(([r, v]) => (
+          {byRegion.map(([r, v], i) => (
             <button
               key={r}
+              style={{ '--i': i }}
               type="button"
               className={`hv-region${region === r ? ' is-active' : ''}${v.been ? '' : ' is-none'}`}
               onClick={() => setRegion(region === r ? 'all' : r)}
@@ -159,7 +239,11 @@ export default function VisitedTab({ S, update }) {
         {/* A tap on the map picks; the card's button changes the data.
             Tapping used to toggle outright, so a stray tap while panning
             added a country you had never been to. */}
-        <WorldMap view="world" fills={fills} onPick={iso2 => COUNTRY_BY_ISO[iso2] && setPicked(iso2)} height={430} />
+        <WorldMap
+          view="world" fills={fills} height={430}
+          onPick={iso2 => COUNTRY_BY_ISO[iso2] && setPicked(iso2)}
+          focus={focus} highlight={highlight} stamp={stamp} inkIn
+        />
         <div className="hv-legend" aria-hidden="true">
           <span className="is-been">Been</span>
           {upcomingN > 0 && <span className="is-next">Coming up</span>}
@@ -167,7 +251,7 @@ export default function VisitedTab({ S, update }) {
         {picked && (
           <div className="hv-picked" role="status">
             <span className={`hv-picked-dot${detail ? ' is-been' : upcoming[picked] ? ' is-next' : ''}`} aria-hidden="true" />
-            <span className="hv-picked-text">
+            <span className="hv-picked-text" key={picked}>
               <b>{pickedName}</b>
               <span>
                 {detail
@@ -223,7 +307,7 @@ export default function VisitedTab({ S, update }) {
             {been.length > 0 && (
               <>
                 <div className="hv-group"><span>Been</span><em>{been.length}</em></div>
-                <div className="hv-grid">{been.map(c => item(c, true))}</div>
+                <div className="hv-grid">{been.map((c, i) => item(c, true, i))}</div>
               </>
             )}
             {rest.length > 0 && (restOpen ? (
@@ -234,10 +318,10 @@ export default function VisitedTab({ S, update }) {
                     <button type="button" className="hv-group-act" onClick={() => setShowRest(false)}>Hide</button>
                   )}
                 </div>
-                <div className="hv-grid is-rest">{rest.map(c => item(c, false))}</div>
+                <div className={`hv-grid is-rest${unfolding ? ' is-unfold' : ''}`}>{rest.map((c, i) => item(c, false, i))}</div>
               </>
             ) : (
-              <button type="button" className="hv-more" onClick={() => setShowRest(true)}>
+              <button type="button" className="hv-more" onClick={unfold}>
                 <Icon name="plus" size={13} />
                 Add somewhere else
                 <em>{rest.length} not visited yet</em>
