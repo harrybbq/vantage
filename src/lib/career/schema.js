@@ -105,6 +105,16 @@ function companies(d, errs) {
     if (!isObj(c) || !isStr(c.name)) return errs.push(`${p}.name: required`);
     if (!isUrlish(c.careersUrl)) errs.push(`${p}.careersUrl: a full https:// link`);
     if (c.verifiedOn != null && c.verifiedOn !== '' && !/^\d{4}-\d{2}-\d{2}$/.test(c.verifiedOn)) errs.push(`${p}.verifiedOn: YYYY-MM-DD`);
+    if (c.difficulty != null) {
+      const d = c.difficulty;
+      if (!isObj(d) || !Number.isInteger(d.score) || d.score < 1 || d.score > 5) errs.push(`${p}.difficulty.score: a whole number 1–5`);
+    }
+    if (c.salary != null) {
+      const sal = c.salary;
+      if (!isObj(sal) || !isNum(sal.low) || !isNum(sal.high)) errs.push(`${p}.salary: needs low and high (numbers, £/year)`);
+      else if (sal.low > sal.high) errs.push(`${p}.salary: low is above high`);
+      if (isObj(sal) && !isUrlish(sal.url)) errs.push(`${p}.salary.url: a full https:// link`);
+    }
   });
   ids(errs, d, 'companies');
 }

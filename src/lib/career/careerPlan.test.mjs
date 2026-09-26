@@ -9,6 +9,7 @@ import {
 } from './money.js';
 import { columns, span, statusOf, examCollisions, monthsOfItem, shifted, bonusShift } from './planTimeline.js';
 import { validate, KEYS } from './schema.js';
+import { parseMoney, salaryGuard, salaryVerdict, orderCompanies, salaryLabel } from './companies.js';
 
 let n = 0;
 const t = (name, fn) => { fn(); n++; };
@@ -209,6 +210,45 @@ t('status map values are checked', () => {
   assert.deepEqual(validate(KEYS.status, { a: { status: 'done' } }), []);
   assert.equal(validate(KEYS.status, { a: { status: 'finished' } }).length, 1);
   assert.equal(validate('nope', {}).length, 1);
+});
+
+/* companies */
+t('parseMoney reads k, commas and pounds', () => {
+  assert.equal(parseMoney('£42k'), 42000);
+  assert.equal(parseMoney('≥ £48.5k (matches current)'), 48500);
+  assert.equal(parseMoney('£45,000'), 45000);
+  assert.equal(parseMoney('within 30 min'), null);
+});
+t('salaryGuard prefers numbers, falls back to guardrail rows', () => {
+  const plan = { guardrails: [{ label: 'Salary floor', value: '£30k' }, { label: 'Target', value: '≥ £35k' }] };
+  assert.deepEqual(salaryGuard(plan), { floor: 30000, target: 35000 });
+  assert.deepEqual(salaryGuard({ ...plan, salaryGuard: { floor: 31000, target: 36000 } }), { floor: 31000, target: 36000 });
+  assert.deepEqual(salaryGuard({}), { floor: null, target: null });
+});
+t('salaryVerdict against a 30k floor and 35k target', () => {
+  const g = { floor: 30000, target: 35000 };
+  assert.equal(salaryVerdict({ low: 36000, high: 40000 }, g), 'meets');
+  assert.equal(salaryVerdict({ low: 32000, high: 37000 }, g), 'spans');
+  assert.equal(salaryVerdict({ low: 30000, high: 34000 }, g), 'floor');
+  assert.equal(salaryVerdict({ low: 25000, high: 29000 }, g), 'below');
+  assert.equal(salaryVerdict(null, g), 'unknown');
+});
+t('orderCompanies: easiest, highest salary, commute; unknowns last', () => {
+  const L = [
+    { id: 'a', difficulty: { score: 4 }, salary: { low: 30000, high: 40000 }, commute: { x: '20–25' } },
+    { id: 'b', difficulty: { score: 2 }, salary: { low: 40000, high: 50000 }, commute: { x: '10–15' } },
+    { id: 'c', commute: { x: '—' } },
+  ];
+  const low = v => { const m = /^(\d+)/.exec(String(v || '')); return m ? Number(m[1]) : null; };
+  assert.deepEqual(orderCompanies(L, 'easiest').map(c => c.id), ['b', 'a', 'c']);
+  assert.deepEqual(orderCompanies(L, 'salary').map(c => c.id), ['b', 'a', 'c']);
+  assert.deepEqual(orderCompanies(L, 'x', low).map(c => c.id), ['b', 'a', 'c']);
+  assert.deepEqual(orderCompanies(L, 'listed').map(c => c.id), ['a', 'b', 'c']);
+});
+t('salaryLabel', () => {
+  assert.equal(salaryLabel({ low: 40000, high: 52500 }), '£40k–52.5k');
+  assert.equal(salaryLabel({ low: 45000, high: 45000 }), '£45k');
+  assert.equal(salaryLabel({}), '—');
 });
 
 console.log(`career plan: ${n} passed`);
