@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "eslint . && npm run check:visions && npm run check:parity && npm run check:boot && npm run check:savings && npm run check:training && npm run check:merge && npm run check:invite && npm run check:autolog && npm run check:recurring && npm run check:planpost && npm run check:pathplayer && npm run check:bootrun && npm run check:coins && npm run check:ledger && npm run check:relapse && npm run check:ladder && npm run check:crest && npm run check:foods && npm run check:pack && npm run check:trackerlink && npm run check:interest && npm run check:completepot && npm run check:edgematch && npm run check:logmath && npm run check:railmotion && npm run check:visited && vite build",
+    "build": "eslint . && npm run check:visions && npm run check:parity && npm run check:boot && npm run check:savings && npm run check:training && npm run check:merge && npm run check:invite && npm run check:autolog && npm run check:recurring && npm run check:planpost && npm run check:pathplayer && npm run check:bootrun && npm run check:coins && npm run check:ledger && npm run check:relapse && npm run check:ladder && npm run check:crest && npm run check:foods && npm run check:pack && npm run check:trackerlink && npm run check:interest && npm run check:completepot && npm run check:edgematch && npm run check:logmath && npm run check:railmotion && npm run check:visited && npm run check:careerplan && npm run check:savingshistory && vite build",
     "check:visions": "node scripts/check-vision-xp.mjs",
     "check:parity": "node scripts/check-ratings-parity.mjs",
     "check:boot": "node scripts/check-boot-speed.mjs",
@@ -33,6 +33,8 @@
     "check:foods": "node src/lib/diet/contribute.test.mjs",
     "check:railmotion": "node src/lib/holiday/railMotion.test.mjs",
     "check:visited": "node src/lib/holiday/visited.test.mjs",
+    "check:careerplan": "node src/lib/career/careerPlan.test.mjs",
+    "check:savingshistory": "node src/lib/savings/history.test.mjs",
     "check:logmath": "node src/lib/diet/logMath.test.mjs",
     "check:edgematch": "node src/lib/hub/edgeMatch.test.mjs",
     "check:completepot": "node src/lib/savings/completePot.test.mjs",

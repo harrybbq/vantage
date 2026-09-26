@@ -40,6 +40,7 @@
 import { settleAccount } from './interest.js';
 import { toMonthly, activeAt } from './derive.js';
 import { addContribution } from './contribute.js';
+import { withSnapshot } from './history.js';
 
 const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June',
   'July', 'August', 'September', 'October', 'November', 'December'];
@@ -215,14 +216,16 @@ export function applyPlanPosts(prev, month, rows, now = Date.now()) {
   }
 
   const ledger = ledgerOf(next);
-  return {
+  // The post closes `month`, so the balances after it are that month's
+  // end — stamped as its savings snapshot (lib/savings/history).
+  return withSnapshot({
     ...next,
     planLedger: {
       ...ledger,
       from: ledger.from || month,
       months: { ...(ledger.months || {}), [month]: { ts: Date.now(), total, itemIds: posted } },
     },
-  };
+  }, now, month);
 }
 
 /** Decide the month by deciding nothing moved. Recorded, so it is not

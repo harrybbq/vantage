@@ -971,3 +971,36 @@ html[data-theme="cream-pro"]{
   100%{ opacity:0; transform:scale(1.5, 1.8); }
 }
 @keyframes hol-bar-fill{ from{ transform:scaleX(0); } }
+
+
+/* ══ Visited motion ═══════════════════════════════════════════════════
+   Approved from the Visited Motion Preview (26 Sep). The ink sweep, the
+   stamp thump and the region flight are in WorldMap; the rolling count
+   is in VisitedTab. Everything here is opt-in on no-preference. */
+.hv-region-bar i, .hv-world i{ transition:width .5s cubic-bezier(.2,.8,.2,1); }
+.hol-map-country{ transition:fill .18s var(--ease-out), opacity .35s ease; }
+.hol-map-country.is-dim{ opacity:.28; }
+.hol-map-ripple{ fill:none; stroke:var(--gold,#c8970a); pointer-events:none; opacity:0; vector-effect:non-scaling-stroke; }
+@media (prefers-reduced-motion: no-preference){
+  /* Arrival: bars fill in turn, the list settles in behind the map. */
+  .is-arriving .hv-world i{ transform-origin:0 50%; animation:hol-bar-fill .7s cubic-bezier(.2,.8,.2,1) backwards; }
+  .is-arriving .hv-region-bar i{ transform-origin:0 50%;
+    animation:hol-bar-fill .5s cubic-bezier(.2,.8,.2,1) calc(150ms + var(--i, 0) * 40ms) backwards; }
+  .is-arriving .hv-grid .hv-item{ animation:hv-rise .24s cubic-bezier(.2,.8,.2,1) calc(300ms + var(--i, 0) * 18ms) backwards; }
+  /* Unfold: the rest cascade in rather than 200 rows landing at once. */
+  .hv-grid.is-unfold .hv-item{ animation:hv-rise .22s cubic-bezier(.2,.8,.2,1) calc(var(--i, 0) * 12ms) backwards; }
+  /* Stamp: the new row pops in gold. */
+  .hv-item.is-stamped{ animation:hv-pop .38s cubic-bezier(.32,1.28,.5,1); }
+  .hol-map-ripple{ transform-box:fill-box; transform-origin:center; animation:hv-ripple .7s cubic-bezier(.2,.8,.2,1); }
+  /* Coming up breathes. */
+  .hol-map-country.is-upcoming:not(.is-dim){ animation:hv-breathe 2.4s ease-in-out infinite; }
+  /* The card rises; its text swaps in place. */
+  .hv-picked{ animation:hv-card-in .3s cubic-bezier(.32,1.28,.5,1); }
+  .hv-picked-text{ animation:hv-text-in .16s cubic-bezier(.2,.8,.2,1); }
+}
+@keyframes hv-rise{ from{ opacity:0; transform:translateY(6px); } }
+@keyframes hv-pop{ from{ transform:scale(.86); background:rgba(200,151,10,.45); } }
+@keyframes hv-ripple{ from{ transform:scale(.09); opacity:1; } to{ transform:scale(1); opacity:0; } }
+@keyframes hv-breathe{ 50%{ opacity:.5; } }
+@keyframes hv-card-in{ from{ opacity:0; transform:translateY(24px); } }
+@keyframes hv-text-in{ from{ opacity:0; transform:translateY(4px); } }

@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { wheelPixels } from '../../lib/holiday/railMotion';
 
 /**
  * Shared SVG world map.
@@ -25,8 +26,10 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
  *   two fingers        → pan and pinch-zoom the map, anchored on the
  *                        midpoint between them.
  *   double tap         → zoom in on the tapped point.
- *   mouse              → unchanged: drag to pan, wheel to zoom at the
- *                        cursor.
+ *   mouse              → drag to pan, wheel to zoom at the cursor,
+ *                        double-click to zoom in. At full zoom-out the
+ *                        wheel goes back to the page (see onWheel).
+ *   trackpad           → pinch zooms; a sideways swipe pans once zoomed.
  *
  * It used to be touch-action:none with a single-finger pan, which meant
  * a thumb landing anywhere on a 320px-tall map trapped the page scroll,
@@ -40,6 +43,14 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
  *   view       — 'europe' | 'world'
  *   onPick     — (iso2) => void, country click
  *   onPickPin  — (id) => void
+ *   focus      — [lonW, latN, lonE, latS] to fly to, or null to fly back
+ *                out to the whole view. Any gesture cancels a flight.
+ *   highlight  — Set of ISO2; everything else is dimmed. null = none.
+ *   stamp      — { iso2, lat, lon, n }: bumping `n` thumps that country
+ *                and spreads a ring from it (the Visited tab's "mark
+ *                visited").
+ *   inkIn      — sweep the filled countries in from west to east once the
+ *                geometry arrives.
  */
 
 // Equirectangular. Fine for this: no area/route computation depends on
@@ -95,6 +106,10 @@ export default function WorldMap({
   onPickPin,
   height = 460,
   children,
+  focus = null,
+  highlight = null,
+  stamp = null,
+  inkIn = false,
 }) {
   const [geo, setGeo] = useState(null);
   const [failed, setFailed] = useState(false);
@@ -117,6 +132,11 @@ export default function WorldMap({
       .catch(() => { if (alive) setFailed(true); });
     return () => { alive = false; };
   }, []);
+
+  const reduceMotion = () => typeof window !== 'undefined' && window.matchMedia
+    && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const tRef = useRef(t);
+  tRef.current = t;
 
   // Reset framing when the caller switches view.
   useEffect(() => { setT({ zoom: 1, x: 0, y: 0 }); }, [view]);
@@ -199,6 +219,55 @@ export default function WorldMap({
     });
   }, [base, boxFor, clampT]);
 
+  /* ── Flight ────────────────────────────────────────────────────────
+     Eases the transform to a target: zoom in log space (1→4 feels like
+     4→16), centre linearly, 650ms ease-in-out. Any gesture of the hand
+     cancels it, so the map never fights the person using it. */
+  const flight = useRef(0);
+  const cancelFlight = () => { cancelAnimationFrame(flight.current); flight.current = 0; };
+  const flyTo = useCallback((target) => {
+    cancelAnimationFrame(flight.current);
+    const to = clampT(target);
+    if (reduceMotion()) { setT(to); return; }
+    const from = tRef.current, t0 = performance.now();
+    const ease = k => (k < 0.5 ? 4 * k * k * k : 1 - Math.pow(-2 * k + 2, 3) / 2);
+    const lz0 = Math.log(from.zoom), lz1 = Math.log(to.zoom);
+    const step = now => {
+      const k = Math.min(1, (now - t0) / 650), e = ease(k);
+      setT({ zoom: Math.exp(lz0 + (lz1 - lz0) * e), x: from.x + (to.x - from.x) * e, y: from.y + (to.y - from.y) * e });
+      flight.current = k < 1 ? requestAnimationFrame(step) : 0;
+    };
+    flight.current = requestAnimationFrame(step);
+  }, [clampT]);
+  useEffect(() => () => cancelAnimationFrame(flight.current), []);
+
+  /* Where `focus` asks to be. The box has to fit the part of the view
+     that is actually drawn: with `slice` one axis is cropped, so the
+     usable width is min(box width, box height × element aspect). */
+  const focusKey = focus ? focus.join(',') : '';
+  const hadFocus = useRef(false);
+  useEffect(() => {
+    const rect = svgRef.current?.getBoundingClientRect();
+    if (!focus) {
+      if (hadFocus.current) flyTo({ zoom: 1, x: 0, y: 0 });
+      hadFocus.current = false;
+      return;
+    }
+    if (!rect || !rect.width || !rect.height) return;
+    hadFocus.current = true;
+    const [lonW, latN, lonE, latS] = focus;
+    const [x1, y1] = project(latN, lonW), [x2, y2] = project(latS, lonE);
+    const A = rect.width / rect.height;
+    const vw1 = Math.min(base.w, base.h * A), vh1 = Math.min(base.h, base.w / A);
+    const zoom = Math.min(vw1 / ((x2 - x1) * 1.08), vh1 / ((y2 - y1) * 1.08));
+    flyTo({
+      zoom,
+      x: (x1 + x2) / 2 - (base.x + base.w / 2),
+      y: (y1 + y2) / 2 - (base.y + base.h / 2),
+    });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [focusKey]);
+
   const flashHint = useCallback(() => {
     setHint(true);
     clearTimeout(hintTimer.current);
@@ -209,6 +278,7 @@ export default function WorldMap({
   const touchPoints = () => [...pointers.current.values()].filter(p => p.type !== 'mouse');
 
   function onPointerDown(e) {
+    cancelFlight();
     pointers.current.set(e.pointerId, { type: e.pointerType, x: e.clientX, y: e.clientY });
     const touches = touchPoints();
 
@@ -349,12 +419,96 @@ export default function WorldMap({
     setPinching(false);
   }
 
-  function onWheel(e) {
-    e.preventDefault();
-    zoomAt(e.deltaY < 0 ? 1.15 : 1 / 1.15, e.clientX, e.clientY);
-  }
+  /* ── Wheel ────────────────────────────────────────────────────────
+     A native, non-passive listener. React's onWheel is passive, so its
+     preventDefault was ignored and every wheel click over the map zoomed
+     it AND scrolled the page. Now:
+       wheel / two-finger swipe up-down → zoom at the cursor, by how far
+         it moved (a trackpad no longer races: one event, one step, was
+         15% per event however small the event)
+       pinch (ctrlKey)                  → zoom, always kept from the page
+       sideways swipe, zoomed in        → pan
+       fully zoomed out and scrolling on → the page scrolls, so a map in
+         the middle of a long page never traps the wheel. Same rule as
+         the timeline (lib/holiday/railMotion). */
+  useEffect(() => {
+    const el = svgRef.current;
+    if (!el) return undefined;
+    const onWheel = e => {
+      const { dx, dy } = wheelPixels(e);
+      const cur = tRef.current;
+      if (e.ctrlKey) {
+        e.preventDefault(); cancelFlight();
+        zoomAt(Math.exp(-dy * 0.011), e.clientX, e.clientY);
+        return;
+      }
+      if (Math.abs(dx) > Math.abs(dy)) {
+        if (cur.zoom <= MIN_ZOOM * 1.0005) return;
+        e.preventDefault(); cancelFlight();
+        const rect = el.getBoundingClientRect();
+        const w = base.w / cur.zoom;
+        setT(prev => clampT({ ...prev, x: prev.x + dx * (w / rect.width) }));
+        return;
+      }
+      if (!dy) return;
+      if (dy > 0 && cur.zoom <= MIN_ZOOM * 1.0005) return;   // the page's
+      if (dy < 0 && cur.zoom >= MAX_ZOOM * 0.9995) return;
+      e.preventDefault(); cancelFlight();
+      zoomAt(Math.exp(-dy * 0.0016), e.clientX, e.clientY);
+    };
+    el.addEventListener('wheel', onWheel, { passive: false });
+    return () => el.removeEventListener('wheel', onWheel);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [zoomAt, clampT, base, !!geo]);
+
+  /* ── Stamp: a country just marked visited thumps down, and a ring
+     spreads from it. The ring is drawn in screen-constant units. */
+  const [ripples, setRipples] = useState([]);
+  useEffect(() => {
+    if (!stamp || !stamp.n || reduceMotion()) return undefined;
+    const el = svgRef.current?.querySelector(`[data-iso2="${stamp.iso2}"]`);
+    if (el?.animate) {
+      el.style.transformBox = 'fill-box';
+      el.style.transformOrigin = 'center';
+      el.animate(
+        [{ transform: 'scale(1.35)', filter: 'brightness(1.5)' }, { transform: 'scale(.94)', offset: 0.55 }, { transform: 'none', filter: 'none' }],
+        { duration: 420, easing: 'cubic-bezier(.32,1.28,.5,1)' },
+      );
+    }
+    if (Number.isFinite(stamp.lat) && Number.isFinite(stamp.lon)) {
+      const [x, y] = project(stamp.lat, stamp.lon);
+      const id = stamp.n;
+      setRipples(r => [...r, { id, x, y }]);
+      const tm = setTimeout(() => setRipples(r => r.filter(q => q.id !== id)), 760);
+      return () => clearTimeout(tm);
+    }
+    return undefined;
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [stamp && stamp.n]);
+
+  /* ── Ink-in: the first time the countries are drawn, the filled ones
+     sweep in from west to east, like a stamp going across a page. The
+     colours are read from the DOM so the theme's own tokens are what
+     animates. `fill: backwards` — nothing is left half-painted. */
+  const inked = useRef(false);
+  useLayoutEffect(() => {
+    if (!inkIn || inked.current || !geo || reduceMotion()) return;
+    const svg = svgRef.current;
+    if (!svg) return;
+    inked.current = true;
+    const blank = svg.querySelector('.hol-map-country:not(.is-filled)');
+    const land = blank ? getComputedStyle(blank).fill : 'rgba(127,127,127,.1)';
+    svg.querySelectorAll('.hol-map-country.is-filled').forEach(el => {
+      if (!el.animate) return;
+      const b = el.getBBox();
+      const delay = 120 + ((b.x + b.width / 2) / SRC_W) * 900;
+      el.animate([{ fill: land }, { fill: getComputedStyle(el).fill }],
+        { duration: 260, delay, easing: 'cubic-bezier(.2,.8,.2,1)', fill: 'backwards' });
+    });
+  }, [geo, inkIn]);
 
   const zoomButton = (factor) => () => {
+    cancelFlight();
     const rect = svgRef.current?.getBoundingClientRect();
     if (!rect) return;
     zoomAt(factor, rect.left + rect.width / 2, rect.top + rect.height / 2);
@@ -375,7 +529,7 @@ export default function WorldMap({
            trap the scroll; once a second finger lands we take the whole
            gesture for the pinch. */
         style={{ touchAction: pinching ? 'none' : 'pan-y' }}
-        onWheel={onWheel}
+        onDoubleClick={e => { cancelFlight(); zoomAt(1.8, e.clientX, e.clientY); }}
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
         onPointerUp={endGesture}
@@ -391,7 +545,8 @@ export default function WorldMap({
               key={p.iso2}
               d={p.d}
               data-iso2={p.iso2}
-              className={`hol-map-country${tone ? ' is-filled' : ''}${onPick ? ' is-pickable' : ''}`}
+              className={`hol-map-country${tone ? ' is-filled is-' + tone : ''}${onPick ? ' is-pickable' : ''}${
+                highlight && !highlight.has(p.iso2) ? ' is-dim' : ''}`}
               /* Inline style, not a `fill` attribute: presentation
                  attributes lose to the class's own fill rule. */
               style={tone ? { fill: TONE_VAR[tone] || tone } : undefined}
@@ -401,6 +556,10 @@ export default function WorldMap({
             </path>
           );
         })}
+
+        {ripples.map(r => (
+          <circle key={r.id} cx={r.x} cy={r.y} r={46 * u} className="hol-map-ripple" strokeWidth={2 * u} />
+        ))}
 
         {lines.map((l, i) => {
           const [x1, y1] = project(l.from.lat, l.from.lon);
@@ -434,7 +593,7 @@ export default function WorldMap({
       <div className="hol-map-zoom">
         <button type="button" onClick={zoomButton(1.5)} aria-label="Zoom in">+</button>
         <button type="button" onClick={zoomButton(1 / 1.5)} aria-label="Zoom out">−</button>
-        <button type="button" onClick={() => setT({ zoom: 1, x: 0, y: 0 })} aria-label="Reset view">⟲</button>
+        <button type="button" onClick={() => { cancelFlight(); setT({ zoom: 1, x: 0, y: 0 }); }} aria-label="Reset view">⟲</button>
       </div>
       <div className={`hol-map-hint${hint ? ' is-on' : ''}`} aria-hidden={!hint}>
         Use two fingers to move the map

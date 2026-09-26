@@ -12,6 +12,7 @@
 import Icon from '../Icon';
 import { blendedApy, routedToAccount, money, POT_PALETTE, potColor } from '../../lib/savings/derive';
 import { accountBalance, accountsTotal, settleAccount } from '../../lib/savings/interest';
+import { withSnapshot } from '../../lib/savings/history';
 
 const uid = p => p + Date.now().toString(36) + Math.round(Math.random() * 1e4).toString(36);
 
@@ -23,7 +24,9 @@ export default function AccountsPanel({ S, update, sav, horizon, items }) {
   const blended = blendedApy(accounts);
   const future = sav[sav.length - 1] || 0;
 
-  const setAccounts = fn => update(prev => ({ ...prev, savingsAccounts: fn(prev.savingsAccounts || []) }));
+  // Every balance change also stamps this month's total, which is the
+  // "actual" line the Career plan compares against (lib/savings/history).
+  const setAccounts = fn => update(prev => withSnapshot({ ...prev, savingsAccounts: fn(prev.savingsAccounts || []) }));
   const addAccount = () => setAccounts(a => [...a, { id: uid('a'), name: '', balance: '', apy: '' }]);
   const patch = (id, key, val) => setAccounts(a => a.map(x => x.id === id ? { ...x, [key]: val } : x));
   /* Typing a balance says "this is what it holds TODAY", so the interest
