@@ -36,7 +36,11 @@
   transition:fill .18s var(--ease-out);}
 .hol-map-country.is-pickable{cursor:pointer;}
 .hol-map-country.is-pickable:hover{fill:var(--accent-line);}
-.hol-map-country.is-filled{stroke:rgba(255,255,255,.3);}
+/* A filled country is outlined in the page colour, not a faint white:
+   two visited neighbours both painted gold read as one blob otherwise.
+   Non-scaling so the gap stays 1px at every zoom instead of thickening
+   into a moat as you zoom in. */
+.hol-map-country.is-filled{stroke:var(--bg-base,#0c0c0b);stroke-width:1.1px;vector-effect:non-scaling-stroke;}
 .hol-map-line{stroke:var(--em);stroke-linecap:round;fill:none;opacity:.9;}
 .hol-map-line.is-dashed{stroke-dasharray:5 4;opacity:.75;}
 .hol-map-pin{cursor:pointer;}
@@ -70,60 +74,118 @@
 .hol-flag-amber{background:rgba(245,165,36,.12);border:1px solid rgba(245,165,36,.4);color:#c8860d;}
 .hol-flag-green{background:rgba(47,169,107,.12);border:1px solid rgba(47,169,107,.4);color:#2fa96b;}
 
-/* ── Visited tab ── */
-.hol-visited-stats{display:flex;flex-wrap:wrap;align-items:center;gap:18px;margin-bottom:12px;}
-/* Region progress. Each row doubles as a filter — tapping a region
-   scopes the list below, tapping it again clears back to All. */
-.hol-visited-regions{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:6px;margin-bottom:12px;}
-.hol-visited-region{display:flex;align-items:center;gap:9px;padding:7px 11px;border-radius:9px;
-  border:var(--border-card);background:var(--surface);cursor:pointer;text-align:left;
-  font-family:var(--mono);font-size:9px;letter-spacing:.8px;text-transform:uppercase;color:var(--text-muted);}
-.hol-visited-region:hover{border-color:var(--accent-line);}
-.hol-visited-region.is-active{border-color:var(--em);color:var(--text);}
-.hol-visited-region-name{flex:none;min-width:64px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
-.hol-visited-region-bar{flex:1;min-width:24px;height:4px;border-radius:999px;overflow:hidden;
-  background:var(--border-color,rgba(255,255,255,.12));}
-.hol-visited-region-bar i{display:block;height:100%;border-radius:999px;background:var(--em);}
-.hol-visited-region b{flex:none;color:var(--text);font-size:10px;}
-.hol-visited-region b em{font-style:normal;color:var(--text-muted);font-weight:400;}
+/* ── Visited tab ─────────────────────────────────────────────────────
+   Three blocks: the count (with regions, which are also the filter),
+   the map (with the picked country's card on it), and the list. */
+.hol-visited{display:flex;flex-direction:column;gap:14px;}
 
-.hol-visited-search{display:flex;align-items:center;gap:8px;padding:8px 11px;margin-bottom:8px;
+/* 1. The count */
+.hv-summary{display:grid;grid-template-columns:minmax(220px,300px) 1fr;gap:10px 28px;align-items:center;
+  padding:18px 20px;border-radius:var(--radius-xl,18px);border:var(--border-card);background:var(--surface);}
+.hv-eyebrow{display:block;font-family:var(--mono);font-size:9px;letter-spacing:1.6px;text-transform:uppercase;color:var(--text-muted);}
+.hv-big{display:flex;align-items:baseline;gap:9px;margin:4px 0 10px;}
+.hv-big b{font-family:var(--serif,Georgia,serif);font-size:56px;font-weight:900;line-height:.95;letter-spacing:-1.5px;
+  color:var(--gold,#c8970a);font-variant-numeric:tabular-nums;}
+.hv-big span{font-family:var(--mono);font-size:11px;letter-spacing:1px;color:var(--text-muted);}
+.hv-world{height:5px;border-radius:3px;overflow:hidden;background:rgba(127,127,127,.18);}
+.hv-world i{display:block;height:100%;border-radius:3px;background:var(--gold,#c8970a);}
+.hv-sub{display:flex;flex-wrap:wrap;gap:4px 14px;margin-top:9px;font-family:var(--sans);font-size:12px;color:var(--text-muted);}
+.hv-sub b{color:var(--text);font-weight:700;}
+.hv-sub-new b{color:var(--em);}
+.hv-regions{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;}
+.hv-region{display:flex;flex-direction:column;gap:7px;min-width:0;padding:9px 11px;border-radius:10px;
+  border:1px solid transparent;background:rgba(127,127,127,.07);cursor:pointer;text-align:left;
+  transition:border-color .16s,background .16s;}
+.hv-region:hover{border-color:var(--accent-line);}
+.hv-region.is-active{border-color:var(--em);background:rgba(var(--em-rgb),.08);}
+.hv-region-top{display:flex;align-items:baseline;gap:6px;min-width:0;}
+.hv-region-name{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+  font-family:var(--mono);font-size:9px;letter-spacing:1px;text-transform:uppercase;color:var(--text-muted);}
+.hv-region.is-active .hv-region-name{color:var(--text);}
+.hv-region b{font-family:var(--mono);font-size:12px;color:var(--text);}
+.hv-region b em{font-style:normal;font-weight:400;font-size:10px;color:var(--text-muted);}
+.hv-region.is-none b{color:var(--text-muted);}
+.hv-region-bar{height:4px;border-radius:2px;overflow:hidden;background:rgba(127,127,127,.18);}
+.hv-region-bar i{display:block;height:100%;border-radius:2px;background:var(--gold,#c8970a);}
+
+/* 2. The map */
+.hv-mapcard{position:relative;}
+.hv-legend{position:absolute;left:12px;top:12px;display:flex;gap:6px;pointer-events:none;}
+.hv-legend span{display:inline-flex;align-items:center;gap:6px;padding:4px 9px;border-radius:999px;
+  background:var(--surface);border:var(--border-card);
+  font-family:var(--mono);font-size:8.5px;letter-spacing:1.1px;text-transform:uppercase;color:var(--text-muted);}
+.hv-legend span::before{content:'';width:8px;height:8px;border-radius:2px;}
+.hv-legend .is-been::before{background:var(--gold,#c8970a);}
+.hv-legend .is-next::before{background:var(--em);}
+.hv-picked{position:absolute;left:12px;bottom:12px;right:56px;max-width:420px;
+  display:flex;align-items:center;gap:10px;padding:9px 10px 9px 12px;border-radius:12px;
+  background:var(--surface);border:var(--border-card);box-shadow:0 10px 28px rgba(0,0,0,.28);
+  backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);}
+.hv-picked-dot{width:10px;height:10px;flex:none;border-radius:3px;border:1px solid var(--border);}
+.hv-picked-dot.is-been{background:var(--gold,#c8970a);border-color:transparent;}
+.hv-picked-dot.is-next{background:var(--em);border-color:transparent;}
+.hv-picked-text{flex:1;min-width:0;display:flex;flex-direction:column;}
+.hv-picked-text b{font-family:var(--sans);font-size:13.5px;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.hv-picked-text span{font-family:var(--sans);font-size:11.5px;color:var(--text-muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.hv-picked-act{flex:none;padding:6px 12px;border-radius:999px;cursor:pointer;
+  border:1px solid var(--accent-line);background:transparent;color:var(--text);
+  font-family:var(--mono);font-size:9px;letter-spacing:1px;text-transform:uppercase;}
+.hv-picked-act:hover{border-color:var(--em);color:var(--em);}
+.hv-picked-x{flex:none;display:flex;padding:4px;border:0;background:transparent;color:var(--text-muted);cursor:pointer;border-radius:6px;}
+.hv-picked-x:hover{color:var(--text);}
+
+/* Cream: the map's land defaulted to white-on-white and vanished. */
+html[data-theme="cream-pro"]{
+  --holiday-map-land:rgba(28,26,23,.075);
+  --holiday-map-stroke:rgba(28,26,23,.16);
+}
+
+/* 3. The list */
+.hv-list{display:flex;flex-direction:column;gap:8px;}
+.hv-list-head{display:flex;gap:8px;align-items:center;}
+.hv-search{flex:1;min-width:0;display:flex;align-items:center;gap:8px;padding:9px 12px;
   border-radius:10px;border:var(--border-card);background:var(--surface);color:var(--text-muted);}
-.hol-visited-search input{flex:1;min-width:0;background:transparent;border:0;outline:0;color:var(--text);
-  font-family:var(--sans);font-size:13px;}
-.hol-visited-search input::-webkit-search-cancel-button{display:none;}
-.hol-visited-search-clear{background:transparent;border:0;color:var(--text-muted);cursor:pointer;display:flex;padding:2px;}
-.hol-visited-none{padding:18px;border-radius:10px;border:1px dashed var(--border-color,rgba(255,255,255,.14));
+/* !important: dark-os styles every input at (0,5,2) — four :not()s —
+   which paints a second box inside this one. */
+.hol-visited .hv-search input{flex:1;min-width:0;background:transparent !important;border:0;outline:0;box-shadow:none;padding:0;height:auto;min-height:0;
+  color:var(--text);font-family:var(--sans);font-size:13px;}
+.hol-visited .hv-search input::-webkit-search-cancel-button{display:none;}
+.hv-search-clear{background:transparent;border:0;color:var(--text-muted);cursor:pointer;display:flex;padding:2px;}
+.hv-scope{flex:none;display:inline-flex;align-items:center;gap:6px;padding:8px 12px;border-radius:999px;cursor:pointer;
+  border:1px solid var(--em);background:rgba(var(--em-rgb),.1);color:var(--text);
+  font-family:var(--mono);font-size:9px;letter-spacing:1px;text-transform:uppercase;}
+.hv-group{display:flex;align-items:center;gap:8px;margin-top:8px;
+  font-family:var(--mono);font-size:9px;letter-spacing:1.4px;text-transform:uppercase;color:var(--text-muted);}
+.hv-group em{font-style:normal;color:var(--text);}
+.hv-group::after{content:'';flex:1;height:1px;background:var(--border);order:2;}
+.hv-group-act{order:3;border:0;background:transparent;color:var(--text-muted);cursor:pointer;
+  font-family:var(--mono);font-size:9px;letter-spacing:1px;text-transform:uppercase;padding:2px 4px;}
+.hv-group-act:hover{color:var(--text);}
+/* min-width:0 on the items is load-bearing: a grid item defaults to
+   min-width:auto, and "United States Minor Outlying Islands" widened its
+   track past the viewport. */
+.hv-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:6px;}
+.hv-item{display:flex;align-items:center;gap:7px;min-width:0;padding:8px 10px;border-radius:9px;
+  border:1px solid transparent;background:rgba(127,127,127,.06);color:var(--text-muted);
+  font-family:var(--sans);font-size:12.5px;text-align:left;cursor:pointer;transition:border-color .14s,background .14s;}
+.hv-item svg{flex:none;opacity:.55;}
+.hv-item-name{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.hv-item em{flex:none;font-family:var(--mono);font-size:9.5px;font-style:normal;color:var(--text-muted);}
+.hv-item:hover{border-color:var(--accent-line);}
+.hv-item.is-been{color:var(--text);background:rgba(200,151,10,.10);border-color:rgba(200,151,10,.28);}
+.hv-item.is-been svg{color:var(--gold,#c8970a);opacity:1;}
+.hv-item.is-next{color:var(--text);border-color:rgba(var(--em-rgb),.4);}
+.hv-item.is-next svg{color:var(--em);opacity:1;}
+.hv-item em.hv-item-next{color:var(--em);font-size:8.5px;letter-spacing:.6px;text-transform:uppercase;}
+.hv-item.is-picked{border-color:var(--text-muted);}
+.hv-more{display:flex;align-items:center;gap:8px;width:100%;padding:12px 14px;border-radius:10px;cursor:pointer;
+  border:1px dashed var(--border);background:transparent;color:var(--text);font-family:var(--sans);font-size:13px;text-align:left;}
+.hv-more em{margin-left:auto;font-style:normal;font-family:var(--mono);font-size:9.5px;letter-spacing:.6px;color:var(--text-muted);}
+.hv-more:hover{border-color:var(--em);}
+.hv-none{padding:18px;border-radius:10px;border:1px dashed var(--border);
   font-family:var(--sans);font-size:12px;color:var(--text-muted);text-align:center;}
-/* Full-width rule marking where "been" stops and the rest begins. */
-.hol-visited-divider{grid-column:1/-1;display:flex;align-items:center;gap:9px;margin:6px 0 2px;
-  font-family:var(--mono);font-size:8.5px;letter-spacing:1.4px;text-transform:uppercase;color:var(--text-muted);}
-.hol-visited-divider::after{content:'';flex:1;height:1px;background:var(--accent-line-soft,var(--border));}
-/* Placeholder where the tick sits on visited rows, so names line up in
-   both columns instead of jittering by the width of a check. */
-.hol-visited-item-dot{width:12px;height:12px;flex:none;border-radius:50%;
-  border:1px solid var(--border-color,rgba(255,255,255,.18));}
-.hol-visited-detail{margin-top:10px;padding:9px 12px;border-radius:9px;background:var(--surface);
-  border:var(--border-card);font-family:var(--sans);font-size:12px;color:var(--text);
-  display:flex;flex-wrap:wrap;gap:8px;align-items:center;}
-.hol-visited-listwrap{margin-top:16px;}
-.hol-visited-filter{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px;}
-.hol-chip{font-family:var(--mono);font-size:9px;letter-spacing:1.1px;text-transform:uppercase;
-  padding:6px 12px;border-radius:999px;border:var(--border-card);background:transparent;
-  color:var(--text-muted);cursor:pointer;}
-.hol-chip.is-active{background:var(--em);border-color:var(--em);color:var(--on-em,#fff);}
-.hol-visited-list{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:6px;
-  max-height:320px;overflow-y:auto;padding-right:4px;}
-/* min-width:0 is load-bearing: a grid item defaults to min-width:auto,
-   so "United States Minor Outlying Islands" widened its track and pushed
-   the whole list past the viewport. The old inner overflow-y:auto was
-   masking it by clipping horizontally as well. */
-.hol-visited-item{display:flex;align-items:center;gap:6px;min-width:0;padding:7px 10px;border-radius:8px;
-  border:var(--border-card);background:var(--surface);color:var(--text-muted);
-  font-family:var(--sans);font-size:12px;text-align:left;cursor:pointer;}
-.hol-visited-item span{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
-.hol-visited-item em{font-family:var(--mono);font-size:9px;font-style:normal;opacity:.7;}
-.hol-visited-item.is-been{color:var(--text);border-color:var(--em);background:rgba(var(--em-rgb),.1);}
+.hv-hint{margin:6px 0 0;font-family:var(--sans);font-size:12px;line-height:1.6;color:var(--text-muted);max-width:70ch;}
+.hv-hint strong{color:var(--text);}
 
 /* ── Destination intelligence ── */
 .hol-dest{margin-top:12px;padding:12px;border-radius:10px;background:var(--surface);border:var(--border-card);}
@@ -249,28 +311,16 @@
   .hol-map-legend{order:5;margin-top:0;}
 
   /* ══ Visited ════════════════════════════════════════════════════ */
-  .hol-visited-stats{display:flex;gap:0;margin-bottom:10px;overflow:hidden;
-    border:var(--border-card);border-radius:12px;background:var(--surface);}
-  .hol-visited-stat{flex:1 1 0;min-width:0;padding:8px 4px;align-items:center;text-align:center;
-    border-left:1px solid var(--border);}
-  .hol-visited-stat:first-child{border-left:0;}
-  .hol-visited-stat b{font-size:16px;}
-  .hol-visited-stat span{font-size:7.5px;letter-spacing:.9px;}
-  .hol-visited-regions{grid-template-columns:1fr 1fr;gap:5px;}
-  .hol-visited-region{padding:6px 8px;gap:6px;}
-  .hol-visited-region-name{min-width:0;flex:1;}
-  .hol-visited-region-bar{flex:0 0 22px;}
-  /* Region chips scroll rather than wrapping to two rows of pills. */
-  .hol-visited-filter{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;gap:5px;
-    padding-bottom:2px;margin-bottom:8px;}
-  .hol-visited-filter::-webkit-scrollbar{display:none;}
-  .hol-chip{flex:0 0 auto;white-space:nowrap;min-height:30px;display:inline-flex;align-items:center;}
-  /* The list used to scroll INSIDE a page that also scrolls — a nested
-     trap on a touchscreen, and it cut the last row in half. Search and
-     the region filter do the shortening now, so it can just flow. */
-  .hol-visited-list{grid-template-columns:1fr 1fr;gap:5px;max-height:none;overflow:visible;padding-right:0;}
-  .hol-visited-item{padding:9px 10px;font-size:12px;min-height:38px;}
-  .hol-visited-listwrap{margin-top:12px;}
+  .hv-summary{grid-template-columns:1fr;padding:14px;gap:12px;}
+  .hv-big b{font-size:44px;}
+  .hv-regions{grid-template-columns:1fr 1fr;gap:5px;}
+  .hv-region{padding:8px 9px;min-height:44px;}
+  .hv-legend{left:8px;top:8px;}
+  .hv-picked{left:8px;right:52px;bottom:8px;}
+  .hv-grid{grid-template-columns:1fr 1fr;gap:5px;}
+  .hv-item{min-height:40px;}
+  .hv-more em{display:none;}
+}
 }
 
 /* Someone who asked for less motion gets the jump, not the glide —
@@ -385,7 +435,10 @@
 .hol-zoom-level{
   font-family:var(--mono); font-size:8.5px; letter-spacing:1.2px; text-transform:uppercase;
   color:var(--text-muted); min-width:46px; text-align:center;
+  position:relative; display:inline-block; height:14px; line-height:14px; overflow:hidden;
 }
+.hol-zw{ display:block; }
+.hol-zw.is-out{ position:absolute; inset:0; }
 
 /* ── The scroller ──
    `overscroll-behavior:contain` stops a fast pan at the end turning into
@@ -444,12 +497,17 @@
   position:absolute; top:60px; height:88px; z-index:2;
   padding:0; border:0; cursor:pointer; overflow:hidden;
   border-radius:9px;
-  background-image:var(--band-photo, none);
-  background-size:cover; background-position:center;
   background-color:rgba(127,127,127,.16);
   box-shadow:0 0 0 1px rgba(127,127,127,.34), 0 6px 18px rgba(0,0,0,.28);
   display:flex; align-items:flex-end;
-  transition:box-shadow .16s ease, filter .16s ease;
+  transition:box-shadow .22s ease, filter .16s ease, transform .22s cubic-bezier(.2,.8,.2,1);
+}
+/* The photo, on its own layer so hover can push in on it. */
+.hol-band-photo{
+  position:absolute; inset:0; pointer-events:none;
+  background-image:var(--band-photo, none);
+  background-size:cover; background-position:center;
+  transition:transform 4s cubic-bezier(.2,.6,.2,1);
 }
 /* A trip with no photo keeps the striped stand-in the thumbnails had. */
 .hol-band:not([style*="--band-photo"]){
@@ -460,7 +518,10 @@
 .hol-band.is-sel{
   box-shadow:0 0 0 2px var(--em), 0 10px 26px rgba(var(--em-rgb),.3);
   filter:none; z-index:4;
+  /* Lifted off the rail, so the band just picked reads as picked up. */
+  transform:translateY(-4px) scale(1.02);
 }
+.hol-rail-card.is-vertical .hol-band.is-sel{ transform:scale(1.03); }
 /* A trip booked inside a longer one: inset so both edges show. */
 .hol-band.is-nested{
   top:calc(60px + var(--band-inset, 0px));
@@ -476,6 +537,7 @@
 .hol-band-label{
   position:relative; z-index:2; width:100%; min-width:0;
   padding:6px 9px; text-align:left;
+  transition:transform .22s cubic-bezier(.2,.8,.2,1);
 }
 .hol-band-name{
   display:block; font-family:var(--sans); font-size:12.5px; font-weight:700; color:#fff;
@@ -863,3 +925,49 @@
 
 /* The rail takes keyboard focus (arrows, + −, T). */
 .hol-rail-scroll:focus-visible { outline: 2px solid var(--em); outline-offset: 3px; border-radius: 8px; }
+
+
+/* ══ Planner motion ═══════════════════════════════════════════════════
+   Approved from the Timeline Motion Preview (26 Sep). The arrival and
+   the rail's glide to a picked trip are WAAPI in TripRail; the pass swap
+   is framer-motion in BoardingPass. What is left is here. All of it is
+   opt-in on no-preference, so reduced motion gets the finished state
+   with nothing moving — the old word in a zoom roll is not even drawn. */
+@media (prefers-reduced-motion: no-preference){
+  /* Hover: a slow push in on the photo, and the name lifts a touch. */
+  .hol-band:hover .hol-band-photo{ transform:scale(1.09); }
+  .hol-band:hover .hol-band-label{ transform:translateY(-2px); }
+
+  /* Zoom: the word rolls; labels fade in as they appear instead of
+     popping, which is most visible as months thin out to quarters. */
+  .hol-zw.is-in.is-up{ animation:hol-roll-in-up .24s cubic-bezier(.2,.8,.2,1); }
+  .hol-zw.is-out.is-up{ animation:hol-roll-out-up .24s cubic-bezier(.2,.8,.2,1) forwards; }
+  .hol-zw.is-in.is-down{ animation:hol-roll-in-down .24s cubic-bezier(.2,.8,.2,1); }
+  .hol-zw.is-out.is-down{ animation:hol-roll-out-down .24s cubic-bezier(.2,.8,.2,1) forwards; }
+  .hol-tick{ animation:hol-fade-in .18s linear; }
+
+  /* Today breathes: one soft ring every four seconds, so "now" is easy
+     to find on a long rail without anything flashing. */
+  .hol-today span::after{
+    content:''; position:absolute; inset:-1px; border-radius:99px;
+    border:1px solid var(--em); opacity:0; pointer-events:none;
+    animation:hol-today-pulse 4s ease-out infinite;
+  }
+
+  /* The pass: its budget bar fills as the pass lands. */
+  .hol-money-bar i{ transform-origin:0 50%; animation:hol-bar-fill .6s cubic-bezier(.2,.8,.2,1) .12s backwards; }
+}
+@media (prefers-reduced-motion: reduce){
+  .hol-zw.is-out{ display:none; }
+}
+@keyframes hol-roll-in-up{ from{ transform:translateY(100%); opacity:0; } to{ transform:none; opacity:1; } }
+@keyframes hol-roll-out-up{ from{ transform:none; opacity:1; } to{ transform:translateY(-100%); opacity:0; } }
+@keyframes hol-roll-in-down{ from{ transform:translateY(-100%); opacity:0; } to{ transform:none; opacity:1; } }
+@keyframes hol-roll-out-down{ from{ transform:none; opacity:1; } to{ transform:translateY(100%); opacity:0; } }
+@keyframes hol-fade-in{ from{ opacity:0; } to{ opacity:1; } }
+@keyframes hol-today-pulse{
+  0%, 70%{ opacity:0; transform:scale(1); }
+  72%{ opacity:.9; transform:scale(1); }
+  100%{ opacity:0; transform:scale(1.5, 1.8); }
+}
+@keyframes hol-bar-fill{ from{ transform:scaleX(0); } }

@@ -39,6 +39,7 @@ import {
 const isPast = (trip, now) =>
   trip.status === 'completed' || (dayAt(trip.to || trip.from) && daysUntil(trip.to || trip.from, now) < 0);
 
+const ZOOM_WORDS = ['Days', 'Weeks', 'Months', 'Years'];
 const zoomLabel = px => {
   const daysPerTick = 44 / px;
   if (daysPerTick <= 2.5) return 'Days';
@@ -46,6 +47,39 @@ const zoomLabel = px => {
   if (daysPerTick <= 70) return 'Months';
   return 'Years';
 };
+
+/* ── Motion constants ────────────────────────────────────────────────
+   Shared by the arrival and the selection so the two feel like one
+   system. The spring overshoots by about 3%: enough to read as landing,
+   not enough to read as bouncing. */
+const EASE_OUT = 'cubic-bezier(.2,.8,.2,1)';
+const EASE_SPRING = 'cubic-bezier(.32,1.28,.5,1)';
+
+/**
+ * The zoom word, rolling to its next value rather than swapping. Finer
+ * (zooming in) rolls up, coarser rolls down, so the direction of the
+ * roll says which way the zoom went. The old word is kept only until its
+ * roll-out ends; with reduced motion it is never drawn at all.
+ */
+function ZoomWord({ word }) {
+  const [st, setSt] = useState({ cur: word, prev: null, dir: 0, n: 0 });
+  if (word !== st.cur) {
+    setSt(s => ({
+      cur: word, prev: s.cur, n: s.n + 1,
+      dir: ZOOM_WORDS.indexOf(word) < ZOOM_WORDS.indexOf(s.cur) ? 1 : -1,
+    }));
+  }
+  const cls = st.dir > 0 ? ' is-up' : ' is-down';
+  return (
+    <span className="hol-zoom-level" aria-live="polite">
+      <span key={'c' + st.n} className={`hol-zw${st.prev ? ' is-in' + cls : ''}`}>{st.cur}</span>
+      {st.prev && (
+        <span key={'p' + st.n} className={`hol-zw is-out${cls}`} aria-hidden="true"
+              onAnimationEnd={() => setSt(s => (s.n === st.n ? { ...s, prev: null } : s))}>{st.prev}</span>
+      )}
+    </span>
+  );
+}
 
 export default function TripRail({ trips, selectedId, onSelect, now = new Date() }) {
   const isMobile = useIsMobile();
@@ -306,12 +340,75 @@ export default function TripRail({ trips, selectedId, onSelect, now = new Date()
      today at 82% instead of 72%. Depending on `viewport` waits for the
      real number. */
   const placed = useRef(false);
-  useEffect(() => {
+  /* A layout effect, so the arrival below is in place before the first
+     paint — as a plain effect the finished rail could show for a frame
+     and then vanish to be drawn in. */
+  useLayoutEffect(() => {
     if (placed.current || !geo || viewport == null || !scroller.current) return;
     placed.current = true;
     goToToday(false);
+    arrive();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [!!geo, viewport]);
+
+  /* ── Arrival ──────────────────────────────────────────────────────
+     Once per mount. The track draws across the view, the trips in view
+     grow out of their start dates in date order, and Today drops in.
+     Only what is on screen animates: a band 3,000px off to the left has
+     nothing to show, and staggering it would only delay the ones you
+     can see. WAAPI with `fill: backwards`, so nothing is ever left
+     half-drawn — when an animation ends the element is simply itself. */
+  function arrive() {
+    const el = scroller.current;
+    if (!el || reducedMotion() || !el.animate) return;
+    const pos = el[axis.pos], len = el[axis.len];
+    const total = isMobile ? el.scrollHeight : el.scrollWidth;
+    const track = el.querySelector('.hol-rail-track');
+    if (track?.animate) {
+      const from = Math.max(0, total - pos), to = Math.max(0, total - pos - len);
+      const clip = r => (isMobile ? `inset(0 0 ${r}px 0)` : `inset(0 ${r}px 0 0)`);
+      track.animate([{ clipPath: clip(from) }, { clipPath: clip(to) }],
+        { duration: 600, easing: EASE_OUT, fill: 'backwards' });
+    }
+    const startOf = n => (isMobile ? n.offsetTop : n.offsetLeft);
+    const sizeOf = n => (isMobile ? n.offsetHeight : n.offsetWidth);
+    const inView = n => startOf(n) + sizeOf(n) > pos && startOf(n) < pos + len;
+    const grow = isMobile ? 'scaleY(0) scaleX(.6)' : 'scaleX(0) scaleY(.6)';
+    const origin = isMobile ? '50% 0' : '0 100%';
+    [...el.querySelectorAll('.hol-band')].filter(inView)
+      .sort((a, b) => startOf(a) - startOf(b))
+      .forEach((b, i) => b.animate(
+        [{ transform: grow, transformOrigin: origin, opacity: 0 },
+         { transform: 'none', transformOrigin: origin, opacity: 1 }],
+        { duration: 320, delay: 240 + i * 45, easing: EASE_SPRING, fill: 'backwards' },
+      ));
+    [...el.querySelectorAll('.hol-band-out')].filter(inView)
+      .sort((a, b) => startOf(a) - startOf(b))
+      .forEach((o, i) => o.animate(
+        [{ opacity: 0, transform: 'translateY(4px)' }, { opacity: 1, transform: 'none' }],
+        { duration: 200, delay: 420 + i * 45, easing: EASE_OUT, fill: 'backwards' },
+      ));
+    const today = el.querySelector('.hol-today');
+    today?.animate(
+      [{ opacity: 0, transform: isMobile ? 'scaleX(0)' : 'scaleY(0)', transformOrigin: isMobile ? '0 50%' : '50% 100%' },
+       { opacity: 1, transform: 'none', transformOrigin: isMobile ? '0 50%' : '50% 100%' }],
+      { duration: 260, delay: 560, easing: EASE_SPRING, fill: 'backwards' },
+    );
+  }
+
+  /* ── Picking a trip glides the rail to it ─────────────────────────
+     Not on mount (placement owns that), and not when the selection was
+     cleared. Centred, because the band then lifts and the pass below
+     changes — the eye should not have to hunt for which band that was. */
+  const lastSel = useRef(selectedId);
+  useEffect(() => {
+    if (lastSel.current === selectedId) return;
+    lastSel.current = selectedId;
+    const el = scroller.current, band = bands.find(b => b.trip.id === selectedId);
+    if (!el || !band || !placed.current) return;
+    panTo(band.start + band.size / 2 - el[axis.len] / 2);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedId]);
 
   const select = id => { if (!movedRef.current) onSelect(id); };
 
@@ -329,7 +426,7 @@ export default function TripRail({ trips, selectedId, onSelect, now = new Date()
           <button type="button" className="hol-zoom-btn"
                   onClick={() => zoomTo((za.current.raf ? za.current.target : zoom) / ZOOM_STEP, (scroller.current?.[axis.len] || 0) / 2)}
                   aria-label="Zoom out">−</button>
-          <span className="hol-zoom-level" aria-live="polite">{zoomLabel(zoom)}</span>
+          <ZoomWord word={zoomLabel(zoom)} />
           <button type="button" className="hol-zoom-btn"
                   onClick={() => zoomTo((za.current.raf ? za.current.target : zoom) * ZOOM_STEP, (scroller.current?.[axis.len] || 0) / 2)}
                   aria-label="Zoom in">+</button>
@@ -392,6 +489,9 @@ export default function TripRail({ trips, selectedId, onSelect, now = new Date()
                   aria-label={`${t.dest || 'Untitled'}, ${when}`}
                   onClick={() => select(t.id)}
                 >
+                  {/* Its own layer so hover can push in on the photo
+                      without scaling the band's edges. */}
+                  <span className="hol-band-photo" aria-hidden="true" />
                   <span className="hol-band-scrim" aria-hidden="true" />
                   {band.labelInside && (
                     <span className="hol-band-label">

@@ -34,7 +34,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
  * so a second finger just made the map lurch).
  *
  * Props:
- *   fills      — { ISO2: 'red'|'amber'|'green'|'accent' } country tints
+ *   fills      — { ISO2: 'red'|'amber'|'green'|'accent'|'upcoming' } country tints
  *   pins       — [{ id, lat, lon, label, active }]
  *   lines      — [{ from: {lat,lon}, to: {lat,lon}, dashed }]
  *   view       — 'europe' | 'world'
@@ -70,6 +70,8 @@ const TONE_VAR = {
   amber:  'var(--holiday-map-amber, #f5a524)',
   green:  'var(--holiday-map-green, #2fa96b)',
   accent: 'var(--gold, #d4af37)',
+  // Somewhere a planned trip is going that you have not been yet.
+  upcoming: 'var(--em)',
 };
 
 const MIN_ZOOM = 1, MAX_ZOOM = 12;
@@ -461,4 +463,37 @@ function paths(geo) {
   });
   _pathCache = { geo, out };
   return out;
+}
+
+/* ── MiniWorld ──────────────────────────────────────────────────────
+   The same countries, drawn once and still: no gestures, no controls,
+   no hit-testing. For the Holidays prime card, where the map is a
+   picture of where you have been rather than a thing you work in.
+   Shares the lazy geometry and the path cache with the full map, so a
+   visit to the Visited tab and a hub with this block pay for it once. */
+let _geoLoad = null;
+const loadGeo = () => (_geoLoad ||= import('../../data/worldLow.json').then(m => m.default || m));
+
+export function MiniWorld({ fills = {} }) {
+  const [geo, setGeo] = useState(_pathCache.geo);
+  useEffect(() => {
+    if (geo) return undefined;
+    let alive = true;
+    loadGeo().then(g => { if (alive) setGeo(g); }).catch(() => {});
+    return () => { alive = false; };
+  }, [geo]);
+  // Antarctica's strip is 16% of the height and nobody's visited it here.
+  const [, yTop] = project(84, 0), [, yBot] = project(-56, 0);
+  return (
+    <svg className="mini-world" viewBox={`0 ${yTop} ${SRC_W} ${yBot - yTop}`}
+         preserveAspectRatio="xMidYMid meet" role="img" aria-label="Map of countries visited">
+      {paths(geo).map(p => {
+        const tone = fills[p.iso2];
+        return (
+          <path key={p.iso2} d={p.d} className={`mini-world-c${tone ? ' is-' + tone : ''}`}
+                style={tone ? { fill: TONE_VAR[tone] || tone } : undefined} />
+        );
+      })}
+    </svg>
+  );
 }
