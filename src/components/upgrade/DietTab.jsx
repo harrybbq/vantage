@@ -11,11 +11,15 @@
  * the original page exactly, so nothing changes on first load — the
  * plan only moves when it is deliberately moved.
  */
-import { useMemo, useState } from 'react';
+import { useLayoutEffect, useMemo, useRef, useState } from 'react';
 import Icon from '../Icon';
 import { RecipesPanel, VideosPanel } from './MealLibrary';
 import { DEFAULT_PLAN, blendedDailyKcal } from '../../lib/diet/plan';
 import { SEQ, CARDIO_SESSIONS, TRAIN_POS, REST_POS, patternDay, ANCHOR } from '../../lib/rotation/pattern';
+import { weightSeries, pace } from '../../lib/diet/weightTrend';
+
+/* The Log Food panel's macro colours, so a macro is the same colour everywhere. */
+const MACRO_COL = { protein: '#5b8cff', carbs: '#d99114', fat: '#d0498f' };
 
 function latestWeight(S) {
   const log = (S && S.vitalsLog) || {};
@@ -86,6 +90,7 @@ export default function DietTab({ S, update, userId }) {
           <Fig label="Protein" value={`${proteinG} g`}
                sub={`${plan.proteinPerKg} g/kg${kg ? '' : ' of target'}`} />
         </div>
+        <WeightTrend vitalsLog={S.vitalsLog} plan={plan} />
         {editing && (
           <div className="upg-edit-grid">
             <Num label="Target weight (kg)" v={plan.targetKg} step="0.5" onChange={v => set('targetKg', v)} />
@@ -111,28 +116,119 @@ export default function DietTab({ S, update, userId }) {
         />
       </div>
 
-      <div className="upg-fine">
-        Protein stays fixed per kilo regardless of day type. On nights, spread it across your
-        actual waking hours — clock-time meals don&apos;t matter, totals do. The lean-athletic look
-        comes from holding a small surplus and letting shoulder and back volume do the shaping,
-        not from chasing bigger calorie numbers.
-      </div>
-
       <SplitCard />
 
-      <div className="upg-card">
-        <div className="upg-card-head">
-          <h3>How this reaches the rest of the app</h3>
+      {/* The reasoning, kept but folded away: it is read once and then
+          it is in the way. It used to be three paragraphs and a card of
+          its own between the numbers you come here for. */}
+      <details className="upg-card upg-notes">
+        <summary>
+          <span className="upg-notes-h">// how the plan works</span>
           <span className="upg-card-sub">Blended daily: {blendedDailyKcal(S)} kcal</span>
+        </summary>
+        <div className="upg-notes-body">
+          <p><b>Protein</b> stays fixed per kilo regardless of day type. On nights, spread it across your
+          actual waking hours — clock-time meals don&apos;t matter, totals do. The lean-athletic look
+          comes from holding a small surplus and letting shoulder and back volume do the shaping,
+          not from chasing bigger calorie numbers.</p>
+          <p><b>The split:</b> {SEQ.join(' → ')} is slotted from the first shift to the first day off, so one
+          block runs across the four shifts and finishes on the day you come off them — then {REST_POS.size / 2}{' '}
+          rest days before the next block. Every block is a complete PPLUL: Push always lands on the first
+          shift, Lower always on the first day off. Cardio rides on {[...CARDIO_SESSIONS].join(' / ')} days
+          to keep legs fresh.</p>
+          <p><b>Elsewhere in the app:</b> the Body Goal projection needs one daily calorie figure and this plan
+          has two, so it uses the blend — {plan.trainKcal} on the {TRAIN_POS.length} training days and{' '}
+          {plan.restKcal} on the other {16 - TRAIN_POS.length}. That blend is a fallback: a calorie goal set
+          in Track → Daily Macros wins, and once enough days are logged, what you actually ate beats both.</p>
         </div>
-        <p className="upg-fine" style={{ margin: 0 }}>
-          The Body Goal projection needs one daily calorie figure, and this plan has two. It uses
-          the blend above — {plan.trainKcal} on the {TRAIN_POS.length} training days and {plan.restKcal} on
-          the other {16 - TRAIN_POS.length}, weighted by how the rotation actually falls.
-          {' '}That blend is a <b>fallback</b>: a calorie goal set in Track → Daily Macros wins, because
-          that is what your food log measures against. And once you have logged enough days, what you
-          actually ate beats both.
-        </p>
+      </details>
+    </div>
+  );
+}
+
+/**
+ * The last 90 days of weigh-ins against the target, and whether the last
+ * 30 are heading there at the planned rate (lib/diet/weightTrend). One
+ * series, so no legend — the card says what it is. Hover for a day.
+ */
+function WeightTrend({ vitalsLog, plan }) {
+  const series = useMemo(() => weightSeries(vitalsLog, 90), [vitalsLog]);
+  const p = useMemo(() => pace(series, plan.targetKg, plan.rateKgPerMonth), [series, plan.targetKg, plan.rateKgPerMonth]);
+  const wrap = useRef(null);
+  const [w, setW] = useState(600);
+  const [hover, setHover] = useState(null);
+  useLayoutEffect(() => {
+    const el = wrap.current;
+    if (!el) return undefined;
+    const ro = new ResizeObserver(() => setW(el.clientWidth || 600));
+    ro.observe(el);
+    setW(el.clientWidth || 600);
+    return () => ro.disconnect();
+  }, []);
+
+  if (series.length < 2) {
+    return <div className="upg-fine upg-trend-empty">Log a few weights in Track and the trend shows here.</div>;
+  }
+  const H = 120, pad = { l: 34, r: 10, t: 10, b: 18 };
+  const kgs = series.map(q => q.kg).concat(plan.targetKg);
+  const lo = Math.floor(Math.min(...kgs) - 0.3), hi = Math.ceil(Math.max(...kgs) + 0.3);
+  const t0 = series[0].t, t1 = series[series.length - 1].t;
+  const x = t => pad.l + ((t - t0) / (t1 - t0 || 1)) * (w - pad.l - pad.r);
+  const y = kg => pad.t + (1 - (kg - lo) / (hi - lo || 1)) * (H - pad.t - pad.b);
+  const d = series.map((q, i) => `${i ? 'L' : 'M'}${x(q.t).toFixed(1)},${y(q.kg).toFixed(1)}`).join('');
+  const last = series[series.length - 1];
+  const hv = hover != null ? series[hover] : null;
+  const fmtRate = r => (r == null ? '—' : `${r > 0 ? '+' : r < 0 ? '−' : ''}${Math.abs(r).toFixed(2)} kg/mo`);
+  const STATUS = {
+    on: 'On pace', slow: 'Slower than plan', wrong: 'Moving away from target', there: 'At target', unknown: 'Pace: log a few more weights',
+  };
+  const ticks = [lo, Math.round((lo + hi) / 2), hi];
+
+  function onMove(e) {
+    const r = e.currentTarget.getBoundingClientRect();
+    const tx = t0 + ((e.clientX - r.left - pad.l) / (w - pad.l - pad.r)) * (t1 - t0);
+    let best = 0;
+    series.forEach((q, i) => { if (Math.abs(q.t - tx) < Math.abs(series[best].t - tx)) best = i; });
+    setHover(best);
+  }
+
+  return (
+    <div className="upg-trend">
+      <div className="upg-trend-head">
+        <span className="upg-trend-lbl">// last 90 days</span>
+        <span className={`upg-pace is-${p.status}`}>
+          {STATUS[p.status]}
+          {p.rate != null && p.status !== 'there' && <em> · {fmtRate(p.rate)} over 30 days (plan {fmtRate(p.planned)})</em>}
+        </span>
+      </div>
+      <div className="upg-trend-chart" ref={wrap}>
+        <svg width={w} height={H} role="img" aria-label={`Weight over the last 90 days, ${last.kg} kg now, target ${plan.targetKg} kg`}
+             onMouseMove={onMove} onMouseLeave={() => setHover(null)}>
+          {ticks.map(v => (
+            <g key={v}>
+              <line className="upg-trend-grid" x1={pad.l} x2={w - pad.r} y1={y(v)} y2={y(v)} />
+              <text className="upg-trend-axis" x={pad.l - 6} y={y(v) + 3} textAnchor="end">{v}</text>
+            </g>
+          ))}
+          <line className="upg-trend-target" x1={pad.l} x2={w - pad.r} y1={y(plan.targetKg)} y2={y(plan.targetKg)} />
+          <text className="upg-trend-tlbl" x={w - pad.r} y={y(plan.targetKg) - 5} textAnchor="end">target {plan.targetKg} kg</text>
+          <path className="upg-trend-line" d={d} />
+          <circle className="upg-trend-dot" cx={x(last.t)} cy={y(last.kg)} r={4.5} />
+          {hv && (
+            <>
+              <line className="upg-trend-cross" x1={x(hv.t)} x2={x(hv.t)} y1={pad.t} y2={H - pad.b} />
+              <circle className="upg-trend-dot is-hover" cx={x(hv.t)} cy={y(hv.kg)} r={4} />
+            </>
+          )}
+          <text className="upg-trend-axis" x={pad.l} y={H - 4}>{series[0].date.slice(5).split('-').reverse().join('/')}</text>
+          <text className="upg-trend-axis" x={w - pad.r} y={H - 4} textAnchor="end">today</text>
+        </svg>
+        {hv && (
+          <div className="upg-trend-tip" style={{ left: Math.min(Math.max(x(hv.t) + 8, 0), w - 120) }} role="status">
+            <b>{hv.kg} kg</b>
+            <span>{new Date(hv.t).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' })}</span>
+          </div>
+        )}
       </div>
     </div>
   );
@@ -179,12 +275,24 @@ function MacroCard({ title, kcal, protein, carbs, fat, accent, editing, onKcal, 
     { k: 'Carbs', v: carbs, unit: 'g', set: onCarbs, step: 5 },
     { k: 'Fat', v: fat, unit: 'g', set: onFat, step: 5 },
   ];
+  // Where the calories come from, by macro: 4 kcal/g protein and carbs,
+  // 9 kcal/g fat. Shown as one bar so the balance reads at a glance.
+  const kc = { protein: protein * 4, carbs: carbs * 4, fat: fat * 9 };
+  const sum = kc.protein + kc.carbs + kc.fat || 1;
+  const share = k => Math.round((kc[k] / sum) * 100);
   return (
     <div className={'upg-card upg-macro' + (accent ? ' is-accent' : '')}>
       <div className="upg-macro-title">{title}</div>
+      <div className="upg-mbar" aria-hidden="true">
+        {['protein', 'carbs', 'fat'].map(k => <i key={k} style={{ width: `${(kc[k] / sum) * 100}%`, background: MACRO_COL[k] }} />)}
+      </div>
       {rows.map(r => (
         <div key={r.k} className="upg-mrow">
-          <span className="upg-mk">{r.k}</span>
+          <span className="upg-mk">
+            {MACRO_COL[r.k.toLowerCase()] && <i className="upg-mdot" style={{ background: MACRO_COL[r.k.toLowerCase()] }} />}
+            {r.k}
+            {MACRO_COL[r.k.toLowerCase()] && <em className="upg-mshare">{share(r.k.toLowerCase())}%</em>}
+          </span>
           {editing && r.set ? (
             <input className="upg-minput" type="number" step={r.step} value={r.v}
                    onChange={e => { const n = parseInt(e.target.value, 10); if (Number.isFinite(n)) r.set(n); }} />
@@ -226,16 +334,9 @@ function SplitCard() {
         {cycle.map(c => (
           <div key={c.i} className={`upg-split-cell is-${c.shift}${c.cardio ? ' has-cardio' : ''}${c.session === 'Rest' ? ' is-rest' : ''}`}>
             <span className="upg-split-shift">{c.shift === 'night' ? `N${c.shiftNum}` : c.shift === 'day' ? `D${c.shiftNum}` : '·'}</span>
-            <span className="upg-split-sess">{c.session.slice(0, 4).toUpperCase()}</span>
+            <span className="upg-split-sess">{c.session}</span>
           </div>
         ))}
-      </div>
-      <div className="upg-fine" style={{ marginTop: 10 }}>
-        {SEQ.join(' → ')} is slotted from the first shift to the first day off, so one block runs
-        across the four shifts and finishes on the day you come off them — then {REST_POS.size / 2}{' '}
-        rest days before the next block. Block length and sequence length are both five, so every
-        block is a complete PPLUL: Push always lands on the first shift, Lower always on the first
-        day off. Cardio rides on {[...CARDIO_SESSIONS].join(' / ')} days to keep legs fresh.
       </div>
     </div>
   );

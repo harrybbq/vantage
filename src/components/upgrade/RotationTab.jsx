@@ -141,6 +141,10 @@ function TodayPanel({ overrides, S }) {
         ))}
       </div>
 
+      {/* Session and stretch side by side on a wide screen: they are two
+          lists you read at the same moment, and stacked they made this
+          card the height of the screen before the calendar started. */}
+      <div className="upg-today-lists">
       {exercises.length > 0 ? (
         <div className="upg-exlist">
           <div className="upg-exlist-h">
@@ -186,7 +190,51 @@ function TodayPanel({ overrides, S }) {
           </div>
         ))}
       </div>
+      </div>
     </div>
+  );
+}
+
+/**
+ * The next sixteen days — one full cycle from today.
+ *
+ * The calendar answers "what does a month look like"; this answers the
+ * question the page is actually opened for, "what's coming", without
+ * scanning a grid. Each day opens the same editor as the calendar.
+ */
+function NextDays({ overrides, holidayDays, today, onOpen }) {
+  const days = useMemo(() => {
+    const [y, m, d] = today.split('-').map(Number);
+    return Array.from({ length: 16 }, (_, i) => {
+      const dt = new Date(Date.UTC(y, m - 1, d + i));
+      return resolveDay(dt.getUTCFullYear(), dt.getUTCMonth(), dt.getUTCDate(), overrides);
+    }).filter(c => c.inPattern);
+  }, [overrides, today]);
+  if (!days.length) return null;
+  return (
+    <section className="upg-card upg-next">
+      <div className="upg-card-head">
+        <h3>Next 16 days</h3>
+        <span className="upg-card-sub">one full cycle · tap a day to change it</span>
+      </div>
+      <div className="upg-next-row">
+        {days.map((c, i) => {
+          const dt = new Date(c.iso + 'T12:00:00');
+          const chip = chipText(c);
+          return (
+            <button key={c.iso} type="button" onClick={() => onOpen(c)}
+                    className={['upg-next-day', `is-${c.shift}`, c.cardio ? 'has-cardio' : '', c.edited ? 'is-edited' : '',
+                      holidayDays.has(c.iso) ? 'is-holiday' : '', i === 0 ? 'is-today' : ''].filter(Boolean).join(' ')}
+                    aria-label={`${dt.toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' })}: ${c.shift === 'off' ? 'off' : chip}, ${c.session}`}>
+              <span className="upg-next-dow">{i === 0 ? 'Today' : DOW[(dt.getDay() + 6) % 7]}</span>
+              <span className="upg-next-dt">{dt.getDate()}</span>
+              <span className="upg-next-chip">{chip || 'Off'}</span>
+              <span className={'upg-next-sess' + (c.session === 'Rest' ? ' is-rest' : '')}>{c.session}</span>
+            </button>
+          );
+        })}
+      </div>
+    </section>
   );
 }
 
@@ -203,6 +251,23 @@ export default function RotationTab({ S, update, isMobile }) {
   const months = useMemo(
     () => monthRange(WINDOW.fromY, WINDOW.fromM, WINDOW.toY, WINDOW.toM),
     []);
+  /* Three months at a time (one on a phone), opening on this month. All
+     fifteen at once made the page 2,700px tall — 7,200 on a phone — with
+     cells too small to read, and the past months took as much room as
+     the coming ones. */
+  const perPage = isMobile ? 1 : 3;
+  const nowIdx = useMemo(() => {
+    const n = new Date();
+    const i = months.findIndex(([y, m]) => y === n.getFullYear() && m === n.getMonth());
+    return i < 0 ? 0 : i;
+  }, [months]);
+  const maxStart = Math.max(0, months.length - perPage);
+  const [pageStart, setPageStart] = useState(() => Math.min(nowIdx, maxStart));
+  const start = Math.min(pageStart, maxStart);
+  const shown = months.slice(start, start + perPage);
+  const pageLabel = shown.length
+    ? `${MONTHS[shown[0][1]].slice(0, 3)} ${shown[0][0]}${shown.length > 1 ? ` – ${MONTHS[shown[shown.length - 1][1]].slice(0, 3)} ${shown[shown.length - 1][0]}` : ''}`
+    : '';
   const stats = useMemo(
     () => rangeStats(WINDOW.fromDate, WINDOW.toDate, overrides),
     [overrides]);
@@ -219,6 +284,8 @@ export default function RotationTab({ S, update, isMobile }) {
   // per-day overrides. They shade the calendar and drive the countdown;
   // they book nothing and cost no allowance.
   const blocks = useMemo(() => (S.rotation && S.rotation.holidayBlocks) || [], [S.rotation]);
+  const today = todayIso();
+  const holidayDays = useMemo(() => holidayDaySet(blocks), [blocks]);
 
   // Additive: a new `rotation` key, and within it only the days that
   // deviate. Setting a day back to its pattern value deletes the entry
@@ -244,11 +311,9 @@ export default function RotationTab({ S, update, isMobile }) {
     setEditing(null);
   }
 
-  const today = todayIso();
   const resetIn = daysUntilReset(today);
   const editedCount = Object.keys(overrides).length;
   const upcoming = useMemo(() => nextHoliday(blocks, today), [blocks, today]);
-  const holidayDays = useMemo(() => holidayDaySet(blocks), [blocks]);
 
   // The set of dates the picker is currently proposing, so the calendar
   // can shade them before anything is written.
@@ -291,6 +356,7 @@ export default function RotationTab({ S, update, isMobile }) {
   return (
     <div className="upg-pane">
       <TodayPanel overrides={overrides} S={S} />
+      <NextDays overrides={overrides} holidayDays={holidayDays} today={today} onOpen={setEditing} />
       <div className="upg-stats">
         {[
           { k: 'night', n: stats.night, label: 'Night shifts' },
@@ -378,8 +444,20 @@ export default function RotationTab({ S, update, isMobile }) {
         </span>
       </div>
 
-      <div className={'upg-months' + (isMobile ? ' is-mobile' : '')}>
-        {months.map(([y, m]) => (
+      <div className="upg-pager" role="group" aria-label="Calendar months">
+        <button type="button" className="upg-pager-btn" onClick={() => setPageStart(Math.max(0, start - perPage))}
+                disabled={start === 0} aria-label="Earlier months">‹</button>
+        <span className="upg-pager-lbl">{pageLabel}</span>
+        <button type="button" className="upg-pager-btn" onClick={() => setPageStart(Math.min(maxStart, start + perPage))}
+                disabled={start >= maxStart} aria-label="Later months">›</button>
+        {start !== Math.min(nowIdx, maxStart) && (
+          <button type="button" className="upg-textbtn" onClick={() => setPageStart(Math.min(nowIdx, maxStart))}>This month</button>
+        )}
+        <span className="upg-pager-of">{start + 1}–{Math.min(start + perPage, months.length)} of {months.length} months</span>
+      </div>
+
+      <div className={'upg-months is-paged' + (isMobile ? ' is-mobile' : '')}>
+        {shown.map(([y, m]) => (
           <div key={`${y}-${m}`} className="upg-month">
             <h3>{MONTHS[m]} <span>{y}</span></h3>
             <div className="upg-dow">{DOW.map(d => <span key={d}>{d}</span>)}</div>
@@ -417,7 +495,8 @@ export default function RotationTab({ S, update, isMobile }) {
                       <span className="upg-dt">{Number(cell.iso.slice(8))}</span>
                       {chip && <span className="upg-chip">{chip}</span>}
                     </span>
-                    <span className={'upg-sess' + (cell.session === 'Rest' ? ' is-rest' : '')}>{cell.session}</span>
+                    <span className={'upg-sess' + (cell.session === 'Rest' ? ' is-rest' : '')}
+                          data-short={cell.session.slice(0, 3)}><span>{cell.session}</span></span>
                   </button>
                 );
               })}
