@@ -1294,7 +1294,7 @@
 .uh-bob { animation: uh-bob calc(5.6s + var(--i) * .7s) ease-in-out calc(var(--i) * -1.3s) 2; }
 .uh-card { position: relative; display: flex; flex-direction: column; align-items: flex-start; gap: 26px; width: 100%;
   min-height: 240px; padding: 22px; border-radius: 24px; border: 1px solid var(--border);
-  background: color-mix(in srgb, var(--surface) 86%, transparent); backdrop-filter: blur(16px) saturate(1.15);
+  background: var(--upg-solid);
   color: var(--text); text-align: left; cursor: pointer; font: inherit;
   box-shadow: 0 1px 0 color-mix(in srgb, #fff 8%, transparent) inset, 0 18px 40px -22px rgba(0,0,0,.45);
   transition: transform .4s cubic-bezier(.2,.8,.2,1), box-shadow .4s, border-color .3s; }
@@ -1342,3 +1342,44 @@
   .uh-hero, .uh-slot, .uh-bob, .uh-floor, .uh-open { animation: none !important; }
   .uh-card { transition: none; }
 }
+
+/* ── Readability over a page background ──
+   Upgrade can carry a background image (per page, like everywhere
+   else). Frosted or tinted cards let it bleed through the text, even
+   dimmed, so inside Upgrade every surface is SOLID, and an open section
+   sits on one solid panel so its tabs and headings are too. */
+.upg-app { --upg-solid: #fdfaf3; --card: var(--upg-solid); --surface: var(--upg-solid); }
+html[data-theme="cream-pro"] .upg-app { --upg-solid: #faf5e9; }
+html[data-theme="dark-os"] .upg-app { --upg-solid: #131311; }
+html[data-theme="dark-os"] .upg-app .career-pane { --cp-bg: #171715; }
+.upg-app .uh-open { background: var(--upg-solid); border: 1px solid var(--border); border-radius: 22px;
+  padding: 14px 18px 22px; box-shadow: 0 24px 60px -30px rgba(0,0,0,.5); }
+.upg-app .uh-hero { align-self: flex-start; background: var(--upg-solid); border: 1px solid var(--border);
+  border-radius: 22px; padding: 18px 26px 16px; }
+@media (max-width: 700px) { .upg-app .uh-open { padding: 10px 12px 18px; border-radius: 16px; } .upg-app .uh-hero { padding: 14px 16px 12px; } }
+
+/* ── Shopping list: shop chips, running total, gaps ── */
+.upg-stores { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; margin-top: 10px; }
+.upg-store { display: flex; flex-direction: column; align-items: flex-start; gap: 1px; padding: 8px 10px; border-radius: 10px;
+  border: 1px solid var(--border); background: transparent; color: var(--text); font: inherit; cursor: pointer; text-align: left; min-width: 0; }
+.upg-store b { font-size: 13px; }
+.upg-store span { font-family: var(--mono); font-size: 12px; font-variant-numeric: tabular-nums; }
+.upg-store em { font-style: normal; font-family: var(--mono); font-size: 9.5px; color: var(--em); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+.upg-store em.is-gap { color: #e0796a; }
+.upg-store.is-on { border-color: var(--em); background: rgba(var(--em-rgb),.1); }
+.upg-store:focus-visible { outline: 2px solid var(--em); outline-offset: 2px; }
+.upg-running { display: flex; gap: 22px; flex-wrap: wrap; margin: 12px 0 6px; padding: 10px 12px; border-radius: 10px;
+  background: rgba(var(--em-rgb),.06); }
+.upg-running div { display: flex; flex-direction: column; gap: 1px; }
+.upg-running span { font-family: var(--mono); font-size: 9px; letter-spacing: 1px; text-transform: uppercase; color: var(--text-muted); }
+.upg-running b { font-family: var(--mono); font-size: 16px; color: var(--text); font-variant-numeric: tabular-nums; }
+.upg-second { display: flex; align-items: flex-start; gap: 8px; margin: 6px 0; padding: 10px 12px; border-radius: 10px;
+  border: 1px solid color-mix(in srgb, var(--gold) 55%, transparent); background: color-mix(in srgb, var(--gold) 10%, transparent);
+  font-size: 12.5px; line-height: 1.45; color: var(--text); }
+.upg-second svg { flex: none; margin-top: 2px; color: var(--gold); }
+.upg-via { font-style: normal; font-family: var(--mono); font-size: 9.5px; color: var(--gold); margin-left: 6px;
+  padding: 1px 6px; border-radius: 999px; border: 1px solid color-mix(in srgb, var(--gold) 50%, transparent); }
+.upg-shop li.is-out label span { color: #e0796a; }
+.upg-out { display: flex; flex-direction: column; gap: 2px; margin: 3px 0 0 26px; font-size: 11.5px; color: var(--text-mid); }
+.upg-out > span:first-child { color: #e0796a; font-weight: 600; }
+@media (max-width: 700px) { .upg-stores { grid-template-columns: repeat(2, minmax(0, 1fr)); } .upg-running { gap: 14px; } }

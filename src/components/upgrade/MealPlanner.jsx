@@ -22,7 +22,7 @@ import {
   planDays, nextShiftBlock, targetsFor, dayStatus, suggest, batchesOf, shoppingList, EMPTY_PLAN,
   portionOptions, planFood, rememberFood,
 } from '../../lib/diet/planner';
-import { shopPlan, packLabel, catalogueFor } from '../../lib/diet/shopping';
+import { shopPlan, packLabel, catalogueFor, packsAt, storeName, STORES, PRICES_AS_OF } from '../../lib/diet/shopping';
 import { searchByName, readCommunityPref } from '../../lib/diet/foodSearch';
 
 const uid = () => Math.random().toString(36).slice(2, 10) + Date.now().toString(36).slice(-4);
@@ -81,12 +81,28 @@ export default function MealPlanner({ S, update, plan, proteinG }) {
   const prefs = S.shopPrefs || {};
   const savePrefs = fn => update(prev => ({ ...prev, shopPrefs: fn(prev.shopPrefs || {}) }));
   const moveItem = (ikey, to) => savePrefs(p => ({ ...p, cats: { ...(p.cats || {}), [ikey]: to } }));
-  const setPacks = (ikey, family, packs) => savePrefs(p => {
-    const all = { ...(p.packs || {}) };
-    const mine = { ...(all[ikey] || {}) };
+  const store = STORES.some(x => x.id === prefs.store) ? prefs.store : 'tesco';
+  const setStore = id => savePrefs(p => ({ ...p, store: id }));
+  // Your packs and prices for an item AT ONE SHOP (null clears them, and
+  // any older all-shop packs for it, back to the table).
+  const setPacks = (shopId, ikey, family, packs) => savePrefs(p => {
+    const all = { ...(p.storePacks || {}) };
+    const here = { ...(all[shopId] || {}) };
+    const mine = { ...(here[ikey] || {}) };
     if (packs) mine[family] = packs; else delete mine[family];
-    if (Object.keys(mine).length) all[ikey] = mine; else delete all[ikey];
-    return { ...p, packs: all };
+    if (Object.keys(mine).length) here[ikey] = mine; else delete here[ikey];
+    all[shopId] = here;
+    const generic = { ...(p.packs || {}) };
+    if (!packs && generic[ikey]) { const g = { ...generic[ikey] }; delete g[family]; if (Object.keys(g).length) generic[ikey] = g; else delete generic[ikey]; }
+    return { ...p, storePacks: all, packs: generic };
+  });
+  // "Not stocked here", per shop.
+  const setOut = (shopId, ikey, isOut) => savePrefs(p => {
+    const all = { ...(p.out || {}) };
+    const here = { ...(all[shopId] || {}) };
+    if (isOut) here[ikey] = true; else delete here[ikey];
+    all[shopId] = here;
+    return { ...p, out: all };
   });
   const [editPacks, setEditPacks] = useState(null);  // shopping item | null
   const setServ = (id, v) => save(p => ({ ...p, entries: p.entries.map(e => (e.id === id ? { ...e, servings: Math.max(0.5, Math.round(v * 2) / 2) } : e)) }));
@@ -105,18 +121,23 @@ export default function MealPlanner({ S, update, plan, proteinG }) {
   const shortDays = st.filter(x => x.status !== 'empty' && x.protein < -5).length;
   const batches = batchesOf(inRange, recipes);
   const shop = shoppingList(inRange, recipes);
-  const sp = shopPlan(shop.items, prefs);
-  const toBuy = sp.aisles.reduce((a, x) => a + x.items.filter(i => !bought.has(i.key)).length, 0);
+  const sp = shopPlan(shop.items, { ...prefs, store });
+  const shopItems = sp.aisles.flatMap(a => a.items);
+  const toBuy = shopItems.filter(i => !bought.has(i.key)).length;
+  // The running total: what's in the basket so far against the whole shop.
+  const inBasket = Math.round(shopItems.filter(i => bought.has(i.key) && i.packs).reduce((a, i) => a + i.packs.cost, 0) * 100) / 100;
+  const cheapest = sp.stores.filter(x => !x.missing.length).sort((a, b) => a.cost - b.cost)[0] || null;
   const isBlock = start === block.start && n === block.days;
   const shifts = days.filter(d => d.shift === 'day' || d.shift === 'night').length;
 
   function copyList() {
+    const left = shopItems.filter(i => !bought.has(i.key));
+    const block = (title, list) => (list.length ? ['', title, ...list.map(i => `- ${i.buy ? i.buy + ' ' : ''}${i.item}`)] : []);
     const lines = [
-      `Shopping · ${dayLabel(start)} – ${dayLabel(days[days.length - 1].iso)}`,
-      ...sp.aisles.flatMap(a => {
-        const left = a.items.filter(i => !bought.has(i.key));
-        return left.length ? ['', a.name, ...left.map(i => `- ${i.buy ? i.buy + ' ' : ''}${i.item}`)] : [];
-      }),
+      `Shopping · ${dayLabel(start)} – ${dayLabel(days[days.length - 1].iso)} · ≈ £${sp.cost.toFixed(2)}`,
+      ...block(storeName(store), left.filter(i => !i.via && i.at.status !== 'out')),
+      ...(sp.second ? block(storeName(sp.second.store), left.filter(i => i.via === sp.second.store)) : []),
+      ...block('Not found yet', left.filter(i => !i.via && i.at.status === 'out')),
       ...(sp.cupboard.length ? ['', 'Check the cupboard', ...sp.cupboard.map(i => `- ${i.item}${i.amount ? ` (${i.amount})` : ''}`)] : []),
     ].join('\n');
     navigator.clipboard?.writeText(lines).then(() => { setCopied(true); setTimeout(() => setCopied(false), 1800); }).catch(() => {});
@@ -238,12 +259,39 @@ export default function MealPlanner({ S, update, plan, proteinG }) {
           <section className="upg-card upg-plan-shop">
             <div className="upg-plan-shop-head">
               <span className="upg-field-lbl">Shopping list</span>
-              <span className="upg-fine">{toBuy} to buy{sp.priced ? ` · ≈ £${sp.cost.toFixed(2)}` : ''}</span>
+              <span className="upg-fine">{toBuy} to buy</span>
               <button type="button" className="upg-textbtn" onClick={copyList} disabled={!shop.items.length}>
                 <Icon name="copy" size={11} /> {copied ? 'Copied' : 'Copy list'}
               </button>
             </div>
-            {sp.priced > 0 && <div className="upg-fine">Packs are the cheapest mix that covers what you need, at typical UK prices. Tap packs to use your shop’s sizes and prices.</div>}
+            <div className="upg-stores" role="radiogroup" aria-label="Shop">
+              {sp.stores.map(x => (
+                <button key={x.id} type="button" role="radio" aria-checked={x.id === store}
+                        className={`upg-store${x.id === store ? ' is-on' : ''}`} onClick={() => setStore(x.id)}>
+                  <b>{x.name}</b>
+                  <span>≈ £{x.cost.toFixed(2)}</span>
+                  <em className={x.missing.length ? 'is-gap' : ''}>
+                    {x.missing.length ? `+ ${x.missing.length} elsewhere` : cheapest && cheapest.id === x.id ? 'cheapest' : 'has it all'}
+                  </em>
+                </button>
+              ))}
+            </div>
+            <div className="upg-running" aria-live="polite">
+              <div><span>Shop total</span><b>≈ £{sp.cost.toFixed(2)}</b></div>
+              <div><span>In the basket</span><b>£{inBasket.toFixed(2)}</b></div>
+              <div><span>Still to get</span><b>£{Math.max(0, sp.cost - inBasket).toFixed(2)}</b></div>
+            </div>
+            {sp.second && (
+              <div className="upg-second">
+                <Icon name="shopping-bag" size={13} />
+                <span>
+                  {storeName(store)} doesn’t have {sp.missing.length} of these.
+                  Get {sp.second.keys.length === sp.missing.length ? 'them' : `${sp.second.keys.length} of them`} at <b>{storeName(sp.second.store)}</b> (≈ £{sp.second.cost.toFixed(2)})
+                  {sp.second.keys.length === sp.missing.length ? ', and the whole list is covered in two shops.' : '.'}
+                </span>
+              </div>
+            )}
+            <div className="upg-fine">Prices are estimates for {PRICES_AS_OF}, not live. Set a shop’s real price on any item, or mark it not stocked there, and the list uses yours.</div>
             {shop.missing.length > 0 && (
               <div className="upg-setup">
                 <Icon name="triangle-alert" size={13} /> No ingredients yet for {shop.missing.map(r => r.title || 'Untitled recipe').join(', ')}. Add them, or link the video and read them in, in Recipes.
@@ -253,23 +301,41 @@ export default function MealPlanner({ S, update, plan, proteinG }) {
               <div key={a.name} className="upg-aisle">
                 <h4>{a.name}</h4>
                 <ul className="upg-shop">
-                  {a.items.map(i => (
-                    <li key={i.key} className={bought.has(i.key) ? 'is-bought' : ''}>
-                      <label>
-                        <input type="checkbox" checked={bought.has(i.key)} onChange={() => toggleBought(i.key)} />
-                        <b>{i.buy || '—'}</b>
-                        <span>{i.item}</span>
-                      </label>
-                      <div className="upg-shop-sub">
-                        {i.packs && <span>need {i.amount}{spareLabel(i.packs.leftover, i.family)} · ≈ £{i.packs.cost.toFixed(2)}</span>}
-                        {i.family && i.base != null && (
-                          <button type="button" className="upg-textbtn" onClick={() => setEditPacks(i)}>{i.ownPacks ? 'your packs' : 'packs'}</button>
+                  {a.items.map(i => {
+                    const out = !i.via && i.at.status === 'out';
+                    const markedHere = !!(((prefs.out || {})[store] || {})[i.ikey]);
+                    return (
+                      <li key={i.key} className={`${bought.has(i.key) ? 'is-bought' : ''}${out ? ' is-out' : ''}`}>
+                        <label>
+                          <input type="checkbox" checked={bought.has(i.key)} onChange={() => toggleBought(i.key)} />
+                          <b>{out ? '—' : i.buy || '—'}</b>
+                          <span>{i.item}{i.via && <em className="upg-via">@ {storeName(i.via)}</em>}</span>
+                        </label>
+                        {out && (
+                          <div className="upg-out">
+                            <span>Not at {storeName(store)}{i.at.why === 'range' ? ' (usually)' : ''}.</span>
+                            {i.swap && <span>Try <b>{i.swap.buy} {i.swap.item}</b> here ≈ £{i.swap.best.cost.toFixed(2)}</span>}
+                            {i.alt && <span>{i.swap ? 'or get' : 'Get'} it at <b>{storeName(i.alt.store)}</b>: {i.alt.buy} ≈ £{i.alt.best.cost.toFixed(2)}</span>}
+                            {!i.swap && !i.alt && <span>None of the four shops lists it; buy it where you can.</span>}
+                          </div>
                         )}
-                        <button type="button" className="upg-textbtn" onClick={() => moveItem(i.ikey, 'cupboard')}>→ cupboard</button>
-                        {i.from.length > 1 && <em>{i.from.join(' · ')}</em>}
-                      </div>
-                    </li>
-                  ))}
+                        <div className="upg-shop-sub">
+                          {i.packs && <span>need {i.amount}{spareLabel(i.packs.leftover, i.family)} · ≈ £{i.packs.cost.toFixed(2)}{i.at.own ? ' · your price' : ''}</span>}
+                          {i.at.status === 'unpriced' && <span>need {i.amount} · no price yet</span>}
+                          {i.family && i.base != null && (
+                            <button type="button" className="upg-textbtn" onClick={() => setEditPacks({ ...i, shop: i.via || store })}>
+                              {i.ownPacks ? `your ${storeName(i.via || store)} price` : `price at ${storeName(i.via || store)}`}
+                            </button>
+                          )}
+                          <button type="button" className="upg-textbtn" onClick={() => setOut(store, i.ikey, !markedHere)}>
+                            {markedHere ? `${storeName(store)} has it` : `not at ${storeName(store)}`}
+                          </button>
+                          <button type="button" className="upg-textbtn" onClick={() => moveItem(i.ikey, 'cupboard')}>→ cupboard</button>
+                          {i.from.length > 1 && <em>{i.from.join(' · ')}</em>}
+                        </div>
+                      </li>
+                    );
+                  })}
                 </ul>
               </div>
             ))}
@@ -297,8 +363,8 @@ export default function MealPlanner({ S, update, plan, proteinG }) {
       )}
 
       {editPacks && (
-        <PackEditor item={editPacks} prefs={prefs}
-                    onSave={packs => { setPacks(editPacks.ikey, editPacks.family, packs); setEditPacks(null); }}
+        <PackEditor item={editPacks} prefs={prefs} shop={editPacks.shop}
+                    onSave={packs => { setPacks(editPacks.shop, editPacks.ikey, editPacks.family, packs); setEditPacks(null); }}
                     onClose={() => setEditPacks(null)} />
       )}
 
@@ -453,9 +519,10 @@ function AddSheet({ recipes, quick, title, onPick, onForget, onClose }) {
 /**
  * Your own pack sizes and prices for an item, replacing the typical ones.
  */
-function PackEditor({ item, prefs, onSave, onClose }) {
-  const typical = (catalogueFor(item.ikey) || { packs: {} }).packs[item.family] || [];
-  const mine = ((prefs.packs || {})[item.ikey] || {})[item.family];
+function PackEditor({ item, prefs, shop, onSave, onClose }) {
+  const typical = packsAt(catalogueFor(item.ikey), item.family, shop);
+  const mine = (((prefs.storePacks || {})[shop] || {})[item.ikey] || {})[item.family]
+    || ((prefs.packs || {})[item.ikey] || {})[item.family];
   const [rows, setRows] = useState(() => (mine || typical).map(p => ({ size: String(p.size), price: String(p.price), label: p.label || '' })));
   const unit = item.family === 'x' ? 'count' : item.family;
   const clean = rows.map(r => ({ size: Number(r.size), price: Number(r.price), ...(r.label ? { label: r.label } : {}) }))
@@ -463,13 +530,13 @@ function PackEditor({ item, prefs, onSave, onClose }) {
   const set = (i, k, v) => setRows(rs => rs.map((r, j) => (j === i ? { ...r, [k]: v, ...(k === 'size' ? { label: '' } : {}) } : r)));
   return (
     <div className="modal-overlay open" onClick={onClose} role="presentation">
-      <div className="modal upg-sheet" onClick={e => e.stopPropagation()} role="dialog" aria-modal="true" aria-label={`Packs for ${item.item}`}>
+      <div className="modal upg-sheet" onClick={e => e.stopPropagation()} role="dialog" aria-modal="true" aria-label={`${item.item} at ${storeName(shop)}`}>
         <div className="upg-day-head">
-          <h3 style={{ margin: 0, fontSize: 16 }}>Packs · {item.item}</h3>
+          <h3 style={{ margin: 0, fontSize: 16 }}>{item.item} · {storeName(shop)}</h3>
           <button type="button" className="link-del-btn" onClick={onClose} aria-label="Close">✕</button>
         </div>
         <div className="upg-sheet-body">
-          <span className="upg-fine">The sizes your shop sells and what they cost. The list picks the cheapest mix that covers {item.amount}.</span>
+          <span className="upg-fine">The sizes {storeName(shop)} sells and what they cost there. The list picks the cheapest mix that covers {item.amount}.{!typical.length && !mine ? ` ${storeName(shop)} isn’t in the price table for this — add what you find.` : ''}</span>
           <div className="upg-packs">
             <span>Size ({unit})</span><span>Price (£)</span><span />
             {rows.map((r, i) => (
@@ -483,7 +550,7 @@ function PackEditor({ item, prefs, onSave, onClose }) {
           <button type="button" className="upg-textbtn" style={{ alignSelf: 'flex-start' }} onClick={() => setRows(rs => [...rs, { size: '', price: '', label: '' }])}>+ Add a pack size</button>
         </div>
         <div className="upg-day-actions">
-          {mine && <button type="button" className="upg-textbtn" onClick={() => onSave(null)}>Use typical prices</button>}
+          {mine && <button type="button" className="upg-textbtn" onClick={() => onSave(null)}>Use the price table</button>}
           <button type="button" className="link-open-btn" onClick={() => onSave(clean.length ? clean : null)}>Save</button>
         </div>
       </div>
