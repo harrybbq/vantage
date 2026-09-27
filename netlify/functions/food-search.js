@@ -171,20 +171,28 @@ function toText(v, depth = 0) {
 function mapProduct(p) {
   const n = p.nutriments || {};
   const per100 = k => parseFloat(n[k + '_100g'] ?? n[k] ?? 0) || 0;
+  // Every client reads nutrient values as being FOR serving_g (logMath
+  // baseOf, the log sheet's per-gram densities). Open Food Facts gives
+  // them per 100 g, and serving_g is the pack's own serving — so they
+  // are scaled to it here. Before this, a 30 g serving of a 380 kcal/100g
+  // cereal was offered as 380 kcal for 30 g.
+  const serving = parseFloat(p.serving_quantity) || 100;
+  const k = serving / 100;
+  const g = v => Math.round(v * k * 10) / 10;
   return {
     food_name: toText(p.product_name) || toText(p.abbreviated_product_name),
     brand:     toText(p.brands),
     barcode:   p.code || p._id || '',
     image:     p.image_front_small_url || p.image_small_url || '',
-    serving_g: parseFloat(p.serving_quantity) || 100,
+    serving_g: serving,
     serving_unit: servingUnit(p),
-    calories:  per100('energy-kcal'),
-    protein_g: per100('proteins'),
-    carbs_g:   per100('carbohydrates'),
-    fat_g:     per100('fat'),
-    fibre_g:   per100('fiber'),
-    sugar_g:   per100('sugars'),
-    sodium_mg: Math.round(per100('sodium') * 1000),
+    calories:  Math.round(per100('energy-kcal') * k),
+    protein_g: g(per100('proteins')),
+    carbs_g:   g(per100('carbohydrates')),
+    fat_g:     g(per100('fat')),
+    fibre_g:   g(per100('fiber')),
+    sugar_g:   g(per100('sugars')),
+    sodium_mg: Math.round(per100('sodium') * 1000 * k),
     source:    'openfoodfacts',
   };
 }

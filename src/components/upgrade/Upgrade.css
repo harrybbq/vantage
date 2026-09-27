@@ -420,32 +420,19 @@
 .upg-fit { margin-left: auto; color: var(--em); }
 .upg-logbar { border-top: 1px solid var(--border); padding-top: 14px; }
 .upg-logrow { display: flex; gap: 10px; align-items: flex-end; margin-top: 9px; flex-wrap: wrap; }
-
-/* Videos */
-.upg-vgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(290px, 1fr)); gap: 11px; }
-.upg-vrow { display: flex; gap: 11px; align-items: center; padding: 9px; text-align: left;
-  border: 1px solid var(--border); border-radius: 12px; background: transparent; color: var(--text);
-  font-family: inherit; cursor: pointer; }
-.upg-vrow:hover { border-color: var(--em); }
 .upg-vthumb { position: relative; flex: none; width: 100px; aspect-ratio: 16/10; border-radius: 8px;
   overflow: hidden; background: var(--border); display: block; }
 .upg-vthumb.is-tall { width: 62px; aspect-ratio: 9/13; }
-.upg-vthumb.is-hero { width: 100%; max-width: 320px; aspect-ratio: 16/9; margin-bottom: 12px; }
-.upg-vthumb.is-hero.is-tall { max-width: 200px; aspect-ratio: 9/14; }
 .upg-vthumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
 .upg-vtile { position: absolute; inset: 0; display: grid; place-items: center;
   font-family: var(--display, serif); font-size: 22px; font-weight: 700; color: #fff;
   background: linear-gradient(140deg, #3a3630, #22201c); }
 .upg-vtile.is-tiktok { background: linear-gradient(140deg, #2b3a44, #16202a); }
 .upg-vtile.is-instagram { background: linear-gradient(140deg, #7a3350, #3a1f33); }
-.upg-vmeta { min-width: 0; display: flex; flex-direction: column; gap: 4px; }
 .upg-vtitle { font-size: 13px; font-weight: 600; line-height: 1.35; }
-.upg-vsub { display: flex; gap: 8px; flex-wrap: wrap; align-items: center;
-  font-family: var(--mono); font-size: 9px; color: var(--text-muted); }
 .upg-plat { padding: 2px 7px; border-radius: 999px; border: 1px solid var(--border);
   letter-spacing: .6px; text-transform: uppercase; }
 .upg-plat.is-youtube { color: #c0563f; border-color: rgba(192,86,63,.55); }
-.upg-vnote { font-size: 12px; color: var(--text-muted); }
 
 /* Recipe ↔ video links */
 .upg-rvid { position: absolute; right: 8px; bottom: 8px; display: inline-flex; align-items: center; gap: 3px;
@@ -474,12 +461,6 @@
 .upg-rvid-opt > span:last-child { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .upg-rvid-opt .upg-plat { flex: none; font-family: var(--mono); font-size: 8.5px; }
 .upg-rvid-opt:hover { border-color: var(--em); }
-.upg-vrecipes { display: inline-flex; align-items: center; gap: 5px; font-family: var(--mono); font-size: 9.5px;
-  color: var(--em); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.upg-linkchip { display: inline-flex; align-items: center; gap: 6px; cursor: default; }
-.upg-linkchip button { border: 0; background: none; color: inherit; cursor: pointer; padding: 0 0 0 2px;
-  font-size: 10px; opacity: .7; }
-.upg-linkchip button:hover { opacity: 1; }
 
 @media (max-width: 700px) {
   .upg-rgrid { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; }
@@ -1242,10 +1223,10 @@
 .upg-plan-shop .upg-setup { margin-top: 8px; }
 .upg-shop { columns: 2 220px; column-gap: 20px; display: block; }
 .upg-shop li { break-inside: avoid; padding: 4px 0; border-bottom: 1px solid rgba(128,128,128,.12); }
-.upg-shop label { display: grid; grid-template-columns: auto 64px minmax(0, 1fr); align-items: baseline; gap: 8px; cursor: pointer; font-size: 13px; }
+.upg-shop label { display: grid; grid-template-columns: auto minmax(64px, max-content) minmax(0, 1fr); align-items: baseline; gap: 8px; cursor: pointer; font-size: 13px; }
 .upg-shop input { accent-color: var(--em); }
 .upg-shop label b { font-family: var(--mono); font-size: 11px; font-weight: 600; text-align: right; }
-.upg-shop em { display: block; margin-left: 96px; font-style: normal; font-family: var(--mono); font-size: 9px; color: var(--text-muted); }
+
 .upg-shop li.is-bought label { color: var(--text-muted); text-decoration: line-through; }
 .upg-pick-row { flex-direction: column; align-items: flex-start; gap: 2px; }
 .upg-pick-row em { font-style: normal; font-family: var(--mono); font-size: 10px; color: var(--text-muted); }
@@ -1254,3 +1235,42 @@
   .upg-plan-all { margin-left: 0; width: 100%; }
   .upg-plan-sum { gap: 14px; }
 }
+
+/* Shopping list by aisle, with the cupboard split off */
+.upg-aisle { margin-top: 12px; }
+.upg-aisle h4 { margin: 0 0 2px; font-family: var(--mono); font-size: 9.5px; font-weight: 600; letter-spacing: 1.2px;
+  text-transform: uppercase; color: var(--em); }
+.upg-aisle.is-cupboard { padding-top: 10px; border-top: 1px dashed var(--border); }
+.upg-aisle.is-cupboard h4 { color: var(--strike-amber, #d99114); }
+.upg-aisle h4 span { text-transform: none; letter-spacing: 0; font-weight: 400; color: var(--text-muted); margin-left: 6px; }
+.upg-shop-sub { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 10px; margin: 2px 0 0 26px;
+  font-family: var(--mono); font-size: 9.5px; color: var(--text-muted); }
+.upg-shop-sub .upg-textbtn { font-size: 9.5px; padding: 0; }
+.upg-shop-sub em { font-style: normal; flex: 1 1 100%; }
+.upg-shop li.is-bought .upg-shop-sub { opacity: .5; }
+
+/* Planner food entries, quick picks, portions */
+.upg-pday-list li.is-food { background: rgba(91,140,255,.07); }
+.upg-pday-name em { display: block; font-style: normal; font-family: var(--mono); font-size: 9px; color: var(--text-muted); }
+.upg-brand { font-style: normal; color: var(--text-muted); }
+.upg-quick { display: flex; flex-direction: column; gap: 6px; }
+.upg-quick-row { display: flex; flex-wrap: wrap; gap: 6px; }
+.upg-quick-chip { display: inline-flex; align-items: stretch; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
+.upg-quick-chip > button { border: 0; background: transparent; color: var(--text); font: inherit; font-size: 12.5px;
+  padding: 6px 9px; cursor: pointer; text-align: left; }
+.upg-quick-chip > button:hover { background: rgba(var(--em-rgb),.08); }
+.upg-quick-chip em { display: block; font-style: normal; font-family: var(--mono); font-size: 9.5px; color: var(--text-muted); }
+.upg-quick-chip .upg-quick-x { border-left: 1px solid var(--border); color: var(--text-muted); font-size: 10px; padding: 0 7px; }
+.upg-portion { display: flex; flex-direction: column; gap: 8px; }
+.upg-portion > b { font-size: 15px; }
+.upg-packs { display: grid; grid-template-columns: 1fr 1fr auto; gap: 6px 8px; align-items: center;
+  font-family: var(--mono); font-size: 9px; letter-spacing: .8px; text-transform: uppercase; color: var(--text-muted); }
+.upg-packs-row { display: contents; }
+.upg-packs input { width: 100%; padding: 7px 9px; border-radius: 7px; border: 1px solid var(--border); background: transparent;
+  color: var(--text); font-family: var(--mono); font-size: 13px; }
+
+/* Saved videos not yet in a recipe */
+.upg-loose { display: flex; flex-direction: column; gap: 8px; margin-top: 18px; padding-top: 14px; border-top: 1px solid var(--border); }
+.upg-loose-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 8px; }
+.upg-loose-row { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.upg-loose-row .upg-textbtn { flex: none; }

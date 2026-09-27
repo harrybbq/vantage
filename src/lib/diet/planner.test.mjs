@@ -1,7 +1,7 @@
 /** Ingredients and the meal planner. Invented data only. */
 import assert from 'node:assert/strict';
 import { parseLine, aggregate, formatAmount, itemKey, toLine } from './ingredients.js';
-import { planDays, nextShiftBlock, targetsFor, totalsOf, dayStatus, suggest, batchesOf, shoppingList, planSummary } from './planner.js';
+import { planDays, nextShiftBlock, targetsFor, totalsOf, dayStatus, suggest, batchesOf, shoppingList, planSummary, foodLines, portionOptions, planFood, rememberFood } from './planner.js';
 
 let n = 0;
 const t = (name, fn) => { fn(); n++; };
@@ -104,6 +104,36 @@ t('planSummary averages over days with food', () => {
   assert.equal(s.filled, 2);
   assert.equal(s.avgProtein, 135);
   assert.equal(s.short, 2, 'a day 10 g under protein counts as short');
+});
+
+t('single foods count towards the day and the shopping list, not the cooking', () => {
+  const banana = { name: 'Banana', amount: 118, unit: 'g', portion: 'serving', kcal: 105, protein: 1.3, carbs: 27, fat: 0.4 };
+  const yog = { name: 'Greek yoghurt', amount: 150, unit: 'g', portion: 'amount', kcal: 140, protein: 15, carbs: 6, fat: 5 };
+  const entries = [
+    { day: 0, food: banana, servings: 2 }, { day: 1, food: banana, servings: 1 },
+    { day: 0, food: yog, servings: 1 }, { day: 1, food: yog, servings: 2 },
+    { day: 0, recipeId: 'bur', servings: 1 },
+  ];
+  assert.deepEqual(totalsOf(entries.filter(e => e.day === 0), R), { kcal: 950, protein: 63, carbs: 115, fat: 26 });
+  assert.deepEqual(batchesOf(entries, R).map(x => x.recipe.id), ['bur'], 'foods are not cooked');
+  assert.deepEqual(foodLines(entries).map(r => r.lines[0]), ['3 Banana', '450g Greek yoghurt']);
+  const { items } = shoppingList(entries, R);
+  assert.equal(items.find(x => x.ikey === 'banana').amount, '3×');
+  assert.equal(items.find(x => x.ikey === 'greek yoghurt').amount, '450 g');
+});
+
+t('a search result becomes a plan food for the chosen portion', () => {
+  const bar = { food_name: 'Protein bar', brand: 'Brand', serving_g: 60, serving_unit: 'g', calories: 220, protein_g: 20, carbs_g: 18, fat_g: 7 };
+  assert.deepEqual(portionOptions(bar).map(o => o.label), ['1 serving (60 g)', '100 g']);
+  assert.deepEqual(portionOptions({ serving_g: 100, serving_unit: 'ml' }).map(o => o.label), ['100 ml']);
+  const one = planFood(bar, { portion: 'serving', amount: 60 });
+  assert.deepEqual([one.kcal, one.protein, one.portion, one.amount], [220, 20, 'serving', 60]);
+  const g150 = planFood(bar, { portion: 'amount', amount: 150 });
+  assert.deepEqual([g150.kcal, g150.protein], [550, 50]);
+  const list = rememberFood(rememberFood([], one), g150);
+  assert.equal(list.length, 2);
+  assert.equal(rememberFood(list, one)[0], one, 'a repeat moves to the front');
+  assert.equal(rememberFood(list, one).length, 2);
 });
 
 console.log(`meal planner: ${n} passed`);
