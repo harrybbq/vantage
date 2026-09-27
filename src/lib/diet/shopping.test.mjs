@@ -33,8 +33,8 @@ t('seasonings are spotted by name and by measure', () => {
   }
 });
 t('catalogue matches specific items first, and prices each shop', () => {
-  assert.deepEqual(packsAt(catalogueFor('turkey mince'), 'g', 'tesco').map(p => [p.size, p.price]), [[500, 3.5], [1000, 6.25]]);
-  assert.deepEqual(packsAt(catalogueFor('turkey mince'), 'g', 'aldi').map(p => p.size), [500], 'a size a shop does not sell is left out');
+  assert.deepEqual(packsAt(catalogueFor('pork mince'), 'g', 'tesco').map(p => [p.size, p.price]), [[500, 2.49], [750, 4.25]]);
+  assert.deepEqual(packsAt(catalogueFor('pork mince'), 'g', 'aldi').map(p => p.size), [500], 'a size a shop does not sell is left out');
   assert.equal(catalogueFor('5% beef mince').aisle, 0);
   assert.equal(catalogueFor('dragonfruit'), null);
   assert.deepEqual(STORES.map(s => s.id), ['tesco', 'morrisons', 'aldi', 'lidl']);
@@ -55,9 +55,9 @@ t('shopPlan at Tesco: cupboard split, packs by aisle, a running total', () => {
   assert.deepEqual(plan.cupboard.map(i => i.item).sort(), ['beef stock', 'olive oil', 'paprika', 'salt to taste']);
   const meat = plan.aisles.find(a => a.name === 'Meat & fish').items;
   assert.equal(meat.find(i => i.ikey === 'beef mince').buy, '1× 750 g + 1× 500 g');
-  assert.equal(meat.find(i => i.ikey === 'turkey mince').buy, '1× 1 kg', 'the bigger pack is cheaper than two 500s');
+  assert.equal(meat.find(i => i.ikey === 'turkey mince').buy, '2× 500 g', 'no 1 kg turkey mince at Tesco');
   assert.equal(plan.aisles.find(a => a.name === 'Other').items[0].buy, '600 g', 'unknown items keep their amount');
-  assert.equal(plan.cost, 8.6 + 3.1 + 6.25 + 1.5);
+  assert.equal(plan.cost, 9.25 + 2.85 + 8 + 1.65);
   assert.deepEqual(plan.missing, []);
   assert.equal(plan.second, null);
 });
@@ -74,7 +74,7 @@ t('one gap: a swap in the same shop, or the cheapest shop that has it', () => {
   const tm = plan.aisles[0].items.find(i => i.ikey === 'turkey mince');
   assert.equal(tm.at.status, 'out');
   assert.equal(tm.swap.item, 'chicken mince');
-  assert.equal(tm.alt.store, 'lidl', 'Lidl’s 2× 500 g beats Tesco’s 1 kg');
+  assert.equal(tm.alt.store, 'lidl', 'Lidl’s 2× 500 g is the cheapest elsewhere');
   assert.equal(tm.alt.buy, '2× 500 g');
 });
 t('two or more gaps: the one second shop that covers them', () => {
@@ -94,7 +94,7 @@ t('your corrections win: your price at a shop, or "not stocked"', () => {
   assert.equal(itemAt(it, 'aldi', { packs: { 'beef mince': { g: [{ size: 1500, price: 6 }] } } }).own, true, 'older all-shop packs still apply');
   assert.equal(itemAt({ ikey: 'dragonfruit', family: 'g', base: 600 }, 'tesco').status, 'unpriced');
   assert.equal(swapAt({ ikey: 'dragonfruit', family: 'g', base: 600 }, 'tesco'), null);
-  assert.equal(elsewhere(it, 'tesco').store, 'aldi');
+  assert.equal(elsewhere(it, 'tesco').store, 'lidl');
 });
 
 console.log(`shopping: ${n} passed`);

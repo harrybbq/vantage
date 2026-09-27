@@ -43,53 +43,72 @@ export const AISLES = ['Meat & fish', 'Dairy & eggs', 'Fruit & veg', 'Rice, past
 const SP = (size, t, m, a, l, label) => ({ size, prices: { tesco: t, morrisons: m, aldi: a, lidl: l }, ...(label ? { label } : {}) });
 export const CATALOGUE = [
   // Meat & fish
-  { re: /turkey mince/, aisle: 0, packs: { g: [SP(500, 3.5, 3.6, 2.89, 2.89), SP(1000, 6.25, 6.5, null, null)] } },
-  { re: /chicken mince/, aisle: 0, packs: { g: [SP(500, 3.75, 3.85, 3.19, 3.19)] } },
-  { re: /pork mince/, aisle: 0, packs: { g: [SP(500, 3.0, 3.1, 2.49, 2.49), SP(750, 4.25, null, null, null)] } },
-  { re: /mince/, aisle: 0, packs: { g: [SP(500, 3.6, 3.7, 2.99, 2.99), SP(750, 5.0, 5.25, 4.29, null), SP(1000, 6.25, 6.5, 5.49, 5.49)] } },
+  { re: /turkey mince/, aisle: 0, packs: { g: [SP(500, 4, 4.25, 2.99, 2.89)] } },
+  { re: /chicken mince/, aisle: 0, packs: { g: [SP(500, 2.49, 2.49, 2.49, 3.19)] } },
+  { re: /pork mince/, aisle: 0, packs: { g: [SP(500, 2.49, 2.49, 2.49, 2.49), SP(750, 4.25, null, null, null)] } },
+  { re: /mince/, aisle: 0, packs: { g: [SP(500, 3.25, 3.25, 3.25, 2.99), SP(750, 6, null, null, null), SP(1000, null, null, null, 5.49)] } },
   { re: /chicken breast/, aisle: 0, packs: {
-    g: [SP(300, 2.85, 2.95, 2.39, 2.39), SP(650, 4.85, 5.0, 3.99, 3.99), SP(1000, 6.75, 7.0, 5.79, 5.79)],
-    x: [SP(2, 2.85, 2.95, 2.39, 2.39), SP(4, 4.85, 5.0, 3.99, 3.99)] } },
-  { re: /chicken thigh/, aisle: 0, packs: { g: [SP(500, 3.25, 3.35, 2.69, 2.69), SP(1000, 5.5, 5.75, 4.49, 4.49)] } },
+    g: [SP(300, null, null, 2.29, 2.39), SP(330, null, 2.52, null, null), SP(350, 2.67, null, null, null), SP(650, 4.9, null, 4.69, 3.99), SP(1000, 6.69, 6.99, 6.69, 5.79)],
+    x: [SP(2, 2.67, 2.52, 2.29, 2.39), SP(4, 4.9, 5, 4.69, 3.99)] } },
+  { re: /chicken thigh/, aisle: 0, packs: {
+    g: [SP(500, null, null, null, 2.69), SP(600, 5.75, 5.75, null, null), SP(900, null, null, 5.39, null), SP(1000, 7.25, 7.25, null, 4.49)] } },
   { re: /salmon/, aisle: 0, packs: {
-    x: [SP(2, 4.0, 4.1, 3.29, 3.29), SP(4, 6.75, 7.0, 5.99, 5.99)],
-    g: [SP(240, 4.0, 4.1, 3.29, 3.29), SP(480, 6.75, 7.0, 5.99, 5.99)] } },
-  { re: /\bcod\b|haddock|white fish/, aisle: 0, packs: { x: [SP(2, 3.75, 3.85, 3.19, 3.19), SP(4, 6.25, 6.5, null, null)], g: [SP(280, 3.75, 3.85, 3.19, 3.19)] } },
-  { re: /prawn/, aisle: 0, packs: { g: [SP(150, 2.75, 2.85, 2.29, 2.29), SP(300, 4.5, 4.65, 3.79, 3.79)] } },
-  { re: /tuna/, aisle: 0, packs: { tin: [SP(1, 1.15, 1.2, 0.89, 0.89), SP(4, 3.9, 4.0, 3.19, 3.19)], x: [SP(1, 1.15, 1.2, 0.89, 0.89), SP(4, 3.9, 4.0, 3.19, 3.19)] } },
-  { re: /steak|sirloin|rump/, aisle: 0, packs: { x: [SP(1, 4.75, 4.9, 3.99, 3.99), SP(2, 8.25, 8.5, 6.99, 6.99)], g: [SP(225, 4.75, 4.9, 3.99, 3.99), SP(450, 8.25, 8.5, 6.99, 6.99)] } },
-  { re: /bacon/, aisle: 0, packs: { g: [SP(300, 2.85, 2.95, 2.29, 2.29)], slice: [SP(10, 2.85, 2.95, 2.29, 2.29)], x: [SP(10, 2.85, 2.95, 2.29, 2.29)] } },
-  { re: /sausage/, aisle: 0, packs: { x: [SP(6, 2.6, 2.7, 1.99, 1.99), SP(12, 4.5, 4.6, 3.69, null)] } },
+    x: [SP(2, 4.9, 4.15, 3.59, 3.29), SP(4, 9.25, 8.5, 6.85, 5.99)],
+    g: [SP(220, null, 4.15, null, null), SP(240, null, null, 3.59, 3.29), SP(260, 4.9, null, null, null), SP(440, null, 8.5, null, null), SP(480, null, null, 6.85, 5.99), SP(520, 9.25, null, null, null)] } },
+  { re: /\bcod\b|haddock|white fish/, aisle: 0, packs: {
+    x: [SP(2, 8.15, 6.5, 3.19, 3.19), SP(4, 6.25, 6.5, null, null)],
+    g: [SP(220, null, 6.5, null, null), SP(280, 8.15, null, null, 3.19), SP(360, null, null, 3.95, null)] } },
+  { re: /prawn/, aisle: 0, packs: { g: [SP(150, 3.5, 3.75, 2.49, 2.29), SP(300, 6.5, 4.65, 3.79, 3.79)] } },
+  { re: /tuna/, aisle: 0, packs: {
+    tin: [SP(1, 0.65, 0.8, 0.65, 0.89), SP(4, 2.49, 2.49, 2.49, 3.19)],
+    x: [SP(1, 0.65, 0.8, 0.65, 0.89), SP(4, 2.49, 2.49, 2.49, 3.19)] } },
+  { re: /steak|sirloin|rump/, aisle: 0, packs: {
+    x: [SP(1, 6, 7.35, 4.49, 3.99), SP(2, 8.25, 8.5, 6.99, 6.99)],
+    g: [SP(200, null, null, 4.49, null), SP(225, 6, 7.35, null, 3.99), SP(450, 8.25, 8.5, 6.99, 6.99)] } },
+  { re: /bacon/, aisle: 0, packs: { g: [SP(300, 1.49, 1.49, 1.49, 2.29)], slice: [SP(10, 1.49, 1.49, 1.49, 2.29)], x: [SP(10, 1.49, 1.49, 1.49, 2.29)] } },
+  { re: /sausage/, aisle: 0, packs: { x: [SP(6, null, null, null, 1.99), SP(8, 1.79, 1.79, 1.79, null), SP(12, 2.65, 4.6, 3.69, null)] } },
   // Dairy & eggs
-  { re: /\beggs?\b/, aisle: 1, packs: { x: [SP(6, 1.75, 1.8, 1.45, 1.45), SP(12, 3.1, 3.2, 2.59, 2.59), SP(15, 3.5, 3.6, 2.99, null)] } },
-  { re: /milk/, aisle: 1, packs: { ml: [SP(568, 0.8, 0.8, 0.7, 0.7, '1 pint'), SP(1136, 1.35, 1.35, 1.15, 1.15, '2 pints'), SP(2272, 1.75, 1.75, 1.55, 1.55, '4 pints')] } },
-  { re: /cottage cheese/, aisle: 1, packs: { g: [SP(300, 1.5, 1.55, 1.19, 1.19)] } },
-  { re: /yogh?urt|skyr/, aisle: 1, packs: { g: [SP(500, 1.65, 1.7, 1.35, 1.35), SP(1000, 2.75, 2.85, 2.25, 2.25)] } },
-  { re: /cheddar|mozzarella|cheese/, aisle: 1, packs: { g: [SP(200, 2.25, 2.3, 1.85, 1.85), SP(400, 3.6, 3.7, 2.99, 2.99)] } },
-  { re: /butter/, aisle: 1, packs: { g: [SP(250, 2.4, 2.45, 1.99, 1.99)] } },
+  { re: /\beggs?\b/, aisle: 1, packs: { x: [SP(6, 1.8, 1.8, 1.49, 1.45), SP(12, 2.85, 2.85, 2.49, 2.59), SP(15, 2.85, 3.6, 2.85, null)] } },
+  { re: /milk/, aisle: 1, packs: {
+    ml: [SP(568, 0.85, 0.8, 0.85, 0.7, '1 pint'), SP(1136, 1.2, 1.2, 1.2, 1.15, '2 pints'), SP(2272, 1.65, 1.65, 1.65, 1.55, '4 pints')] } },
+  { re: /cottage cheese/, aisle: 1, packs: { g: [SP(300, 1.65, 1.65, 1.39, 1.19)] } },
+  { re: /yogh?urt|skyr/, aisle: 1, packs: { g: [SP(500, 1.15, 1.15, 0.95, 1.35), SP(1000, 1.7, 1.7, 1.49, 2.25)] } },
+  { re: /cheddar|mozzarella|cheese/, aisle: 1, packs: { g: [SP(200, null, 2.3, 1.85, 1.85), SP(220, 2.5, null, null, null), SP(400, 2.95, 2.95, 2.45, 2.99)] } },
+  { re: /butter/, aisle: 1, packs: { g: [SP(250, 1.85, 1.85, 1.85, 1.99)] } },
   // Fruit & veg
-  { re: /sweet potato/, aisle: 2, packs: { g: [SP(1000, 1.6, 1.65, 1.29, 1.29)], x: [SP(1, 0.45, 0.45, null, null)] } },
-  { re: /potato/, aisle: 2, packs: { g: [SP(1000, 1.05, 1.1, 0.85, 0.85), SP(2500, 1.75, 1.8, 1.39, 1.39)], x: [SP(1, 0.28, 0.3, null, null)] } },
-  { re: /onion/, aisle: 2, packs: { x: [SP(1, 0.16, 0.17, null, null), SP(3, 0.69, 0.72, 0.55, 0.55)], g: [SP(1000, 1.0, 1.05, 0.85, 0.85)] } },
-  { re: /banana/, aisle: 2, packs: { x: [SP(1, 0.18, 0.18, 0.15, 0.15), SP(5, 0.89, 0.92, 0.75, 0.75)] } },
-  { re: /broccoli/, aisle: 2, packs: { x: [SP(1, 0.79, 0.82, 0.62, 0.62)], g: [SP(350, 0.79, 0.82, 0.62, 0.62)] } },
-  { re: /avocado/, aisle: 2, packs: { x: [SP(1, 0.89, 0.95, 0.69, 0.69), SP(2, 1.6, 1.65, 1.29, 1.29)] } },
-  { re: /(bell )?pepper$/, aisle: 2, packs: { x: [SP(1, 0.6, 0.62, null, null), SP(3, 1.5, 1.55, 1.19, 1.19)] } },
-  { re: /spinach/, aisle: 2, packs: { g: [SP(240, 1.35, 1.4, 1.09, 1.09)] } },
-  { re: /lettuce/, aisle: 2, packs: { x: [SP(1, 0.65, 0.68, 0.55, 0.55)] } },
-  { re: /berr/, aisle: 2, packs: { g: [SP(150, 2.1, 2.2, 1.69, 1.69), SP(300, 3.6, 3.75, 2.99, 2.99)] } },
-  { re: /garlic/, aisle: 2, packs: { clove: [SP(10, 0.37, 0.38, 0.29, 0.29, '1 bulb')], x: [SP(1, 0.37, 0.38, 0.29, 0.29, '1 bulb')] } },
+  { re: /sweet potato/, aisle: 2, packs: { g: [SP(1000, 1.19, 1.19, 1.19, 1.29)], x: [SP(1, 0.42, 0.45, 0.69, null)] } },
+  { re: /potato/, aisle: 2, packs: {
+    g: [SP(1000, 1.05, 1.1, 0.85, 0.85), SP(2000, 1.85, null, 1.32, null), SP(2500, null, 1.65, 1.65, 1.39)],
+    x: [SP(1, 0.27, 0.3, 0.24, null)] } },
+  { re: /onion/, aisle: 2, packs: { x: [SP(1, 0.11, 0.17, null, null), SP(3, 0.95, 0.95, 0.95, 0.55)], g: [SP(1000, 0.95, 0.95, 0.8, 0.85)] } },
+  { re: /banana/, aisle: 2, packs: { x: [SP(1, 0.16, 0.18, 0.16, 0.15), SP(5, 0.78, 0.78, 0.78, 0.75)] } },
+  { re: /broccoli/, aisle: 2, packs: {
+    x: [SP(1, 0.9, 0.9, 0.86, 0.62)],
+    g: [SP(350, null, null, null, 0.62), SP(360, null, null, 0.86, null), SP(375, 0.9, 0.9, null, null)] } },
+  { re: /avocado/, aisle: 2, packs: { x: [SP(1, 0.69, 1.1, 1.39, 0.69), SP(2, 1.5, 1.5, 1.39, 1.29)] } },
+  { re: /(bell )?pepper$/, aisle: 2, packs: { x: [SP(1, 0.7, 0.7, 0.7, null), SP(3, 1.5, 1.99, 1.79, 1.19)] } },
+  { re: /spinach/, aisle: 2, packs: { g: [SP(160, null, 1, null, null), SP(240, null, null, 1.09, 1.09), SP(250, 1.3, null, null, null)] } },
+  { re: /lettuce/, aisle: 2, packs: { x: [SP(1, 0.89, 0.89, 0.89, 0.55)] } },
+  { re: /berr/, aisle: 2, packs: { g: [SP(150, 2, 2, 1.69, 1.69), SP(250, 2.75, null, null, null), SP(300, null, 3.3, 2.69, 2.99)] } },
+  { re: /garlic/, aisle: 2, packs: {
+    clove: [SP(10, 0.5, 0.38, null, 0.29, '1 bulb'), SP(40, 0.87, 0.87, 0.87, null, '4 bulbs')],
+    x: [SP(1, 0.5, 0.38, null, 0.29, '1 bulb'), SP(4, 0.87, 0.87, 0.87, null, '4 bulbs')] } },
   // Rice, pasta & bread
-  { re: /rice/, aisle: 3, packs: { g: [SP(500, 0.95, 1.0, 0.79, 0.79), SP(1000, 1.7, 1.75, 1.39, 1.39), SP(2000, 2.9, 3.0, 2.39, null)] } },
-  { re: /pasta|spaghetti|penne|fusilli|noodle/, aisle: 3, packs: { g: [SP(500, 0.8, 0.85, 0.65, 0.65), SP(1000, 1.35, 1.4, 1.1, 1.1)] } },
-  { re: /\boats?\b|porridge/, aisle: 3, packs: { g: [SP(1000, 1.0, 1.05, 0.85, 0.85)] } },
-  { re: /tortilla|wrap/, aisle: 3, packs: { x: [SP(8, 1.25, 1.3, 0.99, 0.99)] } },
-  { re: /bagel/, aisle: 3, packs: { x: [SP(5, 1.25, 1.3, 0.99, 0.99)] } },
+  { re: /rice/, aisle: 3, packs: { g: [SP(500, null, 1, 0.79, 0.79), SP(1000, 1.25, 1.25, 1.25, 1.39), SP(2000, 2.5, 2.5, 2.39, null)] } },
+  { re: /pasta|spaghetti|penne|fusilli|noodle/, aisle: 3, packs: { g: [SP(500, 0.69, 0.69, 0.69, 0.65), SP(1000, 1.19, 1.29, 1.1, 1.1)] } },
+  { re: /\boats?\b|porridge/, aisle: 3, packs: { g: [SP(1000, 1.25, 1.35, 0.85, 0.85)] } },
+  { re: /tortilla|wrap/, aisle: 3, packs: { x: [SP(8, 1.4, 1.4, 0.99, 0.99)] } },
+  { re: /bagel/, aisle: 3, packs: { x: [SP(5, 1.75, 0.99, 0.99, 0.99)] } },
   // Tins & jars
-  { re: /chopped tomato|tinned tomato|plum tomato/, aisle: 4, packs: { tin: [SP(1, 0.47, 0.49, 0.38, 0.38), SP(4, 1.65, 1.7, 1.35, 1.35)], x: [SP(1, 0.47, 0.49, 0.38, 0.38), SP(4, 1.65, 1.7, 1.35, 1.35)] } },
-  { re: /bean|chickpea|lentil/, aisle: 4, packs: { tin: [SP(1, 0.58, 0.6, 0.45, 0.45), SP(4, 2.05, 2.1, 1.65, 1.65)], x: [SP(1, 0.58, 0.6, 0.45, 0.45), SP(4, 2.05, 2.1, 1.65, 1.65)], g: [SP(400, 0.58, 0.6, 0.45, 0.45)] } },
-  { re: /coconut milk/, aisle: 4, packs: { tin: [SP(1, 1.15, 1.2, 0.89, 0.89)], ml: [SP(400, 1.15, 1.2, 0.89, 0.89)] } },
-  { re: /peanut butter/, aisle: 4, packs: { g: [SP(340, 2.1, 2.15, 1.69, 1.69)] } },
+  { re: /chopped tomato|tinned tomato|plum tomato/, aisle: 4, packs: {
+    tin: [SP(1, 0.47, 0.45, 0.45, 0.38), SP(4, 1.85, 1.75, 1.35, 1.35)],
+    x: [SP(1, 0.47, 0.45, 0.45, 0.38), SP(4, 1.85, 1.75, 1.35, 1.35)] } },
+  { re: /bean|chickpea|lentil/, aisle: 4, packs: {
+    tin: [SP(1, 0.41, 0.37, 0.41, 0.45), SP(4, 2.05, 2.1, 1.65, 1.65)],
+    x: [SP(1, 0.41, 0.37, 0.41, 0.45), SP(4, 2.05, 2.1, 1.65, 1.65)],
+    g: [SP(400, 0.41, 0.37, 0.41, 0.45)] } },
+  { re: /coconut milk/, aisle: 4, packs: { tin: [SP(1, 0.75, 1, 0.75, 0.89)], ml: [SP(400, 0.75, 1, 0.75, 0.89)] } },
+  { re: /peanut butter/, aisle: 4, packs: { g: [SP(340, 0.95, 1.25, 0.95, 1.69)] } },
 ];
 
 // Same-shop swaps worth offering when an item isn't stocked: close
