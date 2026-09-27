@@ -1,6 +1,6 @@
 /** Links between recipes and saved videos. Invented data only. */
 import assert from 'node:assert/strict';
-import { linkedVideos, linkedRecipes, linkVideo, unlinkVideo } from './meals.js';
+import { linkedVideos, linkedRecipes, linkVideo, unlinkVideo, fillFromRead, applyRead } from './meals.js';
 
 let n = 0;
 const t = (name, fn) => { fn(); n++; };
@@ -46,6 +46,27 @@ t('unlinkVideo removes the id, or clears the sourceUrl doing the linking', () =>
   assert.equal(b.recipes[0].sourceUrl, '');
   assert.deepEqual(b.recipes[0].videoIds, ['v2']);
   assert.equal(unlinkVideo(s, 'r2', 'v1'), s);
+});
+
+const READ = { title: 'Breakfast burrito', servings: 6, lines: ['10 eggs', '500g turkey mince'], macros: { kcal: 510, protein: 45, carbs: 33, fat: 22 }, source: 'description' };
+t('fillFromRead fills only what the recipe is missing', () => {
+  const blank = { id: 'r', title: '', servings: 1, kcal: 0, protein: 0, carbs: 0, fat: 0, ingredients: [''] };
+  const f = fillFromRead(blank, READ);
+  assert.deepEqual(f.ingredients, READ.lines);
+  assert.equal(f.servings, 6);
+  assert.equal(f.protein, 45);
+  assert.equal(f.macrosEstimated, true);
+  assert.equal(f.title, 'Breakfast burrito');
+  const typed = { id: 'r', title: 'Mine', servings: 4, kcal: 600, protein: 50, carbs: 0, fat: 0, ingredients: ['2 eggs'] };
+  assert.deepEqual(fillFromRead(typed, READ), typed, 'nothing typed is overwritten');
+  assert.equal(fillFromRead(blank, { ...READ, lines: [] }), blank, 'an empty read changes nothing');
+});
+t('applyRead stores the read on the video and fills the recipe', () => {
+  const s = { mealVideos: [{ id: 'v1', url: 'u' }], recipes: [{ id: 'r1', title: '', servings: 1, ingredients: [] }, { id: 'r2' }] };
+  const a = applyRead(s, 'v1', 'r1', READ);
+  assert.equal(a.mealVideos[0].read, READ);
+  assert.equal(a.recipes[0].servings, 6);
+  assert.equal(a.recipes[1], s.recipes[1]);
 });
 
 console.log(`meal links: ${n} passed`);

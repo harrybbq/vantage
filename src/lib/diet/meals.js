@@ -244,3 +244,33 @@ export function unlinkVideo(prev, recipeId, videoId) {
     })),
   };
 }
+
+/* ══ Recipes read from a video ════════════════════════════════════════ */
+/*
+ * A video's read (lib/diet/videoRecipe.js) is stored on the VIDEO
+ * (`video.read`, a new key) so it is fetched once, whichever recipe links
+ * it. A recipe only takes what it is missing: ingredients when it has
+ * none, servings when still the default 1, macros when all zero (flagged
+ * `macrosEstimated`), a title when blank. Anything already typed is left
+ * alone; "Use these" in the sheet replaces on request.
+ */
+const hasLines = r => (r.ingredients || []).some(l => String(l).trim());
+const noMacros = r => !['kcal', 'protein', 'carbs', 'fat'].some(k => Number(r[k]) > 0);
+
+/** Fill what the recipe is missing from a read. Pure. */
+export function fillFromRead(recipe, read) {
+  if (!read || !read.lines || !read.lines.length) return recipe;
+  const out = { ...recipe };
+  if (!hasLines(recipe)) out.ingredients = read.lines;
+  if ((!recipe.servings || recipe.servings === 1) && read.servings) out.servings = read.servings;
+  if (noMacros(recipe) && read.macros) Object.assign(out, read.macros, { macrosEstimated: true });
+  if (!String(recipe.title || '').trim() && read.title) out.title = read.title;
+  return out;
+}
+
+/** State update: store the read on the video and fill the recipe. */
+export function applyRead(prev, videoId, recipeId, read) {
+  const mealVideos = (prev.mealVideos || []).map(v => (v.id === videoId ? { ...v, read } : v));
+  const recipes = (prev.recipes || []).map(r => (r.id === recipeId ? fillFromRead(r, read) : r));
+  return { ...prev, mealVideos, recipes };
+}

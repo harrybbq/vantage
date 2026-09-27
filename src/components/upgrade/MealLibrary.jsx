@@ -18,8 +18,10 @@ import { supabase } from '../../lib/supabase';
 import {
   EMPTY_RECIPE, MEAL_TYPES, PLATFORM_LABEL, RECIPE_TAGS, VIDEO_TAGS,
   batchTotals, filterItems, isPortrait, parseVideoUrl, servingToLogRow,
-  shareOfTarget, tagCounts, videoThumb, linkedVideos, linkedRecipes, linkVideo, unlinkVideo,
+  shareOfTarget, tagCounts, videoThumb, linkedVideos, linkedRecipes, linkVideo, unlinkVideo, applyRead,
 } from '../../lib/diet/meals';
+import { readVideoRecipe } from '../../lib/diet/videoRecipe';
+import { parseLine } from '../../lib/diet/ingredients';
 import { deleteRecipeImage, signedUrls, uploadRecipeImage } from '../../lib/diet/recipeImages';
 
 const uid = () => Math.random().toString(36).slice(2, 10) + Date.now().toString(36).slice(-4);
@@ -105,6 +107,11 @@ export function RecipesPanel({ S, update, userId, targets }) {
               </span>
               <span className="upg-rbody">
                 <span className="upg-rtitle">{r.title || 'Untitled recipe'}</span>
+                {(names => names.length > 0 && (
+                  <span className="upg-ringr" title={(r.ingredients || []).filter(l => String(l).trim()).join('\n')}>
+                    {names.slice(0, 3).join(' · ')}{names.length > 3 ? ` +${names.length - 3}` : ''}
+                  </span>
+                ))((r.ingredients || []).map(l => parseLine(l)).filter(Boolean).map(p => p.item.split(',')[0].trim()))}
                 <span className="upg-macros">
                   <span className="upg-macro is-kcal">{r.kcal || 0} kcal</span>
                   <span className="upg-macro">P {r.protein || 0}</span>
@@ -156,7 +163,8 @@ function RecipeSheet({ recipe, userId, targets, videos, update, imageUrl, onClos
     setBusy(false);
   }
 
-  const num = (k, v) => onChange({ [k]: Math.max(0, parseFloat(v) || 0) });
+  // Typing a macro makes it yours: it is no longer the video's estimate.
+  const num = (k, v) => onChange({ [k]: Math.max(0, parseFloat(v) || 0), ...(['kcal', 'protein', 'carbs', 'fat'].includes(k) ? { macrosEstimated: false } : {}) });
 
   return (
     <div className="modal-overlay open" onClick={onClose} role="presentation">
@@ -177,7 +185,7 @@ function RecipeSheet({ recipe, userId, targets, videos, update, imageUrl, onClos
           <input ref={fileRef} type="file" hidden accept="image/*" onChange={pickImage} />
           {msg && <div className="upg-fine" style={{ marginBottom: 10 }}>{msg}</div>}
 
-          <RecipeVideos recipe={recipe} videos={videos} update={update} />
+          <RecipeVideos recipe={recipe} videos={videos} update={update} onChange={onChange} />
 
           <div className="upg-field">
             <span className="upg-field-lbl">Per serving · makes {recipe.servings || 1}</span>
@@ -198,6 +206,7 @@ function RecipeSheet({ recipe, userId, targets, videos, update, imageUrl, onClos
             )}
             <div className="upg-fine" style={{ marginTop: 6 }}>
               Whole batch: {batch.kcal} kcal · {batch.protein}p · {batch.carbs}c · {batch.fat}f
+              {recipe.macrosEstimated && <> · <span className="upg-est">estimated from the video, edit to correct</span></>}
             </div>
           </div>
 
@@ -261,12 +270,28 @@ function RecipeSheet({ recipe, userId, targets, videos, update, imageUrl, onClos
  * to unlink, and a picker that links a saved video or saves a pasted
  * link straight into the Videos list and links it.
  */
-function RecipeVideos({ recipe, videos, update }) {
+const READABLE = new Set(['youtube', 'tiktok']);
+
+function RecipeVideos({ recipe, videos, update, onChange }) {
   const [picking, setPicking] = useState(false);
   const [paste, setPaste] = useState('');
   const [err, setErr] = useState('');
+  const [reading, setReading] = useState({});
+  const [readErr, setReadErr] = useState({});
   const linked = linkedVideos(recipe, videos);
   const others = videos.filter(v => !linked.some(l => l.id === v.id));
+
+  // Read a video's recipe (once; it is kept on the video) and fill what
+  // this recipe is missing.
+  async function read(v) {
+    if (!READABLE.has(v.platform)) return;
+    setReading(r => ({ ...r, [v.id]: true }));
+    setReadErr(e => ({ ...e, [v.id]: '' }));
+    const { read: got, error } = await readVideoRecipe(v.url);
+    setReading(r => ({ ...r, [v.id]: false }));
+    if (error) { setReadErr(e => ({ ...e, [v.id]: error })); return; }
+    update(prev => applyRead(prev, v.id, recipe.id, got));
+  }
 
   function addPasted() {
     const parsed = parseVideoUrl(paste);
@@ -281,6 +306,7 @@ function RecipeVideos({ recipe, videos, update }) {
       return linkVideo(withVideo, recipe.id, v.id);
     });
     setPaste(''); setErr(''); setPicking(false);
+    if (!v.read) read(v);
   }
 
   return (
@@ -307,6 +333,8 @@ function RecipeVideos({ recipe, videos, update }) {
                 </a>
                 <button type="button" className="link-del-btn" aria-label={`Unlink ${v.title || 'video'}`}
                         onClick={() => update(prev => unlinkVideo(prev, recipe.id, v.id))}>✕</button>
+                <VideoRead v={v} recipe={recipe} busy={!!reading[v.id]} error={readErr[v.id]}
+                           onRead={() => read(v)} onChange={onChange} />
               </div>
             );
           })}
@@ -332,7 +360,7 @@ function RecipeVideos({ recipe, videos, update }) {
               <div className="upg-rvid-list">
                 {others.map(v => (
                   <button key={v.id} type="button" className="upg-rvid-opt"
-                          onClick={() => { update(prev => linkVideo(prev, recipe.id, v.id)); setPicking(false); }}>
+                          onClick={() => { update(prev => linkVideo(prev, recipe.id, v.id)); setPicking(false); if (!v.read) read(v); }}>
                     <span className={`upg-plat is-${v.platform}`}>{PLATFORM_LABEL[v.platform] || 'Link'}</span>
                     <span>{v.title || v.url.replace(/^https?:\/\/(www\.)?/, '').slice(0, 48)}</span>
                   </button>
@@ -343,6 +371,60 @@ function RecipeVideos({ recipe, videos, update }) {
           <button type="button" className="upg-textbtn" style={{ alignSelf: 'flex-start' }} onClick={() => { setPicking(false); setPaste(''); setErr(''); }}>Cancel</button>
         </div>
       )}
+    </div>
+  );
+}
+
+/**
+ * The ingredients box under a linked video: what the video says goes in
+ * it, where that came from, the macro estimate, and buttons to use them.
+ */
+function VideoRead({ v, recipe, busy, error, onRead, onChange }) {
+  const r = v.read;
+  const readable = READABLE.has(v.platform);
+  if (!r && !busy && !error) {
+    return readable ? (
+      <button type="button" className="upg-textbtn upg-vread-get" onClick={onRead}>Get the ingredients from this video</button>
+    ) : null;
+  }
+  if (busy) return <div className="upg-vread is-busy"><span className="upg-spin" aria-hidden="true" /> Reading the video…</div>;
+  if (error && !r) {
+    return <div className="upg-vread is-err">{error} <button type="button" className="upg-textbtn" onClick={onRead}>Try again</button></div>;
+  }
+  const same = (a, b) => JSON.stringify((a || []).map(x => String(x).trim()).filter(Boolean)) === JSON.stringify(b || []);
+  const usedLines = same(recipe.ingredients, r.lines);
+  const m = r.macros;
+  const usedMacros = m && ['kcal', 'protein', 'carbs', 'fat'].every(k => Math.round(recipe[k] || 0) === m[k]);
+  return (
+    <div className={`upg-vread${r.source === 'inferred' ? ' is-guess' : ''}`}>
+      <div className="upg-vread-head">
+        <span className="upg-field-lbl">Ingredients from the video</span>
+        <span className="upg-vread-src">
+          {r.source === 'description' ? 'from the description' : r.source === 'inferred' ? 'a typical version, check the video' : 'none found'}
+          {r.servings ? ` · makes ${r.servings}` : ''}
+        </span>
+      </div>
+      {r.lines.length > 0 ? (
+        <ul className="upg-vread-list">{r.lines.map((l, i) => <li key={i}>{l}</li>)}</ul>
+      ) : <div className="upg-fine">The video doesn’t list its ingredients. Add them by hand.</div>}
+      {m && (
+        <div className="upg-vread-macros">
+          ≈ {m.kcal} kcal · <b>{m.protein} g protein</b> · {m.carbs} c · {m.fat} f per serving <span className="upg-est">estimate</span>
+        </div>
+      )}
+      {r.note && <div className="upg-fine">{r.note}</div>}
+      <div className="upg-vread-acts">
+        {r.lines.length > 0 && !usedLines && (
+          <button type="button" className="link-open-btn" onClick={() => onChange({ ingredients: r.lines, ...(r.servings ? { servings: r.servings } : {}) })}>
+            {(recipe.ingredients || []).some(l => String(l).trim()) ? 'Replace my ingredients' : 'Use these ingredients'}
+          </button>
+        )}
+        {m && !usedMacros && (
+          <button type="button" className="upg-textbtn" onClick={() => onChange({ ...m, macrosEstimated: true })}>Use the macro estimate</button>
+        )}
+        <button type="button" className="upg-textbtn" onClick={onRead}>Read again</button>
+      </div>
+      {error && <div className="upg-fine" style={{ color: '#e0796a' }}>{error}</div>}
     </div>
   );
 }
