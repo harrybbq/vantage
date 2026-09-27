@@ -8,6 +8,7 @@
  * recent completions/relapses) — without that, identical numbers on
  * Tuesday and Wednesday produce identical advice.
  */
+import { habitElapsed } from '../habits/progress.js';
 
 const DAY_MS = 86_400_000;
 
@@ -53,7 +54,7 @@ function buildTrackerSummary(t, logs) {
 }
 
 function buildHabitSummary(h) {
-  const days = Math.floor((Date.now() - (h.startTime || Date.now())) / DAY_MS);
+  const days = Math.floor(habitElapsed(h, Date.now()) / DAY_MS);
   const relapses = h.relapseCount || 0;
   return {
     id: h.id,

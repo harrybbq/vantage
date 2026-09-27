@@ -34,6 +34,8 @@ import { useHubModuleMenu } from './HubModuleMenu';
 import { APP_PRESETS } from '../data/appPresets';
 import { fetchAppPreview } from '../lib/appPreview';
 import { strikeState } from '../lib/habits/strikes';
+import { isCut, current as cutCurrent } from '../lib/habits/cutdown';
+import { habitElapsed, cutHeadline } from '../lib/habits/progress';
 import Icon from './Icon';
 import { useOwnHandle } from '../hooks/useOwnHandle';
 
@@ -87,13 +89,16 @@ function habitsWidgetHtml(S) {
   if (!habits.length) return '<div class="hub-widget-empty">No habits yet — add one in Habits.</div>';
   const now = Date.now();
   return habits.map(h => {
-    const elapsed = now - h.startTime;
+    const elapsed = habitElapsed(h, now);
     const { target, next } = habitTarget(h, elapsed);
     const pct = Math.max(0, Math.min(100, target ? (elapsed / target) * 100 : 100));
+    const cut = isCut(h);
     const strikes = strikeState(h, now);
-    const struckCls = strikes.state === 'struck' ? ' is-struck' : strikes.state === 'maxed' ? ' is-maxed' : '';
+    const struckCls = cut ? (cutCurrent(h, now).state === 'over' ? ' is-maxed' : '') : strikes.state === 'struck' ? ' is-struck' : strikes.state === 'maxed' ? ' is-maxed' : '';
+    // On a Cut-down habit the quick button logs today against the budget.
+    const act = cut ? 'Log today against the budget' : 'Log a relapse, now';
     return `<div class="hub-habit hub-row-go" data-go-to="habits" role="link" tabindex="0">
-      <div class="hub-habit-top"><span class="hub-habit-name">${escapeHtml(h.name)}</span><span class="hub-habit-time${struckCls}" data-habit-timer="${escapeHtml(h.id)}">${fmtHabitElapsed(elapsed)}</span><button type="button" class="hub-habit-relapse" data-habit-relapse="${escapeHtml(h.id)}" title="Log a relapse, now" aria-label="Log a relapse for ${escapeHtml(h.name)}">↻</button></div>
+      <div class="hub-habit-top"><span class="hub-habit-name">${escapeHtml(h.name)}</span><span class="hub-habit-time${struckCls}" data-habit-timer="${escapeHtml(h.id)}">${cut ? cutHeadline(h, now) : fmtHabitElapsed(elapsed)}</span><button type="button" class="hub-habit-relapse" data-habit-relapse="${escapeHtml(h.id)}" title="${act}" aria-label="${act}: ${escapeHtml(h.name)}">${cut ? '+' : '↻'}</button></div>
       <div class="hub-habit-bar"><div class="hub-habit-fill" data-habit-bar="${escapeHtml(h.id)}" style="width:${pct}%"></div></div>
       ${next ? `<div class="hub-habit-next">${escapeHtml(next.label || '')}</div>` : ''}
     </div>`;
@@ -758,12 +763,12 @@ export default function HubSection({ S, update, active, onOpenModal, onOpenWaitl
       habits.forEach(h => { byId[h.id] = h; });
       document.querySelectorAll('#widgetCanvas [data-habit-timer]').forEach(el => {
         const h = byId[el.getAttribute('data-habit-timer')];
-        if (h && h.startTime) el.textContent = fmtHabitElapsed(now - h.startTime);
+        if (h && h.startTime) el.textContent = isCut(h) ? cutHeadline(h, now) : fmtHabitElapsed(now - h.startTime);
       });
       document.querySelectorAll('#widgetCanvas [data-habit-bar]').forEach(el => {
         const h = byId[el.getAttribute('data-habit-bar')];
         if (!h || !h.startTime) return;
-        const elapsed = now - h.startTime;
+        const elapsed = habitElapsed(h, now);
         const { target } = habitTarget(h, elapsed);
         el.style.width = Math.max(0, Math.min(100, target ? (elapsed / target) * 100 : 100)) + '%';
       });
@@ -829,7 +834,7 @@ export default function HubSection({ S, update, active, onOpenModal, onOpenWaitl
       clearTimeout(timer);
       canvas.querySelectorAll('[data-habit-relapse].is-arming').forEach(b => {
         b.classList.remove('is-arming');
-        b.textContent = '↻';
+        b.textContent = b.getAttribute('title') === 'Log today against the budget' ? '+' : '↻';
       });
     };
     const handler = e => {

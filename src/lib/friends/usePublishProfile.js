@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { upsertOwnPublicStats, updateOwnProfile } from './queries';
+import { habitElapsed } from '../habits/progress.js';
 
 /**
  * Debounced sync of the user's public-facing data:
@@ -92,7 +93,7 @@ function currentStreak(S) {
   let best = { days: 0, name: null };
   for (const h of S.habits || []) {
     if (!h.startTime) continue;
-    const days = Math.floor((now - h.startTime) / DAY_MS);
+    const days = Math.floor(habitElapsed(h, now) / DAY_MS);
     if (days > best.days) best = { days, name: h.name };
   }
   return best.days > 0 ? best : null;

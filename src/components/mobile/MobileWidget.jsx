@@ -21,6 +21,8 @@ import { APP_PRESETS, getAppPreset, RETIRED_PRESETS } from '../../data/appPreset
 import { fetchAppPreview } from '../../lib/appPreview';
 import { strikeState } from '../../lib/habits/strikes';
 import { applyRelapse } from '../../lib/habits/relapse';
+import { isCut, current as cutCurrent } from '../../lib/habits/cutdown';
+import { habitElapsed, cutHeadline } from '../../lib/habits/progress';
 import { SavingsPotsBody, SavingsProjectionBody } from '../savings/SavingsWidgets';
 import { BodyBody, SubscriptionsBody } from '../widgets/LifeWidgets';
 import { GoalsBody, BodyGoalBody } from '../widgets/GoalsWidget';
@@ -1139,15 +1141,16 @@ function HabitsBody({ S, update, navigate }) {
   return (
     <ul className="m-widget-list m-widget-habits">
       {habits.map(h => {
-        const elapsed = now - h.startTime;
+        const elapsed = habitElapsed(h, now);
         const { pct, label } = habitProgress(h, elapsed);
+        const cut = isCut(h);
         const strikes = strikeState(h, now);
-        const struckCls = strikes.state === 'struck' ? ' is-struck' : strikes.state === 'maxed' ? ' is-maxed' : '';
+        const struckCls = cut ? (cutCurrent(h, now).state === 'over' ? ' is-maxed' : '') : strikes.state === 'struck' ? ' is-struck' : strikes.state === 'maxed' ? ' is-maxed' : '';
         return (
           <li key={h.id} className="m-widget-habit m-widget-clickable" onClick={go}>
             <div className="m-widget-habit-top">
               <span className="m-widget-habit-name">{h.name}</span>
-              <span className={`m-widget-habit-time${struckCls}`}>{fmtElapsed(elapsed)}</span>
+              <span className={`m-widget-habit-time${struckCls}`}>{cut ? cutHeadline(h, now) : fmtElapsed(elapsed)}</span>
               {/* stopPropagation, not preventDefault: the whole row is a
                   shortcut to the Habits page, and relapsing should not
                   also navigate away from the thing you just did. */}
@@ -1160,10 +1163,10 @@ function HabitsBody({ S, update, navigate }) {
                   setArming(null);
                   update(prev => applyRelapse(prev, h.id, Date.now()));
                 }}
-                title={arming === h.id ? 'Tap again to log it' : 'Log a relapse, now'}
-                aria-label={arming === h.id ? `Confirm relapse for ${h.name}` : `Log a relapse for ${h.name}`}
+                title={arming === h.id ? 'Tap again to log it' : cut ? 'Log today against the budget' : 'Log a relapse, now'}
+                aria-label={arming === h.id ? `Confirm for ${h.name}` : cut ? `Log today for ${h.name}` : `Log a relapse for ${h.name}`}
               >
-                {arming === h.id ? 'Sure?' : <Icon name="rotate-ccw" size={12} />}
+                {arming === h.id ? 'Sure?' : cut ? <Icon name="plus" size={12} /> : <Icon name="rotate-ccw" size={12} />}
               </button>
             </div>
             <div className="m-widget-habit-bar"><div className="m-widget-habit-fill" style={{ width: `${pct * boot}%` }} /></div>

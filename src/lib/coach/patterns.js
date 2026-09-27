@@ -1,4 +1,5 @@
 import { trainingAdherence } from '../body/goal.js';
+import { habitElapsed } from '../habits/progress.js';
 /**
  * Pattern snapshot — extended user state for proactive nudge detection.
  *
@@ -153,7 +154,7 @@ function consistencyScore(logs, days, today) {
  */
 function habitSummary(h, today) {
   const startMs = h.startTime || today;
-  const currentRunDays = Math.floor((today - startMs) / DAY_MS);
+  const currentRunDays = Math.floor(habitElapsed(h, today) / DAY_MS);
   const totalRelapses = h.relapseCount || 0;
   // Account-lifetime average: total relapses / total days on the habit.
   // Without per-relapse history we use start-of-time = original

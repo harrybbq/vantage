@@ -28,6 +28,8 @@ import { subsStats, daysUntil } from '../money/recurring.js';
 import { balanceNow } from '../savings/interest.js';
 import { livePots } from '../savings/completePot.js';
 import { strikeState } from '../habits/strikes.js';
+import { isCut, current as cutCurrent } from '../habits/cutdown.js';
+import { habitElapsed, runnerDays, cutHeadline } from '../habits/progress.js';
 import { coinsToday } from '../coins/daily.js';
 import { ledgerRows } from '../coins/ledger.js';
 import { dayBurn } from '../burn.js';
@@ -592,7 +594,7 @@ const holidayBlocks = {
 
 function nextMilestone(h, now) {
   const ms = (h.milestones || []).slice().sort((a, b) => a.duration - b.duration);
-  const el = now - (h.startTime || now);
+  const el = habitElapsed(h, now);
   return { next: ms.find(m => m.duration > el) || null, elapsed: el, last: ms[ms.length - 1] || null };
 }
 
@@ -609,7 +611,7 @@ const habitBlocks = {
       const { next, elapsed: el, last } = nextMilestone(h, now);
       const target = next ? next.duration : last ? last.duration : el || 1;
       return [`${h.name || 'Habit'}${next ? ` → ${next.label}` : ''}`,
-              pct(el, target), potColor(h, i), elapsed(el)];
+              pct(el, target), potColor(h, i), isCut(h) ? cutHeadline(h, now) : elapsed(el)];
     }))
       // The relapse button, same as the standalone widget's: the card
       // host decides whether to honour it (it needs `update`).
@@ -618,10 +620,10 @@ const habitBlocks = {
         act: { kind: 'relapse', id: shown[i].id, name: shown[i].name || 'Habit' },
         // The little runner at the tip of the bar. Days clean drive its
         // gait through the Habits page runner's own stage ladder.
-        runner: { days: Math.max(0, (now - shown[i].startTime) / 86400000) },
+        runner: { days: Math.max(0, runnerDays(shown[i], now)) },
       }));
-    const longest = list.reduce((a, b) => ((now - a.startTime) > (now - b.startTime) ? a : b));
-    return { d: { items }, s: { fl: 'LONGEST', fv: `${longest.name} ${elapsed(now - longest.startTime)}` } };
+    const longest = list.reduce((a, b) => (habitElapsed(a, now) > habitElapsed(b, now) ? a : b));
+    return { d: { items }, s: { fl: 'LONGEST', fv: `${longest.name} ${isCut(longest) ? cutHeadline(longest, now) : elapsed(habitElapsed(longest, now))}` } };
   },
 
   next(S) {
@@ -644,11 +646,12 @@ const habitBlocks = {
   },
 
   strikes(S) {
-    const list = (S.habits || []).filter(h => Number(h.strikesAllowed) > 0);
+    // Cut-down budgets are allowances too, and read the same way here.
+    const list = (S.habits || []).filter(h => (isCut(h) ? Number(h.budget && h.budget.max) > 0 : Number(h.strikesAllowed) > 0));
     if (!list.length) return EMPTY_LIST('STRIKES', 'No allowances set');
     const now = Date.now();
     const rows = list.slice(0, 6).map(h => {
-      const st = strikeState(h, now);
+      const st = isCut(h) ? (c => ({ used: Math.min(c.used, c.max), allowed: c.max }))(cutCurrent(h, now)) : strikeState(h, now);
       const used = st.used || 0;
       const allowed = st.allowed || 0;
       const left = Math.max(0, allowed - used);
@@ -683,7 +686,7 @@ const habitBlocks = {
       if (w >= 0 && w < weeks) buckets[weeks - 1 - w] += 1;
     }));
     const total = buckets.reduce((s, v) => s + v, 0);
-    const longest = list.reduce((a, h) => Math.max(a, now - (h.startTime || now)), 0);
+    const longest = list.reduce((a, h) => Math.max(a, isCut(h) ? 0 : habitElapsed(h, now)), 0);
     return {
       d: { ll: `RELAPSES · ${weeks} WK`, lv: `${total}`, rl: 'LONGEST RUN', rv: elapsed(longest),
            mx: -1, ax0: `${weeks}w ago`, ax1: '', ax2: 'now',
