@@ -403,6 +403,18 @@
   font-variant-numeric: tabular-nums; }
 .upg-macro-input:focus { outline: none; }
 .upg-macro-cell.kcal .upg-macro-input { color: var(--em); }
+/* The per-serving figures: four cells in a row. These classes were never
+   styled, so the inputs fell back to the modal's full-width fields and
+   stacked with their labels underneath. */
+.upg-macro-row { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; }
+.upg-macro-cell { display: flex; flex-direction: column; gap: 2px; min-width: 0; padding: 8px 10px;
+  border: 1px solid var(--border); border-radius: 9px; cursor: text; }
+.upg-macro-cell.kcal { border-color: var(--em); background: rgba(var(--em-rgb),.06); }
+.upg-macro-cell:focus-within { border-color: var(--em); }
+.upg-sheet .upg-macro-cell .upg-macro-input { border: 0; background: transparent; box-shadow: none;
+  padding: 0; margin: 0; height: auto; border-radius: 0; }
+.upg-macro-cell .k { font-family: var(--mono); font-size: 9px; letter-spacing: .6px; text-transform: uppercase;
+  color: var(--text-muted); }
 .upg-srcbar { display: flex; align-items: center; gap: 9px; padding: 8px 11px; border-radius: 9px;
   border: 1px solid var(--border); font-family: var(--mono); font-size: 10.5px; color: var(--text-muted); }
 .upg-fit { margin-left: auto; color: var(--em); }
@@ -434,6 +446,40 @@
   letter-spacing: .6px; text-transform: uppercase; }
 .upg-plat.is-youtube { color: #c0563f; border-color: rgba(192,86,63,.55); }
 .upg-vnote { font-size: 12px; color: var(--text-muted); }
+
+/* Recipe ↔ video links */
+.upg-rvid { position: absolute; right: 8px; bottom: 8px; display: inline-flex; align-items: center; gap: 3px;
+  font-family: var(--mono); font-size: 9.5px; padding: 3px 7px; border-radius: 999px;
+  background: rgba(20,18,15,.66); color: #fff; }
+.upg-rvids { display: flex; flex-direction: column; gap: 7px; margin-bottom: 6px; }
+.upg-rvideo { display: flex; align-items: center; gap: 8px; }
+.upg-rvideo-link { flex: 1; min-width: 0; display: flex; align-items: center; gap: 10px; padding: 6px;
+  border: 1px solid var(--border); border-radius: 10px; color: var(--text); text-decoration: none; }
+.upg-rvideo-link:hover { border-color: var(--em); }
+.upg-rvideo-link:focus-visible { outline: 2px solid var(--em); outline-offset: 2px; }
+.upg-rvideo-link .upg-vthumb { width: 84px; }
+.upg-rvideo-link .upg-vthumb.is-tall { width: 46px; }
+.upg-rvideo-play { position: absolute; inset: 0; display: grid; place-items: center; color: #fff;
+  background: rgba(0,0,0,.18); }
+.upg-rvideo-meta { min-width: 0; display: flex; flex-direction: column; align-items: flex-start; gap: 5px;
+  font-family: var(--mono); font-size: 9px; color: var(--text-muted); }
+.upg-rvideo-meta .upg-vtitle { color: var(--text); font-family: var(--body, inherit); overflow: hidden; text-overflow: ellipsis;
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+.upg-rvid-pick { display: flex; flex-direction: column; gap: 8px; padding: 10px; border: 1px dashed var(--border);
+  border-radius: 10px; }
+.upg-rvid-list { display: flex; flex-direction: column; gap: 4px; max-height: 190px; overflow-y: auto; }
+.upg-rvid-opt { display: flex; align-items: center; gap: 8px; padding: 7px 8px; border: 1px solid var(--border);
+  border-radius: 8px; background: transparent; color: var(--text); font: inherit; font-size: 12.5px;
+  text-align: left; cursor: pointer; min-width: 0; }
+.upg-rvid-opt > span:last-child { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.upg-rvid-opt .upg-plat { flex: none; font-family: var(--mono); font-size: 8.5px; }
+.upg-rvid-opt:hover { border-color: var(--em); }
+.upg-vrecipes { display: inline-flex; align-items: center; gap: 5px; font-family: var(--mono); font-size: 9.5px;
+  color: var(--em); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.upg-linkchip { display: inline-flex; align-items: center; gap: 6px; cursor: default; }
+.upg-linkchip button { border: 0; background: none; color: inherit; cursor: pointer; padding: 0 0 0 2px;
+  font-size: 10px; opacity: .7; }
+.upg-linkchip button:hover { opacity: 1; }
 
 @media (max-width: 700px) {
   .upg-rgrid { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; }

@@ -187,3 +187,60 @@ export function servingToLogRow(recipe, { userId, logDate, mealType = 'lunch', s
 }
 
 export const MEAL_TYPES = ['breakfast', 'lunch', 'dinner', 'snack'];
+
+/* ══ Links between the two ════════════════════════════════════════════ */
+/*
+ * A recipe can point at any number of saved videos: `recipe.videoIds`
+ * (new key, additive). A recipe made from a video before links existed
+ * only carried the video's URL in `sourceUrl`, so a saved video whose URL
+ * matches counts as linked too — worked out on read, nothing rewritten.
+ * Ids that no longer resolve (a deleted video) are simply not shown.
+ */
+const sameUrl = (a, b) => !!a && !!b && String(a).trim().replace(/\/+$/, '') === String(b).trim().replace(/\/+$/, '');
+
+/** The saved videos a recipe links to, in the order they were linked. */
+export function linkedVideos(recipe, videos) {
+  const list = videos || [];
+  const ids = (recipe && recipe.videoIds) || [];
+  const byId = ids.map(id => list.find(v => v.id === id)).filter(Boolean);
+  const bySource = list.filter(v => sameUrl(v.url, recipe && recipe.sourceUrl) && !ids.includes(v.id));
+  return [...byId, ...bySource];
+}
+
+/** The recipes that link to a saved video. */
+export function linkedRecipes(video, recipes) {
+  if (!video) return [];
+  return (recipes || []).filter(r => ((r.videoIds || []).includes(video.id)) || sameUrl(r.sourceUrl, video.url));
+}
+
+/**
+ * Link or unlink a video and a recipe. Returns `prev` by identity when
+ * nothing changes, so a repeated tap costs no save. Unlinking a video
+ * that is linked only through `sourceUrl` clears that field, since it
+ * is the thing doing the linking.
+ */
+export function linkVideo(prev, recipeId, videoId) {
+  const recipes = (prev && prev.recipes) || [];
+  const r = recipes.find(x => x.id === recipeId);
+  if (!r || !videoId || (r.videoIds || []).includes(videoId)) return prev;
+  if (!((prev.mealVideos || []).some(v => v.id === videoId))) return prev;
+  return { ...prev, recipes: recipes.map(x => (x.id === recipeId ? { ...x, videoIds: [...(x.videoIds || []), videoId] } : x)) };
+}
+
+export function unlinkVideo(prev, recipeId, videoId) {
+  const recipes = (prev && prev.recipes) || [];
+  const r = recipes.find(x => x.id === recipeId);
+  if (!r) return prev;
+  const v = (prev.mealVideos || []).find(x => x.id === videoId);
+  const inIds = (r.videoIds || []).includes(videoId);
+  const bySource = v && sameUrl(v.url, r.sourceUrl);
+  if (!inIds && !bySource) return prev;
+  return {
+    ...prev,
+    recipes: recipes.map(x => (x.id !== recipeId ? x : {
+      ...x,
+      videoIds: (x.videoIds || []).filter(id => id !== videoId),
+      ...(bySource ? { sourceUrl: '' } : {}),
+    })),
+  };
+}
