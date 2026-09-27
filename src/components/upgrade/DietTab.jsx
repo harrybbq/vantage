@@ -13,7 +13,7 @@
  */
 import { useLayoutEffect, useMemo, useRef, useState } from 'react';
 import Icon from '../Icon';
-import { RecipesPanel, VideosPanel } from './MealLibrary';
+import { RecipesPanel } from './MealLibrary';
 import MealPlanner from './MealPlanner';
 import { DEFAULT_PLAN, blendedDailyKcal } from '../../lib/diet/plan';
 import { SEQ, CARDIO_SESSIONS, TRAIN_POS, REST_POS, patternDay, ANCHOR } from '../../lib/rotation/pattern';
@@ -36,7 +36,6 @@ const PANELS = [
   { id: 'plan', label: 'Plan', icon: 'target' },
   { id: 'planner', label: 'Planner', icon: 'calendar-days' },
   { id: 'recipes', label: 'Recipes', icon: 'utensils' },
-  { id: 'videos', label: 'Videos', icon: 'newspaper' },
 ];
 
 export default function DietTab({ S, update, userId }) {
@@ -67,7 +66,6 @@ export default function DietTab({ S, update, userId }) {
         <Nav panel={panel} setPanel={setPanel} />
         {panel === 'planner' && <MealPlanner S={S} update={update} plan={plan} proteinG={proteinG} />}
         {panel === 'recipes' && <RecipesPanel S={S} update={update} userId={userId} targets={targets} />}
-        {panel === 'videos' && <VideosPanel S={S} update={update} />}
       </div>
     );
   }

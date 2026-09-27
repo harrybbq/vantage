@@ -10,7 +10,8 @@
  *                    fat, minutes, tags, ingredients[], method,
  *                    sourceUrl, createdAt }]
  *   S.mealVideos  [{ id, url, platform, videoId, title, note, tags,
- *                    watched, savedAt }]
+ *                    watched, savedAt, read? }] — shown on the recipes
+ *                    that link them (recipe.videoIds)
  *
  * Photos are the one thing NOT in S — see lib/diet/recipeImages.js.
  */
@@ -129,7 +130,6 @@ export const RECIPE_TAGS = [
   'Meal prep', 'Under 20 min', 'No cook', 'One pan',
 ];
 
-export const VIDEO_TAGS = ['To try', 'Made it', 'High protein', 'Meal prep', 'Technique'];
 
 /**
  * Search + filter, shared by both libraries so they behave identically.

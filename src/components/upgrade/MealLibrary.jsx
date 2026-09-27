@@ -1,13 +1,12 @@
 /**
- * Meal library — recipes and saved videos, in the Diet tab.
+ * Meal library — recipes, in the Diet tab. Saved cooking videos live ON
+ * recipes now: a recipe links any number of them (`recipe.videoIds`),
+ * shows them in its sheet, and can read the ingredients and a macro
+ * estimate out of their description (lib/diet/videoRecipe.js).
  *
- * Two lists rather than one, which was a deliberate call: a video has no
- * macros and a recipe has no watch state, so a merged list would leave
- * half its columns empty whichever row you were looking at. They are
- * LINKED instead: a recipe can point at any number of saved videos
- * (`recipe.videoIds`), shown on its card and in its sheet; a video shows
- * the recipes that use it; "Make this a recipe" creates one already
- * linked. Pasting a link inside a recipe saves the video too.
+ * There is no separate Videos list any more. Pasting a link starts a
+ * recipe from it; a saved video that no recipe uses yet is listed at the
+ * foot of the page so none are lost (S.mealVideos is kept as it was).
  *
  * Photos live in Supabase Storage (lib/diet/recipeImages.js) and fail
  * soft until the bucket exists. Everything else is in S.
@@ -16,7 +15,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import Icon from '../Icon';
 import { supabase } from '../../lib/supabase';
 import {
-  EMPTY_RECIPE, MEAL_TYPES, PLATFORM_LABEL, RECIPE_TAGS, VIDEO_TAGS,
+  EMPTY_RECIPE, MEAL_TYPES, PLATFORM_LABEL, RECIPE_TAGS,
   batchTotals, filterItems, isPortrait, parseVideoUrl, servingToLogRow,
   shareOfTarget, tagCounts, videoThumb, linkedVideos, linkedRecipes, linkVideo, unlinkVideo, applyRead,
 } from '../../lib/diet/meals';
@@ -37,6 +36,9 @@ export function RecipesPanel({ S, update, userId, targets }) {
   const [openId, setOpenId] = useState(null);
   const [urls, setUrls] = useState({});
   const [setupMsg, setSetupMsg] = useState('');
+  const [link, setLink] = useState('');
+  const [linkErr, setLinkErr] = useState('');
+  const [autoRead, setAutoRead] = useState(null);   // video id to read when its new recipe opens
 
   // One signed-URL request for the whole grid, not one per card.
   useEffect(() => {
@@ -59,6 +61,37 @@ export function RecipesPanel({ S, update, userId, targets }) {
 
   const rows = filterItems(recipes, { q, tag });
   const open = recipes.find(r => r.id === openId) || null;
+  const loose = videos.filter(v => !linkedRecipes(v, recipes).length);
+
+  // A new recipe from a video (a saved one, or a pasted link saved now),
+  // opened straight away with its ingredients being read in.
+  function recipeFromVideo(v, isNew) {
+    const r = {
+      ...EMPTY_RECIPE(), id: uid(), createdAt: Date.now(),
+      // A readable video names the dish when it is read; the video's own
+      // title (often clickbait) is only the fallback if reading fails.
+      title: READABLE.has(v.platform) ? '' : v.title || '', sourceUrl: v.url, videoIds: [v.id],
+      tags: (v.tags || []).filter(t => t !== 'To try' && t !== 'Made it'),
+    };
+    update(prev => ({
+      ...prev,
+      ...(isNew ? { mealVideos: [v, ...(prev.mealVideos || [])] } : {}),
+      recipes: [...(prev.recipes || []), r],
+    }));
+    setOpenId(r.id);
+    setAutoRead(v.id);
+  }
+  function fromLink() {
+    const parsed = parseVideoUrl(link);
+    if (!parsed.valid) { setLinkErr('That doesn’t look like a link.'); return; }
+    const existing = videos.find(v => v.url === parsed.url);
+    const v = existing || {
+      id: uid(), url: parsed.url, platform: parsed.platform, videoId: parsed.videoId,
+      title: '', note: '', tags: [], watched: false, savedAt: today(),
+    };
+    recipeFromVideo(v, !existing);
+    setLink(''); setLinkErr('');
+  }
 
   return (
     <>
@@ -70,6 +103,13 @@ export function RecipesPanel({ S, update, userId, targets }) {
           + Recipe
         </button>
       </div>
+      <div className="upg-toolbar">
+        <input className="upg-search" value={link} onChange={e => { setLink(e.target.value); setLinkErr(''); }}
+               onKeyDown={e => { if (e.key === 'Enter' && link.trim()) fromLink(); }}
+               placeholder="Paste a YouTube or TikTok link to start a recipe from it" aria-label="Video link" />
+        <button type="button" className="link-open-btn" onClick={fromLink} disabled={!link.trim()}>From video</button>
+      </div>
+      {linkErr && <div className="upg-fine" style={{ color: '#e0796a' }}>{linkErr}</div>}
 
       <div className="upg-chipset">
         <button type="button" className={'upg-opt' + (tag === '' ? ' is-on' : '')} onClick={() => setTag('')}>
@@ -129,10 +169,40 @@ export function RecipesPanel({ S, update, userId, targets }) {
         })}
       </div>
 
+      {loose.length > 0 && (
+        <section className="upg-loose">
+          <span className="upg-field-lbl">Saved videos not in a recipe · {loose.length}</span>
+          <div className="upg-loose-list">
+            {loose.map(v => {
+              const thumb = videoThumb(v);
+              return (
+                <div key={v.id} className="upg-loose-row">
+                  <a href={v.url} target="_blank" rel="noreferrer noopener" className="upg-rvideo-link" title={`Open on ${PLATFORM_LABEL[v.platform] || 'the web'}`}>
+                    <span className={'upg-vthumb' + (isPortrait(v.platform) ? ' is-tall' : '')}>
+                      {thumb
+                        ? <img src={thumb} alt="" loading="lazy" />
+                        : <span className={`upg-vtile is-${v.platform}`}>{(PLATFORM_LABEL[v.platform] || '?')[0]}</span>}
+                    </span>
+                    <span className="upg-rvideo-meta">
+                      <span className="upg-vtitle">{v.title || v.url.replace(/^https?:\/\/(www\.)?/, '').slice(0, 48)}</span>
+                      <span className={`upg-plat is-${v.platform}`}>{PLATFORM_LABEL[v.platform] || 'Link'}</span>
+                    </span>
+                  </a>
+                  <button type="button" className="upg-textbtn" onClick={() => recipeFromVideo(v, false)}>Make a recipe</button>
+                  <button type="button" className="link-del-btn" aria-label={`Delete ${v.title || 'video'}`}
+                          onClick={() => update(prev => ({ ...prev, mealVideos: (prev.mealVideos || []).filter(x => x.id !== v.id) }))}>✕</button>
+                </div>
+              );
+            })}
+          </div>
+        </section>
+      )}
+
       {open && (
         <RecipeSheet recipe={open} userId={userId} targets={targets} videos={videos} update={update}
+                     autoRead={autoRead}
                      imageUrl={open.image ? urls[open.image] : null}
-                     onClose={() => setOpenId(null)}
+                     onClose={() => { setOpenId(null); setAutoRead(null); }}
                      onChange={patch => upsert({ ...open, ...patch })}
                      onDelete={() => { remove(open); setOpenId(null); }} />
       )}
@@ -140,7 +210,7 @@ export function RecipesPanel({ S, update, userId, targets }) {
   );
 }
 
-function RecipeSheet({ recipe, userId, targets, videos, update, imageUrl, onClose, onChange, onDelete }) {
+function RecipeSheet({ recipe, userId, targets, videos, update, autoRead, imageUrl, onClose, onChange, onDelete }) {
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState('');
   const fileRef = useRef(null);
@@ -185,7 +255,7 @@ function RecipeSheet({ recipe, userId, targets, videos, update, imageUrl, onClos
           <input ref={fileRef} type="file" hidden accept="image/*" onChange={pickImage} />
           {msg && <div className="upg-fine" style={{ marginBottom: 10 }}>{msg}</div>}
 
-          <RecipeVideos recipe={recipe} videos={videos} update={update} onChange={onChange} />
+          <RecipeVideos recipe={recipe} videos={videos} update={update} onChange={onChange} autoRead={autoRead} />
 
           <div className="upg-field">
             <span className="upg-field-lbl">Per serving · makes {recipe.servings || 1}</span>
@@ -268,11 +338,11 @@ function RecipeSheet({ recipe, userId, targets, videos, update, imageUrl, onClos
 /**
  * The videos a recipe links to: thumbnails that open the video, an ×
  * to unlink, and a picker that links a saved video or saves a pasted
- * link straight into the Videos list and links it.
+ * link and links it.
  */
 const READABLE = new Set(['youtube', 'tiktok']);
 
-function RecipeVideos({ recipe, videos, update, onChange }) {
+function RecipeVideos({ recipe, videos, update, onChange, autoRead }) {
   const [picking, setPicking] = useState(false);
   const [paste, setPaste] = useState('');
   const [err, setErr] = useState('');
@@ -289,9 +359,24 @@ function RecipeVideos({ recipe, videos, update, onChange }) {
     setReadErr(e => ({ ...e, [v.id]: '' }));
     const { read: got, error } = await readVideoRecipe(v.url);
     setReading(r => ({ ...r, [v.id]: false }));
-    if (error) { setReadErr(e => ({ ...e, [v.id]: error })); return; }
+    if (error) {
+      setReadErr(e => ({ ...e, [v.id]: error }));
+      if (!String(recipe.title || '').trim() && v.title) onChange({ title: v.title });
+      return;
+    }
     update(prev => applyRead(prev, v.id, recipe.id, got));
   }
+
+  // A recipe just made from a video reads it straight away.
+  const autoDone = useRef(false);
+  useEffect(() => {
+    if (!autoRead || autoDone.current) return;
+    const v = videos.find(x => x.id === autoRead);
+    if (!v) return;
+    autoDone.current = true;
+    if (!v.read) read(v);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoRead, videos]);
 
   function addPasted() {
     const parsed = parseVideoUrl(paste);
@@ -473,191 +558,6 @@ function LogServing({ recipe, userId }) {
         </button>
       </div>
       {state === 'error' && <div className="upg-fine" style={{ color: '#e0796a' }}>{msg}</div>}
-    </div>
-  );
-}
-
-/* ══ Videos ═══════════════════════════════════════════════════════════ */
-
-export function VideosPanel({ S, update }) {
-  const videos = useMemo(() => S.mealVideos || [], [S.mealVideos]);
-  const recipes = useMemo(() => S.recipes || [], [S.recipes]);
-  const [paste, setPaste] = useState('');
-  const [q, setQ] = useState('');
-  const [tag, setTag] = useState('');
-  const [openId, setOpenId] = useState(null);
-  const [err, setErr] = useState('');
-
-  const save = next => update(prev => ({ ...prev, mealVideos: next }));
-
-  function add() {
-    const parsed = parseVideoUrl(paste);
-    if (!parsed.valid) { setErr('That doesn’t look like a link.'); return; }
-    const v = {
-      id: uid(), url: parsed.url, platform: parsed.platform, videoId: parsed.videoId,
-      title: '', note: '', tags: ['To try'], watched: false, savedAt: today(),
-    };
-    save([v, ...videos]);
-    setPaste(''); setErr(''); setOpenId(v.id);
-  }
-
-  const rows = filterItems(videos, { q, tag });
-  const open = videos.find(v => v.id === openId) || null;
-
-  return (
-    <>
-      <div className="upg-toolbar">
-        <input className="upg-search" value={paste} onChange={e => { setPaste(e.target.value); setErr(''); }}
-               onKeyDown={e => { if (e.key === 'Enter') add(); }}
-               placeholder="Paste a YouTube or TikTok link…" />
-        <button type="button" className="link-open-btn" onClick={add}>+ Save</button>
-      </div>
-      {err && <div className="upg-fine" style={{ color: '#e0796a' }}>{err}</div>}
-
-      <input className="upg-search" value={q} onChange={e => setQ(e.target.value)}
-             placeholder="Search saved videos" />
-
-      <div className="upg-chipset">
-        <button type="button" className={'upg-opt' + (tag === '' ? ' is-on' : '')} onClick={() => setTag('')}>
-          All · {videos.length}
-        </button>
-        {tagCounts(videos).map(([t, n]) => (
-          <button key={t} type="button" className={'upg-opt' + (tag === t ? ' is-on' : '')}
-                  onClick={() => setTag(tag === t ? '' : t)}>{t} · {n}</button>
-        ))}
-      </div>
-
-      {!rows.length && (
-        <div className="upg-empty">
-          {videos.length ? 'Nothing matches that.' : 'Nothing saved. Paste a link above.'}
-        </div>
-      )}
-
-      <div className="upg-vgrid">
-        {rows.map(v => {
-          const thumb = videoThumb(v);
-          return (
-            <button key={v.id} type="button" className="upg-vrow" onClick={() => setOpenId(v.id)}>
-              <span className={'upg-vthumb' + (isPortrait(v.platform) ? ' is-tall' : '')}>
-                {thumb
-                  ? <img src={thumb} alt="" loading="lazy" />
-                  : <span className={`upg-vtile is-${v.platform}`}>{(PLATFORM_LABEL[v.platform] || '?')[0]}</span>}
-              </span>
-              <span className="upg-vmeta">
-                <span className="upg-vtitle">{v.title || v.url.replace(/^https?:\/\/(www\.)?/, '').slice(0, 60)}</span>
-                <span className="upg-vsub">
-                  <span className={`upg-plat is-${v.platform}`}>{PLATFORM_LABEL[v.platform] || 'Link'}</span>
-                  {v.watched && <span>Made it</span>}
-                  <span>{v.savedAt}</span>
-                </span>
-                {(rs => rs.length > 0 && (
-                  <span className="upg-vrecipes"><Icon name="utensils" size={10} /> {rs.map(r => r.title || 'Untitled recipe').join(' · ')}</span>
-                ))(linkedRecipes(v, recipes))}
-                {v.note && <span className="upg-vnote">{v.note}</span>}
-              </span>
-            </button>
-          );
-        })}
-      </div>
-
-      {open && (
-        <VideoSheet video={open} recipes={recipes}
-                    onLink={rid => update(prev => linkVideo(prev, rid, open.id))}
-                    onUnlink={rid => update(prev => unlinkVideo(prev, rid, open.id))}
-                    onClose={() => setOpenId(null)}
-                    onChange={patch => save(videos.map(v => (v.id === open.id ? { ...v, ...patch } : v)))}
-                    onDelete={() => { save(videos.filter(v => v.id !== open.id)); setOpenId(null); }}
-                    onMakeRecipe={() => {
-                      update(prev => ({
-                        ...prev,
-                        recipes: [...(prev.recipes || []), {
-                          ...EMPTY_RECIPE(), id: uid(), createdAt: Date.now(),
-                          title: open.title || '', sourceUrl: open.url, videoIds: [open.id],
-                          tags: (open.tags || []).filter(t => t !== 'To try'),
-                        }],
-                      }));
-                      setOpenId(null);
-                    }} />
-      )}
-    </>
-  );
-}
-
-function VideoSheet({ video, recipes, onLink, onUnlink, onClose, onChange, onDelete, onMakeRecipe }) {
-  const thumb = videoThumb(video);
-  const linked = linkedRecipes(video, recipes);
-  const others = recipes.filter(r => !linked.some(l => l.id === r.id));
-  return (
-    <div className="modal-overlay open" onClick={onClose} role="presentation">
-      <div className="modal upg-sheet" onClick={e => e.stopPropagation()} role="dialog" aria-modal="true">
-        <div className="upg-day-head">
-          <input className="upg-title-input" value={video.title} placeholder="What is it?"
-                 onChange={e => onChange({ title: e.target.value })} />
-          <button type="button" className="link-del-btn" onClick={onClose} aria-label="Close">✕</button>
-        </div>
-
-        <div className="upg-sheet-body">
-          {thumb && (
-            <span className={'upg-vthumb is-hero' + (isPortrait(video.platform) ? ' is-tall' : '')}>
-              <img src={thumb} alt="" />
-            </span>
-          )}
-          <a className="link-open-btn" href={video.url} target="_blank" rel="noreferrer noopener"
-             style={{ display: 'inline-flex', alignItems: 'center', gap: 6, textDecoration: 'none', marginBottom: 12 }}>
-            Open on {PLATFORM_LABEL[video.platform] || 'the web'} <Icon name="external-link" size={12} />
-          </a>
-
-          <div className="upg-field">
-            <span className="upg-field-lbl">Tags</span>
-            <div className="upg-chipset">
-              {[...new Set([...VIDEO_TAGS, ...(video.tags || [])])].map(t => {
-                const on = (video.tags || []).includes(t);
-                return (
-                  <button key={t} type="button" className={'upg-opt' + (on ? ' is-on' : '')}
-                          onClick={() => onChange({
-                            tags: on ? video.tags.filter(x => x !== t) : [...(video.tags || []), t],
-                            ...(t === 'Made it' && !on ? { watched: true } : {}),
-                          })}>{t}</button>
-                );
-              })}
-            </div>
-          </div>
-
-          <div className="upg-field">
-            <span className="upg-field-lbl">Recipes using this video</span>
-            {linked.length > 0 ? (
-              <div className="upg-chipset">
-                {linked.map(r => (
-                  <span key={r.id} className="upg-opt is-on upg-linkchip">
-                    {r.title || 'Untitled recipe'}
-                    <button type="button" aria-label={`Unlink ${r.title || 'recipe'}`} onClick={() => onUnlink(r.id)}>✕</button>
-                  </span>
-                ))}
-              </div>
-            ) : <span className="upg-fine">None yet.</span>}
-            {others.length > 0 && (
-              <select className="upg-search" value="" aria-label="Link to a recipe" style={{ marginTop: 8 }}
-                      onChange={e => { if (e.target.value) onLink(e.target.value); }}>
-                <option value="">Link to a recipe…</option>
-                {others.map(r => <option key={r.id} value={r.id}>{r.title || 'Untitled recipe'}</option>)}
-              </select>
-            )}
-          </div>
-
-          <label className="upg-field">
-            <span className="upg-field-lbl">Note</span>
-            <textarea rows={4} value={video.note || ''}
-                      placeholder="The bit worth coming back for — and what you'd change."
-                      onChange={e => onChange({ note: e.target.value })} />
-          </label>
-        </div>
-
-        <div className="upg-day-actions">
-          <button type="button" className="upg-textbtn" onClick={onDelete}>Delete</button>
-          <button type="button" className="upg-textbtn" onClick={onMakeRecipe}>Make this a recipe</button>
-          <button type="button" className="link-open-btn" onClick={onClose}>Done</button>
-        </div>
-      </div>
     </div>
   );
 }

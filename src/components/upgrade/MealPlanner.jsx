@@ -4,15 +4,26 @@
  * with what to add where protein falls short, how many batches to cook,
  * and one shopping list for the lot.
  *
+ * A day takes recipes or single foods from the food search (the same
+ * search as Track), with one-tap picks of foods planned before.
+ *
+ * The shopping list comes out as you'd buy it (lib/diet/shopping.js):
+ * the cheapest packs that cover each item, grouped by aisle, with
+ * seasonings and cupboard staples split off to check rather than buy.
+ *
  * Targets are read from the Diet plan exactly as the Plan panel shows
  * them (lib/diet/planner.targetsFor); nothing here edits them.
- * State: S.mealPlan (lib/diet/planner.js).
+ * State: S.mealPlan, S.plannerFoods (quick picks), S.shopPrefs (your
+ * own pack sizes/prices, and items moved between the two lists).
  */
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import Icon from '../Icon';
 import {
   planDays, nextShiftBlock, targetsFor, dayStatus, suggest, batchesOf, shoppingList, EMPTY_PLAN,
+  portionOptions, planFood, rememberFood,
 } from '../../lib/diet/planner';
+import { shopPlan, packLabel, catalogueFor } from '../../lib/diet/shopping';
+import { searchByName, readCommunityPref } from '../../lib/diet/foodSearch';
 
 const uid = () => Math.random().toString(36).slice(2, 10) + Date.now().toString(36).slice(-4);
 const todayIso = () => {
@@ -27,6 +38,12 @@ const dayLabel = iso => {
 };
 const SHIFT = { day: 'Day shift', night: 'Night shift', off: 'Off', leave: 'Leave', unknown: '' };
 const fmtServ = n => String(Math.round(n * 100) / 100);
+// Left over after buying: weights to the nearest 5, counts in whole items.
+const spareLabel = (left, family) => {
+  if (family === 'g' || family === 'ml') return left >= 5 ? ` · ${packLabel({ size: Math.round(left / 5) * 5 }, family)} spare` : '';
+  const n = Math.floor(left + 1e-9);
+  return n >= 1 ? ` · ${n} spare` : '';
+};
 
 export default function MealPlanner({ S, update, plan, proteinG }) {
   const recipes = useMemo(() => S.recipes || [], [S.recipes]);
@@ -48,10 +65,30 @@ export default function MealPlanner({ S, update, plan, proteinG }) {
     const cur = prev.mealPlan || { ...EMPTY_PLAN(), start, days: n };
     return { ...prev, mealPlan: fn({ ...cur, start: cur.start || start, days: cur.days || n }) };
   });
-  const add = (dayIdx, recipeId, servings = 1) => save(p => ({
-    ...p,
-    entries: [...(p.entries || []), ...(dayIdx === 'all' ? days.map(d => d.i) : [dayIdx]).map(day => ({ id: uid(), day, recipeId, servings }))],
-  }));
+  // `item` is { recipeId } or { food }; a food is also remembered as a
+  // one-tap pick.
+  const add = (dayIdx, item, servings = 1) => update(prev => {
+    const cur = prev.mealPlan || { ...EMPTY_PLAN(), start, days: n };
+    const targets = dayIdx === 'all' ? days.map(d => d.i) : [dayIdx];
+    const mealPlan = {
+      ...cur, start: cur.start || start, days: cur.days || n,
+      entries: [...(cur.entries || []), ...targets.map(day => ({ id: uid(), day, ...item, servings }))],
+    };
+    return item.food
+      ? { ...prev, mealPlan, plannerFoods: rememberFood(prev.plannerFoods, item.food) }
+      : { ...prev, mealPlan };
+  });
+  const prefs = S.shopPrefs || {};
+  const savePrefs = fn => update(prev => ({ ...prev, shopPrefs: fn(prev.shopPrefs || {}) }));
+  const moveItem = (ikey, to) => savePrefs(p => ({ ...p, cats: { ...(p.cats || {}), [ikey]: to } }));
+  const setPacks = (ikey, family, packs) => savePrefs(p => {
+    const all = { ...(p.packs || {}) };
+    const mine = { ...(all[ikey] || {}) };
+    if (packs) mine[family] = packs; else delete mine[family];
+    if (Object.keys(mine).length) all[ikey] = mine; else delete all[ikey];
+    return { ...p, packs: all };
+  });
+  const [editPacks, setEditPacks] = useState(null);  // shopping item | null
   const setServ = (id, v) => save(p => ({ ...p, entries: p.entries.map(e => (e.id === id ? { ...e, servings: Math.max(0.5, Math.round(v * 2) / 2) } : e)) }));
   const remove = id => save(p => ({ ...p, entries: p.entries.filter(e => e.id !== id) }));
   const setRange = (s, d) => save(p => ({ ...p, start: s, days: Math.max(1, Math.min(14, d)) }));
@@ -68,13 +105,19 @@ export default function MealPlanner({ S, update, plan, proteinG }) {
   const shortDays = st.filter(x => x.status !== 'empty' && x.protein < -5).length;
   const batches = batchesOf(inRange, recipes);
   const shop = shoppingList(inRange, recipes);
+  const sp = shopPlan(shop.items, prefs);
+  const toBuy = sp.aisles.reduce((a, x) => a + x.items.filter(i => !bought.has(i.key)).length, 0);
   const isBlock = start === block.start && n === block.days;
   const shifts = days.filter(d => d.shift === 'day' || d.shift === 'night').length;
 
   function copyList() {
     const lines = [
       `Shopping · ${dayLabel(start)} – ${dayLabel(days[days.length - 1].iso)}`,
-      ...shop.items.filter(i => !bought.has(i.key)).map(i => `- ${i.amount ? i.amount + ' ' : ''}${i.item}`),
+      ...sp.aisles.flatMap(a => {
+        const left = a.items.filter(i => !bought.has(i.key));
+        return left.length ? ['', a.name, ...left.map(i => `- ${i.buy ? i.buy + ' ' : ''}${i.item}`)] : [];
+      }),
+      ...(sp.cupboard.length ? ['', 'Check the cupboard', ...sp.cupboard.map(i => `- ${i.item}${i.amount ? ` (${i.amount})` : ''}`)] : []),
     ].join('\n');
     navigator.clipboard?.writeText(lines).then(() => { setCopied(true); setTimeout(() => setCopied(false), 1800); }).catch(() => {});
   }
@@ -103,11 +146,11 @@ export default function MealPlanner({ S, update, plan, proteinG }) {
           <div><span>Days short</span><b className={shortDays ? 'is-bad' : filled.length ? 'is-ok' : ''}>{filled.length ? `${shortDays} of ${n}` : '—'}</b></div>
           <div><span>Shift days</span><b>{shifts}</b></div>
           <div><span>To cook</span><b>{batches.length ? `${batches.length} recipe${batches.length === 1 ? '' : 's'}` : '—'}</b></div>
-          <button type="button" className="link-open-btn upg-plan-all" onClick={() => setPicker('all')} disabled={!recipes.length}>+ Add to every day</button>
+          <button type="button" className="link-open-btn upg-plan-all" onClick={() => setPicker('all')}>+ Add to every day</button>
         </div>
       </div>
 
-      {!recipes.length && <div className="upg-empty">Add a recipe first, with its macros per serving. Then plan it across your days here.</div>}
+      {!recipes.length && !entries.length && <div className="upg-empty">Add recipes in Recipes, or search foods straight into a day here.</div>}
 
       <div className="upg-plan-days-grid">
         {days.map((d, i) => {
@@ -125,23 +168,27 @@ export default function MealPlanner({ S, update, plan, proteinG }) {
               </header>
               <ul className="upg-pday-list">
                 {list.map(e => {
-                  const r = recipes.find(x => x.id === e.recipeId);
+                  const r = e.food || recipes.find(x => x.id === e.recipeId);
                   if (!r) return null;
+                  const name = e.food ? e.food.name : (r.title || 'Untitled recipe');
                   return (
-                    <li key={e.id}>
-                      <span className="upg-pday-name">{r.title || 'Untitled recipe'}</span>
+                    <li key={e.id} className={e.food ? 'is-food' : ''}>
+                      <span className="upg-pday-name" title={name}>
+                        {name}
+                        {e.food && <em>{e.food.portion === 'serving' ? `per serving · ${e.food.amount} ${e.food.unit}` : `per ${e.food.amount} ${e.food.unit}`}</em>}
+                      </span>
                       <span className="upg-pday-serv">
                         <button type="button" onClick={() => setServ(e.id, e.servings - 0.5)} disabled={e.servings <= 0.5} aria-label="Less">−</button>
                         <b>×{fmtServ(e.servings)}</b>
                         <button type="button" onClick={() => setServ(e.id, e.servings + 0.5)} aria-label="More">+</button>
                       </span>
                       <span className="upg-pday-p">{Math.round((r.protein || 0) * e.servings)} g</span>
-                      <button type="button" className="upg-pday-x" onClick={() => remove(e.id)} aria-label={`Remove ${r.title || 'recipe'}`}>✕</button>
+                      <button type="button" className="upg-pday-x" onClick={() => remove(e.id)} aria-label={`Remove ${name}`}>✕</button>
                     </li>
                   );
                 })}
               </ul>
-              <button type="button" className="upg-textbtn upg-pday-add" onClick={() => setPicker(d.i)} disabled={!recipes.length}>+ Add a recipe</button>
+              <button type="button" className="upg-textbtn upg-pday-add" onClick={() => setPicker(d.i)}>+ Add a recipe or food</button>
               <div className="upg-pday-bars">
                 <div className="upg-pbar is-protein" title={`${s.total.protein} of ${s.target.protein} g protein`}>
                   <span>Protein</span><i><em style={{ width: `${pPct}%` }} /></i><b>{s.total.protein}/{s.target.protein} g</b>
@@ -162,7 +209,7 @@ export default function MealPlanner({ S, update, plan, proteinG }) {
               {sug.length > 0 && (
                 <div className="upg-pday-sug">
                   {sug.map(x => (
-                    <button key={x.recipe.id} type="button" className="upg-opt" onClick={() => add(d.i, x.recipe.id, 1)}>
+                    <button key={x.recipe.id} type="button" className="upg-opt" onClick={() => add(d.i, { recipeId: x.recipe.id }, 1)}>
                       + {x.recipe.title} <em>+{Math.round(x.recipe.protein)} g · {Math.round(x.recipe.kcal)} kcal</em>
                     </button>
                   ))}
@@ -173,9 +220,9 @@ export default function MealPlanner({ S, update, plan, proteinG }) {
         })}
       </div>
 
-      {batches.length > 0 && (
+      {inRange.length > 0 && (
         <div className="upg-plan-bottom">
-          <section className="upg-card upg-plan-cook">
+          {batches.length > 0 && <section className="upg-card upg-plan-cook">
             <span className="upg-field-lbl">To cook</span>
             <ul>
               {batches.map(b => (
@@ -186,42 +233,82 @@ export default function MealPlanner({ S, update, plan, proteinG }) {
                 </li>
               ))}
             </ul>
-          </section>
+          </section>}
 
           <section className="upg-card upg-plan-shop">
             <div className="upg-plan-shop-head">
               <span className="upg-field-lbl">Shopping list</span>
-              <span className="upg-fine">{shop.items.filter(i => !bought.has(i.key)).length} to buy</span>
+              <span className="upg-fine">{toBuy} to buy{sp.priced ? ` · ≈ £${sp.cost.toFixed(2)}` : ''}</span>
               <button type="button" className="upg-textbtn" onClick={copyList} disabled={!shop.items.length}>
                 <Icon name="copy" size={11} /> {copied ? 'Copied' : 'Copy list'}
               </button>
             </div>
+            {sp.priced > 0 && <div className="upg-fine">Packs are the cheapest mix that covers what you need, at typical UK prices. Tap packs to use your shop’s sizes and prices.</div>}
             {shop.missing.length > 0 && (
               <div className="upg-setup">
                 <Icon name="triangle-alert" size={13} /> No ingredients yet for {shop.missing.map(r => r.title || 'Untitled recipe').join(', ')}. Add them, or link the video and read them in, in Recipes.
               </div>
             )}
-            <ul className="upg-shop">
-              {shop.items.map(i => (
-                <li key={i.key} className={bought.has(i.key) ? 'is-bought' : ''}>
-                  <label>
-                    <input type="checkbox" checked={bought.has(i.key)} onChange={() => toggleBought(i.key)} />
-                    <b>{i.amount || '—'}</b>
-                    <span>{i.item}</span>
-                  </label>
-                  {i.from.length > 1 && <em>{i.from.join(' · ')}</em>}
-                </li>
-              ))}
-            </ul>
+            {sp.aisles.map(a => (
+              <div key={a.name} className="upg-aisle">
+                <h4>{a.name}</h4>
+                <ul className="upg-shop">
+                  {a.items.map(i => (
+                    <li key={i.key} className={bought.has(i.key) ? 'is-bought' : ''}>
+                      <label>
+                        <input type="checkbox" checked={bought.has(i.key)} onChange={() => toggleBought(i.key)} />
+                        <b>{i.buy || '—'}</b>
+                        <span>{i.item}</span>
+                      </label>
+                      <div className="upg-shop-sub">
+                        {i.packs && <span>need {i.amount}{spareLabel(i.packs.leftover, i.family)} · ≈ £{i.packs.cost.toFixed(2)}</span>}
+                        {i.family && i.base != null && (
+                          <button type="button" className="upg-textbtn" onClick={() => setEditPacks(i)}>{i.ownPacks ? 'your packs' : 'packs'}</button>
+                        )}
+                        <button type="button" className="upg-textbtn" onClick={() => moveItem(i.ikey, 'cupboard')}>→ cupboard</button>
+                        {i.from.length > 1 && <em>{i.from.join(' · ')}</em>}
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ))}
+            {sp.cupboard.length > 0 && (
+              <div className="upg-aisle is-cupboard">
+                <h4>Seasonings &amp; cupboard <span>check you have these</span></h4>
+                <ul className="upg-shop">
+                  {sp.cupboard.map(i => (
+                    <li key={i.key} className={bought.has(i.key) ? 'is-bought' : ''}>
+                      <label>
+                        <input type="checkbox" checked={bought.has(i.key)} onChange={() => toggleBought(i.key)} />
+                        <b>{i.amount || ''}</b>
+                        <span>{i.item}</span>
+                      </label>
+                      <div className="upg-shop-sub">
+                        <button type="button" className="upg-textbtn" onClick={() => moveItem(i.ikey, 'shop')}>→ shopping list</button>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
           </section>
         </div>
       )}
 
+      {editPacks && (
+        <PackEditor item={editPacks} prefs={prefs}
+                    onSave={packs => { setPacks(editPacks.ikey, editPacks.family, packs); setEditPacks(null); }}
+                    onClose={() => setEditPacks(null)} />
+      )}
+
       {picker != null && (
-        <RecipePicker
+        <AddSheet
           recipes={recipes}
+          quick={S.plannerFoods || []}
           title={picker === 'all' ? `Add to all ${n} days` : `Add to ${dayLabel(days[picker].iso)}`}
-          onPick={id => { add(picker, id, 1); setPicker(null); }}
+          onPick={item => { add(picker, item, 1); setPicker(null); }}
+          onForget={f => update(prev => ({ ...prev, plannerFoods: (prev.plannerFoods || []).filter(x => x !== f && !(x.name === f.name && x.amount === f.amount && x.portion === f.portion)) }))}
           onClose={() => setPicker(null)}
         />
       )}
@@ -229,11 +316,44 @@ export default function MealPlanner({ S, update, plan, proteinG }) {
   );
 }
 
-function RecipePicker({ recipes, title, onPick, onClose }) {
+/**
+ * What to add to a day: one of your recipes, or a single food from the
+ * same food search Track uses. Before you type, the foods you've planned
+ * before are one tap away.
+ */
+function AddSheet({ recipes, quick, title, onPick, onForget, onClose }) {
+  const [tab, setTab] = useState(recipes.length ? 'recipes' : 'food');
   const [q, setQ] = useState('');
-  const rows = recipes
+  const [results, setResults] = useState([]);
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState('');
+  const [chosen, setChosen] = useState(null);   // search result awaiting a portion
+  const [grams, setGrams] = useState('');
+  const seq = useRef(0);
+
+  useEffect(() => {
+    if (tab !== 'food') return undefined;
+    const term = q.trim();
+    if (term.length < 2) { setResults([]); setErr(''); return undefined; }
+    const my = ++seq.current;
+    const id = setTimeout(async () => {
+      setBusy(true); setErr('');
+      try {
+        const r = await searchByName(term, readCommunityPref());
+        if (my === seq.current) setResults(r.slice(0, 25));
+      } catch (e) {
+        if (my === seq.current) setErr(e.message || 'Search failed');
+      } finally {
+        if (my === seq.current) setBusy(false);
+      }
+    }, 350);
+    return () => clearTimeout(id);
+  }, [q, tab]);
+
+  const recipeRows = recipes
     .filter(r => !q.trim() || `${r.title} ${(r.tags || []).join(' ')}`.toLowerCase().includes(q.trim().toLowerCase()))
     .sort((a, b) => (b.protein || 0) / Math.max(1, b.kcal || 1) - (a.protein || 0) / Math.max(1, a.kcal || 1));
+
   return (
     <div className="modal-overlay open" onClick={onClose} role="presentation">
       <div className="modal upg-sheet" onClick={e => e.stopPropagation()} role="dialog" aria-modal="true" aria-label={title}>
@@ -242,17 +362,129 @@ function RecipePicker({ recipes, title, onPick, onClose }) {
           <button type="button" className="link-del-btn" onClick={onClose} aria-label="Close">✕</button>
         </div>
         <div className="upg-sheet-body">
-          <input className="upg-search" value={q} autoFocus onChange={e => setQ(e.target.value)} placeholder="Search recipes" />
-          <span className="upg-fine">Most protein per calorie first. One serving each; change it on the day.</span>
-          <div className="upg-rvid-list" style={{ maxHeight: 'none' }}>
-            {rows.map(r => (
-              <button key={r.id} type="button" className="upg-rvid-opt upg-pick-row" onClick={() => onPick(r.id)}>
-                <span>{r.title || 'Untitled recipe'}</span>
-                <em>{Math.round(r.protein || 0)} g protein · {Math.round(r.kcal || 0)} kcal</em>
-              </button>
-            ))}
-            {!rows.length && <div className="upg-fine">Nothing matches that.</div>}
+          <div className="upg-chipset" role="tablist">
+            <button type="button" role="tab" aria-selected={tab === 'recipes'} className={'upg-opt' + (tab === 'recipes' ? ' is-on' : '')}
+                    onClick={() => { setTab('recipes'); setChosen(null); }}>Recipes</button>
+            <button type="button" role="tab" aria-selected={tab === 'food'} className={'upg-opt' + (tab === 'food' ? ' is-on' : '')}
+                    onClick={() => setTab('food')}>Search food</button>
           </div>
+          <input className="upg-search" value={q} autoFocus onChange={e => { setQ(e.target.value); setChosen(null); }}
+                 placeholder={tab === 'recipes' ? 'Search your recipes' : 'Search foods, e.g. banana, whey, Greek yoghurt'} />
+
+          {tab === 'recipes' && (
+            <>
+              <span className="upg-fine">Most protein per calorie first. One serving each; change it on the day.</span>
+              <div className="upg-rvid-list" style={{ maxHeight: 'none' }}>
+                {recipeRows.map(r => (
+                  <button key={r.id} type="button" className="upg-rvid-opt upg-pick-row" onClick={() => onPick({ recipeId: r.id })}>
+                    <span>{r.title || 'Untitled recipe'}</span>
+                    <em>{Math.round(r.protein || 0)} g protein · {Math.round(r.kcal || 0)} kcal</em>
+                  </button>
+                ))}
+                {!recipeRows.length && <div className="upg-fine">{recipes.length ? 'Nothing matches that.' : 'No recipes yet. Search a food instead.'}</div>}
+              </div>
+            </>
+          )}
+
+          {tab === 'food' && !chosen && (
+            <>
+              {q.trim().length < 2 && quick.length > 0 && (
+                <div className="upg-quick">
+                  <span className="upg-fine">Planned before, one tap</span>
+                  <div className="upg-quick-row">
+                    {quick.map((f, i) => (
+                      <span key={`${f.name}-${f.amount}-${i}`} className="upg-quick-chip">
+                        <button type="button" onClick={() => onPick({ food: f })}>
+                          {f.name} <em>{f.portion === 'serving' ? '1 serving' : `${f.amount} ${f.unit}`} · {Math.round(f.protein)} g P</em>
+                        </button>
+                        <button type="button" className="upg-quick-x" aria-label={`Forget ${f.name}`} onClick={() => onForget(f)}>✕</button>
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+              {busy && <div className="upg-fine"><span className="upg-spin" aria-hidden="true" /> Searching…</div>}
+              {err && <div className="upg-fine" style={{ color: '#e0796a' }}>{err}</div>}
+              <div className="upg-rvid-list" style={{ maxHeight: 'none' }}>
+                {results.map((f, i) => (
+                  <button key={`${f.food_name}-${f.brand}-${i}`} type="button" className="upg-rvid-opt upg-pick-row"
+                          onClick={() => { setChosen(f); setGrams(''); }}>
+                    <span>{f.food_name}{f.brand ? <i className="upg-brand"> · {f.brand}</i> : null}</span>
+                    <em>{Math.round(f.protein_g || 0)} g protein · {Math.round(f.calories || 0)} kcal per {Math.round(f.serving_g || 100)} {f.serving_unit === 'ml' ? 'ml' : 'g'}</em>
+                  </button>
+                ))}
+                {!busy && !err && q.trim().length >= 2 && !results.length && <div className="upg-fine">No foods found.</div>}
+              </div>
+            </>
+          )}
+
+          {tab === 'food' && chosen && (
+            <div className="upg-portion">
+              <b>{chosen.food_name}</b>
+              {chosen.brand && <span className="upg-fine">{chosen.brand}</span>}
+              <span className="upg-fine">How much, per time you eat it?</span>
+              <div className="upg-chipset">
+                {portionOptions(chosen).map(o => {
+                  const f = planFood(chosen, o);
+                  return (
+                    <button key={o.label} type="button" className="upg-opt" onClick={() => onPick({ food: f })}>
+                      {o.label} · {Math.round(f.protein)} g P · {f.kcal} kcal
+                    </button>
+                  );
+                })}
+              </div>
+              <div className="upg-logrow">
+                <label className="upg-num" style={{ flex: '0 0 130px' }}>
+                  <span>Or an amount ({chosen.serving_unit === 'ml' ? 'ml' : 'g'})</span>
+                  <input type="number" min="1" value={grams} onChange={e => setGrams(e.target.value)} />
+                </label>
+                <button type="button" className="link-open-btn" disabled={!(Number(grams) > 0)}
+                        onClick={() => onPick({ food: planFood(chosen, { portion: 'amount', amount: Number(grams) }) })}>Add</button>
+                <button type="button" className="upg-textbtn" onClick={() => setChosen(null)}>Back</button>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Your own pack sizes and prices for an item, replacing the typical ones.
+ */
+function PackEditor({ item, prefs, onSave, onClose }) {
+  const typical = (catalogueFor(item.ikey) || { packs: {} }).packs[item.family] || [];
+  const mine = ((prefs.packs || {})[item.ikey] || {})[item.family];
+  const [rows, setRows] = useState(() => (mine || typical).map(p => ({ size: String(p.size), price: String(p.price), label: p.label || '' })));
+  const unit = item.family === 'x' ? 'count' : item.family;
+  const clean = rows.map(r => ({ size: Number(r.size), price: Number(r.price), ...(r.label ? { label: r.label } : {}) }))
+    .filter(r => r.size > 0 && r.price >= 0);
+  const set = (i, k, v) => setRows(rs => rs.map((r, j) => (j === i ? { ...r, [k]: v, ...(k === 'size' ? { label: '' } : {}) } : r)));
+  return (
+    <div className="modal-overlay open" onClick={onClose} role="presentation">
+      <div className="modal upg-sheet" onClick={e => e.stopPropagation()} role="dialog" aria-modal="true" aria-label={`Packs for ${item.item}`}>
+        <div className="upg-day-head">
+          <h3 style={{ margin: 0, fontSize: 16 }}>Packs · {item.item}</h3>
+          <button type="button" className="link-del-btn" onClick={onClose} aria-label="Close">✕</button>
+        </div>
+        <div className="upg-sheet-body">
+          <span className="upg-fine">The sizes your shop sells and what they cost. The list picks the cheapest mix that covers {item.amount}.</span>
+          <div className="upg-packs">
+            <span>Size ({unit})</span><span>Price (£)</span><span />
+            {rows.map((r, i) => (
+              <div key={i} className="upg-packs-row">
+                <input type="number" min="0" value={r.size} onChange={e => set(i, 'size', e.target.value)} aria-label="Pack size" />
+                <input type="number" min="0" step="0.01" value={r.price} onChange={e => set(i, 'price', e.target.value)} aria-label="Pack price" />
+                <button type="button" className="link-del-btn" aria-label="Remove pack" onClick={() => setRows(rs => rs.filter((_, j) => j !== i))}>✕</button>
+              </div>
+            ))}
+          </div>
+          <button type="button" className="upg-textbtn" style={{ alignSelf: 'flex-start' }} onClick={() => setRows(rs => [...rs, { size: '', price: '', label: '' }])}>+ Add a pack size</button>
+        </div>
+        <div className="upg-day-actions">
+          {mine && <button type="button" className="upg-textbtn" onClick={() => onSave(null)}>Use typical prices</button>}
+          <button type="button" className="link-open-btn" onClick={() => onSave(clean.length ? clean : null)}>Save</button>
         </div>
       </div>
     </div>

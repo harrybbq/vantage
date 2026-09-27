@@ -11,9 +11,12 @@
  *   Diet     — the macro plan and the physique it is aimed at
  *   Career   — certifications, CV, and deliberate practice
  *
- * Tabs mirror AchievementsSection's goals/savings pair, down to the
- * class names, so the two owner-facing multi-tab pages behave
- * identically rather than each inventing a convention.
+ * It opens on a home menu (UpgradeHome): a large title and one card per
+ * section with a live line, rather than a tab strip — Upgrade is a small
+ * app of its own inside Vantage. A card opens its section full-width with
+ * a slim "‹ Upgrade" header; the browser's or phone's back gesture also
+ * returns to the menu (one history entry per opened section). Which
+ * section is open is not stored anywhere: the menu always comes first.
  *
  * Gating: entry points only render for the owner and this re-checks
  * isOwner, so a deep link shows nothing for anyone else. Owner identity
@@ -21,29 +24,45 @@
  * planning data in the user's own state, so there is nothing to
  * server-side authorise, but do not put secrets in it.
  */
-import { useState } from 'react';
-import { motion } from 'framer-motion';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useIsMobile } from '../../hooks/useIsMobile';
-import SectionHelp from '../SectionHelp';
+import Icon from '../Icon';
 import RotationTab from './RotationTab';
 import DietTab from './DietTab';
 import CareerTab from './CareerTab';
 import ReviewTab from './ReviewTab';
+import UpgradeHome, { SECTIONS } from './UpgradeHome';
 import './Upgrade.css';
-
-const TABS = [
-  { id: 'rotation', label: 'Rotation' },
-  { id: 'diet', label: 'Diet' },
-  { id: 'career', label: 'Career' },
-  // Not personal planning like the other three — this one moderates
-  // something other people can see. Its data lives on the server and
-  // the server re-checks who is asking; the tab is only the door.
-  { id: 'review', label: 'Review' },
-];
 
 export default function UpgradeSection({ S, update, active, isOwner, userId }) {
   const isMobile = useIsMobile();
-  const [tab, setTab] = useState('rotation');
+  const [tab, setTab] = useState(null);           // null = the home menu
+  const [origin, setOrigin] = useState('50% 30%');
+  const pushed = useRef(false);
+  const root = useRef(null);
+
+  // Back (browser or phone gesture) closes the open section.
+  useEffect(() => {
+    const onPop = () => { if (pushed.current) { pushed.current = false; setTab(null); } };
+    window.addEventListener('popstate', onPop);
+    return () => window.removeEventListener('popstate', onPop);
+  }, []);
+
+  const open = useCallback((id, rect) => {
+    const box = root.current && root.current.getBoundingClientRect();
+    if (rect && box) {
+      const x = ((rect.left + rect.width / 2 - box.left) / Math.max(1, box.width)) * 100;
+      const y = rect.top + rect.height / 2 - box.top;
+      setOrigin(`${x.toFixed(1)}% ${Math.max(0, y).toFixed(0)}px`);
+    }
+    setTab(id);
+    try { window.history.pushState({ upgrade: id }, ''); pushed.current = true; } catch { /* sandboxed */ }
+    window.scrollTo({ top: 0 });
+  }, []);
+  const back = useCallback(() => {
+    if (pushed.current) window.history.back();   // popstate closes it
+    else setTab(null);
+  }, []);
 
   if (!isOwner) {
     return (
@@ -53,48 +72,27 @@ export default function UpgradeSection({ S, update, active, isOwner, userId }) {
     );
   }
 
+  const cur = SECTIONS.find(x => x.id === tab) || null;
+
   return (
-    <section id="upgrade" className={`section${active ? ' active' : ''}`}>
-      <motion.div
-        style={{ marginBottom: isMobile ? '10px' : '16px' }}
-        initial={{ opacity: 0, y: 20 }}
-        whileInView={{ opacity: 1, y: 0 }}
-        viewport={{ once: true }}
-        transition={{ duration: 0.4, ease: 'easeOut' }}
-      >
-        <div className="eyebrow">Owner</div>
-        <div className="sec-title">
-          Upgrade
-          <SectionHelp
-            title="Upgrade"
-            rows={[
-              { term: 'Rotation', def: 'The 16-day cycle with training on it. Tap a day to swap or book leave.' },
-              { term: 'Diet', def: 'Macro targets and the build they are aimed at.' },
-              { term: 'Career', def: 'Certifications, CV, and LeetCode and KQL practice.' },
-              { term: 'Review', def: 'Group pictures the automatic screen could not decide. Normally empty.' },
-            ]}
-          />
+    <section id="upgrade" ref={root} className={`section upg-app${active ? ' active' : ''}${cur ? ' is-open' : ''}`}>
+      {!cur && <UpgradeHome S={S} userId={userId} onOpen={open} />}
+      {cur && (
+        <div className="uh-open" style={{ transformOrigin: origin }}>
+          <div className="uh-open-head">
+            <button type="button" className="uh-back" onClick={back} aria-label="Back to Upgrade">
+              <Icon name="chevron-left" size={16} /> Upgrade
+            </button>
+            <span className="uh-open-sep" aria-hidden="true" />
+            <span className={`uh-open-icon tone-${cur.tone}`}><Icon name={cur.icon} size={15} /></span>
+            <h2 className="uh-open-name">{cur.name}</h2>
+          </div>
+          {tab === 'rotation' && <RotationTab S={S} update={update} isMobile={isMobile} />}
+          {tab === 'diet' && <DietTab S={S} update={update} userId={userId} isMobile={isMobile} />}
+          {tab === 'career' && <CareerTab S={S} update={update} userId={userId} isMobile={isMobile} />}
+          {tab === 'review' && <ReviewTab />}
         </div>
-      </motion.div>
-
-      <div className="ach-tabs-row upg-tabs-row">
-        <div className="ach-tabs" role="tablist">
-          {TABS.map(t => (
-            <button
-              key={t.id}
-              role="tab"
-              aria-selected={tab === t.id}
-              className={`ach-tab${tab === t.id ? ' is-active' : ''}`}
-              onClick={() => setTab(t.id)}
-            >{t.label}</button>
-          ))}
-        </div>
-      </div>
-
-      {tab === 'rotation' && <RotationTab S={S} update={update} isMobile={isMobile} />}
-      {tab === 'diet' && <DietTab S={S} update={update} userId={userId} isMobile={isMobile} />}
-      {tab === 'career' && <CareerTab S={S} update={update} userId={userId} isMobile={isMobile} />}
-      {tab === 'review' && <ReviewTab />}
+      )}
     </section>
   );
 }

@@ -118,7 +118,7 @@ export function aggregate(rows) {
       const p = parseLine(raw);
       if (!p || !p.key) continue;
       const k = p.base == null ? `?|${p.key}` : `${p.family}|${p.key}`;
-      const g = groups.get(k) || { key: k, ikey: p.key, item: p.item.split(',')[0].trim(), family: p.base == null ? null : p.family, base: p.base == null ? null : 0, from: [] };
+      const g = groups.get(k) || { key: k, ikey: p.key, raw: p.raw, item: p.item.split(',')[0].trim(), family: p.base == null ? null : p.family, base: p.base == null ? null : 0, from: [] };
       if (p.base != null) g.base += p.base * factor;
       if (from && !g.from.includes(from)) g.from.push(from);
       groups.set(k, g);

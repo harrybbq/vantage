@@ -87,7 +87,6 @@ async function searchUSDA(q, page, env) {
     + '&dataType=Branded,Foundation,SR%20Legacy,Survey%20(FNDDS)';
   const json = await fetchJson(url);
   return (json.foods || []).map(f => {
-    // USDA reports per 100g for Branded, per serving for some others.
     const by = {};
     for (const n of f.foodNutrients || []) {
       by[n.nutrientName || n.nutrientId] = n.value;
@@ -96,19 +95,24 @@ async function searchUSDA(q, page, env) {
       for (const n of names) if (by[n] != null) return by[n];
       return 0;
     };
+    // Search results carry nutrients per 100 g/ml; servingSize is the
+    // pack's serving. Values are scaled to it, because every client reads
+    // them as being FOR serving_g (see food-search mapProduct).
+    const servingG = num(f.servingSize) || 100;
+    const k = servingG / 100;
     return food({
       name: f.description,
       brand: f.brandName || f.brandOwner || '',
       barcode: f.gtinUpc || '',
-      servingG: num(f.servingSize) || 100,
+      servingG,
       servingUnit: /ml|milliliter/i.test(f.servingSizeUnit || '') ? 'ml' : 'g',
-      kcal: pick('Energy', 'Energy (Atwater General Factors)'),
-      protein: pick('Protein'),
-      carbs: pick('Carbohydrate, by difference'),
-      fat: pick('Total lipid (fat)'),
-      fibre: pick('Fiber, total dietary'),
-      sugar: pick('Sugars, total including NLEA', 'Total Sugars'),
-      sodiumMg: pick('Sodium, Na'),
+      kcal: pick('Energy', 'Energy (Atwater General Factors)') * k,
+      protein: pick('Protein') * k,
+      carbs: pick('Carbohydrate, by difference') * k,
+      fat: pick('Total lipid (fat)') * k,
+      fibre: pick('Fiber, total dietary') * k,
+      sugar: pick('Sugars, total including NLEA', 'Total Sugars') * k,
+      sodiumMg: pick('Sodium, Na') * k,
       source: 'usda',
     });
   });
