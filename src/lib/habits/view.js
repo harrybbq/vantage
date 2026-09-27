@@ -70,3 +70,32 @@ export function resetsLabel(cur) {
   if (cur.per === 'month') return `resets ${d} ${dt.toLocaleDateString('en-GB', { month: 'short' })}`;
   return 'resets Mon';
 }
+
+/**
+ * "7 d" / "3 wk" — how long until the ladder reaches `targetMs`, in the
+ * habit's own units (Cut down counts whole periods; a week only counts
+ * when it closes). null when it is already reached.
+ */
+export function etaLabel(h, v, targetMs) {
+  const left = targetMs - v.elapsed;
+  if (!(left > 0)) return null;
+  if (v.cut) {
+    const per = budgetOf(h).per;
+    const n = Math.max(1, Math.ceil(left / PERIOD_MS[per]));
+    return `${n} ${per === 'month' ? 'mo' : 'wk'}`;
+  }
+  return shortSpan(left);
+}
+
+/** The gap to the ghost (or past it), in the habit's units. */
+export function gapLabel(h, v) {
+  const d = Math.abs(v.bestMs - v.elapsed);
+  if (v.cut) {
+    const per = budgetOf(h).per;
+    return `${Math.max(1, Math.round(d / PERIOD_MS[per]))} ${per === 'month' ? 'mo' : 'wk'}`;
+  }
+  return shortSpan(d);
+}
+
+/** Week thresholds matching the runner's day stages (see weeksToDays). */
+export const STAGE_WEEKS = [0, 1, 2, 4, 8, 13];

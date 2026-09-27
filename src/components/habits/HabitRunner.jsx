@@ -45,7 +45,7 @@ import { useEffect, useRef } from 'react';
 // `cadence` is rad/s of stride phase; one cycle = 2 steps, so
 // steps/sec = cadence / π. Walk ≈ 1.7/s, run ≈ 2.9/s (~175 spm).
 const RUN = { speed: 78, cadence: 9.2, amp: 0.85, gait: 1 };
-const STAGES = [
+export const STAGES = [
   { at: 0,  label: 'Walking',      speed: 22, cadence: 5.4, amp: 0.38, gait: 0,    kinds: [] },
   { at: 1,  label: 'Brisk walk',   speed: 34, cadence: 6.4, amp: 0.52, gait: 0.3,  kinds: [] },
   { at: 4,  label: 'Jogging',      speed: 55, cadence: 7.8, amp: 0.68, gait: 0.65, kinds: [] },
@@ -524,9 +524,12 @@ function drawScenery(ctx, w, g, level, dist, pal) {
  * pbAt     0..1 — where a beaten best sits (gold PB flag), or null
  * flagKey  bump it to plant one planned-day flag ahead
  * scenery  days of the run for the backdrop, or null for none
+ * scale    draws the whole lane — the same figure, course and scenery —
+ *          this many times larger (the Habits page's hero lane uses 1.6).
+ *          Nothing about the figure changes but its size.
  */
 export default function HabitRunner({ progress, days, colour, done, endless = false, stumbleKey,
-  ghost = null, pbAt = null, flagKey, scenery = null }) {
+  ghost = null, pbAt = null, flagKey, scenery = null, scale = 1 }) {
   const canvasRef = useRef(null);
   const stateRef = useRef({
     obstacles: [], action: null, spawnGap: 170,
@@ -566,13 +569,17 @@ export default function HabitRunner({ progress, days, colour, done, endless = fa
     const reduced = window.matchMedia('(prefers-reduced-motion: reduce)');
     let w = 0, h = 0;
 
+    // `w`/`h` are the lane in FIGURE units: at scale 1.6 a 180px lane is
+    // 112 units tall and everything is drawn 1.6× — backing store stays
+    // at device resolution so the larger figure is just as crisp.
     const resize = () => {
       const r = canvas.getBoundingClientRect();
       const dpr = Math.min(2, window.devicePixelRatio || 1);
-      w = r.width; h = r.height;
-      canvas.width = Math.round(w * dpr);
-      canvas.height = Math.round(h * dpr);
-      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      const k = scale > 0 ? scale : 1;
+      w = r.width / k; h = r.height / k;
+      canvas.width = Math.round(r.width * dpr);
+      canvas.height = Math.round(r.height * dpr);
+      ctx.setTransform(dpr * k, 0, 0, dpr * k, 0, 0);
     };
     resize();
     const ro = new ResizeObserver(resize);
@@ -878,7 +885,7 @@ export default function HabitRunner({ progress, days, colour, done, endless = fa
       document.removeEventListener('visibilitychange', onVis);
       ro.disconnect(); io.disconnect(); mo.disconnect();
     };
-  }, []);
+  }, [scale]);
 
   return <canvas ref={canvasRef} className="habit-lane-canvas" aria-hidden="true" />;
 }
