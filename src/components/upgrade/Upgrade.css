@@ -1367,6 +1367,7 @@ html[data-theme="dark-os"] .upg-app .career-pane { --cp-bg: #171715; }
 .upg-store em { font-style: normal; font-family: var(--mono); font-size: 9.5px; color: var(--em); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
 .upg-store em.is-gap { color: #e0796a; }
 .upg-store.is-on { border-color: var(--em); background: rgba(var(--em-rgb),.1); }
+.upg-store-as { font-style: normal; font-family: var(--mono); font-size: 9px; color: var(--text-muted); }
 .upg-store:focus-visible { outline: 2px solid var(--em); outline-offset: 2px; }
 .upg-running { display: flex; gap: 22px; flex-wrap: wrap; margin: 12px 0 6px; padding: 10px 12px; border-radius: 10px;
   background: rgba(var(--em-rgb),.06); }

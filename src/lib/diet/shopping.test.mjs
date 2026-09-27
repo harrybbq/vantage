@@ -1,6 +1,6 @@
 /** Pack rounding and the seasonings split. Invented prices in tests. */
 import assert from 'node:assert/strict';
-import { bestPacks, isSeasoning, catalogueFor, shopPlan, picksLabel, packsAt, itemAt, swapAt, elsewhere, STORES } from './shopping.js';
+import { bestPacks, isSeasoning, catalogueFor, shopPlan, picksLabel, packsAt, itemAt, swapAt, elsewhere, STORES, PRICED_AS } from './shopping.js';
 import { aggregate } from './ingredients.js';
 
 let n = 0;
@@ -94,7 +94,14 @@ t('your corrections win: your price at a shop, or "not stocked"', () => {
   assert.equal(itemAt(it, 'aldi', { packs: { 'beef mince': { g: [{ size: 1500, price: 6 }] } } }).own, true, 'older all-shop packs still apply');
   assert.equal(itemAt({ ikey: 'dragonfruit', family: 'g', base: 600 }, 'tesco').status, 'unpriced');
   assert.equal(swapAt({ ikey: 'dragonfruit', family: 'g', base: 600 }, 'tesco'), null);
-  assert.equal(elsewhere(it, 'tesco').store, 'lidl');
+  assert.equal(elsewhere(it, 'tesco').store, 'morrisons', 'Morrisons, Aldi and Lidl all come to £9.75; first listed wins');
+});
+
+t('Lidl reads Aldi’s verified prices until it has its own', () => {
+  assert.equal(PRICED_AS.lidl, 'aldi');
+  assert.deepEqual(packsAt(catalogueFor('turkey mince'), 'g', 'lidl'), packsAt(catalogueFor('turkey mince'), 'g', 'aldi'));
+  const it = { ikey: 'turkey mince', family: 'g', base: 600 };
+  assert.equal(itemAt(it, 'lidl', { storePacks: { lidl: { 'turkey mince': { g: [{ size: 500, price: 2.5 }] } } } }).best.cost, 5, 'your Lidl price still wins');
 });
 
 console.log(`shopping: ${n} passed`);

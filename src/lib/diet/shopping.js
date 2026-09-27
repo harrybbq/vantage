@@ -26,6 +26,17 @@
  */
 
 export const PRICES_AS_OF = 'Sep 2026';
+
+/**
+ * Shops whose own prices couldn't be checked, and whose verified table
+ * stands in for them. Lidl UK doesn't list grocery prices online, so
+ * the Sep 2026 refresh verified Tesco, Morrisons and Aldi only; left on
+ * guesses, Lidl undercut the checked prices and won every comparison.
+ * Aldi and Lidl price own-brand basics very closely, so Lidl reads
+ * Aldi's column until real Lidl prices are entered (per item, those
+ * always win). Remove the entry once the Lidl column is verified.
+ */
+export const PRICED_AS = { lidl: 'aldi' };
 export const STORES = [
   { id: 'tesco', name: 'Tesco' },
   { id: 'morrisons', name: 'Morrisons' },
@@ -152,9 +163,10 @@ export function catalogueFor(ikey) {
 
 /** A catalogue entry's packs at one shop → [{ size, price, label }] (sizes it sells). */
 export function packsAt(entry, family, store) {
+  const col = PRICED_AS[store] || store;
   return ((entry && entry.packs[family]) || [])
-    .filter(p => p.prices[store] != null)
-    .map(p => ({ size: p.size, price: p.prices[store], ...(p.label ? { label: p.label } : {}) }));
+    .filter(p => p.prices[col] != null)
+    .map(p => ({ size: p.size, price: p.prices[col], ...(p.label ? { label: p.label } : {}) }));
 }
 
 /**

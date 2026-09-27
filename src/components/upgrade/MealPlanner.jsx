@@ -22,7 +22,7 @@ import {
   planDays, nextShiftBlock, targetsFor, dayStatus, suggest, batchesOf, shoppingList, EMPTY_PLAN,
   portionOptions, planFood, rememberFood,
 } from '../../lib/diet/planner';
-import { shopPlan, packLabel, catalogueFor, packsAt, storeName, STORES, PRICES_AS_OF } from '../../lib/diet/shopping';
+import { shopPlan, packLabel, catalogueFor, packsAt, storeName, STORES, PRICES_AS_OF, PRICED_AS } from '../../lib/diet/shopping';
 import { searchByName, readCommunityPref } from '../../lib/diet/foodSearch';
 
 const uid = () => Math.random().toString(36).slice(2, 10) + Date.now().toString(36).slice(-4);
@@ -273,6 +273,7 @@ export default function MealPlanner({ S, update, plan, proteinG }) {
                   <em className={x.missing.length ? 'is-gap' : ''}>
                     {x.missing.length ? `+ ${x.missing.length} elsewhere` : cheapest && cheapest.id === x.id ? 'cheapest' : 'has it all'}
                   </em>
+                  {PRICED_AS[x.id] && <i className="upg-store-as">priced as {storeName(PRICED_AS[x.id])}</i>}
                 </button>
               ))}
             </div>
@@ -291,7 +292,11 @@ export default function MealPlanner({ S, update, plan, proteinG }) {
                 </span>
               </div>
             )}
-            <div className="upg-fine">Prices are estimates for {PRICES_AS_OF}, not live. Set a shop’s real price on any item, or mark it not stocked there, and the list uses yours.</div>
+            <div className="upg-fine">
+              Shelf prices checked on the {(n => (n.length > 1 ? `${n.slice(0, -1).join(', ')} and ${n[n.length - 1]}` : n[0]))(STORES.filter(x => !PRICED_AS[x.id]).map(x => x.name))} websites, {PRICES_AS_OF}; not live.
+              {Object.keys(PRICED_AS).length > 0 && ` ${Object.entries(PRICED_AS).map(([a, b]) => `${storeName(a)} doesn’t list prices online, so it uses ${storeName(b)}’s`).join('; ')}.`}
+              {' '}Set a shop’s real price on any item, or mark it not stocked there, and the list uses yours.
+            </div>
             {shop.missing.length > 0 && (
               <div className="upg-setup">
                 <Icon name="triangle-alert" size={13} /> No ingredients yet for {shop.missing.map(r => r.title || 'Untitled recipe').join(', ')}. Add them, or link the video and read them in, in Recipes.

@@ -148,3 +148,7 @@ no live feed by the owner's choice. Every four months or so, review the
 table, update the prices and `PRICES_AS_OF`, and keep `shopping.test.mjs`
 passing. The owner's own corrections (`S.shopPrefs.storePacks`, `.out`)
 always win over the table, so a refresh never overrides them.
+Last refresh: Sep 2026 (#219), Tesco/Morrisons/Aldi checked on their
+websites. Lidl UK lists no grocery prices online, so `PRICED_AS` makes
+Lidl read Aldi's column; drop that entry once Lidl prices are verified
+(Lidl Plus app or a receipt).
