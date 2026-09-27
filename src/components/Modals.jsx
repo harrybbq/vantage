@@ -3,6 +3,7 @@ import { supabase } from '../lib/supabase';
 import AddMobileWidgetModal from './mobile/AddMobileWidgetModal';
 import { appPresetToLink, visibleAppPresets } from '../data/appPresets';
 import { applyRelapse } from '../lib/habits/relapse';
+import { toCut, toQuit, isoDay } from '../lib/habits/cutdown';
 import PrimePicker from './widgets/prime/PrimePicker';
 import { isSuperseded } from '../lib/hub/primeBlocks';
 import { useSubscriptionContext } from '../context/SubscriptionContext';
@@ -1318,8 +1319,12 @@ function EditHolidayModal({ openId, onClose, holidays, onEdit, onDelete, S }) {
 const HABIT_SWATCHES = ['#1a7a4a', '#2d6cdf', '#c84040', '#d99114', '#7a4fd0', '#12a5a5', '#d0498f', '#5a6472'];
 
 function AddHabitModal({ openId, onClose, onAdd }) {
-  const emptyMs = (coins = '') => ({ _id: 'ms' + Date.now() + Math.random(), amount: '1', unit: 'weeks', coins });
-  const freshForm = () => ({ name: '', color: '#1a7a4a', endless: false, strikes: '0', strikesUnit: 'week', milestones: [emptyMs('20')] });
+  const emptyMs = (coins = '', amount = '1', unit = 'weeks') => ({ _id: 'ms' + Date.now() + Math.random(), amount, unit, coins });
+  // A Cut-down habit's milestones count periods on target, so its starter
+  // ladder is in weeks: a fortnight, a month's worth, a quarter.
+  const cutLadder = () => [emptyMs('20', '2'), emptyMs('40', '4'), emptyMs('100', '13')];
+  const freshForm = () => ({ name: '', color: '#1a7a4a', endless: false, strikes: '0', strikesUnit: 'week',
+    kind: 'quit', budgetMax: '2', budgetPer: 'week', msTouched: false, milestones: [emptyMs('20')] });
   const [form, setForm] = useState(freshForm);
   const [open, setOpen] = useState({ rewards: false, allowance: false });
   const customColorRef = useRef(null);
@@ -1341,24 +1346,35 @@ function AddHabitModal({ openId, onClose, onAdd }) {
     return `${n} ${n === 1 ? s[unit] : unit}`;
   }
   function updateMs(_id, key, val) {
-    setForm(f => ({ ...f, milestones: f.milestones.map(m => m._id === _id ? { ...m, [key]: val } : m) }));
+    setForm(f => ({ ...f, msTouched: true, milestones: f.milestones.map(m => m._id === _id ? { ...m, [key]: val } : m) }));
   }
   function removeMs(_id) {
-    setForm(f => ({ ...f, milestones: f.milestones.filter(m => m._id !== _id) }));
+    setForm(f => ({ ...f, msTouched: true, milestones: f.milestones.filter(m => m._id !== _id) }));
   }
+  function setKind(kind) {
+    setForm(f => ({
+      ...f, kind,
+      // Swap the starter ladder with the type, unless it has been edited.
+      milestones: f.msTouched ? f.milestones : (kind === 'cut' ? cutLadder() : [emptyMs('20')]),
+    }));
+  }
+  // Cut down: milestone units follow the budget's period.
+  const cutUnit = form.budgetPer === 'month' ? 'months' : 'weeks';
 
   function submit() {
     if (!form.name.trim()) return;
+    const cut = form.kind === 'cut';
     const milestones = form.milestones
       .filter(m => m.amount && m.coins && parseInt(m.coins) > 0)
       .map((m, i) => ({
         id: 'm' + Date.now() + i,
-        duration: toDuration(parseInt(m.amount), m.unit),
+        duration: toDuration(parseInt(m.amount), cut ? cutUnit : m.unit),
         coins: parseInt(m.coins),
-        label: msLabel(parseInt(m.amount), m.unit),
+        label: msLabel(parseInt(m.amount), cut ? cutUnit : m.unit),
         awarded: false,
       }))
       .sort((a, b) => a.duration - b.duration);
+    const now = Date.now();
     onAdd({
       id: 'hb' + Date.now(),
       name: form.name.trim(),
@@ -1366,10 +1382,16 @@ function AddHabitModal({ openId, onClose, onAdd }) {
       endless: form.endless,
       startTime: Date.now(),
       relapseCount: 0,
-      strikesAllowed: parseInt(form.strikes) || 0,
+      strikesAllowed: cut ? 0 : parseInt(form.strikes) || 0,
       strikesPeriod: form.strikesUnit,
       strikeTimes: [],
       milestones,
+      ...(cut ? {
+        kind: 'cut',
+        budget: { max: Math.max(0, parseInt(form.budgetMax) || 0), per: form.budgetPer === 'month' ? 'month' : 'week' },
+        budgetSince: isoDay(now),
+        useDays: [],
+      } : {}),
     });
     setForm(freshForm());
     setOpen({ rewards: false, allowance: false });
@@ -1382,7 +1404,7 @@ function AddHabitModal({ openId, onClose, onAdd }) {
   const rewardsSummary = !validMs.length
     ? 'None'
     : validMs.length === 1
-      ? `${msLabel(parseInt(validMs[0].amount), validMs[0].unit)} → ⬡ ${validMs[0].coins}`
+      ? `${msLabel(parseInt(validMs[0].amount), form.kind === 'cut' ? cutUnit : validMs[0].unit)} → ⬡ ${validMs[0].coins}`
       : `${validMs.length} milestones`;
   const strikesN = parseInt(form.strikes) || 0;
   const allowanceSummary = strikesN > 0
@@ -1392,14 +1414,39 @@ function AddHabitModal({ openId, onClose, onAdd }) {
   return (
     <Modal id="addHabitModal" openId={openId} onClose={onClose} style={{ maxWidth: '460px' }}>
       <h3>New Habit</h3>
-      <div style={{ fontSize: '12px', color: 'var(--text-muted)', margin: '-6px 0 16px' }}>
-        Your clean-time counter starts the moment you hit Start.
+      <div className="habit-kind-seg" role="radiogroup" aria-label="Habit type">
+        <button type="button" role="radio" aria-checked={form.kind === 'quit'} className={form.kind === 'quit' ? 'is-on' : ''} onClick={() => setKind('quit')}>
+          <b>Quit it</b><span>A timer from your last relapse</span>
+        </button>
+        <button type="button" role="radio" aria-checked={form.kind === 'cut'} className={form.kind === 'cut' ? 'is-on' : ''} onClick={() => setKind('cut')}>
+          <b>Cut down</b><span>A budget, e.g. 2 days a week</span>
+        </button>
+      </div>
+      <div style={{ fontSize: '12px', color: 'var(--text-muted)', margin: '0 0 16px' }}>
+        {form.kind === 'cut'
+          ? 'Log the days you have one. Nothing resets; every week you stay within budget moves the runner on.'
+          : 'Your clean-time counter starts the moment you hit Start.'}
       </div>
 
       <div className="fg">
-        <label>What are you quitting?</label>
+        <label>{form.kind === 'cut' ? 'What are you cutting down?' : 'What are you quitting?'}</label>
         <input ref={nameRef} type="text" placeholder="e.g. Alcohol, Fast Food, Smoking..." value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} />
       </div>
+
+      {form.kind === 'cut' && (
+        <div className="fg">
+          <label>Budget</label>
+          <div className="habit-ms-row">
+            <span className="habit-ms-word">Up to</span>
+            <input type="number" min="0" max="31" value={form.budgetMax} onChange={e => setForm(f => ({ ...f, budgetMax: e.target.value }))} className="habit-ms-num" aria-label="Days allowed" />
+            <span className="habit-ms-word">days per</span>
+            <select value={form.budgetPer} onChange={e => setForm(f => ({ ...f, budgetPer: e.target.value }))} className="habit-ms-unit" aria-label="Budget period">
+              <option value="week">week</option>
+              <option value="month">month</option>
+            </select>
+          </div>
+        </div>
+      )}
 
       <div className="fg">
         <label>Colour</label>
@@ -1430,7 +1477,7 @@ function AddHabitModal({ openId, onClose, onAdd }) {
         <button type="button" className="habit-opt-head" onClick={() => setOpen(o => ({ ...o, rewards: !o.rewards }))}>
           <div>
             <div className="habit-opt-title">⬡ Reward milestones</div>
-            <div className="habit-opt-sub">Earn coins for staying clean</div>
+            <div className="habit-opt-sub">{form.kind === 'cut' ? `Earn coins for ${cutUnit} on target` : 'Earn coins for staying clean'}</div>
           </div>
           <span className="habit-opt-sum">{rewardsSummary}</span>
           <span className={`habit-opt-chev${open.rewards ? ' open' : ''}`}><Icon name="chevron-down" size={14} /></span>
@@ -1441,18 +1488,22 @@ function AddHabitModal({ openId, onClose, onAdd }) {
               <div key={m._id} className="habit-ms-row">
                 <span className="habit-ms-word">After</span>
                 <input type="number" min="1" value={m.amount} onChange={e => updateMs(m._id, 'amount', e.target.value)} className="habit-ms-num" />
-                <select value={m.unit} onChange={e => updateMs(m._id, 'unit', e.target.value)} className="habit-ms-unit">
-                  <option value="hours">hours</option>
-                  <option value="days">days</option>
-                  <option value="weeks">weeks</option>
-                  <option value="months">months</option>
-                </select>
+                {form.kind === 'cut' ? (
+                  <span className="habit-ms-word">{cutUnit} on target</span>
+                ) : (
+                  <select value={m.unit} onChange={e => updateMs(m._id, 'unit', e.target.value)} className="habit-ms-unit">
+                    <option value="hours">hours</option>
+                    <option value="days">days</option>
+                    <option value="weeks">weeks</option>
+                    <option value="months">months</option>
+                  </select>
+                )}
                 <span className="habit-ms-word">earn ⬡</span>
                 <input type="number" min="1" placeholder="20" value={m.coins} onChange={e => updateMs(m._id, 'coins', e.target.value)} className="habit-ms-num" />
                 <button type="button" className="habit-ms-del" onClick={() => removeMs(m._id)} aria-label="Remove milestone"><Icon name="x" size={13} /></button>
               </div>
             ))}
-            <button className="btn btn-ghost btn-sm" onClick={() => setForm(f => ({ ...f, milestones: [...f.milestones, emptyMs()] }))} style={{ fontSize: '12px' }}>
+            <button className="btn btn-ghost btn-sm" onClick={() => setForm(f => ({ ...f, msTouched: true, milestones: [...f.milestones, emptyMs()] }))} style={{ fontSize: '12px' }}>
               + Add milestone
             </button>
             <label className="habit-endless-row">
@@ -1463,8 +1514,9 @@ function AddHabitModal({ openId, onClose, onAdd }) {
         )}
       </div>
 
-      {/* Optional: planned allowance (strikes) */}
-      <div className="habit-opt-sec">
+      {/* Optional: planned allowance (strikes) — Quit only; a Cut-down
+          habit's budget is the allowance, and it never resets a timer. */}
+      {form.kind === 'quit' && <div className="habit-opt-sec">
         <button type="button" className="habit-opt-head" onClick={() => setOpen(o => ({ ...o, allowance: !o.allowance }))}>
           <div>
             <div className="habit-opt-title">↻ Planned allowance</div>
@@ -1486,11 +1538,11 @@ function AddHabitModal({ openId, onClose, onAdd }) {
               </select>
             </div>
             <div style={{ fontSize: '11px', color: 'var(--text-muted)', lineHeight: 1.5 }}>
-              A slip-up always restarts your timer, but within your allowance the card shows amber instead of red. The allowance refills every Monday (weekly) or on the 1st (monthly).
+              A slip-up always restarts your timer, but within your allowance the card shows amber instead of red. The allowance refills every Monday (weekly) or on the 1st (monthly). If the slips are part of the plan, choose Cut down instead.
             </div>
           </div>
         )}
-      </div>
+      </div>}
 
       <div className="modal-actions" style={{ marginTop: '18px' }}>
         <button className="btn btn-ghost" onClick={() => onClose('addHabitModal')}>Cancel</button>
@@ -1508,7 +1560,8 @@ function EditHabitModal({ openId, onClose, habits, onEdit, onDelete }) {
   const habit = habitId ? (habits || []).find(h => h.id === habitId) : null;
 
   const emptyMs = () => ({ _id: 'ms' + Date.now() + Math.random(), _existingId: null, amount: '1', unit: 'weeks', coins: '' });
-  const [form, setForm] = useState({ name: '', color: '#1a7a4a', endless: false, milestones: [emptyMs()] });
+  const [form, setForm] = useState({ name: '', color: '#1a7a4a', endless: false, milestones: [emptyMs()],
+    kind: 'quit', budgetMax: '2', budgetPer: 'week', bestDays: '' });
 
   // Convert a stored milestone back into form shape (best-effort unit detection)
   function msFromStored(m) {
@@ -1532,6 +1585,10 @@ function EditHabitModal({ openId, onClose, habits, onEdit, onDelete }) {
         name: habit.name || '',
         color: habit.color || '#1a7a4a',
         endless: !!habit.endless,
+        kind: habit.kind === 'cut' ? 'cut' : 'quit',
+        budgetMax: String(habit.budget?.max ?? habit.strikesAllowed ?? 2),
+        budgetPer: (habit.budget?.per ?? habit.strikesPeriod) === 'month' ? 'month' : 'week',
+        bestDays: habit.bestManualMs ? String(Math.round(habit.bestManualMs / 86400000)) : '',
         milestones: (habit.milestones || []).length
           ? habit.milestones.map(m => {
               const parsed = msFromStored(m);
@@ -1572,11 +1629,25 @@ function EditHabitModal({ openId, onClose, habits, onEdit, onDelete }) {
         awarded: existingAwarded.get(m._existingId) ?? false,
       }))
       .sort((a, b) => a.duration - b.duration);
-    onEdit(habitId, {
-      name: form.name.trim(),
-      color: form.color,
-      endless: form.endless,
-      milestones,
+    const budget = { max: Math.max(0, parseInt(form.budgetMax) || 0), per: form.budgetPer === 'month' ? 'month' : 'week' };
+    const kind = form.kind;
+    const best = parseInt(form.bestDays);
+    // Worked out against the LATEST habit inside the state update, so a
+    // day logged or a relapse while this dialog was open is never undone.
+    // Switching type goes through the converters, which keep the timer,
+    // the history and the logged days, and re-mark milestones without
+    // paying — nothing is deleted either way.
+    onEdit(habitId, h => {
+      let data = { ...h, name: form.name.trim(), color: form.color, endless: form.endless, milestones };
+      const wasCut = h.kind === 'cut';
+      if (kind === 'cut' && !wasCut) data = toCut(data, budget);
+      else if (kind === 'quit' && wasCut) data = toQuit(data);
+      else if (kind === 'cut') data = { ...data, budget };
+      if (kind === 'quit') {
+        if (best > 0) data.bestManualMs = best * 86400000;
+        else if (h.bestManualMs) data.bestManualMs = 0;
+      }
+      return data;
     });
     onClose(openId);
   }
@@ -1597,6 +1668,38 @@ function EditHabitModal({ openId, onClose, habits, onEdit, onDelete }) {
         <h3>Edit Habit</h3>
         <div className="fg"><label>Habit Name</label><input type="text" value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} /></div>
         <div className="fg"><label>Colour</label><input type="color" value={form.color} onChange={e => setForm(f => ({ ...f, color: e.target.value }))} /></div>
+
+        <div className="habit-kind-seg" role="radiogroup" aria-label="Habit type">
+          <button type="button" role="radio" aria-checked={form.kind === 'quit'} className={form.kind === 'quit' ? 'is-on' : ''} onClick={() => setForm(f => ({ ...f, kind: 'quit' }))}>
+            <b>Quit it</b><span>Timer from the last relapse</span>
+          </button>
+          <button type="button" role="radio" aria-checked={form.kind === 'cut'} className={form.kind === 'cut' ? 'is-on' : ''} onClick={() => setForm(f => ({ ...f, kind: 'cut' }))}>
+            <b>Cut down</b><span>A budget of days</span>
+          </button>
+        </div>
+        {form.kind === 'cut' ? (
+          <div className="fg">
+            <label>Budget</label>
+            <div className="habit-ms-row">
+              <span className="habit-ms-word">Up to</span>
+              <input type="number" min="0" max="31" value={form.budgetMax} onChange={e => setForm(f => ({ ...f, budgetMax: e.target.value }))} className="habit-ms-num" aria-label="Days allowed" />
+              <span className="habit-ms-word">days per</span>
+              <select value={form.budgetPer} onChange={e => setForm(f => ({ ...f, budgetPer: e.target.value }))} className="habit-ms-unit" aria-label="Budget period">
+                <option value="week">week</option>
+                <option value="month">month</option>
+              </select>
+            </div>
+            {habit && habit.kind !== 'cut' && (
+              <div className="habit-kind-note">Your timer, history and coins stay as they are. Weeks on target start counting from today, and milestones pay again as they climb.</div>
+            )}
+          </div>
+        ) : (
+          <div className="fg">
+            <label>Best run before now <span style={{ textTransform: 'none', letterSpacing: 0, opacity: .7 }}>(days, optional)</span></label>
+            <input type="number" min="0" placeholder="e.g. 41" value={form.bestDays} onChange={e => setForm(f => ({ ...f, bestDays: e.target.value }))} />
+            <div className="habit-kind-note">Sets the ghost you race. Runs are recorded from now on, so this only matters for your history before.</div>
+          </div>
+        )}
 
         <div style={{ borderTop: '1px solid var(--border-lt)', margin: '14px 0' }}></div>
         <div style={{ fontFamily: 'var(--mono)', fontSize: '10px', color: 'var(--em-mid)', letterSpacing: '2px', textTransform: 'uppercase', marginBottom: '12px' }}>⬡ Reward Milestones</div>
@@ -1984,7 +2087,9 @@ export default function Modals({ openModal, S, update, onClose, onOpen, onShowCo
   function handleEditHabit(id, data) {
     update(prev => ({
       ...prev,
-      habits: (prev.habits || []).map(h => h.id === id ? { ...h, ...data } : h),
+      // `data` is a patch, or a function of the latest habit for edits
+      // that must be worked out against it (a type switch).
+      habits: (prev.habits || []).map(h => h.id === id ? { ...h, ...(typeof data === 'function' ? data(h) : data), id: h.id } : h),
     }));
   }
   function handleDeleteHabit(id) {

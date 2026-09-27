@@ -25,6 +25,7 @@
  * XP per completion via derive.js — that's intentional so people who
  * mostly use the board view still see their level move.
  */
+import { habitElapsed } from '../habits/progress.js';
 
 const DAY_MS = 86_400_000;
 
@@ -33,7 +34,7 @@ function maxHabitDaysClean(S) {
   const now = Date.now();
   return (S.habits || []).reduce((max, h) => {
     if (!h.startTime) return max;
-    const days = Math.floor((now - h.startTime) / DAY_MS);
+    const days = Math.floor(habitElapsed(h, now) / DAY_MS);
     return days > max ? days : max;
   }, 0);
 }

@@ -19,8 +19,16 @@
  *     streak; leaving them awarded would mean passing a week clean again
  *     paid nothing.
  *
+ *   · the run that just ended is appended to `runs` (the newest 60), so
+ *     the best run and the total clean time survive the reset. Before
+ *     this, a relapse took every visible sign of progress with it.
+ *
  * It does NOT touch `name`, `milestones`' definitions, or the strikes
  * allowance — the parts the user decided.
+ *
+ * A Cut-down habit has no timer to restart: a "relapse" from any of the
+ * quick buttons (hub widget, prime card) logs that DAY against the
+ * budget instead, via cutdown.addUse.
  *
  * Returns `prev` BY IDENTITY when there is nothing to do: no such habit,
  * or a timestamp that is not a usable instant. The save pipeline treats
@@ -30,6 +38,8 @@
  * Pure. No React, no DOM.
  */
 import { periodStart } from './strikes.js';
+import { isCut, addUse, isoDay } from './cutdown.js';
+import { MAX_RUNS } from './progress.js';
 
 export function applyRelapse(prev, id, whenTs) {
   const habits = (prev && prev.habits) || [];
@@ -37,6 +47,9 @@ export function applyRelapse(prev, id, whenTs) {
 
   const ts = Number(whenTs);
   if (!Number.isFinite(ts) || ts <= 0) return prev;
+
+  const target = habits.find(h => h && h.id === id);
+  if (isCut(target)) return addUse(prev, id, isoDay(ts), Math.max(Date.now(), ts));
 
   return {
     ...prev,
@@ -47,8 +60,13 @@ export function applyRelapse(prev, id, whenTs) {
       // week's allowance, because that is the allowance being tracked.
       const start = periodStart(h.strikesPeriod, Date.now());
       const recent = [...(h.strikeTimes || []).filter(t => t >= start), ts];
+      const began = Number(h.startTime);
+      const ended = Number.isFinite(began) && ts > began
+        ? [...(Array.isArray(h.runs) ? h.runs : []), { start: began, end: ts }].slice(-MAX_RUNS)
+        : h.runs;
       return {
         ...h,
+        ...(ended ? { runs: ended } : {}),
         startTime: ts,
         strikeTimes: recent,
         relapseCount: (h.relapseCount || 0) + 1,

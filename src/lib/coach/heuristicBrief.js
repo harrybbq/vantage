@@ -7,6 +7,8 @@
  *
  * Pure: given S, returns { focus, watch, micro, source:'heuristic' }.
  */
+import { habitElapsed } from '../habits/progress.js';
+import { isCut } from '../habits/cutdown.js';
 
 const DAY = 86_400_000;
 const todayStr = () => new Date().toISOString().slice(0, 10);
@@ -21,7 +23,7 @@ function topHabit(S) {
   let best = null;
   for (const h of (S.habits || [])) {
     if (!h.startTime) continue;
-    const days = Math.floor((now - h.startTime) / DAY);
+    const days = Math.floor(habitElapsed(h, now) / DAY);
     if (!best || days > best.days) best = { name: h.name, days, h };
   }
   return best;
@@ -38,7 +40,7 @@ function nextMilestone(days) {
 function riskyHabit(S) {
   const now = Date.now();
   for (const h of (S.habits || [])) {
-    if (!h.startTime) continue;
+    if (!h.startTime || isCut(h)) continue;         // a budget has no "relapse risk"
     const days = Math.floor((now - h.startTime) / DAY);
     const relapses = h.relapseCount || 0;
     if (relapses > 0 && days <= 2) return { name: h.name, days };

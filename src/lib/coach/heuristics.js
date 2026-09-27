@@ -20,6 +20,7 @@
  *   body          one-sentence elaboration referencing real numbers
  *   verb?         optional { label, action, args } — wired in App.jsx
  */
+import { habitElapsed } from '../habits/progress.js';
 
 const DAY_MS = 86_400_000;
 
@@ -82,7 +83,7 @@ function trackerTrends(S) {
 // ── Habit analysis ────────────────────────────────────────────────────────
 
 function habitDanger(habit) {
-  const days = Math.floor((Date.now() - (habit.startTime || Date.now())) / DAY_MS);
+  const days = Math.floor(habitElapsed(habit, Date.now()) / DAY_MS);
   const relapses = habit.relapseCount || 0;
   const avgDaysBetween = relapses > 0 ? days / (relapses + 1) : Infinity;
   return { days, relapses, avgDaysBetween };

@@ -48,7 +48,9 @@ if (typeof document !== 'undefined') document.addEventListener('visibilitychange
 const reducedMotion = () =>
   typeof window !== 'undefined' && window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
-export default function MiniRunner({ days, height = 18 }) {
+/* `colour`/`className` let the habit trail reuse it outside the prime card,
+   where there is no difference-blend bar underneath. */
+export default function MiniRunner({ days, height = 18, colour = '#fff', className = 'pv-runner' }) {
   const ref = useRef(null);
   const daysRef = useRef(days);
   daysRef.current = days;
@@ -72,7 +74,7 @@ export default function MiniRunner({ days, height = 18 }) {
       ctx.setTransform(1, 0, 0, 1, 0, 0);
       ctx.clearRect(0, 0, cv.width, cv.height);
       ctx.setTransform(dpr * k, 0, 0, dpr * k, 0, 0);
-      drawRunner(ctx, BOX_W / 2, GROUND, '#fff', {
+      drawRunner(ctx, BOX_W / 2, GROUND, colour, {
         mode: still ? 'idle' : 'run', p: phase, t: 0,
         amp: g.amp, gait: g.gait, land: 0, shadow: null, ob: null,
       });
@@ -99,7 +101,7 @@ export default function MiniRunner({ days, height = 18 }) {
       lanes.delete(lane);
       if (io) io.disconnect();
     };
-  }, [height]);
+  }, [height, colour]);
 
-  return <canvas ref={ref} className="pv-runner" aria-hidden="true" />;
+  return <canvas ref={ref} className={className} aria-hidden="true" />;
 }

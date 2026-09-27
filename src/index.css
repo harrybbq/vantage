@@ -535,6 +535,18 @@ nav:hover .nav-tab-label{opacity:1;}
 .habit-swatch:hover{transform:scale(1.12);}
 .habit-swatch.sel{border-color:var(--text);box-shadow:0 0 0 2px var(--card,#fff) inset;}
 .habit-swatch-custom{background:conic-gradient(#e66,#ec4,#6c6,#49d,#a6e,#e66);color:#fff;font-size:15px;font-weight:700;line-height:1;display:flex;align-items:center;justify-content:center;text-shadow:0 1px 2px rgba(0,0,0,.4);}
+/* Quit / Cut down choice, in Add and Edit */
+.habit-kind-seg{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:0 0 12px;}
+.habit-kind-seg button{appearance:none;text-align:left;border:1px solid var(--border);background:none;border-radius:10px;padding:9px 11px;cursor:pointer;display:flex;flex-direction:column;gap:2px;color:var(--text-muted);font:inherit;transition:border-color .15s,background .15s;}
+.habit-kind-seg button b{font-size:13px;color:var(--text);font-weight:700;}
+.habit-kind-seg button span{font-size:11px;line-height:1.35;}
+.habit-kind-seg button.is-on{border-color:var(--em);background:color-mix(in srgb,var(--em) 8%,transparent);}
+.habit-kind-seg button:focus-visible{outline:2px solid var(--em);outline-offset:2px;}
+.habit-kind-note{font-size:11px;color:var(--text-muted);line-height:1.5;margin-top:6px;}
+/* The budget row sits inside a .fg, whose inputs are full width. */
+.fg .habit-ms-row .habit-ms-num{width:58px;flex:0 0 58px;padding:7px 6px;font-size:13px;border-radius:8px;}
+.fg .habit-ms-row .habit-ms-unit{width:auto;flex:0 1 120px;padding:7px 8px;font-size:13px;border-radius:8px;}
+.fg .habit-ms-row{margin-bottom:0;}
 .habit-opt-sec{border:1px solid var(--border);border-radius:11px;margin-bottom:10px;background:rgba(0,0,0,.02);}
 .habit-opt-head{display:flex;align-items:center;gap:10px;width:100%;padding:11px 13px;background:none;border:none;cursor:pointer;text-align:left;font-family:var(--body);}
 .habit-opt-title{font-weight:600;font-size:13px;color:var(--text);}
@@ -2312,6 +2324,82 @@ nav:hover .nav-tab-label{opacity:1;}
 .habit-relapse-count{font-family:var(--mono);font-size:10px;color:var(--text-muted);text-align:center;margin-top:-4px;}
 .habit-relapse-btn{padding:8px 0;border-radius:9px;border:1px solid var(--border);background:none;color:var(--text-muted);font-family:var(--body);font-size:12px;font-weight:600;cursor:pointer;transition:all .18s;width:100%;}
 .habit-relapse-btn:hover{border-color:#c84040;color:#c84040;background:rgba(200,64,64,.06);}
+/* ── Habits 2026-09: Cut down, ghost/odometer, trail view ──
+   Cut-down cards keep the same lane, track and ladder as Quit cards; what
+   changes is the headline (weeks on target), the day strip that logs
+   use, and the button. Amber is a planned day, red is over budget. */
+.habit-card-tools{display:flex;align-items:center;gap:4px;flex-shrink:0;}
+.habit-view-btn{display:inline-flex;align-items:center;gap:4px;border:1px solid var(--border);background:none;color:var(--text-muted);font-family:var(--mono);font-size:9.5px;letter-spacing:.8px;text-transform:uppercase;padding:3px 7px;border-radius:6px;cursor:pointer;transition:color .15s,border-color .15s;}
+.habit-view-btn:hover,.habit-view-btn.is-on{color:var(--em);border-color:var(--em);}
+.habit-view-btn:focus-visible,.cut-day:focus-visible{outline:2px solid var(--em);outline-offset:2px;}
+.habit-kind-badge{font-family:var(--mono);font-size:9.5px;letter-spacing:.6px;color:var(--strike-amber,#d99114);border:1px solid color-mix(in srgb,var(--strike-amber,#d99114) 45%,transparent);padding:1px 6px;border-radius:100px;white-space:nowrap;flex-shrink:0;}
+.habit-cut-head{display:flex;align-items:baseline;justify-content:center;gap:8px;flex-wrap:wrap;}
+.habit-cut-big{font-family:var(--mono);font-size:26px;font-weight:700;color:var(--text);line-height:1;font-variant-numeric:tabular-nums;}
+.habit-cut-unit{font-family:var(--mono);font-size:10px;letter-spacing:1.2px;text-transform:uppercase;color:var(--text-muted);}
+.habit-cut-best{font-family:var(--mono);font-size:10px;color:var(--text-muted);opacity:.8;}
+.habit-cut-status{display:flex;align-items:center;justify-content:center;gap:8px;font-family:var(--mono);font-size:10.5px;color:var(--text-muted);font-variant-numeric:tabular-nums;}
+.habit-cut-status.is-dry,.habit-cut-status.is-ok{color:var(--em);}
+.habit-cut-status.is-at{color:var(--strike-amber,#d99114);}
+.habit-cut-status.is-over{color:var(--strike-red,#c84040);font-weight:700;}
+.habit-tokens{display:inline-flex;gap:3px;}
+.habit-tokens i{width:8px;height:8px;border-radius:50%;border:1.5px solid var(--em);display:block;}
+.habit-tokens i.is-used{background:var(--strike-amber,#d99114);border-color:var(--strike-amber,#d99114);}
+.habit-tokens i.is-over{background:var(--strike-red,#c84040);border-color:var(--strike-red,#c84040);}
+.cut-week{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:5px;}
+.cut-week-dow{font-family:var(--mono);font-size:8.5px;color:var(--text-muted);text-align:center;letter-spacing:.8px;}
+.cut-day{appearance:none;border:1px solid var(--border);background:rgba(128,128,128,.07);border-radius:7px;padding:5px 0 6px;display:flex;flex-direction:column;align-items:center;gap:3px;cursor:pointer;color:var(--text-muted);font-family:var(--mono);font-size:9.5px;letter-spacing:.4px;min-width:0;transition:background .15s,border-color .15s,color .15s;}
+.cut-day i{width:10px;height:10px;border-radius:50%;border:1.5px solid var(--border);display:block;}
+.cut-day:hover:not(:disabled){border-color:var(--text-muted);}
+.cut-day.is-today{border-color:var(--em);color:var(--text);}
+.cut-day.is-used{background:color-mix(in srgb,var(--strike-amber,#d99114) 15%,transparent);border-color:color-mix(in srgb,var(--strike-amber,#d99114) 60%,transparent);color:var(--strike-amber,#d99114);}
+.cut-day.is-used i{background:var(--strike-amber,#d99114);border-color:var(--strike-amber,#d99114);}
+.cut-day.is-over{background:color-mix(in srgb,var(--strike-red,#c84040) 15%,transparent);border-color:color-mix(in srgb,var(--strike-red,#c84040) 60%,transparent);color:var(--strike-red,#c84040);}
+.cut-day.is-over i{background:var(--strike-red,#c84040);border-color:var(--strike-red,#c84040);}
+.cut-day.is-future{opacity:.4;cursor:default;}
+.cut-day.is-before:not(.is-used){opacity:.55;}
+.cut-week.is-month{gap:3px;}
+.cut-week.is-month .cut-day{padding:3px 0;font-size:9px;border-radius:5px;}
+.habit-use-btn{border-color:color-mix(in srgb,var(--strike-amber,#d99114) 50%,var(--border));color:var(--text-mid);}
+.habit-use-btn:hover{border-color:var(--strike-amber,#d99114);color:var(--strike-amber,#d99114);background:color-mix(in srgb,var(--strike-amber,#d99114) 8%,transparent);}
+.habit-use-btn.is-done{color:var(--strike-amber,#d99114);}
+.habit-odo{display:flex;justify-content:center;gap:14px;font-family:var(--mono);font-size:10px;letter-spacing:.4px;color:var(--text-muted);margin-top:-6px;}
+.habit-odo b{color:var(--text-mid);font-weight:700;}
+.m-habit-time small{font-size:12px;font-weight:500;letter-spacing:1px;text-transform:uppercase;color:var(--text-muted);}
+.m-habit-relapse-btn.is-done{color:var(--strike-amber,#d99114);border-color:color-mix(in srgb,var(--strike-amber,#d99114) 55%,transparent);}
+.m-habit-card .habit-cut-status{justify-content:flex-start;gap:6px;}
+.m-habit-card.is-cut .m-habit-count{white-space:normal;min-width:0;}
+.m-habit-card.is-cut .m-habit-relapse-btn{white-space:nowrap;flex-shrink:0;}
+/* Trail */
+.habit-trail{display:flex;flex-direction:column;gap:8px;min-height:106px;}
+.habit-trail-stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(64px,1fr));gap:6px 10px;}
+.habit-trail-stats div{display:flex;flex-direction:column;gap:1px;min-width:0;}
+.habit-trail-stats span{font-family:var(--mono);font-size:8.5px;letter-spacing:1px;text-transform:uppercase;color:var(--text-muted);white-space:nowrap;}
+.habit-trail-stats b{font-family:var(--mono);font-size:14px;color:var(--text);font-variant-numeric:tabular-nums;white-space:nowrap;}
+.habit-trail-bars{position:relative;height:58px;display:grid;grid-template-columns:repeat(var(--n),minmax(0,1fr));gap:2px;align-items:end;border-bottom:1px solid var(--border);}
+.habit-trail-col{position:relative;height:100%;display:flex;align-items:flex-end;justify-content:center;}
+.habit-trail-col b{display:block;width:100%;border-radius:2px 2px 0 0;background:var(--em);}
+.habit-trail-col.is-over b{background:var(--strike-red,#c84040);}
+.habit-trail-col.is-now b{background:var(--em);opacity:.45;}
+.habit-trail-col.is-off b{background:var(--border);}
+.habit-trail-col em{display:block;width:6px;height:6px;border-radius:50%;background:var(--gold);margin-bottom:2px;}
+.habit-trail-col.is-now em{background:none;border:1.5px solid var(--em);width:5px;height:5px;}
+.habit-trail-budget{position:absolute;left:0;right:0;height:0;border-top:1px dashed var(--text-muted);opacity:.7;pointer-events:none;z-index:1;}
+.habit-trail-budget span{position:absolute;right:0;bottom:1px;font-family:var(--mono);font-size:8px;font-style:normal;letter-spacing:.6px;color:var(--text-muted);background:var(--surface);padding:0 2px;}
+.habit-trail-axis{display:flex;justify-content:space-between;font-family:var(--mono);font-size:8.5px;letter-spacing:.8px;text-transform:uppercase;color:var(--text-muted);margin-top:-4px;}
+.habit-trail-legend{display:flex;gap:12px;font-family:var(--mono);font-size:9px;color:var(--text-muted);}
+.habit-trail-legend i{display:inline-block;width:8px;height:8px;border-radius:2px;margin-right:5px;vertical-align:-1px;background:var(--em);}
+.habit-trail-legend i.is-dry{background:var(--gold);border-radius:50%;}
+.habit-trail-legend i.is-over{background:var(--strike-red,#c84040);}
+.habit-trail-ribbon{display:flex;align-items:flex-end;gap:4px;padding-top:28px;}
+.habit-trail-run{position:relative;flex-basis:0;min-width:6px;display:flex;flex-direction:column;gap:4px;}
+.habit-trail-run b{display:block;height:9px;border-radius:3px;background:var(--em);opacity:.45;}
+.habit-trail-run.is-best b{background:var(--gold);opacity:1;}
+.habit-trail-run.is-now b{opacity:1;}
+.habit-trail-run + .habit-trail-run::before{content:'';position:absolute;left:-3px;bottom:13px;width:1.5px;height:15px;margin-left:-.75px;background:var(--strike-red,#c84040);border-radius:1px;}
+.habit-trail-len{font-family:var(--mono);font-size:8.5px;color:var(--text-muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-align:center;}
+.habit-trail-tip{position:absolute;right:-4px;bottom:13px;line-height:0;}
+.habit-trail-runner{display:block;}
+.habit-trail-note{font-size:11px;color:var(--text-muted);line-height:1.45;margin:0;}
 /* Empty state */
 .habits-empty{text-align:center;padding:80px 20px;color:var(--text-muted);font-family:var(--mono);font-size:13px;}
 .habits-empty-icon{font-size:44px;margin-bottom:16px;}

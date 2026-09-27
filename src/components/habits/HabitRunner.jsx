@@ -22,6 +22,19 @@ import { useEffect, useRef } from 'react';
  *   - Endless habits that have cleared every milestone don't stop to
  *     celebrate — the figure keeps running in gold with a spark trail.
  *
+ * Around the runner (2026-09):
+ *   - GHOST: a faint runner at the spot the best previous run reached,
+ *     labelled BEST. Once the current run passes it, a gold PB flag
+ *     stays at the old mark instead.
+ *   - FLAGS: each planned day logged on a Cut-down habit plants an amber
+ *     flag ahead that he runs past without breaking stride — only going
+ *     over the budget trips him (that is still `stumbleKey`).
+ *   - SCENERY: the world behind him grows with the run — grass from day
+ *     1, hills at a week, trees at a month, a sun at 90 days, flowers at
+ *     180, a gold horizon at a year — at three depths so the lane reads
+ *     as travel. It only ever draws behind the figure and fades in, and
+ *     with reduced motion it is a still picture like everything else.
+ *
  * Rendering: one shared rAF drives every lane; a lane stops when
  * offscreen or the tab is hidden. prefers-reduced-motion freezes a
  * static stance with no obstacles/particles — the bar underneath always
@@ -418,16 +431,111 @@ function drawObstacle(ctx, o, groundY, red) {
   ctx.restore();
 }
 
+// A flag on a post: planned days (amber) and the beaten best (gold, 'PB').
+function drawFlag(ctx, x, groundY, col, label) {
+  ctx.save();
+  ctx.strokeStyle = col;
+  ctx.fillStyle = col;
+  ctx.lineWidth = 1.5;
+  ctx.lineCap = 'round';
+  ctx.beginPath(); ctx.moveTo(x, groundY); ctx.lineTo(x, groundY - 17); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(x, groundY - 17); ctx.lineTo(x + 8, groundY - 14); ctx.lineTo(x, groundY - 11); ctx.closePath(); ctx.fill();
+  if (label) { ctx.font = '600 8px ui-monospace, Menlo, monospace'; ctx.textAlign = 'center'; ctx.fillText(label, x, groundY - 21); }
+  ctx.restore();
+}
+
+// Deterministic 0..1 per integer, so a tree keeps its height as it scrolls.
+const hash = n => { const x = Math.sin(n * 127.1 + 311.7) * 43758.5453; return x - Math.floor(x); };
+
+// The world behind the runner. `level` is days (or day-equivalents) of
+// the run; `dist` is how far the world has scrolled. Layers fade in over
+// the days after they unlock rather than popping.
+function drawScenery(ctx, w, g, level, dist, pal) {
+  if (level >= 90) {
+    const a = Math.min(1, (level - 90) / 40);
+    ctx.save();
+    ctx.fillStyle = pal.gold;
+    ctx.globalAlpha = 0.18 * a; ctx.beginPath(); ctx.arc(w - 36, 20, 16, 0, Math.PI * 2); ctx.fill();
+    ctx.globalAlpha = 0.6 * a;  ctx.beginPath(); ctx.arc(w - 36, 20, 9, 0, Math.PI * 2); ctx.fill();
+    ctx.restore();
+  }
+  if (level >= 7) {
+    const a = Math.min(1, (level - 7) / 10), off = dist * 0.12;
+    ctx.save();
+    ctx.globalAlpha = 0.7 * a;
+    ctx.fillStyle = pal.line;
+    ctx.beginPath(); ctx.moveTo(0, g);
+    for (let x = 0; x <= w + 6; x += 6) {
+      const X = x + off;
+      ctx.lineTo(x, g - 15 - 9 * Math.sin(X / 57) - 5 * Math.sin(X / 23 + 1));
+    }
+    ctx.lineTo(w, g); ctx.closePath(); ctx.fill();
+    ctx.restore();
+  }
+  if (level >= 365) {
+    ctx.save();
+    ctx.strokeStyle = pal.gold; ctx.globalAlpha = 0.7; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.moveTo(0, g - 0.5); ctx.lineTo(w, g - 0.5); ctx.stroke();
+    ctx.restore();
+  }
+  if (level >= 30) {
+    const a = Math.min(1, (level - 30) / 20), off = dist * 0.45, sp = 64;
+    const base = Math.floor(off / sp);
+    ctx.save();
+    ctx.globalAlpha = 0.5 * a;
+    ctx.fillStyle = pal.em; ctx.strokeStyle = pal.em; ctx.lineWidth = 1.5;
+    for (let k = -1; k < w / sp + 2; k++) {
+      const seed = base + k;
+      const x = k * sp - (off % sp) + hash(seed) * 30;
+      const th = 16 + hash(seed + 7) * 12;
+      ctx.beginPath(); ctx.moveTo(x, g); ctx.lineTo(x, g - th * 0.4); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(x - 6, g - th * 0.34); ctx.lineTo(x, g - th); ctx.lineTo(x + 6, g - th * 0.34); ctx.closePath(); ctx.fill();
+    }
+    ctx.restore();
+  }
+  if (level >= 1) {
+    const dens = Math.min(1, level / 14), sp = 14;
+    const base = Math.floor(dist / sp);
+    const flowers = level >= 180 ? Math.min(0.4, (level - 180) / 250) : 0;
+    ctx.save();
+    ctx.strokeStyle = pal.em; ctx.lineWidth = 1.1; ctx.lineCap = 'round';
+    for (let k = -1; k < w / sp + 2; k++) {
+      const seed = base + k;
+      if (hash(seed + 3) > dens) continue;
+      const x = k * sp - (dist % sp) + hash(seed) * 8;
+      ctx.globalAlpha = 0.55;
+      ctx.beginPath();
+      ctx.moveTo(x - 2, g); ctx.lineTo(x - 3, g - 4);
+      ctx.moveTo(x, g);     ctx.lineTo(x, g - 6);
+      ctx.moveTo(x + 2, g); ctx.lineTo(x + 3, g - 4);
+      ctx.stroke();
+      if (hash(seed + 11) < flowers) {
+        ctx.globalAlpha = 0.95; ctx.fillStyle = pal.gold;
+        ctx.beginPath(); ctx.arc(x, g - 7, 1.8, 0, Math.PI * 2); ctx.fill();
+      }
+    }
+    ctx.restore();
+  }
+}
+
 // ── Component ───────────────────────────────────────────────────────
-export default function HabitRunner({ progress, days, colour, done, endless = false, stumbleKey }) {
+/**
+ * ghost    { progress, days } — the best previous run, or null
+ * pbAt     0..1 — where a beaten best sits (gold PB flag), or null
+ * flagKey  bump it to plant one planned-day flag ahead
+ * scenery  days of the run for the backdrop, or null for none
+ */
+export default function HabitRunner({ progress, days, colour, done, endless = false, stumbleKey,
+  ghost = null, pbAt = null, flagKey, scenery = null }) {
   const canvasRef = useRef(null);
   const stateRef = useRef({
     obstacles: [], action: null, spawnGap: 170,
     stumbleStart: 0, phase: 0, scroll: 0,
     particles: [], stepCount: 0, land: 0, trailAcc: 0,
+    markers: [], dist: 0, gphase: Math.random() * 6,
   });
-  const propsRef = useRef({ progress, days, colour, done, endless });
-  propsRef.current = { progress, days, colour, done, endless };
+  const propsRef = useRef({ progress, days, colour, done, endless, ghost, pbAt, scenery });
+  propsRef.current = { progress, days, colour, done, endless, ghost, pbAt, scenery };
 
   // A relapse restarts the streak (startTime changes) — the figure trips.
   // The first run is mount, not a relapse, so it doesn't tumble on load.
@@ -440,6 +548,16 @@ export default function HabitRunner({ progress, days, colour, done, endless = fa
     }
     seenStumbleKey.current = stumbleKey ?? 0;
   }, [stumbleKey]);
+
+  // A planned day was logged: plant a flag ahead (x is set on the next
+  // frame, when the lane knows its width). Mount is not an event.
+  const seenFlagKey = useRef(null);
+  useEffect(() => {
+    if (seenFlagKey.current !== null && (flagKey ?? 0) > seenFlagKey.current) {
+      stateRef.current.markers.push({ x: null });
+    }
+    seenFlagKey.current = flagKey ?? 0;
+  }, [flagKey]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -471,6 +589,8 @@ export default function HabitRunner({ progress, days, colour, done, endless = fa
         gold: s.getPropertyValue('--gold').trim() || '#c8970a',
         red:  dark ? '#e2685c' : '#c0392b',
         ink:  s.getPropertyValue('--text-muted').trim() || '#8a8175',
+        em:   s.getPropertyValue('--em').trim() || '#1a7a4a',
+        amber: s.getPropertyValue('--strike-amber').trim() || '#d99114',
       };
     };
     readPalette();
@@ -495,7 +615,7 @@ export default function HabitRunner({ progress, days, colour, done, endless = fa
       visible: true,
       step(dt, now) {
         const st = stateRef.current;
-        const { progress: pr, days: dy, colour: col, done: dn, endless: el } = propsRef.current;
+        const { progress: pr, days: dy, colour: col, done: dn, endless: el, ghost: gh, pbAt, scenery: scn } = propsRef.current;
         const prm = paramsForDays(dy);
         const still = reduced.matches;
 
@@ -561,7 +681,10 @@ export default function HabitRunner({ progress, days, colour, done, endless = fa
           // Phase keeps ticking even for a finished non-endless habit —
           // it drives the celebration hop.
           st.phase += dt * (running ? prm.cadence : 3.4);
-          if (running) st.scroll = (st.scroll + prm.speed * worldMul * dt) % 12;
+          if (running) {
+            st.scroll = (st.scroll + prm.speed * worldMul * dt) % 12;
+            st.dist += prm.speed * worldMul * dt;
+          }
         }
         // A finished endless habit sits at 100%, but pinning the figure to
         // the very edge leaves no runway to see obstacles coming — hold it
@@ -595,6 +718,15 @@ export default function HabitRunner({ progress, days, colour, done, endless = fa
         } else if (still) {
           st.obstacles = [];
         }
+
+        // Planned-day flags ride the world past him. Under reduced motion
+        // there is no travel, so they are simply not drawn.
+        for (const m of st.markers) if (m.x == null) m.x = w + 16;
+        if (still) st.markers = [];
+        else if (running && !stumbling) {
+          for (const m of st.markers) m.x -= Math.max(prm.speed * worldMul, prm.speed * 0.6) * dt;
+        }
+        st.markers = st.markers.filter(m => m.x > -20);
 
         if (st.action) {
           st.action.t += dt / st.action.dur;
@@ -647,6 +779,8 @@ export default function HabitRunner({ progress, days, colour, done, endless = fa
         const groundY = h - 1;
         ctx.clearRect(0, 0, w, h);
 
+        if (scn != null && scn > 0) drawScenery(ctx, w, groundY, scn, st.dist, palette);
+
         const mode = stumbling ? 'stumble'
           : (dn && !el) ? 'celebrate'
           : st.action ? st.action.mode
@@ -670,6 +804,7 @@ export default function HabitRunner({ progress, days, colour, done, endless = fa
           ctx.restore();
         }
 
+        for (const m of st.markers) drawFlag(ctx, m.x, groundY, palette.amber);
         for (const o of st.obstacles) drawObstacle(ctx, o, groundY, palette.red);
 
         for (const q of st.particles) {
@@ -681,6 +816,33 @@ export default function HabitRunner({ progress, days, colour, done, endless = fa
           ctx.arc(q.x, q.y, 1.1 + 0.6 * a, 0, Math.PI * 2);
           ctx.fill();
           ctx.restore();
+        }
+
+        // The best previous run: a ghost while it is still ahead, a gold
+        // PB flag once it has been passed.
+        if (gh && Number.isFinite(gh.progress)) {
+          const gx = Math.max(10, Math.min(w - 10, gh.progress * w));
+          if (runnerX < gx - 2) {
+            const gp = paramsForDays(gh.days || 0);
+            if (!still) st.gphase += dt * gp.cadence;
+            ctx.save();
+            ctx.globalAlpha = 0.3;
+            drawRunner(ctx, gx, groundY, palette.ink, {
+              mode: still ? 'idle' : 'run', p: st.gphase, t: 0,
+              amp: gp.amp, gait: gp.gait, land: 0, shadow: null, ob: null,
+            });
+            ctx.restore();
+            ctx.save();
+            ctx.fillStyle = palette.ink;
+            ctx.font = '600 8px ui-monospace, Menlo, monospace';
+            ctx.textAlign = 'center';
+            ctx.fillText('BEST', gx, 9);
+            ctx.restore();
+          }
+        }
+        if (pbAt != null && Number.isFinite(pbAt)) {
+          const px = Math.max(10, Math.min(w - 10, pbAt * w));
+          if (Math.abs(px - runnerX) > 6) drawFlag(ctx, px, groundY, palette.gold, 'PB');
         }
 
         // Live obstacle anchor for the current move — rel drifts left
