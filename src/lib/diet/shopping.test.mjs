@@ -104,4 +104,22 @@ t('Lidl reads Aldi’s verified prices until it has its own', () => {
   assert.equal(itemAt(it, 'lidl', { storePacks: { lidl: { 'turkey mince': { g: [{ size: 500, price: 2.5 }] } } } }).best.cost, 5, 'your Lidl price still wins');
 });
 
+t('5% beef mince is priced as 5%, not the 20% shelf pack', () => {
+  const [it] = aggregate([{ lines: ['1kg 5% beef mince'], factor: 1, from: 'R' }]);
+  assert.notEqual(catalogueFor(it.ikey), catalogueFor('beef mince'), 'lean has its own entry');
+  assert.equal(catalogueFor('lean beef mince'), catalogueFor(it.ikey));
+  assert.equal(catalogueFor('turkey mince').re.test('lean turkey mince'), true, 'lean turkey stays turkey');
+  const m = itemAt(it, 'morrisons');
+  assert.equal(m.status, 'ok');
+  assert.equal(m.best.cost, 10.1, '2× 500 g at £5.05');
+  const t2 = itemAt(it, 'tesco');
+  assert.equal(t2.status, 'unpriced', 'Tesco sells it; price not checked, so not guessed');
+  assert.equal(t2.why, 'unchecked');
+  assert.equal(itemAt(it, 'lidl').status, 'unpriced', 'Lidl follows Aldi, unchecked too');
+  assert.equal(itemAt(it, 'tesco', { storePacks: { tesco: { [it.ikey]: { g: [{ size: 500, price: 4.5 }] } } } }).best.cost, 9, 'your price fills the gap');
+  const plan = shopPlan([it], { store: 'tesco' });
+  assert.deepEqual(plan.missing, [], 'unchecked is not "not stocked"');
+  assert.equal(plan.cost, 0);
+});
+
 console.log(`shopping: ${n} passed`);

@@ -326,7 +326,7 @@ export default function MealPlanner({ S, update, plan, proteinG }) {
                         )}
                         <div className="upg-shop-sub">
                           {i.packs && <span>need {i.amount}{spareLabel(i.packs.leftover, i.family)} · ≈ £{i.packs.cost.toFixed(2)}{i.at.own ? ' · your price' : ''}</span>}
-                          {i.at.status === 'unpriced' && <span>need {i.amount} · no price yet</span>}
+                          {i.at.status === 'unpriced' && <span>need {i.amount} · {i.at.why === 'unchecked' ? `stocked, price not checked at ${storeName(i.via || store)}` : 'no price yet'}</span>}
                           {i.family && i.base != null && (
                             <button type="button" className="upg-textbtn" onClick={() => setEditPacks({ ...i, shop: i.via || store })}>
                               {i.ownPacks ? `your ${storeName(i.via || store)} price` : `price at ${storeName(i.via || store)}`}

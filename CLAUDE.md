@@ -152,3 +152,8 @@ Last refresh: Sep 2026 (#219), Tesco/Morrisons/Aldi checked on their
 websites. Lidl UK lists no grocery prices online, so `PRICED_AS` makes
 Lidl read Aldi's column; drop that entry once Lidl prices are verified
 (Lidl Plus app or a receipt).
+Check the SPEC, not just the product name: the Sep 2026 refresh priced
+"beef mince" from the 20% pack while recipes use 5%. Lean mince now has
+its own entry (Morrisons £5.05/500 g, owner-checked); Tesco and Aldi 5%
+are `U` (stocked, price unchecked — shows "price not checked", never a
+guess). Fill those in at the next refresh.
