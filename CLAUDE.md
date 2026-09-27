@@ -133,6 +133,18 @@ rendering unchosen features as empty states, not to cut features), the
 the generated-design house style; the operator console is the answer we
 already own), and the OVR-as-spine bet.
 
+**Not recorded there:** anything in the owner-only Upgrade section
+(Career, Diet, Rotation, Review and its menu) stays OFF the Before &
+After page from 2026-09-27 on, at the owner's request.
+
 **Correction worth remembering:** Vantage gathers NO purchase history
 and has no bank/Open Banking integration — savings and expenses are
 manual entry only. Don't repeat that claim.
+
+## Shop prices (Diet → Planner) — refresh every ~4 months
+`src/lib/diet/shopping.js` hard-codes typical pack sizes and prices for
+Tesco, Morrisons, Aldi and Lidl (`CATALOGUE`, `PRICES_AS_OF`). There is
+no live feed by the owner's choice. Every four months or so, review the
+table, update the prices and `PRICES_AS_OF`, and keep `shopping.test.mjs`
+passing. The owner's own corrections (`S.shopPrefs.storePacks`, `.out`)
+always win over the table, so a refresh never overrides them.
