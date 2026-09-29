@@ -282,7 +282,7 @@ export function applyAutoLogs(prev, proposals, { now = new Date() } = {}) {
     if (!touched.has(t.id) || !t.weeklyTarget || !t.weeklyCoins) continue;
     const awardKey = 'awarded_' + t.id + '_' + thisWeek;
     if (next[awardKey]) continue;
-    if (countWeekLogs(logs, t.id, today) < t.weeklyTarget) continue;
+    if (countWeekLogs(logs, t.id, today, t) < t.weeklyTarget) continue;
     next = {
       ...next,
       [awardKey]: true,

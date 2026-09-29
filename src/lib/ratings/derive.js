@@ -49,6 +49,7 @@
 // Explicit .js — the pure-lib convention in this repo, so the module
 // stays runnable under plain node for the parity check in scripts/.
 import { VISIONS_BY_ID } from '../visions/definitions.js';
+import { trackerDone } from '../trackers/done.js';
 
 const DAY_MS = 86_400_000;
 const TIME_SPACING_MS = 7 * DAY_MS;
@@ -173,7 +174,7 @@ function trackerPoints(S, category) {
     for (let i = 0; i < TRACKER_HISTORY_DAYS; i++) {
       const k = ymd(new Date(today - i * DAY_MS));
       const v = logs[k]?.[t.id];
-      const truthy = t.type === 'boolean' ? !!v : (Number(v) || 0) > 0;
+      const truthy = trackerDone(t, v);
       if (truthy) hits++;
     }
     // Density 0-1 × scaled cap (10 points max per tracker, achieved at

@@ -11,13 +11,13 @@ import { recalcStreaks } from '../utils/streaks';
 import SectionHelp from './SectionHelp';
 import NutritionSection from './NutritionSection';
 import VitalsPanel from './track/VitalsPanel';
-import { markManual, isAutoFilled, autoProvenance, ruleLabel, ruleChip } from '../lib/trackers/autoLog';
+import { markManual, isAutoFilled, autoProvenance, ruleLabel, ruleChip, sourceById } from '../lib/trackers/autoLog';
 import AutoFillModal from './track/AutoFillModal';
+import { trackerDone, trackerStep, dailyGoalOf, fmtTrackerValue } from '../lib/trackers/done';
 
-function getWeekProgress(logs, trackerId, weeklyTarget) {
-  const dateStr = getTodayStr();
-  const count = countWeekLogs(logs, trackerId, dateStr);
-  return { count, target: weeklyTarget };
+function getWeekProgress(logs, tracker) {
+  const count = countWeekLogs(logs, tracker.id, getTodayStr(), tracker);
+  return { count, target: tracker.weeklyTarget };
 }
 
 /**
@@ -28,8 +28,9 @@ function getWeekProgress(logs, trackerId, weeklyTarget) {
  * the old ~330px cards with the fat grey week pill.
  *
  * Ring tap semantics mirror the hub QuickLog: boolean trackers toggle
- * today's log; number trackers increment today by 1 (long math still
- * lives in the calendar day editor). Streaks recalc on every change.
+ * today's log; number trackers add one step (a twentieth of the daily
+ * target, else 1 — lib/trackers/done.js; long math still lives in the
+ * calendar day editor). Streaks recalc on every change.
  */
 function TrackerRing({ tracker, count, target, doneToday, onClick }) {
   const R = 13, C = 2 * Math.PI * R;
@@ -73,7 +74,7 @@ function TrackersList({ trackers, logs, streaks, onDelete, onOpenModal, update, 
         if (dayLog[t.id]) delete dayLog[t.id];
         else dayLog[t.id] = true;
       } else {
-        dayLog[t.id] = (typeof dayLog[t.id] === 'number' ? dayLog[t.id] : 0) + 1;
+        dayLog[t.id] = (typeof dayLog[t.id] === 'number' ? dayLog[t.id] : 0) + trackerStep(t, sourceById(t.auto?.source)?.step);
       }
       if (Object.keys(dayLog).length) newLogs[today] = dayLog;
       else delete newLogs[today];
@@ -105,11 +106,11 @@ function TrackersList({ trackers, logs, streaks, onDelete, onOpenModal, update, 
         {trackers.map((t, index) => {
           const hasChallenge = !!(t.weeklyTarget && t.weeklyCoins);
           const { count, target } = hasChallenge
-            ? getWeekProgress(logs, t.id, t.weeklyTarget)
+            ? getWeekProgress(logs, t)
             : { count: 0, target: 0 };
           const weekDone = hasChallenge && count >= target;
           const v = todayLogs[t.id];
-          const doneToday = t.type === 'boolean' ? !!v : (typeof v === 'number' && v > 0);
+          const doneToday = trackerDone(t, v);
           const s = t.type === 'boolean' ? streaks?.[t.id] : null;
           return (
             <motion.div
@@ -126,7 +127,7 @@ function TrackersList({ trackers, logs, streaks, onDelete, onOpenModal, update, 
                   <span className="tracker-dot" style={{ background: t.color }}></span>
                   <span className="tracker-row-label">{t.name}</span>
                   {t.type !== 'boolean' && typeof v === 'number' && v > 0 && (
-                    <span className="tracker-row-todayval">{v}{t.unit ? ` ${t.unit}` : ''} today</span>
+                    <span className="tracker-row-todayval">{fmtTrackerValue(v)}{dailyGoalOf(t) ? ` / ${fmtTrackerValue(dailyGoalOf(t))}` : ''}{t.unit ? ` ${t.unit}` : ''} today</span>
                   )}
                 </div>
                 {/* What fills this one in, and a way to change it. A
@@ -500,7 +501,7 @@ function CalendarView({ S, update, onShowCoinToast, nutritionMonthData }) {
         if (!t.weeklyTarget || !t.weeklyCoins) return;
         const weekKey = getWeekKey(key);
         const awardKey = 'awarded_' + t.id + '_' + weekKey;
-        const count = countWeekLogs(newLogs, t.id, key);
+        const count = countWeekLogs(newLogs, t.id, key, t);
         const alreadyAwarded = !!next[awardKey];
 
         if (count >= t.weeklyTarget && !alreadyAwarded) {

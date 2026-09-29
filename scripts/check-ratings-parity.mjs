@@ -102,6 +102,11 @@ function* cases() {
   yield ['ten years of logged days', {
     trackers, logs: mkLogs(3650), visions: mkVisions(8),
   }, 0, 0];
+  // A daily target: half the days fall short of it and must not count.
+  yield ['number tracker with a daily target', {
+    trackers: [{ id: 's', category: 'fitness', type: 'number', dailyGoal: 10000 }],
+    logs: Object.fromEntries(Array.from({ length: 30 }, (_, i) => [ymd(now - i * DAY), { s: i % 2 ? 6000 : 11000 }])),
+  }, 0, 0];
   yield ['forty trackers in one category', {
     trackers: Array.from({ length: 40 }, (_, i) => ({ id: 'b' + i, category: 'brain', type: 'boolean' })),
     logs: (() => {

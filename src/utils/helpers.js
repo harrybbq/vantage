@@ -1,3 +1,5 @@
+import { trackerDone } from '../lib/trackers/done.js';
+
 export function adjustColour(hex, amt) {
   const h = hex.replace('#', '');
   const num = parseInt(h.length === 3 ? h.split('').map(x => x + x).join('') : h, 16);
@@ -29,10 +31,13 @@ export function getWeekKey(dateStr) {
   return d.getFullYear() + '-W' + String(week).padStart(2, '0');
 }
 
-export function countWeekLogs(logs, trackerId, dateStr) {
+/** Days this week the tracker was logged — or, given the tracker,
+ *  days it was DONE (a number tracker's daily target met). */
+export function countWeekLogs(logs, trackerId, dateStr, tracker) {
   const targetWeek = getWeekKey(dateStr);
   return Object.entries(logs).filter(([key, dayLog]) => {
-    return getWeekKey(key) === targetWeek && dayLog[trackerId];
+    if (getWeekKey(key) !== targetWeek) return false;
+    return tracker ? trackerDone(tracker, dayLog[trackerId]) : !!dayLog[trackerId];
   }).length;
 }
 

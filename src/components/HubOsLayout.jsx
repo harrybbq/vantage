@@ -17,6 +17,7 @@ import { motion } from 'framer-motion';
 import AiCoachWidget from './AiCoachWidget';
 import CoachBriefPanel from './CoachBriefPanel';
 import QuickLog from './QuickLog';
+import { trackerDone } from '../lib/trackers/done';
 import FriendsRail from './friends/FriendsRail';
 import RatingsPanel from './RatingsPanel';
 import { useHubModuleMenu, moduleIdFromLabel } from './HubModuleMenu';
@@ -258,7 +259,7 @@ export function OsSessionPanel({ name, trackers, logs, S }) {
   // Tracker completion nodes (moved here from the standalone Trackers
   // panel). Each node = one tracker; filled when completed today. A
   // boolean tracker is "hit" when logged truthy; a number tracker when
-  // it reaches its goal. Read-only indicators — toggling still happens
+  // it reaches its daily target (lib/trackers/done.js). Read-only indicators — toggling still happens
   // in the QuickLog panel.
   const today = (() => {
     const d = new Date();
@@ -266,9 +267,7 @@ export function OsSessionPanel({ name, trackers, logs, S }) {
   })();
   const nodes = (trackers || []).map(t => {
     const v = logs?.[today]?.[t.id];
-    const hit = t.type === 'boolean'
-      ? !!v
-      : !!(t.goal && (Number(v) || 0) >= t.goal);
+    const hit = trackerDone(t, v);
     return { t, hit };
   });
   const doneCount = nodes.filter(n => n.hit).length;
@@ -406,7 +405,7 @@ export function OsTrackersPanel({ trackers, logs }) {
       return { t, hit: !!v, label: v ? '✓ Done' : '—' };
     }
     const n = Number(v) || 0;
-    return { t, hit: t.goal && n >= t.goal, label: `${n}${t.unit || ''}` };
+    return { t, hit: trackerDone(t, v), label: `${n}${t.unit || ''}` };
   });
 
   return (

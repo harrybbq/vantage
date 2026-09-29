@@ -4,6 +4,7 @@ import AddMobileWidgetModal from './mobile/AddMobileWidgetModal';
 import { appPresetToLink, visibleAppPresets } from '../data/appPresets';
 import { applyRelapse } from '../lib/habits/relapse';
 import { toCut, toQuit, isoDay } from '../lib/habits/cutdown';
+import { targetFromName } from '../lib/trackers/done';
 import PrimePicker from './widgets/prime/PrimePicker';
 import { isSuperseded } from '../lib/hub/primeBlocks';
 import { useSubscriptionContext } from '../context/SubscriptionContext';
@@ -847,7 +848,7 @@ function EditSavingsGoalModal({ openId, onClose, savings, achievements, onEdit, 
 
 // ── Add Tracker ──
 function AddTrackerModal({ openId, onClose, onAdd }) {
-  const [form, setForm] = useState({ name: '', type: 'boolean', unit: '', goal: '', color: '#1a7a4a', weeklyTarget: '', weeklyCoins: '', category: 'general' });
+  const [form, setForm] = useState({ name: '', type: 'boolean', unit: '', goal: '', dailyGoal: '', color: '#1a7a4a', weeklyTarget: '', weeklyCoins: '', category: 'general' });
   const isNumber = form.type === 'number';
   function submit() {
     if (!form.name) return;
@@ -857,12 +858,13 @@ function AddTrackerModal({ openId, onClose, onAdd }) {
       type: form.type,
       unit: form.unit,
       goal: parseFloat(form.goal) || null,
+      dailyGoal: form.type === 'number' ? (parseFloat(form.dailyGoal) || null) : null,
       color: form.color,
       weeklyTarget: parseInt(form.weeklyTarget) || null,
       weeklyCoins: parseInt(form.weeklyCoins) || null,
       category: form.category || 'general',
     });
-    setForm({ name: '', type: 'boolean', unit: '', goal: '', color: '#1a7a4a', weeklyTarget: '', weeklyCoins: '', category: 'general' });
+    setForm({ name: '', type: 'boolean', unit: '', goal: '', dailyGoal: '', color: '#1a7a4a', weeklyTarget: '', weeklyCoins: '', category: 'general' });
     onClose('addTrackerModal');
   }
   return (
@@ -877,6 +879,7 @@ function AddTrackerModal({ openId, onClose, onAdd }) {
         </select>
       </div>
       {isNumber && <div className="fg"><label>Unit</label><input type="text" placeholder="£, g, km..." value={form.unit} onChange={e => setForm(f => ({ ...f, unit: e.target.value }))} /></div>}
+      {isNumber && <div className="fg"><label>Daily target <span style={{ color: 'var(--text-muted)', fontWeight: 400 }}>(the day only ticks once it's reached)</span></label><input type="number" min="0" step="any" placeholder={targetFromName(form.name) ? String(targetFromName(form.name)) : 'e.g. 10000'} value={form.dailyGoal} onChange={e => setForm(f => ({ ...f, dailyGoal: e.target.value }))} /></div>}
       {isNumber && <div className="fg"><label>Monthly Target</label><input type="number" placeholder="500" value={form.goal} onChange={e => setForm(f => ({ ...f, goal: e.target.value }))} /></div>}
       <div className="fg"><label>Colour</label><input type="color" value={form.color} onChange={e => setForm(f => ({ ...f, color: e.target.value }))} /></div>
       <div style={{ borderTop: '1px solid var(--border-lt)', margin: '14px 0' }}></div>

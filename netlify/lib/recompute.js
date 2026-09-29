@@ -57,6 +57,15 @@ function achievementPoints(state, category) {
   return FULL_CREDIT_N + Math.sqrt((count - FULL_CREDIT_N) * FULL_CREDIT_N);
 }
 
+// Mirror of src/lib/trackers/done.js: a number tracker with a daily
+// target (`dailyGoal`) is done at or above it, otherwise at any amount.
+function trackerDone(t, v) {
+  if (t.type === 'boolean') return !!v;
+  const n = Number(v) || 0;
+  const g = Number(t.dailyGoal);
+  return g > 0 ? n >= g : n > 0;
+}
+
 function trackerPoints(state, category) {
   const trackers = (state.trackers || []).filter(t => t.category === category);
   if (!trackers.length) return 0;
@@ -68,8 +77,7 @@ function trackerPoints(state, category) {
     for (let i = 0; i < TRACKER_HISTORY_DAYS; i++) {
       const k = ymd(today - i * DAY_MS);
       const v = logs[k]?.[t.id];
-      const truthy = t.type === 'boolean' ? !!v : (Number(v) || 0) > 0;
-      if (truthy) hits++;
+      if (trackerDone(t, v)) hits++;
     }
     total += (hits / TRACKER_HISTORY_DAYS) * 10;
   }

@@ -2705,6 +2705,43 @@ nav:hover .nav-tab-label{opacity:1;}
 .quick-log-row .streak-flame-badge{
   position:static;flex-shrink:0;
 }
+/* Number trackers: a row (not a button) that wraps to hold the editor.
+   The value is its own button — tap to type an amount or a target. */
+.quick-log-row.is-num{cursor:default;flex-wrap:wrap;row-gap:10px;position:relative;}
+.quick-log-row-saved{position:absolute;left:48px;top:2px;pointer-events:none;}
+.quick-log-row-saved>span{margin-left:0 !important;font-size:8px !important;}
+.quick-log-row.is-num:active{transform:none;}
+.quick-log-row.is-editing{border-color:var(--em);}
+.quick-log-row-check{position:relative;}
+.quick-log-row-ring{position:absolute;inset:-2px;width:calc(100% + 4px);height:calc(100% + 4px);}
+.quick-log-row-stepper .step-val{
+  min-width:44px;padding:2px 4px;border-radius:6px;
+  border:1px dashed transparent;background:none;font:inherit;color:inherit;cursor:pointer;
+}
+.quick-log-row-stepper .step-val:hover,.quick-log-row.is-editing .step-val{border-color:var(--border);}
+.quick-log-row-stepper .step-unit{white-space:nowrap;}
+.quick-log-edit{
+  flex-basis:100%;display:grid;grid-template-columns:1fr 1fr;gap:8px 10px;
+  padding-top:10px;border-top:1px solid var(--border);min-width:0;
+}
+.quick-log-edit-field{display:flex;flex-direction:column;gap:4px;min-width:0;}
+.quick-log-edit-field>span:first-child{
+  font-family:var(--mono);font-size:9px;letter-spacing:1px;text-transform:uppercase;color:var(--text-muted);
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+}
+.quick-log-edit-input{display:flex;align-items:center;gap:6px;min-width:0;
+  border:1px solid var(--border);border-radius:7px;padding:0 8px;background:var(--os-surface2, transparent);}
+/* !important: the themes' global input rules (hub-dark.css) out-rank
+   any class selector, and the box is drawn by the wrapper instead. */
+.quick-log-edit-input input{
+  flex:1;min-width:0;width:100%;color:var(--text);
+  border:0 !important;background:transparent !important;padding:7px 0 !important;margin:0;box-shadow:none !important;
+  font-family:var(--mono);font-size:14px;outline:none;
+}
+.quick-log-edit-input:focus-within{border-color:var(--em);}
+.quick-log-edit-note{grid-column:1/-1;margin:0;font-size:11px;line-height:1.4;color:var(--text-muted);}
+.quick-log-edit-actions{grid-column:1/-1;display:flex;justify-content:flex-end;gap:6px;}
+.profile-col--with-rail .quick-log-edit{grid-template-columns:1fr;}
 .streak-flame-badge{position:absolute;top:6px;right:6px;font-family:var(--mono);font-size:9px;font-weight:700;color:#c8970a;background:rgba(200,151,10,.15);border:1px solid rgba(200,151,10,.3);border-radius:100px;padding:1px 5px;line-height:1.4;}
 .streak-flame-badge.bright{color:#f5c842;background:rgba(245,200,66,.18);border-color:rgba(245,200,66,.4);box-shadow:0 0 6px rgba(245,200,66,.3);}
 .streak-flame-badge.pulse{animation:streak-pulse 1.6s ease-in-out infinite;}
