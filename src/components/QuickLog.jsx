@@ -151,13 +151,13 @@ function TrackerCard({ tracker, value, streak, onChange, onSetTarget }) {
         <button type="button" className="step-btn" {...decProps} aria-label={`Decrease by ${fmtTrackerValue(step)}`}><Icon name="minus" size={14} /></button>
         <button
           type="button"
-          className="step-val"
+          className={`step-val${goal ? '' : ' no-target'}`}
           onClick={() => setEditing(e => !e)}
           aria-expanded={editing}
           aria-label={`${tracker.name}: ${fmtTrackerValue(numVal)}${goal ? ` of ${fmtTrackerValue(goal)}` : ''}${unit} — type an amount or set a daily target`}
         >
           <span className="step-num">{fmtTrackerValue(numVal, true)}</span>
-          <span className="step-unit">{goal ? `of ${fmtTrackerValue(goal, true)}${shortUnit}` : (tracker.unit || 'set target')}</span>
+          <span className="step-unit">{goal ? `of ${fmtTrackerValue(goal, true)}${shortUnit}` : '+ target'}</span>
         </button>
         <button type="button" className="step-btn" {...incProps} aria-label={`Increase by ${fmtTrackerValue(step)}`}><Icon name="plus" size={14} /></button>
       </span>
@@ -168,8 +168,10 @@ function TrackerCard({ tracker, value, streak, onChange, onSetTarget }) {
           value={numVal}
           onCancel={() => setEditing(false)}
           onSave={(v, g) => {
-            if (v !== numVal) onChange(tracker.id, v);
+            // Target first: the value's weekly coin check then counts
+            // the day against the new rule, not the old one.
             if (g !== goal) onSetTarget(tracker.id, g);
+            if (v !== numVal) onChange(tracker.id, v);
             setEditing(false);
             flashSaved();
           }}

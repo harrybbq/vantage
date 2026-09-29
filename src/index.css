@@ -2716,9 +2716,11 @@ nav:hover .nav-tab-label{opacity:1;}
 .quick-log-row-ring{position:absolute;inset:-2px;width:calc(100% + 4px);height:calc(100% + 4px);}
 .quick-log-row-stepper .step-val{
   min-width:44px;padding:2px 4px;border-radius:6px;
-  border:1px dashed transparent;background:none;font:inherit;color:inherit;cursor:pointer;
+  border:1px dashed var(--border);background:none;font:inherit;color:inherit;cursor:pointer;
 }
-.quick-log-row-stepper .step-val:hover,.quick-log-row.is-editing .step-val{border-color:var(--border);}
+.quick-log-row-stepper .step-val:hover,.quick-log-row.is-editing .step-val{border-color:var(--text-muted);}
+/* No target yet: the hint under the number is the way in, so it reads as one. */
+.quick-log-row-stepper .step-val.no-target .step-unit{color:var(--em);}
 .quick-log-row-stepper .step-unit{white-space:nowrap;}
 .quick-log-edit{
   flex-basis:100%;display:grid;grid-template-columns:1fr 1fr;gap:8px 10px;
