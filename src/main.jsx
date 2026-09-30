@@ -49,7 +49,13 @@ createRoot(document.getElementById('root')).render(
 //   - First boot doesn't reload (no previous controller).
 //   - Subsequent updates reload after a tiny debounce so any
 //     in-flight save (1.5s debounce in useVisionBoardState) lands.
-if ('serviceWorker' in navigator && import.meta.env.PROD) {
+//
+// Never inside the Capacitor shell: the native app ships its bundle in
+// the binary, so a worker there can only add a second, stale copy of it
+// (and a cache that outlives sign-out). Store builds update through the
+// store.
+const isNativeShell = typeof window !== 'undefined' && !!window.Capacitor?.isNativePlatform?.();
+if ('serviceWorker' in navigator && import.meta.env.PROD && !isNativeShell) {
   window.addEventListener('load', () => {
     navigator.serviceWorker.register('/sw.js', { scope: '/' })
       .catch(err => console.warn('SW registration failed:', err));
