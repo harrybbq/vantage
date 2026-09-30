@@ -34,6 +34,7 @@ import { getOfferings, purchasePackage, restorePurchases, isAvailable as rcIsAva
 import { platform as storePlatform } from '../lib/billing/manageSubscription';
 import { priceLine, renewalLine, storeName } from '../lib/billing/renewalWording';
 import Overlay from './ui/Overlay';
+import { isNativeApp } from '../lib/native/platform';
 
 // Display order for package cards. RC's `availablePackages` array
 // arrives in dashboard order which is unreliable; sort by our own
@@ -115,7 +116,11 @@ export default function PaywallModal({ openId, onClose, onUpgrade, onShowToast, 
     } else {
       setError(
         result.reason === 'unavailable'
-          ? "Purchases need the iOS or Android build to fire — they don't work on the web."
+          // Inside the app "use the app" is nonsense — there it means
+          // the store couldn't be reached or isn't configured yet.
+          ? (isNativeApp()
+            ? "The store isn't available right now. Please try again in a moment."
+            : "Purchases need the iOS or Android build to fire — they don't work on the web.")
           : "Couldn't complete the purchase. Try again, or restore from Settings → Subscription if you've bought before."
       );
     }

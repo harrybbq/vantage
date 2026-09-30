@@ -1,6 +1,7 @@
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { isNativeApp } from './lib/native/platform'
 import './index.css'
 import './hub-dark.css'
 import './theme-cream-pro.css'
@@ -54,8 +55,7 @@ createRoot(document.getElementById('root')).render(
 // the binary, so a worker there can only add a second, stale copy of it
 // (and a cache that outlives sign-out). Store builds update through the
 // store.
-const isNativeShell = typeof window !== 'undefined' && !!window.Capacitor?.isNativePlatform?.();
-if ('serviceWorker' in navigator && import.meta.env.PROD && !isNativeShell) {
+if ('serviceWorker' in navigator && import.meta.env.PROD && !isNativeApp()) {
   window.addEventListener('load', () => {
     navigator.serviceWorker.register('/sw.js', { scope: '/' })
       .catch(err => console.warn('SW registration failed:', err));

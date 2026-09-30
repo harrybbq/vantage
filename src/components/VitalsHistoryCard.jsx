@@ -11,6 +11,8 @@
  */
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { supabase } from '../lib/supabase';
+import { apiUrl } from '../lib/authFetch';
+import { webOrigin } from '../lib/native/platform';
 import { parseHealthExport, applyHealthImport } from '../lib/appleHealth';
 import { syncWhoop } from '../lib/whoopClient';
 import { syncOura, disconnectWearable } from '../lib/ouraClient';
@@ -87,7 +89,7 @@ export function AppleHealthImport({ S, update }) {
 
   const token = S?.healthToken || null;
   const syncUrl = token && typeof window !== 'undefined'
-    ? `${window.location.origin}/.netlify/functions/health-sync?token=${token}`
+    ? `${webOrigin()}/.netlify/functions/health-sync?token=${token}`
     : null;
   // This token is a bearer credential: anyone holding it can POST
   // health data into this account. The old fallback was
@@ -203,7 +205,7 @@ const REDIRECT_KEY = 'vb_whoop_redirect';
  */
 function callbackUrlForThisOrigin() {
   if (typeof window === 'undefined') return '';
-  return `${window.location.origin}/.netlify/functions/whoop-callback`;
+  return `${webOrigin()}/.netlify/functions/whoop-callback`;
 }
 
 function WhoopPanel({ S, update }) {
@@ -284,7 +286,7 @@ function WhoopPanel({ S, update }) {
     setBusy(true); setMsg('');
     try {
       const { data: { session } } = await supabase.auth.getSession();
-      const res = await fetch('/.netlify/functions/whoop-connect', {
+      const res = await fetch(apiUrl('/.netlify/functions/whoop-connect'), {
         method: 'POST',
         headers: { Authorization: `Bearer ${session?.access_token}` },
       });
@@ -448,7 +450,7 @@ function OuraPanel({ S, update }) {
     setBusy(true); setMsg('');
     try {
       const { data: { session } } = await supabase.auth.getSession();
-      const res = await fetch('/.netlify/functions/oura-connect', {
+      const res = await fetch(apiUrl('/.netlify/functions/oura-connect'), {
         method: 'POST',
         headers: { Authorization: `Bearer ${session?.access_token}` },
       });

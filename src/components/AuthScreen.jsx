@@ -1,9 +1,11 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { supabase } from '../lib/supabase';
 import { withTimeout, friendlyAuthError } from '../utils/withTimeout';
 import Logo from './Logo';
-import { useIsMobile } from '../hooks/useIsMobile';
+import { isNativeApp, webOrigin } from '../lib/native/platform';
+import { nativeOAuth, onNativeAuthError } from '../lib/native/deepLinks';
+import { markTermsAcceptedPending } from './TermsAcceptanceSheet';
 
 /**
  * AuthScreen
@@ -97,13 +99,9 @@ function AppleGlyph() {
 }
 
 export default function AuthScreen({ onOpenLegal }) {
-  // Sign in with Apple is mobile-only for now. App Store rule 4.8
-  // (must offer SIWA alongside any other OAuth) only bites on iOS, so
-  // hiding it on desktop while we don't have the Apple Developer
-  // membership configured is safe — desktop users can still email-auth
-  // or Google. Re-enable everywhere by removing this gate once the
-  // Apple Services ID + .p8 setup is done.
-  const isMobile = useIsMobile();
+  // Sign in with Apple renders at every width. It used to be gated to
+  // phone-sized viewports, which hid it on iPad and in landscape while
+  // Google stayed — exactly the case App Store 4.8 rejects.
   const [mode, setMode] = useState('login');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -118,11 +116,47 @@ export default function AuthScreen({ onOpenLegal }) {
     setMode(next); setError(''); setInfo('');
   }, []);
 
+  // Native OAuth finishes in lib/native/deepLinks.js, long after the
+  // button handler returned; a refusal comes back through here.
+  useEffect(() => onNativeAuthError(msg => setError(msg)), []);
+
+  // Signing up with Google/Apple skips the form, so the 13+/Terms box
+  // has to be ticked before those buttons work in sign-up mode — the
+  // same gate the email route has. On sign-in, a brand-new OAuth
+  // account is caught after the fact by TermsAcceptanceSheet.
+  const oauthBlocked = mode === 'signup' && !ageConfirmed;
+
+  /**
+   * Start Google/Apple. Web: Supabase navigates the page away and back.
+   * Native: the system browser, returning via com.vantage.app:// — see
+   * lib/native/deepLinks.js for why the WebView can't do it itself.
+   */
+  async function startOAuth(provider, queryParams) {
+    if (oauthBlocked) {
+      setError('Please confirm you are 13 or older and agree to the Terms first.');
+      return;
+    }
+    if (mode === 'signup') markTermsAcceptedPending();
+    if (isNativeApp()) {
+      await nativeOAuth(provider, queryParams);
+      return;
+    }
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider,
+      options: {
+        redirectTo: window.location.origin,
+        ...(queryParams ? { queryParams } : {}),
+      },
+    });
+    if (error) throw error;
+  }
+
   /**
    * Google OAuth sign-in. Supabase handles the full redirect dance —
    * we just point it at the Google provider and tell it where to send
-   * the user back to. `redirectTo` is the current origin (preserves
-   * port for local dev, falls back to the deployed origin in prod).
+   * the user back to. `redirectTo` is the current origin on the web
+   * (preserves port for local dev) and com.vantage.app://auth-callback
+   * in the app (startOAuth / lib/native/deepLinks.js).
    *
    * The browser will full-page navigate away to accounts.google.com,
    * so any state we set here is discarded — no need for a loading
@@ -135,7 +169,8 @@ export default function AuthScreen({ onOpenLegal }) {
    *   2. Supabase Dashboard → Authentication → Providers → Google →
    *      paste the client ID + secret and enable.
    *   3. Supabase Dashboard → Authentication → URL Configuration →
-   *      add this app's origins to the allowed redirect list.
+   *      add this app's origins AND com.vantage.app://auth-callback to
+   *      the allowed redirect list.
    *
    * Without those, the Google button still renders (so the UI is
    * complete) but clicking it surfaces the Supabase error message
@@ -145,17 +180,11 @@ export default function AuthScreen({ onOpenLegal }) {
     setError('');
     setInfo('');
     try {
-      const { error } = await supabase.auth.signInWithOAuth({
-        provider: 'google',
-        options: {
-          redirectTo: window.location.origin,
-          // queryParams.prompt forces the account chooser so a user with
-          // multiple Google accounts isn't auto-signed-in to the wrong one.
-          queryParams: { prompt: 'select_account' },
-        },
-      });
-      if (error) throw error;
-      // No state to set on success — the page is about to redirect away.
+      // queryParams.prompt forces the account chooser so a user with
+      // multiple Google accounts isn't auto-signed-in to the wrong one.
+      await startOAuth('google', { prompt: 'select_account' });
+      // No state to set on success — the page is about to redirect away
+      // (web) or the browser sheet is open (native).
     } catch (err) {
       setError(err.message || 'Could not start Google sign-in.');
     }
@@ -183,11 +212,7 @@ export default function AuthScreen({ onOpenLegal }) {
     setError('');
     setInfo('');
     try {
-      const { error } = await supabase.auth.signInWithOAuth({
-        provider: 'apple',
-        options: { redirectTo: window.location.origin },
-      });
-      if (error) throw error;
+      await startOAuth('apple');
     } catch (err) {
       setError(err.message || 'Could not start Apple sign-in.');
     }
@@ -227,11 +252,15 @@ export default function AuthScreen({ onOpenLegal }) {
         // that matches its allow list, and silently falls back to the
         // Site URL otherwise. Both halves are needed; see
         // STARTUP_REQUIREMENTS.
+        //
+        // In the app, webOrigin() is the website, not capacitor://localhost:
+        // the email opens in a mail app and its link in a browser, often
+        // on another device, and only an https URL means anything there.
         const { error } = await withTimeout(
           supabase.auth.signUp({
             email,
             password,
-            options: { emailRedirectTo: window.location.origin },
+            options: { emailRedirectTo: webOrigin() },
           }), 20000,
         );
         if (error) throw error;
@@ -239,9 +268,10 @@ export default function AuthScreen({ onOpenLegal }) {
         setMode('login');
       } else if (mode === 'reset') {
         // Same trap: a reset link with no redirectTo goes to the Site URL.
+        // Same reason for webOrigin() as the sign-up link above.
         const { error } = await withTimeout(
           supabase.auth.resetPasswordForEmail(email, {
-            redirectTo: window.location.origin,
+            redirectTo: webOrigin(),
           }), 20000,
         );
         if (error) throw error;
@@ -397,34 +427,39 @@ export default function AuthScreen({ onOpenLegal }) {
               <span style={S.dividerLine} />
             </div>
             <div style={S.oauthStack}>
+              {oauthBlocked && (
+                <div style={S.oauthHint} id="auth-oauth-hint">
+                  Tick the box above to sign up with Google or Apple.
+                </div>
+              )}
               <button
                 type="button"
                 onClick={handleGoogleSignIn}
-                disabled={loading}
+                disabled={loading || oauthBlocked}
                 className="auth-google"
-                style={S.googleBtn}
+                style={{ ...S.googleBtn, ...(oauthBlocked ? S.oauthOff : null) }}
                 aria-label={mode === 'signup' ? 'Sign up with Google' : 'Sign in with Google'}
+                aria-describedby={oauthBlocked ? 'auth-oauth-hint' : undefined}
               >
                 <GoogleGlyph />
                 <span style={S.googleLabel}>
                   {mode === 'signup' ? 'Sign up with Google' : 'Continue with Google'}
                 </span>
               </button>
-              {isMobile && (
-                <button
-                  type="button"
-                  onClick={handleAppleSignIn}
-                  disabled={loading}
-                  className="auth-apple"
-                  style={S.appleBtn}
-                  aria-label={mode === 'signup' ? 'Sign up with Apple' : 'Sign in with Apple'}
-                >
-                  <AppleGlyph />
-                  <span style={S.googleLabel}>
-                    {mode === 'signup' ? 'Sign up with Apple' : 'Continue with Apple'}
-                  </span>
-                </button>
-              )}
+              <button
+                type="button"
+                onClick={handleAppleSignIn}
+                disabled={loading || oauthBlocked}
+                className="auth-apple"
+                style={{ ...S.appleBtn, ...(oauthBlocked ? S.oauthOff : null) }}
+                aria-label={mode === 'signup' ? 'Sign up with Apple' : 'Sign in with Apple'}
+                aria-describedby={oauthBlocked ? 'auth-oauth-hint' : undefined}
+              >
+                <AppleGlyph />
+                <span style={S.googleLabel}>
+                  {mode === 'signup' ? 'Sign up with Apple' : 'Continue with Apple'}
+                </span>
+              </button>
             </div>
           </>
         )}
@@ -575,6 +610,13 @@ const S = {
   },
   googleLabel: {
     letterSpacing: 0.2,
+  },
+  // Sign-up mode before the 13+/Terms box is ticked.
+  oauthOff: { opacity: 0.45, cursor: 'not-allowed' },
+  oauthHint: {
+    fontSize: 12, lineHeight: 1.45, textAlign: 'center',
+    color: 'var(--text-muted, #8a8278)',
+    fontFamily: 'var(--sans, "DM Sans", sans-serif)',
   },
   divider: {
     display: 'flex', alignItems: 'center', gap: 10,

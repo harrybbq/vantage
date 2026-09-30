@@ -1,11 +1,12 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, lazy, Suspense } from 'react';
 import { motion } from 'framer-motion';
 import { supabase } from '../lib/supabase';
 import { adjustColour } from '../utils/helpers';
 import MacroGoalsPanel from './MacroGoalsPanel';
 import NotificationsPanel from './NotificationsPanel';
 import SubscriptionPanel from './SubscriptionPanel';
-import { AppleHealthImport, WearableSync } from './VitalsHistoryCard';
+import { WearableSync } from './VitalsHistoryCard';
+import { OWNER_SURFACES_IN_BUILD } from '../lib/native/ownerSurfaces';
 import AccountPanel from './settings/AccountPanel';
 import DataExportCard from './settings/DataExportCard';
 import ConsentCard from './settings/ConsentCard';
@@ -18,6 +19,12 @@ import TravelPolicyCard from './holiday/TravelPolicyCard';
 import { authFetch } from '../lib/authFetch';
 import { clearLocalUserData } from '../lib/state/clearLocal';
 import { privacyOn, privacyToggle } from '../lib/friends/privacy';
+
+// Owner-only Apple Health Shortcut panel — compiled out of native builds
+// (lib/native/ownerSurfaces.js); null there, so the branch below drops.
+const AppleHealthImport = OWNER_SURFACES_IN_BUILD
+  ? lazy(() => import('./VitalsHistoryCard').then(m => ({ default: m.AppleHealthImport })))
+  : null;
 
 // Small helper: inline icon + label for the Tools/Data action buttons.
 const IconLabel = ({ name, children, size = 15 }) => (
@@ -1031,12 +1038,14 @@ export default function SettingsSection({ S, update, active, userId, userEmail, 
           desc="Connect a wearable and its vitals flow into your Vitals & Macros history — sleep, resting HR, HRV, recovery and daily burn. Nothing you've logged by hand is ever replaced."
         >
           <WearableSync S={S} update={update} />
-          {typeof window !== 'undefined' && window.__vantageOwner && (
+          {AppleHealthImport && typeof window !== 'undefined' && window.__vantageOwner && (
             <>
               <p className="settings-group-note">
                 Apple Health: import an export file, or turn on live daily sync via an iOS Shortcut.
               </p>
-              <AppleHealthImport S={S} update={update} />
+              <Suspense fallback={null}>
+                <AppleHealthImport S={S} update={update} />
+              </Suspense>
             </>
           )}
         </SettingsGroup>

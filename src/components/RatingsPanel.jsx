@@ -29,6 +29,7 @@ import { RATING_COLOURS, ratingShares } from '../lib/ratings/palette';
 import { useDarkSurface } from '../hooks/useDarkSurface';
 import PrestigeBadge from './PrestigeBadge';
 import { supabase } from '../lib/supabase';
+import { apiUrl } from '../lib/authFetch';
 import { isCooldownActive, daysUntilRetake } from './SelfCheck';
 import BrainCheck   from './BrainCheck';
 import FinanceCheck from './FinanceCheck';
@@ -131,7 +132,7 @@ export default function RatingsPanel({ S, update, compact = false }) {
       const { data: { session } } = await supabase.auth.getSession();
       const token = session?.access_token;
       if (!token) throw new Error('Not signed in.');
-      const res = await fetch('/.netlify/functions/prestige-up', {
+      const res = await fetch(apiUrl('/.netlify/functions/prestige-up'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
       });

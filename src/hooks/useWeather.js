@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { apiUrl } from '../lib/authFetch';
 
 /**
  * useWeather — current conditions for the greeting-header chip.
@@ -49,7 +50,7 @@ export function useWeather(enabled = true) {
     let cancelled = false;
     (async () => {
       try {
-        const res = await fetch('/.netlify/functions/weather');
+        const res = await fetch(apiUrl('/.netlify/functions/weather'));
         const data = await res.json().catch(() => ({}));
         if (cancelled) return;
         if (data && typeof data.tempC === 'number') {

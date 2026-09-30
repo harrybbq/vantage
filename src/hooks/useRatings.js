@@ -21,6 +21,7 @@
 import { useEffect, useRef } from 'react';
 import { deriveRatings } from '../lib/ratings/derive';
 import { supabase } from '../lib/supabase';
+import { apiUrl } from '../lib/authFetch';
 
 const CLIENT_DEBOUNCE_MS = 1500;
 const SERVER_DEBOUNCE_MS = 30_000;
@@ -116,7 +117,7 @@ export function useRatings(userId, S, update, friendCount = 0, hydrated = true) 
           const { data: { session } } = await supabase.auth.getSession();
           const token = session?.access_token;
           if (!token) return;
-          const res = await fetch('/.netlify/functions/recompute-ratings', {
+          const res = await fetch(apiUrl('/.netlify/functions/recompute-ratings'), {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',

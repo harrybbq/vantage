@@ -20,7 +20,7 @@
  *
  * Gating: entry points only render for the owner and this re-checks
  * isOwner, so a deep link shows nothing for anyone else. Owner identity
- * is a UI gate (VITE_OWNER_EMAIL) — everything here is personal
+ * is a UI gate (useIsOwner → is_app_owner()) — everything here is personal
  * planning data in the user's own state, so there is nothing to
  * server-side authorise, but do not put secrets in it.
  */

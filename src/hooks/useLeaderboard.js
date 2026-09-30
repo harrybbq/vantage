@@ -10,6 +10,7 @@
  */
 import { useEffect, useState, useCallback } from 'react';
 import { supabase } from '../lib/supabase';
+import { apiUrl } from '../lib/authFetch';
 
 const CACHE_TTL_MS = 60_000;
 const cache = new Map(); // key -> { ts, data }
@@ -36,7 +37,7 @@ export function useLeaderboard({ scope = 'friends', timeframe = 'alltime' } = {}
       const session = (await supabase.auth.getSession()).data?.session;
       const token = session?.access_token;
       if (!token) throw new Error('Not signed in.');
-      const res = await fetch('/.netlify/functions/get-leaderboard', {
+      const res = await fetch(apiUrl('/.netlify/functions/get-leaderboard'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         body: JSON.stringify({ scope, timeframe }),

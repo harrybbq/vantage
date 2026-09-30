@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { supabase } from './supabase';
 import { consentStatus } from './consent/consent';
+import { apiUrl } from './authFetch';
 
 /**
  * Client-side WHOOP sync: calls the whoop-sync function and merges the
@@ -10,7 +11,7 @@ import { consentStatus } from './consent/consent';
  */
 export async function syncWhoop(update, days = 7) {
   const { data: { session } } = await supabase.auth.getSession();
-  const res = await fetch('/.netlify/functions/whoop-sync', {
+  const res = await fetch(apiUrl('/.netlify/functions/whoop-sync'), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session?.access_token}` },
     body: JSON.stringify({ days }),
