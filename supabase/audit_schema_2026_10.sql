@@ -181,9 +181,10 @@ revoke execute on function public.throttle_friend_requests() from public, anon, 
 
 -- ── 49. health-sync token lookup without a full-table scan ──────────────
 -- PostgREST's `state->>healthToken=eq.X` filter uses this index directly.
+-- No partial `where state ? 'healthToken'`: the planner can't prove that
+-- from `state->>'healthToken' = X`, so a partial index would go unused.
 create index if not exists user_data_health_token_idx
-  on public.user_data ((state->>'healthToken'))
-  where state ? 'healthToken';
+  on public.user_data ((state->>'healthToken'));
 
 -- ── 54. Server-side anti-wipe predicate mirrors the client's ────────────
 -- src/lib/state/meaningful.js: any non-empty store counts unless it is on

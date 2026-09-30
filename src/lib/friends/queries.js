@@ -125,6 +125,8 @@ export async function updateOwnProfile(userId, patch) {
   // the public-text filter refuses is published as no name at all. The
   // user's own S.profile.name is untouched — this only decides what
   // leaves the device.
+  // 40 chars: the profiles_display_name_len check (audit SQL).
+  if (typeof clean.display_name === 'string') clean.display_name = clean.display_name.slice(0, 40);
   if (typeof clean.display_name === 'string' && publicNameProblem(clean.display_name)) {
     clean.display_name = null;
   }

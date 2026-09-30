@@ -154,7 +154,8 @@ export function usePublishProfile(userId, S, hasPro, visionState, { hydrated = f
     const ownName = (S.profile?.name || '').trim();
     const payload = {
       // profiles slice
-      display_name: ownName && !publicNameProblem(ownName) ? ownName : null,
+      // 40 chars: the profiles_display_name_len check (audit SQL).
+      display_name: ownName && !publicNameProblem(ownName) ? ownName.slice(0, 40) : null,
       level,
       // last_active_at gates on sharePresence — see also the heartbeat
       // effect below which won't ping if presence is opted out.
