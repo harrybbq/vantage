@@ -1898,7 +1898,12 @@ async function loadLivePreviewIntoLink(linkId, url) {
     if (data && data.imageUrl) {
       // Both values come back from a scrape of a third-party page, so
       // both go through safeUrl before reaching outerHTML.
-      hero.outerHTML = `<a class="link-island-live-hero" href="${safeUrl(url)}" target="_blank" rel="noreferrer"><img src="${safeUrl(data.imageUrl)}" alt="" loading="lazy" onerror="this.style.display='none'"></a>`;
+      hero.outerHTML = `<a class="link-island-live-hero" href="${safeUrl(url)}" target="_blank" rel="noreferrer"><img src="${safeUrl(data.imageUrl)}" alt="" loading="lazy"></a>`;
+      // Hide a broken image with a listener, not an inline onerror
+      // attribute — an enforced CSP (no 'unsafe-inline') blocks those.
+      // The error event is queued as a task, so attaching now is in time.
+      body.querySelector('.link-island-live-hero img')
+        ?.addEventListener('error', e => { e.currentTarget.style.display = 'none'; }, { once: true });
     } else if (data && data.notes) {
       hero.outerHTML = `<div class="link-island-notes">${escapeHtml(data.notes)}</div>`;
     } else {
