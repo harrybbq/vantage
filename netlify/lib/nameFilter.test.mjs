@@ -32,6 +32,8 @@ const PASS = [
   'Hancock Park', 'Cumbria cyclists', 'Analyst guild', 'Sony WH-1000XM5', 'Samsung 55" 4K TV',
   'iPhone 15 Pro 256GB', 'Nike Air Max 90', 'Lego set 10497', 'Kettlebell 24kg', 'Coffee grinder £129.99',
   'The Grapes of Wrath', 'Titleist golf balls', 'Therapist fund', 'Pakistan trip', 'Scrapbook kit',
+  // Sentence-style names whose next word happens to be a TLD.
+  'Time. To. Run', 'Level up. To 99', 'Bike. Me. Now', 'Eat. Sleep. Shop. Repeat',
 ];
 
 const failures = [];

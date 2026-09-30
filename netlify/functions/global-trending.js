@@ -65,7 +65,12 @@ async function computeTrending(env) {
   // and PostgREST's `not.eq.false` would drop nulls too. Opted-out items
   // reach only this trusted service-role function and are discarded here.
   const uRes = await sb(`user_data?select=id,items:state->shopItems,trending:state->privacy->shareTrending`, env);
-  if (!uRes.ok) throw new Error(`user_data read ${uRes.status}`);
+  // A failed read is not "nobody wants anything": serve the last good
+  // board if there is one, and never cache the failure itself.
+  if (!uRes.ok) {
+    if (CACHE.items) return CACHE.items;
+    throw new Error(`user_data read ${uRes.status}`);
+  }
   const all = await uRes.json();
   const suspended = await suspendedIds({ supabaseUrl: env.SUPABASE_URL, serviceKey: env.SUPABASE_SERVICE_ROLE_KEY });
 

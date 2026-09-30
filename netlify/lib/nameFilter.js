@@ -74,7 +74,7 @@ function hitsBlocklist(text) {
 
 // Contact details and links, read on the raw text (before l33t mapping,
 // which would turn digits into letters).
-const URL_RE = /(https?:\/\/|www\.|\b[a-z0-9-]{2,}\s*(\.|\bdot\b)\s*(com|net|org|io|co|uk|xyz|ru|gg|me|app|link|ly|shop|store|site|info|biz|tk|tv|cc|to)\b)/i;
+const URL_RE = /(https?:\/\/|www\.|\b[a-z0-9-]{2,}(\.(?=[a-z0-9])|\s+dot\s+)(com|net|org|io|co|uk|xyz|ru|gg|me|app|link|ly|shop|store|site|info|biz|tk|tv|cc|to)\b)/i;
 const EMAIL_RE = /[^\s@]+@[^\s@]+\.[a-z]{2,}/i;
 const PHONE_RE = /(\+?\d[\d\s().-]{7,}\d)/;
 

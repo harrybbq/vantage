@@ -58,16 +58,15 @@ function debounced(userId) {
 /**
  * profiles.prestiged_at, read on its own so a missing column (schema
  * not yet run) is a 400 on THIS query only. → { supported, at }.
+ * Only 400/404 mean "column absent"; any other failure throws, so a
+ * transient error cannot quietly skip the cooldown.
  */
 async function readPrestigedAt(supabaseUrl, sbHeaders, userId) {
-  try {
-    const res = await fetch(`${supabaseUrl}/rest/v1/profiles?id=eq.${userId}&select=prestiged_at`, { headers: sbHeaders });
-    if (!res.ok) return { supported: false, at: null };
-    const row = (await res.json())[0];
-    return { supported: true, at: row?.prestiged_at || null };
-  } catch {
-    return { supported: false, at: null };
-  }
+  const res = await fetch(`${supabaseUrl}/rest/v1/profiles?id=eq.${userId}&select=prestiged_at`, { headers: sbHeaders });
+  if (res.status === 400 || res.status === 404) return { supported: false, at: null };
+  if (!res.ok) throw new Error(`prestiged_at read ${res.status}`);
+  const row = (await res.json())[0];
+  return { supported: true, at: row?.prestiged_at || null };
 }
 
 exports.handler = async (event) => {
