@@ -26,7 +26,7 @@ const { screenImage, parseDataUrl } = require('../lib/imageModeration');
 const { withinDailyAiCap, overDailyCap } = require('../lib/aiQuota');
 const {
   MAX_SEATS, DIVISIONS, sb, fetchBaselines, memberScore, groupScore, groupSplit, rankGroups,
-  divisionName, weekStartDate, COIN_AWARD,
+  divisionName, weekStartDate, COIN_AWARD, handOverGroup,
 } = require('../lib/leagues');
 
 const CORS = {
@@ -230,22 +230,13 @@ async function leaveGroup(userId, env) {
   const isOwner = group.owner_id === userId;
 
   if (isOwner) {
-    /* The owner leaving hands the group to whoever has been in it
-       longest rather than deleting it under everyone. A group is other
-       people's week; one person quitting should not end it. */
-    const others = await sb(env.supabaseUrl, env.serviceKey,
-      `/rest/v1/group_members?group_id=eq.${group.id}&user_id=neq.${userId}&select=user_id&order=joined_at.asc&limit=1`);
-    const heir = others.ok ? (await others.json())[0] : null;
-    if (heir) {
-      await sb(env.supabaseUrl, env.serviceKey, `/rest/v1/groups?id=eq.${group.id}`, {
-        method: 'PATCH', headers: { Prefer: 'return=minimal' },
-        body: JSON.stringify({ owner_id: heir.user_id }),
-      });
-      await sb(env.supabaseUrl, env.serviceKey,
-        `/rest/v1/group_members?group_id=eq.${group.id}&user_id=eq.${heir.user_id}`, {
-          method: 'PATCH', headers: { Prefer: 'return=minimal' },
-          body: JSON.stringify({ role: 'owner' }),
-        });
+    // Heir logic lives in lib/leagues.js — delete-account runs it too.
+    // A failed hand-over now stops the leave rather than leaving the
+    // group owned by someone who is no longer in it.
+    try {
+      await handOverGroup(group.id, userId, env);
+    } catch {
+      return fail(500, 'Could not hand the group over — try again.');
     }
   }
 

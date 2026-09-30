@@ -59,7 +59,10 @@ exports.handler = async (event) => {
   // Defense — block private / loopback hosts. Without this an attacker
   // could turn this function into an SSRF probe of internal Netlify
   // network or your local services.
-  const parsed = new URL(url);
+  let parsed;
+  try { parsed = new URL(url); } catch {
+    return { statusCode: 400, headers: CORS, body: JSON.stringify({ error: 'invalid url' }) };
+  }
   if (isBlockedHost(parsed.hostname)) {
     return { statusCode: 400, headers: CORS, body: JSON.stringify({ error: 'host not allowed' }) };
   }
@@ -71,7 +74,8 @@ exports.handler = async (event) => {
     return {
       statusCode: 200, // 200 with empty result so client can fall back to manual entry cleanly
       headers: CORS,
-      body: JSON.stringify({ ok: false, reason: 'fetch_failed', detail: e.message }),
+      // Only a generic reason goes back (see productPage.js).
+      body: JSON.stringify({ ok: false, reason: e.message === 'blocked' ? 'blocked_host' : 'fetch_failed' }),
     };
   }
 

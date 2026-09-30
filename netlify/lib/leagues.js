@@ -188,9 +188,41 @@ function rankGroups(groups) {
 
 const divisionName = num => (DIVISIONS.find(d => d.num === num) || DIVISIONS[9]).name;
 
+/**
+ * The owner is leaving: hand the group to whoever has been in it
+ * longest rather than deleting it under everyone. A group is other
+ * people's week; one person quitting should not end it.
+ *
+ * Shared by groups.js (Leave) and delete-account.js. The second one
+ * matters more: groups.owner_id cascades on delete, so an owner deleting
+ * their account used to take the whole group — every member's league
+ * history — down with them.
+ *
+ * → the heir's user id, or null when nobody else is in the group (the
+ * caller's own removal then empties it, which is the right outcome).
+ */
+async function handOverGroup(groupId, leavingUserId, { supabaseUrl, serviceKey }) {
+  const others = await sb(supabaseUrl, serviceKey,
+    `/rest/v1/group_members?group_id=eq.${groupId}&user_id=neq.${leavingUserId}&select=user_id&order=joined_at.asc&limit=1`);
+  if (!others.ok) throw new Error('heir lookup failed');
+  const heir = (await others.json())[0];
+  if (!heir) return null;
+  const g = await sb(supabaseUrl, serviceKey, `/rest/v1/groups?id=eq.${groupId}`, {
+    method: 'PATCH', headers: { Prefer: 'return=minimal' },
+    body: JSON.stringify({ owner_id: heir.user_id }),
+  });
+  if (!g.ok) throw new Error('hand-over failed');
+  await sb(supabaseUrl, serviceKey,
+    `/rest/v1/group_members?group_id=eq.${groupId}&user_id=eq.${heir.user_id}`, {
+      method: 'PATCH', headers: { Prefer: 'return=minimal' },
+      body: JSON.stringify({ role: 'owner' }),
+    });
+  return heir.user_id;
+}
+
 module.exports = {
   DIVISIONS, MAX_SEATS, COIN_AWARD, MIN_GROUPS_TO_SETTLE, MAX_MOVED, GROUPS_PER_EXTRA_MOVE,
   movementFor, CATEGORIES,
   weekStart, weekStartDate, sb, fetchBaselines, memberScore, groupScore, groupSplit,
-  rankGroups, divisionName,
+  rankGroups, divisionName, handOverGroup,
 };
