@@ -101,6 +101,10 @@ export async function handleUrl(url) {
       refresh_token: session.refresh_token,
     });
     if (error) throw error;
+    // The PKCE client persisted its own copy of the session. The main
+    // client now owns it and will rotate the refresh token; a second,
+    // stale copy has no reason to sit in storage.
+    try { localStorage.removeItem('vb-native-oauth'); } catch { /* private mode */ }
     // An OAuth sign-in is a "remember me" sign-in: the checkbox belongs
     // to the password form, and a stale '0' from an earlier password
     // login would sign this session out on the next launch.
