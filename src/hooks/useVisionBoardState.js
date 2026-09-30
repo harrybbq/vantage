@@ -978,7 +978,9 @@ export function useVisionBoardState(userId) {
       // does — including a row whose photo another device removed, which
       // must not be resurrected from this device's in-memory copy.
       const onScreen = addTransient({ ...DEFAULT_STATE, ...merged });
-      const photo = photoChanged ? mine : (fresh.photo || null);
+      // A pending "Remove photo" keeps it off screen too, or the next
+      // save would read the cloud copy as a new pick and re-send it.
+      const photo = photoChanged ? mine : (clearPhotoRef.current ? null : (fresh.photo || null));
       if (photo) onScreen.profile = { ...onScreen.profile, photo };
       if (!photoChanged) lastPhotoRef.current = fresh.photo || null;
 
