@@ -15,6 +15,7 @@
  */
 
 const { recomputeUser } = require('../lib/recompute');
+const { suspendedIds } = require('../lib/suspended');
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
@@ -125,16 +126,23 @@ function rowFromProfile(p, snapshotOvr, callerId) {
 // (profiles.leaderboard_color, opt-in via Settings). Kept as a separate
 // query so a missing column (migration not yet applied) can't break the
 // board — a 400 just means no colours this run.
+//
+// Pro and lifetime only, checked HERE against the server-owned tier: the
+// colour is a Pro customisation (CLAUDE.md tier line), and the column is
+// client-writable, so a free account that set it directly was showing a
+// paid feature to everyone.
 async function attachNameColors(supabaseUrl, serviceKey, rows) {
   const ids = Array.from(new Set(rows.map(r => r.userId).filter(Boolean)));
   if (!ids.length) return;
   try {
     const res = await sb(supabaseUrl, serviceKey,
-      `/rest/v1/profiles?id=in.(${ids.join(',')})&select=id,leaderboard_color`
+      `/rest/v1/profiles?id=in.(${ids.join(',')})&select=id,leaderboard_color,tier`
     );
     if (!res.ok) return;
     const data = await res.json();
-    const byId = new Map(data.map(d => [d.id, d.leaderboard_color]));
+    const byId = new Map(data
+      .filter(d => d.tier === 'pro' || d.tier === 'lifetime')
+      .map(d => [d.id, d.leaderboard_color]));
     for (const r of rows) {
       const c = byId.get(r.userId);
       if (c && /^#[0-9a-fA-F]{6}$/.test(c)) r.nameColor = c;
@@ -174,7 +182,8 @@ async function buildFriendsBoard({ supabaseUrl, serviceKey, callerId, timeframe 
   const pRes = await sb(supabaseUrl, serviceKey,
     `/rest/v1/profiles?id=in.(${ids.join(',')})&select=id,handle,display_name,avatar_url,ratings,ratings_ovr,ratings_computed_at,prestige`
   );
-  const profiles = pRes.ok ? await pRes.json() : [];
+  const suspended = await suspendedIds({ supabaseUrl, serviceKey });
+  const profiles = (pRes.ok ? await pRes.json() : []).filter(p => p.id === callerId || !suspended.has(p.id));
 
   const snaps = await fetchSnapshotOvrs(supabaseUrl, serviceKey, ids);
   const rows = profiles.map(p => rowFromProfile(p, snaps.get(p.id), callerId));
@@ -200,7 +209,11 @@ async function buildGlobalBoard({ supabaseUrl, serviceKey, callerId, timeframe }
   const candRes = await sb(supabaseUrl, serviceKey,
     `/rest/v1/profiles?leaderboard_optin=eq.true&ratings_ovr=not.is.null&select=id,handle,display_name,avatar_url,ratings,ratings_ovr,ratings_computed_at,prestige&order=lifetime_rating.desc&limit=${limit}`
   );
-  const candidates = candRes.ok ? await candRes.json() : [];
+  // Suspended users are removed from the public board (item 63). The
+  // caller's own pinned row below is unaffected — only others see less.
+  const suspended = await suspendedIds({ supabaseUrl, serviceKey });
+  const candidates = (candRes.ok ? await candRes.json() : [])
+    .filter(p => p.id === callerId || !suspended.has(p.id));
 
   const candIds = candidates.map(p => p.id);
   const snaps = await fetchSnapshotOvrs(supabaseUrl, serviceKey, candIds);
