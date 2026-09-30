@@ -672,7 +672,7 @@ export default function SettingsSection({ S, update, active, userId, userEmail, 
             userEmail={userEmail}
             onSignOut={onSignOut}
           >
-            <DataExportCard S={S} onOpenLegal={onOpenLegal} />
+            <DataExportCard S={S} userId={userId} onOpenLegal={onOpenLegal} />
 
             {/* Last group on the page. Without the card border it used
                 to sit behind, the red heading and the red button carry
