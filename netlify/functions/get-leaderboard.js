@@ -271,7 +271,8 @@ exports.handler = async (event) => {
     headers: { apikey: serviceKey, Authorization: `Bearer ${token}` },
   });
   if (!userRes.ok) return { statusCode: 401, headers: CORS, body: JSON.stringify({ error: 'invalid token' }) };
-  const callerId = (await userRes.json())?.id;
+  const caller = await userRes.json();
+  const callerId = caller?.id;
   if (!callerId) return { statusCode: 401, headers: CORS, body: JSON.stringify({ error: 'no user id' }) };
 
   // Body
@@ -290,7 +291,8 @@ exports.handler = async (event) => {
     const stale = !meRow?.ratings_computed_at ||
       (Date.now() - new Date(meRow.ratings_computed_at).getTime()) > STALE_MS;
     if (stale) {
-      await recomputeUser(callerId, { supabaseUrl, serviceKey }).catch(() => null);
+      await recomputeUser(callerId, { supabaseUrl, serviceKey }, { createdAt: caller?.created_at || null })
+        .catch(() => null);
     }
   } catch { /* non-fatal — the board still loads with whatever profile holds */ }
 

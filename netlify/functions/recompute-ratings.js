@@ -49,7 +49,7 @@ exports.handler = async (event) => {
   const supabaseUrl = process.env.SUPABASE_URL;
   const serviceKey  = process.env.SUPABASE_SERVICE_ROLE_KEY;
   if (!supabaseUrl || !serviceKey) {
-    return { statusCode: 500, headers: CORS, body: JSON.stringify({ error: 'supabase env missing' }) };
+    return { statusCode: 500, headers: CORS, body: JSON.stringify({ error: 'not configured' }) };
   }
 
   // ── Auth: verify the user's JWT ──
@@ -66,12 +66,13 @@ exports.handler = async (event) => {
   if (!userId) return { statusCode: 401, headers: CORS, body: JSON.stringify({ error: 'no user id' }) };
 
   try {
-    const { ratings, computedAt, prestige } = await recomputeUser(userId, { supabaseUrl, serviceKey });
+    // created_at from the verified auth user floors and caps the day
+    // keys the rating counts (see netlify/lib/recompute.js dayWindow).
+    const { ratings, computedAt, prestige } = await recomputeUser(
+      userId, { supabaseUrl, serviceKey }, { createdAt: user?.created_at || null });
     return { statusCode: 200, headers: CORS, body: JSON.stringify({ ok: true, ratings, computedAt, prestige }) };
   } catch (e) {
-    return {
-      statusCode: 500, headers: CORS,
-      body: JSON.stringify({ error: e.message || 'recompute failed', detail: e.detail }),
-    };
+    console.error('recompute-ratings failed', e?.message);
+    return { statusCode: 500, headers: CORS, body: JSON.stringify({ error: 'recompute failed' }) };
   }
 };

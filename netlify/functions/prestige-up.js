@@ -5,8 +5,19 @@
  * reset their competitive climb in exchange for prestige += 1 (cap 99).
  *
  * Server-side guards (never trusts the client):
- *   - profiles.ratings_ovr must be >= 99
+ *   - the OVR RECOMPUTED here, from one fresh read of the state, must
+ *     be >= 99 — not the stored profiles.ratings_ovr. Checking the
+ *     stored value and then snapshotting the baseline from a second,
+ *     later read let a user empty their state in between: the guard
+ *     passed on yesterday's 99, the baseline came out as zero, and the
+ *     next recompute put them straight back at 99 with prestige + 1.
+ *     Repeat to P99. Guard and baseline now come from the same read.
  *   - profiles.prestige must be < 99
+ *   - at least PRESTIGE_COOLDOWN_DAYS since profiles.prestiged_at, when
+ *     that column exists (supabase/audit_schema_2026_10.sql). Before it
+ *     does, the 10 s debounce below is the only brake — fail soft.
+ *   - the prestige PATCH is conditional on the prestige value read, so
+ *     two concurrent requests cannot both land.
  *
  * Mechanics — competitive reset only, nothing is wiped:
  *   1. Snapshot the user's CURRENT raw per-category points
@@ -20,7 +31,7 @@
  *      stay untouched.
  */
 
-const { derivePoints, recomputeUser, fetchMacroDays } = require('../lib/recompute');
+const { derivePoints, deriveRatings, loadRatingInputs, writeRatings } = require('../lib/recompute');
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
@@ -29,6 +40,10 @@ const CORS = {
 };
 
 const PRESTIGE_MAX = 99;
+const PRESTIGE_COOLDOWN_DAYS = 7;
+const DAY_MS = 86_400_000;
+
+const reply = (statusCode, body) => ({ statusCode, headers: CORS, body: JSON.stringify(body) });
 
 // One prestige attempt per user per 10s — absorbs double-clicks on the
 // confirm button without needing a DB lock.
@@ -40,83 +55,97 @@ function debounced(userId) {
   return now - last < 10_000;
 }
 
+/**
+ * profiles.prestiged_at, read on its own so a missing column (schema
+ * not yet run) is a 400 on THIS query only. → { supported, at }.
+ */
+async function readPrestigedAt(supabaseUrl, sbHeaders, userId) {
+  try {
+    const res = await fetch(`${supabaseUrl}/rest/v1/profiles?id=eq.${userId}&select=prestiged_at`, { headers: sbHeaders });
+    if (!res.ok) return { supported: false, at: null };
+    const row = (await res.json())[0];
+    return { supported: true, at: row?.prestiged_at || null };
+  } catch {
+    return { supported: false, at: null };
+  }
+}
+
 exports.handler = async (event) => {
   if (event.httpMethod === 'OPTIONS') return { statusCode: 204, headers: CORS, body: '' };
-  if (event.httpMethod !== 'POST') {
-    return { statusCode: 405, headers: CORS, body: JSON.stringify({ error: 'method not allowed' }) };
-  }
+  if (event.httpMethod !== 'POST') return reply(405, { error: 'method not allowed' });
 
   const supabaseUrl = process.env.SUPABASE_URL;
   const serviceKey  = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  if (!supabaseUrl || !serviceKey) {
-    return { statusCode: 500, headers: CORS, body: JSON.stringify({ error: 'supabase env missing' }) };
-  }
+  if (!supabaseUrl || !serviceKey) return reply(500, { error: 'not configured' });
+  const env = { supabaseUrl, serviceKey };
 
   // ── Auth ──
   const auth = event.headers.authorization || event.headers.Authorization || '';
   const token = auth.replace(/^Bearer\s+/i, '');
-  if (!token) return { statusCode: 401, headers: CORS, body: JSON.stringify({ error: 'missing token' }) };
+  if (!token) return reply(401, { error: 'missing token' });
   const userRes = await fetch(`${supabaseUrl}/auth/v1/user`, {
     headers: { apikey: serviceKey, Authorization: `Bearer ${token}` },
   });
-  if (!userRes.ok) return { statusCode: 401, headers: CORS, body: JSON.stringify({ error: 'invalid token' }) };
-  const userId = (await userRes.json())?.id;
-  if (!userId) return { statusCode: 401, headers: CORS, body: JSON.stringify({ error: 'no user id' }) };
+  if (!userRes.ok) return reply(401, { error: 'invalid token' });
+  const user = await userRes.json();
+  const userId = user?.id;
+  if (!userId) return reply(401, { error: 'no user id' });
 
-  if (debounced(userId)) {
-    return { statusCode: 429, headers: CORS, body: JSON.stringify({ error: 'try again in a moment' }) };
-  }
+  if (debounced(userId)) return reply(429, { error: 'try again in a moment' });
 
   const sbHeaders = { apikey: serviceKey, Authorization: `Bearer ${serviceKey}` };
 
   try {
-    // ── Guards against the CANONICAL profile values ──
-    const profRes = await fetch(
-      `${supabaseUrl}/rest/v1/profiles?id=eq.${userId}&select=ratings_ovr,prestige`,
-      { headers: sbHeaders }
-    );
-    const prof = profRes.ok ? (await profRes.json())[0] : null;
-    if (!prof) return { statusCode: 404, headers: CORS, body: JSON.stringify({ error: 'no profile' }) };
-    if ((prof.ratings_ovr || 0) < 99) {
-      return { statusCode: 400, headers: CORS, body: JSON.stringify({ error: 'OVR must be 99 to prestige' }) };
-    }
-    if ((prof.prestige || 0) >= PRESTIGE_MAX) {
-      return { statusCode: 400, headers: CORS, body: JSON.stringify({ error: 'max prestige reached' }) };
+    // ── Cooldown (fail soft until the column exists) ──
+    const stamp = await readPrestigedAt(supabaseUrl, sbHeaders, userId);
+    if (stamp.at && Date.now() - new Date(stamp.at).getTime() < PRESTIGE_COOLDOWN_DAYS * DAY_MS) {
+      return reply(429, { error: `You can prestige once every ${PRESTIGE_COOLDOWN_DAYS} days.` });
     }
 
-    // ── Snapshot current raw points as the new baseline ──
-    const stateRes = await fetch(
-      `${supabaseUrl}/rest/v1/user_data?id=eq.${userId}&select=state`,
-      { headers: sbHeaders }
-    );
-    if (!stateRes.ok) throw new Error('state read failed');
-    const state = (await stateRes.json())?.[0]?.state || {};
+    // ── ONE read: state, friends, prestige row, macro days ──
+    const inp = await loadRatingInputs(userId, env, { createdAt: user.created_at || null });
+    if (!inp.profile) return reply(404, { error: 'no profile' });
+    const prevPrestige = inp.prestige;
+    if (prevPrestige >= PRESTIGE_MAX) return reply(400, { error: 'max prestige reached' });
 
-    const friendsRes = await fetch(
-      `${supabaseUrl}/rest/v1/friendships?status=eq.accepted&or=(requester_id.eq.${userId},addressee_id.eq.${userId})&select=requester_id`,
-      { headers: sbHeaders }
-    );
-    const friends = friendsRes.ok ? (await friendsRes.json()).length : 0;
+    // Guard on the value recomputed from THIS read, net of the current
+    // baseline — exactly what the leaderboard would show right now.
+    const current = deriveRatings(inp.state, inp.friends, inp.baseline, inp.macroDays, inp.createdAt);
+    if (current.ovr < 99) {
+      // Store the honest number while we have it, so the button the
+      // client showed off a stale 99 goes away.
+      await writeRatings(userId, current, env).catch(() => null);
+      return reply(400, { error: 'OVR must be 99 to prestige' });
+    }
 
-    const macroDays = await fetchMacroDays(userId, { supabaseUrl, serviceKey });
-    const baseline = derivePoints(state, friends, macroDays);
-    const newPrestige = (prof.prestige || 0) + 1;
+    // ── Baseline from the same read ──
+    const baseline = derivePoints(inp.state, inp.friends, inp.macroDays, inp.createdAt);
+    const newPrestige = prevPrestige + 1;
+    const patch = { prestige: newPrestige, prestige_baseline: baseline };
+    if (stamp.supported) patch.prestiged_at = new Date().toISOString();
 
-    const patchRes = await fetch(`${supabaseUrl}/rest/v1/profiles?id=eq.${userId}`, {
-      method: 'PATCH',
-      headers: { ...sbHeaders, 'Content-Type': 'application/json', Prefer: 'return=minimal' },
-      body: JSON.stringify({ prestige: newPrestige, prestige_baseline: baseline }),
-    });
-    if (!patchRes.ok) throw new Error('prestige patch failed');
+    // Conditional on the prestige we read: a concurrent request that got
+    // there first leaves this one matching zero rows.
+    const patchRes = await fetch(
+      `${supabaseUrl}/rest/v1/profiles?id=eq.${userId}&prestige=eq.${prevPrestige}&select=id`, {
+        method: 'PATCH',
+        headers: { ...sbHeaders, 'Content-Type': 'application/json', Prefer: 'return=representation' },
+        body: JSON.stringify(patch),
+      });
+    if (!patchRes.ok) {
+      console.error('prestige-up: patch failed', patchRes.status, (await patchRes.text().catch(() => '')).slice(0, 300));
+      throw new Error('prestige patch failed');
+    }
+    const updated = await patchRes.json().catch(() => []);
+    if (!Array.isArray(updated) || !updated.length) return reply(409, { error: 'try again in a moment' });
 
-    // ── Recompute so the canonical OVR drops to the new floor ──
-    const { ratings, computedAt } = await recomputeUser(userId, { supabaseUrl, serviceKey });
+    // ── Canonical OVR drops to the new floor — same inputs, new baseline ──
+    const ratings = deriveRatings(inp.state, inp.friends, baseline, inp.macroDays, inp.createdAt);
+    const computedAt = await writeRatings(userId, ratings, env);
 
-    return {
-      statusCode: 200, headers: CORS,
-      body: JSON.stringify({ ok: true, prestige: newPrestige, ratings, computedAt }),
-    };
+    return reply(200, { ok: true, prestige: newPrestige, ratings, computedAt });
   } catch (e) {
-    return { statusCode: 500, headers: CORS, body: JSON.stringify({ error: e.message || 'prestige failed' }) };
+    console.error('prestige-up failed', e?.message);
+    return reply(500, { error: 'prestige failed' });
   }
 };

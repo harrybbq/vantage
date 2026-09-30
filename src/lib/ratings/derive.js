@@ -113,6 +113,55 @@ function toRating(points, k = RATING_SCALE) {
   return clamp(r);
 }
 
+// ── Which day keys count (mirror of netlify/lib/recompute.js) ─────────────
+//
+// `logs`, `vitalsLog` and `burnLog` are maps keyed by day, and until
+// 2026-09-30 every key counted. Ten thousand junk keys, or ten years of
+// dates before the account existed, or dates in the future, all scored
+// as years of logging — which is how anyone could reach global #1.
+//
+// A key now counts only if it is a real calendar date (YYYY-MM-DD that
+// round-trips), not after tomorrow (a day of slack for timezones ahead
+// of UTC) and, when `ctx.createdAt` is known, not before the day before
+// the account was created. Lifetime day counts are also capped at the
+// account's age in days — implied by the window, kept explicit so a
+// change to the window cannot lift it. Unknown createdAt: no floor, no
+// cap, as before. Honest users are unaffected: their keys are real,
+// past dates.
+//
+// Known cost: history imported from before sign-up (an Apple Health
+// export, a wearable's 30-day backfill) stays in the user's data but
+// does not count toward the rating.
+//
+// Achievements are NOT touched: undated ones still count unspaced, as
+// legitimate accounts older than the createdAt stamp would otherwise
+// lose rating they earned. Known hole; waits on item 26.
+const DAY_KEY_RE = /^\d{4}-\d{2}-\d{2}$/;
+
+function toMs(v) {
+  if (v == null || v === '') return null;
+  const n = typeof v === 'number' ? v : Date.parse(v);
+  return Number.isFinite(n) && n > 0 ? n : null;
+}
+
+function dayWindow(createdAt, now = Date.now()) {
+  const created = toMs(createdAt);
+  const known = created != null && created <= now;
+  return {
+    min: known ? ymd(created - DAY_MS) : null,
+    max: ymd(now + DAY_MS),
+    cap: known ? Math.floor((now - created) / DAY_MS) + 3 : Infinity,
+  };
+}
+
+function isCountableDay(key, win) {
+  if (!DAY_KEY_RE.test(key)) return false;
+  if (key > win.max) return false;
+  if (win.min && key < win.min) return false;
+  const t = Date.parse(key + 'T00:00:00Z');
+  return Number.isFinite(t) && ymd(t) === key;
+}
+
 // ── Rule 1: time-spaced achievement points ─────────────────────────────────
 
 /**
@@ -162,7 +211,7 @@ function achievementPoints(S, category) {
  *  above what anyone sensibly runs in one category. */
 const TRACKER_CAP_N = 4;
 
-function trackerPoints(S, category) {
+function trackerPoints(S, category, win = dayWindow(null)) {
   const trackers = (S.trackers || []).filter(t => t.category === category);
   if (!trackers.length) return 0;
   const logs = S.logs || {};
@@ -172,6 +221,7 @@ function trackerPoints(S, category) {
     let hits = 0;
     for (let i = 0; i < TRACKER_HISTORY_DAYS; i++) {
       const k = ymd(new Date(today - i * DAY_MS));
+      if (win.min && k < win.min) break;
       const v = logs[k]?.[t.id];
       const truthy = t.type === 'boolean' ? !!v : (Number(v) || 0) > 0;
       if (truthy) hits++;
@@ -206,12 +256,14 @@ function trackerPoints(S, category) {
 // OVR is the mean of the four, the three slow ones set the pace.
 const CATEGORY_DAY_POINTS = 0.6;
 
-function categoryDayPoints(S, category) {
+function categoryDayPoints(S, category, win = dayWindow(null)) {
   const ids = new Set((S.trackers || []).filter(t => t.category === category).map(t => t.id));
   if (!ids.size) return 0;
   const logs = S.logs || {};
   let days = 0;
   for (const key of Object.keys(logs)) {
+    if (days >= win.cap) break;
+    if (!isCountableDay(key, win)) continue;
     const day = logs[key] || {};
     for (const id of ids) {
       const v = day[id];
@@ -270,7 +322,7 @@ function socialSelfCheckPoints(S) { return selfCheckPoints(S.socialScore); }
 
 // ── Social: friend count + days-active ─────────────────────────────────────
 
-function socialPoints(S, friendCount = 0) {
+function socialPoints(S, friendCount = 0, win = dayWindow(null)) {
   // Friend count caps at 20 for points purposes (≥20 friends = max contrib).
   const friends = Math.min(friendCount, 20);
   // Approximate days-active from log keys: number of distinct days with
@@ -280,6 +332,7 @@ function socialPoints(S, friendCount = 0) {
   let activeDays = 0;
   for (let i = 0; i < 30; i++) {
     const k = ymd(new Date(today - i * DAY_MS));
+    if (win.min && k < win.min) break;
     if (logs[k] && Object.keys(logs[k]).length > 0) activeDays++;
   }
   // Friends contribute up to 12pt; active streak up to 16pt.
@@ -305,28 +358,34 @@ function socialPoints(S, friendCount = 0) {
 
 const BURN_DAY_CAP_KCAL = 600;
 
-function vitalsPoints(S) {
+function vitalsPoints(S, win = dayWindow(null)) {
   const log = S.vitalsLog || {};
   let days = 0;
   for (const k of Object.keys(log)) {
+    if (days >= win.cap) break;
+    if (!isCountableDay(k, win)) continue;
     const e = log[k];
     if (e && (e.weight != null || e.sleep != null || e.rhr != null)) days++;
   }
   return days * 0.4;
 }
 
-function burnPoints(S) {
+function burnPoints(S, win = dayWindow(null)) {
   const log = S.burnLog || {};
-  let pts = 0;
+  let pts = 0, days = 0;
   for (const k of Object.keys(log)) {
-    const kcal = (log[k] || []).reduce((sum, a) => sum + (Number(a.kcal) || 0), 0);
-    if (kcal > 0) pts += Math.min(kcal, BURN_DAY_CAP_KCAL) / BURN_DAY_CAP_KCAL * 0.5;
+    if (days >= win.cap) break;
+    if (!isCountableDay(k, win)) continue;
+    const list = Array.isArray(log[k]) ? log[k] : [];
+    const kcal = list.reduce((sum, a) => sum + (Number(a?.kcal) || 0), 0);
+    if (kcal > 0) { pts += Math.min(kcal, BURN_DAY_CAP_KCAL) / BURN_DAY_CAP_KCAL * 0.5; days++; }
   }
   return pts;
 }
 
-function macroPoints(macroDays = 0) {
-  return Math.max(0, macroDays) * 0.5;
+// nutrition rows are client-written too, so the same age cap holds
+function macroPoints(macroDays = 0, win = dayWindow(null)) {
+  return Math.max(0, Math.min(macroDays || 0, win.cap)) * 0.5;
 }
 
 // ── Visions contribution ───────────────────────────────────────────────────
@@ -359,38 +418,45 @@ function visionPoints(S, category) {
 
 // ── Public API ─────────────────────────────────────────────────────────────
 
+/**
+ * ctx: { friendCount, macroDays, createdAt } — createdAt is the account's
+ * creation time (ISO or ms, e.g. session.user.created_at). Leave it out
+ * and day keys are unfloored and uncapped; the server passes it, so the
+ * leaderboard number is the capped one either way.
+ */
 export function deriveRatings(S, ctx = {}) {
   const friendCount = ctx.friendCount || 0;
+  const win = dayWindow(ctx.createdAt);
 
   const brainPts =
     brainScorePoints(S) +
-    categoryDayPoints(S, 'brain') +
-    trackerPoints(S, 'brain') * 1.0 +
+    categoryDayPoints(S, 'brain', win) +
+    trackerPoints(S, 'brain', win) * 1.0 +
     achievementPoints(S, 'brain') * 2.5 +
     visionPoints(S, 'brain');
 
   const financePts =
     financeScorePoints(S) +
-    categoryDayPoints(S, 'finance') +
+    categoryDayPoints(S, 'finance', win) +
     savingsPoints(S) +
-    trackerPoints(S, 'finance') * 1.0 +
+    trackerPoints(S, 'finance', win) * 1.0 +
     achievementPoints(S, 'finance') * 2.5 +
     visionPoints(S, 'finance');
 
   const fitnessPts =
     fitnessScorePoints(S) +
-    categoryDayPoints(S, 'fitness') +
-    trackerPoints(S, 'fitness') * 1.2 +
+    categoryDayPoints(S, 'fitness', win) +
+    trackerPoints(S, 'fitness', win) * 1.2 +
     achievementPoints(S, 'fitness') * 2.5 +
     visionPoints(S, 'fitness') +
-    vitalsPoints(S) +
-    burnPoints(S) +
-    macroPoints(ctx.macroDays);
+    vitalsPoints(S, win) +
+    burnPoints(S, win) +
+    macroPoints(ctx.macroDays, win);
 
   const socialPts =
     socialSelfCheckPoints(S) +
-    categoryDayPoints(S, 'social') +
-    socialPoints(S, friendCount) +
+    categoryDayPoints(S, 'social', win) +
+    socialPoints(S, friendCount, win) +
     achievementPoints(S, 'social') * 2.5 +
     visionPoints(S, 'social');
 
@@ -412,40 +478,41 @@ export function deriveRatings(S, ctx = {}) {
  */
 export function categoryBreakdown(S, category, ctx = {}) {
   const friendCount = ctx.friendCount || 0;
+  const win = dayWindow(ctx.createdAt);
   switch (category) {
     case 'brain':
       return [
         { label: 'Brain self-check', points: brainScorePoints(S) },
-        { label: 'Days logged (lifetime)', points: categoryDayPoints(S, 'brain') },
-        { label: 'Brain trackers',   points: trackerPoints(S, 'brain') * 1.0 },
+        { label: 'Days logged (lifetime)', points: categoryDayPoints(S, 'brain', win) },
+        { label: 'Brain trackers',   points: trackerPoints(S, 'brain', win) * 1.0 },
         { label: 'Brain achievements', points: achievementPoints(S, 'brain') * 2.5 },
         { label: 'Brain visions',    points: visionPoints(S, 'brain') },
       ];
     case 'finance':
       return [
         { label: 'Finance self-check', points: financeScorePoints(S) },
-        { label: 'Days logged (lifetime)', points: categoryDayPoints(S, 'finance') },
+        { label: 'Days logged (lifetime)', points: categoryDayPoints(S, 'finance', win) },
         { label: 'Savings goals',    points: savingsPoints(S) },
-        { label: 'Finance trackers', points: trackerPoints(S, 'finance') * 1.0 },
+        { label: 'Finance trackers', points: trackerPoints(S, 'finance', win) * 1.0 },
         { label: 'Finance achievements', points: achievementPoints(S, 'finance') * 2.5 },
         { label: 'Finance visions',  points: visionPoints(S, 'finance') },
       ];
     case 'fitness':
       return [
         { label: 'Fitness self-check', points: fitnessScorePoints(S) },
-        { label: 'Days logged (lifetime)', points: categoryDayPoints(S, 'fitness') },
-        { label: 'Fitness trackers', points: trackerPoints(S, 'fitness') * 1.2 },
+        { label: 'Days logged (lifetime)', points: categoryDayPoints(S, 'fitness', win) },
+        { label: 'Fitness trackers', points: trackerPoints(S, 'fitness', win) * 1.2 },
         { label: 'Fitness achievements', points: achievementPoints(S, 'fitness') * 2.5 },
         { label: 'Fitness visions',  points: visionPoints(S, 'fitness') },
-        { label: 'Vitals log days',  points: vitalsPoints(S) },
-        { label: 'Activity burn',    points: burnPoints(S) },
-        { label: 'On-target macro days', points: macroPoints(ctx.macroDays) },
+        { label: 'Vitals log days',  points: vitalsPoints(S, win) },
+        { label: 'Activity burn',    points: burnPoints(S, win) },
+        { label: 'On-target macro days', points: macroPoints(ctx.macroDays, win) },
       ];
     case 'social':
       return [
         { label: 'Social self-check', points: socialSelfCheckPoints(S) },
-        { label: 'Days logged (lifetime)', points: categoryDayPoints(S, 'social') },
-        { label: 'Friends + activity', points: socialPoints(S, friendCount) },
+        { label: 'Days logged (lifetime)', points: categoryDayPoints(S, 'social', win) },
+        { label: 'Friends + activity', points: socialPoints(S, friendCount, win) },
         { label: 'Social achievements', points: achievementPoints(S, 'social') * 2.5 },
         { label: 'Social visions',   points: visionPoints(S, 'social') },
       ];
