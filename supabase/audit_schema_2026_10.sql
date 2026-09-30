@@ -81,6 +81,14 @@ alter table public.reports
   add constraint reports_reported_id_fkey
   foreign key (reported_id) references auth.users(id) on delete set null;
 
+-- Same for the reporter: deleting their account removes who filed it,
+-- not the report itself (the queue still needs it to act on).
+alter table public.reports alter column reporter_id drop not null;
+alter table public.reports drop constraint if exists reports_reporter_id_fkey;
+alter table public.reports
+  add constraint reports_reporter_id_fkey
+  foreign key (reporter_id) references auth.users(id) on delete set null;
+
 -- Clients may file a report, never set its outcome.
 revoke insert, update, delete on public.reports from anon, authenticated;
 grant insert (reporter_id, reported_id, reason, context, reported_snapshot)
