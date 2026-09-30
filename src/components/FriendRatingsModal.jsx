@@ -12,6 +12,7 @@
 import { ovrTier, categoryTier } from '../lib/ratings/tiers';
 import PrestigeBadge from './PrestigeBadge';
 import { backdropClose } from '../utils/backdropClose';
+import ReportBlockButton from './friends/ReportBlockButton';
 
 const COLORS = ['#1a7a4a', '#2563eb', '#7c3aed', '#c2410c', '#0891b2', '#be185d', '#854d0e'];
 function avatarColor(name) {
@@ -39,7 +40,7 @@ const CATEGORIES = [
   { id: 'social',  label: 'Social',  icon: '◌' },
 ];
 
-export default function FriendRatingsModal({ row, onClose }) {
+export default function FriendRatingsModal({ row, onClose, userId, onBlocked }) {
   if (!row) return null;
   const prestige = ovrTier(row.ovr || 1);
   return (
@@ -102,7 +103,17 @@ export default function FriendRatingsModal({ row, onClose }) {
           })}
         </ul>
 
-        <div className="modal-actions">
+        {/* Report / block (Apple 1.2): a leaderboard row is someone's
+            name and photo in front of everyone, so the row's card has to
+            offer both, friend or not. */}
+        <div className="modal-actions" style={{ alignItems: 'center', justifyContent: 'space-between' }}>
+          <ReportBlockButton
+            userId={userId}
+            target={{ id: row.userId, name: row.username, handle: row.handle }}
+            where="leaderboard"
+            variant="text"
+            onBlocked={t => { onBlocked?.(t); onClose(); }}
+          />
           <button className="btn btn-primary" onClick={onClose}>Close</button>
         </div>
       </div>

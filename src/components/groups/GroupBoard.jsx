@@ -18,6 +18,7 @@ import { useState } from 'react';
 import Icon from '../Icon';
 import InviteModal from './InviteModal';
 import GroupCrest from './GroupCrest';
+import ReportBlockButton from '../friends/ReportBlockButton';
 
 const CATS = [
   { id: 'fitness', label: 'Fitness', color: '#1a7a4a' },
@@ -218,6 +219,12 @@ export default function GroupBoard({ data, onLeave, onRename, onRotateCode, onKi
                   {m.role === 'owner' && <span className="grp-tag">Owner</span>}
                   {top3 && <span className="grp-tag is-mvp">MVP</span>}
                   {idle && <span className="grp-tag is-idle">Idle</span>}
+                  {/* Report / block — any member, not just the owner. */}
+                  <ReportBlockButton
+                    userId={data.selfId}
+                    target={{ id: m.userId, name: m.name, handle: m.handle }}
+                    where="group"
+                  />
                   {group.isOwner && m.role !== 'owner' && (
                     <button type="button" className="grp-kick" disabled={busy}
                       title={`Remove ${m.name} from the group`}

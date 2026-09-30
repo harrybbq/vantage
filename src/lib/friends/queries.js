@@ -329,14 +329,45 @@ export async function blockUser(currentUserId, blockedUserId) {
   if (error) throw new Error(friendlyError(error, 'Could not block.'));
 }
 
-export async function reportUser(currentUserId, reportedUserId, reason, context) {
-  const { error } = await supabase
-    .from('reports')
-    .insert({
-      reporter_id: currentUserId,
-      reported_id: reportedUserId,
-      reason: reason || null,
-      context: context || null,
-    });
+/**
+ * File a report. `snapshot` ({ handle, display_name, where }) is a copy
+ * of what the reporter was looking at: `reported_id` goes null when the
+ * reported account is deleted, and a report that no longer says who or
+ * what it was about can't be acted on or recognised as repeat abuse.
+ *
+ * The column arrives with supabase/audit_schema_2026_10.sql. Until that
+ * has been run, PostgREST refuses the insert with "column not found"
+ * (PGRST204 / 42703) — so it is retried once without the snapshot and
+ * the report still lands exactly as it did before.
+ */
+export async function reportUser(currentUserId, reportedUserId, reason, context, snapshot) {
+  const row = {
+    reporter_id: currentUserId,
+    reported_id: reportedUserId,
+    reason: reason || null,
+    context: context || null,
+  };
+  let { error } = snapshot
+    ? await supabase.from('reports').insert({ ...row, reported_snapshot: snapshot })
+    : await supabase.from('reports').insert(row);
+  if (error && snapshot && isMissingColumn(error, 'reported_snapshot')) {
+    ({ error } = await supabase.from('reports').insert(row));
+  }
   if (error) throw new Error(friendlyError(error, 'Could not submit report.'));
+}
+
+function isMissingColumn(error, column) {
+  const text = `${error?.message || ''} ${error?.details || ''} ${error?.hint || ''}`;
+  return error?.code === 'PGRST204' || error?.code === '42703' || text.includes(column);
+}
+
+/** The snapshot a report carries — what the reporter could see. */
+export function reportSnapshot({ handle, name, displayName, where } = {}) {
+  const snap = {
+    handle: handle ? String(handle).replace(/^@/, '').slice(0, 64) : null,
+    display_name: (displayName || name) ? String(displayName || name).slice(0, 120) : null,
+    where: where || null,
+    at: new Date().toISOString(),
+  };
+  return snap;
 }

@@ -24,6 +24,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import Icon from '../Icon';
 import { crestQueue, decideCrest } from '../../lib/groups/api';
+import ModerationQueue from '../moderation/ModerationQueue';
 
 export default function ReviewTab() {
   const [queue, setQueue] = useState(null);
@@ -67,16 +68,20 @@ export default function ReviewTab() {
 
   if (!setup) {
     return (
-      <div className="upg-review">
-        <p className="upg-review-empty">
-          Group pictures are not switched on yet — run <code>supabase/group_crest_schema.sql</code> in
-          the Supabase SQL editor.
-        </p>
-      </div>
+      <>
+        <div className="upg-review">
+          <p className="upg-review-empty">
+            Group pictures are not switched on yet — run <code>supabase/group_crest_schema.sql</code> in
+            the Supabase SQL editor.
+          </p>
+        </div>
+        <ModerationQueue />
+      </>
     );
   }
 
   return (
+    <>
     <div className="upg-review">
       <div className="upg-review-head">
         <div>
@@ -125,5 +130,8 @@ export default function ReviewTab() {
         </div>
       ))}
     </div>
+    {/* People reported by people — the other half of moderation. */}
+    <ModerationQueue />
+    </>
   );
 }
