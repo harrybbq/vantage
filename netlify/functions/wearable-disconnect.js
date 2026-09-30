@@ -71,10 +71,12 @@ exports.handler = async (event) => {
     // than showing an error for a state that is already correct.
     if (!del.ok && del.status !== 404) {
       const detail = await del.text().catch(() => '');
-      return { statusCode: 502, headers: CORS, body: JSON.stringify({ error: 'could not disconnect', detail: detail.slice(0, 200) }) };
+      console.error('wearable-disconnect: delete failed', del.status, detail.slice(0, 300));
+      return { statusCode: 502, headers: CORS, body: JSON.stringify({ error: 'could not disconnect' }) };
     }
     return { statusCode: 200, headers: CORS, body: JSON.stringify({ ok: true }) };
   } catch (e) {
-    return { statusCode: 502, headers: CORS, body: JSON.stringify({ error: e.message || 'could not disconnect' }) };
+    console.error('wearable-disconnect:', e?.message);
+    return { statusCode: 502, headers: CORS, body: JSON.stringify({ error: 'could not disconnect' }) };
   }
 };

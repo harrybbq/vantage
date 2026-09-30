@@ -29,7 +29,7 @@ exports.handler = async (event) => {
 
   const env = process.env;
   if (!env.WHOOP_CLIENT_ID || !env.WHOOP_CLIENT_SECRET) {
-    return { statusCode: 500, headers: CORS, body: JSON.stringify({ error: 'WHOOP env missing' }) };
+    return { statusCode: 500, headers: CORS, body: JSON.stringify({ error: 'WHOOP is not set up on this site yet.' }) };
   }
 
   // Identity from the verified token, plus a per-account brake:

@@ -260,7 +260,7 @@ exports.handler = async (event) => {
   const supabaseUrl = process.env.SUPABASE_URL;
   const serviceKey  = process.env.SUPABASE_SERVICE_ROLE_KEY;
   if (!supabaseUrl || !serviceKey) {
-    return { statusCode: 500, headers: CORS, body: JSON.stringify({ error: 'supabase env missing' }) };
+    return { statusCode: 500, headers: CORS, body: JSON.stringify({ error: 'not configured' }) };
   }
 
   // Auth: verify the user's JWT
@@ -312,9 +312,10 @@ exports.handler = async (event) => {
       }),
     };
   } catch (e) {
+    console.error('get-leaderboard:', e?.message);
     return {
       statusCode: 500, headers: CORS,
-      body: JSON.stringify({ error: e.message || 'leaderboard build failed' }),
+      body: JSON.stringify({ error: 'leaderboard build failed' }),
     };
   }
 };

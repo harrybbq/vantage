@@ -88,7 +88,7 @@ async function membersOf(groupId, env) {
 
   return rows.map(r => {
     const p = byId.get(r.user_id) || {};
-    const { climb, counted, split } = memberScore(p, baselines.get(r.user_id));
+    const { climb, counted, split } = memberScore(p, baselines.get(r.user_id), r.joined_at);
     return {
       userId: r.user_id,
       role: r.role,
@@ -120,7 +120,7 @@ async function divisionStandings(division, env) {
   if (!groups.length) return [];
 
   const mRes = await sb(env.supabaseUrl, env.serviceKey,
-    `/rest/v1/group_members?group_id=in.(${groups.map(g => g.id).join(',')})&select=group_id,user_id`);
+    `/rest/v1/group_members?group_id=in.(${groups.map(g => g.id).join(',')})&select=group_id,user_id,joined_at`);
   const memberships = mRes.ok ? await mRes.json() : [];
   const ids = Array.from(new Set(memberships.map(m => m.user_id)));
 
@@ -135,7 +135,7 @@ async function divisionStandings(division, env) {
   const scored = groups.map(g => {
     const mine = memberships.filter(m => m.group_id === g.id).map(m => {
       const p = byId.get(m.user_id) || {};
-      const { climb, counted } = memberScore(p, baselines.get(m.user_id));
+      const { climb, counted } = memberScore(p, baselines.get(m.user_id), m.joined_at);
       return { userId: m.user_id, name: p.display_name || (p.handle ? '@' + p.handle : 'Someone'), climb, counted };
     });
     const top = mine.slice().sort((a, b) => b.counted - a.counted)[0];
@@ -421,7 +421,7 @@ exports.handler = async (event) => {
     supabaseUrl: process.env.SUPABASE_URL,
     serviceKey: process.env.SUPABASE_SERVICE_ROLE_KEY,
   };
-  if (!env.supabaseUrl || !env.serviceKey) return fail(500, 'supabase env missing');
+  if (!env.supabaseUrl || !env.serviceKey) return fail(500, 'not configured');
 
   let body;
   try { body = JSON.parse(event.body || '{}'); } catch { body = {}; }
@@ -500,6 +500,7 @@ exports.handler = async (event) => {
       standings,
     });
   } catch (e) {
-    return fail(500, e.message || 'groups failed');
+    console.error('groups:', action, e?.message);
+    return fail(500, 'Something went wrong — try again.');
   }
 };

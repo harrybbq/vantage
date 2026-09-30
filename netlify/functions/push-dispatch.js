@@ -73,7 +73,7 @@ exports.handler = async (event, context) => {
   if (!supabaseUrl || !serviceKey) {
     return {
       statusCode: 500, headers: CORS,
-      body: JSON.stringify({ error: 'SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY not configured' }),
+      body: JSON.stringify({ error: 'not configured' }),
     };
   }
 
@@ -85,9 +85,10 @@ exports.handler = async (event, context) => {
     { limit: BATCH_SIZE }
   );
   if (pending.error) {
+    console.error('push-dispatch: queue read failed', pending.error);
     return {
       statusCode: 500, headers: CORS,
-      body: JSON.stringify({ error: 'queue read failed', detail: pending.error }),
+      body: JSON.stringify({ error: 'queue read failed' }),
     };
   }
   const rows = pending.data || [];

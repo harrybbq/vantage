@@ -46,7 +46,7 @@ exports.handler = async (event) => {
   const supabaseUrl = process.env.SUPABASE_URL;
   const serviceKey  = process.env.SUPABASE_SERVICE_ROLE_KEY;
   if (!supabaseUrl || !serviceKey) {
-    return { statusCode: 500, headers: CORS, body: JSON.stringify({ error: 'supabase env missing' }) };
+    return { statusCode: 500, headers: CORS, body: JSON.stringify({ error: 'not configured' }) };
   }
   const backfill = (event?.queryStringParameters?.backfill === 'true');
 
@@ -58,7 +58,8 @@ exports.handler = async (event) => {
     );
     if (!res.ok) {
       const detail = await res.text().catch(() => '');
-      return { statusCode: 500, headers: CORS, body: JSON.stringify({ error: 'profiles read failed', detail }) };
+      console.error('snapshot-ratings: profiles read failed', res.status, detail.slice(0, 300));
+      return { statusCode: 500, headers: CORS, body: JSON.stringify({ error: 'profiles read failed' }) };
     }
     const page = await res.json();
     if (!page.length) break;
@@ -101,7 +102,8 @@ exports.handler = async (event) => {
       });
       if (!insRes.ok) {
         const detail = await insRes.text().catch(() => '');
-        return { statusCode: 500, headers: CORS, body: JSON.stringify({ error: 'snapshot insert failed', detail }) };
+        console.error('snapshot-ratings: insert failed', insRes.status, detail.slice(0, 300));
+        return { statusCode: 500, headers: CORS, body: JSON.stringify({ error: 'snapshot insert failed' }) };
       }
       written += chunk.length;
     }
