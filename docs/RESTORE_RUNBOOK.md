@@ -55,8 +55,9 @@ Never paste the user's email or state into chat.
 -- The user id (only if you don't have it already).
 select id from auth.users where lower(email) = lower('<their-email>');
 
--- The row as it is now. WRITE DOWN updated_at — step 5 needs it exactly.
-select id, updated_at, pg_column_size(state) as bytes,
+-- The row as it is now. COPY updated_at_exact verbatim — step 5 needs it
+-- to the microsecond, and the editor's normal display may round it.
+select id, updated_at::text as updated_at_exact, pg_column_size(state) as bytes,
        public.vb_state_meaningful(state) as meaningful
 from public.user_data where id = '<uuid>';
 
@@ -146,12 +147,12 @@ from public.user_data_history h
 where u.id = '<uuid>'
   and h.id = <snap-id>
   and h.user_id = u.id
-  and u.updated_at = '<updated_at from step 1>'
+  and u.updated_at = '<updated_at_exact from step 1>'
 returning u.id, u.updated_at, pg_column_size(u.state) as bytes;
 ```
 
 - **Guarded by id** — `u.id` and `h.user_id = u.id` mean it can only ever touch this one user, and only with their own snapshot.
-- **Guarded by `updated_at`** — if a device saved since step 1, it returns **0 rows** and changes nothing. Go back to step 1.
+- **Guarded by `updated_at`** — if a device saved since step 1, it returns **0 rows** and changes nothing. Go back to step 1. If you're sure nothing saved and it still returns 0 rows, the pasted timestamp lost precision — re-run step 1 and paste `updated_at_exact` again.
 - **`backgrounds` carried over** from the current row, because the snapshot doesn't have them. If the current row has lost them too, they're gone from here — only a Supabase backup has them.
 - **`updated_at = now()`** — any device still open with the old version gets a conflict on its next save and three-way merges, instead of writing its old copy over the restore.
 
@@ -192,7 +193,7 @@ set state = jsonb_set(u.state, '{vitalsLog}', h.state -> 'vitalsLog'),
 from public.user_data_history h
 where u.id = '<uuid>' and h.id = <snap-id> and h.user_id = u.id
   and h.state ? 'vitalsLog'
-  and u.updated_at = '<updated_at from step 1>'
+  and u.updated_at = '<updated_at_exact from step 1>'
 returning u.id, u.updated_at;
 ```
 
@@ -248,13 +249,13 @@ Once a quarter, both owners, about 30 minutes. Use a **test account**
 you own, never a real user.
 
 - [ ] Sign in as the test account on a phone and a browser. Add a few entries in `vitalsLog`, `habits`, `savings`, and set a background.
-- [ ] Wait for a `daily` snapshot (or edit again after 20+ hours), so the history table has a row.
+- [ ] Make one more edit after that. The first save after an account holds real data takes a `daily` snapshot when none exists yet; after that, one a day at most. Check step 1 shows a row before going on.
 - [ ] Note a few exact values to compare against later.
 - [ ] Damage it on purpose: delete a habit and a week of vitals in the app.
 - [ ] Start a timer. Follow steps 0–7 above, exactly as written.
 - [ ] Stop the timer when the test account shows the old data on **both** devices.
 - [ ] Check: background still there, photo still there, nothing else lost.
-- [ ] Try the `updated_at` guard once: run step 5 with a stale `updated_at` and confirm it returns 0 rows.
+- [ ] Try the `updated_at` guard once: run step 5 with a stale `updated_at_exact` and confirm it returns 0 rows.
 - [ ] Record below. If any step was wrong or unclear, fix this file in the same week.
 
 | Date | Who | Snapshot age | Time to restore | Problems found | Runbook fixed? |
