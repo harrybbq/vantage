@@ -338,6 +338,19 @@ code fails soft until it is run, so order doesn't matter.
     devDependencies (clears item 22's critical/high — none ship).
     *Status 2026-09-30: personal emails replaced with placeholders in SQL; dead SpotifyBar removed (revoke that Last.fm key — it stays in git history); salary comment neutralised; Capacitor CLI/assets moved to devDependencies; PR build workflow added. `TRADING_APP_CLAUDE.md:9` still holds a real email; `dist/` is still committed per the deploy flow.*
 
+83. `[ ]` **LAUNCH** Any signed-in user can still read every column of a
+    searchable profile — `tier` (who pays), `ratings`,
+    `prestige_baseline`, `last_active_at` — whatever `leaderboard_optin`
+    says. Fix with column-level SELECT grants (the `groups` pattern in
+    `group_crest_schema.sql`), after moving own-row reads of `tier` and
+    `last_active_at` to a definer RPC. Needs a client audit of every
+    `from('profiles').select(...)` first.
+84. `[ ]` **LAUNCH** Name filter and avatar screening bind honest clients
+    only: a user can still PATCH `handle`/`display_name`/`avatar_url` on
+    their own row directly. Binding needs those writes moved to a
+    service-role function, then
+    `revoke update (handle, display_name, avatar_url) on public.profiles from authenticated;`.
+
 ### Non-code tasks missing until now
 71. `[ ]` **Online Safety Act 2023** — DMs, groups and the leaderboard
     make Vantage a user-to-user service: Ofcom illegal-content risk
