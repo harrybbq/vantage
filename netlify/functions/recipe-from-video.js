@@ -19,9 +19,14 @@
  * output (output_config.format, json_schema) guarantees the JSON shape.
  *
  * Required Netlify env var: ANTHROPIC_API_KEY. Optional: YOUTUBE_API_KEY.
- * Signed-in users only; 10 reads a minute each.
+ * OWNER-ONLY, checked here on the verified email: the only caller is the
+ * owner-only Diet surface, and it runs the most expensive model in the
+ * app on text fetched from any public video. 10 reads a minute, and the
+ * durable daily cap in lib/aiQuota.js on top.
  */
 const { requireUser, underLimit, tooMany } = require('../lib/requireUser');
+const { withinDailyAiCap, overDailyCap } = require('../lib/aiQuota');
+const { isOwnerEmail } = require('../lib/owner');
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
@@ -157,6 +162,8 @@ exports.handler = async (event) => {
 
   const auth = await requireUser(event, CORS);
   if (auth.error) return auth.error;
+  // Same answer as a bad token, deliberately — see admin-set-rating.js.
+  if (!isOwnerEmail(auth.email)) return reply(403, { error: 'forbidden' });
   if (!underLimit('ai-recipe', auth.userId, 10)) return tooMany(CORS);
   if (!process.env.ANTHROPIC_API_KEY) return reply(503, { error: 'Reading videos is not set up on this site yet.' });
 
@@ -179,6 +186,8 @@ exports.handler = async (event) => {
     console.error('read video:', e.message);
     return reply(502, { error: 'Couldn’t read that video just now. Try again, or paste the ingredients in by hand.' });
   }
+
+  if (!(await withinDailyAiCap('recipe', auth.userId))) return overDailyCap(CORS);
 
   try {
     const r = await extract(meta);

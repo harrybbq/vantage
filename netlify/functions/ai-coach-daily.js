@@ -35,6 +35,8 @@ function checkRateLimit(ip) {
 }
 
 const { requireUser, underLimit, tooMany } = require('../lib/requireUser');
+const { withinDailyAiCap, overDailyCap } = require('../lib/aiQuota');
+const { isOwnerEmail } = require('../lib/owner');
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
@@ -117,6 +119,55 @@ Return the JSON now. Remember: today's focus / watch / micro must be different i
 
 // ── Snapshot validation ───────────────────────────────────────────────────
 
+/* The snapshot is client-built and was forwarded to the model whole, so
+   a caller could send a megabyte of "habits" and we would pay to have
+   it read. A real one is 2-5 KB. Arrays are trimmed from the end (the
+   builders put the most relevant first) until the JSON fits; anything
+   that still does not fit after that is not a snapshot. */
+const SNAPSHOT_MAX_BYTES = 8 * 1024;
+const RAW_BODY_MAX_BYTES = 256 * 1024;
+const TRIMMABLE = ['recent_completions', 'achievements', 'habits', 'trackers', 'holidays', 'recent_briefs', 'recent_dismissed_topics'];
+
+const sizeOf = v => Buffer.byteLength(JSON.stringify(v), 'utf8');
+
+function fitSnapshot(snapshot) {
+  const s = { ...snapshot };
+  // Long free text anywhere is the cheapest thing to cut first.
+  const clip = v => (typeof v === 'string' && v.length > 300 ? v.slice(0, 300) : v);
+  for (const k of Object.keys(s)) s[k] = clip(s[k]);
+  if (s.shop && typeof s.shop === 'object' && sizeOf(s.shop) > 1024) s.shop = {};
+  let guard = 0;
+  while (sizeOf(s) > SNAPSHOT_MAX_BYTES && guard++ < 40) {
+    // Halve whichever trimmable array is currently the largest.
+    let worst = null, worstSize = 0;
+    for (const k of TRIMMABLE) {
+      if (!Array.isArray(s[k]) || s[k].length <= 1) continue;
+      const n = sizeOf(s[k]);
+      if (n > worstSize) { worst = k; worstSize = n; }
+    }
+    if (!worst) break;
+    s[worst] = s[worst].slice(0, Math.max(1, Math.floor(s[worst].length / 2)));
+  }
+  return sizeOf(s) <= SNAPSHOT_MAX_BYTES ? s : null;
+}
+
+/** Pro/lifetime from the server-owned profiles.tier — never the client. */
+async function isPaid(userId) {
+  const url = process.env.SUPABASE_URL;
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!url || !key) return false;
+  try {
+    const res = await fetch(`${url}/rest/v1/profiles?id=eq.${userId}&select=tier`, {
+      headers: { apikey: key, Authorization: `Bearer ${key}` },
+    });
+    if (!res.ok) return false;
+    const tier = (await res.json())[0]?.tier;
+    return tier === 'pro' || tier === 'lifetime';
+  } catch {
+    return false;
+  }
+}
+
 function isValidSnapshot(s) {
   return s && typeof s === 'object' &&
     typeof s.name === 'string' &&
@@ -141,6 +192,13 @@ exports.handler = async (event) => {
   if (auth.error) return auth.error;
   if (!underLimit('ai-coach', auth.userId, 6)) return tooMany(CORS);
 
+  // The coach is a Pro feature. The client hides it from free users,
+  // but the endpoint spends money for whoever calls it, so the tier is
+  // checked here against the server-owned column. Fails closed.
+  if (!isOwnerEmail(auth.email) && !(await isPaid(auth.userId))) {
+    return { statusCode: 403, headers: CORS, body: JSON.stringify({ error: 'The AI coach is part of Pro.' }) };
+  }
+
   const ip = event.headers['x-forwarded-for'] || 'unknown';
   if (!checkRateLimit(ip)) {
     return { statusCode: 429, headers: CORS, body: JSON.stringify({ error: 'Rate limit reached — try again in a moment' }) };
@@ -151,6 +209,10 @@ exports.handler = async (event) => {
     return { statusCode: 503, headers: CORS, body: JSON.stringify({ error: 'AI Coach is not configured on the server' }) };
   }
 
+  if (Buffer.byteLength(event.body || '', 'utf8') > RAW_BODY_MAX_BYTES) {
+    return { statusCode: 413, headers: CORS, body: JSON.stringify({ error: 'Snapshot too large' }) };
+  }
+
   let body;
   try {
     body = JSON.parse(event.body || '{}');
@@ -158,10 +220,16 @@ exports.handler = async (event) => {
     return { statusCode: 400, headers: CORS, body: JSON.stringify({ error: 'Invalid JSON body' }) };
   }
 
-  const { snapshot } = body;
-  if (!isValidSnapshot(snapshot)) {
+  if (!isValidSnapshot(body.snapshot)) {
     return { statusCode: 400, headers: CORS, body: JSON.stringify({ error: 'snapshot is required and must include name, habits, achievements, trackers' }) };
   }
+  const snapshot = fitSnapshot(body.snapshot);
+  if (!snapshot) {
+    return { statusCode: 413, headers: CORS, body: JSON.stringify({ error: 'Snapshot too large' }) };
+  }
+
+  // Durable per-day cap, charged only once the request is going ahead.
+  if (!(await withinDailyAiCap('coach', auth.userId))) return overDailyCap(CORS);
 
   try {
     const res = await fetch('https://api.anthropic.com/v1/messages', {

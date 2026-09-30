@@ -23,6 +23,7 @@
 
 const { requireUser, underLimit, tooMany } = require('../lib/requireUser');
 const { screenImage, parseDataUrl } = require('../lib/imageModeration');
+const { withinDailyAiCap, overDailyCap } = require('../lib/aiQuota');
 const {
   MAX_SEATS, DIVISIONS, sb, fetchBaselines, memberScore, groupScore, groupSplit, rankGroups,
   divisionName, weekStartDate, COIN_AWARD,
@@ -294,6 +295,8 @@ async function ownerAction(userId, action, body, env) {
   if (action === 'setCrest') {
     const img = parseDataUrl(body.image);
     if (!img.ok) return fail(400, img.error);
+    // Every upload is a paid screening call.
+    if (!(await withinDailyAiCap('crest', userId))) return overDailyCap(CORS);
 
     /* Stored pending FIRST, then screened. If the screening call hangs
        or the function is killed mid-flight, the picture exists in the

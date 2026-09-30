@@ -72,7 +72,12 @@ async function getFreshToken(userId, env) {
     throw err;
   }
   const tok = await ref.json();
-  await sb(`whoop_tokens?user_id=eq.${userId}`, {
+  /* Persist the rotated refresh token BEFORE anything else happens —
+     the old one is already spent, so losing this write disconnects the
+     user. The result used to go unchecked; now a failure is retried
+     once and then logged loudly (the access token still works for this
+     run, so the sync itself carries on). */
+  const persist = () => sb(`whoop_tokens?user_id=eq.${userId}`, {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json', Prefer: 'return=minimal' },
     body: JSON.stringify({
@@ -82,6 +87,9 @@ async function getFreshToken(userId, env) {
       updated_at: new Date().toISOString(),
     }),
   }, env);
+  let saved = await persist().catch(() => null);
+  if (!saved?.ok) saved = await persist().catch(() => null);
+  if (!saved?.ok) console.error('whoop: ROTATED TOKEN NOT STORED — user will need to reconnect', saved?.status || 'network');
   return tok.access_token;
 }
 
