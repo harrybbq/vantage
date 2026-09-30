@@ -13,8 +13,9 @@
  * page path — and nothing else: no query strings, no full URLs, no
  * script samples, no IPs. The log is the dashboard; there is no table.
  *
- * Always 204. Wiring it up (report-uri / Report-To in netlify.toml or
- * _headers) is a separate change.
+ * Always 204. Wired up in netlify.toml: `report-uri` in the
+ * Report-Only CSP, plus `report-to csp-endpoint` with a
+ * Reporting-Endpoints header naming this function.
  */
 const HEADERS = { 'Cache-Control': 'no-store' };
 const MAX_BODY = 16 * 1024;

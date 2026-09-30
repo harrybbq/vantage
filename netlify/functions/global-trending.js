@@ -36,6 +36,7 @@
  */
 const { checkPublicText } = require('../lib/nameFilter');
 const { suspendedIds } = require('../lib/suspended');
+const { pageByKey } = require('../lib/pgPage');
 const CORS = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'Content-Type, Authorization',
@@ -64,33 +65,44 @@ async function computeTrending(env) {
   // applied in JS (not the DB) because a null/absent flag is default-on,
   // and PostgREST's `not.eq.false` would drop nulls too. Opted-out items
   // reach only this trusted service-role function and are discarded here.
-  const uRes = await sb(`user_data?select=id,items:state->shopItems,trending:state->privacy->shareTrending`, env);
-  // A failed read is not "nobody wants anything": serve the last good
-  // board if there is one, and never cache the failure itself.
-  if (!uRes.ok) {
-    if (CACHE.items) return CACHE.items;
-    throw new Error(`user_data read ${uRes.status}`);
-  }
-  const all = await uRes.json();
+  //
+  // Paged by id (keyset) since 2026-09-30. It used to be one request,
+  // and PostgREST answers at most 1000 rows without complaint — so from
+  // the 1,001st account on, the board was silently built from a subset.
+  // Each page is folded into the aggregate as it arrives, so memory
+  // holds the tally, never the whole table.
   const suspended = await suspendedIds({ supabaseUrl: env.SUPABASE_URL, serviceKey: env.SUPABASE_SERVICE_ROLE_KEY });
-
   const map = new Map(); // normalized name → aggregate
-  for (const row of all) {
-    if (row.trending === false) continue;      // explicit opt-out only
-    if (suspended.has(row.id)) continue;
-    const items = Array.isArray(row.items) ? row.items : [];
-    const seen = new Set(); // one vote per user per item
-    for (const it of items) {
-      if (!it || it.bought || !it.name) continue;
-      const key = String(it.name).toLowerCase().replace(/\s+/g, ' ').trim();
-      if (!key || seen.has(key)) continue;
-      seen.add(key);
-      const e = map.get(key) || { name: String(it.name).slice(0, 80), price: '', coins: 0, count: 0 };
-      e.count++;
-      if (!e.price && it.price) e.price = String(it.price).slice(0, 20);
-      if (!e.coins && Number.isFinite(Number(it.coinCost))) e.coins = Number(it.coinCost);
-      map.set(key, e);
+  const fold = rows => {
+    for (const row of rows) {
+      if (row.trending === false) continue;      // explicit opt-out only
+      if (suspended.has(row.id)) continue;
+      const items = Array.isArray(row.items) ? row.items : [];
+      const seen = new Set(); // one vote per user per item
+      for (const it of items) {
+        if (!it || it.bought || !it.name) continue;
+        const key = String(it.name).toLowerCase().replace(/\s+/g, ' ').trim();
+        if (!key || seen.has(key)) continue;
+        seen.add(key);
+        const e = map.get(key) || { name: String(it.name).slice(0, 80), price: '', coins: 0, count: 0 };
+        e.count++;
+        if (!e.price && it.price) e.price = String(it.price).slice(0, 20);
+        if (!e.coins && Number.isFinite(Number(it.coinCost))) e.coins = Number(it.coinCost);
+        map.set(key, e);
+      }
     }
+  };
+  try {
+    await pageByKey((after, limit) => sb(
+      'user_data?select=id,items:state->shopItems,trending:state->privacy->shareTrending' +
+      `&order=id.asc&limit=${limit}` + (after ? `&id=gt.${after}` : ''), env),
+    { onPage: fold, what: 'global-trending user_data' });
+  } catch (e) {
+    // A failed read — first page or fortieth — is not "nobody wants
+    // anything", and half a table is not the board either: serve the
+    // last good board if there is one, and never cache the failure.
+    if (CACHE.items) return CACHE.items;
+    throw e;
   }
 
   return [...map.values()]

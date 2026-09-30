@@ -29,6 +29,8 @@
  * for the clocks to change. In UK summer the reset lands at 01:00 BST.
  */
 
+const { inChunks } = require('./pgPage');
+
 const DIVISIONS = [
   { num: 1,  name: 'Obsidian' },
   { num: 2,  name: 'Ruby' },
@@ -112,18 +114,30 @@ function sb(supabaseUrl, serviceKey, path, init = {}) {
 async function fetchBaselines(userIds, { supabaseUrl, serviceKey }, from = weekStart(), { strict = false } = {}) {
   const out = new Map();
   if (!userIds.length) return out;
-  const res = await sb(supabaseUrl, serviceKey,
-    `/rest/v1/rating_snapshots?user_id=in.(${userIds.join(',')})` +
-    `&snapshotted_at=gte.${from.toISOString()}` +
-    `&select=user_id,ovr,brain,finance,fitness,social,snapshotted_at&order=snapshotted_at.asc`
-  );
-  // The live board shows "—" on a failed read; the Monday settle must
-  // not — empty baselines there would settle a whole week at zero.
-  if (!res.ok) {
+  /* Chunked and paged (2026-09-30): ≤150 ids a request so the URL stays
+     short, and each chunk read oldest-first until every id in it has
+     appeared. A week is ~7 rows a user, so 150 users is ~1,050 rows —
+     past PostgREST's silent 1000-row cap, which would have dropped the
+     tail. Only the FIRST row per user is used, so stopping once each id
+     has been seen cannot change the answer. `user_id` breaks ties so
+     pages are stable. */
+  let rows;
+  try {
+    rows = await inChunks(userIds, (csv, offset, limit) => sb(supabaseUrl, serviceKey,
+      `/rest/v1/rating_snapshots?user_id=in.(${csv})` +
+      `&snapshotted_at=gte.${from.toISOString()}` +
+      `&select=user_id,ovr,brain,finance,fitness,social,snapshotted_at` +
+      `&order=snapshotted_at.asc,user_id.asc&limit=${limit}&offset=${offset}`
+    ), { firstPer: 'user_id', what: 'league baselines' });
+  } catch {
+    // The live board shows "—" on a failed read; the Monday settle must
+    // not — empty baselines there would settle a whole week at zero.
+    // Any failed chunk fails the lot: partial baselines are the same
+    // zeroed week for whoever was in the missing chunk.
     if (strict) throw new Error('baselines read failed');
     return out;
   }
-  for (const r of await res.json()) {
+  for (const r of rows) {
     if (!out.has(r.user_id)) out.set(r.user_id, r);
   }
   return out;

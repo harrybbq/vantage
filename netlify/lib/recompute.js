@@ -76,6 +76,38 @@ function toMs(v) {
   return Number.isFinite(n) && n > 0 ? n : null;
 }
 
+/* ── Vision stamps (mirror of derive.js, 2026-09-30, item 44) ─────────
+   Visions are stamped by the client (`S.visions[id] = { unlockedAt }`)
+   and the server cannot re-run their checks — the predicates live in
+   the app's module graph (see visionXp.js). So a state could stamp all
+   34 on a day-old account and bank 8,200 xp. Two limits, both from the
+   account's age, so an honest user never meets either:
+
+   · A stamp dated before the account existed (a day's slack, as for
+     day keys) or after tomorrow does not count. Undated stamps (none
+     are written today; tolerated for anything legacy) still count, but
+     inside the ceiling below.
+   · The xp counted in total is at most VISION_XP_BASE +
+     VISION_XP_PER_DAY × age in days. Past it, every counted vision is
+     scaled by the same factor, so no category is favoured by which
+     vision happened to be dropped.
+
+   Why these numbers: of the 8,200 xp catalogue, what an honest user
+   can meet on day one is ~4,550 — self-checks, savings, holidays,
+   habits, coins, 25 achievements, a wearable or food backfill (2,800),
+   plus all four habit-streak visions (1,750), because a habit's start
+   date is the user's to set and "I quit two years ago" is true for
+   some. The rest needs logged days in a row — 7, 30, 100 — and so
+   arrives no faster than the ceiling grows: ~5,700 xp is reachable by
+   day 30 against a ceiling of 8,000, the whole 8,200 by day 100
+   against 15,000. The ceiling only bites on a state that claims more
+   than its account could have done (a day-old account stamping all 34
+   counts 5,000 of the 8,200).
+
+   Unknown creation time: no floor, no ceiling, like the day keys. */
+const VISION_XP_BASE = 5000;
+const VISION_XP_PER_DAY = 100;
+
 function dayWindow(createdAt, now = Date.now()) {
   const created = toMs(createdAt);
   const known = created != null && created <= now;
@@ -83,7 +115,16 @@ function dayWindow(createdAt, now = Date.now()) {
     min: known ? ymd(created - DAY_MS) : null,
     max: ymd(now + DAY_MS),
     cap: known ? Math.floor((now - created) / DAY_MS) + 3 : Infinity,
+    stampFrom: known ? created - DAY_MS : null,
+    stampUntil: now + DAY_MS,
+    visionXpCap: known ? VISION_XP_BASE + VISION_XP_PER_DAY * Math.floor((now - created) / DAY_MS) : Infinity,
   };
+}
+
+/** A vision stamp's time in ms: `{ unlockedAt }`, an ISO string or ms. Null = undated. */
+function stampMs(v) {
+  if (v == null || typeof v === 'boolean') return null;
+  return toMs(typeof v === 'object' ? v.unlockedAt : v);
 }
 
 function isCountableDay(key, win) {
@@ -279,20 +320,36 @@ async function fetchMacroDays(userId, { supabaseUrl, serviceKey }) {
  * stuck at the wrong number" bug — not staleness. See visionXp.js.
  *
  * A vision with no category counts a quarter toward each of the four,
- * exactly as on the client. Today no vision declares one, so all of
- * them land that way.
+ * exactly as on the client.
+ *
+ * Stamps outside the account's lifetime are dropped and the total is
+ * held to the age ceiling — see "Vision stamps" at dayWindow.
  */
-function visionPoints(state, category) {
+function countedVisions(state, win) {
   const stamped = state.visions || {};
-  let points = 0;
+  const ids = [];
+  let xp = 0;
   for (const id of Object.keys(stamped)) {
     const def = VISION_XP[id];
     if (!def || !def.xp) continue;
+    const t = stampMs(stamped[id]);
+    if (t != null && (t > win.stampUntil || (win.stampFrom != null && t < win.stampFrom))) continue;
+    ids.push(id);
+    xp += def.xp;
+  }
+  return { ids, scale: xp > win.visionXpCap ? win.visionXpCap / xp : 1 };
+}
+
+function visionPoints(state, category, win) {
+  const { ids, scale } = countedVisions(state, win);
+  let points = 0;
+  for (const id of ids) {
+    const def = VISION_XP[id];
     if (def.category && def.category !== category) continue;
     const weight = def.category ? 1 : 0.25;
     points += (def.xp / 4) * weight;
   }
-  return points;
+  return points * scale;
 }
 
 // ── Public API ───────────────────────────────────────────────────────────
@@ -311,20 +368,20 @@ function derivePoints(state, friendCount = 0, macroDays = 0, createdAt = null) {
       categoryDayPoints(state, 'brain', win) +
       trackerPoints(state, 'brain', win) * 1.0 +
       achievementPoints(state, 'brain') * 2.5 +
-      visionPoints(state, 'brain'),
+      visionPoints(state, 'brain', win),
     finance:
       financeScorePoints(state) +
       categoryDayPoints(state, 'finance', win) +
       savingsPoints(state) +
       trackerPoints(state, 'finance', win) * 1.0 +
       achievementPoints(state, 'finance') * 2.5 +
-      visionPoints(state, 'finance'),
+      visionPoints(state, 'finance', win),
     fitness:
       fitnessScorePoints(state) +
       categoryDayPoints(state, 'fitness', win) +
       trackerPoints(state, 'fitness', win) * 1.2 +
       achievementPoints(state, 'fitness') * 2.5 +
-      visionPoints(state, 'fitness') +
+      visionPoints(state, 'fitness', win) +
       vitalsPoints(state, win) +
       burnPoints(state, win) +
       // nutrition rows are client-written too, so the same age cap holds
@@ -334,7 +391,7 @@ function derivePoints(state, friendCount = 0, macroDays = 0, createdAt = null) {
       categoryDayPoints(state, 'social', win) +
       socialPoints(state, friendCount, win) +
       achievementPoints(state, 'social') * 2.5 +
-      visionPoints(state, 'social'),
+      visionPoints(state, 'social', win),
   };
 }
 

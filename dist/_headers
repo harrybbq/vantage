@@ -24,8 +24,11 @@
 # set a header. The same-origin iframe this was for is gone (the owner
 # Rotation page is a React tab now); see netlify.toml for why it hasn't
 # been tightened to DENY. Cross-origin embedding stays blocked.
+# Permissions-Policy is copied from netlify.toml word for word (it had
+# drifted to a shorter list). The CSP and Reporting-Endpoints headers
+# live ONLY in netlify.toml — one copy of a policy that long is enough.
 /*
   X-Frame-Options: SAMEORIGIN
   X-Content-Type-Options: nosniff
   Referrer-Policy: strict-origin-when-cross-origin
-  Permissions-Policy: camera=(self), microphone=(), geolocation=()
+  Permissions-Policy: geolocation=(), microphone=(), payment=(), usb=(), camera=(self)
