@@ -10,13 +10,6 @@ import Nav from './components/Nav';
 import PageHeader from './components/PageHeader';
 import HubSection from './components/HubSection';
 import MobileHubSection from './components/mobile/MobileHubSection';
-import AchievementsSection from './components/AchievementsSection';
-import TrackSection from './components/TrackSection';
-import ShopSection from './components/ShopSection';
-import HolidaySection from './components/HolidaySection';
-import HabitsSection from './components/HabitsSection';
-import MobileHabitsSection from './components/mobile/MobileHabitsSection';
-import MobileFriendsSection from './components/mobile/MobileFriendsSection';
 import SettingsSection from './components/SettingsSection';
 import { OWNER_SURFACES_IN_BUILD } from './lib/native/ownerSurfaces';
 import { SCHEMES, applyScheme, applyTheme, resolveEffectiveTheme, schemeFromHex } from './components/SettingsSection';
@@ -35,7 +28,6 @@ import CookieBanner from './components/CookieBanner';
 import InstallPrompt from './components/InstallPrompt';
 import TutorialOverlay from './components/TutorialOverlay';
 import BackgroundCropModal from './components/BackgroundCropModal';
-import LeaderboardSection from './components/LeaderboardSection';
 import VisionsModal from './components/VisionsModal';
 import { useIsOwner } from './hooks/useIsOwner';
 import { useCapacitor, haptic } from './hooks/useCapacitor';
@@ -69,6 +61,48 @@ import TermsAcceptanceSheet from './components/TermsAcceptanceSheet';
 // to null and Rollup never emits their chunks.
 const UpgradeSection = OWNER_SURFACES_IN_BUILD ? lazy(() => import('./components/upgrade/UpgradeSection')) : null;
 const AdminEditModal = OWNER_SURFACES_IN_BUILD ? lazy(() => import('./components/AdminEditModal')) : null;
+
+// Sections that are not the first screen load on demand, so the hub
+// paints without first downloading Track, Shop, Achievements and the
+// rest. The Hub stays eager (it IS the first screen) and so does
+// Settings: App and HubSection import its theme helpers statically,
+// which would pin it in the main chunk anyway, and the WHOOP/Oura OAuth
+// return lands on it directly.
+//
+// Board warms every section at idle (see the prefetch effect), so a tap
+// normally finds its chunk already here — and a tab left open across a
+// deploy already holds its chunks rather than asking for hashes the new
+// deploy no longer serves.
+//
+// Why not plain lazy(): a lazy component suspends on its first render
+// even when its module has already arrived, and React holds a revealed
+// Suspense boundary back for up to ~500 ms — the page would fade in
+// empty and then pop. Once preloaded, lazySection renders the module
+// directly. The choice is made once per mount (useState) so a section
+// never swaps component type, and state, under itself.
+function lazySection(load) {
+  let loaded = null;
+  const preload = () => load().then(m => { loaded = m; return m; });
+  const Lazy = lazy(preload);
+  function Section(props) {
+    const [Impl] = useState(() => (loaded ? loaded.default : Lazy));
+    return <Impl {...props} />;
+  }
+  Section.preload = preload;
+  return Section;
+}
+const AchievementsSection  = lazySection(() => import('./components/AchievementsSection'));
+const TrackSection         = lazySection(() => import('./components/TrackSection'));
+const ShopSection          = lazySection(() => import('./components/ShopSection'));
+const HolidaySection       = lazySection(() => import('./components/HolidaySection'));
+const HabitsSection        = lazySection(() => import('./components/HabitsSection'));
+const MobileHabitsSection  = lazySection(() => import('./components/mobile/MobileHabitsSection'));
+const MobileFriendsSection = lazySection(() => import('./components/mobile/MobileFriendsSection'));
+const LeaderboardSection   = lazySection(() => import('./components/LeaderboardSection'));
+const LAZY_SECTIONS = [
+  AchievementsSection, TrackSection, ShopSection, HolidaySection,
+  HabitsSection, MobileHabitsSection, MobileFriendsSection, LeaderboardSection,
+];
 
 const pageMotion = {
   initial: { opacity: 0, y: 14 },
@@ -329,6 +363,18 @@ function Board({ userId, userEmail, onSignOut }) {
   // Debounced inside the hook; safely no-ops if the social schema
   // hasn't been applied yet.
   usePublishProfile(userId, S, hasPro, visionState, { hydrated, loadError });
+
+  // Warm the lazy section chunks once the hub is up and the browser is
+  // idle, so the first tap on Track or Shop doesn't wait on the network
+  // (see lazySection). A failed prefetch is harmless — the section
+  // simply loads when it is opened.
+  useEffect(() => {
+    if (!hydrated) return;
+    const warm = () => LAZY_SECTIONS.forEach(section => section.preload().catch(() => {}));
+    const ric = window.requestIdleCallback;
+    const id = ric ? ric(warm, { timeout: 4000 }) : setTimeout(warm, 2500);
+    return () => (ric ? window.cancelIdleCallback(id) : clearTimeout(id));
+  }, [hydrated]);
 
   // Ranked categories (F5 Sprint 3). Local recompute updates S.ratings
   // on a 1.5s debounce; server recompute fires the Netlify function on
@@ -797,45 +843,56 @@ function Board({ userId, userEmail, onSignOut }) {
         {activeSection === 'achievements' && (
           <motion.div key="achievements" {...pageMotion}>
             <WidgetBoundary variant="section" name="achievements">
-            <AchievementsSection S={S} update={update} active onOpenModal={handleOpenModal} onShowCoinToast={showCoinToast} onOpenVisions={() => setVisionsOpen(true)} />
+            <Suspense fallback={null}>
+              <AchievementsSection S={S} update={update} active onOpenModal={handleOpenModal} onShowCoinToast={showCoinToast} onOpenVisions={() => setVisionsOpen(true)} />
+            </Suspense>
             </WidgetBoundary>
           </motion.div>
         )}
         {activeSection === 'track' && (
           <motion.div key="track" {...pageMotion}>
             <WidgetBoundary variant="section" name="track">
-            <TrackSection S={S} update={update} active onOpenModal={handleOpenModal} onShowCoinToast={showCoinToast} userId={userId} requestedTab={trackTab} />
+            <Suspense fallback={null}>
+              <TrackSection S={S} update={update} active onOpenModal={handleOpenModal} onShowCoinToast={showCoinToast} userId={userId} requestedTab={trackTab} />
+            </Suspense>
             </WidgetBoundary>
           </motion.div>
         )}
         {activeSection === 'shop' && (
           <motion.div key="shop" {...pageMotion}>
             <WidgetBoundary variant="section" name="shop">
-            <ShopSection S={S} update={update} active onOpenModal={handleOpenModal} onShowCoinToast={showCoinToast} />
+            <Suspense fallback={null}>
+              <ShopSection S={S} update={update} active onOpenModal={handleOpenModal} onShowCoinToast={showCoinToast} />
+            </Suspense>
             </WidgetBoundary>
           </motion.div>
         )}
         {activeSection === 'holiday' && (
           <motion.div key="holiday" {...pageMotion}>
             <WidgetBoundary variant="section" name="holiday">
-            <HolidaySection S={S} update={update} active onOpenModal={handleOpenModal} />
+            <Suspense fallback={null}>
+              <HolidaySection S={S} update={update} active onOpenModal={handleOpenModal} />
+            </Suspense>
             </WidgetBoundary>
           </motion.div>
         )}
         {activeSection === 'habits' && (
           <motion.div key="habits" {...pageMotion}>
             <WidgetBoundary variant="section" name="habits">
+            <Suspense fallback={null}>
             {isMobile ? (
               <MobileHabitsSection S={S} update={update} onOpenModal={handleOpenModal} onShowCoinToast={showCoinToast} />
             ) : (
               <HabitsSection S={S} update={update} active onOpenModal={handleOpenModal} onShowCoinToast={showCoinToast} />
             )}
+            </Suspense>
             </WidgetBoundary>
           </motion.div>
         )}
         {activeSection === 'leaderboard' && (
           <motion.div key="leaderboard" {...pageMotion}>
             <WidgetBoundary variant="section" name="leaderboard">
+            <Suspense fallback={null}>
             <LeaderboardSection
               active
               userId={userId}
@@ -843,6 +900,7 @@ function Board({ userId, userEmail, onSignOut }) {
               onAddFriends={() => navigate('hub')}
               onOpenSettings={() => navigate('settings')}
             />
+            </Suspense>
             </WidgetBoundary>
           </motion.div>
         )}
@@ -875,10 +933,12 @@ function Board({ userId, userEmail, onSignOut }) {
         {activeSection === 'friends' && (
           <motion.div key="friends" {...pageMotion}>
             <WidgetBoundary variant="section" name="friends">
+            <Suspense fallback={null}>
             <MobileFriendsSection
               userId={userId}
               onUpgrade={() => handleOpenModal('paywall:friends')}
             />
+            </Suspense>
             </WidgetBoundary>
           </motion.div>
         )}
