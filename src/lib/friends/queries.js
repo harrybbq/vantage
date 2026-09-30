@@ -1,4 +1,5 @@
 import { supabase } from '../supabase';
+import { publicNameProblem } from '../moderation/nameFilter.js';
 
 /**
  * Friends data layer — every Supabase call from the social feature
@@ -53,7 +54,10 @@ export function validateHandle(handle) {
   if (handle.length < 3) return 'Handle must be at least 3 characters.';
   if (handle.length > 20) return 'Handle must be 20 characters or fewer.';
   if (!HANDLE_RE.test(handle)) return 'Letters, numbers, and underscores only.';
-  return null;
+  // Strangers see handles (search, the global board), so they get the
+  // same public-text filter as group names (Apple 1.2). Every path that
+  // sets a handle comes through here.
+  return publicNameProblem(handle, 'handle');
 }
 
 /** Translate Supabase / Postgres errors into something a user can act
@@ -117,6 +121,13 @@ export async function updateOwnProfile(userId, patch) {
   const clean = Object.fromEntries(
     Object.entries(patch).filter(([k]) => allowed.includes(k))
   );
+  // Last line of defence for the display name other people see: a name
+  // the public-text filter refuses is published as no name at all. The
+  // user's own S.profile.name is untouched — this only decides what
+  // leaves the device.
+  if (typeof clean.display_name === 'string' && publicNameProblem(clean.display_name)) {
+    clean.display_name = null;
+  }
   if (Object.keys(clean).length === 0) return null;
   const { data, error } = await supabase
     .from('profiles')

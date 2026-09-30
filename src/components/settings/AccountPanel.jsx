@@ -25,6 +25,7 @@ import SettingsGroup from './SettingsGroup';
 import { supabase } from '../../lib/supabase';
 import { useOwnHandle } from '../../hooks/useOwnHandle';
 import { readPhotoFile } from '../../lib/image/compress';
+import { publicNameProblem } from '../../lib/moderation/nameFilter';
 
 export default function AccountPanel({ S, update, userId, userEmail, onSignOut, children }) {
   const profile = S.profile || {};
@@ -37,6 +38,15 @@ export default function AccountPanel({ S, update, userId, userEmail, onSignOut, 
   const [pwdConfirm, setPwdConfirm] = useState('');
   const [pwdMsg, setPwdMsg] = useState(null);
   const [pwdBusy, setPwdBusy] = useState(false);
+  // Friends, handle search and the global board show this name, so it
+  // gets the public-text filter. A refused name is simply not saved —
+  // the last good one stays — and a name saved before the filter
+  // existed is left alone but flagged (usePublishProfile won't publish
+  // it; see lib/friends/queries updateOwnProfile).
+  const [nameMsg, setNameMsg] = useState(() => {
+    const text = publicNameProblem(profile.name || '');
+    return text ? { kind: 'err', text } : null;
+  });
 
   function setProfileField(field, value) {
     update(prev => ({
@@ -159,9 +169,16 @@ export default function AccountPanel({ S, update, userId, userEmail, onSignOut, 
             className="m-profile-input"
             placeholder="Your name"
             defaultValue={profile.name || ''}
-            onChange={e => setProfileField('name', e.target.value)}
+            aria-invalid={nameMsg ? true : undefined}
+            onChange={e => {
+              const value = e.target.value;
+              const text = publicNameProblem(value);
+              setNameMsg(text ? { kind: 'err', text } : null);
+              if (!text) setProfileField('name', value);
+            }}
           />
         </label>
+        {nameMsg && <FieldMsg msg={nameMsg} />}
 
         <label className="m-profile-field">
           <span className="m-profile-label">Tagline</span>
