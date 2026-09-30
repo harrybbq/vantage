@@ -144,6 +144,10 @@ fix before real users · **AFTER** = hardening.
 
 ### Run today — `supabase/security_hotfix_2026_09_30.sql` (items 32–38)
 Grants, policies, view options, one FK and one index. No data touched.
+Then run `supabase/audit_schema_2026_10.sql` — the new tables and columns
+the wave-1 code uses (AI caps, client errors, moderation, suspension,
+prestige cooldown, throttles, health-token index, anti-wipe mirror). The
+code fails soft until it is run, so order doesn't matter.
 
 32. `[ ]` **BLOCKS** Two SECURITY DEFINER views are readable with the
     public anon key: `notifications_pending` (every user's queued
@@ -166,30 +170,34 @@ Grants, policies, view options, one FK and one index. No data touched.
     Auth). Dashboard toggle.
 
 ### Native build — nothing server-side works in the app shell yet
-40. `[ ]` **BLOCKS** Every call is a relative `/.netlify/functions/…`
+40. `[~]` **BLOCKS** Every call is a relative `/.netlify/functions/…`
     URL (~30 sites; `authFetch.js` passes it through). In Capacitor
     these hit the local bundle: delete-account, AI, leaderboard, groups,
     food search, weather all fail. Add one `API_BASE` helper.
-41. `[ ]` **BLOCKS** RevenueCat loads through
+    *Status 2026-09-30: done in code (apiUrl/authFetch); untested on a device.*
+41. `[~]` **BLOCKS** RevenueCat loads through
     `import(/* @vite-ignore */ '@revenuecat/purchases-capacitor')` — a
     bare specifier a WebView can't resolve, so purchase is impossible and
     Upgrade falls through to the waitlist. Static imports; install
     `@capacitor/browser`; `cap sync`. (This is why item 17 never worked.)
-42. `[ ]` **BLOCKS** Google/Apple sign-in, email confirmation and the
+    *Status 2026-09-30: done in code (bundled imports, native-only init); needs a real-device purchase test (item 17).*
+42. `[~]` **BLOCKS** Google/Apple sign-in, email confirmation and the
     WHOOP/Oura callbacks all return to `window.location.origin`; there is
     no deep-link handler. Google refuses OAuth in an embedded WebView.
     Native sign-in (system browser + custom scheme/universal link +
     `appUrlOpen`), and apply the 13+/Terms gate to OAuth signups too.
     Also: the Apple button only renders when width ≤ 768px while Google
     always shows — breaks 4.8 on iPad / landscape.
-43. `[ ]` **LAUNCH** Android project is stale for Capacitor 8
+    *Status 2026-09-30: done in code (system-browser OAuth + PKCE, com.vantage.app://auth-callback, Apple at every width, 13+/Terms on OAuth). Owner: add `com.vantage.app://auth-callback` to Supabase redirect URLs; untested on device.*
+43. `[~]` **LAUNCH** Android project is stale for Capacitor 8
     (min/compile/target 23/35/35 vs 24/36/36); `allowBackup="true"`
     copies the session + cached health state to Google Drive. Skip the
     PWA install prompt / cookie banner / "no App Store needed" copy on
     native. Don't register the service worker natively.
+    *Status 2026-09-30: done in code (SDK 24/36/36, AGP/Gradle bumped, allowBackup=false, web-only prompts/SW); run `npx cap sync android` on a machine with the SDK.*
 
 ### Rankings and money
-44. `[ ]` **LAUNCH** Anyone can reach global #1. `recompute.js` scores
+44. `[~]` **LAUNCH** Anyone can reach global #1. `recompute.js` scores
     client-written state: any key in `logs` counts as a day, visions are
     not re-verified, undated achievements skip spacing. And
     `prestige-up` checks the stored OVR but takes the new baseline from
@@ -197,102 +205,125 @@ Grants, policies, view options, one FK and one index. No data touched.
     to 99. Fix: recompute inside prestige-up; accept only ISO-date keys
     within the account's age; cap day-counts at account age; a DB
     cooldown between prestiges. Real fix is item 26.
-45. `[ ]` **LAUNCH** AI spend has no durable cap. Today: set a monthly
+    *Status 2026-09-30: partly: only real, in-age ISO day keys count; day counts capped at account age; prestige recomputes from one read + 7-day cooldown (needs audit SQL). Vision re-verification in progress.*
+45. `[~]` **LAUNCH** AI spend has no durable cap. Today: set a monthly
     limit in the Anthropic console. Then a Postgres daily counter per
     user, a server-side tier check on the coach, owner check on
     recipe-from-video, and cap the coach snapshot (~8 KB).
-46. `[ ]` **LAUNCH** RevenueCat webhook trusts event order and type:
+    *Status 2026-09-30: done in code (daily caps per feature, coach tier check, recipe owner-only, 8 KB snapshot cap). Needs audit SQL for durable caps + an Anthropic console spend limit.*
+46. `[~]` **LAUNCH** RevenueCat webhook trusts event order and type:
     a late RENEWAL after EXPIRATION re-grants Pro, sandbox events aren't
     rejected, lifetime can be overwritten to `pro`. Treat the webhook as
     a trigger and read the subscriber from RevenueCat's API.
-47. `[ ]` **LAUNCH** Leagues: members who joined mid-week carry their
+    *Status 2026-09-30: done in code (sandbox rejected, lifetime never overwritten, event ordering, subscriber API when REVENUECAT_SECRET_API_KEY is set).*
+47. `[x]` **LAUNCH** Leagues: members who joined mid-week carry their
     whole week's climb into the new group; users can lower their state
     before the Monday snapshot. Count only `joined_at <= weekStart`.
+    *Status 2026-09-30: done.*
 
 ### Server functions
 48. `[ ]` **LAUNCH** `cronAuth.js:42` accepts any body with `next_run`
     as "the scheduler". Delete that branch (item 24b's "refused until
     CRON_SECRET exists" is not true while it's there).
-49. `[ ]` **LAUNCH** `health-sync`: no login, rate-limited per
+49. `[~]` **LAUNCH** `health-sync`: no login, rate-limited per
     *caller-chosen* token, and the lookup is an unindexed JSONB filter
     that unpacks every user's ~1 MB state — a script can saturate the
     Micro DB. Move tokens to a hashed, indexed table; limit per IP too;
     header-only token (item 24).
-50. `[ ]` **LAUNCH** health-sync, whoop-cron and oura-cron rewrite the
+    *Status 2026-09-30: done in code (per-IP limit, header preferred, generic errors, CAS write); needs audit SQL for the token index.*
+50. `[x]` **LAUNCH** health-sync, whoop-cron and oura-cron rewrite the
     WHOLE state with no `updated_at` check — a save landing in between
     is lost. Same class as the 2026-05-03 wipe.
-51. `[ ]` **LAUNCH** SSRF in `productPage.js` (shop-autofill,
+    *Status 2026-09-30: done (compare-and-set on updated_at, one retry, never forced).*
+51. `[x]` **LAUNCH** SSRF in `productPage.js` (shop-autofill,
     shop-price-check): the host block misses 0.0.0.0, IPv6-mapped,
     ULA/CGNAT and DNS names that resolve privately, and follows
     redirects unchecked. Resolve + check IP, `redirect: 'manual'`.
-52. `[ ]` **LAUNCH** A group owner deleting their account deletes the
+    *Status 2026-09-30: done (resolved-IP checks, manual redirects re-checked, 80/443 only).*
+52. `[x]` **LAUNCH** A group owner deleting their account deletes the
     group for everyone (FK cascade; delete-account skips the heir
     hand-over that leaveGroup does).
-53. `[ ]` **AFTER** Error bodies leak DB error text and env-var names;
+    *Status 2026-09-30: done (heir hand-over; Storage objects + RevenueCat subscriber removed on deletion).*
+53. `[x]` **AFTER** Error bodies leak DB error text and env-var names;
     weather/destination-brief send `Cache-Control: public`; cron
     deadline (60 s) may exceed Netlify's scheduled limit — a kill
     mid-refresh loses a rotating WHOOP token.
+    *Status 2026-09-30: done (generic errors, private caching, 20 s cron deadline, refresh token persisted first).*
 
 ### Client and data safety
-54. `[ ]` **BLOCKS** The anti-wipe guard (`hasMeaningfulData`,
+54. `[~]` **BLOCKS** The anti-wipe guard (`hasMeaningfulData`,
     `looksLikeFactoryDefault`, SQL `vb_state_meaningful`) ignores
     vitalsLog, bodyLog, burnLog, subscriptions, holidays, backgrounds…
     A wearable-only user on a new device can have defaults saved over
     real data. Treat any non-empty collection as meaningful.
-55. `[ ]` **LAUNCH** Stored XSS: the GitHub hub widget puts repo
+    *Status 2026-09-30: done in the client (ignore-list predicate, check:wipeguard); SQL mirror in audit SQL.*
+55. `[x]` **LAUNCH** Stored XSS: the GitHub hub widget puts repo
     name/description/language/url into `outerHTML` unescaped
     (`HubSection.jsx:1816-1830`). `escapeHtml`/`safeUrl` already exist.
-56. `[ ]` **LAUNCH** Sign-out and account deletion leave the full state
+    *Status 2026-09-30: done (GitHub widget, link preview and leaderboard templates escaped).*
+56. `[x]` **LAUNCH** Sign-out and account deletion leave the full state
     (health, meals, money) in localStorage and SW caches. Clear per-user
     keys + `caches.delete` on explicit sign-out/delete.
-57. `[ ]` **LAUNCH** Service worker caches every function GET
+    *Status 2026-09-30: done (explicit sign-out/deletion only; never on session expiry).*
+57. `[x]` **LAUNCH** Service worker caches every function GET
     cache-first until the next CACHE_VERSION bump (weather, news, market,
     food search, GitHub). Cache-first only `/assets/*`.
-58. `[ ]` **LAUNCH** One error boundary for the whole app — any widget
+    *Status 2026-09-30: done (cache-first only /assets; CACHE_VERSION bumped; no SW in the native shell).*
+58. `[x]` **LAUNCH** One error boundary for the whole app — any widget
     crash is a dead app for a reviewer. Boundary per widget/section.
-59. `[ ]` **LAUNCH** Profile photo stored full-size and re-sent on every
+    *Status 2026-09-30: done (WidgetBoundary on every widget and section, reporting to client-error).*
+59. `[x]` **LAUNCH** Profile photo stored full-size and re-sent on every
     save/poll (~5 MB); "remove photo" never clears the server copy.
     Full state re-downloaded every 60 s while visible — poll
     `updated_at` first.
+    *Status 2026-09-30: done (512 px photos, photo only sent when changed, explicit remove flag, poll checks updated_at first).*
 60. `[ ]` **AFTER** CSP has no report endpoint, so "promote when quiet"
     (item 21) can never be observed; inline scripts and Google Fonts
     would break under enforcement.
 
 ### Store, legal and moderation
-61. `[ ]` **BLOCKS** Settings says "Your login email is retained" and
+61. `[x]` **BLOCKS** Settings says "Your login email is retained" and
     the button reads "Delete All Data" — reads as the account surviving
     (5.1.1(v)). Say "Delete account", and warn that store subscriptions
     must be cancelled in the store.
-62. `[ ]` **BLOCKS** Owner-only surfaces (Upgrade, Apple Health
+    *Status 2026-09-30: done.*
+62. `[~]` **BLOCKS** Owner-only surfaces (Upgrade, Apple Health
     Shortcut panel, admin editors) ship in the binary behind a client
     email check — hidden features (2.3.1), and `VITE_OWNER_EMAIL` is
     readable in the bundle. Compile them out of native builds the way
     `trading/enabled.js` does; check owner server-side.
-63. `[ ]` **BLOCKS** UGC (Apple 1.2): no filter on display names,
+    *Status 2026-09-30: done in code (owner surfaces compiled out of native; owner check via is_app_owner RPC).*
+63. `[~]` **BLOCKS** UGC (Apple 1.2): no filter on display names,
     handles, group names or trending items; avatars unscreened yet shown
     on the global board; no report from leaderboard/group rows; nothing
     reads `reports`, no suspend/ban, and deleting an account cascades
     away the reports against it. Global trending lets two accounts put
     any text + URL on every user's Shop page.
-64. `[ ]` **BLOCKS** Privacy policy vs reality: no controller identity
+    *Status 2026-09-30: mostly: report/block from leaderboard + group rows, owner moderation queue + function, suspended users hidden, name filter on group names + trending, trending floors raised, message/friend-request throttles (audit SQL). Needs audit SQL. Profile-name filter + avatar screening in progress.*
+64. `[~]` **BLOCKS** Privacy policy vs reality: no controller identity
     or contact; missing processors (ipwho.is gets every user's IP,
     GitHub, Google favicons, FatSecret, USDA, YouTube/TikTok, GNews,
     Finnhub, Open-Meteo); "not retained by Anthropic" needs a ZDR
     contract or must go; says leaderboard/search are opt-in but both
     default ON; no mention of 14 history snapshots.
-65. `[ ]` **BLOCKS** Paywall lacks Terms/Privacy links and renewal
+    *Status 2026-09-30: factual corrections done; controller identity and security contact are placeholders until the company exists.*
+65. `[x]` **BLOCKS** Paywall lacks Terms/Privacy links and renewal
     wording from the store product; price is hard-coded.
-66. `[ ]` **LAUNCH** No explicit consent for special-category health
+    *Status 2026-09-30: done (store-product wording, Terms/Privacy, Restore).*
+66. `[x]` **LAUNCH** No explicit consent for special-category health
     data (UK GDPR Art. 9) — "you logged it" is not explicit consent —
     and the AI coach sends data to Anthropic on page load for Pro users.
     Consent screen before health features and before AI.
-67. `[ ]` **LAUNCH** Deletion leaves Storage objects (`cv/`,
+    *Status 2026-09-30: done (one-time consent sheet + just-in-time asks; coach brief waits for AI consent; withdraw in Settings).*
+67. `[~]` **LAUNCH** Deletion leaves Storage objects (`cv/`,
     `recipes/`), the RevenueCat subscriber, and un-revoked WHOOP/Oura
     grants. Export omits `nutrition_log`, messages and profile, and
     `a.download` does nothing in a WebView.
-68. `[ ]` **LAUNCH** Defaults for 13–17s: handle search and leaderboard
+    *Status 2026-09-30: done except WHOOP/Oura grant revocation (no documented endpoint found); export now includes food log, profile, friendships, messages.*
+68. `[~]` **LAUNCH** Defaults for 13–17s: handle search and leaderboard
     are ON; `shareStreak` publishes habit names (e.g. a quit-drinking
     streak) to friends by default.
+    *Status 2026-09-30: done in the client (streak opt-in, toggles show real state); new-account DB defaults in audit SQL.*
 69. `[ ]` **LAUNCH** The trading app's schemas (`ledger`, `paper`,
     `research`) live in Vantage's Supabase project — one service-role
     key, one Micro instance, one restore unit. Move them to their own
