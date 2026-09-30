@@ -8,7 +8,7 @@
  * and the one where it must not touch what the user decided.
  */
 import assert from 'node:assert/strict';
-import { applyRelapse } from './relapse.js';
+import { applyRelapse, relapseFloor } from './relapse.js';
 import { periodStart } from './strikes.js';
 
 let n = 0;
@@ -100,6 +100,26 @@ const base = () => ({
   eq(h.relapseCount, 1, 'a first relapse counts from zero, not from undefined');
   eq(h.strikeTimes, [NOW], 'and starts the strike list');
   eq(h.milestones, [], 'with no milestones to re-arm');
+}
+
+// ── Back-dating past the streak start (economy fix) ──
+{
+  const b = base();
+  const start = b.habits[0].startTime;               // 30 days ago
+  const yearAgo = NOW - 365 * DAY;
+  const next = applyRelapse(b, 'h1', yearAgo);
+  const h = next.habits.find(x => x.id === 'h1');
+  eq(h.startTime, start, 'a relapse dated before the streak began is clamped to its start — the timer never moves backwards');
+  ok(!(h.runs || []).length, 'and no zero-or-negative run is recorded');
+  ok(h.strikeTimes.every(t => t >= start), 'nor a strike before the start');
+  eq(relapseFloor(b.habits[0]), start, 'relapseFloor is the current streak start');
+  eq(relapseFloor({}), 0, 'and 0 for a habit without one');
+}
+{
+  const b = base();
+  const at = b.habits[0].startTime + DAY;            // inside the streak: untouched
+  const h = applyRelapse(b, 'h1', at).habits.find(x => x.id === 'h1');
+  eq(h.startTime, at, 'a relapse inside the streak keeps its own time');
 }
 
 console.log(`habit relapse: ${n} assertions passed`);

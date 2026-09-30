@@ -26,6 +26,14 @@
  * It does NOT touch `name`, `milestones`' definitions, or the strikes
  * allowance — the parts the user decided.
  *
+ * A relapse can never be dated before the streak it ends began
+ * (`startTime`; habits carry no separate creation stamp, and the first
+ * streak starts at creation). Back-dating one past that moved the timer
+ * BACKWARDS — a year-old "relapse" on a day-old habit handed out a
+ * year's worth of milestone coins the moment it was saved. Such a time
+ * is clamped to the start, which is exactly "it happened just as the
+ * streak began": the timer, runs and strikes are as if it had.
+ *
  * A Cut-down habit has no timer to restart: a "relapse" from any of the
  * quick buttons (hub widget, prime card) logs that DAY against the
  * budget instead, via cutdown.addUse.
@@ -41,6 +49,14 @@ import { periodStart } from './strikes.js';
 import { isCut, addUse, isoDay } from './cutdown.js';
 import { MAX_RUNS } from './progress.js';
 
+/** The earliest instant a relapse on this habit may be dated: the start
+ *  of its current streak. 0 when the habit has no usable start. Shared
+ *  with the relapse modal's date picker `min`. */
+export function relapseFloor(habit) {
+  const start = Number(habit && habit.startTime);
+  return Number.isFinite(start) && start > 0 ? start : 0;
+}
+
 export function applyRelapse(prev, id, whenTs) {
   const habits = (prev && prev.habits) || [];
   if (!id || !habits.some(h => h && h.id === id)) return prev;
@@ -49,7 +65,9 @@ export function applyRelapse(prev, id, whenTs) {
   if (!Number.isFinite(ts) || ts <= 0) return prev;
 
   const target = habits.find(h => h && h.id === id);
-  if (isCut(target)) return addUse(prev, id, isoDay(ts), Math.max(Date.now(), ts));
+  const floor = relapseFloor(target);
+  const when = Math.max(ts, floor);
+  if (isCut(target)) return addUse(prev, id, isoDay(when), Math.max(Date.now(), when));
 
   return {
     ...prev,
@@ -59,15 +77,15 @@ export function applyRelapse(prev, id, whenTs) {
       // fell in: a slip back-dated to last week still spends this
       // week's allowance, because that is the allowance being tracked.
       const start = periodStart(h.strikesPeriod, Date.now());
-      const recent = [...(h.strikeTimes || []).filter(t => t >= start), ts];
+      const recent = [...(h.strikeTimes || []).filter(t => t >= start), when];
       const began = Number(h.startTime);
-      const ended = Number.isFinite(began) && ts > began
-        ? [...(Array.isArray(h.runs) ? h.runs : []), { start: began, end: ts }].slice(-MAX_RUNS)
+      const ended = Number.isFinite(began) && when > began
+        ? [...(Array.isArray(h.runs) ? h.runs : []), { start: began, end: when }].slice(-MAX_RUNS)
         : h.runs;
       return {
         ...h,
         ...(ended ? { runs: ended } : {}),
-        startTime: ts,
+        startTime: when,
         strikeTimes: recent,
         relapseCount: (h.relapseCount || 0) + 1,
         milestones: (h.milestones || []).map(m => ({ ...m, awarded: false })),

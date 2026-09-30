@@ -2,7 +2,8 @@ import { useState, useRef, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import AddMobileWidgetModal from './mobile/AddMobileWidgetModal';
 import { appPresetToLink, visibleAppPresets } from '../data/appPresets';
-import { applyRelapse } from '../lib/habits/relapse';
+import { applyRelapse, relapseFloor } from '../lib/habits/relapse';
+import { WEEKLY_COINS_MAX } from '../utils/helpers';
 import { toCut, toQuit, isoDay } from '../lib/habits/cutdown';
 import PrimePicker from './widgets/prime/PrimePicker';
 import { isSuperseded } from '../lib/hub/primeBlocks';
@@ -859,7 +860,8 @@ function AddTrackerModal({ openId, onClose, onAdd }) {
       goal: parseFloat(form.goal) || null,
       color: form.color,
       weeklyTarget: parseInt(form.weeklyTarget) || null,
-      weeklyCoins: parseInt(form.weeklyCoins) || null,
+      // Capped at 50 — the reward is paid every week the goal is met.
+      weeklyCoins: Math.min(WEEKLY_COINS_MAX, parseInt(form.weeklyCoins) || 0) || null,
       category: form.category || 'general',
     });
     setForm({ name: '', type: 'boolean', unit: '', goal: '', color: '#1a7a4a', weeklyTarget: '', weeklyCoins: '', category: 'general' });
@@ -883,7 +885,7 @@ function AddTrackerModal({ openId, onClose, onAdd }) {
       <div style={{ fontFamily: 'var(--mono)', fontSize: '10px', color: 'var(--em-mid)', letterSpacing: '2px', textTransform: 'uppercase', marginBottom: '10px' }}>⬡ Weekly Coin Challenge (optional)</div>
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
         <div className="fg" style={{ marginBottom: 0 }}><label>Times per week</label><input type="number" placeholder="e.g. 5" min="1" max="7" value={form.weeklyTarget} onChange={e => setForm(f => ({ ...f, weeklyTarget: e.target.value }))} /></div>
-        <div className="fg" style={{ marginBottom: 0 }}><label>⬡ Coins reward</label><input type="number" placeholder="e.g. 10" min="1" value={form.weeklyCoins} onChange={e => setForm(f => ({ ...f, weeklyCoins: e.target.value }))} /></div>
+        <div className="fg" style={{ marginBottom: 0 }}><label>⬡ Coins reward</label><input type="number" placeholder="e.g. 10" min="1" max={WEEKLY_COINS_MAX} value={form.weeklyCoins} onChange={e => setForm(f => ({ ...f, weeklyCoins: e.target.value }))} /></div>
       </div>
       <div style={{ fontFamily: 'var(--mono)', fontSize: '10px', color: 'var(--text-muted)', marginTop: '6px' }}>Hit the weekly target to earn coins every week.</div>
       <div style={{ borderTop: '1px solid var(--border-lt)', margin: '14px 0' }}></div>
@@ -1802,11 +1804,17 @@ function RelapseModal({ openId, onClose, habits, onRelapse }) {
     // two habits reset from the same minute keep their own second.
     const ts = touched ? picked + (now % 60000) : now;
     if (ts > now) { setError('Relapse time can’t be in the future.'); return; }
+    // Nor before the streak it ends began — applyRelapse clamps it
+    // anyway (it was a coin exploit), but say so rather than silently
+    // logging a different time.
+    if (floor && ts < floor - 60000) { setError('That’s before this streak started.'); return; }
     onRelapse(habitId, ts);
     onClose(openId);
   }
 
   const maxInput = toLocalInput(new Date()); // disables future in supporting browsers
+  const floor = relapseFloor(habit);
+  const minInput = floor ? toLocalInput(new Date(floor)) : undefined;
 
   return (
     <div
@@ -1823,6 +1831,7 @@ function RelapseModal({ openId, onClose, habits, onRelapse }) {
           <input
             type="datetime-local"
             value={when}
+            min={minInput}
             max={maxInput}
             onChange={e => { setWhen(e.target.value); setTouched(true); setError(''); }}
           />

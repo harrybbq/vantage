@@ -36,7 +36,7 @@
  * Pure. No React, no network, no DOM.
  */
 import { recalcStreaks } from '../../utils/streaks.js';
-import { getWeekKey, countWeekLogs } from '../../utils/helpers.js';
+import { getWeekKey, countWeekLogs, trackerWeeklyCoins } from '../../utils/helpers.js';
 
 /** The marker meaning "the user has spoken; hands off this cell". */
 export const MANUAL = 'manual';
@@ -279,16 +279,18 @@ export function applyAutoLogs(prev, proposals, { now = new Date() } = {}) {
     proposals.filter(p => getWeekKey(p.day) === thisWeek).map(p => p.trackerId)
   );
   for (const t of (prev.trackers || [])) {
-    if (!touched.has(t.id) || !t.weeklyTarget || !t.weeklyCoins) continue;
+    // Capped at read time, like the manual award paths.
+    const reward = trackerWeeklyCoins(t);
+    if (!touched.has(t.id) || !t.weeklyTarget || !reward) continue;
     const awardKey = 'awarded_' + t.id + '_' + thisWeek;
     if (next[awardKey]) continue;
     if (countWeekLogs(logs, t.id, today) < t.weeklyTarget) continue;
     next = {
       ...next,
       [awardKey]: true,
-      coins: (next.coins || 0) + t.weeklyCoins,
+      coins: (next.coins || 0) + reward,
       coinHistory: [
-        { type: 'earn', label: `${t.name} weekly goal (${t.weeklyTarget}x)`, amount: t.weeklyCoins, ts: Date.now() },
+        { type: 'earn', label: `${t.name} weekly goal (${t.weeklyTarget}x)`, amount: reward, ts: Date.now() },
         ...(next.coinHistory || []),
       ],
     };
