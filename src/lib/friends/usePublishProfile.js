@@ -2,6 +2,8 @@ import { useEffect, useRef } from 'react';
 import { upsertOwnPublicStats, updateOwnProfile } from './queries';
 import { habitElapsed } from '../habits/progress.js';
 import { privacyOn } from './privacy.js';
+import { publicNameProblem } from '../moderation/nameFilter.js';
+import { photoHash, requestAvatarScreen } from './avatarScreen.js';
 
 /**
  * Debounced sync of the user's public-facing data:
@@ -25,6 +27,10 @@ import { privacyOn } from './privacy.js';
 
 const DAY_MS = 86_400_000;
 const AVATAR_TARGET_PX = 96; // square; friend list renders at 28-32px so 96 is sharp on retina
+// After a screening call gives no verdict (offline, not deployed, over
+// the daily cap), don't ask about the same photo again for a while —
+// S changes constantly and each publish would otherwise re-ask.
+const SCREEN_RETRY_MS = 10 * 60_000;
 
 function ymd(d) { return d.toISOString().slice(0, 10); }
 
@@ -113,7 +119,7 @@ function recentWins(S) {
 // cloud copy has arrived, S is the local backup or the factory seed —
 // publishing that would push a stale or empty card (name blank, level
 // 1, no streak) over the real one for every friend to see.
-export function usePublishProfile(userId, S, hasPro, visionState, { hydrated = false, loadError = null } = {}) {
+export function usePublishProfile(userId, S, hasPro, visionState, { hydrated = false, loadError = null, update = null } = {}) {
   // Skip publish entirely if the user has no profile (paywall_schema
   // creates one on first login but we don't want to tightly couple).
   // The first successful run sets `triedRef.current = true` so we
@@ -122,6 +128,11 @@ export function usePublishProfile(userId, S, hasPro, visionState, { hydrated = f
   const triedRef = useRef(false);
   const lastPayloadRef = useRef('');
   const timerRef = useRef(null);
+  // `update` records screening verdicts in S.avatarScreen. Held in a ref
+  // so a new function identity doesn't re-run the publish effect.
+  const updateRef = useRef(update);
+  updateRef.current = update;
+  const screenRetryRef = useRef({ hash: null, until: 0 });
 
   useEffect(() => {
     if (!userId || !S) return;
@@ -138,9 +149,12 @@ export function usePublishProfile(userId, S, hasPro, visionState, { hydrated = f
     const priv = S.privacy || {};
     // Streak is opt-IN (see privacy.js) — it publishes the habit name.
     const streak = privacyOn(priv, 'shareStreak') ? currentStreak(S) : null;
+    // A name the public-text filter refuses is published as no name
+    // (Settings › Account says why). S.profile.name itself is untouched.
+    const ownName = (S.profile?.name || '').trim();
     const payload = {
       // profiles slice
-      display_name: (S.profile?.name || '').trim() || null,
+      display_name: ownName && !publicNameProblem(ownName) ? ownName : null,
       level,
       // last_active_at gates on sharePresence — see also the heartbeat
       // effect below which won't ping if presence is opted out.
@@ -155,10 +169,12 @@ export function usePublishProfile(userId, S, hasPro, visionState, { hydrated = f
     // Avatar — gates on shareAvatar AND the user actually having a
     // photo set. The raw photo data URL is in S.profile.photo
     // (large; not yet resized). We resize ONLY when the source has
-    // changed since the last publish, tracked via a hash of the
-    // first 64 chars of the data URL (cheap, stable enough).
+    // changed since the last publish. The signature is length + tail:
+    // the first bytes of a data URL are the JPEG header, identical for
+    // every photo from the same encoder, so a head slice never changed.
     const photoSrc = priv.shareAvatar !== false ? (S.profile?.photo || null) : null;
-    const photoSig = photoSrc ? photoSrc.slice(0, 64) : '';
+    const photoSig = photoSrc ? `${photoSrc.length}:${photoSrc.slice(-64)}` : '';
+    const lastScreen = S.avatarScreen || null;
 
     // Skip the network round-trip if the meaningful slice hasn't
     // changed — only `last_active_at` would differ on a no-op tick.
@@ -177,8 +193,10 @@ export function usePublishProfile(userId, S, hasPro, visionState, { hydrated = f
       try {
         // Resize avatar lazily inside the timer so the heavy canvas
         // work happens after the debounce settles, not on every
-        // render. Returns null when shareAvatar is off or no photo.
-        const avatarUrl = photoSrc ? await resizeAvatar(photoSrc) : null;
+        // render. Null when shareAvatar is off, there's no photo, or
+        // the photo hasn't passed screening.
+        const resized = photoSrc ? await resizeAvatar(photoSrc) : null;
+        const avatarUrl = resized ? await screenedAvatar(photoSrc, resized, lastScreen) : null;
 
         // Two rows in parallel — they're independent and the
         // friends rail tolerates either failing without the other.
@@ -215,6 +233,28 @@ export function usePublishProfile(userId, S, hasPro, visionState, { hydrated = f
 
     return () => clearTimeout(timerRef.current);
   }, [userId, S, hasPro, visionState, hydrated, loadError]);
+
+  /**
+   * The avatar strangers will see, or null. Fails CLOSED: no verdict
+   * (no key, offline, function not deployed) publishes no avatar, and
+   * the photo stays on this device exactly as it was. Only definitive
+   * verdicts are remembered, additively, in S.avatarScreen.
+   */
+  async function screenedAvatar(photoSrc, resized, lastScreen) {
+    const hash = await photoHash(photoSrc);
+    if (!hash) return null;
+    if (lastScreen?.hash === hash) return lastScreen.ok ? resized : null;
+    const retry = screenRetryRef.current;
+    if (retry.hash === hash && Date.now() < retry.until) return null;
+
+    const ok = await requestAvatarScreen(resized);
+    if (ok === null) {
+      screenRetryRef.current = { hash, until: Date.now() + SCREEN_RETRY_MS };
+      return null;
+    }
+    updateRef.current?.(prev => ({ ...prev, avatarScreen: { hash, ok, at: new Date().toISOString() } }));
+    return ok ? resized : null;
+  }
 
   // ── Presence heartbeat ─────────────────────────────────────────
   // The debounced publish above only fires when state CHANGES. If

@@ -362,7 +362,7 @@ function Board({ userId, userEmail, onSignOut }) {
   // public_stats heatmap + wins) to Supabase so friends can see it.
   // Debounced inside the hook; safely no-ops if the social schema
   // hasn't been applied yet.
-  usePublishProfile(userId, S, hasPro, visionState, { hydrated, loadError });
+  usePublishProfile(userId, S, hasPro, visionState, { hydrated, loadError, update });
 
   // Warm the lazy section chunks once the hub is up and the browser is
   // idle, so the first tap on Track or Shop doesn't wait on the network

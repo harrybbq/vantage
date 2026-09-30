@@ -26,6 +26,7 @@ const DAILY_CAPS = {
   'food-detect': 40,
   recipe: 15,
   crest: 10,
+  avatar: 10,
 };
 
 const MISSING_RETRY_MS = 10 * 60_000;
