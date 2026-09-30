@@ -29,7 +29,8 @@ exports.handler = async (event) => {
 
   const { SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, WHOOP_CLIENT_ID, WHOOP_CLIENT_SECRET } = process.env;
   if (!WHOOP_CLIENT_ID || !WHOOP_CLIENT_SECRET) {
-    return { statusCode: 500, headers: CORS, body: JSON.stringify({ error: 'WHOOP env missing — set WHOOP_CLIENT_ID / WHOOP_CLIENT_SECRET in Netlify' }) };
+    console.error('whoop-connect: WHOOP_CLIENT_ID / WHOOP_CLIENT_SECRET not set');
+    return { statusCode: 500, headers: CORS, body: JSON.stringify({ error: 'WHOOP is not set up on this site yet.' }) };
   }
 
   const auth = await requireUser(event, CORS);

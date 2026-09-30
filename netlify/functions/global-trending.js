@@ -20,16 +20,29 @@
  * Warm function instances then serve every shop-open from memory instead
  * of re-scanning user_data. Cold instances recompute once.
  *
- * POST, Bearer Supabase JWT. Returns { items: [{ name, price, url,
- * imageUrl, coins, count }] }.
+ * Moderation (2026-09-30, item 63 — Apple 1.2):
+ *   • The floor is FIVE distinct people, not two. At two, a pair of
+ *     accounts could put any text on every user's Shop page.
+ *   • No links and no image URLs go out — only a name, a price, coins
+ *     and a count. A shared board is not a place to publish URLs (the
+ *     client never rendered imageUrl, and the link is what made spam
+ *     worth doing).
+ *   • Names pass lib/nameFilter.js (slurs, explicit terms, links, phone
+ *     numbers, emails) or are dropped.
+ *   • Suspended users' items are not counted.
+ *
+ * POST, Bearer Supabase JWT. Returns { items: [{ name, price, coins,
+ * count }] }.
  */
+const { checkPublicText } = require('../lib/nameFilter');
+const { suspendedIds } = require('../lib/suspended');
 const CORS = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'Content-Type, Authorization',
   'Content-Type': 'application/json',
 };
 
-const MIN_USERS = 2;          // anonymity floor: item must span ≥2 people
+const MIN_USERS = 5;          // anonymity + anti-spam floor: ≥5 distinct people
 const TOP_N = 20;             // most-wanted items returned
 const CACHE_TTL_MS = 15 * 60 * 1000;
 
@@ -51,12 +64,20 @@ async function computeTrending(env) {
   // applied in JS (not the DB) because a null/absent flag is default-on,
   // and PostgREST's `not.eq.false` would drop nulls too. Opted-out items
   // reach only this trusted service-role function and are discarded here.
-  const uRes = await sb(`user_data?select=items:state->shopItems,trending:state->privacy->shareTrending`, env);
-  const all = uRes.ok ? await uRes.json() : [];
+  const uRes = await sb(`user_data?select=id,items:state->shopItems,trending:state->privacy->shareTrending`, env);
+  // A failed read is not "nobody wants anything": serve the last good
+  // board if there is one, and never cache the failure itself.
+  if (!uRes.ok) {
+    if (CACHE.items) return CACHE.items;
+    throw new Error(`user_data read ${uRes.status}`);
+  }
+  const all = await uRes.json();
+  const suspended = await suspendedIds({ supabaseUrl: env.SUPABASE_URL, serviceKey: env.SUPABASE_SERVICE_ROLE_KEY });
 
   const map = new Map(); // normalized name → aggregate
   for (const row of all) {
     if (row.trending === false) continue;      // explicit opt-out only
+    if (suspended.has(row.id)) continue;
     const items = Array.isArray(row.items) ? row.items : [];
     const seen = new Set(); // one vote per user per item
     for (const it of items) {
@@ -64,18 +85,17 @@ async function computeTrending(env) {
       const key = String(it.name).toLowerCase().replace(/\s+/g, ' ').trim();
       if (!key || seen.has(key)) continue;
       seen.add(key);
-      const e = map.get(key) || { name: String(it.name).slice(0, 80), price: '', url: '', imageUrl: '', coins: 0, count: 0 };
+      const e = map.get(key) || { name: String(it.name).slice(0, 80), price: '', coins: 0, count: 0 };
       e.count++;
       if (!e.price && it.price) e.price = String(it.price).slice(0, 20);
-      if (!e.url && typeof it.url === 'string' && it.url.startsWith('http')) e.url = it.url;
-      if (!e.imageUrl && typeof it.imageUrl === 'string' && it.imageUrl.startsWith('http')) e.imageUrl = it.imageUrl;
-      if (!e.coins && it.coinCost) e.coins = it.coinCost;
+      if (!e.coins && Number.isFinite(Number(it.coinCost))) e.coins = Number(it.coinCost);
       map.set(key, e);
     }
   }
 
   return [...map.values()]
     .filter(e => e.count >= MIN_USERS)         // anonymity floor
+    .filter(e => checkPublicText(e.name).ok && checkPublicText(e.price).ok)
     .sort((a, b) => b.count - a.count || a.name.localeCompare(b.name))
     .slice(0, TOP_N);
 }
@@ -86,7 +106,7 @@ exports.handler = async (event) => {
 
   const env = process.env;
   if (!env.SUPABASE_URL || !env.SUPABASE_SERVICE_ROLE_KEY) {
-    return { statusCode: 500, headers: CORS, body: JSON.stringify({ error: 'supabase env missing' }) };
+    return { statusCode: 500, headers: CORS, body: JSON.stringify({ error: 'not configured' }) };
   }
 
   // Require a valid session (prevents anonymous scraping of the board).
@@ -102,6 +122,7 @@ exports.handler = async (event) => {
     }
     return { statusCode: 200, headers: CORS, body: JSON.stringify({ items: CACHE.items }) };
   } catch (e) {
-    return { statusCode: 502, headers: CORS, body: JSON.stringify({ error: e.message || 'failed' }) };
+    console.error('global-trending:', e?.message);
+    return { statusCode: 502, headers: CORS, body: JSON.stringify({ error: 'failed' }) };
   }
 };

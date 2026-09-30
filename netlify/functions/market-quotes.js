@@ -89,9 +89,11 @@ exports.handler = async (event) => {
     const nearby = Object.keys(process.env)
       .filter(k => /FINN|GNEWS|FINNHUB/i.test(k))
       .sort();
+    // Names go to the log only — never list env vars in a response.
+    console.warn('market-quotes: FINNHUB_API_KEY not visible to the function; related names:', nearby.join(', ') || 'none');
     return {
       statusCode: 200, headers: CORS,
-      body: JSON.stringify({ configured: false, missing: 'FINNHUB_API_KEY', nearby }),
+      body: JSON.stringify({ configured: false }),
     };
   }
 
@@ -129,7 +131,8 @@ exports.handler = async (event) => {
       }
       return { statusCode: 200, headers: CORS, body: JSON.stringify({ configured: true, results }) };
     } catch (e) {
-      return { statusCode: 502, headers: CORS, body: JSON.stringify({ error: 'search failed', detail: e.message }) };
+      console.error('market-quotes: search', e?.message);
+      return { statusCode: 502, headers: CORS, body: JSON.stringify({ error: 'search failed' }) };
     }
   }
 
@@ -149,6 +152,7 @@ exports.handler = async (event) => {
       body: JSON.stringify({ configured: true, delayed: true, asOf: new Date().toISOString(), quotes }),
     };
   } catch (e) {
-    return { statusCode: 502, headers: CORS, body: JSON.stringify({ error: 'upstream', detail: e.message }) };
+    console.error('market-quotes: upstream', e?.message);
+    return { statusCode: 502, headers: CORS, body: JSON.stringify({ error: 'upstream' }) };
   }
 };

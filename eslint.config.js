@@ -22,7 +22,7 @@ import react from 'eslint-plugin-react';
 
 export default [
   {
-    ignores: ['dist/**', 'node_modules/**', 'android/**', 'ios/**', 'public/**', 'coverage/**'],
+    ignores: ['dist/**', 'node_modules/**', 'android/**', 'ios/**', 'public/**', 'coverage/**', '.claude/**'],
   },
 
   // ── Browser source ──

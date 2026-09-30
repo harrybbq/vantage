@@ -58,9 +58,12 @@ exports.handler = async (event) => {
     const nearby = Object.keys(process.env)
       .filter(k => /NEWS|GNEWS|FINNHUB/i.test(k))
       .sort();
+    // The names go to the function log, never the response — a public
+    // endpoint listing our environment variables is a map for anyone.
+    console.warn('news-today: GNEWS_API_KEY not visible to the function; related names:', nearby.join(', ') || 'none');
     return {
       statusCode: 200, headers: CORS,
-      body: JSON.stringify({ configured: false, missing: 'GNEWS_API_KEY', nearby }),
+      body: JSON.stringify({ configured: false }),
     };
   }
 
@@ -101,12 +104,14 @@ exports.handler = async (event) => {
         const j = JSON.parse(upstream);
         detail = Array.isArray(j?.errors) ? j.errors.join('; ') : (j?.message || '');
       } catch { detail = upstream; }
+      // The provider's explanation goes to the log; the client gets
+      // the status, which is enough to tell a quota from a bad key.
+      console.error('news-today: upstream', res.status, detail || '');
       return {
         statusCode: 502, headers: CORS,
         body: JSON.stringify({
           error: res.status === 429 ? 'rate-limited' : 'upstream',
           status: res.status,
-          detail: detail || `HTTP ${res.status}`,
         }),
       };
     }
@@ -131,6 +136,7 @@ exports.handler = async (event) => {
       body: JSON.stringify({ configured: true, query: q, items }),
     };
   } catch (e) {
-    return { statusCode: 504, headers: CORS, body: JSON.stringify({ error: 'unreachable', detail: e.message }) };
+    console.error('news-today: unreachable', e?.message);
+    return { statusCode: 504, headers: CORS, body: JSON.stringify({ error: 'unreachable' }) };
   }
 };

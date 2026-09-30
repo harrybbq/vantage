@@ -379,3 +379,4 @@ android/app/build/
 android/build/
 ios/App/Pods/
 ios/App/DerivedData/
+.claude/worktrees/

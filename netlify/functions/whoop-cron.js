@@ -19,6 +19,7 @@
  */
 const { sb, getFreshToken, fetchWhoopData, mergeWhoopIntoState } = require('../lib/whoop');
 const { requireScheduler } = require('../lib/cronAuth');
+const { mergeStateCAS } = require('../lib/stateWrite');
 
 const DAYS = 3; // enough to catch anything a run or two ago missed
 
@@ -44,7 +45,7 @@ exports.handler = async (event) => {
     return { statusCode: 502 };
   }
   const rows = await tokRes.json().catch(() => []);
-  let synced = 0, skipped = 0, failed = 0, deferred = 0;
+  let synced = 0, skipped = 0, failed = 0, deferred = 0, conflicted = 0;
 
   // Wall-clock budget. Each account costs four upstream calls plus
   // a read and a write, so an unbounded serial loop stops being
@@ -52,7 +53,12 @@ exports.handler = async (event) => {
   // mid-loop is indistinguishable from one that worked. Stopping
   // deliberately, and saying how many were left, is the difference
   // between a backlog and a silent hole in everyone's data.
-  const DEADLINE = Date.now() + 60_000;
+  //
+  // 20 s, not 60: Netlify's scheduled-function limit is shorter than a
+  // minute, and a run killed mid-account can die between WHOOP rotating
+  // a refresh token and us storing it — which disconnects that user.
+  // Stopping early costs a deferral; being killed costs a connection.
+  const DEADLINE = Date.now() + 20_000;
 
   for (const { user_id: userId } of rows) {
     if (Date.now() > DEADLINE) { deferred++; continue; }
@@ -67,19 +73,12 @@ exports.handler = async (event) => {
       // "skipped" count finally means what it says.
       if (!Object.keys(vitals).length && !Object.keys(burn).length) { skipped++; continue; }
 
-      // Read current state, merge, write back. Additive merge only.
-      const stRes = await sb(`user_data?id=eq.${userId}&select=state`, {}, env);
-      if (!stRes.ok) { failed++; continue; }
-      const state = (await stRes.json().catch(() => []))[0]?.state;
-      if (!state || typeof state !== 'object') { skipped++; continue; } // no app data yet — don't create junk
-
-      const next = mergeWhoopIntoState(state, vitals, burn);
-      const wr = await sb(`user_data?id=eq.${userId}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json', Prefer: 'return=minimal' },
-        body: JSON.stringify({ state: next, updated_at: new Date().toISOString() }),
-      }, env);
-      if (!wr.ok) { failed++; continue; }
+      // Read, merge, compare-and-set write (lib/stateWrite.js): a client
+      // save that lands between our read and our write is never
+      // overwritten. Additive merge only; no state yet → no junk row.
+      const outcome = await mergeStateCAS(userId, st => mergeWhoopIntoState(st, vitals, burn), env);
+      if (outcome === 'missing') { skipped++; continue; }
+      if (outcome === 'conflict') { conflicted++; continue; }
       synced++;
     } catch (e) {
       console.error('whoop-cron: user sync failed', userId, e?.whoopStatus || '', e?.message, e?.whoopDetail || '');
@@ -87,6 +86,6 @@ exports.handler = async (event) => {
     }
   }
 
-  console.info(`whoop-cron: ${synced} synced, ${skipped} skipped, ${failed} failed, ${deferred} deferred to the next run, of ${rows.length}`);
+  console.info(`whoop-cron: ${synced} synced, ${skipped} skipped, ${failed} failed, ${conflicted} busy (retry next run), ${deferred} deferred to the next run, of ${rows.length}`);
   return { statusCode: 200 };
 };

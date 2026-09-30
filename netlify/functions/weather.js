@@ -20,9 +20,13 @@ const CORS = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'Content-Type',
   'Content-Type': 'application/json',
-  // Let the browser/CDN cache the response briefly too.
-  'Cache-Control': 'public, max-age=900',
+  // Errors and anything that is not the caller's own answer: never cached.
+  'Cache-Control': 'no-store',
 };
+/* Success only, and PRIVATE: the answer is geolocated from the caller's
+   IP, so a shared (CDN) cache would hand one person's city and weather
+   to the next. The browser may keep its own copy for 15 minutes. */
+const OK_HEADERS = { ...CORS, 'Cache-Control': 'private, max-age=900' };
 
 const CACHE_TTL_MS = 15 * 60 * 1000;
 const CACHE = new Map(); // "lat,lon" → { at, data }
@@ -78,14 +82,15 @@ exports.handler = async (event) => {
     const now = Date.now();
     const hit = CACHE.get(key);
     if (hit && now - hit.at < CACHE_TTL_MS) {
-      return { statusCode: 200, headers: CORS, body: JSON.stringify(hit.data) };
+      return { statusCode: 200, headers: OK_HEADERS, body: JSON.stringify(hit.data) };
     }
     const wx = await currentWeather(loc.latitude, loc.longitude);
     const data = { tempC: wx.tempC, tempF: Math.round(wx.tempC * 9 / 5 + 32), code: wx.code, isDay: wx.isDay, city: loc.city || '' };
     CACHE.set(key, { at: now, data });
-    return { statusCode: 200, headers: CORS, body: JSON.stringify(data) };
+    return { statusCode: 200, headers: OK_HEADERS, body: JSON.stringify(data) };
   } catch (e) {
     // Fail soft — the client hides the chip on any error.
-    return { statusCode: 200, headers: CORS, body: JSON.stringify({ error: e.message || 'weather unavailable' }) };
+    console.error('weather:', e?.message);
+    return { statusCode: 200, headers: CORS, body: JSON.stringify({ error: 'weather unavailable' }) };
   }
 };

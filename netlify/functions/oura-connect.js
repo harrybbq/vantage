@@ -33,7 +33,8 @@ exports.handler = async (event) => {
 
   const { SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, OURA_CLIENT_ID, OURA_CLIENT_SECRET } = process.env;
   if (!OURA_CLIENT_ID || !OURA_CLIENT_SECRET) {
-    return { statusCode: 500, headers: CORS, body: JSON.stringify({ error: 'Oura env missing — set OURA_CLIENT_ID / OURA_CLIENT_SECRET in Netlify' }) };
+    console.error('oura-connect: OURA_CLIENT_ID / OURA_CLIENT_SECRET not set');
+    return { statusCode: 500, headers: CORS, body: JSON.stringify({ error: 'Oura is not set up on this site yet.' }) };
   }
 
   const auth = await requireUser(event, CORS);

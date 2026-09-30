@@ -10,9 +10,17 @@
  * friend wants what. Bought items are excluded. (A per-user opt-in
  * should gate this before any non-friends surface uses it.)
  *
+ * Floor (2026-09-30): an item must be wanted by at least MIN_FRIENDS
+ * distinct friends. With a count of one, "anonymous" meant nothing —
+ * a user with one friend was shown exactly that friend's wishlist.
+ * Suspended users' items are not counted.
+ *
  * POST, Bearer Supabase JWT. Returns { items: [{ name, price, url,
  * imageUrl, coins, count }] }.
  */
+const { suspendedIds } = require('../lib/suspended');
+
+const MIN_FRIENDS = 3;
 const CORS = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'Content-Type, Authorization',
@@ -34,7 +42,7 @@ exports.handler = async (event) => {
 
   const env = process.env;
   if (!env.SUPABASE_URL || !env.SUPABASE_SERVICE_ROLE_KEY) {
-    return { statusCode: 500, headers: CORS, body: JSON.stringify({ error: 'supabase env missing' }) };
+    return { statusCode: 500, headers: CORS, body: JSON.stringify({ error: 'not configured' }) };
   }
 
   const jwt = (event.headers.authorization || event.headers.Authorization || '').replace(/^Bearer\s+/i, '');
@@ -47,8 +55,11 @@ exports.handler = async (event) => {
   try {
     const fRes = await sb(`friendships?status=eq.accepted&or=(requester_id.eq.${callerId},addressee_id.eq.${callerId})&select=requester_id,addressee_id`, env);
     const edges = fRes.ok ? await fRes.json() : [];
-    const friendIds = edges.map(e => (e.requester_id === callerId ? e.addressee_id : e.requester_id));
-    if (!friendIds.length) return { statusCode: 200, headers: CORS, body: JSON.stringify({ items: [] }) };
+    const suspended = await suspendedIds({ supabaseUrl: env.SUPABASE_URL, serviceKey: env.SUPABASE_SERVICE_ROLE_KEY });
+    const friendIds = edges
+      .map(e => (e.requester_id === callerId ? e.addressee_id : e.requester_id))
+      .filter(id => !suspended.has(id));
+    if (friendIds.length < MIN_FRIENDS) return { statusCode: 200, headers: CORS, body: JSON.stringify({ items: [] }) };
 
     // JSON-path projection keeps this to just each friend's shopItems
     // plus their trending opt-in flag (state->privacy->shareTrending).
@@ -78,10 +89,12 @@ exports.handler = async (event) => {
     }
 
     const items = [...map.values()]
+      .filter(e => e.count >= MIN_FRIENDS)
       .sort((a, b) => b.count - a.count || a.name.localeCompare(b.name))
       .slice(0, 14);
     return { statusCode: 200, headers: CORS, body: JSON.stringify({ items }) };
   } catch (e) {
-    return { statusCode: 502, headers: CORS, body: JSON.stringify({ error: e.message || 'failed' }) };
+    console.error('friends-trending:', e?.message);
+    return { statusCode: 502, headers: CORS, body: JSON.stringify({ error: 'failed' }) };
   }
 };

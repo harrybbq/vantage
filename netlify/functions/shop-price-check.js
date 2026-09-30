@@ -77,7 +77,7 @@ async function checkOne(url) {
     if (priceNum == null) return { ...base, reason: 'no_price' };
     return { url, ok: true, price: info.price, priceNum };
   } catch (e) {
-    return { ...base, reason: 'fetch_failed', detail: (e.message || '').slice(0, 120) };
+    return { ...base, reason: e.message === 'blocked' ? 'blocked_host' : 'fetch_failed' };
   }
 }
 
