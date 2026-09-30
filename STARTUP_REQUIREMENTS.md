@@ -205,7 +205,7 @@ code fails soft until it is run, so order doesn't matter.
     to 99. Fix: recompute inside prestige-up; accept only ISO-date keys
     within the account's age; cap day-counts at account age; a DB
     cooldown between prestiges. Real fix is item 26.
-    *Status 2026-09-30: partly: only real, in-age ISO day keys count; day counts capped at account age; prestige recomputes from one read + 7-day cooldown (needs audit SQL). Vision re-verification in progress.*
+    *Status 2026-09-30: only real, in-age ISO day keys count; day counts and vision XP capped by account age (identical client/server, parity-tested); prestige recomputes from one read + 7-day cooldown (needs audit SQL). The durable fix is still item 26.*
 45. `[~]` **LAUNCH** AI spend has no durable cap. Today: set a monthly
     limit in the Anthropic console. Then a Postgres daily counter per
     user, a server-side tier check on the coach, owner check on
@@ -225,6 +225,7 @@ code fails soft until it is run, so order doesn't matter.
 48. `[ ]` **LAUNCH** `cronAuth.js:42` accepts any body with `next_run`
     as "the scheduler". Delete that branch (item 24b's "refused until
     CRON_SECRET exists" is not true while it's there).
+    *Status 2026-09-30: logic unchanged on purpose — removing it may stop every cron. Owner check: a plain GET with no body to /.netlify/functions/snapshot-ratings; a 404 means scheduled functions are not reachable by URL and this is moot; `{"error":"unauthorized"}` means it must be put behind a secret.*
 49. `[~]` **LAUNCH** `health-sync`: no login, rate-limited per
     *caller-chosen* token, and the lookup is an unindexed JSONB filter
     that unpacks every user's ~1 MB state — a script can saturate the
@@ -277,9 +278,10 @@ code fails soft until it is run, so order doesn't matter.
     Full state re-downloaded every 60 s while visible — poll
     `updated_at` first.
     *Status 2026-09-30: done (512 px photos, photo only sent when changed, explicit remove flag, poll checks updated_at first).*
-60. `[ ]` **AFTER** CSP has no report endpoint, so "promote when quiet"
+60. `[~]` **AFTER** CSP has no report endpoint, so "promote when quiet"
     (item 21) can never be observed; inline scripts and Google Fonts
     would break under enforcement.
+    *Status 2026-09-30: report-uri/report-to wired to csp-report, inline scripts and handlers removed from index.html and the hub, Google Fonts allowed; still Report-Only. Enforcing needs `unsafe-eval` for the owner-only Career runner (web only) and keeps `style-src unsafe-inline`.*
 
 ### Store, legal and moderation
 61. `[x]` **BLOCKS** Settings says "Your login email is retained" and
@@ -299,7 +301,7 @@ code fails soft until it is run, so order doesn't matter.
     reads `reports`, no suspend/ban, and deleting an account cascades
     away the reports against it. Global trending lets two accounts put
     any text + URL on every user's Shop page.
-    *Status 2026-09-30: mostly: report/block from leaderboard + group rows, owner moderation queue + function, suspended users hidden, name filter on group names + trending, trending floors raised, message/friend-request throttles (audit SQL). Needs audit SQL. Profile-name filter + avatar screening in progress.*
+    *Status 2026-09-30: report/block from leaderboard + group rows, owner moderation queue, suspension hidden everywhere, name filter on names/handles/groups/trending (client + server), profile pictures screened before others see them, message/friend-request throttles. Needs audit SQL. Binding enforcement of names/avatars needs profile writes moved server-side (revoke update on handle/display_name/avatar_url).*
 64. `[~]` **BLOCKS** Privacy policy vs reality: no controller identity
     or contact; missing processors (ipwho.is gets every user's IP,
     GitHub, Google favicons, FatSecret, USDA, YouTube/TikTok, GNews,
@@ -328,12 +330,13 @@ code fails soft until it is run, so order doesn't matter.
     `research`) live in Vantage's Supabase project — one service-role
     key, one Micro instance, one restore unit. Move them to their own
     project before launch.
-70. `[ ]` **AFTER** Repo hygiene: personal emails in
+70. `[~]` **AFTER** Repo hygiene: personal emails in
     `lifetime_grants.sql`/`recomp_schema.sql`; an apparent real salary
     comment in `career/companies.js`; a Last.fm key in dead
     `SpotifyBar.jsx`; `dist/` committed (78 MB .git); no CI outside the
     Netlify build. Move `@capacitor/cli` + `@capacitor/assets` to
     devDependencies (clears item 22's critical/high — none ship).
+    *Status 2026-09-30: personal emails replaced with placeholders in SQL; dead SpotifyBar removed (revoke that Last.fm key — it stays in git history); salary comment neutralised; Capacitor CLI/assets moved to devDependencies; PR build workflow added. `TRADING_APP_CLAUDE.md:9` still holds a real email; `dist/` is still committed per the deploy flow.*
 
 ### Non-code tasks missing until now
 71. `[ ]` **Online Safety Act 2023** — DMs, groups and the leaderboard
@@ -356,17 +359,19 @@ code fails soft until it is run, so order doesn't matter.
 The point is that when something goes wrong, you find out first, you
 can stop the bleeding in minutes, and you meet the legal clock.
 
-76. `[ ]` **A way in for reporters.** `security@<domain>` inbox (both
+76. `[~]` **A way in for reporters.** `security@<domain>` inbox (both
     owners), `/.well-known/security.txt` pointing at it, and a short
     disclosure page: what's in scope, "we reply within 3 working days",
     no legal action for good-faith reports. A hall of fame costs
     nothing; paid bounties can wait.
-77. `[ ]` **Know before users tell you.** Sentry (client + functions,
+    *Status 2026-09-30: SECURITY.md + /.well-known/security.txt written with a `security@[your-domain]` placeholder — create the inbox and fill it in.*
+77. `[~]` **Know before users tell you.** Sentry (client + functions,
     PII scrubbing on), an uptime check on `/` and one function, the
     Anthropic spend alert and hard limit, Supabase usage alerts, and an
     in-app "not saved" indicator. Weekly: Supabase security advisors +
     `npm audit` (a scheduled Claude routine can do this and report).
-78. `[ ]` **Incident runbook (one page, both owners have it).**
+    *Status 2026-09-30: client crash reports → client_errors (needs audit SQL); /.netlify/functions/health for an uptime monitor. Owner: point an uptime monitor at it, set the Anthropic spend limit, Supabase usage alerts.*
+78. `[~]` **Incident runbook (one page, both owners have it).**
     - *Contain:* Netlify → publish previous deploy (instant rollback);
       a `MAINTENANCE`/feature-flag env var that disables AI, social or
       sync functions without a deploy; Supabase → pause a function or
@@ -384,23 +389,28 @@ can stop the bleeding in minutes, and you meet the legal clock.
       Stores: Apple/Google may need telling if the app is the vector.
     - *Review:* write-up, fix, and a test or check so it can't recur
       (the pattern already used after the 2026-05-03 wipe).
-79. `[ ]` **Abuse handling with a clock on it.** Reports reach an owner
+    *Status 2026-09-30: docs/INCIDENT_RUNBOOK.md (contain, secrets inventory, ICO 72 h, breach log, post-mortem). No kill-switch env var exists yet — the runbook documents today's options.*
+79. `[~]` **Abuse handling with a clock on it.** Reports reach an owner
     within hours (push or email), a target of acting within 24 h (what
     Apple expects), a suspend flag that hides a user everywhere, and
     evidence kept when an account is deleted.
+    *Status 2026-09-30: docs/ABUSE_HANDLING.md; moderation queue built. Nothing alerts an owner when a report arrives yet — check the queue daily until it does.*
 80. `[ ]` **Accounts that can't be taken over.** 2FA (authenticator
     app, not SMS) on GitHub, Supabase, Netlify, Apple, Google Play,
     RevenueCat, Anthropic, the domain registrar and the owner email;
     secrets in a shared password manager, never in chat or the repo;
     GitHub secret scanning + push protection on (the repo is public).
     Consider making the repo private before launch.
-81. `[ ]` **Every change stays safe by default.** A pre-merge checklist:
+    *Status 2026-09-30: docs/ACCOUNT_SECURITY.md lists every service and step — the doing is the owners'.*
+81. `[x]` **Every change stays safe by default.** A pre-merge checklist:
     new table → RLS + `on delete cascade` + column grants; new function
     → `requireUser` + durable limit + no raw errors; new view →
     `security_invoker`; run Supabase advisors after every SQL file.
-82. `[ ]` **Practise recovery.** Decide PITR (item 27); once a quarter,
+    *Status 2026-09-30: .github/pull_request_template.md.*
+82. `[~]` **Practise recovery.** Decide PITR (item 27); once a quarter,
     restore a `user_data_history` snapshot to a test account and time
     it. A backup that has never been restored is a hope, not a backup.
+    *Status 2026-09-30: docs/RESTORE_RUNBOOK.md (restore from user_data_history, drill checklist, PITR notes). Run the first drill.*
 
 ## Phase 6 — Scale readiness (before real user numbers)
 
