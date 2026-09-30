@@ -8773,3 +8773,44 @@ div.m-hubdrawer-coach { cursor: default; display: flex; flex-direction: column; 
 }
 #widgetCanvas .edge-guide.is-y { border-left: 0; border-top: 1px dashed var(--em); }
 #widgetCanvas .edge-guide[hidden] { display: none; }
+
+/* ── Consent sheet (components/consent/ConsentHost.jsx) ──────────────────
+   A .modal, so it inherits the height cap + internal scroll (85dvh
+   desktop, ~88–90dvh as a bottom sheet on mobile) and the backdrop stays
+   tappable. Above the cookie banner (8000), below the legal page (9000)
+   it links to. */
+.consent-overlay{z-index:8500;}
+.consent-sheet{width:480px;}
+.consent-eyebrow{
+  font-family:var(--mono);font-size:10px;letter-spacing:1.6px;
+  text-transform:uppercase;color:var(--text-muted);margin-bottom:6px;
+}
+.modal h3.consent-title{margin:0 0 8px;font-size:21px;line-height:1.25;}
+.consent-sub{margin:0 0 14px;font-size:13px;line-height:1.5;color:var(--text-mid);}
+.consent-list{display:flex;flex-direction:column;gap:10px;}
+.consent-item{
+  display:flex;gap:12px;align-items:flex-start;
+  padding:12px 14px;border-radius:10px;
+  border:2px solid var(--border);
+  background:var(--card, rgba(255,255,255,0.04));
+  cursor:pointer;transition:border-color .16s, background .16s;
+}
+.consent-item.is-on{border-color:var(--em);background:rgba(var(--em-rgb),0.07);}
+.consent-item.is-static{cursor:default;}
+.consent-item input{
+  width:18px;height:18px;margin-top:2px;flex-shrink:0;
+  accent-color:var(--em);cursor:pointer;
+}
+.consent-item-body{flex:1;min-width:0;}
+.consent-item-title{font-family:var(--sans);font-size:14px;font-weight:700;color:var(--text);margin-bottom:4px;}
+.consent-item-text{margin:0 0 6px;font-size:12.5px;line-height:1.5;color:var(--text-mid);overflow-wrap:anywhere;}
+.consent-item-where{margin-bottom:0;color:var(--text-muted);font-size:12px;}
+.consent-legal{margin:12px 0 0;font-size:12px;color:var(--text-muted);}
+.consent-legal button{
+  background:none;border:none;padding:0;font:inherit;cursor:pointer;
+  color:var(--text-mid);text-decoration:underline;text-underline-offset:2px;
+}
+.consent-actions{display:flex;gap:10px;justify-content:flex-end;margin-top:16px;flex-wrap:wrap;}
+@media (max-width:480px){
+  .consent-actions .btn{flex:1 1 0;min-height:44px;}
+}

@@ -8,6 +8,7 @@ import SubscriptionPanel from './SubscriptionPanel';
 import { AppleHealthImport, WearableSync } from './VitalsHistoryCard';
 import AccountPanel from './settings/AccountPanel';
 import DataExportCard from './settings/DataExportCard';
+import ConsentCard from './settings/ConsentCard';
 import SettingsGroup from './settings/SettingsGroup';
 import { useSubscriptionContext } from '../context/SubscriptionContext';
 import { getOwnProfile, updateOwnProfile } from '../lib/friends/queries';
@@ -873,6 +874,9 @@ export default function SettingsSection({ S, update, active, userId, userEmail, 
         {/* ─── PRIVACY TAB ─── */}
         {activeTab === 'privacy' && (
         <>
+        {/* Health + AI consent (UK GDPR Art. 9) — first, because the
+            privacy policy sends people here to withdraw it. */}
+        <ConsentCard S={S} update={update} />
         {/* Friends privacy */}
         {userId
           ? <FriendsPrivacyCard userId={userId} S={S} update={update} />

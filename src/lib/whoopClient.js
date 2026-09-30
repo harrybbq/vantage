@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { supabase } from './supabase';
+import { consentStatus } from './consent/consent';
 
 /**
  * Client-side WHOOP sync: calls the whoop-sync function and merges the
@@ -65,7 +66,10 @@ export async function syncWhoop(update, days = 7) {
  * hammer the endpoint. No-op unless the user is WHOOP-connected.
  */
 export function useWhoopAutoSync(S, update, { throttleMs = 10 * 60 * 1000 } = {}) {
-  const connected = !!S?.whoopConnected;
+  // Declined or withdrawn health consent stops the passive pull. Never
+  // asked (undefined) keeps today's behaviour until the one-time sheet
+  // has been answered.
+  const connected = !!S?.whoopConnected && consentStatus(S?.consent, 'health') !== 'declined';
   const updateRef = useRef(update);
   updateRef.current = update;
   const lastRef = useRef(0);
