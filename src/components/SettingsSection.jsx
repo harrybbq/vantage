@@ -577,7 +577,7 @@ export default function SettingsSection({ S, update, active, userId, userEmail, 
   }
 
   async function handleDeleteAccount() {
-    if (!window.confirm('This will permanently delete your account and everything in it. This cannot be undone.')) return;
+    if (!window.confirm('Delete your Vantage account?\n\nYour login and everything in the account are permanently erased. This cannot be undone.\n\nAn App Store or Google Play subscription is NOT cancelled by this — cancel it in the store.')) return;
     if (!window.confirm('Are you absolutely sure? Press OK to confirm deletion.')) return;
     setDeleting(true);
     try {
@@ -663,11 +663,22 @@ export default function SettingsSection({ S, update, active, userId, userEmail, 
             {/* Last group on the page. Without the card border it used
                 to sit behind, the red heading and the red button carry
                 the warning. */}
+            {/* Wording is App Store 5.1.1(v): it has to read as the
+                ACCOUNT going, login included — the old "Delete All Data
+                / login email is retained" read as the account surviving.
+                And a store subscription is billed by Apple or Google, not
+                us, so deleting here cannot stop it; say where to cancel. */}
             <SettingsGroup
               tone="danger"
-              title="Danger zone"
-              desc="Permanently deletes all boards, trackers, achievements, and settings. Your login email is retained for re-registration."
+              title="Delete account"
+              desc="Permanently deletes your Vantage account and everything in it — your login, profile, friends, messages, food log, vitals, boards, trackers and settings. It cannot be undone, and the same email can only come back as a brand-new, empty account."
             >
+              <p className="settings-group-desc" style={{ marginTop: 0 }}>
+                Paying for Pro through the App Store or Google Play? Deleting your account does
+                not cancel that subscription — cancel it in the store first.
+                {' '}<strong>iPhone:</strong> Settings → your name → Subscriptions → Vantage → Cancel.
+                {' '}<strong>Android:</strong> Google Play → profile icon → Payments &amp; subscriptions → Subscriptions → Vantage → Cancel.
+              </p>
               <button
                 onClick={handleDeleteAccount}
                 disabled={deleting}
@@ -678,7 +689,7 @@ export default function SettingsSection({ S, update, active, userId, userEmail, 
                   fontFamily: 'var(--sans)', opacity: deleting ? 0.6 : 1, transition: 'all .18s',
                 }}
               >
-                {deleting ? 'Deleting…' : <IconLabel name="trash-2">Delete All Data</IconLabel>}
+                {deleting ? 'Deleting…' : <IconLabel name="trash-2">Delete account</IconLabel>}
               </button>
             </SettingsGroup>
           </AccountPanel>
