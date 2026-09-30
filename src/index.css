@@ -3743,7 +3743,10 @@ input,select,textarea,button{touch-action:manipulation;}
 /* ── Paywall Modal ──────────────────────────────────────────────────────── */
 .paywall-modal{
   max-width:480px;width:92vw;
-  padding:0;overflow:hidden;
+  /* overflow-y, not hidden: the sheet now carries renewal terms, legal
+     links and Restore below the cards, and .modal's max-height would
+     clip them on a short window instead of scrolling to them. */
+  padding:0;overflow-x:hidden;overflow-y:auto;
 }
 .paywall-hero{
   padding:32px 28px 24px;
@@ -3803,9 +3806,11 @@ input,select,textarea,button{touch-action:manipulation;}
   font-size:13px !important;padding:10px 20px !important;
 }
 .paywall-fineprint{
-  margin:0;padding:0 28px 24px;
-  font-family:var(--mono);font-size:9px;letter-spacing:1px;
-  text-transform:uppercase;color:var(--text-muted);text-align:center;
+  /* Renewal terms live here, so they are set to be read — Apple wants
+     them clear and conspicuous, which 9px uppercase mono was not. */
+  margin:0;padding:14px 28px 20px;
+  font-family:var(--sans);font-size:11px;line-height:1.5;
+  color:var(--text-muted);text-align:center;
 }
 
 /* ── Paywall AI v2 inline preview (F3) ── */
@@ -3893,6 +3898,26 @@ input,select,textarea,button{touch-action:manipulation;}
   font-family:var(--mono);font-size:10px;letter-spacing:.6px;
   color:var(--em);margin-top:2px;
 }
+.paywall-pkg-renew{
+  font-family:var(--sans);font-size:10.5px;line-height:1.45;
+  color:var(--text-muted);margin-top:2px;
+}
+.paywall-restore-msg{
+  margin:8px 22px 0;padding:10px 12px;border-radius:8px;
+  background:var(--card, rgba(255,255,255,0.04));border:1px solid var(--border);
+  font-family:var(--mono);font-size:11px;line-height:1.5;color:var(--text);
+}
+.paywall-legal{
+  display:flex;flex-wrap:wrap;justify-content:center;align-items:center;gap:6px 10px;
+  padding:0 22px 24px;margin-top:-12px;
+  font-family:var(--sans);font-size:12px;color:var(--text-muted);
+}
+.paywall-legal-link{
+  background:none;border:none;padding:4px 2px;cursor:pointer;font:inherit;
+  color:var(--text-mid);text-decoration:underline;text-underline-offset:2px;
+}
+.paywall-legal-link:hover{color:var(--em);}
+.paywall-legal-link[disabled]{opacity:.6;cursor:wait;}
 .paywall-error{
   margin:8px 22px 0;padding:10px 12px;
   border-radius:8px;

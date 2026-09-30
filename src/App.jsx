@@ -869,6 +869,7 @@ function Board({ userId, userEmail, onSignOut }) {
         onClose={handleCloseModal}
         onUpgrade={() => { handleCloseModal(); handleOpenModal('waitlistModal'); }}
         onShowToast={showCoinToast}
+        onOpenLegal={setLegalPage}
       />
 
       <ConnectToast onCancel={handleCancelConnect} />
