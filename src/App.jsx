@@ -30,6 +30,7 @@ import ConnectToast from './components/ConnectToast';
 import CommandPalette from './components/CommandPalette';
 import ShortcutsModal from './components/ShortcutsModal';
 import LegalPage from './components/LegalPage';
+import ConsentHost from './components/consent/ConsentHost';
 import CookieBanner from './components/CookieBanner';
 import InstallPrompt from './components/InstallPrompt';
 import TutorialOverlay from './components/TutorialOverlay';
@@ -894,6 +895,7 @@ function Board({ userId, userEmail, onSignOut }) {
         onClose={handleCloseModal}
         onUpgrade={() => { handleCloseModal(); handleOpenModal('waitlistModal'); }}
         onShowToast={showCoinToast}
+        onOpenLegal={setLegalPage}
       />
 
       <ConnectToast onCancel={handleCancelConnect} />
@@ -948,6 +950,8 @@ function Board({ userId, userEmail, onSignOut }) {
           </>
         )}
       />
+      {/* Health/AI consent sheet — one-time ask + requestConsent() host. */}
+      <ConsentHost S={S} update={update} hydrated={hydrated} onOpenLegal={setLegalPage} />
       {legalPage && <LegalPage page={legalPage} onClose={() => setLegalPage(null)} />}
 
       {/* Onboarding tutorial — shows once for new users, replayable

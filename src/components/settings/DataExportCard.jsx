@@ -2,6 +2,7 @@ import { useState } from 'react';
 import Icon from '../Icon';
 import SettingsGroup from './SettingsGroup';
 import { encryptExport, decryptExport, passphraseStrength } from '../../lib/data/exportCrypto';
+import { collectAccountData } from '../../lib/data/accountExport';
 
 /**
  * Export my data.
@@ -11,7 +12,15 @@ import { encryptExport, decryptExport, passphraseStrength } from '../../lib/data
  * works either way: the plain file is one click behind a confirmation,
  * and an encrypted file can be opened again right here, so it never
  * becomes a blob you can't do anything with.
+ *
+ * What's in it (keep INCLUDED and the plain-text confirm in step with
+ * this): the app data in `S`, plus the rows that live in their own
+ * tables — the food log, your profile, your friendships and the messages
+ * you sent or received. A table that can't be read is named in the file
+ * (`missing`) rather than silently left out.
  */
+const INCLUDED = 'Your app data (vitals, habits, trackers, savings, boards and settings), your food log, '
+  + 'your profile, your friend list and your messages.';
 
 function download(name, text) {
   const url = URL.createObjectURL(new Blob([text], { type: 'application/json' }));
@@ -26,8 +35,15 @@ function stamp() {
   return new Date().toISOString().split('T')[0];
 }
 
-function envelopeFor(S) {
-  return { exportedAt: new Date().toISOString(), appVersion: 'Vantage v1', data: S };
+async function envelopeFor(S, userId) {
+  const { tables, missing } = await collectAccountData(userId);
+  return {
+    exportedAt: new Date().toISOString(),
+    appVersion: 'Vantage v1',
+    data: S,
+    tables,
+    ...(missing.length ? { missing } : {}),
+  };
 }
 
 function summarise(S) {
@@ -42,7 +58,7 @@ function summarise(S) {
   return bits.length ? bits.join(' · ') : 'Everything you have logged';
 }
 
-export default function DataExportCard({ S, onOpenLegal }) {
+export default function DataExportCard({ S, userId, onOpenLegal }) {
   const [pass, setPass] = useState('');
   const [confirm, setConfirm] = useState('');
   const [busy, setBusy] = useState(false);
@@ -58,7 +74,7 @@ export default function DataExportCard({ S, onOpenLegal }) {
   async function handleEncrypted() {
     setBusy(true); setMsg(null);
     try {
-      const env = await encryptExport(envelopeFor(S), pass);
+      const env = await encryptExport(await envelopeFor(S, userId), pass);
       download(`vantage-export-${stamp()}.vantage.json`, JSON.stringify(env, null, 2));
       setPass(''); setConfirm('');
       setMsg({ kind: 'ok', text: 'Downloaded. Keep the passphrase somewhere safe — it is the only way back in.' });
@@ -69,14 +85,22 @@ export default function DataExportCard({ S, onOpenLegal }) {
     }
   }
 
-  function handlePlain() {
+  async function handlePlain() {
     const ok = window.confirm(
-      'Export without a passphrase?\n\nThe file will contain your weight history, everything you have eaten, '
-      + 'your savings goals and your habits, readable by anything that opens it.',
+      'Export without a passphrase?\n\nThe file will contain your app data (weight and vitals history, habits, '
+      + 'trackers, savings and settings), everything in your food log, your profile, your friend list and '
+      + 'every message you have sent or received — readable by anything that opens it.',
     );
     if (!ok) return;
-    download(`vantage-export-${stamp()}.json`, JSON.stringify(envelopeFor(S), null, 2));
-    setMsg({ kind: 'ok', text: 'Downloaded as plain text.' });
+    setBusy(true); setMsg(null);
+    try {
+      download(`vantage-export-${stamp()}.json`, JSON.stringify(await envelopeFor(S, userId), null, 2));
+      setMsg({ kind: 'ok', text: 'Downloaded as plain text.' });
+    } catch (e) {
+      setMsg({ kind: 'err', text: e.message || 'Could not build the export.' });
+    } finally {
+      setBusy(false);
+    }
   }
 
   async function handleOpen() {
@@ -101,6 +125,7 @@ export default function DataExportCard({ S, onOpenLegal }) {
         {summarise(S)}. Yours to take at any time — this is your right to data
         portability under UK GDPR.
       </p>
+      <p className="dx-note" style={{ marginTop: 0 }}>Includes: {INCLUDED}</p>
 
       {!openMode && (
         <>

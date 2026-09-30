@@ -8,6 +8,7 @@ import SubscriptionPanel from './SubscriptionPanel';
 import { AppleHealthImport, WearableSync } from './VitalsHistoryCard';
 import AccountPanel from './settings/AccountPanel';
 import DataExportCard from './settings/DataExportCard';
+import ConsentCard from './settings/ConsentCard';
 import SettingsGroup from './settings/SettingsGroup';
 import { useSubscriptionContext } from '../context/SubscriptionContext';
 import { getOwnProfile, updateOwnProfile } from '../lib/friends/queries';
@@ -193,9 +194,16 @@ export function applyScheme(scheme) {
 // Per-field profile-card privacy toggles. Live in S.privacy (no
 // schema migration); usePublishProfile reads them and zeroes-out
 // hidden fields on the next debounced publish.
+//
+// `defaultOn: false` means an ABSENT value reads as off. The streak card
+// publishes the habit's name — "12d Alcohol" tells every friend what
+// someone is quitting — so it has to be switched on, not left on
+// (audit item 68). An explicit true already in someone's state is kept;
+// nothing is written for existing accounts. usePublishProfile applies
+// the same rule, so the toggle and what friends see can't disagree.
 const SHARE_TOGGLES = [
   { id: 'shareAvatar',   label: 'Profile photo',         desc: 'Your uploaded photo. Off shows your @handle initial instead.' },
-  { id: 'shareStreak',   label: 'Active habit streak',  desc: 'Days clean + habit name (e.g. "12d Alcohol").' },
+  { id: 'shareStreak',   label: 'Active habit streak',  desc: 'Days clean + habit name (e.g. "12d Alcohol"). Off unless you turn it on.', defaultOn: false },
   { id: 'shareHeatmap',  label: '91-day activity heatmap', desc: 'Coloured grid of days you logged anything.' },
   { id: 'shareWins',     label: 'Recent achievement wins', desc: 'Last 3 completed achievements with their icons.' },
   { id: 'sharePresence', label: 'Online status',         desc: 'Green dot when you\'re active in the last 3 minutes.' },
@@ -222,11 +230,15 @@ function FriendsPrivacyCard({ userId, S, update }) {
         // editing the friends query module.
         const p = await getOwnProfile(userId);
         if (cancelled) return;
-        setSearchable(p?.is_searchable ?? true);
+        // A missing value is shown as OFF: new accounts are created with
+        // both of these false (audit item 68), and a toggle that claims
+        // "on" for a value it never read is how someone ends up findable
+        // without knowing. Real stored values show as they are.
+        setSearchable(p?.is_searchable ?? false);
         setHandle(p?.handle || null);
         const optRes = await supabase.from('profiles')
           .select('leaderboard_optin').eq('id', userId).maybeSingle();
-        if (!cancelled) setLeaderboardOptin(optRes.data?.leaderboard_optin ?? true);
+        if (!cancelled) setLeaderboardOptin(optRes.data?.leaderboard_optin ?? false);
         // leaderboard_color is a separate, best-effort read so a missing
         // column (migration not applied) doesn't break the card.
         const colRes = await supabase.from('profiles')
@@ -330,7 +342,7 @@ function FriendsPrivacyCard({ userId, S, update }) {
         </span>
       </label>
 
-      {/* Global leaderboard opt-in. Defaults true. Off → caller is
+      {/* Global leaderboard opt-in. Off for new accounts. Off → caller is
           excluded from global queries entirely (friends scope unaffected,
           friendship is the consent). */}
       <label
@@ -460,8 +472,8 @@ function FriendsPrivacyCard({ userId, S, update }) {
         </div>
       )}
 
-      {/* Per-field profile-card toggles. Defaults all ON (existing
-          behavior). Toggling OFF clears the field on the next 4s
+      {/* Per-field profile-card toggles. On unless switched off, except
+          the habit streak (see SHARE_TOGGLES). Toggling OFF clears the field on the next 4s
           debounced publish — friends will see the empty value the
           next time they refresh the rail. */}
       <div style={{
@@ -579,7 +591,7 @@ export default function SettingsSection({ S, update, active, userId, userEmail, 
   }
 
   async function handleDeleteAccount() {
-    if (!window.confirm('This will permanently delete your account and everything in it. This cannot be undone.')) return;
+    if (!window.confirm('Delete your Vantage account?\n\nYour login and everything in the account are permanently erased. This cannot be undone.\n\nAn App Store or Google Play subscription is NOT cancelled by this — cancel it in the store.')) return;
     if (!window.confirm('Are you absolutely sure? Press OK to confirm deletion.')) return;
     setDeleting(true);
     try {
@@ -664,16 +676,27 @@ export default function SettingsSection({ S, update, active, userId, userEmail, 
             userEmail={userEmail}
             onSignOut={onSignOut}
           >
-            <DataExportCard S={S} onOpenLegal={onOpenLegal} />
+            <DataExportCard S={S} userId={userId} onOpenLegal={onOpenLegal} />
 
             {/* Last group on the page. Without the card border it used
                 to sit behind, the red heading and the red button carry
                 the warning. */}
+            {/* Wording is App Store 5.1.1(v): it has to read as the
+                ACCOUNT going, login included — the old "Delete All Data
+                / login email is retained" read as the account surviving.
+                And a store subscription is billed by Apple or Google, not
+                us, so deleting here cannot stop it; say where to cancel. */}
             <SettingsGroup
               tone="danger"
-              title="Danger zone"
-              desc="Permanently deletes all boards, trackers, achievements, and settings. Your login email is retained for re-registration."
+              title="Delete account"
+              desc="Permanently deletes your Vantage account and everything in it — your login, profile, friends, messages, food log, vitals, boards, trackers and settings. It cannot be undone, and the same email can only come back as a brand-new, empty account."
             >
+              <p className="settings-group-desc" style={{ marginTop: 0 }}>
+                Paying for Pro through the App Store or Google Play? Deleting your account does
+                not cancel that subscription — cancel it in the store first.
+                {' '}<strong>iPhone:</strong> Settings → your name → Subscriptions → Vantage → Cancel.
+                {' '}<strong>Android:</strong> Google Play → profile icon → Payments &amp; subscriptions → Subscriptions → Vantage → Cancel.
+              </p>
               <button
                 onClick={handleDeleteAccount}
                 disabled={deleting}
@@ -684,7 +707,7 @@ export default function SettingsSection({ S, update, active, userId, userEmail, 
                   fontFamily: 'var(--sans)', opacity: deleting ? 0.6 : 1, transition: 'all .18s',
                 }}
               >
-                {deleting ? 'Deleting…' : <IconLabel name="trash-2">Delete All Data</IconLabel>}
+                {deleting ? 'Deleting…' : <IconLabel name="trash-2">Delete account</IconLabel>}
               </button>
             </SettingsGroup>
           </AccountPanel>
@@ -868,6 +891,9 @@ export default function SettingsSection({ S, update, active, userId, userEmail, 
         {/* ─── PRIVACY TAB ─── */}
         {activeTab === 'privacy' && (
         <>
+        {/* Health + AI consent (UK GDPR Art. 9) — first, because the
+            privacy policy sends people here to withdraw it. */}
+        <ConsentCard S={S} update={update} />
         {/* Friends privacy */}
         {userId
           ? <FriendsPrivacyCard userId={userId} S={S} update={update} />

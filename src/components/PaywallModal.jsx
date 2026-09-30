@@ -18,13 +18,21 @@
  *
  * The cap context (FREE_CAPS[capKey]) is preserved so the headline
  * still reads "You've reached your free limit of N habits".
+ *
+ * Store rules (App Store 3.1.2, Play's subscription policy) that shape
+ * the bottom of the sheet: every price and renewal term is read from the
+ * store product (lib/billing/renewalWording.js) — nothing is quoted when
+ * no product is loaded — and the sheet always carries Terms, Privacy and
+ * Restore purchases.
  */
 import { useEffect, useState } from 'react';
 import Icon from './Icon';
 import { motion, AnimatePresence } from 'framer-motion';
 import { FREE_CAPS } from '../hooks/useTierLimits';
 import { useSubscriptionContext } from '../context/SubscriptionContext';
-import { getOfferings, purchasePackage, isAvailable as rcIsAvailable } from '../lib/billing/revenuecat';
+import { getOfferings, purchasePackage, restorePurchases, isAvailable as rcIsAvailable } from '../lib/billing/revenuecat';
+import { platform as storePlatform } from '../lib/billing/manageSubscription';
+import { priceLine, renewalLine, storeName } from '../lib/billing/renewalWording';
 import Overlay from './ui/Overlay';
 
 // Display order for package cards. RC's `availablePackages` array
@@ -54,7 +62,7 @@ function packageWeight(p) {
   return idx === -1 ? 99 : idx;
 }
 
-export default function PaywallModal({ openId, onClose, onUpgrade, onShowToast }) {
+export default function PaywallModal({ openId, onClose, onUpgrade, onShowToast, onOpenLegal }) {
   const { proIsLive, hasPro } = useSubscriptionContext();
   const isOpen = typeof openId === 'string' && openId.startsWith('paywall:');
   const capKey = isOpen ? openId.split(':')[1] : null;
@@ -64,6 +72,8 @@ export default function PaywallModal({ openId, onClose, onUpgrade, onShowToast }
   const [offeringsLoading, setOfferingsLoading] = useState(false);
   const [purchasingId, setPurchasingId] = useState(null);
   const [error, setError] = useState(null);
+  const [restoring, setRestoring] = useState(false);
+  const [restoreMsg, setRestoreMsg] = useState(null);
 
   // Load offerings when the modal opens. We do it on every open
   // (not on mount) so a user who connects to RC mid-session gets
@@ -72,6 +82,7 @@ export default function PaywallModal({ openId, onClose, onUpgrade, onShowToast }
     if (!isOpen) {
       setError(null);
       setPurchasingId(null);
+      setRestoreMsg(null);
       return;
     }
     let cancelled = false;
@@ -110,11 +121,44 @@ export default function PaywallModal({ openId, onClose, onUpgrade, onShowToast }
     }
   }
 
+  // Same outcomes and wording as Settings → Subscription, so the two
+  // restore buttons never disagree about what happened.
+  async function handleRestore() {
+    setRestoring(true);
+    setRestoreMsg(null);
+    const r = await restorePurchases();
+    setRestoring(false);
+    if (r.ok) {
+      const upgraded = Object.values(r.entitlements || {}).some(e => e?.isActive);
+      setRestoreMsg(upgraded
+        ? 'Purchases restored. Your Pro entitlement is active.'
+        : 'No prior purchases were found on this account.');
+      if (upgraded) onShowToast?.('✦ Pro restored.', true);
+    } else if (r.reason === 'unavailable') {
+      setRestoreMsg("Restore needs the iOS or Android app — purchases can't be made or restored on the web.");
+    } else if (r.reason !== 'cancelled') {
+      setRestoreMsg("Couldn't restore purchases. Check your network and try again.");
+    }
+  }
+
+  // In-app routes first, so the legal page opens over the app instead
+  // of reloading it; the href is what a new tab or a no-JS reader gets.
+  function legalLink(key, label) {
+    return (
+      <a
+        href={`/${key}`}
+        className="paywall-legal-link"
+        onClick={e => { if (onOpenLegal) { e.preventDefault(); onOpenLegal(key); } }}
+      >{label}</a>
+    );
+  }
+
   // Decide what to render in the actions area
   const packages = (offerings?.availablePackages || []).filter(p => !UNSELLABLE.has(p.identifier));
   const hasPackages = packages.length > 0;
   const useStorefront = isOpen && proIsLive && hasPackages && !hasPro;
   const sortedPackages = hasPackages ? [...packages].sort((a, b) => packageWeight(a) - packageWeight(b)) : [];
+  const plat = storePlatform();
 
   return (
     <Overlay>
@@ -175,19 +219,20 @@ export default function PaywallModal({ openId, onClose, onUpgrade, onShowToast }
               </div>
             )}
 
-            {/* Inline preview — what your coach noticed.
-                Shown only to non-Pro users; gives them a real example
-                pulled from their own data when possible. */}
+            {/* Illustration of the kind of nudge the coach sends. It is
+                NOT drawn from the reader's data — it used to be headed "A
+                nudge your coach would send" above a "+2 more insights this
+                week" teaser, which read as a real finding about them. A
+                sales sheet that invents facts about the buyer is the
+                thing review (and consumer law) objects to, so it says
+                Example and the teaser is gone. */}
             {!hasPro && (
               <div className="paywall-preview">
-                <div className="paywall-preview-eyebrow">A nudge your coach would send</div>
+                <div className="paywall-preview-eyebrow">Example nudge — not from your data</div>
                 <p className="paywall-preview-body">
                   "Wednesday is your weakest day for Gym Session — three weeks running.
                   Want to schedule a 15-min walk instead?"
                 </p>
-                <div className="paywall-preview-blur">
-                  <span>+ 2 more pattern insights this week</span>
-                </div>
               </div>
             )}
 
@@ -215,9 +260,12 @@ export default function PaywallModal({ openId, onClose, onUpgrade, onShowToast }
                       {meta.badge && <span className="paywall-pkg-badge">{meta.badge}</span>}
                       <div className="paywall-pkg-label">{meta.label}</div>
                       <div className="paywall-pkg-price">
-                        {pkg.product?.priceString || ''}
+                        {priceLine(pkg) || ''}
                       </div>
                       <div className="paywall-pkg-sub">{meta.sub}</div>
+                      {renewalLine(pkg, plat) && (
+                        <div className="paywall-pkg-renew">{renewalLine(pkg, plat)}</div>
+                      )}
                       {busy && <div className="paywall-pkg-busy">Opening…</div>}
                     </button>
                   );
@@ -236,7 +284,10 @@ export default function PaywallModal({ openId, onClose, onUpgrade, onShowToast }
                     : offeringsLoading
                       ? 'Loading…'
                       : proIsLive
-                        ? 'Upgrade — £3.99/mo'
+                        // No product loaded (web, or the store didn't
+                        // answer) → no price. The only price quoted is
+                        // the one the store is about to charge.
+                        ? 'Upgrade to Pro'
                         : 'Join the waitlist'}
                 </button>
               </div>
@@ -246,10 +297,32 @@ export default function PaywallModal({ openId, onClose, onUpgrade, onShowToast }
               <div className="paywall-error" role="alert">{error}</div>
             )}
 
+            {restoreMsg && (
+              <div className="paywall-restore-msg" role="status">{restoreMsg}</div>
+            )}
+
             <p className="paywall-fineprint">
-              Cancel anytime. UK GDPR compliant. Your data stays yours.
-              {useStorefront && ' Subscriptions auto-renew until cancelled in your platform settings.'}
+              {useStorefront
+                ? `Payment is charged to your ${plat === 'android' ? 'Google Play' : plat === 'ios' ? 'Apple ID' : 'store'} account at confirmation. `
+                  + `Subscriptions auto-renew at the price shown until cancelled; cancel at least 24 hours before the period ends in ${storeName(plat)} subscription settings.`
+                : proIsLive && !hasPro
+                  ? 'Pro is bought in the iOS and Android apps. The price and renewal terms are shown there before you pay, and a subscription can be cancelled any time in the store.'
+                  : 'Your data stays yours.'}
             </p>
+
+            <div className="paywall-legal">
+              {legalLink('terms', 'Terms of Service')}
+              <span aria-hidden="true">·</span>
+              {legalLink('privacy', 'Privacy Policy')}
+              {!hasPro && (
+                <>
+                  <span aria-hidden="true">·</span>
+                  <button type="button" className="paywall-legal-link" onClick={handleRestore} disabled={restoring}>
+                    {restoring ? 'Restoring…' : 'Restore purchases'}
+                  </button>
+                </>
+              )}
+            </div>
           </motion.div>
         </motion.div>
       )}

@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { supabase } from './supabase';
+import { consentStatus } from './consent/consent';
 
 /**
  * Client-side Oura sync, mirroring whoopClient. Calls the oura-sync
@@ -42,7 +43,10 @@ export async function syncOura(update, days = 7) {
  * hammer the endpoint. No-op unless the user is Oura-connected.
  */
 export function useOuraAutoSync(S, update, { throttleMs = 10 * 60 * 1000 } = {}) {
-  const connected = !!S?.ouraConnected;
+  // Declined or withdrawn health consent stops the passive pull. Never
+  // asked (undefined) keeps today's behaviour until the one-time sheet
+  // has been answered.
+  const connected = !!S?.ouraConnected && consentStatus(S?.consent, 'health') !== 'declined';
   const updateRef = useRef(update);
   updateRef.current = update;
   const lastRef = useRef(0);

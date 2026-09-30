@@ -1,5 +1,6 @@
 import { useRef, useEffect, useState, forwardRef, useImperativeHandle } from 'react';
 import { authFetch } from '../lib/authFetch';
+import { requestConsent } from '../lib/consent/request';
 
 /**
  * CameraScanner — camera viewfinder for product-code scanning.
@@ -343,6 +344,11 @@ const CameraScanner = forwardRef(function CameraScanner({ onBarcode, onAIResult,
     if (!video.videoWidth) {
       setMsg('Camera hasn’t started yet — tap the viewfinder first.');
       setNeedsTap(true);
+      return;
+    }
+    // The frame goes to Anthropic's API — explicit AI consent first.
+    if (!(await requestConsent('ai'))) {
+      setMsg('Identifying food by photo uses AI and needs your OK first. Barcode and text search work without it.');
       return;
     }
     setStatus('identifying');

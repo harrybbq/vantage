@@ -3782,7 +3782,10 @@ input,select,textarea,button{touch-action:manipulation;}
 /* ── Paywall Modal ──────────────────────────────────────────────────────── */
 .paywall-modal{
   max-width:480px;width:92vw;
-  padding:0;overflow:hidden;
+  /* overflow-y, not hidden: the sheet now carries renewal terms, legal
+     links and Restore below the cards, and .modal's max-height would
+     clip them on a short window instead of scrolling to them. */
+  padding:0;overflow-x:hidden;overflow-y:auto;
 }
 .paywall-hero{
   padding:32px 28px 24px;
@@ -3842,9 +3845,11 @@ input,select,textarea,button{touch-action:manipulation;}
   font-size:13px !important;padding:10px 20px !important;
 }
 .paywall-fineprint{
-  margin:0;padding:0 28px 24px;
-  font-family:var(--mono);font-size:9px;letter-spacing:1px;
-  text-transform:uppercase;color:var(--text-muted);text-align:center;
+  /* Renewal terms live here, so they are set to be read — Apple wants
+     them clear and conspicuous, which 9px uppercase mono was not. */
+  margin:0;padding:14px 28px 20px;
+  font-family:var(--sans);font-size:11px;line-height:1.5;
+  color:var(--text-muted);text-align:center;
 }
 
 /* ── Paywall AI v2 inline preview (F3) ── */
@@ -3932,6 +3937,26 @@ input,select,textarea,button{touch-action:manipulation;}
   font-family:var(--mono);font-size:10px;letter-spacing:.6px;
   color:var(--em);margin-top:2px;
 }
+.paywall-pkg-renew{
+  font-family:var(--sans);font-size:10.5px;line-height:1.45;
+  color:var(--text-muted);margin-top:2px;
+}
+.paywall-restore-msg{
+  margin:8px 22px 0;padding:10px 12px;border-radius:8px;
+  background:var(--card, rgba(255,255,255,0.04));border:1px solid var(--border);
+  font-family:var(--mono);font-size:11px;line-height:1.5;color:var(--text);
+}
+.paywall-legal{
+  display:flex;flex-wrap:wrap;justify-content:center;align-items:center;gap:6px 10px;
+  padding:0 22px 24px;margin-top:-12px;
+  font-family:var(--sans);font-size:12px;color:var(--text-muted);
+}
+.paywall-legal-link{
+  background:none;border:none;padding:4px 2px;cursor:pointer;font:inherit;
+  color:var(--text-mid);text-decoration:underline;text-underline-offset:2px;
+}
+.paywall-legal-link:hover{color:var(--em);}
+.paywall-legal-link[disabled]{opacity:.6;cursor:wait;}
 .paywall-error{
   margin:8px 22px 0;padding:10px 12px;
   border-radius:8px;
@@ -8787,3 +8812,115 @@ div.m-hubdrawer-coach { cursor: default; display: flex; flex-direction: column; 
 }
 #widgetCanvas .edge-guide.is-y { border-left: 0; border-top: 1px dashed var(--em); }
 #widgetCanvas .edge-guide[hidden] { display: none; }
+
+/* ── Consent sheet (components/consent/ConsentHost.jsx) ──────────────────
+   A .modal, so it inherits the height cap + internal scroll (85dvh
+   desktop, ~88–90dvh as a bottom sheet on mobile) and the backdrop stays
+   tappable. Above the cookie banner (8000), below the legal page (9000)
+   it links to. */
+.consent-overlay{z-index:8500;}
+.consent-sheet{width:480px;}
+.consent-eyebrow{
+  font-family:var(--mono);font-size:10px;letter-spacing:1.6px;
+  text-transform:uppercase;color:var(--text-muted);margin-bottom:6px;
+}
+.modal h3.consent-title{margin:0 0 8px;font-size:21px;line-height:1.25;}
+.consent-sub{margin:0 0 14px;font-size:13px;line-height:1.5;color:var(--text-mid);}
+.consent-list{display:flex;flex-direction:column;gap:10px;}
+.consent-item{
+  display:flex;gap:12px;align-items:flex-start;
+  padding:12px 14px;border-radius:10px;
+  border:2px solid var(--border);
+  background:var(--card, rgba(255,255,255,0.04));
+  cursor:pointer;transition:border-color .16s, background .16s;
+}
+.consent-item.is-on{border-color:var(--em);background:rgba(var(--em-rgb),0.07);}
+.consent-item.is-static{cursor:default;}
+.consent-item input{
+  width:18px;height:18px;margin-top:2px;flex-shrink:0;
+  accent-color:var(--em);cursor:pointer;
+}
+.consent-item-body{flex:1;min-width:0;}
+.consent-item-title{font-family:var(--sans);font-size:14px;font-weight:700;color:var(--text);margin-bottom:4px;}
+.consent-item-text{margin:0 0 6px;font-size:12.5px;line-height:1.5;color:var(--text-mid);overflow-wrap:anywhere;}
+.consent-item-where{margin-bottom:0;color:var(--text-muted);font-size:12px;}
+.consent-legal{margin:12px 0 0;font-size:12px;color:var(--text-muted);}
+.consent-legal button{
+  background:none;border:none;padding:0;font:inherit;cursor:pointer;
+  color:var(--text-mid);text-decoration:underline;text-underline-offset:2px;
+}
+.consent-actions{display:flex;gap:10px;justify-content:flex-end;margin-top:16px;flex-wrap:wrap;}
+@media (max-width:480px){
+  .consent-actions .btn{flex:1 1 0;min-height:44px;}
+}
+
+/* ── Report / block (friends/ReportBlockButton.jsx) ──────────────────────
+   The flag on a leaderboard or group row copies .grp-kick's manners:
+   quiet until hovered on desktop, always visible on touch, 28px target. */
+.rb-flag{
+  flex:none;width:28px;height:28px;border-radius:7px;cursor:pointer;
+  display:inline-flex;align-items:center;justify-content:center;
+  border:1px solid transparent;background:transparent;color:var(--text-muted);
+  opacity:.55;transition:opacity .12s ease, color .12s ease, border-color .12s ease;
+}
+.rb-flag:hover,.rb-flag:focus-visible{opacity:1;color:rgb(199,44,72);border-color:rgba(199,44,72,.4);}
+@media (hover:none){ .rb-flag{ opacity:.85; } }
+.rb-text{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--text-muted);}
+.rb-text-btn{
+  background:none;border:none;padding:6px 2px;cursor:pointer;font:inherit;
+  color:var(--text-muted);text-decoration:underline;text-underline-offset:2px;
+}
+.rb-text-btn:hover{color:rgb(199,44,72);}
+.report-block-link{
+  align-self:flex-start;background:none;border:none;padding:4px 0;cursor:pointer;
+  font-family:var(--sans);font-size:12px;color:var(--text-muted);
+  text-decoration:underline;text-underline-offset:2px;
+}
+.report-block-link:hover{color:rgb(199,44,72);}
+
+/* ── Report queue (components/moderation/ModerationQueue.jsx) ────────────
+   Sits under the group-picture queue in Upgrade → Review and borrows its
+   .upg-review frame; only the row is its own. */
+.mod-queue{margin-top:28px;}
+.mod-head-acts{margin-left:auto;display:flex;align-items:center;gap:10px;flex:none;}
+.mod-closed-toggle{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--text-muted);cursor:pointer;white-space:nowrap;}
+.mod-row{
+  display:flex;align-items:flex-start;gap:12px;
+  padding:12px;border:1px solid var(--border);border-radius:12px;
+}
+.mod-row.is-dismissed,.mod-row.is-actioned{opacity:.6;}
+.mod-main{flex:1;min-width:0;}
+.mod-who{display:flex;align-items:center;flex-wrap:wrap;gap:6px 8px;}
+.mod-name{font-size:14px;font-weight:600;color:var(--text);overflow-wrap:anywhere;}
+.mod-handle{font-family:var(--mono);font-size:11px;color:var(--text-muted);overflow-wrap:anywhere;}
+.mod-tag{
+  font-family:var(--mono);font-size:8.5px;letter-spacing:1px;text-transform:uppercase;
+  padding:2px 6px;border-radius:4px;white-space:nowrap;border:1px solid var(--border);color:var(--text-muted);
+}
+.mod-tag.is-warn{color:#8a6a06;border-color:rgba(200,151,10,.42);background:rgba(200,151,10,.12);}
+.mod-tag.is-bad{color:rgb(199,44,72);border-color:rgba(199,44,72,.4);background:rgba(199,44,72,.08);}
+.mod-meta{margin-top:4px;font-size:12px;color:var(--text-mid);overflow-wrap:anywhere;}
+.mod-context{
+  /* Vertical spacing is a transparent border, not padding: overflow
+     clips at the padding box, so padding let a fourth line peek through
+     under the clamp. */
+  margin-top:8px;padding:0 10px;border:8px solid transparent;border-width:8px 0;border-radius:8px;
+  background:rgba(128,128,128,.08);font-size:12.5px;line-height:1.5;color:var(--text);
+  white-space:pre-wrap;overflow-wrap:anywhere;
+  display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;
+}
+.mod-context.is-open{display:block;-webkit-line-clamp:unset;}
+.mod-more{
+  display:block;margin-top:4px;background:none;border:none;padding:0;cursor:pointer;
+  font:inherit;font-size:11px;color:var(--em);
+}
+.mod-note{margin-top:6px;font-size:12px;color:var(--text-muted);}
+.mod-acts{display:flex;flex-direction:column;gap:6px;flex:none;}
+.mod-act{color:rgb(199,44,72);border-color:rgba(199,44,72,.4);}
+@media (max-width:560px){
+  .mod-queue .upg-review-head{flex-wrap:wrap;}
+  .mod-head-acts{margin-left:0;width:100%;justify-content:space-between;}
+  .mod-row{flex-wrap:wrap;}
+  .mod-acts{flex-direction:row;width:100%;}
+  .mod-acts .btn{flex:1;min-height:40px;}
+}

@@ -14,6 +14,9 @@ import Overlay from '../ui/Overlay';
  *   open
  *   friend       — { name, handle }
  *   onSubmit     — async (reason, context) => void
+ *   onBlock      — optional async () => void. When given, the sheet also
+ *                  offers Block, so a surface with room for one control
+ *                  (a leaderboard or group row) still gets both actions.
  *   onClose
  */
 const REASONS = [
@@ -24,7 +27,7 @@ const REASONS = [
   'Something else',
 ];
 
-export default function ReportFriendModal({ open, friend, onSubmit, onClose }) {
+export default function ReportFriendModal({ open, friend, onSubmit, onBlock, onClose }) {
   const [reason, setReason] = useState(REASONS[0]);
   const [context, setContext] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -92,6 +95,11 @@ export default function ReportFriendModal({ open, friend, onSubmit, onClose }) {
                   future requests.
                 </p>
                 <div className="handle-claim-actions">
+                  {onBlock && (
+                    <button type="button" className="btn btn-ghost" onClick={onBlock}>
+                      Block
+                    </button>
+                  )}
                   <button type="button" className="btn btn-primary" onClick={onClose}>
                     Done
                   </button>
@@ -127,6 +135,12 @@ export default function ReportFriendModal({ open, friend, onSubmit, onClose }) {
                 />
 
                 {error && <div className="handle-claim-error">{error}</div>}
+
+                {onBlock && (
+                  <button type="button" className="report-block-link" onClick={onBlock} disabled={submitting}>
+                    Block without reporting
+                  </button>
+                )}
 
                 <div className="handle-claim-actions">
                   <button

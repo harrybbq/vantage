@@ -15,9 +15,10 @@
  * If the plugin isn't installed yet (current state), Restore returns
  * 'unavailable' and we tell the user the native build is required.
  */
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useSubscriptionContext } from '../context/SubscriptionContext';
-import { restorePurchases, openManageSubscription, presentCustomerCenter } from '../lib/billing/revenuecat';
+import { restorePurchases, openManageSubscription, presentCustomerCenter, getOfferings } from '../lib/billing/revenuecat';
+import { priceLine, yearlySaving, money } from '../lib/billing/renewalWording';
 import SettingsGroup from './settings/SettingsGroup';
 
 const PLAN_LABEL = {
@@ -36,6 +37,25 @@ export default function SubscriptionPanel() {
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState(null);
   const [msgKind, setMsgKind] = useState('info'); // 'info' | 'ok' | 'err'
+
+  // Prices come from the store product, never from this file — the
+  // badge used to say "£3.99 / mo" and the yearly banner "£29 instead
+  // of £47.88", both typed in, both wrong the day the store price or
+  // currency differs. getOfferings() is null on the web, so there the
+  // badge shows no price and the banner makes no numeric claim.
+  const [offering, setOffering] = useState(null);
+  const wantsPrices = (!hasPro && proIsLive) || isMonthly;
+  useEffect(() => {
+    if (!wantsPrices) return undefined;
+    let cancelled = false;
+    getOfferings().then(o => { if (!cancelled) setOffering(o); }).catch(() => {});
+    return () => { cancelled = true; };
+  }, [wantsPrices]);
+  const pkgs = offering?.availablePackages || [];
+  const monthlyPkg = pkgs.find(p => p.identifier === '$rc_monthly') || null;
+  const annualPkg = pkgs.find(p => p.identifier === '$rc_annual') || null;
+  const fromPrice = priceLine(monthlyPkg) || priceLine(annualPkg);
+  const saving = yearlySaving(monthlyPkg, annualPkg);
 
   function flash(kind, text) {
     setMsgKind(kind);
@@ -101,13 +121,13 @@ export default function SubscriptionPanel() {
             {planLabel}
           </div>
         </div>
-        {!hasPro && proIsLive && (
+        {!hasPro && proIsLive && fromPrice && (
           <span style={{
             padding: '5px 10px', borderRadius: '6px',
             background: 'var(--em)', color: 'var(--em-on, #fff)',
             fontFamily: 'var(--mono)', fontSize: '10px',
             letterSpacing: '1px', textTransform: 'uppercase', fontWeight: 700,
-          }}>£3.99 / mo</span>
+          }}>{fromPrice}</span>
         )}
       </div>
 
@@ -133,13 +153,19 @@ export default function SubscriptionPanel() {
               fontFamily: 'var(--mono)', fontSize: '10px',
               letterSpacing: '1.4px', textTransform: 'uppercase',
               color: 'var(--em)', marginBottom: '4px',
-            }}>Save £18.88 / year</div>
+            }}>{saving ? `Save ${money(saving.amount, saving.currency)} / year` : 'Yearly plan'}</div>
             <div style={{
               fontFamily: 'var(--sans)', fontSize: '13px',
               color: 'var(--text)', lineHeight: 1.5,
             }}>
-              Switch to <strong>Yearly</strong> and pay £29 instead of £47.88
-              over a year. Same Pro features, ~39% off.
+              {saving ? (
+                <>
+                  Switch to <strong>Yearly</strong> and pay {money(saving.annual, saving.currency)} instead
+                  of {money(saving.yearAtMonthly, saving.currency)} over a year. Same Pro features, ~{saving.pct}% off.
+                </>
+              ) : (
+                <>Switch to <strong>Yearly</strong> in your store&apos;s subscription settings — same Pro features, billed once a year. The store shows the price before you switch.</>
+              )}
             </div>
           </div>
           <button

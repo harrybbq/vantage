@@ -14,6 +14,12 @@ import { supabase } from '../lib/supabase';
 import { parseHealthExport, applyHealthImport } from '../lib/appleHealth';
 import { syncWhoop } from '../lib/whoopClient';
 import { syncOura, disconnectWearable } from '../lib/ouraClient';
+import { requestConsent } from '../lib/consent/request';
+
+// Health data is special-category (UK GDPR Art. 9): every route that
+// starts a new source of it asks for explicit consent first. Data that
+// is already here is never hidden — only new collection waits on a yes.
+const NEEDS_HEALTH_CONSENT = 'Connecting health data needs your consent — nothing was changed.';
 
 const METRICS = [
   { key: 'weight', label: 'Weight',  unit: 'kg',  src: 'vitals' },
@@ -99,7 +105,8 @@ export function AppleHealthImport({ S, update }) {
     return Array.from(bytes, b => b.toString(16).padStart(2, '0')).join('');
   }
 
-  function enableSync() {
+  async function enableSync() {
+    if (!(await requestConsent('health'))) { setMsg(NEEDS_HEALTH_CONSENT); return; }
     const t = mintToken();
     if (!t) { setMsg('This browser cannot generate a secure token.'); return; }
     update(prev => ({ ...prev, healthToken: t }));
@@ -125,6 +132,7 @@ export function AppleHealthImport({ S, update }) {
     const file = e.target.files?.[0];
     e.target.value = '';
     if (!file) return;
+    if (!(await requestConsent('health'))) { setMsg(NEEDS_HEALTH_CONSENT); return; }
     setStatus('parsing'); setPct(0); setMsg('');
     try {
       const res = await parseHealthExport(file, setPct);
@@ -272,6 +280,7 @@ function WhoopPanel({ S, update }) {
   }
 
   async function connect() {
+    if (!(await requestConsent('health'))) { setMsg(NEEDS_HEALTH_CONSENT); return; }
     setBusy(true); setMsg('');
     try {
       const { data: { session } } = await supabase.auth.getSession();
@@ -435,6 +444,7 @@ function OuraPanel({ S, update }) {
   }
 
   async function connect() {
+    if (!(await requestConsent('health'))) { setMsg(NEEDS_HEALTH_CONSENT); return; }
     setBusy(true); setMsg('');
     try {
       const { data: { session } } = await supabase.auth.getSession();
