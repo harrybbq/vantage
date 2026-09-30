@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import Icon from './Icon';
+import { isNativeApp } from '../lib/native/platform';
 
 const DISMISSED_KEY = 'vb4_install_dismissed';
 
@@ -20,7 +21,9 @@ export default function InstallPrompt() {
   const [visible, setVisible] = useState(false);
 
   useEffect(() => {
-    // Don't show if already installed or previously dismissed
+    // Don't show if already installed or previously dismissed — and
+    // never in the native app, which IS the installed thing.
+    if (isNativeApp()) return;
     if (isInStandaloneMode()) return;
     if (sessionStorage.getItem(DISMISSED_KEY)) return;
 

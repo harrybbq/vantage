@@ -1,0 +1,43 @@
+# Build check on every pull request.
+#
+# Netlify's deploy build was the only CI: a PR that broke lint, a check
+# script or the bundle was found out when master failed to deploy. This
+# runs the same `npm run build` (eslint + every check:* script + vite)
+# before merge, plus the native bundle, which nothing else builds until
+# someone runs `npm run cap:*` by hand.
+#
+# Placeholder Supabase values: the client reads them at build time and
+# they only need to exist. Nothing here talks to a live service.
+name: build
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      VITE_SUPABASE_URL: https://placeholder.supabase.co
+      VITE_SUPABASE_ANON_KEY: ci-placeholder-key
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Web build (lint + checks + vite)
+        run: npm run build
+      - name: Native bundle (owner surfaces compiled out)
+        run: npx vite build --outDir dist-native
+        env:
+          VITE_NATIVE_BUILD: 'true'

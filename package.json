@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "eslint . && npm run check:visions && npm run check:parity && npm run check:boot && npm run check:savings && npm run check:training && npm run check:merge && npm run check:invite && npm run check:autolog && npm run check:recurring && npm run check:planpost && npm run check:pathplayer && npm run check:bootrun && npm run check:coins && npm run check:ledger && npm run check:relapse && npm run check:cutdown && npm run check:ladder && npm run check:crest && npm run check:foods && npm run check:pack && npm run check:trackerlink && npm run check:interest && npm run check:completepot && npm run check:edgematch && npm run check:logmath && npm run check:railmotion && npm run check:visited && npm run check:careerplan && npm run check:careernext && npm run check:savingshistory && npm run check:weighttrend && npm run check:meallinks && npm run check:mealplanner && npm run check:shopping && vite build",
+    "build": "eslint . && npm run check:visions && npm run check:parity && npm run check:boot && npm run check:savings && npm run check:training && npm run check:merge && npm run check:invite && npm run check:autolog && npm run check:recurring && npm run check:planpost && npm run check:pathplayer && npm run check:bootrun && npm run check:coins && npm run check:ledger && npm run check:relapse && npm run check:cutdown && npm run check:ladder && npm run check:crest && npm run check:foods && npm run check:pack && npm run check:trackerlink && npm run check:interest && npm run check:completepot && npm run check:edgematch && npm run check:logmath && npm run check:railmotion && npm run check:visited && npm run check:careerplan && npm run check:careernext && npm run check:savingshistory && npm run check:weighttrend && npm run check:meallinks && npm run check:mealplanner && npm run check:shopping && npm run check:apiurl && npm run check:authcallback && vite build",
     "check:visions": "node scripts/check-vision-xp.mjs",
     "check:parity": "node scripts/check-ratings-parity.mjs",
     "check:boot": "node scripts/check-boot-speed.mjs",
@@ -46,13 +46,14 @@
     "check:completepot": "node src/lib/savings/completePot.test.mjs",
     "check:interest": "node src/lib/savings/interest.test.mjs",
     "check:trackerlink": "node src/lib/achievements/trackerLink.test.mjs",
-    "check:pack": "node src/lib/hub/pack.test.mjs"
+    "check:pack": "node src/lib/hub/pack.test.mjs",
+    "check:apiurl": "node src/lib/native/apiUrl.test.mjs",
+    "check:authcallback": "node src/lib/native/authCallback.test.mjs"
   },
   "dependencies": {
     "@capacitor/android": "^8.3.1",
     "@capacitor/app": "^8.1.0",
-    "@capacitor/assets": "^3.0.5",
-    "@capacitor/cli": "^8.3.1",
+    "@capacitor/browser": "^8.0.4",
     "@capacitor/core": "^8.3.1",
     "@capacitor/haptics": "^8.0.2",
     "@capacitor/push-notifications": "^8.0.3",
@@ -72,6 +73,8 @@
     "react-dom": "^18.3.1"
   },
   "devDependencies": {
+    "@capacitor/assets": "^3.0.5",
+    "@capacitor/cli": "^8.3.1",
     "@eslint/js": "^9.39.5",
     "@types/react": "^18.3.1",
     "@types/react-dom": "^18.3.1",

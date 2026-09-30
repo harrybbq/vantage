@@ -9,7 +9,7 @@
  *
  * ── The gate is on the server ────────────────────────────────────────
  * This tab renders inside UpgradeSection, which is owner-gated by
- * VITE_OWNER_EMAIL. That is a UI gate and nothing more. The `groups`
+ * useIsOwner (is_app_owner()). That is a UI gate and nothing more. The `groups`
  * function checks the email the AUTH SERVER returns before it will
  * answer `crestQueue` or `crestDecide` at all, and answers a non-owner
  * exactly as it answers a bad token. The leaderboard forgery is the

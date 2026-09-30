@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { TRENDING_ITEMS } from '../../data/trendingItems';
 import { supabase } from '../../lib/supabase';
+import { apiUrl } from '../../lib/authFetch';
 import Icon from '../Icon';
 
 /**
@@ -39,7 +40,7 @@ export default function TrendingBoard({ onAdd }) {
       const auth = { 'Content-Type': 'application/json', Authorization: `Bearer ${session?.access_token}` };
       const load = async (fn) => {
         try {
-          const res = await fetch(`/.netlify/functions/${fn}`, { method: 'POST', headers: auth });
+          const res = await fetch(apiUrl(`/.netlify/functions/${fn}`), { method: 'POST', headers: auth });
           const body = await res.json().catch(() => ({}));
           return Array.isArray(body.items) ? body.items : [];
         } catch { return []; }

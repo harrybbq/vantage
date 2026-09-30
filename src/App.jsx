@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, lazy, Suspense } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { supabase } from './lib/supabase';
 import { useVisionBoardState, hasLocalStorageData, clearLocalStorageData } from './hooks/useVisionBoardState';
@@ -18,7 +18,7 @@ import HabitsSection from './components/HabitsSection';
 import MobileHabitsSection from './components/mobile/MobileHabitsSection';
 import MobileFriendsSection from './components/mobile/MobileFriendsSection';
 import SettingsSection from './components/SettingsSection';
-import UpgradeSection from './components/upgrade/UpgradeSection';
+import { OWNER_SURFACES_IN_BUILD } from './lib/native/ownerSurfaces';
 import { SCHEMES, applyScheme, applyTheme, resolveEffectiveTheme, schemeFromHex } from './components/SettingsSection';
 import { useSubscriptionContext } from './context/SubscriptionContext';
 import Modals from './components/Modals';
@@ -35,7 +35,6 @@ import InstallPrompt from './components/InstallPrompt';
 import TutorialOverlay from './components/TutorialOverlay';
 import BackgroundCropModal from './components/BackgroundCropModal';
 import LeaderboardSection from './components/LeaderboardSection';
-import AdminEditModal from './components/AdminEditModal';
 import VisionsModal from './components/VisionsModal';
 import { useIsOwner } from './hooks/useIsOwner';
 import { useCapacitor, haptic } from './hooks/useCapacitor';
@@ -53,6 +52,14 @@ import MobileAppBar from './components/mobile/MobileAppBar';
 import { registerPushToken, handleIncomingPush } from './lib/push/handlers';
 import NotificationPermissionPrompt, { hasAskedPushPrePrompt } from './components/NotificationPermissionPrompt';
 import BootSequence from './components/BootSequence';
+import { initDeepLinks } from './lib/native/deepLinks';
+import TermsAcceptanceSheet from './components/TermsAcceptanceSheet';
+
+// Owner-only surfaces, absent from native builds (lib/native/ownerSurfaces.js).
+// Lazy so the flag can drop them: with VITE_NATIVE_BUILD set these fold
+// to null and Rollup never emits their chunks.
+const UpgradeSection = OWNER_SURFACES_IN_BUILD ? lazy(() => import('./components/upgrade/UpgradeSection')) : null;
+const AdminEditModal = OWNER_SURFACES_IN_BUILD ? lazy(() => import('./components/AdminEditModal')) : null;
 
 const pageMotion = {
   initial: { opacity: 0, y: 14 },
@@ -113,7 +120,7 @@ function Board({ userId, userEmail, onSignOut }) {
   } = useVisionBoardState(userId);
   const { atLimit } = useTierLimits();
   const { hasPro } = useSubscriptionContext();
-  const { isOwner } = useIsOwner(userEmail);
+  const { isOwner } = useIsOwner(userId);
   // Passive WHOOP sync — refreshes vitals/burn whenever the app opens or
   // regains focus (throttled), so data stays fresh without visiting Track.
   useWhoopAutoSync(S, update);
@@ -832,9 +839,11 @@ function Board({ userId, userEmail, onSignOut }) {
             a deep link shows nothing for anyone else.
             'schedule' is the id this lived under before it grew tabs —
             still accepted so an old link or a stale tab doesn't 404. */}
-        {(activeSection === 'upgrade' || activeSection === 'schedule') && (
+        {UpgradeSection && (activeSection === 'upgrade' || activeSection === 'schedule') && (
           <motion.div key="upgrade" {...pageMotion}>
-            <UpgradeSection S={S} update={update} active isOwner={isOwner} userId={userId} />
+            <Suspense fallback={null}>
+              <UpgradeSection S={S} update={update} active isOwner={isOwner} userId={userId} />
+            </Suspense>
           </motion.div>
         )}
         {/* Friends — mobile-only route. Desktop puts FriendsRail in
@@ -885,14 +894,18 @@ function Board({ userId, userEmail, onSignOut }) {
       <ShortcutsModal open={shortcutsOpen} onClose={() => setShortcutsOpen(false)} />
       <CookieBanner onOpenLegal={setLegalPage} />
       <InstallPrompt />
-      <AdminEditModal
-        open={!!adminEdit}
-        target={adminEdit}
-        userId={userId}
-        S={S}
-        update={update}
-        onClose={() => setAdminEdit(null)}
-      />
+      {AdminEditModal && isOwner && (
+        <Suspense fallback={null}>
+          <AdminEditModal
+            open={!!adminEdit}
+            target={adminEdit}
+            userId={userId}
+            S={S}
+            update={update}
+            onClose={() => setAdminEdit(null)}
+          />
+        </Suspense>
+      )}
       <VisionsModal
         open={visionsOpen}
         S={S}
@@ -923,6 +936,7 @@ function Board({ userId, userEmail, onSignOut }) {
           </>
         )}
       />
+      <TermsAcceptanceSheet S={S} update={update} hydrated={hydrated} onOpenLegal={setLegalPage} onSignOut={onSignOut} />
       {legalPage && <LegalPage page={legalPage} onClose={() => setLegalPage(null)} />}
 
       {/* Onboarding tutorial — shows once for new users, replayable
@@ -955,6 +969,11 @@ export default function App() {
     // Drop the /privacy or /terms path so the app boots normally.
     try { window.history.replaceState(null, '', '/'); } catch { /* no-op */ }
   }
+
+  // Native only: the Google/Apple sign-in return (com.vantage.app://…).
+  // Registered here, above AuthScreen, so a callback that cold-starts
+  // the app is caught before any screen mounts. No-op on the web.
+  useEffect(() => { initDeepLinks(); }, []);
 
   useEffect(() => {
     let settled = false;

@@ -1,6 +1,7 @@
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { isNativeApp } from './lib/native/platform'
 import './index.css'
 import './hub-dark.css'
 import './theme-cream-pro.css'
@@ -49,7 +50,11 @@ createRoot(document.getElementById('root')).render(
 //   - First boot doesn't reload (no previous controller).
 //   - Subsequent updates reload after a tiny debounce so any
 //     in-flight save (1.5s debounce in useVisionBoardState) lands.
-if ('serviceWorker' in navigator && import.meta.env.PROD) {
+//
+// Never in the native app: it loads from its own bundle, so there is no
+// server copy for a network-first worker to prefer, and a worker caching
+// capacitor://localhost would only pin one binary's JS past an update.
+if ('serviceWorker' in navigator && import.meta.env.PROD && !isNativeApp()) {
   window.addEventListener('load', () => {
     navigator.serviceWorker.register('/sw.js', { scope: '/' })
       .catch(err => console.warn('SW registration failed:', err));

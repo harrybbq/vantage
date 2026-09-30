@@ -19,6 +19,7 @@ import { useState } from 'react';
 import { useSubscriptionContext } from '../context/SubscriptionContext';
 import { restorePurchases, openManageSubscription, presentCustomerCenter } from '../lib/billing/revenuecat';
 import SettingsGroup from './settings/SettingsGroup';
+import { isNativeApp } from '../lib/native/platform';
 
 const PLAN_LABEL = {
   monthly:  'Pro — Monthly',
@@ -54,7 +55,9 @@ export default function SubscriptionPanel() {
           ? 'Purchases restored. Your Pro entitlement is active.'
           : 'No prior purchases were found on this account.');
     } else if (r.reason === 'unavailable') {
-      flash('info', "Restore needs the iOS or Android build — it's a no-op on the web.");
+      flash('info', isNativeApp()
+        ? "The store isn't available right now. Please try again in a moment."
+        : "Restore needs the iOS or Android build — it's a no-op on the web.");
     } else if (r.reason === 'cancelled') {
       // Silent
     } else {

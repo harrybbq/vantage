@@ -16,6 +16,7 @@
  */
 import { useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
+import { apiUrl } from '../lib/authFetch';
 import { PRESTIGE_MAX } from '../lib/ratings/prestige';
 import { backdropClose } from '../utils/backdropClose';
 
@@ -83,7 +84,7 @@ export default function AdminEditModal({ open, target, userId, S, update, onClos
         const { data: sess } = await supabase.auth.getSession();
         const token = sess?.session?.access_token;
         if (!token) throw new Error('Session expired — sign in again.');
-        const res = await fetch('/.netlify/functions/admin-set-rating', {
+        const res = await fetch(apiUrl('/.netlify/functions/admin-set-rating'), {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
           body: JSON.stringify({ prestige, ...ratings }),

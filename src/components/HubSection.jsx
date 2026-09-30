@@ -8,6 +8,7 @@ import { GoalsBody, BodyGoalBody } from './widgets/GoalsWidget';
 import { RotationBody } from './widgets/RotationWidget';
 import { tradingWidgetAvailable, TRADING_WIDGET_BUILD_EXCLUDED } from '../lib/trading/enabled';
 import { isRetiredWidget } from '../lib/widgets/retired';
+import { apiUrl } from '../lib/authFetch';
 import { applyRelapse } from '../lib/habits/relapse';
 import MarketBody from './widgets/MarketWidget';
 import NewsBody from './widgets/NewsWidget';
@@ -1892,7 +1893,7 @@ async function loadLeaderboardIntoWidget(hwId) {
     const session = (await supabase.auth.getSession()).data?.session;
     const token = session?.access_token;
     if (!token) { host.textContent = 'Sign in to see the leaderboard.'; return; }
-    const res = await fetch('/.netlify/functions/get-leaderboard', {
+    const res = await fetch(apiUrl('/.netlify/functions/get-leaderboard'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
       body: JSON.stringify({ scope: 'friends', timeframe: 'alltime' }),
