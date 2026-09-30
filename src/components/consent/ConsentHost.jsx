@@ -119,7 +119,7 @@ export default function ConsentHost({ S, update, hydrated, onOpenLegal }) {
   const title = once
     ? 'Your say on two kinds of data'
     : kinds.length === 1
-      ? `Allow ${CONSENT_COPY[kinds[0]].title.toLowerCase()}?`
+      ? CONSENT_COPY[kinds[0]].prompt
       : 'Allow these?';
 
   return (

@@ -175,16 +175,15 @@ export default function ModerationQueue() {
                 {r.reporter && ` · by @${r.reporter}`}
               </div>
               {r.context && (
-                <div className={`mod-context${expanded || !long ? ' is-open' : ''}`}>
-                  {r.context}
-                  {long && (
-                    <button type="button" className="mod-more" onClick={() => setOpen(s => {
-                      const next = new Set(s);
-                      if (next.has(r.id)) next.delete(r.id); else next.add(r.id);
-                      return next;
-                    })}>{expanded ? 'Less' : 'More'}</button>
-                  )}
-                </div>
+                <div className={`mod-context${expanded || !long ? ' is-open' : ''}`}>{r.context}</div>
+              )}
+              {/* Outside the clamped box, or the clamp hides it too. */}
+              {r.context && long && (
+                <button type="button" className="mod-more" onClick={() => setOpen(s => {
+                  const next = new Set(s);
+                  if (next.has(r.id)) next.delete(r.id); else next.add(r.id);
+                  return next;
+                })}>{expanded ? 'Show less' : 'Show all'}</button>
               )}
               {r.note && r.status !== 'open' && <div className="mod-note">Note: {r.note}</div>}
             </div>
