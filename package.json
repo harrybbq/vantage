@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "eslint . && npm run check:visions && npm run check:parity && npm run check:boot && npm run check:savings && npm run check:training && npm run check:merge && npm run check:invite && npm run check:autolog && npm run check:recurring && npm run check:planpost && npm run check:pathplayer && npm run check:bootrun && npm run check:coins && npm run check:ledger && npm run check:relapse && npm run check:cutdown && npm run check:ladder && npm run check:crest && npm run check:foods && npm run check:pack && npm run check:trackerlink && npm run check:interest && npm run check:completepot && npm run check:edgematch && npm run check:logmath && npm run check:railmotion && npm run check:visited && npm run check:careerplan && npm run check:careernext && npm run check:savingshistory && npm run check:weighttrend && npm run check:meallinks && npm run check:mealplanner && npm run check:shopping && npm run check:trackerdone && npm run check:ssrf && npm run check:names && vite build",
+    "build": "eslint . && npm run check:visions && npm run check:parity && npm run check:boot && npm run check:savings && npm run check:training && npm run check:merge && npm run check:invite && npm run check:autolog && npm run check:recurring && npm run check:planpost && npm run check:pathplayer && npm run check:bootrun && npm run check:coins && npm run check:ledger && npm run check:relapse && npm run check:cutdown && npm run check:ladder && npm run check:crest && npm run check:foods && npm run check:pack && npm run check:trackerlink && npm run check:interest && npm run check:completepot && npm run check:edgematch && npm run check:logmath && npm run check:railmotion && npm run check:visited && npm run check:careerplan && npm run check:careernext && npm run check:savingshistory && npm run check:weighttrend && npm run check:meallinks && npm run check:mealplanner && npm run check:shopping && npm run check:trackerdone && npm run check:ssrf && npm run check:names && npm run check:wipeguard && npm run check:telemetry && npm run check:clearlocal && npm run check:weekkey && vite build",
     "check:visions": "node scripts/check-vision-xp.mjs",
     "check:parity": "node scripts/check-ratings-parity.mjs",
     "check:boot": "node scripts/check-boot-speed.mjs",
@@ -49,7 +49,11 @@
     "check:pack": "node src/lib/hub/pack.test.mjs",
     "check:trackerdone": "node src/lib/trackers/done.test.mjs",
     "check:ssrf": "node netlify/lib/ssrfGuard.test.mjs",
-    "check:names": "node netlify/lib/nameFilter.test.mjs"
+    "check:names": "node netlify/lib/nameFilter.test.mjs",
+    "check:wipeguard": "node src/lib/state/meaningful.test.mjs",
+    "check:telemetry": "node src/lib/telemetry/shape.test.mjs",
+    "check:clearlocal": "node src/lib/state/clearLocal.test.mjs",
+    "check:weekkey": "node src/utils/helpers.test.mjs"
   },
   "dependencies": {
     "@capacitor/android": "^8.3.1",

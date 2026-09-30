@@ -53,6 +53,14 @@ import MobileAppBar from './components/mobile/MobileAppBar';
 import { registerPushToken, handleIncomingPush } from './lib/push/handlers';
 import NotificationPermissionPrompt, { hasAskedPushPrePrompt } from './components/NotificationPermissionPrompt';
 import BootSequence from './components/BootSequence';
+import { compressImageDataUrl } from './lib/image/compress';
+import WidgetBoundary from './components/WidgetBoundary';
+import SaveStatusPill from './components/SaveStatusPill';
+import { clearLocalUserData } from './lib/state/clearLocal';
+import { installGlobalErrorHandlers } from './lib/telemetry/reportError';
+
+// window.onerror + unhandledrejection → client-error reports (item 77).
+installGlobalErrorHandlers();
 
 const pageMotion = {
   initial: { opacity: 0, y: 14 },
@@ -71,29 +79,8 @@ function loadLegacyBgs() {
   try { return JSON.parse(localStorage.getItem(LEGACY_BG_KEY) || '{}'); } catch { return {}; }
 }
 
-/**
- * Downscale a base64/data-URL image to a sane size so syncing it in the
- * state blob doesn't bloat every save. Max 1600px on the long edge,
- * JPEG @ 0.72. Resolves to a data URL (or the original on failure).
- */
-function compressImageDataUrl(dataUrl, max = 1600, quality = 0.72) {
-  return new Promise(resolve => {
-    try {
-      const img = new Image();
-      img.onload = () => {
-        const scale = Math.min(1, max / Math.max(img.width, img.height));
-        const w = Math.round(img.width * scale);
-        const h = Math.round(img.height * scale);
-        const canvas = document.createElement('canvas');
-        canvas.width = w; canvas.height = h;
-        canvas.getContext('2d').drawImage(img, 0, 0, w, h);
-        resolve(canvas.toDataURL('image/jpeg', quality));
-      };
-      img.onerror = () => resolve(dataUrl);
-      img.src = dataUrl;
-    } catch { resolve(dataUrl); }
-  });
-}
+// compressImageDataUrl moved to lib/image/compress.js so the profile
+// photo uploaders can share it.
 
 // Maps add-modal IDs to the free-tier cap key + a fn that counts current items
 // for that key. Anything not listed here is unmetered.
@@ -110,7 +97,22 @@ function Board({ userId, userEmail, onSignOut }) {
   const {
     S, update, loading, hydrated, justMigrated, dismissMigrationBanner,
     loadError, retryLoad, startFresh, restoreFromBackup, hasBackup,
+    saveStatus, flushNow,
   } = useVisionBoardState(userId);
+
+  // Explicit sign-out (the Nav and Settings buttons — never a session
+  // that simply expired): save anything pending, then remove this
+  // device's copies of the user's data (item 56). If the save can't
+  // land, ask before discarding it. On a load error the local backup
+  // may be the only good copy, so it is left in place.
+  async function handleExplicitSignOut() {
+    const flushed = await flushNow();
+    if (!flushed.ok && !window.confirm(
+      'Your latest changes haven\'t reached the cloud yet. Sign out anyway and discard them?'
+    )) return;
+    await onSignOut();
+    if (!loadError) await clearLocalUserData(userId);
+  }
   const { atLimit } = useTierLimits();
   const { hasPro } = useSubscriptionContext();
   const { isOwner } = useIsOwner(userEmail);
@@ -318,7 +320,7 @@ function Board({ userId, userEmail, onSignOut }) {
   // public_stats heatmap + wins) to Supabase so friends can see it.
   // Debounced inside the hook; safely no-ops if the social schema
   // hasn't been applied yet.
-  usePublishProfile(userId, S, hasPro, visionState);
+  usePublishProfile(userId, S, hasPro, visionState, { hydrated, loadError });
 
   // Ranked categories (F5 Sprint 3). Local recompute updates S.ratings
   // on a 1.5s debounce; server recompute fires the Netlify function on
@@ -705,7 +707,7 @@ function Board({ userId, userEmail, onSignOut }) {
       <div id="shop-overlay" className={activeSection === 'shop' && currentBg ? 'visible' : ''}></div>
 
       {/* Sidebar nav (desktop only — hidden via @media on mobile) */}
-      <Nav activeSection={activeSection} onNavigate={navigate} onSignOut={onSignOut} isOwner={isOwner} />
+      <Nav activeSection={activeSection} onNavigate={navigate} onSignOut={handleExplicitSignOut} isOwner={isOwner} />
 
       {/* Mobile chrome — bottom tab bar + app bar + More drawer.
           Only mounts on mobile viewports so we don't pay for these
@@ -762,10 +764,12 @@ function Board({ userId, userEmail, onSignOut }) {
         onBgFx={setBgFx}
       />
 
-      {/* Main sections */}
+      {/* Main sections — each in its own boundary, so one page throwing
+          leaves the nav and the other pages working (item 58). */}
       <AnimatePresence mode="wait">
         {activeSection === 'hub' && (
           <motion.div key="hub" {...pageMotion}>
+            <WidgetBoundary variant="section" name="hub">
             {isMobile ? (
               <MobileHubSection
                 S={S}
@@ -779,39 +783,51 @@ function Board({ userId, userEmail, onSignOut }) {
             ) : (
               <HubSection S={S} update={update} active onOpenModal={handleOpenModal} onOpenWaitlist={() => handleOpenModal('waitlistModal')} onNavigateSettings={() => navigate('settings')} onNavigateTrack={() => navigate('track')} onShowCoinToast={showCoinToast} onCoachAct={handleCoachAct} visionState={visionState} userId={userId} onUpgrade={() => handleOpenModal('paywall:friends')} onNavigate={navigate} />
             )}
+            </WidgetBoundary>
           </motion.div>
         )}
         {activeSection === 'achievements' && (
           <motion.div key="achievements" {...pageMotion}>
+            <WidgetBoundary variant="section" name="achievements">
             <AchievementsSection S={S} update={update} active onOpenModal={handleOpenModal} onShowCoinToast={showCoinToast} onOpenVisions={() => setVisionsOpen(true)} />
+            </WidgetBoundary>
           </motion.div>
         )}
         {activeSection === 'track' && (
           <motion.div key="track" {...pageMotion}>
+            <WidgetBoundary variant="section" name="track">
             <TrackSection S={S} update={update} active onOpenModal={handleOpenModal} onShowCoinToast={showCoinToast} userId={userId} requestedTab={trackTab} />
+            </WidgetBoundary>
           </motion.div>
         )}
         {activeSection === 'shop' && (
           <motion.div key="shop" {...pageMotion}>
+            <WidgetBoundary variant="section" name="shop">
             <ShopSection S={S} update={update} active onOpenModal={handleOpenModal} onShowCoinToast={showCoinToast} />
+            </WidgetBoundary>
           </motion.div>
         )}
         {activeSection === 'holiday' && (
           <motion.div key="holiday" {...pageMotion}>
+            <WidgetBoundary variant="section" name="holiday">
             <HolidaySection S={S} update={update} active onOpenModal={handleOpenModal} />
+            </WidgetBoundary>
           </motion.div>
         )}
         {activeSection === 'habits' && (
           <motion.div key="habits" {...pageMotion}>
+            <WidgetBoundary variant="section" name="habits">
             {isMobile ? (
               <MobileHabitsSection S={S} update={update} onOpenModal={handleOpenModal} onShowCoinToast={showCoinToast} />
             ) : (
               <HabitsSection S={S} update={update} active onOpenModal={handleOpenModal} onShowCoinToast={showCoinToast} />
             )}
+            </WidgetBoundary>
           </motion.div>
         )}
         {activeSection === 'leaderboard' && (
           <motion.div key="leaderboard" {...pageMotion}>
+            <WidgetBoundary variant="section" name="leaderboard">
             <LeaderboardSection
               active
               userId={userId}
@@ -819,11 +835,14 @@ function Board({ userId, userEmail, onSignOut }) {
               onAddFriends={() => navigate('hub')}
               onOpenSettings={() => navigate('settings')}
             />
+            </WidgetBoundary>
           </motion.div>
         )}
         {activeSection === 'settings' && (
           <motion.div key="settings" {...pageMotion}>
-            <SettingsSection S={S} update={update} active userId={userId} userEmail={userEmail} onSignOut={onSignOut} requestedTab={settingsTab} onOpenLegal={setLegalPage} onOpenPalette={() => setPaletteOpen(true)} onOpenShortcuts={() => setShortcutsOpen(true)} onOpenVisions={() => setVisionsOpen(true)} onOpenSchedule={isOwner ? () => navigate('upgrade') : null} />
+            <WidgetBoundary variant="section" name="settings">
+            <SettingsSection S={S} update={update} active userId={userId} userEmail={userEmail} onSignOut={handleExplicitSignOut} requestedTab={settingsTab} onOpenLegal={setLegalPage} onOpenPalette={() => setPaletteOpen(true)} onOpenShortcuts={() => setShortcutsOpen(true)} onOpenVisions={() => setVisionsOpen(true)} onOpenSchedule={isOwner ? () => navigate('upgrade') : null} />
+            </WidgetBoundary>
           </motion.div>
         )}
         {/* Upgrade — owner-only: rotation, diet, career. Reached from
@@ -834,7 +853,9 @@ function Board({ userId, userEmail, onSignOut }) {
             still accepted so an old link or a stale tab doesn't 404. */}
         {(activeSection === 'upgrade' || activeSection === 'schedule') && (
           <motion.div key="upgrade" {...pageMotion}>
+            <WidgetBoundary variant="section" name="upgrade">
             <UpgradeSection S={S} update={update} active isOwner={isOwner} userId={userId} />
+            </WidgetBoundary>
           </motion.div>
         )}
         {/* Friends — mobile-only route. Desktop puts FriendsRail in
@@ -843,13 +864,17 @@ function Board({ userId, userEmail, onSignOut }) {
             but in practice the bottom-tab/drawer surface is mobile. */}
         {activeSection === 'friends' && (
           <motion.div key="friends" {...pageMotion}>
+            <WidgetBoundary variant="section" name="friends">
             <MobileFriendsSection
               userId={userId}
               onUpgrade={() => handleOpenModal('paywall:friends')}
             />
+            </WidgetBoundary>
           </motion.div>
         )}
       </AnimatePresence>
+
+      <SaveStatusPill status={saveStatus} />
 
       {/* Modals */}
       <Modals

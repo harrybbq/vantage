@@ -19,6 +19,7 @@
  * dark.
  */
 import { Component } from 'react';
+import { reportError } from '../lib/telemetry/reportError';
 
 const wrap = {
   minHeight: '100dvh', display: 'flex', flexDirection: 'column',
@@ -50,6 +51,10 @@ export default class RootErrorBoundary extends Component {
       };
     }
     console.error('[Vantage] Uncaught render error:', error, info?.componentStack);
+    try {
+      const message = error?.message || String(error);
+      reportError('root', { message, stack: `${error?.stack || message}\n--- component stack ---${info?.componentStack || ''}` });
+    } catch { /* reporting must never re-throw here */ }
   }
 
   render() {

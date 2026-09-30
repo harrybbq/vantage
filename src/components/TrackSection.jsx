@@ -5,7 +5,7 @@ import { eventColour, eventWhen, eventsInMonth, eventsOn } from '../lib/calendar
 import EventModal from './calendar/EventModal';
 import Icon from './Icon';
 import { motion } from 'framer-motion';
-import { getWeekKey, countWeekLogs, getTodayStr } from '../utils/helpers';
+import { getWeekKey, countWeekLogs, getTodayStr, trackerWeeklyCoins } from '../utils/helpers';
 import { fireGoal, fireStreak7, fireStreak30 } from '../utils/confetti';
 import { recalcStreaks } from '../utils/streaks';
 import SectionHelp from './SectionHelp';
@@ -104,7 +104,7 @@ function TrackersList({ trackers, logs, streaks, onDelete, onOpenModal, update, 
           </div>
         )}
         {trackers.map((t, index) => {
-          const hasChallenge = !!(t.weeklyTarget && t.weeklyCoins);
+          const hasChallenge = !!(t.weeklyTarget && trackerWeeklyCoins(t));
           const { count, target } = hasChallenge
             ? getWeekProgress(logs, t)
             : { count: 0, target: 0 };
@@ -155,7 +155,7 @@ function TrackersList({ trackers, logs, streaks, onDelete, onOpenModal, update, 
                 <div className="tracker-row-meta">
                   {s?.current > 0 && <span className="tracker-row-fire">🔥{s.current}</span>}
                   {s?.best > (s?.current || 0) && <span> best {s.best}</span>}
-                  {hasChallenge && <span className="tracker-row-coins"> ⬡{t.weeklyCoins}</span>}
+                  {hasChallenge && <span className="tracker-row-coins"> ⬡{trackerWeeklyCoins(t)}</span>}
                 </div>
               </div>
               <button
@@ -498,25 +498,28 @@ function CalendarView({ S, update, onShowCoinToast, nutritionMonthData }) {
       // 3. Weekly challenge — symmetric award/refund so toggling a log
       // can't farm coins (mirrors QuickLog; see the anti-scam note there).
       trackers.forEach(t => {
-        if (!t.weeklyTarget || !t.weeklyCoins) return;
+        // Capped at read time (trackerWeeklyCoins) — a value stored before
+        // the 50-coin cap, or edited into state, can't pay more.
+        const reward = trackerWeeklyCoins(t);
+        if (!t.weeklyTarget || !reward) return;
         const weekKey = getWeekKey(key);
         const awardKey = 'awarded_' + t.id + '_' + weekKey;
         const count = countWeekLogs(newLogs, t.id, key, t);
         const alreadyAwarded = !!next[awardKey];
 
         if (count >= t.weeklyTarget && !alreadyAwarded) {
-          const coins = (next.coins || 0) + t.weeklyCoins;
+          const coins = (next.coins || 0) + reward;
           const coinHistory = [
-            { type: 'earn', label: t.name + ' weekly goal (' + t.weeklyTarget + 'x)', amount: t.weeklyCoins, ts: Date.now() },
+            { type: 'earn', label: t.name + ' weekly goal (' + t.weeklyTarget + 'x)', amount: reward, ts: Date.now() },
             ...(next.coinHistory || []),
           ];
-          onShowCoinToast('+' + t.weeklyCoins + ' ⬡ — ' + t.name + ' weekly goal!', true);
+          onShowCoinToast('+' + reward + ' ⬡ — ' + t.name + ' weekly goal!', true);
           fireGoal();
           next = { ...next, [awardKey]: true, coins, coinHistory };
         } else if (count < t.weeklyTarget && alreadyAwarded) {
-          const coins = Math.max(0, (next.coins || 0) - t.weeklyCoins);
+          const coins = Math.max(0, (next.coins || 0) - reward);
           const coinHistory = [
-            { type: 'refund', label: t.name + ' weekly goal reversed', amount: -t.weeklyCoins, ts: Date.now() },
+            { type: 'refund', label: t.name + ' weekly goal reversed', amount: -reward, ts: Date.now() },
             ...(next.coinHistory || []),
           ];
           const reversed = { ...next, coins, coinHistory };

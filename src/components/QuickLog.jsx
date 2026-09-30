@@ -1,7 +1,7 @@
 import { useState, useRef } from 'react';
 import Icon from './Icon';
 import { motion, AnimatePresence } from 'framer-motion';
-import { getTodayStr, getWeekKey, countWeekLogs } from '../utils/helpers';
+import { getTodayStr, getWeekKey, countWeekLogs, trackerWeeklyCoins } from '../utils/helpers';
 import { recalcStreaks } from '../utils/streaks';
 import { fireGoal, fireStreak7, fireStreak30 } from '../utils/confetti';
 import { haptic } from '../hooks/useCapacitor';
@@ -346,25 +346,28 @@ export default function QuickLog({ S, update, onNavigateTrack, onShowCoinToast }
       // nets exactly zero. Coins are only ever held while the weekly goal
       // is genuinely met.
       (prev.trackers || []).forEach(t => {
-        if (!t.weeklyTarget || !t.weeklyCoins) return;
+        // Capped at read time (trackerWeeklyCoins) — a value stored before
+        // the 50-coin cap, or edited into state, can't pay more.
+        const reward = trackerWeeklyCoins(t);
+        if (!t.weeklyTarget || !reward) return;
         const weekKey = getWeekKey(today);
         const awardKey = 'awarded_' + t.id + '_' + weekKey;
         const count = countWeekLogs(newLogs, t.id, today, t);
         const alreadyAwarded = !!next[awardKey];
 
         if (count >= t.weeklyTarget && !alreadyAwarded) {
-          const coins = (next.coins || 0) + t.weeklyCoins;
+          const coins = (next.coins || 0) + reward;
           const coinHistory = [
-            { type: 'earn', label: t.name + ' weekly goal (' + t.weeklyTarget + 'x)', amount: t.weeklyCoins, ts: Date.now() },
+            { type: 'earn', label: t.name + ' weekly goal (' + t.weeklyTarget + 'x)', amount: reward, ts: Date.now() },
             ...(next.coinHistory || []),
           ];
-          onShowCoinToast('+' + t.weeklyCoins + ' ⬡ — ' + t.name + ' weekly goal!', true);
+          onShowCoinToast('+' + reward + ' ⬡ — ' + t.name + ' weekly goal!', true);
           fireGoal();
           next = { ...next, [awardKey]: true, coins, coinHistory };
         } else if (count < t.weeklyTarget && alreadyAwarded) {
-          const coins = Math.max(0, (next.coins || 0) - t.weeklyCoins);
+          const coins = Math.max(0, (next.coins || 0) - reward);
           const coinHistory = [
-            { type: 'refund', label: t.name + ' weekly goal reversed', amount: -t.weeklyCoins, ts: Date.now() },
+            { type: 'refund', label: t.name + ' weekly goal reversed', amount: -reward, ts: Date.now() },
             ...(next.coinHistory || []),
           ];
           const reversed = { ...next, coins, coinHistory };

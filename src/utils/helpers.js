@@ -21,14 +21,51 @@ export function timeAgo(date) {
   return date.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
 }
 
+/**
+ * ISO-8601 week key, 'YYYY-Www', for a 'YYYY-MM-DD' day (or a Date).
+ *
+ * It keys persisted state — the weekly-coin awards are stored as
+ * `awarded_<tracker>_<weekKey>` — so for every mid-year day it returns
+ * exactly what the previous version did. The fixes are at the edges:
+ *   · the year is the ISO week-YEAR, decided by the week's Thursday.
+ *     1 Jan 2027 (a Friday) is 2026-W53, not "2027-W00"; 29 Dec 2025 (a
+ *     Monday) is 2026-W01, not a second "2025-W53". The old keys split
+ *     one real week in two across New Year, so its weekly goal could be
+ *     awarded twice and its logs never added up.
+ *   · the string is read as a LOCAL calendar day, by its parts. `new
+ *     Date('2026-09-28')` is UTC midnight, which west of Greenwich is
+ *     still Sunday — Mondays landed in the previous week.
+ *   · the arithmetic is on UTC day numbers, so a DST change between
+ *     January and the date can't knock a Monday back an hour into the
+ *     week before.
+ */
 export function getWeekKey(dateStr) {
-  const d = new Date(dateStr);
-  const jan4 = new Date(d.getFullYear(), 0, 4);
-  const startOfWeek1 = new Date(jan4);
-  startOfWeek1.setDate(jan4.getDate() - ((jan4.getDay() + 6) % 7));
-  const diff = d - startOfWeek1;
-  const week = Math.floor(diff / 604800000) + 1;
-  return d.getFullYear() + '-W' + String(week).padStart(2, '0');
+  let y, m, d;
+  const parts = typeof dateStr === 'string' && /^(\d{4})-(\d{2})-(\d{2})/.exec(dateStr);
+  if (parts) {
+    y = +parts[1]; m = +parts[2] - 1; d = +parts[3];
+  } else {
+    const dt = dateStr instanceof Date ? dateStr : new Date(dateStr);
+    y = dt.getFullYear(); m = dt.getMonth(); d = dt.getDate();
+  }
+  const day = new Date(Date.UTC(y, m, d));
+  const dow = (day.getUTCDay() + 6) % 7;             // Mon=0 … Sun=6
+  day.setUTCDate(day.getUTCDate() - dow + 3);        // this week's Thursday
+  const isoYear = day.getUTCFullYear();
+  const jan4 = new Date(Date.UTC(isoYear, 0, 4));
+  const week1Thu = new Date(jan4);
+  week1Thu.setUTCDate(jan4.getUTCDate() - ((jan4.getUTCDay() + 6) % 7) + 3);
+  const week = 1 + Math.round((day - week1Thu) / 604800000);
+  return isoYear + '-W' + String(week).padStart(2, '0');
+}
+
+/** The most coins a tracker's weekly goal can pay. Forms cap what they
+ *  store; every award reads through this too, so a value written before
+ *  the cap (or edited into state by hand) can't pay more. */
+export const WEEKLY_COINS_MAX = 50;
+export function trackerWeeklyCoins(t) {
+  const n = Math.floor(Number(t && t.weeklyCoins));
+  return Number.isFinite(n) ? Math.max(0, Math.min(WEEKLY_COINS_MAX, n)) : 0;
 }
 
 /** Days this week the tracker was logged — or, given the tracker,

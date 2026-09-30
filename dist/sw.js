@@ -1,15 +1,26 @@
 // Vantage Service Worker
 //
 // Strategy:
-//   - Hashed Vite assets (JS / CSS) → cache-first (safe: hashed filenames
-//     never change content, so an old cached file is identical to itself)
+//   - Same-origin hashed Vite bundles under /assets/ → cache-first (safe:
+//     hashed filenames never change content, so an old cached file is
+//     identical to itself)
 //   - HTML navigation requests → network-first, NEVER cache index.html
 //     (this was the bug that pinned old builds to old clients in
 //     2026-05-03 — old cached index.html referenced old JS hashes which
 //     were also cached, so users were stuck on stale code forever)
 //   - Truly static immutable assets (icons, manifest, background) →
 //     precache so the app installs as a real PWA
-//   - Supabase / API calls → network-first
+//   - Other same-origin static files (images, fonts) → network-first,
+//     cached copy only as an offline fallback
+//   - EVERYTHING ELSE passes straight through, never cached:
+//     /.netlify/functions/*, Supabase, and every cross-origin GET.
+//
+// History (2026-09-30, audit item 57): the catch-all used to be
+// cache-first, so every function GET — weather, news, market quotes,
+// food search, GitHub — was served from its first response until the
+// next CACHE_VERSION bump. Stale for days, and those responses carried
+// the user's location and searches into a cache that outlived sign-out.
+// Only /assets/ is content-addressed; nothing else may be cache-first.
 //
 // Cache rotation discipline:
 //   Bump CACHE_VERSION on EVERY deploy that includes structural changes
@@ -21,7 +32,7 @@
 //   running broken code) is real data loss — see git log f6a7a50 for
 //   the wipe incident this SW caused.
 
-const CACHE_VERSION = 'vb-v160-2026-09-27';
+const CACHE_VERSION = 'vb-v161-2026-09-30';
 const CACHE = CACHE_VERSION;
 
 // Notice: NO '/index.html' and NO '/'. Those are network-first only.
@@ -49,6 +60,8 @@ self.addEventListener('install', event => {
 });
 
 // ── Activate: purge old caches, take control, notify clients ──────────────
+// Every cache that isn't this version's goes — including the runtime
+// entries earlier versions stored for function responses.
 self.addEventListener('activate', event => {
   event.waitUntil((async () => {
     const keys = await caches.keys();
@@ -71,16 +84,12 @@ self.addEventListener('fetch', event => {
   if (request.method !== 'GET') return;
   if (!url.protocol.startsWith('http')) return;
 
-  // Supabase / external API → network-first (never cache auth / data)
-  if (
-    url.hostname.includes('supabase.co') ||
-    url.hostname.includes('googleapis.com') ||
-    url.pathname.startsWith('/rest/') ||
-    url.pathname.startsWith('/auth/')
-  ) {
-    event.respondWith(networkFirst(request, /* cacheOnSuccess */ false));
-    return;
-  }
+  // Cross-origin (Supabase, GitHub, Open-Meteo, fonts, …) and every
+  // function call: not ours to cache. A plain return hands the request
+  // to the browser exactly as if there were no service worker — no
+  // cache read on failure either, so nothing stale can be served.
+  if (url.origin !== self.location.origin) return;
+  if (url.pathname.startsWith('/.netlify/') || url.pathname.startsWith('/api/')) return;
 
   // HTML navigation → network-first, NO cache fallback to a stale shell.
   // If the network is genuinely down we serve a tiny inline offline
@@ -98,8 +107,15 @@ self.addEventListener('fetch', event => {
     return;
   }
 
-  // Hashed Vite bundles + other static assets → cache-first
-  event.respondWith(cacheFirst(request));
+  // Content-addressed bundles and the precached shell → cache-first.
+  if (url.pathname.startsWith('/assets/') || PRECACHE.includes(url.pathname)) {
+    event.respondWith(cacheFirst(request));
+    return;
+  }
+
+  // Any other same-origin file (e.g. /track-bg.webp) can change in
+  // place, so the network wins and the cache is only an offline net.
+  event.respondWith(networkFirst(request));
 });
 
 async function cacheFirst(request) {
@@ -117,10 +133,14 @@ async function cacheFirst(request) {
   }
 }
 
-async function networkFirst(request, cacheOnSuccess = true) {
+async function networkFirst(request) {
   try {
     const response = await fetch(request);
-    if (response.ok && cacheOnSuccess) {
+    // Only plain same-origin files are kept, and never HTML — an SPA
+    // fallback page stored under some other path is exactly the stale
+    // shell the navigation rule above exists to prevent.
+    const type = response.headers.get('Content-Type') || '';
+    if (response.ok && response.type === 'basic' && !type.includes('text/html')) {
       const cache = await caches.open(CACHE);
       cache.put(request, response.clone());
     }
