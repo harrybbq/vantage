@@ -103,7 +103,7 @@ function PrivacyPolicyContent() {
         <Ul items={[
           'Performance of a contract — your email, account and app content are processed to deliver the service you signed up for.',
           'Explicit consent — health & fitness data (section 3), AI features (section 7) and push notifications. You can withdraw consent at any time without affecting the rest of the App.',
-          'Legitimate interests — storing preferences, keeping the service secure, screening uploaded group pictures, handling reports and preventing abuse of social features.',
+          'Legitimate interests — storing preferences, keeping the service secure, screening uploaded group pictures and profile pictures, handling reports and preventing abuse of social features.',
           'Legal obligation — keeping records we are required to keep, and responding to lawful requests.',
         ]} />
       </Section>
@@ -139,7 +139,7 @@ function PrivacyPolicyContent() {
           'Daily brief / AI coach — a compact snapshot of your own App data (e.g. first name, recent habits, trackers, goals, vitals and macro trends) is sent to generate your personal daily brief.',
           'Recipe from a video — the title and description of a YouTube or TikTok video you save are sent to extract the ingredient list and estimate macros.',
         ]} />
-        <P>Separately, and not optional: when a group picture is uploaded, the image is sent to Anthropic's API to screen it for content that breaks the Terms before other people can see it. This is done on the basis of legitimate interests (keeping the App safe).</P>
+        <P>Separately, and not optional: when a group picture is uploaded, or before your profile picture is shown to other people, the image is sent to Anthropic's API to screen it for content that breaks the Terms. Until a picture passes, other people see your initial instead; the picture itself stays on your account. This is done on the basis of legitimate interests (keeping the App safe).</P>
         <P>In each case the data is sent to Anthropic's API to generate the result and is handled by Anthropic under its commercial terms, under which data sent via the API is not used to train their models. We do not store the camera frame or the snapshot we send; the result (for example your brief) is saved in your account. If you never use the optional features, none of your data is sent to Anthropic by them. AI output can be wrong — see the Terms of Service health disclaimer.</P>
       </Section>
 
@@ -148,7 +148,7 @@ function PrivacyPolicyContent() {
         <Ul items={[
           'Supabase — database and authentication, hosted in the EU. Stores your account, app content, messages, nutrition and health data.',
           'Netlify — web hosting and the serverless functions that power sync, leaderboards, groups, trending and integrations. Receives your IP address when you use the App.',
-          'Anthropic — AI features and group-picture screening, as described in section 7.',
+          'Anthropic — AI features and screening of group and profile pictures, as described in section 7.',
           'RevenueCat, Apple and Google — subscription billing and entitlement management for Vantage Pro. Payment details are handled by the platform you purchase through.',
           'Firebase Cloud Messaging (Google) — delivery of push notifications you enable; processes your device push token.',
           'Google / Apple sign-in — optional authentication only (section 9).',
@@ -305,7 +305,7 @@ function TermsContent() {
         <Ul items={[
           'Report — you can report a person from their friend card, from a conversation, from a leaderboard row or from a group\'s member list. Reports are private: the person reported is not told who reported them.',
           'Block — blocking removes the person from your friends, stops them messaging you and stops them sending you friend requests.',
-          'Review — every report is reviewed by a person. We aim to act within 24 hours. Group pictures are also screened automatically when uploaded, and held back until approved if the screen is unsure.',
+          'Review — every report is reviewed by a person. We aim to act within 24 hours. Group pictures and profile pictures are also screened automatically before others see them, and held back if the screen is unsure.',
           'Action — depending on what we find we may remove or reset content (for example a display name, handle or group picture), hide an account from the leaderboard, search and group boards, suspend it, or close it. Serious or repeated breaches lead to permanent closure. Content that may be illegal can be reported to the police or other authorities.',
           'Evidence — a report, with a copy of the reported handle and display name and any messages attached to it, may be kept after the account involved is deleted, so that repeat abuse can be recognised.',
           'Disagree with a decision? Contact us via the support address on the store listing and we will look at it again.',
