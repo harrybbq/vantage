@@ -91,7 +91,7 @@ function PrivacyPolicyContent() {
       </Section>
 
       <Section title="3. Health Data & Your Explicit Consent">
-        <P>Vitals, sleep, heart-rate and nutrition information are health data — "special category" data under UK GDPR. We only process it with your explicit consent, which we ask for on a consent screen before you first connect a wearable or import Apple Health data. Saying no is fine: features that do not need health data keep working.</P>
+        <P>Vitals, sleep, heart-rate and nutrition information are health data — "special category" data under UK GDPR. We ask for your explicit consent to health data on a consent screen that every account sees once, and again before you connect WHOOP or an Oura Ring or turn on Apple Health import — no connected source is set up without it. Saying no is fine: features that do not need health data keep working, and anything you choose to type in yourself (such as a weight or a meal) is still saved to your account and shown only to you.</P>
         <Ul items={[
           'You can withdraw consent at any time in Settings → Privacy → Consent. To stop a connected source sending anything further, also use Disconnect on its WHOOP or Oura panel (this immediately deletes that device’s stored access tokens) or turn off Apple Health sync. You can delete individual entries or your whole account at any time; metrics already recorded stay in your history until you do.',
           'Health data is used solely to show you your own trends, widgets and (if you use it) the daily AI brief. It is never shown to other users, never used for advertising, and never sold.',

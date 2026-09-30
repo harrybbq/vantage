@@ -40,6 +40,7 @@ export async function collectAccountData(userId) {
     .from('friendships').select('*')
     .or(`requester_id.eq.${userId},addressee_id.eq.${userId}`)
     .order('created_at', { ascending: true }).order('requester_id', { ascending: true })
+    .order('addressee_id', { ascending: true })   // with requester_id: the PK, so a total order
     .range(from, to)));
 
   await grab('messages', () => fetchAllPages((from, to) => supabase
