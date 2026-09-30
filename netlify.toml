@@ -16,8 +16,9 @@
   # server-side secrets (SUPABASE_SERVICE_ROLE_KEY, FCM_*, etc.) —
   # those should never appear in the bundle in the first place.
   #
-  # VITE_OWNER_EMAIL is a client-side UI gate (useIsOwner) — it's an
-  # email identifier bundled on purpose, not a credential.
+  # VITE_OWNER_EMAIL used to be the client-side UI gate (useIsOwner);
+  # the client no longer reads it, but some functions still fall back to
+  # it for OWNER_EMAIL. An email identifier, not a credential.
   #
   # SUPABASE_URL is the server-side twin of VITE_SUPABASE_URL — same
   # value (the public project endpoint), used by the Netlify functions
