@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { upsertOwnPublicStats, updateOwnProfile } from './queries';
 import { habitElapsed } from '../habits/progress.js';
+import { privacyOn } from './privacy.js';
 
 /**
  * Debounced sync of the user's public-facing data:
@@ -108,7 +109,11 @@ function recentWins(S) {
     .map(a => ({ icon: a.icon || '✨', name: a.name }));
 }
 
-export function usePublishProfile(userId, S, hasPro, visionState) {
+// `hydrated` / `loadError` come from useVisionBoardState. Until the
+// cloud copy has arrived, S is the local backup or the factory seed —
+// publishing that would push a stale or empty card (name blank, level
+// 1, no streak) over the real one for every friend to see.
+export function usePublishProfile(userId, S, hasPro, visionState, { hydrated = false, loadError = null } = {}) {
   // Skip publish entirely if the user has no profile (paywall_schema
   // creates one on first login but we don't want to tightly couple).
   // The first successful run sets `triedRef.current = true` so we
@@ -120,6 +125,7 @@ export function usePublishProfile(userId, S, hasPro, visionState) {
 
   useEffect(() => {
     if (!userId || !S) return;
+    if (!hydrated || loadError) return;
     // The visions hook returns a fallback shape when state hasn't
     // loaded yet; skip until we have a real level.
     const level = visionState?.level || 1;
@@ -130,7 +136,8 @@ export function usePublishProfile(userId, S, hasPro, visionState) {
     // is unchanged; toggling off CLEARS the previous value on the
     // next debounced publish.
     const priv = S.privacy || {};
-    const streak = priv.shareStreak !== false ? currentStreak(S) : null;
+    // Streak is opt-IN (see privacy.js) — it publishes the habit name.
+    const streak = privacyOn(priv, 'shareStreak') ? currentStreak(S) : null;
     const payload = {
       // profiles slice
       display_name: (S.profile?.name || '').trim() || null,
@@ -207,7 +214,7 @@ export function usePublishProfile(userId, S, hasPro, visionState) {
     }, 4000);
 
     return () => clearTimeout(timerRef.current);
-  }, [userId, S, hasPro, visionState]);
+  }, [userId, S, hasPro, visionState, hydrated, loadError]);
 
   // ── Presence heartbeat ─────────────────────────────────────────
   // The debounced publish above only fires when state CHANGES. If

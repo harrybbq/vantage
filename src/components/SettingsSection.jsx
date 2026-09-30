@@ -15,6 +15,8 @@ import { VISIONS_BY_ID } from '../lib/visions/definitions';
 import Icon from './Icon';
 import TravelPolicyCard from './holiday/TravelPolicyCard';
 import { authFetch } from '../lib/authFetch';
+import { clearLocalUserData } from '../lib/state/clearLocal';
+import { privacyOn, privacyToggle } from '../lib/friends/privacy';
 
 // Small helper: inline icon + label for the Tools/Data action buttons.
 const IconLabel = ({ name, children, size = 15 }) => (
@@ -471,7 +473,7 @@ function FriendsPrivacyCard({ userId, S, update }) {
         }}>What friends see on your profile card</div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
           {SHARE_TOGGLES.map(t => {
-            const on = S?.privacy?.[t.id] !== false;
+            const on = privacyOn(S?.privacy, t.id);
             return (
               <label key={t.id} style={{
                 display: 'flex', alignItems: 'center', gap: 12,
@@ -485,7 +487,7 @@ function FriendsPrivacyCard({ userId, S, update }) {
                   checked={on}
                   onChange={() => update(prev => ({
                     ...prev,
-                    privacy: { ...(prev.privacy || {}), [t.id]: !on },
+                    privacy: privacyToggle(prev.privacy, t.id),
                   }))}
                   style={{ width: 16, height: 16, accentColor: 'var(--em)', cursor: 'pointer' }}
                 />
@@ -594,6 +596,10 @@ export default function SettingsSection({ S, update, active, userId, userEmail, 
       });
       const out = await res.json().catch(() => ({}));
       if (!res.ok || !out.ok) throw new Error(out.error || 'Deletion failed.');
+      // The account is gone server-side, so this device's copies of it
+      // go too (item 56) — backup, pictures, pending edit, breadcrumb,
+      // SW caches. Only after the server confirms.
+      await clearLocalUserData(userId, { deleted: true });
       // Only sign out once the server confirms — otherwise the user is
       // logged out believing they're deleted when they aren't.
       await supabase.auth.signOut();

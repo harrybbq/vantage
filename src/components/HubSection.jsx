@@ -1,5 +1,7 @@
 import { useEffect, useRef, useCallback, useState, lazy, Suspense } from 'react';
 import { createRoot } from 'react-dom/client';
+import WidgetBoundary from './WidgetBoundary';
+import { readPhotoFile } from '../lib/image/compress';
 import { motion } from 'framer-motion';
 import { VitalsBody, BurnBody, MacrosBody } from './mobile/MobileWidget';
 import { BodyBody, SubscriptionsBody } from './widgets/LifeWidgets';
@@ -692,7 +694,14 @@ export default function HubSection({ S, update, active, onOpenModal, onOpenWaitl
     onNavigate && onNavigate('diet');
   }, [onNavigate]);
 
+  // Every island body sits inside its own boundary: one widget throwing
+  // shows a "Reload widget" card in its own box instead of emptying the
+  // island (each island is a separate React root, so an uncaught throw
+  // unmounted it silently).
   function reactWidgetEl(hw) {
+    return <WidgetBoundary name={hw.type}>{reactWidgetBody(hw)}</WidgetBoundary>;
+  }
+  function reactWidgetBody(hw) {
     if (primeOf(hw)) {
       return (
         <PrimeFit
@@ -871,14 +880,18 @@ export default function HubSection({ S, update, active, onOpenModal, onOpenWaitl
   // write-back lands.
   const isOsLayout = isOsLayoutTheme(resolveEffectiveTheme(S.theme));
 
-  function handleUploadPhoto(e) {
+  // Downscaled to 512px before it reaches state — the raw camera file
+  // was ~5 MB and rode along with every save (see lib/image/compress).
+  async function handleUploadPhoto(e) {
     const file = e.target.files[0];
+    e.target.value = '';
     if (!file) return;
-    const r = new FileReader();
-    r.onload = ev => {
-      update(prev => ({ ...prev, profile: { ...prev.profile, photo: ev.target.result } }));
-    };
-    r.readAsDataURL(file);
+    const photo = await readPhotoFile(file);
+    if (!photo) {
+      alert('That image couldn\'t be read. Try a JPEG or PNG.');
+      return;
+    }
+    update(prev => ({ ...prev, profile: { ...prev.profile, photo } }));
   }
 
   function handleToggleSnap() {

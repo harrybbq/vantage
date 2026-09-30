@@ -3,6 +3,7 @@ import { DEFAULT_STATE } from '../data/initialState';
 import { supabase } from '../lib/supabase';
 import { mergeState, sameValue } from '../lib/state/merge';
 import { hasMeaningfulData, looksLikeFactoryDefault, meaningfulEvidence } from '../lib/state/meaningful';
+import { reportError } from '../lib/telemetry/reportError';
 
 // Keys that are only relevant to the current session — never persisted
 const TRANSIENT_KEYS = [
@@ -137,10 +138,50 @@ async function loadFromCloud(userId) {
   // `raw` is the stored state without the defaults folded in — the exact
   // thing the next write is compared against, so a merge base is what
   // was actually saved rather than what the app filled in around it.
-  return { kind: 'loaded', state, updatedAt: data.updated_at || null, raw: data.state };
+  return { kind: 'loaded', state, updatedAt: data.updated_at || null, raw: data.state, photo: data.photo || null };
 }
 
-async function saveToCloud(userId, state, { allowEmpty = false, fromBackup = false, baseUpdatedAt = null } = {}) {
+/** Just the version stamp — a few bytes instead of the ~1 MB row. The
+ *  poll asks this first and only downloads the state when it moved. */
+async function readUpdatedAt(userId) {
+  const { data, error } = await supabase
+    .from('user_data').select('updated_at').eq('id', userId).maybeSingle();
+  if (error) throw error;
+  return data ? (data.updated_at || null) : undefined;
+}
+
+/**
+ * Clear the stored profile photo — the only path that ever writes a null
+ * to the photo column, reached only from the explicit "Remove photo"
+ * action (see clearPhotoRef in the hook).
+ *
+ * Re-reads the row first and clears ONLY if the column still holds the
+ * very photo the user was looking at when they pressed remove. If
+ * another device has set a different photo since, that newer choice
+ * stands. A photo column that is already empty needs no write.
+ *
+ * Touches the photo column alone: the state and its updated_at are left
+ * exactly as they are, so this can't disturb the compare-and-set of the
+ * next state save.
+ */
+async function clearCloudPhoto(userId, expected) {
+  if (!expected) return 'nothing_to_clear';
+  const { data, error } = await supabase
+    .from('user_data').select('photo').eq('id', userId).maybeSingle();
+  if (error) throw error;
+  if (!data || !data.photo) return 'already_clear';
+  if (data.photo !== expected) return 'changed_elsewhere';
+  const { error: wErr } = await supabase.from('user_data').update({ photo: null }).eq('id', userId);
+  if (wErr) throw wErr;
+  return 'cleared';
+}
+
+// `photo`: undefined → the legacy rule (send the state's photo if it has
+// one); false → leave the column alone; a string → send exactly that.
+// The debounced path passes false unless the photo actually changed —
+// re-sending an unchanged multi-megabyte photo on every save was half of
+// audit item 59.
+async function saveToCloud(userId, state, { allowEmpty = false, fromBackup = false, baseUpdatedAt = null, photo: photoOpt } = {}) {
   // A state descended from the local backup is missing the photo and
   // the backgrounds. Writing one replaces the real thing with the gap.
   // Only the explicit user-confirmed restore may do it knowingly.
@@ -153,7 +194,7 @@ async function saveToCloud(userId, state, { allowEmpty = false, fromBackup = fal
 
   const stateToSave = stripForSave(state);
   delete stateToSave.__slim;   // never let the marker reach the database
-  const photo = state.profile?.photo || null;
+  const photo = photoOpt === undefined ? (state.profile?.photo || null) : (photoOpt || null);
 
   // ── Definitive anti-wipe guard (read-before-write) ──────────────────
   // If we're about to persist a factory-default-looking state, re-read
@@ -183,8 +224,8 @@ async function saveToCloud(userId, state, { allowEmpty = false, fromBackup = fal
   // falsy value here means "we don't have it loaded", never "the user
   // removed it", and writing the null is always destructive. Omitting
   // the column leaves the stored value alone (upsert only SETs the keys
-  // it is given). If a delete-photo feature is ever added it must pass
-  // an explicit flag rather than relying on a falsy value.
+  // it is given). Removing a photo is the explicit `clearPhotoRef` path
+  // (clearCloudPhoto), never a falsy value arriving here.
   const row = {
     id: userId,
     state: stateToSave,
@@ -505,6 +546,25 @@ export function useVisionBoardState(userId) {
   // morning's load silently reverts it.
   const pendingStateRef = useRef(null);
   const lastRefreshRef = useRef(0);
+  // The photo the cloud row is known to hold (as loaded, or as last
+  // sent). A save only includes the photo column when the state's photo
+  // differs from this — otherwise it is omitted and the column is left
+  // alone.
+  const lastPhotoRef = useRef(null);
+  // Set only by the explicit "Remove photo" action (update's
+  // { clearPhoto: true }). Holds the photo that was on screen when the
+  // user pressed it; clearCloudPhoto clears the column only if it still
+  // holds that one.
+  const clearPhotoRef = useRef(null);
+  // Save-failure bookkeeping for the retry loop and the "Not saved"
+  // indicator. `saveStatus` is null while saves are landing.
+  const retryTimer = useRef(null);
+  const failuresRef = useRef(0);
+  const [saveStatus, setSaveStatus] = useState(null);
+  // update()'s debounce and the retry timer outlive the render that
+  // scheduled them; they read the current load error through this.
+  const loadErrorRef = useRef(loadError);
+  loadErrorRef.current = loadError;
 
   useEffect(() => {
     if (!userId) return;
@@ -579,6 +639,7 @@ export function useVisionBoardState(userId) {
         // measure later edits against.
         baseUpdatedAtRef.current = result.updatedAt;
         baseStateRef.current = result.raw;
+        lastPhotoRef.current = result.photo;
         setS(result.state);
 
         // Discard anything queued against the OPTIMISTIC state.
@@ -607,6 +668,9 @@ export function useVisionBoardState(userId) {
         // change the user can no longer see.
         dirtyRef.current = false;
         pendingStateRef.current = null;
+        // Including a "Remove photo" pressed on the optimistic paint —
+        // the photo it removed was the cached copy, not a loaded one.
+        clearPhotoRef.current = null;
 
         // ── Replay an edit the last session never got to save ────────
         // A page killed inside the debounce window leaves its state in
@@ -702,6 +766,7 @@ export function useVisionBoardState(userId) {
           const firstAt = await saveToCloud(userId, initial);
           baseUpdatedAtRef.current = firstAt;
           baseStateRef.current = stripForSave(initial);
+          lastPhotoRef.current = initial.profile?.photo || null;
         } catch (e) {
           if (cancelled) return;
           setLoadError({
@@ -770,11 +835,27 @@ export function useVisionBoardState(userId) {
 
     async function refresh() {
       if (typeof document !== 'undefined' && document.visibilityState !== 'visible') return;
-      if (dirtyRef.current || loadingRef.current || loadError) return;
+      // A photo removal still waiting to reach the server counts as an
+      // unsaved edit: adopting the cloud copy now would put the removed
+      // photo back on screen, and the next save would re-send it.
+      if (dirtyRef.current || loadingRef.current || loadError || clearPhotoRef.current) return;
       // Throttle — at most once per 8s, so rapid focus toggles don't hammer.
       const now = Date.now();
       if (now - lastRefreshRef.current < 8000) return;
       lastRefreshRef.current = now;
+
+      // Ask for the version stamp first. The row is ~1 MB with the photo
+      // and this runs every minute a tab is visible; when nothing has
+      // been written since our copy, a few bytes answer the question.
+      // Any doubt (no base yet, a read error) falls through to the full
+      // load, which is exactly what this did before.
+      if (baseUpdatedAtRef.current) {
+        try {
+          const stamp = await readUpdatedAt(userId);
+          if (stamp && stamp === baseUpdatedAtRef.current) return;
+        } catch { /* fall through to the full read */ }
+        if (cancelled || dirtyRef.current) return;
+      }
 
       let result;
       try {
@@ -798,6 +879,7 @@ export function useVisionBoardState(userId) {
         }
         baseUpdatedAtRef.current = result.updatedAt;
         baseStateRef.current = result.raw;
+        lastPhotoRef.current = result.photo;
         setS(result.state);
       }
     }
@@ -851,14 +933,21 @@ export function useVisionBoardState(userId) {
   const persist = useCallback(async (uid, next, { allowEmpty = false } = {}) => {
     const base = casBrokenRef.current ? null : baseUpdatedAtRef.current;
 
-    const accept = (savedAt, state) => {
+    const accept = (savedAt, state, sentPhoto) => {
       baseUpdatedAtRef.current = savedAt;
       baseStateRef.current = stripForSave(state);
+      if (sentPhoto) lastPhotoRef.current = sentPhoto;
     };
+    // The photo column is written only when this device's photo differs
+    // from what the row is known to hold — i.e. the user just picked a
+    // new one. Everything else omits it (false), leaving it untouched.
+    const mine = next.profile?.photo || null;
+    const photoChanged = !!mine && mine !== lastPhotoRef.current;
+    const photoOpt = photoChanged ? mine : false;
 
     try {
-      const savedAt = await saveToCloud(uid, next, { allowEmpty, baseUpdatedAt: base });
-      accept(savedAt, next);
+      const savedAt = await saveToCloud(uid, next, { allowEmpty, baseUpdatedAt: base, photo: photoOpt });
+      accept(savedAt, next, photoOpt);
       return { ok: true };
     } catch (err) {
       if (err?.code !== 'CONFLICT') throw err;
@@ -874,8 +963,8 @@ export function useVisionBoardState(userId) {
           + 'updated_at predicate is not working. Falling back to unconditional writes for '
           + 'this session: saving still works, cross-device protection is OFF.',
         );
-        const savedAt = await saveToCloud(uid, next, { allowEmpty, baseUpdatedAt: null });
-        accept(savedAt, next);
+        const savedAt = await saveToCloud(uid, next, { allowEmpty, baseUpdatedAt: null, photo: photoOpt });
+        accept(savedAt, next, photoOpt);
         return { ok: true, degraded: true };
       }
 
@@ -885,12 +974,16 @@ export function useVisionBoardState(userId) {
       );
       // stripForSave nulls the photo because it lives in its own column;
       // the state the app holds must not carry that null back.
+      // A photo this device just picked wins; otherwise the row's photo
+      // does — including a row whose photo another device removed, which
+      // must not be resurrected from this device's in-memory copy.
       const onScreen = addTransient({ ...DEFAULT_STATE, ...merged });
-      const photo = next.profile?.photo || fresh.state.profile?.photo || null;
+      const photo = photoChanged ? mine : (fresh.photo || null);
       if (photo) onScreen.profile = { ...onScreen.profile, photo };
+      if (!photoChanged) lastPhotoRef.current = fresh.photo || null;
 
-      const savedAt = await saveToCloud(uid, onScreen, { allowEmpty, baseUpdatedAt: fresh.updatedAt });
-      accept(savedAt, onScreen);
+      const savedAt = await saveToCloud(uid, onScreen, { allowEmpty, baseUpdatedAt: fresh.updatedAt, photo: photoOpt });
+      accept(savedAt, onScreen, photoOpt);
       setS(onScreen);
       pendingStateRef.current = null;
       if (conflicts.length) {
@@ -900,6 +993,141 @@ export function useVisionBoardState(userId) {
       return { ok: true, merged: true, conflicts };
     }
   }, []);
+
+  /** Carry out a pending "Remove photo" (see clearCloudPhoto). */
+  const applyPhotoClear = useCallback(async (uid) => {
+    const req = clearPhotoRef.current;
+    if (!req) return;
+    // A photo picked after pressing remove supersedes the removal; the
+    // ordinary save path sends it.
+    if (pendingStateRef.current?.profile?.photo) {
+      if (clearPhotoRef.current === req) clearPhotoRef.current = null;
+      return;
+    }
+    const outcome = await clearCloudPhoto(uid, req.expected);
+    if (clearPhotoRef.current === req) clearPhotoRef.current = null;
+    if (outcome === 'cleared' || outcome === 'already_clear') lastPhotoRef.current = null;
+  }, []);
+
+  /**
+   * One save attempt of `next` (plus any pending photo removal), behind
+   * the same guards the debounce always had. Shared by the debounce, the
+   * retry loop and flushNow so they can't drift apart.
+   *
+   * Throws on failure; returns false when a guard declined to save.
+   */
+  const saveOnce = useCallback(async (uid, next) => {
+    const needState = !!next && dirtyRef.current;
+    if (!needState && !clearPhotoRef.current) return true;
+    // Parked on a load error, or the initial load still in flight: the
+    // in-memory state may be the seed, and saving it would be a wipe.
+    if (loadErrorRef.current || loadingRef.current) return false;
+    // ── Anti-wipe guard ───────────────────────────────────────
+    // Never let an in-memory anomaly overwrite real cloud data
+    // with the factory-default seed. This is the one transition
+    // that is never a legitimate single edit. The user's real
+    // data stays in the cloud; a refresh restores the UI. The
+    // only way past this is an explicit, user-confirmed reset
+    // (startFresh), which flips allowEmptyRef.
+    if (needState && lastGoodMeaningfulRef.current && !allowEmptyRef.current && looksLikeFactoryDefault(next)) {
+      console.error(
+        '[useVisionBoardState] BLOCKED save: refusing to overwrite real data with factory defaults. ' +
+        'Cloud data preserved; reload to restore.'
+      );
+      return false;
+    }
+    if (needState) {
+      await persist(uid, next);
+      // Clean only if nothing newer was queued while this was in flight
+      // (a merge clears the queue itself, hence null). Otherwise that
+      // newer edit's own debounce is still to run and must not find the
+      // flag already down.
+      if (pendingStateRef.current === next || pendingStateRef.current === null) dirtyRef.current = false;
+      clearPending(uid);
+      if (hasMeaningfulData(next)) writeBackup(uid, next);
+    }
+    await applyPhotoClear(uid);
+    return true;
+  }, [persist, applyPhotoClear]);
+
+  /*
+   * Failed saves retry, and say so.
+   *
+   * A failed save used to be logged and forgotten: the edit sat in
+   * memory until another edit happened to trigger another save, and
+   * nothing on screen said the cloud was behind. Now a failure re-arms
+   * a save after 5 s, 15 s, then every minute while the edit is still
+   * unsaved (and immediately when the browser says it is back online),
+   * and after the second failure `saveStatus` is set so the UI can show
+   * "Not saved — retrying". The guards are the debounce's own, via
+   * saveOnce. The two refusals that are decisions rather than accidents
+   * (the wipe and slim guards) are not retried — the same state would be
+   * refused again — they are surfaced as `blocked` and reported.
+   */
+  const runSaveRef = useRef(null);
+  runSaveRef.current = (next) => {
+    const uid = userIdRef.current;
+    if (!uid) return;
+    clearTimeout(retryTimer.current);
+    saveOnce(uid, next).then(
+      done => {
+        if (!done) return;
+        failuresRef.current = 0;
+        setSaveStatus(cur => (cur ? null : cur));
+      },
+      err => {
+        const code = err?.code;
+        console.error('[useVisionBoardState] Save failed — keeping last-known-good:', err?.message || err);
+        if (code === 'WIPE_GUARD' || code === 'SLIM_GUARD') {
+          reportError('save-blocked', err);
+          setSaveStatus({ state: 'blocked', failures: failuresRef.current + 1, at: Date.now() });
+          return;
+        }
+        failuresRef.current += 1;
+        const n = failuresRef.current;
+        reportError('save-failed', err);
+        if (n >= 2) setSaveStatus({ state: 'retrying', failures: n, at: Date.now() });
+        const delay = [5000, 15000, 60000][Math.min(n - 1, 2)];
+        retryTimer.current = setTimeout(() => {
+          if (dirtyRef.current || clearPhotoRef.current) runSaveRef.current(pendingStateRef.current);
+        }, delay);
+      },
+    );
+  };
+
+  useEffect(() => {
+    const onOnline = () => {
+      if (failuresRef.current > 0 && (dirtyRef.current || clearPhotoRef.current)) {
+        runSaveRef.current(pendingStateRef.current);
+      }
+    };
+    window.addEventListener('online', onOnline);
+    return () => {
+      window.removeEventListener('online', onOnline);
+      clearTimeout(retryTimer.current);
+    };
+  }, []);
+
+  /**
+   * Save now and say whether it landed. For the explicit sign-out path,
+   * which is about to clear this device's local copies — including the
+   * pending-edit snapshot that is otherwise the only record of an edit
+   * made in the last 1.5 s. `{ ok: false }` means something is still
+   * unsaved and the caller must ask before discarding it.
+   */
+  const flushNow = useCallback(async () => {
+    clearTimeout(saveTimer.current);
+    clearTimeout(retryTimer.current);
+    const uid = userIdRef.current;
+    if (!uid) return { ok: true };
+    if (!dirtyRef.current && !clearPhotoRef.current) return { ok: true };
+    try {
+      const done = await saveOnce(uid, pendingStateRef.current);
+      return { ok: !!done && !dirtyRef.current && !clearPhotoRef.current };
+    } catch (error) {
+      return { ok: false, error };
+    }
+  }, [saveOnce]);
 
   // ── Flush pending saves when the app is backgrounded ────────────────
   // The 1.5s debounce assumes the JS runtime survives long enough to
@@ -943,7 +1171,12 @@ export function useVisionBoardState(userId) {
     };
   }, [loadError, persist]);
 
-  const update = useCallback((updater) => {
+  // `opts.clearPhoto` is set by the "Remove photo" action and nothing
+  // else: it is what lets that one null reach the server (see
+  // clearCloudPhoto). A null photo arriving any other way is treated as
+  // "not loaded" and never written.
+  const update = useCallback((updater, opts) => {
+    if (opts && opts.clearPhoto) clearPhotoRef.current = { expected: lastPhotoRef.current };
     setS(prev => {
       const next = typeof updater === 'function' ? updater(prev) : { ...prev, ...updater };
 
@@ -957,7 +1190,7 @@ export function useVisionBoardState(userId) {
       if (next === prev) return prev;
 
       // Once this user is known to have real data, remember it so the
-      // save guard below can refuse a regression to factory defaults.
+      // save guard can refuse a regression to factory defaults.
       if (hasMeaningfulData(next)) lastGoodMeaningfulRef.current = true;
 
       // Mark unsaved — blocks focus-refresh from overwriting in-flight
@@ -967,55 +1200,17 @@ export function useVisionBoardState(userId) {
       dirtyRef.current = true;
       pendingStateRef.current = next;
 
-      // Debounce cloud saves — 1.5 s after last change.
+      // Debounce cloud saves — 1.5 s after last change. A retry waiting
+      // on its backoff is superseded: this save carries the same edits
+      // and more. The guards (load error, load in flight, anti-wipe)
+      // live in saveOnce, which runSaveRef goes through.
       clearTimeout(saveTimer.current);
-      saveTimer.current = setTimeout(() => {
-        const uid = userIdRef.current;
-        if (!uid) return;
-
-        // Skip if parked on a load error — saving now could overwrite
-        // the very data we're trying not to clobber.
-        if (loadError) return;
-
-        // Skip while the initial load is still in flight — the
-        // in-memory state is the default seed until real data arrives,
-        // and persisting it would be a wipe. (Closes the load race.)
-        if (loadingRef.current) return;
-
-        // ── Anti-wipe guard ───────────────────────────────────────
-        // Never let an in-memory anomaly overwrite real cloud data
-        // with the factory-default seed. This is the one transition
-        // that is never a legitimate single edit. The user's real
-        // data stays in the cloud; a refresh restores the UI. The
-        // only way past this is an explicit, user-confirmed reset
-        // (startFresh), which flips allowEmptyRef.
-        if (
-          lastGoodMeaningfulRef.current &&
-          !allowEmptyRef.current &&
-          looksLikeFactoryDefault(next)
-        ) {
-          console.error(
-            '[useVisionBoardState] BLOCKED save: refusing to overwrite real data with factory defaults. ' +
-            'Cloud data preserved; reload to restore.'
-          );
-          return;
-        }
-
-        persist(uid, next)
-          .then(() => {
-            // Successful write is a new known-good snapshot.
-            dirtyRef.current = false;
-            clearPending(uid);
-            if (hasMeaningfulData(next)) writeBackup(uid, next);
-          })
-          .catch(err => {
-            console.error('[useVisionBoardState] Save failed — keeping last-known-good:', err?.message || err);
-          });
-      }, 1500);
+      clearTimeout(retryTimer.current);
+      saveTimer.current = setTimeout(() => runSaveRef.current(next), 1500);
 
       return next;
     });
-  }, [loadError, persist]);
+  }, []);
 
   function dismissMigrationBanner() {
     setJustMigrated(false);
@@ -1093,6 +1288,7 @@ export function useVisionBoardState(userId) {
     try {
       clearUserSeen(uid);
       const restoredAt = await saveToCloud(uid, restored, { fromBackup: true });
+      if (restored.profile?.photo) lastPhotoRef.current = restored.profile.photo;
       baseUpdatedAtRef.current = restoredAt;
       baseStateRef.current = stripForSave(restored);
       clearPending(uid);
@@ -1120,5 +1316,9 @@ export function useVisionBoardState(userId) {
     // rather than another trip through this file.
     mergeNotice,
     dismissMergeNotice: () => setMergeNotice(null),
+    // null while saves land; { state: 'retrying' | 'blocked', failures }
+    // after repeated failures. Rendered by SaveStatusPill.
+    saveStatus,
+    flushNow,
   };
 }
