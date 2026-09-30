@@ -1898,7 +1898,12 @@ async function loadLivePreviewIntoLink(linkId, url) {
     if (data && data.imageUrl) {
       // Both values come back from a scrape of a third-party page, so
       // both go through safeUrl before reaching outerHTML.
-      hero.outerHTML = `<a class="link-island-live-hero" href="${safeUrl(url)}" target="_blank" rel="noreferrer"><img src="${safeUrl(data.imageUrl)}" alt="" loading="lazy" onerror="this.style.display='none'"></a>`;
+      // The error handler is attached, not an inline onerror=, so the
+      // CSP can be enforced without 'unsafe-inline' (item 60). Same
+      // task as the insert, so it is in place before any load settles.
+      hero.outerHTML = `<a class="link-island-live-hero" href="${safeUrl(url)}" target="_blank" rel="noreferrer"><img src="${safeUrl(data.imageUrl)}" alt="" loading="lazy"></a>`;
+      const img = body.querySelector('.link-island-live-hero img');
+      if (img) img.addEventListener('error', () => { img.style.display = 'none'; });
     } else if (data && data.notes) {
       hero.outerHTML = `<div class="link-island-notes">${escapeHtml(data.notes)}</div>`;
     } else {

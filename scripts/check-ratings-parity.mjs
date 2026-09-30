@@ -157,7 +157,37 @@ function* cases() {
     vitalsLog: Object.fromEntries(Array.from({ length: 300 }, (_, i) => [ymd(now - i * DAY), { weight: 82 }])),
     burnLog: Object.fromEntries(Array.from({ length: 300 }, (_, i) => [ymd(now - i * DAY), [{ kcal: 450 }]])),
   }, 8, 200, now - 365 * DAY];
+
+  // ── Vision stamps vs account age (2026-09-30) ──
+  // Stamps as the app writes them ({ unlockedAt }), ISO strings (as
+  // above), and undated — all three shapes, on both sides.
+  const stampAll = at => Object.fromEntries(VISIONS.map((v, i) => [v.id,
+    i % 3 === 0 ? { unlockedAt: new Date(at).toISOString() } : i % 3 === 1 ? new Date(at).toISOString() : true]));
+  yield ['every vision stamped on a day-old account', { visions: stampAll(now) }, 0, 0, now - DAY];
+  yield ['every vision stamped on a fresh account', { visions: stampAll(now) }, 0, 0, now - 60_000];
+  yield ['visions stamped before the account and in the future', {
+    visions: {
+      ...Object.fromEntries(VISIONS.slice(0, 10).map(v => [v.id, { unlockedAt: new Date(now - 400 * DAY).toISOString() }])),
+      ...Object.fromEntries(VISIONS.slice(10, 20).map(v => [v.id, new Date(now + 30 * DAY).toISOString()])),
+      ...Object.fromEntries(VISIONS.slice(20).map(v => [v.id, { unlockedAt: now - 5 * DAY }])),
+    },
+  }, 0, 0, now - 60 * DAY];
+  yield ['every vision, honest two-year-old account', {
+    trackers, logs: mkLogs(400), visions: stampAll(now - 10 * DAY),
+  }, 5, 100, now - 730 * DAY];
 }
+
+/* What an honest user can stamp on day one — self-checks, savings,
+   holidays, habits, coins, achievements, a wearable/food backfill, and
+   every habit streak (a habit's start date can predate the account).
+   4,550 xp; the ceiling on a brand-new account is 5,000. */
+const DAY_ONE_VISIONS = [
+  'check-brain', 'check-finance', 'check-fitness', 'check-social',
+  'savings-first', 'savings-goals-3', 'savings-1k', 'savings-10k',
+  'coins-1k', 'coins-5k', 'holiday-planned', 'holiday-done', 'habits-3',
+  'ach-3', 'ach-10', 'ach-25', 'vitals-7', 'macros-7',
+  'streak-7', 'streak-30', 'streak-100', 'streak-365',
+];
 
 /* Behaviour, not just agreement: a sanitised state must score exactly
    what its clean half scores, on both sides. Parity alone would pass if
@@ -179,6 +209,23 @@ function* behaviourCases() {
   // so at most six keys (days -5 .. 0) can count.
   yield ['pre-account history adds nothing', { trackers, logs: old }, { trackers, logs: recent },
     { createdAt: now - 4 * DAY }, {}];
+
+  // Vision stamps outside the account's life are dropped: the dirty
+  // state scores exactly its in-life half.
+  const inLife = Object.fromEntries(VISIONS.slice(0, 6).map(v => [v.id, { unlockedAt: new Date(now - 3 * DAY).toISOString() }]));
+  const outOfLife = {
+    ...inLife,
+    ...Object.fromEntries(VISIONS.slice(6, 14).map(v => [v.id, { unlockedAt: new Date(now - 90 * DAY).toISOString() }])),
+    ...Object.fromEntries(VISIONS.slice(14, 20).map(v => [v.id, new Date(now + 3 * DAY).toISOString()])),
+  };
+  const ctx30 = { createdAt: now - 30 * DAY };
+  yield ['pre-account and future vision stamps add nothing', { visions: outOfLife }, { visions: inLife }, ctx30, ctx30];
+
+  // The ceiling never touches an honest day one: the day-one set on a
+  // minutes-old account scores what it scores with no age known at all.
+  const dayOne = Object.fromEntries(DAY_ONE_VISIONS.map(id => [id, { unlockedAt: new Date(now).toISOString() }]));
+  yield ['honest day-one visions are not capped', { visions: dayOne }, { visions: dayOne },
+    { createdAt: now - 60_000 }, {}];
 }
 
 const TOLERANCE = 1;
@@ -222,6 +269,36 @@ for (const [name, dirty, clean, dirtyCtx, cleanCtx] of behaviourCases()) {
   const open = serverDerive(S, 0, {}, 0, null).fitness;
   checked++;
   if (!(capped < open / 2)) failures.push(`age cap: 10-day account scored ${capped}, uncapped ${open}`);
+}
+
+// Every vision stamped on a day-old account: the xp ceiling binds, on
+// both sides, and by the same amount.
+{
+  const now = Date.now();
+  const S = { visions: Object.fromEntries(VISIONS.map(v => [v.id, { unlockedAt: new Date(now).toISOString() }])) };
+  const total = VISIONS.reduce((s, v) => s + (v.xp || 0), 0);
+  for (const [side, capped, open] of [
+    ['app', clientDerive(S, { createdAt: now - DAY }), clientDerive(S, {})],
+    ['leaderboard', serverDerive(S, 0, {}, 0, now - DAY), serverDerive(S, 0, {}, 0, null)],
+  ]) {
+    checked++;
+    if (!(total > 5100 && capped.ovr < open.ovr)) {
+      failures.push(`vision ceiling (${side}): day-old account ovr ${capped.ovr}, uncapped ${open.ovr}, catalogue ${total} xp`);
+    }
+  }
+}
+
+// The two copies of the vision ceiling constants must agree — a drift
+// here moves the leaderboard without moving the app.
+{
+  const read = f => readFileSync(join(root, f), 'utf8');
+  const pick = (src, name) => (src.match(new RegExp(`const ${name} = ([\\d_]+);`)) || [])[1];
+  for (const name of ['VISION_XP_BASE', 'VISION_XP_PER_DAY']) {
+    checked++;
+    const a = pick(read('src/lib/ratings/derive.js'), name);
+    const b = pick(read('netlify/lib/recompute.js'), name);
+    if (!a || a !== b) failures.push(`${name}: derive.js ${a}, recompute.js ${b}`);
+  }
 }
 
 if (failures.length) {

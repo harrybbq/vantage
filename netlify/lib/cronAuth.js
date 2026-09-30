@@ -35,7 +35,42 @@ function safeEqual(a, b) {
   try { return timingSafeEqual(A, B); } catch { return false; }
 }
 
-/** True when this looks like the platform's own invocation. */
+/**
+ * True when this looks like the platform's own invocation.
+ *
+ * ── The `next_run` branch (item 48) — kept, on purpose ────────────────
+ * The audit asked for it to be deleted, because any HTTP client can
+ * POST `{"next_run":"x"}`. It stays until the platform's own shape is
+ * confirmed, because deleting the branch Netlify actually uses would
+ * silently stop push-dispatch, snapshot-ratings, the wearable crons and
+ * settle-leagues: requireScheduler would 401 every scheduled run.
+ *
+ * What was checked (2026-09-30): no @netlify/functions or netlify-cli
+ * is installed in this repo, so there is no primary source to read
+ * here. What Netlify's docs are understood to say — UNVERIFIED from
+ * this repo:
+ *   · a scheduled invocation of a v1 `handler` arrives as a POST whose
+ *     body is JSON with a `next_run` timestamp;
+ *   · scheduled functions run only on the published deploy and are not
+ *     invokable through their URL in production (local testing goes
+ *     through `netlify functions:invoke`, which forges the same body).
+ * netlify-cli's local emulation also sends `User-Agent: Netlify
+ * Clockwork` and, in some versions, an `x-nf-event: schedule` header.
+ * Neither is a platform-only signal: a user agent is set by the
+ * client, and nothing documented says Netlify strips an inbound
+ * `x-nf-event` from public requests. Requiring either would only add a
+ * way to break the crons, so the logic below is UNCHANGED.
+ *
+ * The real guard is the second bullet: if scheduled functions are not
+ * URL-reachable in production, this branch is unreachable by an
+ * attacker. To confirm before launch, harmlessly: a plain GET (no
+ * body, no secret) to /.netlify/functions/snapshot-ratings on the live
+ * site. This function's own `{"error":"unauthorized"}` means the URL
+ * reaches it, and this branch must then be gated on a secret (or the
+ * crons moved to v2 `config.schedule`); anything else from Netlify
+ * means it does not. Don't probe with a next_run body — if reachable,
+ * that runs the job.
+ */
 function isSchedulerInvocation(event) {
   if (!event || !event.httpMethod) return true;
   try {

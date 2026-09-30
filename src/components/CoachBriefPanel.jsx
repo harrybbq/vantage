@@ -115,6 +115,18 @@ export default function CoachBriefPanel({ S, update, onCoachAct, userId }) {
           <p>{brief.weekly_review}</p>
         </div>
       )}
+
+      {/* Every brief is model-written from health data (weight, sleep,
+          food), so it says so, and says what it isn't (item 45). */}
+      <p
+        className="coach-brief-disclaimer"
+        style={{
+          margin: '2px 0 0', fontFamily: 'var(--mono)', fontSize: 9,
+          letterSpacing: 1, textTransform: 'uppercase', color: 'var(--text-muted)',
+        }}
+      >
+        AI-generated · not medical advice
+      </p>
     </div>
   );
 }

@@ -145,6 +145,20 @@ function toMs(v) {
   return Number.isFinite(n) && n > 0 ? n : null;
 }
 
+// ── Vision stamps (mirror of netlify/lib/recompute.js, 2026-09-30) ──────
+//
+// Stamps are client-written and the server cannot re-run the checks, so
+// a day-old state could stamp every vision. Two limits from account age,
+// neither of which an honest user meets:
+//   · a stamp dated before the account (a day's slack) or after
+//     tomorrow does not count; undated stamps still do, inside the cap;
+//   · total xp counted ≤ VISION_XP_BASE + VISION_XP_PER_DAY × age in
+//     days, applied as one scale factor across all counted visions.
+// The reasoning behind the numbers is at the same spot in recompute.js.
+// Unknown createdAt: no floor, no cap.
+const VISION_XP_BASE = 5000;
+const VISION_XP_PER_DAY = 100;
+
 function dayWindow(createdAt, now = Date.now()) {
   const created = toMs(createdAt);
   const known = created != null && created <= now;
@@ -152,7 +166,16 @@ function dayWindow(createdAt, now = Date.now()) {
     min: known ? ymd(created - DAY_MS) : null,
     max: ymd(now + DAY_MS),
     cap: known ? Math.floor((now - created) / DAY_MS) + 3 : Infinity,
+    stampFrom: known ? created - DAY_MS : null,
+    stampUntil: now + DAY_MS,
+    visionXpCap: known ? VISION_XP_BASE + VISION_XP_PER_DAY * Math.floor((now - created) / DAY_MS) : Infinity,
   };
+}
+
+/** A vision stamp's time in ms: `{ unlockedAt }`, an ISO string or ms. Null = undated. */
+function stampMs(v) {
+  if (v == null || typeof v === 'boolean') return null;
+  return toMs(typeof v === 'object' ? v.unlockedAt : v);
 }
 
 function isCountableDay(key, win) {
@@ -400,21 +423,36 @@ function macroPoints(macroDays = 0, win = dayWindow(null)) {
  * in `category` contribute (xp / 4) points to that category's rating.
  * Visions without a category contribute equally to ALL categories
  * (rewards general progress).
+ *
+ * Stamps outside the account's lifetime are dropped and the total is
+ * held to the age ceiling — see "Vision stamps" at dayWindow.
  */
-function visionPoints(S, category) {
+function countedVisions(S, win) {
   const stamped = S.visions || {};
-  let points = 0;
+  const ids = [];
+  let xp = 0;
   for (const id of Object.keys(stamped)) {
     const def = VISIONS_BY_ID[id];
-    if (!def) continue;
-    const xp = def.xp || 0;
-    if (!xp) continue;
+    if (!def || !def.xp) continue;
+    const t = stampMs(stamped[id]);
+    if (t != null && (t > win.stampUntil || (win.stampFrom != null && t < win.stampFrom))) continue;
+    ids.push(id);
+    xp += def.xp;
+  }
+  return { ids, scale: xp > win.visionXpCap ? win.visionXpCap / xp : 1 };
+}
+
+function visionPoints(S, category, win = dayWindow(null)) {
+  const { ids, scale } = countedVisions(S, win);
+  let points = 0;
+  for (const id of ids) {
+    const def = VISIONS_BY_ID[id];
     if (def.category && def.category !== category) continue;
     // Uncategorised visions split equally across the 4 categories
     const weight = def.category ? 1 : 0.25;
-    points += (xp / 4) * weight;
+    points += (def.xp / 4) * weight;
   }
-  return points;
+  return points * scale;
 }
 
 // ── Public API ─────────────────────────────────────────────────────────────
@@ -434,7 +472,7 @@ export function deriveRatings(S, ctx = {}) {
     categoryDayPoints(S, 'brain', win) +
     trackerPoints(S, 'brain', win) * 1.0 +
     achievementPoints(S, 'brain') * 2.5 +
-    visionPoints(S, 'brain');
+    visionPoints(S, 'brain', win);
 
   const financePts =
     financeScorePoints(S) +
@@ -442,14 +480,14 @@ export function deriveRatings(S, ctx = {}) {
     savingsPoints(S) +
     trackerPoints(S, 'finance', win) * 1.0 +
     achievementPoints(S, 'finance') * 2.5 +
-    visionPoints(S, 'finance');
+    visionPoints(S, 'finance', win);
 
   const fitnessPts =
     fitnessScorePoints(S) +
     categoryDayPoints(S, 'fitness', win) +
     trackerPoints(S, 'fitness', win) * 1.2 +
     achievementPoints(S, 'fitness') * 2.5 +
-    visionPoints(S, 'fitness') +
+    visionPoints(S, 'fitness', win) +
     vitalsPoints(S, win) +
     burnPoints(S, win) +
     macroPoints(ctx.macroDays, win);
@@ -459,7 +497,7 @@ export function deriveRatings(S, ctx = {}) {
     categoryDayPoints(S, 'social', win) +
     socialPoints(S, friendCount, win) +
     achievementPoints(S, 'social') * 2.5 +
-    visionPoints(S, 'social');
+    visionPoints(S, 'social', win);
 
   const brain   = toRating(brainPts);
   const finance = toRating(financePts);
@@ -487,7 +525,7 @@ export function categoryBreakdown(S, category, ctx = {}) {
         { label: 'Days logged (lifetime)', points: categoryDayPoints(S, 'brain', win) },
         { label: 'Brain trackers',   points: trackerPoints(S, 'brain', win) * 1.0 },
         { label: 'Brain achievements', points: achievementPoints(S, 'brain') * 2.5 },
-        { label: 'Brain visions',    points: visionPoints(S, 'brain') },
+        { label: 'Brain visions',    points: visionPoints(S, 'brain', win) },
       ];
     case 'finance':
       return [
@@ -496,7 +534,7 @@ export function categoryBreakdown(S, category, ctx = {}) {
         { label: 'Savings goals',    points: savingsPoints(S) },
         { label: 'Finance trackers', points: trackerPoints(S, 'finance', win) * 1.0 },
         { label: 'Finance achievements', points: achievementPoints(S, 'finance') * 2.5 },
-        { label: 'Finance visions',  points: visionPoints(S, 'finance') },
+        { label: 'Finance visions',  points: visionPoints(S, 'finance', win) },
       ];
     case 'fitness':
       return [
@@ -504,7 +542,7 @@ export function categoryBreakdown(S, category, ctx = {}) {
         { label: 'Days logged (lifetime)', points: categoryDayPoints(S, 'fitness', win) },
         { label: 'Fitness trackers', points: trackerPoints(S, 'fitness', win) * 1.2 },
         { label: 'Fitness achievements', points: achievementPoints(S, 'fitness') * 2.5 },
-        { label: 'Fitness visions',  points: visionPoints(S, 'fitness') },
+        { label: 'Fitness visions',  points: visionPoints(S, 'fitness', win) },
         { label: 'Vitals log days',  points: vitalsPoints(S, win) },
         { label: 'Activity burn',    points: burnPoints(S, win) },
         { label: 'On-target macro days', points: macroPoints(ctx.macroDays, win) },
@@ -515,7 +553,7 @@ export function categoryBreakdown(S, category, ctx = {}) {
         { label: 'Days logged (lifetime)', points: categoryDayPoints(S, 'social', win) },
         { label: 'Friends + activity', points: socialPoints(S, friendCount, win) },
         { label: 'Social achievements', points: achievementPoints(S, 'social') * 2.5 },
-        { label: 'Social visions',   points: visionPoints(S, 'social') },
+        { label: 'Social visions',   points: visionPoints(S, 'social', win) },
       ];
     default:
       return [];

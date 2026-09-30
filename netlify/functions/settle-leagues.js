@@ -40,6 +40,7 @@ const { requireScheduler } = require('../lib/cronAuth');
 const {
   sb, fetchBaselines, memberScore, groupScore, rankGroups, weekStart, COIN_AWARD, DIVISIONS,
 } = require('../lib/leagues');
+const { pageAll, inChunks } = require('../lib/pgPage');
 
 const CORS = { 'Access-Control-Allow-Origin': '*', 'Content-Type': 'application/json' };
 const DAY_MS = 86_400_000;
@@ -74,13 +75,21 @@ exports.handler = async (event) => {
     return { statusCode: 200, headers: CORS, body: JSON.stringify({ ok: true, weekStart: weekKey, alreadySettled: true }) };
   }
 
-  const gRes = await sb(env.supabaseUrl, env.serviceKey,
-    '/rest/v1/groups?select=id,name,division,created_at');
-  if (!gRes.ok) {
-    console.error('settle-leagues: groups read failed', gRes.status);
+  /* Every multi-row read below is paged (lib/pgPage.js, 2026-09-30).
+     PostgREST returns at most 1000 rows and says nothing about the
+     rest, and here "the rest" would have been groups that were never
+     scored and members who were never counted — settled for good. A
+     page that fails fails the whole read, which stops the run before
+     anything is written, exactly like a failed single read did. */
+  let groups;
+  try {
+    groups = await pageAll((offset, limit) => sb(env.supabaseUrl, env.serviceKey,
+      `/rest/v1/groups?select=id,name,division,created_at&order=id&limit=${limit}&offset=${offset}`),
+    { what: 'settle groups' });
+  } catch (e) {
+    console.error('settle-leagues: groups read failed', e?.status);
     return { statusCode: 500, headers: CORS, body: JSON.stringify({ error: 'read failed — not settled' }) };
   }
-  const groups = await gRes.json();
   if (!groups.length) {
     return { statusCode: 200, headers: CORS, body: JSON.stringify({ ok: true, weekStart: weekKey, groups: 0 }) };
   }
@@ -90,17 +99,29 @@ exports.handler = async (event) => {
     return { statusCode: 502, headers: CORS, body: JSON.stringify({ error: 'read failed — not settled' }) };
   };
 
-  const mRes = await sb(env.supabaseUrl, env.serviceKey, '/rest/v1/group_members?select=group_id,user_id,joined_at');
-  if (!mRes.ok) return readFailed('memberships');
-  const memberships = await mRes.json();
+  let memberships;
+  try {
+    // Ordered on the full row key so no membership repeats or slips
+    // between pages.
+    memberships = await pageAll((offset, limit) => sb(env.supabaseUrl, env.serviceKey,
+      `/rest/v1/group_members?select=group_id,user_id,joined_at&order=group_id,user_id&limit=${limit}&offset=${offset}`),
+    { what: 'settle memberships' });
+  } catch {
+    return readFailed('memberships');
+  }
   const ids = Array.from(new Set(memberships.map(m => m.user_id)));
 
   let byId = new Map(), baselines = new Map();
   if (ids.length) {
-    const pRes = await sb(env.supabaseUrl, env.serviceKey,
-      `/rest/v1/profiles?id=in.(${ids.join(',')})&select=id,ratings_ovr`);
-    if (!pRes.ok) return readFailed('profiles');
-    byId = new Map((await pRes.json()).map(p => [p.id, p]));
+    let profiles;
+    try {
+      profiles = await inChunks(ids, (csv, offset, limit) => sb(env.supabaseUrl, env.serviceKey,
+        `/rest/v1/profiles?id=in.(${csv})&select=id,ratings_ovr&order=id&limit=${limit}&offset=${offset}`),
+      { what: 'settle profiles' });
+    } catch {
+      return readFailed('profiles');
+    }
+    byId = new Map(profiles.map(p => [p.id, p]));
     try {
       baselines = await fetchBaselines(ids, env, from, { strict: true });
     } catch {
