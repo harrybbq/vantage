@@ -192,9 +192,16 @@ export function applyScheme(scheme) {
 // Per-field profile-card privacy toggles. Live in S.privacy (no
 // schema migration); usePublishProfile reads them and zeroes-out
 // hidden fields on the next debounced publish.
+//
+// `defaultOn: false` means an ABSENT value reads as off. The streak card
+// publishes the habit's name — "12d Alcohol" tells every friend what
+// someone is quitting — so it has to be switched on, not left on
+// (audit item 68). An explicit true already in someone's state is kept;
+// nothing is written for existing accounts. usePublishProfile applies
+// the same rule, so the toggle and what friends see can't disagree.
 const SHARE_TOGGLES = [
   { id: 'shareAvatar',   label: 'Profile photo',         desc: 'Your uploaded photo. Off shows your @handle initial instead.' },
-  { id: 'shareStreak',   label: 'Active habit streak',  desc: 'Days clean + habit name (e.g. "12d Alcohol").' },
+  { id: 'shareStreak',   label: 'Active habit streak',  desc: 'Days clean + habit name (e.g. "12d Alcohol"). Off unless you turn it on.', defaultOn: false },
   { id: 'shareHeatmap',  label: '91-day activity heatmap', desc: 'Coloured grid of days you logged anything.' },
   { id: 'shareWins',     label: 'Recent achievement wins', desc: 'Last 3 completed achievements with their icons.' },
   { id: 'sharePresence', label: 'Online status',         desc: 'Green dot when you\'re active in the last 3 minutes.' },
@@ -221,11 +228,15 @@ function FriendsPrivacyCard({ userId, S, update }) {
         // editing the friends query module.
         const p = await getOwnProfile(userId);
         if (cancelled) return;
-        setSearchable(p?.is_searchable ?? true);
+        // A missing value is shown as OFF: new accounts are created with
+        // both of these false (audit item 68), and a toggle that claims
+        // "on" for a value it never read is how someone ends up findable
+        // without knowing. Real stored values show as they are.
+        setSearchable(p?.is_searchable ?? false);
         setHandle(p?.handle || null);
         const optRes = await supabase.from('profiles')
           .select('leaderboard_optin').eq('id', userId).maybeSingle();
-        if (!cancelled) setLeaderboardOptin(optRes.data?.leaderboard_optin ?? true);
+        if (!cancelled) setLeaderboardOptin(optRes.data?.leaderboard_optin ?? false);
         // leaderboard_color is a separate, best-effort read so a missing
         // column (migration not applied) doesn't break the card.
         const colRes = await supabase.from('profiles')
@@ -329,7 +340,7 @@ function FriendsPrivacyCard({ userId, S, update }) {
         </span>
       </label>
 
-      {/* Global leaderboard opt-in. Defaults true. Off → caller is
+      {/* Global leaderboard opt-in. Off for new accounts. Off → caller is
           excluded from global queries entirely (friends scope unaffected,
           friendship is the consent). */}
       <label
@@ -459,8 +470,8 @@ function FriendsPrivacyCard({ userId, S, update }) {
         </div>
       )}
 
-      {/* Per-field profile-card toggles. Defaults all ON (existing
-          behavior). Toggling OFF clears the field on the next 4s
+      {/* Per-field profile-card toggles. On unless switched off, except
+          the habit streak (see SHARE_TOGGLES). Toggling OFF clears the field on the next 4s
           debounced publish — friends will see the empty value the
           next time they refresh the rail. */}
       <div style={{
@@ -472,7 +483,9 @@ function FriendsPrivacyCard({ userId, S, update }) {
         }}>What friends see on your profile card</div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
           {SHARE_TOGGLES.map(t => {
-            const on = S?.privacy?.[t.id] !== false;
+            const on = t.defaultOn === false
+              ? S?.privacy?.[t.id] === true
+              : S?.privacy?.[t.id] !== false;
             return (
               <label key={t.id} style={{
                 display: 'flex', alignItems: 'center', gap: 12,

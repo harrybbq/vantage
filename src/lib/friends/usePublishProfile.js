@@ -130,7 +130,9 @@ export function usePublishProfile(userId, S, hasPro, visionState) {
     // is unchanged; toggling off CLEARS the previous value on the
     // next debounced publish.
     const priv = S.privacy || {};
-    const streak = priv.shareStreak !== false ? currentStreak(S) : null;
+    // Opt-IN, unlike the others: the streak carries the habit's name.
+    // Must match SHARE_TOGGLES in SettingsSection (defaultOn: false).
+    const streak = priv.shareStreak === true ? currentStreak(S) : null;
     const payload = {
       // profiles slice
       display_name: (S.profile?.name || '').trim() || null,
