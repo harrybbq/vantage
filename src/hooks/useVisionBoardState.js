@@ -2,6 +2,7 @@ import { useState, useCallback, useEffect, useRef } from 'react';
 import { DEFAULT_STATE } from '../data/initialState';
 import { supabase } from '../lib/supabase';
 import { mergeState, sameValue } from '../lib/state/merge';
+import { hasMeaningfulData, looksLikeFactoryDefault, meaningfulEvidence } from '../lib/state/meaningful';
 
 // Keys that are only relevant to the current session — never persisted
 const TRANSIENT_KEYS = [
@@ -165,7 +166,8 @@ async function saveToCloud(userId, state, { allowEmpty = false, fromBackup = fal
     const { data: existing, error: readErr } = await supabase
       .from('user_data').select('state').eq('id', userId).maybeSingle();
     if (!readErr && existing?.state && hasMeaningfulData(existing.state)) {
-      const e = new Error('Refused to overwrite real cloud data with defaults (wipe guard).');
+      const e = new Error('Refused to overwrite real cloud data with defaults (wipe guard): cloud holds '
+        + meaningfulEvidence(existing.state).slice(0, 8).join(', ') + '.');
       e.code = 'WIPE_GUARD';
       console.error('[useVisionBoardState] ' + e.message);
       throw e;
@@ -232,51 +234,13 @@ async function saveToCloud(userId, state, { allowEmpty = false, fromBackup = fal
 //
 // DEFAULT_STATE is NOT empty — it ships with 4 seed achievements + 3
 // seed trackers. So a wiped state doesn't look empty; it looks like
-// factory defaults. These two predicates let the save path tell the
-// difference between "user genuinely has data" and "state has been
-// reset to the out-of-box seed", so we can refuse the one transition
-// that is never a legitimate single edit: real data → factory default.
-
-/** True if the state carries any evidence of real user activity. */
-function hasMeaningfulData(state) {
-  if (!state || typeof state !== 'object') return false;
-  return (
-    Object.keys(state.logs || {}).length > 0 ||
-    (state.savings || []).length > 0 ||
-    Object.keys(state.visions || {}).length > 0 ||
-    (state.coins || 0) > 0 ||
-    !!(state.profile && state.profile.name) ||
-    !!(state.profile && state.profile.tagline) ||
-    (state.habits || []).length > 0 ||
-    (state.links || []).length > 0 ||
-    (state.shopItems || []).length > 0 ||
-    (state.achievements || []).some(a => a.completed) ||
-    (state.achievements || []).length > 4 ||
-    (state.trackers || []).length > 3 ||
-    !!state.brainScore || !!state.financeScore ||
-    !!state.fitnessScore || !!state.socialScore
-  );
-}
-
-/** True if the state is indistinguishable from the out-of-box seed:
- *  no logs / savings / visions / coins, no profile identity, only the
- *  seed achievements (none completed) and seed trackers. This is the
- *  exact shape a wipe-to-defaults produces. */
-function looksLikeFactoryDefault(state) {
-  if (!state || typeof state !== 'object') return false;
-  return (
-    Object.keys(state.logs || {}).length === 0 &&
-    (state.savings || []).length === 0 &&
-    Object.keys(state.visions || {}).length === 0 &&
-    (state.coins || 0) === 0 &&
-    !(state.profile && state.profile.name) &&
-    !(state.profile && state.profile.tagline) &&
-    (state.habits || []).length === 0 &&
-    (state.achievements || []).length <= 4 &&
-    !(state.achievements || []).some(a => a.completed) &&
-    (state.trackers || []).length <= 3
-  );
-}
+// factory defaults. `hasMeaningfulData` / `looksLikeFactoryDefault`
+// (lib/state/meaningful.js) tell the difference between "user genuinely
+// has data" and "state has been reset to the out-of-box seed", so we can
+// refuse the one transition that is never a legitimate single edit:
+// real data → factory default. Since 2026-09-30 ANY non-empty store
+// counts unless it is on the module's ignore list — see its header for
+// the WHOOP-only user the old fixed list missed.
 
 // ── Local last-known-good backup ─────────────────────────────────────────────
 //
