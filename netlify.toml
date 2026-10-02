@@ -193,3 +193,12 @@
 # the wrong end of itself.
 [functions."settle-leagues"]
   schedule = "5 0 * * 1"
+
+# security-sweep raises tickets for the owner's Security console
+# (Upgrade → Security): DB down/slow, disk or connections > 80 %,
+# Security advisor errors, client-error spikes, reports open > 24 h, a
+# failed production deploy, poor real-user LCP, repeated AI-cap hits.
+# Writes only to security_tickets; reads no user state. Minute 23 keeps
+# it clear of the on-the-hour crons above.
+[functions."security-sweep"]
+  schedule = "23 * * * *"

@@ -26,7 +26,7 @@ function Ul({ items }) {
   );
 }
 
-const LAST_UPDATED = '30 September 2026';
+const LAST_UPDATED = '2 October 2026';
 
 function Updated() {
   return (
@@ -86,6 +86,8 @@ function PrivacyPolicyContent() {
           'Third-party sign-in data (optional) — if you sign in with Google or Apple, we receive a minimal profile from that provider (section 9).',
           'Session data — a session token kept by our authentication provider to keep you signed in.',
           'Preferences — colour scheme, background and similar choices, stored in your browser\'s / device\'s localStorage and in your account.',
+          'Anonymous performance measurements (web app only) — on about one page load in five, the browser measures how quickly the page loaded and responded and sends us those timings with the page path and a coarse device type (phone, tablet or desktop); they are stored without your account, IP address or any other identifier and are used only to find and fix slow pages.',
+          'Problem reports — if you use Settings → Report a problem, we store what you write, the category you choose and the page you were on, linked to your account so we can follow up.',
         ]} />
         <P>We do not collect precise location data, biometric identification data, advertising identifiers, contact lists or purchase history. We use no advertising or analytics trackers.</P>
       </Section>
@@ -197,6 +199,7 @@ function PrivacyPolicyContent() {
           'WHOOP and Oura tokens — deleted immediately when you disconnect that device.',
           'Direct messages — retained until you delete them or your account.',
           'Reports — a report you make, or one made about you, may be kept after the account involved is deleted, only as long as needed to deal with it and with repeat abuse.',
+          'Problem reports — kept until the problem is dealt with; if you delete your account first, the report loses its link to you.',
           'Camera frames & AI snapshots — not stored by us; discarded after each request.',
           'Subscriptions — deleting your account does not cancel an App Store or Google Play subscription; cancel it in the store.',
           'Data export — you can export your data at any time in Settings → Account.',
