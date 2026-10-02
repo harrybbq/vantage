@@ -61,7 +61,7 @@ The real options, fastest first:
    | `OURA_CLIENT_SECRET` | `oura-cron`, `oura-sync`, `oura-connect`, `oura-callback` | same |
    | `REVENUECAT_WEBHOOK_AUTH` | `revenuecat-webhook` (tier changes) | 500 "not configured". RevenueCat retries, so events are not lost. |
    | `TRADING_REPORT_TOKEN` | `trading-summary` | setup hint, no fetch |
-   | `OWNER_EMAIL` (and `VITE_OWNER_EMAIL`) | every owner-only function: `moderation`, `admin-set-rating`, `trading-summary`, crest review | 403 for everyone |
+   | `OWNER_EMAIL` (and `VITE_OWNER_EMAIL`) | every owner-only function: `moderation`, `security-console`, `admin-set-rating`, `trading-summary`, crest review | 403 for everyone |
    | `SUPABASE_SERVICE_ROLE_KEY` | nearly every function (anything that writes or reads across users) | 500. The app itself still loads and saves — the client talks to Supabase directly with the anon key. |
 
    ⚠️ Netlify applies env var changes **only on the next deploy.** After changing one: Deploys → **Trigger deploy → Deploy site** (redeploys the current commit, ~15 credits, a few minutes).
@@ -77,12 +77,12 @@ A redirect in `netlify.toml` over `/.netlify/functions/<name>` is **not** a docu
 
 ### Scheduled functions
 
-`push-dispatch` (every minute), `snapshot-ratings` (03:00), `whoop-cron` (06:00), `oura-cron` (06:30), `settle-leagues` (Mon 00:05) — all UTC, in `netlify.toml`.
+`push-dispatch` (every minute), `security-sweep` (hourly at :23), `snapshot-ratings` (03:00), `whoop-cron` (06:00), `oura-cron` (06:30), `settle-leagues` (Mon 00:05) — all UTC, in `netlify.toml`. `security-sweep` only writes tickets; it never touches user data.
 To stop a cron that is damaging data: remove its env var as above (whoop/oura), or roll back the deploy. Removing the `schedule` line from `netlify.toml` also works but needs a merge and a build.
 
 ### One user's account
 
-- **Lock them out:** Supabase → Authentication → Users → the user. Ban them there if the option is shown; otherwise the Auth admin API's `updateUserById` with `ban_duration` does it. Rotating the JWT secret signs out *everyone*, not one user.
+- **Lock them out:** Upgrade → Security → Moderation → **Ban** (sets the Auth ban and the suspend flag together). Or Supabase → Authentication → Users → the user, or the Auth admin API's `updateUserById` with `ban_duration`. Rotating the JWT secret signs out *everyone*, not one user.
 - **Hide them from public boards:** the moderation suspend flag (see `docs/ABUSE_HANDLING.md`).
 
 ---
@@ -113,6 +113,8 @@ After rotating any of these: set the new value in Netlify, **then redeploy** (en
 | `GNEWS_API_KEY` | News widget quota. | GNews dashboard. | News widget empty. |
 | `FINNHUB_API_KEY` | Market widget quota. | Finnhub dashboard. | Market widget empty. |
 | `YOUTUBE_API_KEY` | Optional recipe-from-video lookups. | Google Cloud console → Credentials. | Falls back to page scraping. |
+| `SUPABASE_ACCESS_TOKEN` | **Top tier.** Supabase Management API as the owner — the Security console's DB metrics, traffic and advisors. A *classic* token acts on every org and project in the account (settings, keys, SQL); a *scoped* one only on what it was given. | supabase.com/dashboard/account/tokens: revoke the old one, create a new **scoped** token — this project only, `analytics_usage_read`, `advisors_read`, `analytics_logs_read` — with an expiry. | Console traffic/advisor panels show the setup card; metrics fall back to the service key; the sweep skips advisor checks. |
+| `NETLIFY_AUTH_TOKEN` (or `VANTAGE_NETLIFY_TOKEN`) | **Top tier.** Netlify API as the owner — the console's site/deploy panel and the sweep's failed-deploy check. Netlify tokens **cannot be scoped**: it can change or delete any site in the account and read its env vars. Resetting your Netlify password invalidates every PAT. | Netlify → User settings → Applications → Personal access tokens: revoke, create a new one with an expiry. | Console Netlify panel shows the setup card; the sweep skips the deploy check. |
 
 Not secrets, but related:
 
@@ -149,11 +151,27 @@ Where to look:
 - **GitHub** — commit history, and Security → Secret scanning alerts if a key was pushed.
 - **Anthropic console** — usage by day, for runaway AI spend.
 - **Supabase security advisors** — Dashboard → Advisors. Run after any SQL fix.
+- **The Security console** — Upgrade → Security (owner only). One screen for the above; see "Security console" below.
 
 Rules while assessing:
 
 - Read only. Don't "tidy up" rows while you look.
 - Don't copy personal data into chat tools or issues. Refer to users by id prefix, not name or email.
+
+### Security console
+
+Upgrade → **Security** (owner only; `netlify/functions/security-console.js`, checked server-side against `OWNER_EMAIL` on every call). Panels:
+
+- **Overview** — DB / Netlify / App status, open and critical tickets, open reports, suspended accounts, client errors (24 h), advisor errors.
+- **Database** — CPU, memory, disk, connections, size, cache hit, uptime, top tables (Supabase privileged metrics + `owner_db_stats()`); API traffic and advisors (need `SUPABASE_ACCESS_TOKEN`).
+- **Netlify** — published deploy, last 10 deploys (need `NETLIFY_AUTH_TOKEN`); real-user web vitals p75 from `public.web_vitals`; DB ping. Netlify has **no API** for Observability (requests, status codes), function invocations or bandwidth — the panel links to those dashboard pages instead.
+- **Advisors** — a finding you have looked at and accept (e.g. RLS on with no policies, on purpose) can be **accepted**: it stops counting on the Overview and the sweep stops raising it (`public.security_accepted_findings`, keyed by the advisor's `cache_key`). Un-accept to bring it back. Advisor endpoints are experimental upstream.
+- **Moderation** — the report queue (same logic as `moderation.js`), suspended accounts, crest queue. **Suspend** hides a user from public boards; **Ban** also sets an Auth-level ban (`ban_duration`), so they cannot sign in or refresh a session. An access token they already hold stays valid until it expires (about an hour by default) — for an active SEV1, also rotate as in section 4. Both are reversible from the same screen. Owner accounts cannot be banned there.
+- **Tickets** — `public.security_tickets`: raised hourly by `security-sweep` (DB down/slow, disk/connections > 80 %, advisor ERRORs, client-error spike, reports open > 24 h, failed production deploy, LCP p75 > 4 s, repeated AI-cap hits), by users from Settings → Report a problem (5 a day each), or by hand. A repeating condition bumps its ticket's count; a resolved one re-opens if it returns. **A critical ticket is a reason to open this runbook at section 2.**
+
+Setup: run `supabase/security_console_2026_10.sql`; set `SUPABASE_ACCESS_TOKEN` and `NETLIFY_AUTH_TOKEN` (both optional, both top-tier — see section 4); redeploy. Every panel shows a setup card until its piece is there.
+
+To silence the sweep in an incident: remove its `schedule` line, or roll back (section 3). To stop the console reading upstream APIs: delete the two tokens and redeploy.
 
 ---
 

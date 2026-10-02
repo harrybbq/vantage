@@ -18,6 +18,7 @@ import './boot.css'
 import './shop.css'
 import App from './App.jsx'
 import RootErrorBoundary from './components/RootErrorBoundary.jsx'
+import './lib/telemetry/webVitals.js' // anonymous 1-in-5 page-load performance beacon (prod web only)
 
 const queryClient = new QueryClient({
   defaultOptions: {

@@ -10,6 +10,7 @@ import { OWNER_SURFACES_IN_BUILD } from '../lib/native/ownerSurfaces';
 import AccountPanel from './settings/AccountPanel';
 import DataExportCard from './settings/DataExportCard';
 import ConsentCard from './settings/ConsentCard';
+import SupportCard from './settings/SupportCard';
 import SettingsGroup from './settings/SettingsGroup';
 import { useSubscriptionContext } from '../context/SubscriptionContext';
 import { getOwnProfile, updateOwnProfile } from '../lib/friends/queries';
@@ -684,6 +685,9 @@ export default function SettingsSection({ S, update, active, userId, userEmail, 
             onSignOut={onSignOut}
           >
             <DataExportCard S={S} userId={userId} onOpenLegal={onOpenLegal} />
+
+            {/* Support channel (store requirement) → owner's Security console. */}
+            {userId && <SupportCard />}
 
             {/* Last group on the page. Without the card border it used
                 to sit behind, the red heading and the red button carry
