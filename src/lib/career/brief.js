@@ -51,7 +51,8 @@ const fmtDay = iso => {
  *   apps, companies, pacing ({ cert, plan: planStudy result, examIso }),
  *   plan (career.plan), statusMap, vs (latest closed actual-vs-plan),
  *   certs, today ('YYYY-MM-DD')
- * → [{ id, tag, title, why, score, panel }]
+ * → [{ id, tag, title, why, score, panel, overdue? }] — `overdue` is
+ *   carried by pipeline steps only: true once the step is past its due date.
  */
 export function candidates({ apps = [], companies = [], pacing = null, plan = null, statusMap = {}, vs = null, certs = [], today }) {
   const out = [];
@@ -66,6 +67,7 @@ export function candidates({ apps = [], companies = [], pacing = null, plan = nu
       title: `${what} — ${coName(a)}`,
       why: `${STAGE_LABEL[a.stage]} · ${d < 0 ? `overdue by ${-d} day${d === -1 ? '' : 's'}` : d === 0 ? 'due today' : `due ${fmtDay(a.next.due)}`}${a.cvSent ? ` · they have your "${a.cvSent}" CV` : ''}`,
       score: d < 0 ? 100 - d : 80 - d,
+      overdue: d < 0,
     });
   }
   for (const a of apps.filter(x => isOpen(x) && x.stage === 'offer')) {
