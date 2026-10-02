@@ -144,28 +144,28 @@ fix before real users · **AFTER** = hardening.
 
 ### Run today — `supabase/security_hotfix_2026_09_30.sql` (items 32–38)
 Grants, policies, view options, one FK and one index. No data touched.
-Then run `supabase/audit_schema_2026_10.sql` — the new tables and columns
+*Both applied live and verified 2026-10-02 (grants, views, block helper, FKs, index; ai_usage, client_errors, report status/snapshot, suspended_at/prestiged_at, throttles, health-token index, new vb_state_meaningful).* Then run `supabase/audit_schema_2026_10.sql` — the new tables and columns
 the wave-1 code uses (AI caps, client errors, moderation, suspension,
 prestige cooldown, throttles, health-token index, anti-wipe mirror). The
 code fails soft until it is run, so order doesn't matter.
 
-32. `[ ]` **BLOCKS** Two SECURITY DEFINER views are readable with the
+32. `[x]` **BLOCKS** Two SECURITY DEFINER views are readable with the
     public anon key: `notifications_pending` (every user's queued
     pushes) and `coach_nudges_active` (every user's AI nudges).
-33. `[ ]` **BLOCKS** `profiles` is readable by `anon` — anyone with the
+33. `[x]` **BLOCKS** `profiles` is readable by `anon` — anyone with the
     anon key can list searchable users (photo, name, handle, tier, last
     active). Contradicts the privacy policy.
-34. `[ ]` **BLOCKS** Blocking doesn't block. Policies check `blocks`
+34. `[x]` **BLOCKS** Blocking doesn't block. Policies check `blocks`
     under the caller's RLS, and a blocked user can't see the row; the
     addressee can also rewrite `requester_id` and forge an accepted
     friendship with anyone. Apple 1.2 requires a working block.
-35. `[ ]` **LAUNCH** A DM recipient can rewrite `body`/`sender_id` of
+35. `[x]` **LAUNCH** A DM recipient can rewrite `body`/`sender_id` of
     messages they received — forged evidence for reports.
-36. `[ ]` **AFTER** Definer RPCs executable by `anon`
+36. `[x]` **AFTER** Definer RPCs executable by `anon`
     (`search_profiles_by_handle`, `seed_default_macros` for ANY user id).
-37. `[ ]` **LAUNCH** `tracker_streaks` FK is NO ACTION — account deletion
+37. `[x]` **LAUNCH** `tracker_streaks` FK is NO ACTION — account deletion
     fails for anyone with a row. Breaks the item-20 rule.
-38. `[ ]` **LAUNCH** `nutrition_log` has no `(user_id, log_date)` index.
+38. `[x]` **LAUNCH** `nutrition_log` has no `(user_id, log_date)` index.
 39. `[ ]` **LAUNCH** Enable **Leaked Password Protection** (Supabase →
     Auth). Dashboard toggle.
 
@@ -222,10 +222,10 @@ code fails soft until it is run, so order doesn't matter.
     *Status 2026-09-30: done.*
 
 ### Server functions
-48. `[ ]` **LAUNCH** `cronAuth.js:42` accepts any body with `next_run`
+48. `[x]` **LAUNCH** `cronAuth.js:42` accepts any body with `next_run`
     as "the scheduler". Delete that branch (item 24b's "refused until
     CRON_SECRET exists" is not true while it's there).
-    *Status 2026-09-30: logic unchanged on purpose — removing it may stop every cron. Owner check: a plain GET with no body to /.netlify/functions/snapshot-ratings; a 404 means scheduled functions are not reachable by URL and this is moot; `{"error":"unauthorized"}` means it must be put behind a secret.*
+    *Status 2026-09-30: resolved — Netlify docs (verified 2026-10-02): scheduled functions can't be invoked by URL in production and `schedule` can't be combined with `path`, so the `next_run` branch is only reachable by the scheduler.*
 49. `[~]` **LAUNCH** `health-sync`: no login, rate-limited per
     *caller-chosen* token, and the lookup is an unindexed JSONB filter
     that unpacks every user's ~1 MB state — a script can saturate the
@@ -350,6 +350,21 @@ code fails soft until it is run, so order doesn't matter.
     their own row directly. Binding needs those writes moved to a
     service-role function, then
     `revoke update (handle, display_name, avatar_url) on public.profiles from authenticated;`.
+
+85. `[ ]` **LAUNCH** Supabase is retiring the legacy `anon`/`service_role`
+    keys by the end of 2026. The new `sb_secret_…` keys go in the `apikey`
+    header, are not JWTs, and are refused when the request carries a
+    browser User-Agent. Every Netlify function sends the service key as
+    both `apikey` and `Authorization: Bearer` — that breaks on the switch.
+    Move server calls to supabase-js (handles both) or send `apikey` only,
+    and test against a secret key before swapping it in.
+86. `[ ]` **LAUNCH** Netlify Web security center (observed 2026-10-02):
+    no WAF, no rate-limiting rules, no firewall traffic rules. Add a
+    rate-limit rule on `/.netlify/functions/*` (per-IP) before launch —
+    the in-function limits are per instance.
+87. `[ ]` **AFTER** `push-dispatch` runs every minute — ~44k invocations a
+    month on credit-based pricing, mostly finding nothing. Consider
+    every 5 minutes, or trigger it from the queue insert instead.
 
 ### Non-code tasks missing until now
 71. `[ ]` **Online Safety Act 2023** — DMs, groups and the leaderboard
