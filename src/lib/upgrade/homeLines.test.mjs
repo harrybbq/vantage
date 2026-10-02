@@ -227,7 +227,7 @@ t('career: exam day and past exam read 0 d', () => {
 });
 t('career: nothing to do', () => {
   const c = careerCard({ store: store('ready'), actions: [], exam: null });
-  assert.deepEqual([c.figure, c.figureLabel, c.text, c.state], ['0', 'actions this week', 'Nothing pressing this week', 'neutral']);
+  assert.deepEqual([c.figure, c.figureLabel, c.text, c.state], ['Clear', 'this week', 'Nothing pressing this week', 'neutral']);
 });
 t('career: loading, setup (neutral), failed (unknown + error)', () => {
   assert.equal(careerCard({ store: store('loading') }).loading, true);

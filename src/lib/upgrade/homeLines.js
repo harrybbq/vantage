@@ -228,8 +228,9 @@ export function careerCard({ store, actions = [], exam = null }) {
   const action = first ? `${overdue ? 'Overdue' : 'Next'}: ${first.title}` : 'Nothing pressing this week';
   const examBit = examDays != null ? `${exam.name} exam${exam.behind ? ' · behind pace' : ''}` : null;
   return card({
-    figure: examDays != null ? `${examDays} d` : String(open.length),
-    figureLabel: examDays != null ? 'to exam' : open.length === 1 ? 'action this week' : 'actions this week',
+    // A bare "0" headline reads as a missing number; nothing due says so.
+    figure: examDays != null ? `${examDays} d` : open.length ? String(open.length) : 'Clear',
+    figureLabel: examDays != null ? 'to exam' : !open.length ? 'this week' : open.length === 1 ? 'action this week' : 'actions this week',
     text: [examBit, action].filter(Boolean).join(' · '),
     state: overdue || examSoonBehind ? 'attention' : 'neutral',
     updatedAt: toMs(store.at),

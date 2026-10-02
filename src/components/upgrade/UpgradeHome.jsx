@@ -1,35 +1,34 @@
 /**
- * Upgrade's home menu — what the section opens on. A large title with
- * today's line under it, then one card per section (Career, Diet,
- * Rotation, Security), each carrying a single live line from the data that
- * section already reads. Tapping a card opens that section.
+ * Upgrade's home menu — what the section opens on. The big "Upgrade"
+ * title with today's line under it, then one card per section (Career,
+ * Diet, Rotation, Security), all on one solid sheet so nothing sits on
+ * the page's background photo. Tapping a card opens that section.
  *
- * Every line is derived from state the tabs already use: the rotation
- * from S, Diet's protein target from the plan plus today's shared day
- * summary (one cached request, the same one the hub uses), Career from
- * the owner store the Career tab loads anyway (module-cached, so opening
- * Career after this costs nothing), and Security from the console's cheap
- * `?panel=overview` (falling back to the crest queue until that function
- * is deployed). Nothing here writes anything.
+ * Every card reads from useHomeLines (home/useHomeLines.js), which owns
+ * the data: a headline figure + its caption, one supporting sentence, a
+ * state (ok / attention / critical / unknown / neutral), when the data
+ * is from, and — for cards that fetch — an error and a retry. This file
+ * is markup only; nothing here fetches or writes anything.
  *
- * Motion: cards float in, bob for a few seconds, then settle; hover
- * lifts. All of it is off under prefers-reduced-motion.
+ * Card anatomy: icon · name · state tag (dot + word, never colour
+ * alone) / figure + caption / sentence / footer "Updated 2 m ago" and a
+ * chevron. On a failed fetch the footer carries the error and a Retry
+ * that re-fetches WITHOUT opening the section: the card is a container
+ * whose main area is the open-button (stretched over the whole card) and
+ * Retry is a sibling button stacked above it.
+ *
+ * Loading: nothing for the first 300 ms, then skeleton bars sized like
+ * the final figure and sentence, so the card never changes size.
+ *
+ * Motion (the character, kept on purpose): cards sit at a slight tilt on
+ * staggered tops, float in, bob twice, then settle; hover lifts a few px.
+ * All of it is off under prefers-reduced-motion, and the one-column phone
+ * layout drops the tilt and stagger.
  */
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import Icon from '../Icon';
-import { rotationLine } from '../../lib/upgrade/homeLines';
-import { planProteinG } from '../../lib/diet/plan';
-import { useDaySummary } from '../../lib/diet/daySummary';
-import { useOwnerContent } from '../../lib/owner/ownerContent';
-import { KEYS } from '../../lib/career/schema';
-import { briefFor } from '../../lib/career/brief';
-import { usePacing, useLatestVs, todayIso } from './career/careerData';
-import { crestQueue } from '../../lib/groups/api';
-import { fetchPanel } from '../../lib/security/api';
-import { overviewLine } from '../../lib/security/status';
-
-/** "Night 2 · Pull", "Off · Rest" — lives in the home-lines module now. */
-export { rotationLine };
+import { useHomeLines } from './home/useHomeLines';
+import { ago, exactTime, rotationLine } from '../../lib/upgrade/homeLines';
 
 export const SECTIONS = [
   { id: 'career', name: 'Career', icon: 'briefcase', tone: 'gold' },
@@ -42,105 +41,132 @@ export const SECTIONS = [
 export const SECTION_ALIASES = { review: 'security' };
 export const resolveSection = id => SECTION_ALIASES[id] || id;
 
-function latestKg(S) {
-  const log = (S && S.vitalsLog) || {};
-  const days = Object.keys(log).sort();
-  for (let i = days.length - 1; i >= 0; i--) if (log[days[i]] && log[days[i]].weight != null) return log[days[i]].weight;
-  return null;
-}
+// Lives with the other card shaping now; re-exported for existing importers.
+export { rotationLine };
 
-function useCareerLine(S) {
-  const oc = useOwnerContent('career.');
-  const d = oc.data;
-  const certs = useMemo(() => d[KEYS.certs] || [], [d]);
-  const pacing = usePacing(S, certs);
-  const vs = useLatestVs(S, oc);
-  if (oc.state === 'loading') return { line: null };
-  if (oc.state !== 'ready') return { line: 'Plan, money, certs and the pipeline' };
-  const today = todayIso();
-  const { actions } = briefFor({
-    apps: d[KEYS.applications] || [], companies: d[KEYS.companies] || [], plan: d[KEYS.plan] || null,
-    statusMap: d[KEYS.status] || {}, vs, certs, today,
-    pacing: pacing.cert ? { cert: pacing.cert, plan: pacing.plan, examIso: pacing.examIso } : null,
-  }, d[KEYS.brief] || null);
-  const first = actions.find(a => !a.done) || null;
-  const exam = pacing.cert && pacing.examIso
-    ? `${pacing.cert.name.split(' ·')[0]} in ${Math.max(0, Math.round((Date.parse(pacing.examIso + 'T12:00:00Z') - Date.parse(today + 'T12:00:00Z')) / 86400000))} d`
-    : null;
-  const parts = [first ? `Brief · ${first.title}` : 'Nothing pressing this week', exam].filter(Boolean);
-  return { line: parts.join(' · ') };
-}
+/** The word that always travels with a state dot. Neutral has no dot. */
+const STATE_WORD = { ok: 'OK', attention: 'Attention', critical: 'Critical', unknown: 'Unknown' };
 
-/**
- * → { line (for the card), sub (for the title line, or null) }
- * "2 tickets open · all systems ok". Until the security-console function
- * answers, the crest queue's line stands in — it is still real news.
- */
-function useSecurityLine() {
-  const [out, setOut] = useState({ line: null, sub: null });
+/** Ticks so "Updated 2 m ago" stays true while the menu is open. */
+function useNow(every = 30000) {
+  const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
-    let live = true;
-    (async () => {
-      const ov = await fetchPanel('overview');
-      if (!live) return;
-      if (ov.state === 'ok') { const o = overviewLine(ov.data); setOut({ line: o.line, sub: o.sub }); return; }
-      try {
-        const body = await crestQueue();
-        if (!live) return;
-        if (body.setup === false) { setOut({ line: 'Console not deployed yet', sub: null }); return; }
-        const n = (body.queue || []).length;
-        setOut(n
-          ? { line: `${n} picture${n === 1 ? '' : 's'} waiting`, sub: `${n} to review` }
-          : { line: 'Nothing to review', sub: null });
-      } catch {
-        if (live) setOut({ line: 'Couldn’t reach the console', sub: null });
-      }
-    })();
-    return () => { live = false; };
-  }, []);
-  return out;
+    const t = setInterval(() => setNow(Date.now()), every);
+    return () => clearInterval(t);
+  }, [every]);
+  return now;
+}
+
+/** True once `on` has held for `ms` — the skeleton's 300 ms grace. */
+function useAfter(on, ms) {
+  const [since, setSince] = useState(null);
+  useEffect(() => {
+    if (!on) { setSince(null); return undefined; }
+    const t = setTimeout(() => setSince(Date.now()), ms);
+    return () => clearTimeout(t);
+  }, [on, ms]);
+  return on && since != null;
+}
+
+function StateDot({ state }) {
+  if (!STATE_WORD[state]) return null;
+  return <i className={`uh-dot is-${state}`} aria-hidden="true" />;
+}
+
+function Fresh({ updatedAt, now }) {
+  if (updatedAt == null) return <span className="uh-fresh" title="Worked out from your data just now">Live</span>;
+  const a = ago(updatedAt, now);
+  return (
+    <span className="uh-fresh" title={exactTime(updatedAt)}>
+      {a === 'now' ? 'Updated just now' : `Updated ${a} ago`}
+    </span>
+  );
+}
+
+function HomeCard({ section: s, card, index, now, onOpen }) {
+  const c = card || { loading: true, state: 'neutral' };
+  const loading = !!c.loading;
+  const skel = useAfter(loading, 300);
+  const word = STATE_WORD[c.state] || null;
+  const failed = !loading && !!c.error;
+  const open = e => onOpen(s.id, e.currentTarget.closest('.uh-card').getBoundingClientRect());
+  const label = loading
+    ? `Open ${s.name}. Loading.`
+    : ['Open ' + s.name, [c.figure, c.figureLabel].filter(Boolean).join(' '), c.text, failed ? c.error : null, word ? `Status ${word.toLowerCase()}` : null]
+        .filter(Boolean).join('. ');
+
+  return (
+    <div role="listitem" className={`uh-slot is-${index}`} style={{ '--i': index }}>
+      <i className="uh-floor" aria-hidden="true" />
+      <div className="uh-bob">
+        <div className={`uh-card tone-${s.tone} is-${c.state || 'neutral'}${loading ? ' is-loading' : ''}${skel ? ' is-skel' : ''}`}
+             aria-busy={loading ? 'true' : undefined}>
+          <button type="button" className="uh-card-main" aria-label={label}
+                  onClick={open}>
+            <span className="uh-icon" aria-hidden="true"><Icon name={s.icon} size={20} strokeWidth={1.9} /></span>
+            <span className="uh-head">
+              <span className="uh-name">{s.name}</span>
+              {!loading && word && (
+                <span className={`uh-tag is-${c.state}`}><StateDot state={c.state} /><span className="uh-tag-word">{word}</span></span>
+              )}
+            </span>
+            <span className="uh-fig">
+              {loading ? (
+                <><span className="uh-bar uh-bar-fig" /><span className="uh-bar uh-bar-cap" /></>
+              ) : (
+                <>
+                  <span className="uh-figure">{c.figure || '—'}</span>
+                  {(c.figureLabel || !c.figure) && <span className="uh-figlabel">{c.figureLabel || 'no reading'}</span>}
+                </>
+              )}
+            </span>
+            <span className="uh-text" title={!loading && c.text ? c.text : undefined}>
+              {loading
+                ? <><span className="uh-bar uh-bar-line" /><span className="uh-bar uh-bar-line is-short" /></>
+                : (c.text || (failed ? 'Unknown until it answers again.' : ''))}
+            </span>
+          </button>
+          {/* Mouse-only extra hit area (the main button is the keyboard path). */}
+          <div className="uh-foot" onClick={open}>
+            {loading ? <span className="uh-bar uh-bar-foot" />
+              : failed ? (
+                <>
+                  <span className="uh-err"><Icon name="octagon-alert" size={14} strokeWidth={2} /><span>{c.error}</span></span>
+                  {c.retry && (
+                    <button type="button" className="uh-retry" aria-label={`Retry ${s.name}`}
+                            onClick={e => { e.stopPropagation(); c.retry(); }}>
+                      <Icon name="rotate-cw" size={13} strokeWidth={2} /> Retry
+                    </button>
+                  )}
+                </>
+              ) : <Fresh updatedAt={c.updatedAt} now={now} />}
+            <span className="uh-chev" aria-hidden="true"><Icon name="chevron-right" size={16} strokeWidth={2} /></span>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
 }
 
 export default function UpgradeHome({ S, userId, onOpen }) {
-  const kg = latestKg(S);
-  const target = planProteinG(S, kg);
-  const day = useDaySummary(userId);
-  const had = day.summary ? Math.round(Number(day.summary.protein_g) || 0) : null;
-  const dietLine = `${target} g protein today${had != null ? (had >= target ? ' · target hit' : ` · ${target - had} g to go`) : ''}`;
-  const career = useCareerLine(S);
-  const security = useSecurityLine();
-  const rota = rotationLine(S);
-  const lines = { career: career.line, diet: dietLine, rotation: rota, security: security.line };
-
-  const today = new Date().toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' });
-  const sub = [today, rota, security.sub].filter(Boolean).join(' · ');
+  const { hero, cards } = useHomeLines(S, userId);
+  const now = useNow();
+  const heroWord = STATE_WORD[hero && hero.state];
 
   return (
     <div className="uh">
       <header className="uh-hero">
         <span className="uh-eyebrow">Owner · Vantage</span>
         <h2 className="uh-title">Upgrade</h2>
-        <span className="uh-sub">{sub}</span>
+        <p className="uh-sub">
+          <StateDot state={hero && hero.state} />
+          {heroWord && <span className="sr-only">Status {heroWord.toLowerCase()}. </span>}
+          <span>{hero && hero.sub}</span>
+        </p>
       </header>
       <div className="uh-grid" role="list">
         {SECTIONS.map((s, i) => (
-          <div key={s.id} role="listitem" className={`uh-slot is-${i}`} style={{ '--i': i }}>
-            <i className="uh-floor" aria-hidden="true" />
-            <div className="uh-bob">
-              <button type="button" className={`uh-card tone-${s.tone}`}
-                      aria-label={`Open ${s.name}${lines[s.id] ? `. ${lines[s.id]}` : ''}`}
-                      onClick={e => onOpen(s.id, e.currentTarget.getBoundingClientRect())}>
-                <span className="uh-icon"><Icon name={s.icon} size={24} strokeWidth={1.8} /></span>
-                <span className="uh-card-foot">
-                  <span className="uh-name">{s.name}</span>
-                  <span className="uh-line">
-                    <i aria-hidden="true" />
-                    {lines[s.id] || <span className="uh-line-wait">Loading…</span>}
-                  </span>
-                </span>
-              </button>
-            </div>
-          </div>
+          <HomeCard key={s.id} section={s} card={cards && cards[s.id]} index={i} now={now} onOpen={onOpen} />
         ))}
       </div>
     </div>

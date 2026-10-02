@@ -1276,46 +1276,148 @@
 .upg-loose-row .upg-textbtn { flex: none; }
 
 /* ── Upgrade home menu (UpgradeHome) ──────────────────────────────────
-   A large title and four floating section cards. Cards float in, bob
-   twice, then settle; hover lifts. Frosted so a page background shows
-   through. Theme tokens only. */
-.uh { display: flex; flex-direction: column; gap: clamp(26px, 4vw, 46px); padding: 6px 0 40px; }
-.uh-hero { display: flex; flex-direction: column; gap: 10px; animation: uh-in .6s cubic-bezier(.2,.8,.2,1) both; }
-.uh-eyebrow { font-family: var(--mono); font-size: 11px; letter-spacing: 2.4px; text-transform: uppercase; color: var(--em); }
-.uh-title { margin: 0; font-family: var(--display); font-size: clamp(64px, 11vw, 140px); font-weight: 800; letter-spacing: -.035em;
-  line-height: 1; padding-bottom: .08em; color: var(--text); }
-.uh-sub { font-family: var(--mono); font-size: 13px; color: var(--text-muted); }
-.uh-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 26px; align-items: start; }
-.uh-slot { position: relative; padding-bottom: 22px; animation: uh-in .75s cubic-bezier(.2,.8,.2,1) calc(.12s + var(--i) * .09s) both; }
+   The big Playfair title and four section cards, all on ONE solid sheet
+   (nothing on the menu sits on the page photo). Cards keep the
+   character — a slight tilt on staggered tops, float in, bob twice, then
+   settle — but the text is the point: every line is ≥12px and ≥4.5:1 on
+   its own surface in every theme (verified in a harness, not by eye).
+
+   Colour roles, all scoped to .upg-app:
+     --uh-card     card surface, one step off the sheet
+     --uh-ink      figures, names           --uh-soft  supporting sentence
+     --uh-dim      labels, meta, footer     --uh-accent the "//" eyebrow mark
+     --uh-ok / --uh-warn / --uh-crit / --uh-unk  state dots only (≥3:1)
+   Brand tone (gold / em / ink) is on the icon only; state is separate. */
+.upg-app {
+  --uh-card: #fffdf8; --uh-card-hover: #fffefb;
+  --uh-ink: var(--text); --uh-soft: var(--text-mid); --uh-dim: var(--text-mid);
+  --uh-accent: var(--em);
+  --uh-ok: #1d7a4b; --uh-warn: #9a6400; --uh-crit: #b8382a; --uh-unk: #74695c;
+  --uh-line: color-mix(in srgb, var(--border) 70%, var(--uh-card));
+  --uh-skel: color-mix(in srgb, var(--text) 9%, var(--uh-card));
+}
+html[data-theme="cream-pro"] .upg-app { --uh-card: #fffbf1; --uh-card-hover: #fffdf8; --uh-soft: #574d42; --uh-dim: #5f554a; }
+html[data-theme="dark-os"] .upg-app {
+  --uh-card: #1a1a17; --uh-card-hover: #20201d;
+  --uh-soft: #b9b4aa; --uh-dim: #a19c92;
+  --uh-accent: var(--em-light);
+  --uh-ok: #4cbb7f; --uh-warn: #d9a441; --uh-crit: #f0705f; --uh-unk: #8d887e;
+  --uh-skel: color-mix(in srgb, var(--text) 8%, var(--uh-card));
+}
+
+.uh { display: flex; flex-direction: column; gap: clamp(22px, 3vw, 36px); width: 100%; max-width: 1200px; margin: 0 auto 40px; }
+.upg-app .uh { background: var(--upg-solid); border: 1px solid var(--border); border-radius: 22px;
+  padding: 28px 32px 30px; box-shadow: 0 24px 60px -30px rgba(0,0,0,.5); }
+
+.uh-hero { display: flex; flex-direction: column; gap: 8px; min-width: 0; animation: uh-in .6s cubic-bezier(.2,.8,.2,1) both; }
+.uh-eyebrow { display: inline-flex; align-items: center; gap: 8px; font-family: var(--mono); font-size: 12px; line-height: 16px;
+  letter-spacing: 2px; text-transform: uppercase; color: var(--uh-dim); }
+.uh-eyebrow::before { content: '//'; letter-spacing: 0; color: var(--uh-accent); }
+.uh-title { margin: 0; font-family: var(--display); font-size: clamp(56px, 9vw, 112px); font-weight: 800; letter-spacing: -.035em;
+  line-height: 1; padding-bottom: .06em; color: var(--uh-ink); }
+.uh-sub { display: flex; align-items: flex-start; gap: 9px; margin: 0; font-family: var(--body); font-size: 14px; line-height: 20px;
+  color: var(--uh-soft); font-variant-numeric: tabular-nums; }
+.uh-sub > .uh-dot { margin-top: 6px; }
+
+.uh-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 24px; align-items: start; }
+.uh-slot { position: relative; min-width: 0; padding-bottom: 22px; animation: uh-in .7s cubic-bezier(.2,.8,.2,1) calc(.1s + var(--i) * .08s) both; }
 .uh-slot.is-1 { margin-top: 56px; } .uh-slot.is-2 { margin-top: 18px; } .uh-slot.is-3 { margin-top: 76px; }
 .uh-floor { position: absolute; left: 14%; right: 14%; bottom: 0; height: 14px; border-radius: 50%;
-  background: color-mix(in srgb, var(--text) 30%, transparent); filter: blur(7px); opacity: .45;
+  background: color-mix(in srgb, var(--text) 30%, transparent); filter: blur(7px); opacity: .4;
   animation: uh-shadow calc(5.6s + var(--i) * .7s) ease-in-out calc(var(--i) * -1.3s) 2; }
 .uh-bob { animation: uh-bob calc(5.6s + var(--i) * .7s) ease-in-out calc(var(--i) * -1.3s) 2; }
-.uh-card { position: relative; display: flex; flex-direction: column; align-items: flex-start; gap: 26px; width: 100%;
-  min-height: 240px; padding: 22px; border-radius: 24px; border: 1px solid var(--border);
-  background: var(--upg-solid);
-  color: var(--text); text-align: left; cursor: pointer; font: inherit;
-  box-shadow: 0 1px 0 color-mix(in srgb, #fff 8%, transparent) inset, 0 18px 40px -22px rgba(0,0,0,.45);
-  transition: transform .4s cubic-bezier(.2,.8,.2,1), box-shadow .4s, border-color .3s; }
-.uh-slot.is-0 .uh-card { transform: rotate(-1.4deg); } .uh-slot.is-1 .uh-card { transform: rotate(1deg); }
-.uh-slot.is-2 .uh-card { transform: rotate(-.6deg); } .uh-slot.is-3 .uh-card { transform: rotate(1.3deg); }
-.uh-card:hover { transform: translateY(-10px) rotate(0) scale(1.025) !important;
-  box-shadow: 0 1px 0 color-mix(in srgb, #fff 8%, transparent) inset, 0 34px 60px -26px rgba(0,0,0,.55); border-color: color-mix(in srgb, var(--tone) 45%, var(--border)); }
-.uh-card:focus-visible { outline: 2px solid var(--em); outline-offset: 5px; }
-.uh-card.tone-gold { --tone: var(--gold); } .uh-card.tone-em { --tone: var(--em); } .uh-card.tone-ink { --tone: var(--text); }
-.uh-icon { display: grid; place-items: center; width: 56px; height: 56px; border-radius: 50%; color: var(--tone);
-  background: color-mix(in srgb, var(--tone) 16%, var(--surface)); box-shadow: 0 0 0 6px color-mix(in srgb, var(--tone) 7%, transparent); }
-.uh-card-foot { display: flex; flex-direction: column; gap: 6px; margin-top: auto; width: 100%; min-width: 0; }
-.uh-name { font-family: var(--display); font-size: 32px; font-weight: 800; letter-spacing: -.02em; line-height: 1; }
-.uh-line { display: flex; align-items: flex-start; gap: 7px; font-family: var(--mono); font-size: 11.5px; line-height: 1.45; color: var(--text-muted); }
-.uh-line > i { flex: none; width: 6px; height: 6px; margin-top: 5px; border-radius: 50%; background: var(--tone); }
-.uh-line-wait { opacity: .6; }
-@keyframes uh-in { from { opacity: 0; transform: translateY(28px) scale(.96); } to { opacity: 1; transform: none; } }
-@keyframes uh-bob { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-9px); } }
-@keyframes uh-shadow { 0%, 100% { transform: scaleX(1); opacity: .45; } 50% { transform: scaleX(.82); opacity: .26; } }
 
-/* An open section: slim header, grown from the card that opened it. */
+/* The card is a container; .uh-card-main is the open-button, stretched
+   over the whole card by its ::after. Retry sits above that layer. */
+.uh-card { --tilt: 0deg; position: relative; display: flex; flex-direction: column; min-height: 248px;
+  border-radius: 16px; border: 1px solid var(--border); background: var(--uh-card); color: var(--uh-ink);
+  box-shadow: 0 1px 0 color-mix(in srgb, #fff 6%, transparent) inset, 0 16px 34px -22px rgba(0,0,0,.45);
+  transform: rotate(var(--tilt));
+  transition: transform .18s ease-out, box-shadow .18s ease-out, border-color .18s, background-color .18s; }
+.uh-slot.is-0 .uh-card { --tilt: -1.4deg; } .uh-slot.is-1 .uh-card { --tilt: 1deg; }
+.uh-slot.is-2 .uh-card { --tilt: -.6deg; } .uh-slot.is-3 .uh-card { --tilt: 1.3deg; }
+.uh-card:hover { transform: translateY(-5px) rotate(var(--tilt)); background: var(--uh-card-hover);
+  border-color: color-mix(in srgb, var(--tone) 45%, var(--border));
+  box-shadow: 0 1px 0 color-mix(in srgb, #fff 6%, transparent) inset, 0 24px 44px -24px rgba(0,0,0,.5); }
+.uh-card:has(.uh-card-main:focus-visible) { outline: 2px solid var(--uh-accent); outline-offset: 4px; }
+.uh-card.tone-gold, .uh-open-icon.tone-gold { --tone: var(--gold); }
+.uh-card.tone-em, .uh-open-icon.tone-em { --tone: var(--em); }
+.uh-card.tone-ink, .uh-open-icon.tone-ink { --tone: var(--text); }
+/* Icon glyphs need 3:1 on their tinted circle: gold is too pale for the
+   cream themes as-is, and em too deep for dark-os. */
+.upg-app .uh-card.tone-gold, .upg-app .uh-open-icon.tone-gold { --tone: color-mix(in srgb, var(--gold) 70%, var(--text)); }
+html[data-theme="dark-os"] .upg-app .tone-gold { --tone: var(--gold); }
+html[data-theme="dark-os"] .upg-app .tone-em { --tone: var(--em-light); }
+
+.uh-card-main { flex: 1; display: grid; grid-template-columns: auto minmax(0, 1fr);
+  grid-template-areas: "icon head" "fig fig" "text text"; align-content: start; align-items: center; gap: 16px 12px;
+  margin: 0; padding: 20px 20px 14px; border: 0; background: none; color: inherit; font: inherit; text-align: left; cursor: pointer;
+  -webkit-tap-highlight-color: transparent; }
+.uh-card-main::after { content: ''; position: absolute; inset: 0; border-radius: inherit; }
+.uh-card-main:focus-visible { outline: none; }
+@supports not selector(:has(*)) { .uh-card-main:focus-visible::after { outline: 2px solid var(--uh-accent); outline-offset: 4px; } }
+
+.uh-icon { grid-area: icon; display: grid; place-items: center; width: 40px; height: 40px; border-radius: 50%; color: var(--tone);
+  background: color-mix(in srgb, var(--tone) 15%, var(--uh-card)); }
+.uh-head { grid-area: head; display: flex; align-items: center; justify-content: space-between; gap: 8px; min-width: 0; }
+.uh-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  font-family: var(--body); font-size: 18px; line-height: 24px; font-weight: 600; letter-spacing: -.01em; color: var(--uh-ink); }
+.uh-tag { flex: none; display: inline-flex; align-items: center; gap: 6px; padding: 2px 8px 2px 7px; border-radius: 999px;
+  border: 1px solid var(--uh-line); font-family: var(--mono); font-size: 12px; line-height: 16px; color: var(--uh-dim); }
+.uh-tag.is-attention, .uh-tag.is-critical { color: var(--uh-ink); }
+.uh-tag.is-critical { border-color: color-mix(in srgb, var(--uh-crit) 55%, var(--uh-card)); }
+.uh-tag.is-attention { border-color: color-mix(in srgb, var(--uh-warn) 55%, var(--uh-card)); }
+
+.uh-dot { flex: none; display: inline-block; width: 8px; height: 8px; border-radius: 50%; box-sizing: border-box; }
+.uh-dot.is-ok { background: var(--uh-ok); }
+.uh-dot.is-attention { background: var(--uh-warn); }
+.uh-dot.is-critical { background: var(--uh-crit); box-shadow: 0 0 0 3px color-mix(in srgb, var(--uh-crit) 28%, transparent); }
+.uh-dot.is-unknown { background: transparent; border: 2px solid var(--uh-unk); }
+
+.uh-fig { grid-area: fig; display: flex; align-items: baseline; flex-wrap: wrap; gap: 2px 8px; min-width: 0; min-height: 36px; }
+.uh-figure { font-family: var(--body); font-size: 28px; line-height: 36px; font-weight: 600; letter-spacing: -.02em;
+  font-variant-numeric: tabular-nums; color: var(--uh-ink); white-space: nowrap; }
+.uh-figlabel { font-family: var(--mono); font-size: 12px; line-height: 16px; color: var(--uh-dim); }
+.uh-text { grid-area: text; align-self: start; min-height: 60px; font-family: var(--body); font-size: 13px; line-height: 20px;
+  color: var(--uh-soft); overflow-wrap: anywhere;
+  display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+
+/* Footer: freshness left, chevron right — or the error and Retry. The
+   footer opens the card on click too (mouse only; keyboard uses the
+   main button), Retry stops that. */
+.uh-foot { position: relative; z-index: 1; display: flex; align-items: center; gap: 10px; min-height: 52px; margin: 0 20px;
+  padding: 10px 0 12px; border-top: 1px solid var(--uh-line); font-family: var(--mono); font-size: 12px; line-height: 20px;
+  color: var(--uh-dim); cursor: pointer; }
+.uh-fresh { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.uh-err { display: flex; align-items: center; gap: 6px; min-width: 0; font-family: var(--body); color: var(--uh-ink); }
+.uh-err > svg { flex: none; color: var(--uh-unk); }
+.uh-err > span { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; line-height: 16px; }
+.uh-retry { flex: none; position: relative; z-index: 2; display: inline-flex; align-items: center; gap: 5px; height: 30px; padding: 0 10px;
+  border-radius: 8px; border: 1px solid var(--border); background: var(--upg-solid); color: var(--uh-ink);
+  font-family: var(--body); font-size: 12px; font-weight: 600; cursor: pointer; transition: border-color .15s, color .15s; }
+.uh-retry:hover { border-color: var(--uh-accent); }
+.uh-retry:focus-visible { outline: 2px solid var(--uh-accent); outline-offset: 2px; }
+.uh-chev { flex: none; display: grid; place-items: center; margin-left: auto; color: var(--uh-dim); transition: transform .18s ease-out, color .18s; }
+.uh-card:hover .uh-chev { transform: translateX(2px); color: var(--uh-ink); }
+
+/* Skeleton: the bars are always laid out (so nothing shifts when data
+   lands) but only become visible after 300 ms of loading (.is-skel). */
+.uh-bar { display: block; border-radius: 6px; background: var(--uh-skel); visibility: hidden; }
+.uh-card.is-skel .uh-bar { visibility: visible; animation: uh-pulse 1.4s ease-in-out infinite; }
+.uh-card.is-loading .uh-fig { align-items: center; }
+.uh-bar-fig { width: 46%; height: 28px; }
+.uh-bar-cap { width: 24%; height: 12px; }
+.uh-bar-line { width: 88%; height: 13px; margin: 3.5px 0; }
+.uh-bar-line.is-short { width: 58%; }
+.uh-bar-foot { width: 42%; height: 12px; }
+
+@keyframes uh-in { from { opacity: 0; transform: translateY(22px) scale(.97); } to { opacity: 1; transform: none; } }
+@keyframes uh-bob { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-9px); } }
+@keyframes uh-shadow { 0%, 100% { transform: scaleX(1); opacity: .4; } 50% { transform: scaleX(.82); opacity: .24; } }
+@keyframes uh-pulse { 0%, 100% { opacity: 1; } 50% { opacity: .55; } }
+
+/* An open section: slim header, grown from the card that opened it.
+   Names in the body sans, like the cards. */
 .uh-open { animation: uh-grow .42s cubic-bezier(.2,.8,.2,1) both; }
 @keyframes uh-grow { from { opacity: 0; transform: scale(.55); } to { opacity: 1; transform: none; } }
 .uh-open-head { display: flex; align-items: center; gap: 12px; min-height: 56px; margin-bottom: 16px; padding-bottom: 10px; border-bottom: 1px solid var(--border); }
@@ -1325,38 +1427,64 @@
 .uh-back:focus-visible { outline: 2px solid var(--em); outline-offset: 2px; }
 .uh-open-sep { width: 1px; height: 22px; background: var(--border); }
 .uh-open-icon { display: grid; place-items: center; width: 30px; height: 30px; border-radius: 50%; color: var(--tone);
-  background: color-mix(in srgb, var(--tone) 16%, var(--surface)); }
-.uh-open-icon.tone-gold { --tone: var(--gold); } .uh-open-icon.tone-em { --tone: var(--em); } .uh-open-icon.tone-ink { --tone: var(--text); }
-.uh-open-name { margin: 0; font-family: var(--display); font-size: 20px; font-weight: 800; letter-spacing: -.3px; color: var(--text); }
+  background: color-mix(in srgb, var(--tone) 15%, var(--surface)); }
+.uh-open-name { margin: 0; font-family: var(--body); font-size: 18px; line-height: 24px; font-weight: 600; letter-spacing: -.01em; color: var(--text); }
 
 @media (max-width: 900px) {
-  .uh-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px 12px; }
+  .uh-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
   .uh-slot.is-1 { margin-top: 30px; } .uh-slot.is-2 { margin-top: 6px; } .uh-slot.is-3 { margin-top: 36px; }
-  .uh-card { min-height: 172px; padding: 16px; gap: 16px; border-radius: 20px; }
-  .uh-icon { width: 44px; height: 44px; }
-  .uh-name { font-size: 22px; }
-  .uh-line { font-size: 10.5px; }
-  .uh-sub { font-size: 11.5px; }
+  .uh-card { min-height: 236px; }
+  .uh-card-main { padding: 16px 16px 12px; gap: 14px 10px; }
+  .uh-foot { margin: 0 16px; }
+}
+/* Phone: one column of compact rows — icon, name + sentence, figure on
+   the right. No tilt, stagger or bob here: rows need a straight edge. */
+@media (max-width: 543px) {
+  .upg-app .uh { padding: 18px 14px 16px; border-radius: 16px; }
+  .uh { gap: 18px; }
+  .uh-sub { font-size: 13px; }
+  .uh-grid { grid-template-columns: minmax(0, 1fr); gap: 10px; }
+  .uh-slot, .uh-slot.is-1, .uh-slot.is-2, .uh-slot.is-3 { margin-top: 0; padding-bottom: 0; }
+  .uh-floor { display: none; }
+  .uh-bob { animation: none; }
+  .uh-slot.is-0 .uh-card, .uh-slot.is-1 .uh-card, .uh-slot.is-2 .uh-card, .uh-slot.is-3 .uh-card { --tilt: 0deg; }
+  .uh-card { min-height: 0; border-radius: 14px; }
+  .uh-card:hover { transform: none; }
+  .uh-card-main { grid-template-columns: auto minmax(0, 1fr) auto; grid-template-areas: "icon head fig" "icon text fig";
+    align-items: start; gap: 2px 12px; padding: 14px 14px 10px; }
+  .uh-icon { width: 36px; height: 36px; margin-top: 2px; }
+  .uh-name { font-size: 16px; line-height: 22px; }
+  .uh-head { justify-content: flex-start; }
+  .uh-tag { padding: 0; border: 0; }
+  .uh-tag-word { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+  .uh-fig { flex-direction: column; align-items: flex-end; gap: 0; min-height: 0; text-align: right; }
+  .uh-card.is-loading .uh-fig { align-items: flex-end; gap: 6px; padding-top: 2px; }
+  .uh-figure { font-size: 20px; line-height: 26px; }
+  .uh-figlabel { white-space: nowrap; }
+  .uh-text { min-height: 40px; -webkit-line-clamp: 2; }
+  .uh-bar-fig { width: 64px; height: 20px; }
+  .uh-bar-cap { width: 48px; }
+  .uh-bar-line { width: 92%; }
+  .uh-foot { min-height: 44px; margin: 0 14px 0 62px; padding: 6px 0 8px; }
+  .uh-retry { height: 32px; }
 }
 @media (prefers-reduced-motion: reduce) {
-  .uh-hero, .uh-slot, .uh-bob, .uh-floor, .uh-open { animation: none !important; }
-  .uh-card { transition: none; }
+  .uh-hero, .uh-slot, .uh-bob, .uh-floor, .uh-open, .uh-card.is-skel .uh-bar { animation: none !important; }
+  .uh-card, .uh-chev { transition: none; }
 }
 
 /* ── Readability over a page background ──
    Upgrade can carry a background image (per page, like everywhere
    else). Frosted or tinted cards let it bleed through the text, even
-   dimmed, so inside Upgrade every surface is SOLID, and an open section
-   sits on one solid panel so its tabs and headings are too. */
+   dimmed, so inside Upgrade every surface is SOLID: the home menu (.uh,
+   above) and an open section each sit on one solid sheet. */
 .upg-app { --upg-solid: #fdfaf3; --card: var(--upg-solid); --surface: var(--upg-solid); }
 html[data-theme="cream-pro"] .upg-app { --upg-solid: #faf5e9; }
 html[data-theme="dark-os"] .upg-app { --upg-solid: #131311; }
 html[data-theme="dark-os"] .upg-app .career-pane { --cp-bg: #171715; }
 .upg-app .uh-open { background: var(--upg-solid); border: 1px solid var(--border); border-radius: 22px;
   padding: 14px 18px 22px; box-shadow: 0 24px 60px -30px rgba(0,0,0,.5); }
-.upg-app .uh-hero { align-self: flex-start; background: var(--upg-solid); border: 1px solid var(--border);
-  border-radius: 22px; padding: 18px 26px 16px; }
-@media (max-width: 700px) { .upg-app .uh-open { padding: 10px 12px 18px; border-radius: 16px; } .upg-app .uh-hero { padding: 14px 16px 12px; } }
+@media (max-width: 700px) { .upg-app .uh-open { padding: 10px 12px 18px; border-radius: 16px; } }
 
 /* ── Shopping list: shop chips, running total, gaps ── */
 .upg-stores { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; margin-top: 10px; }
