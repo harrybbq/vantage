@@ -25,16 +25,26 @@ export function readQueueResponse(status, raw) {
   if (status < 200 || status >= 300) {
     return { state: 'error', reports: [], error: body?.error || `The queue didn't load (HTTP ${status}).` };
   }
-  const list = Array.isArray(body) ? body : (body?.reports || body?.queue || []);
-  return { state: 'ok', reports: list.map(normaliseReport).filter(Boolean) };
+  // moderation.js answers `items` (a page of 25, with `total`); earlier
+  // drafts and the security console's panel use `reports`. Read them all.
+  const list = Array.isArray(body) ? body : (body?.items || body?.reports || body?.queue || []);
+  const out = { state: 'ok', reports: (Array.isArray(list) ? list : []).map(normaliseReport).filter(Boolean) };
+  if (body && Number.isFinite(body.total)) out.total = body.total;
+  return out;
 }
 
-/** One report row, whatever the exact field names turn out to be. */
+/**
+ * One report row, whatever the exact field names turn out to be — the
+ * function's camelCase shape ({ createdAt, snapshot, reported: { id,
+ * name, handle, suspendedAt }, reporter: { handle }, messages }) and the
+ * raw table's snake_case both read the same.
+ */
 export function normaliseReport(r) {
   if (!r || r.id == null) return null;
-  const snap = (r.reported_snapshot && typeof r.reported_snapshot === 'object') ? r.reported_snapshot : {};
-  const who = r.reported || r.reported_profile || {};
-  const reportedId = r.reported_id ?? r.reportedId ?? null;
+  const rawSnap = r.reported_snapshot ?? r.snapshot;
+  const snap = (rawSnap && typeof rawSnap === 'object') ? rawSnap : {};
+  const who = (r.reported && typeof r.reported === 'object' ? r.reported : null) || r.reported_profile || {};
+  const reportedId = r.reported_id ?? r.reportedId ?? who.id ?? null;
   return {
     id: r.id,
     at: r.created_at || r.createdAt || null,
@@ -45,12 +55,20 @@ export function normaliseReport(r) {
     reportedId,
     // Live profile first — it's what everyone sees now — then the copy
     // the reporter saw, which is all that's left once an account is gone.
-    name: who.display_name || snap.display_name || null,
+    name: who.display_name || who.name || snap.display_name || null,
     handle: who.handle || snap.handle || null,
-    avatar: who.avatar_url || null,
-    suspended: !!(who.suspended_at || r.reported_suspended_at),
+    avatar: who.avatar_url || who.avatarUrl || null,
+    suspended: !!(who.suspended_at || who.suspendedAt || r.reported_suspended_at),
+    banned: !!(who.banned_at || who.bannedAt || who.banned),
     where: snap.where || r.where || null,
     reporter: r.reporter?.handle || r.reporter_handle || null,
+    messages: Array.isArray(r.messages)
+      ? r.messages.filter(m => m && typeof m === 'object').map(m => ({
+        from: m.from === 'reported' ? 'reported' : 'reporter',
+        body: String(m.body || ''),
+        at: m.at || m.created_at || null,
+      }))
+      : [],
     deleted: reportedId == null,
   };
 }

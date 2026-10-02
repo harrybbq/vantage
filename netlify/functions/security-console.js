@@ -527,7 +527,7 @@ exports.handler = async (event) => {
       case 'advisor.unaccept': {
         const key = typeof b.cache_key === 'string' ? b.cache_key.trim().slice(0, 300) : '';
         if (!key) return reply(400, { error: 'cache_key required' });
-        const on = b.action === 'advisor.accept';
+        const on = b.action === 'advisor.accept' && b.on !== false; // the UI sends accept {on:false} to undo
         const r = await D.setAccepted(env, auth.userId, key, on, typeof b.note === 'string' ? b.note.slice(0, 500) : null);
         if (r === 'missing') { out = [501, { error: 'accepted findings not installed', hint: D.HINTS.sql }]; break; }
         overviewCache.at = 0;

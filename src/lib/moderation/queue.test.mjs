@@ -38,6 +38,27 @@ const ok = (c, m) => { assert.ok(c, m); n++; };
 
   eq(normaliseReport({ id: 'r3', reported_id: 'u2' }).name, null, 'no names at all');
   eq(normaliseReport(null), null, 'null row');
+
+  // What netlify/functions/moderation.js actually answers.
+  const page = readQueueResponse(200, JSON.stringify({
+    ok: true, page: 0, pageSize: 25, total: 40,
+    items: [{
+      id: 'r9', createdAt: '2026-10-01T09:00:00Z', reason: 'Harassment', context: 'DMs',
+      snapshot: { display_name: 'Then', handle: 'then', where: 'messages' },
+      reporter: { id: 'u1', handle: 'alice' },
+      reported: { id: 'u2', handle: 'bob', name: 'Bob', suspendedAt: null },
+      messages: [{ from: 'reported', body: 'hey', at: '2026-10-01T08:59:00Z' }, null],
+    }, {
+      id: 'r10', createdAt: '2026-10-01T10:00:00Z', reported: null,
+      snapshot: { display_name: 'Gone', handle: 'gone' },
+    }],
+  }));
+  eq([page.state, page.total, page.reports.length], ['ok', 40, 2], 'items + total read');
+  const fn = page.reports[0];
+  eq([fn.at, fn.reportedId, fn.name, fn.handle, fn.where, fn.reporter, fn.suspended, fn.messages.length],
+    ['2026-10-01T09:00:00Z', 'u2', 'Bob', 'bob', 'messages', 'alice', false, 1], 'function shape normalised');
+  eq([page.reports[1].deleted, page.reports[1].name], [true, 'Gone'], 'deleted account in function shape');
+  eq(normaliseReport({ id: 'r11', reported: { id: 'u3', suspendedAt: '2026-10-01' } }).suspended, true, 'camelCase suspension');
 }
 
 // ── Counting and order ──
