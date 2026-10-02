@@ -17,7 +17,7 @@
  */
 import { useEffect, useMemo, useState } from 'react';
 import Icon from '../Icon';
-import { resolveDay } from '../../lib/rotation/pattern';
+import { rotationLine } from '../../lib/upgrade/homeLines';
 import { planProteinG } from '../../lib/diet/plan';
 import { useDaySummary } from '../../lib/diet/daySummary';
 import { useOwnerContent } from '../../lib/owner/ownerContent';
@@ -27,6 +27,9 @@ import { usePacing, useLatestVs, todayIso } from './career/careerData';
 import { crestQueue } from '../../lib/groups/api';
 import { fetchPanel } from '../../lib/security/api';
 import { overviewLine } from '../../lib/security/status';
+
+/** "Night 2 · Pull", "Off · Rest" — lives in the home-lines module now. */
+export { rotationLine };
 
 export const SECTIONS = [
   { id: 'career', name: 'Career', icon: 'briefcase', tone: 'gold' },
@@ -44,15 +47,6 @@ function latestKg(S) {
   const days = Object.keys(log).sort();
   for (let i = days.length - 1; i >= 0; i--) if (log[days[i]] && log[days[i]].weight != null) return log[days[i]].weight;
   return null;
-}
-
-/** "Night 2 · Pull", "Off · Rest", "Annual leave · Rest" */
-export function rotationLine(S, iso = todayIso()) {
-  const [y, m, d] = iso.split('-').map(Number);
-  const r = resolveDay(y, m - 1, d, (S.rotation && S.rotation.overrides) || {});
-  if (!r.inPattern) return 'Before the rotation starts';
-  const shift = r.shift === 'night' ? `Night ${r.shiftNum}` : r.shift === 'day' ? `Day ${r.shiftNum}` : r.shift === 'leave' ? 'Leave' : 'Off';
-  return `${shift} · ${r.session || 'Rest'}`;
 }
 
 function useCareerLine(S) {
