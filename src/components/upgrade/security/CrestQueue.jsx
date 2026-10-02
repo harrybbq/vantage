@@ -1,5 +1,6 @@
 /**
- * The moderation queue: group pictures waiting on a person.
+ * Group pictures waiting on a person. (Moved here from the old
+ * ReviewTab when Review became Security — same behaviour, same calls.)
  *
  * Screening on upload is a first pass and it is wrong in both
  * directions — a crest refused for a cartoon skull, a photograph nobody
@@ -8,25 +9,21 @@
  * runs again on a picture a person has looked at.
  *
  * ── The gate is on the server ────────────────────────────────────────
- * This tab renders inside UpgradeSection, which is owner-gated by
- * useIsOwner (is_app_owner()). That is a UI gate and nothing more. The `groups`
- * function checks the email the AUTH SERVER returns before it will
- * answer `crestQueue` or `crestDecide` at all, and answers a non-owner
- * exactly as it answers a bad token. The leaderboard forgery is the
- * standing reminder of why the two have to be separate things.
+ * Upgrade is owner-gated by useIsOwner (is_app_owner()), a UI gate and
+ * nothing more. The `groups` function checks the email the AUTH SERVER
+ * returns before it will answer `crestQueue` or `crestDecide` at all,
+ * and answers a non-owner exactly as it answers a bad token.
  *
  * ── Why the queue is normally empty ──────────────────────────────────
  * Anything the screening cleared or refused outright never arrives here
  * — only what it could not decide, and what it could not reach (no API
- * key, a timeout). An empty queue is the healthy state, so it says so
- * rather than looking broken.
+ * key, a timeout). An empty queue is the healthy state, so it says so.
  */
 import { useCallback, useEffect, useState } from 'react';
-import Icon from '../Icon';
-import { crestQueue, decideCrest } from '../../lib/groups/api';
-import ModerationQueue from '../moderation/ModerationQueue';
+import Icon from '../../Icon';
+import { crestQueue, decideCrest } from '../../../lib/groups/api';
 
-export default function ReviewTab() {
+export default function CrestQueue({ className = '', onChanged }) {
   const [queue, setQueue] = useState(null);
   const [error, setError] = useState(null);
   const [busyId, setBusyId] = useState(null);
@@ -59,6 +56,7 @@ export default function ReviewTab() {
     try {
       await decideCrest(g.id, verdict, note || undefined);
       setQueue(q => (q || []).filter(x => x.id !== g.id));
+      if (onChanged) onChanged();
     } catch (e) {
       setError(e?.message || 'Could not record that.');
     } finally {
@@ -68,24 +66,21 @@ export default function ReviewTab() {
 
   if (!setup) {
     return (
-      <>
-        <div className="upg-review">
-          <p className="upg-review-empty">
-            Group pictures are not switched on yet — run <code>supabase/group_crest_schema.sql</code> in
-            the Supabase SQL editor.
-          </p>
-        </div>
-        <ModerationQueue />
-      </>
+      <div className={`upg-review ${className}`}>
+        <div className="upg-review-title">Group pictures</div>
+        <p className="upg-review-empty">
+          Group pictures are not switched on yet — run <code>supabase/group_crest_schema.sql</code> in
+          the Supabase SQL editor.
+        </p>
+      </div>
     );
   }
 
   return (
-    <>
-    <div className="upg-review">
+    <div className={`upg-review ${className}`}>
       <div className="upg-review-head">
         <div>
-          <div className="upg-review-title">Group pictures awaiting review</div>
+          <div className="upg-review-title">Group pictures awaiting review{queue && queue.length ? ` · ${queue.length}` : ''}</div>
           <p className="upg-review-sub">
             Only pictures the automatic screen could not decide — or could not reach — arrive here.
             Until one is approved, the group&apos;s own members are the only people who can see it.
@@ -130,8 +125,5 @@ export default function ReviewTab() {
         </div>
       ))}
     </div>
-    {/* People reported by people — the other half of moderation. */}
-    <ModerationQueue />
-    </>
   );
 }

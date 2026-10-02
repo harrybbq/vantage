@@ -1,15 +1,16 @@
 /**
  * Upgrade's home menu — what the section opens on. A large title with
  * today's line under it, then one card per section (Career, Diet,
- * Rotation, Review), each carrying a single live line from the data that
+ * Rotation, Security), each carrying a single live line from the data that
  * section already reads. Tapping a card opens that section.
  *
  * Every line is derived from state the tabs already use: the rotation
  * from S, Diet's protein target from the plan plus today's shared day
  * summary (one cached request, the same one the hub uses), Career from
  * the owner store the Career tab loads anyway (module-cached, so opening
- * Career after this costs nothing), and Review from its queue. Nothing
- * here writes anything.
+ * Career after this costs nothing), and Security from the console's cheap
+ * `?panel=overview` (falling back to the crest queue until that function
+ * is deployed). Nothing here writes anything.
  *
  * Motion: cards float in, bob for a few seconds, then settle; hover
  * lifts. All of it is off under prefers-reduced-motion.
@@ -24,13 +25,19 @@ import { KEYS } from '../../lib/career/schema';
 import { briefFor } from '../../lib/career/brief';
 import { usePacing, useLatestVs, todayIso } from './career/careerData';
 import { crestQueue } from '../../lib/groups/api';
+import { fetchPanel } from '../../lib/security/api';
+import { overviewLine } from '../../lib/security/status';
 
 export const SECTIONS = [
   { id: 'career', name: 'Career', icon: 'briefcase', tone: 'gold' },
   { id: 'diet', name: 'Diet', icon: 'utensils', tone: 'em' },
   { id: 'rotation', name: 'Rotation', icon: 'refresh-cw', tone: 'ink' },
-  { id: 'review', name: 'Review', icon: 'shield', tone: 'em' },
+  { id: 'security', name: 'Security', icon: 'shield', tone: 'em' },
 ];
+
+/** Tab ids that used to exist, mapped forward (history entries, deep links). */
+export const SECTION_ALIASES = { review: 'security' };
+export const resolveSection = id => SECTION_ALIASES[id] || id;
 
 function latestKg(S) {
   const log = (S && S.vitalsLog) || {};
@@ -70,21 +77,31 @@ function useCareerLine(S) {
   return { line: parts.join(' · ') };
 }
 
-/** → { line (for the card), sub (for the title line, or null) } */
-function useReviewLine() {
+/**
+ * → { line (for the card), sub (for the title line, or null) }
+ * "2 tickets open · all systems ok". Until the security-console function
+ * answers, the crest queue's line stands in — it is still real news.
+ */
+function useSecurityLine() {
   const [out, setOut] = useState({ line: null, sub: null });
   useEffect(() => {
     let live = true;
-    crestQueue()
-      .then(body => {
+    (async () => {
+      const ov = await fetchPanel('overview');
+      if (!live) return;
+      if (ov.state === 'ok') { const o = overviewLine(ov.data); setOut({ line: o.line, sub: o.sub }); return; }
+      try {
+        const body = await crestQueue();
         if (!live) return;
-        if (body.setup === false) { setOut({ line: 'Group pictures aren’t switched on', sub: null }); return; }
+        if (body.setup === false) { setOut({ line: 'Console not deployed yet', sub: null }); return; }
         const n = (body.queue || []).length;
         setOut(n
           ? { line: `${n} picture${n === 1 ? '' : 's'} waiting`, sub: `${n} to review` }
-          : { line: 'Nothing to review', sub: 'queue clear' });
-      })
-      .catch(() => { if (live) setOut({ line: 'Couldn’t load the queue', sub: null }); });
+          : { line: 'Nothing to review', sub: null });
+      } catch {
+        if (live) setOut({ line: 'Couldn’t reach the console', sub: null });
+      }
+    })();
     return () => { live = false; };
   }, []);
   return out;
@@ -97,12 +114,12 @@ export default function UpgradeHome({ S, userId, onOpen }) {
   const had = day.summary ? Math.round(Number(day.summary.protein_g) || 0) : null;
   const dietLine = `${target} g protein today${had != null ? (had >= target ? ' · target hit' : ` · ${target - had} g to go`) : ''}`;
   const career = useCareerLine(S);
-  const review = useReviewLine();
+  const security = useSecurityLine();
   const rota = rotationLine(S);
-  const lines = { career: career.line, diet: dietLine, rotation: rota, review: review.line };
+  const lines = { career: career.line, diet: dietLine, rotation: rota, security: security.line };
 
   const today = new Date().toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' });
-  const sub = [today, rota, review.sub].filter(Boolean).join(' · ');
+  const sub = [today, rota, security.sub].filter(Boolean).join(' · ');
 
   return (
     <div className="uh">
