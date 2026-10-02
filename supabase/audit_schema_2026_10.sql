@@ -48,7 +48,7 @@ grant execute on function public.ai_usage_bump(uuid, text, integer) to service_r
 create table if not exists public.client_errors (
   id       bigint generated always as identity primary key,
   user_id  uuid references auth.users(id) on delete set null,
-  at       timestamptz not null default now(),
+  occurred_at timestamptz not null default now(),
   kind     text,
   message  text,
   stack    text,
@@ -56,11 +56,11 @@ create table if not exists public.client_errors (
   ua       text,
   release  text
 );
-create index if not exists client_errors_at_idx on public.client_errors (at desc);
+create index if not exists client_errors_occurred_at_idx on public.client_errors (occurred_at desc);
 alter table public.client_errors enable row level security;  -- service role only
 revoke all on public.client_errors from anon, authenticated;
 -- Retention: delete rows older than 30 days by hand, or schedule it:
---   delete from public.client_errors where at < now() - interval '30 days';
+--   delete from public.client_errors where occurred_at < now() - interval '30 days';
 
 -- ── 63. Moderation: report status, evidence that survives deletion ──────
 alter table public.reports add column if not exists status text not null default 'open';

@@ -140,10 +140,10 @@ Where to look:
 - **Supabase auth audit** — `auth.audit_log_entries` (sign-ins, token refreshes) via the SQL editor.
 - **`public.client_errors`** — the app's own crash reports (`netlify/functions/client-error.js`). Service role only. Once `supabase/audit_schema_2026_10.sql` has been run.
   ```sql
-  select at, kind, message, url, release
+  select occurred_at, kind, message, url, release
   from public.client_errors
-  where at > now() - interval '24 hours'
-  order by at desc limit 200;
+  where occurred_at > now() - interval '24 hours'
+  order by occurred_at desc limit 200;
   ```
 - **`public.user_data_history`** — if data was wiped, the pre-wipe snapshots are here. See `docs/RESTORE_RUNBOOK.md`.
 - **GitHub** — commit history, and Security → Secret scanning alerts if a key was pushed.
