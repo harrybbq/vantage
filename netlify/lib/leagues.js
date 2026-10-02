@@ -29,6 +29,8 @@
  * for the clocks to change. In UK summer the reset lands at 01:00 BST.
  */
 
+const { inChunks } = require('./pgPage');
+
 const DIVISIONS = [
   { num: 1,  name: 'Obsidian' },
   { num: 2,  name: 'Ruby' },
@@ -109,16 +111,33 @@ function sb(supabaseUrl, serviceKey, path, init = {}) {
  * in the window oldest-first and keeps the first per user — which is
  * the earliest, which is Monday's.
  */
-async function fetchBaselines(userIds, { supabaseUrl, serviceKey }, from = weekStart()) {
+async function fetchBaselines(userIds, { supabaseUrl, serviceKey }, from = weekStart(), { strict = false } = {}) {
   const out = new Map();
   if (!userIds.length) return out;
-  const res = await sb(supabaseUrl, serviceKey,
-    `/rest/v1/rating_snapshots?user_id=in.(${userIds.join(',')})` +
-    `&snapshotted_at=gte.${from.toISOString()}` +
-    `&select=user_id,ovr,brain,finance,fitness,social,snapshotted_at&order=snapshotted_at.asc`
-  );
-  if (!res.ok) return out;
-  for (const r of await res.json()) {
+  /* Chunked and paged (2026-09-30): ≤150 ids a request so the URL stays
+     short, and each chunk read oldest-first until every id in it has
+     appeared. A week is ~7 rows a user, so 150 users is ~1,050 rows —
+     past PostgREST's silent 1000-row cap, which would have dropped the
+     tail. Only the FIRST row per user is used, so stopping once each id
+     has been seen cannot change the answer. `user_id` breaks ties so
+     pages are stable. */
+  let rows;
+  try {
+    rows = await inChunks(userIds, (csv, offset, limit) => sb(supabaseUrl, serviceKey,
+      `/rest/v1/rating_snapshots?user_id=in.(${csv})` +
+      `&snapshotted_at=gte.${from.toISOString()}` +
+      `&select=user_id,ovr,brain,finance,fitness,social,snapshotted_at` +
+      `&order=snapshotted_at.asc,user_id.asc&limit=${limit}&offset=${offset}`
+    ), { firstPer: 'user_id', what: 'league baselines' });
+  } catch {
+    // The live board shows "—" on a failed read; the Monday settle must
+    // not — empty baselines there would settle a whole week at zero.
+    // Any failed chunk fails the lot: partial baselines are the same
+    // zeroed week for whoever was in the missing chunk.
+    if (strict) throw new Error('baselines read failed');
+    return out;
+  }
+  for (const r of rows) {
     if (!out.has(r.user_id)) out.set(r.user_id, r);
   }
   return out;
@@ -127,8 +146,27 @@ async function fetchBaselines(userIds, { supabaseUrl, serviceKey }, from = weekS
 const CATEGORIES = ['brain', 'finance', 'fitness', 'social'];
 
 /**
+ * Did this member join on or before the week began?
+ *
+ * The baseline is the member's Monday snapshot wherever they were on
+ * Monday — so someone who joined on Thursday carried their whole week's
+ * climb, earned in another group or none, into this one. Recruiting a
+ * big climber late in the week was worth more than the group's own
+ * work. A member now counts from the first full week they are in.
+ *
+ * A missing joined_at (older callers, or a row read without it) counts
+ * as joined — the old behaviour — rather than silently zeroing people.
+ */
+function joinedByWeekStart(joinedAt, from = weekStart()) {
+  if (joinedAt == null) return true;
+  const t = new Date(joinedAt).getTime();
+  return !Number.isFinite(t) || t <= from.getTime();
+}
+
+/**
  * One member's contribution. `climb` is null when there is no baseline
- * to measure from — displayed as "—", counted as zero.
+ * to measure from, or when the member joined after the week began —
+ * displayed as "—", counted as zero.
  *
  * `split` is the same subtraction per category, which is what lets the
  * group card say where its week came from. Those four do NOT sum to the
@@ -136,10 +174,10 @@ const CATEGORIES = ['brain', 'finance', 'fitness', 'social'];
  * fitness alone moves 1 overall. The card labels them as category
  * points for that reason.
  */
-function memberScore(profile, baseline) {
+function memberScore(profile, baseline, joinedAt = null, from = weekStart()) {
   const current = profile?.ratings_ovr;
   const baseOvr = baseline?.ovr;
-  if (current == null || baseOvr == null) {
+  if (current == null || baseOvr == null || !joinedByWeekStart(joinedAt, from)) {
     return { climb: null, counted: 0, split: { brain: 0, finance: 0, fitness: 0, social: 0 } };
   }
   const climb = Math.max(0, current - baseOvr);
@@ -188,9 +226,41 @@ function rankGroups(groups) {
 
 const divisionName = num => (DIVISIONS.find(d => d.num === num) || DIVISIONS[9]).name;
 
+/**
+ * The owner is leaving: hand the group to whoever has been in it
+ * longest rather than deleting it under everyone. A group is other
+ * people's week; one person quitting should not end it.
+ *
+ * Shared by groups.js (Leave) and delete-account.js. The second one
+ * matters more: groups.owner_id cascades on delete, so an owner deleting
+ * their account used to take the whole group — every member's league
+ * history — down with them.
+ *
+ * → the heir's user id, or null when nobody else is in the group (the
+ * caller's own removal then empties it, which is the right outcome).
+ */
+async function handOverGroup(groupId, leavingUserId, { supabaseUrl, serviceKey }) {
+  const others = await sb(supabaseUrl, serviceKey,
+    `/rest/v1/group_members?group_id=eq.${groupId}&user_id=neq.${leavingUserId}&select=user_id&order=joined_at.asc&limit=1`);
+  if (!others.ok) throw new Error('heir lookup failed');
+  const heir = (await others.json())[0];
+  if (!heir) return null;
+  const g = await sb(supabaseUrl, serviceKey, `/rest/v1/groups?id=eq.${groupId}`, {
+    method: 'PATCH', headers: { Prefer: 'return=minimal' },
+    body: JSON.stringify({ owner_id: heir.user_id }),
+  });
+  if (!g.ok) throw new Error('hand-over failed');
+  await sb(supabaseUrl, serviceKey,
+    `/rest/v1/group_members?group_id=eq.${groupId}&user_id=eq.${heir.user_id}`, {
+      method: 'PATCH', headers: { Prefer: 'return=minimal' },
+      body: JSON.stringify({ role: 'owner' }),
+    });
+  return heir.user_id;
+}
+
 module.exports = {
   DIVISIONS, MAX_SEATS, COIN_AWARD, MIN_GROUPS_TO_SETTLE, MAX_MOVED, GROUPS_PER_EXTRA_MOVE,
   movementFor, CATEGORIES,
-  weekStart, weekStartDate, sb, fetchBaselines, memberScore, groupScore, groupSplit,
-  rankGroups, divisionName,
+  weekStart, weekStartDate, sb, fetchBaselines, memberScore, joinedByWeekStart, groupScore, groupSplit,
+  rankGroups, divisionName, handOverGroup,
 };

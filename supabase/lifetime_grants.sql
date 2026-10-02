@@ -3,6 +3,12 @@
 -- Run in the Supabase SQL Editor.
 -- ============================================================
 --
+-- ⚠️ PLACEHOLDERS. The addresses below (<owner-email>,
+-- <co-owner-email>, <revoked-grantee-email>) stand in for real
+-- people's emails. Substitute the real values in the SQL editor when
+-- you run this, and NEVER commit them back — this repo is public.
+-- As committed, the file matches zero rows by design.
+--
 -- Lifetime is a GRANT, never a purchase. It is deliberately absent
 -- from the paywall (see UNSELLABLE in src/components/PaywallModal.jsx)
 -- so the public can only ever buy Free → Pro.
@@ -23,9 +29,9 @@
 
 with grantees(email) as (
   values
-    ('harrym3002@outlook.com'),      -- owner
-    ('anotherone650@gmail.com')      -- co-owner
-    -- finlaycarsonm@gmail.com — granted 2026-07-29, revoked 2026-08-16.
+    ('<owner-email>'),      -- owner
+    ('<co-owner-email>')      -- co-owner
+    -- <revoked-grantee-email> — granted 2026-07-29, revoked 2026-08-16.
     -- Removing a line from this list does NOT revoke anything: the
     -- statement only ever sets tier TO lifetime, so an existing grant
     -- survives until it is explicitly taken back. See the revoke block
@@ -47,9 +53,9 @@ select u.email, p.tier, p.tier_updated_at
 from public.profiles p
 join auth.users u on u.id = p.id
 where lower(u.email) in (
-  'harrym3002@outlook.com',
-  'anotherone650@gmail.com',
-  'finlaycarsonm@gmail.com'   -- kept here so a revoke can be verified too
+  '<owner-email>',
+  '<co-owner-email>',
+  '<revoked-grantee-email>'   -- kept here so a revoke can be verified too
 );
 
 -- ── Note on RevenueCat ───────────────────────────────────────
@@ -77,25 +83,25 @@ where lower(u.email) in (
 -- is worth checking the RevenueCat dashboard for an active entitlement
 -- on that email first.
 --
--- Revoked 2026-08-16 — finlaycarsonm@gmail.com:
+-- Revoked 2026-08-16 — <revoked-grantee-email>:
 --
 --   -- 1. Look before writing:
 --   select u.email, p.tier, p.tier_updated_at
 --   from public.profiles p join auth.users u on u.id = p.id
---   where lower(u.email) = 'finlaycarsonm@gmail.com';
+--   where lower(u.email) = '<revoked-grantee-email>';
 --
 --   -- 2. Revoke (no-op unless they are currently 'lifetime'):
 --   update public.profiles p
 --   set tier = 'free', tier_updated_at = now()
 --   from auth.users u
 --   where p.id = u.id
---     and lower(u.email) = 'finlaycarsonm@gmail.com'
+--     and lower(u.email) = '<revoked-grantee-email>'
 --     and p.tier = 'lifetime';
 --
 --   -- 3. Confirm — expect tier = 'free':
 --   select u.email, p.tier, p.tier_updated_at
 --   from public.profiles p join auth.users u on u.id = p.id
---   where lower(u.email) = 'finlaycarsonm@gmail.com';
+--   where lower(u.email) = '<revoked-grantee-email>';
 --
 -- To reinstate: put the address back in `grantees` and re-run the
 -- update at the top of this file. Nothing about the account's data is

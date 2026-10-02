@@ -36,6 +36,24 @@
  * The function is idempotent — replaying the same event yields the
  * same tier update. RC retries on 5xx, so non-2xx responses are
  * reserved for genuine failures.
+ *
+ * ── Hardening (2026-09-30, item 46) ─────────────────────────────────
+ *   · SANDBOX events are acknowledged and ignored unless
+ *     REVENUECAT_ALLOW_SANDBOX is 'true' — a TestFlight purchase must
+ *     not grant Pro on the production database.
+ *   · A lifetime row is never overwritten, on ANY path: every PATCH
+ *     carries tier=neq.lifetime (writing lifetime onto lifetime is a
+ *     no-op anyway).
+ *   · With REVENUECAT_SECRET_API_KEY set, the event is treated as a
+ *     trigger only: the tier comes from GET /v1/subscribers/{id} —
+ *     RevenueCat's current view — so a late or replayed event cannot
+ *     re-grant or revoke anything. Fails soft to the event logic.
+ *   · Without the key, events are ordered by their own timestamp:
+ *     tier_updated_at is set to the event's event_timestamp_ms and the
+ *     PATCH only applies when the stored stamp is older. A RENEWAL
+ *     delivered after the EXPIRATION that followed it is ignored.
+ *     No schema change — tier_updated_at already exists and nothing
+ *     else in the app writes it.
  */
 
 const { safeEqual } = require('../lib/cronAuth');
@@ -65,6 +83,35 @@ function deriveTier(entitlementIdsActive = []) {
   return null; // no recognized entitlement; caller decides what to do
 }
 
+/**
+ * The subscriber's tier as RevenueCat sees it NOW, or null when the
+ * secret key is unset or the call fails (caller falls back to the
+ * event). An entitlement is active while its expires_date is null
+ * (lifetime / non-expiring) or in the future.
+ */
+async function tierFromSubscriberApi(appUserId) {
+  const key = process.env.REVENUECAT_SECRET_API_KEY;
+  if (!key) return null;
+  try {
+    const res = await fetch(`https://api.revenuecat.com/v1/subscribers/${encodeURIComponent(appUserId)}`, {
+      headers: { Authorization: `Bearer ${key}`, Accept: 'application/json' },
+    });
+    if (!res.ok) {
+      console.error('revenuecat-webhook: subscriber read failed', res.status);
+      return null;
+    }
+    const ents = (await res.json())?.subscriber?.entitlements || {};
+    const now = Date.now();
+    const active = Object.entries(ents)
+      .filter(([, v]) => v && (v.expires_date == null || new Date(v.expires_date).getTime() > now))
+      .map(([id]) => id);
+    return deriveTier(active) || 'free';
+  } catch (e) {
+    console.error('revenuecat-webhook: subscriber read unreachable', e?.message);
+    return null;
+  }
+}
+
 exports.handler = async (event) => {
   if (event.httpMethod === 'OPTIONS') {
     return { statusCode: 204, headers: CORS, body: '' };
@@ -79,7 +126,7 @@ exports.handler = async (event) => {
   if (!expected) {
     return {
       statusCode: 500, headers: CORS,
-      body: JSON.stringify({ error: 'REVENUECAT_WEBHOOK_AUTH not configured on this Netlify site' }),
+      body: JSON.stringify({ error: 'not configured' }),
     };
   }
   // Constant-time: `!==` returns as soon as two bytes differ, so the
@@ -100,12 +147,17 @@ exports.handler = async (event) => {
     return { statusCode: 400, headers: CORS, body: JSON.stringify({ error: 'no event field' }) };
   }
 
+  // Sandbox purchases are free; they must never reach production tiers.
+  if (String(e.environment || '').toUpperCase() === 'SANDBOX' && process.env.REVENUECAT_ALLOW_SANDBOX !== 'true') {
+    return { statusCode: 200, headers: CORS, body: JSON.stringify({ ok: true, skipped: 'sandbox' }) };
+  }
+
   const supabaseUrl = process.env.SUPABASE_URL;
   const serviceKey  = process.env.SUPABASE_SERVICE_ROLE_KEY;
   if (!supabaseUrl || !serviceKey) {
     return {
       statusCode: 500, headers: CORS,
-      body: JSON.stringify({ error: 'Supabase env vars missing' }),
+      body: JSON.stringify({ error: 'not configured' }),
     };
   }
 
@@ -163,46 +215,61 @@ exports.handler = async (event) => {
       return { statusCode: 200, headers: CORS, body: JSON.stringify({ ok: true, action: 'unhandled', type: eventType }) };
   }
 
+  // With the secret key, RevenueCat's CURRENT view of the subscriber
+  // decides — the event only tells us to look. Null = could not ask.
+  const fromApi = await tierFromSubscriberApi(userId);
+  if (fromApi) nextTier = fromApi;
+
   // Patch profiles.tier.
   //
   // Lifetime is a GRANT, never a purchase (supabase/lifetime_grants.sql)
-  // — so a grantee has no RevenueCat entitlement backing it. An
-  // EXPIRATION for such an account (an old trial finally lapsing, a
-  // TRANSFER's donor leg) would set tier='free' and silently revoke a
-  // grant nobody meant to touch. The filter makes the demotion skip
-  // lifetime rows in the same statement rather than reading first and
-  // racing a concurrent event.
-  //
-  // Upgrades deliberately keep no such guard: those are legitimate.
-  const guard = nextTier === 'free' ? '&tier=neq.lifetime' : '';
-  const url = `${supabaseUrl}/rest/v1/profiles?id=eq.${encodeURIComponent(userId)}${guard}`;
+  // — so a grantee has no RevenueCat entitlement backing it. Any write
+  // here (an EXPIRATION from an old trial, a TRANSFER's donor leg, a
+  // Pro renewal) would silently replace a grant nobody meant to touch.
+  // The filter skips lifetime rows in the same statement rather than
+  // reading first and racing a concurrent event.
+  const filters = ['tier=neq.lifetime'];
+  let stamp = new Date().toISOString();
+  if (!fromApi) {
+    // Event-ordered: apply only if nothing newer has been applied.
+    const ts = Number(e.event_timestamp_ms);
+    if (Number.isFinite(ts) && ts > 0) {
+      stamp = new Date(ts).toISOString();
+      // Quoted (%22): the timestamp holds PostgREST-reserved . and : characters.
+      filters.push(`or=(tier_updated_at.is.null,tier_updated_at.lt.%22${stamp}%22)`);
+    }
+  }
+  const url = `${supabaseUrl}/rest/v1/profiles?id=eq.${encodeURIComponent(userId)}&${filters.join('&')}&select=id`;
   const res = await fetch(url, {
     method: 'PATCH',
     headers: {
       apikey: serviceKey,
       Authorization: `Bearer ${serviceKey}`,
       'Content-Type': 'application/json',
-      Prefer: 'return=minimal',
+      Prefer: 'return=representation',
     },
     body: JSON.stringify({
       tier: nextTier,
-      tier_updated_at: new Date().toISOString(),
+      tier_updated_at: stamp,
     }),
   });
 
   if (!res.ok) {
     const errText = await res.text().catch(() => '');
-    console.error('profiles.tier PATCH failed:', res.status, errText);
+    console.error('profiles.tier PATCH failed:', res.status, errText.slice(0, 300));
     // Return 500 so RC retries — transient Supabase failures shouldn't
     // silently lose a tier update.
-    return {
-      statusCode: 500, headers: CORS,
-      body: JSON.stringify({ error: 'profile update failed', detail: errText }),
-    };
+    return { statusCode: 500, headers: CORS, body: JSON.stringify({ error: 'profile update failed' }) };
   }
+  const applied = ((await res.json().catch(() => [])) || []).length > 0;
 
   return {
     statusCode: 200, headers: CORS,
-    body: JSON.stringify({ ok: true, user_id: userId, tier: nextTier, event: eventType }),
+    body: JSON.stringify({
+      ok: true, event: eventType,
+      // Not applied = lifetime row, no profile, or an older event.
+      action: applied ? 'applied' : 'ignored',
+      source: fromApi ? 'subscriber_api' : 'event',
+    }),
   };
 };

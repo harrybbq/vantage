@@ -73,7 +73,7 @@ exports.handler = async (event, context) => {
   if (!supabaseUrl || !serviceKey) {
     return {
       statusCode: 500, headers: CORS,
-      body: JSON.stringify({ error: 'SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY not configured' }),
+      body: JSON.stringify({ error: 'not configured' }),
     };
   }
 
@@ -85,9 +85,10 @@ exports.handler = async (event, context) => {
     { limit: BATCH_SIZE }
   );
   if (pending.error) {
+    console.error('push-dispatch: queue read failed', pending.error);
     return {
       statusCode: 500, headers: CORS,
-      body: JSON.stringify({ error: 'queue read failed', detail: pending.error }),
+      body: JSON.stringify({ error: 'queue read failed' }),
     };
   }
   const rows = pending.data || [];
@@ -119,8 +120,11 @@ exports.handler = async (event, context) => {
       // Tokens come from the dedicated push_tokens table — NOT from
       // user_data.state.pushTokens (legacy, removed 2026-05-03 after
       // the read-modify-write race wiped a user's data on phone).
-      const userState = await supabase.selectOne('user_data', { id: row.user_id }, 'state');
-      const prefs = userState?.data?.state?.notifications || {};
+      //
+      // JSON-path projection: only state->notifications crosses the
+      // wire, not the ~1 MB state, once per queued row (Micro DB).
+      const userState = await supabase.selectOne('user_data', { id: row.user_id }, 'notifications:state->notifications');
+      const prefs = userState?.data?.notifications || {};
       const tokenRows = await supabase.select('push_tokens', {
         match: { user_id: row.user_id },
         select: 'token,platform,last_seen_at',

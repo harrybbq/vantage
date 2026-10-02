@@ -23,9 +23,12 @@
 
 const { requireUser, underLimit, tooMany } = require('../lib/requireUser');
 const { screenImage, parseDataUrl } = require('../lib/imageModeration');
+const { withinDailyAiCap, overDailyCap } = require('../lib/aiQuota');
+const { checkPublicText } = require('../lib/nameFilter');
+const { suspendedIds } = require('../lib/suspended');
 const {
   MAX_SEATS, DIVISIONS, sb, fetchBaselines, memberScore, groupScore, groupSplit, rankGroups,
-  divisionName, weekStartDate, COIN_AWARD,
+  divisionName, weekStartDate, COIN_AWARD, handOverGroup,
 } = require('../lib/leagues');
 
 const CORS = {
@@ -52,6 +55,20 @@ function makeCode() {
 }
 
 const cleanName = v => String(v || '').replace(/\s+/g, ' ').trim().slice(0, 32);
+
+/* Group names are shown on every division table, to strangers. The
+   filter (lib/nameFilter.js) refuses slurs, explicit terms, links and
+   phone numbers; the copy says what to change without echoing a match. */
+function nameProblem(name) {
+  if (name.length < 2) return 'Give the group a name of at least 2 characters.';
+  const verdict = checkPublicText(name);
+  if (!verdict.ok) {
+    return verdict.reason === 'contact'
+      ? 'Group names can’t include links, emails or phone numbers.'
+      : 'That name isn’t allowed — pick another.';
+  }
+  return null;
+}
 const isHex = v => typeof v === 'string' && /^#[0-9a-fA-F]{6}$/.test(v);
 
 // ── Reads ────────────────────────────────────────────────────────────
@@ -71,11 +88,14 @@ async function myGroup(userId, env) {
 }
 
 /** Members of one group, scored against Monday. Sorted by climb. */
-async function membersOf(groupId, env) {
+async function membersOf(groupId, env, viewerId = null) {
   const mRes = await sb(env.supabaseUrl, env.serviceKey,
     `/rest/v1/group_members?group_id=eq.${groupId}&select=user_id,role,joined_at`);
   if (!mRes.ok) throw new Error('members read failed');
-  const rows = await mRes.json();
+  // Suspended members vanish from the table (item 63). They are still
+  // seated — a moderator un-suspending them should not need a re-invite.
+  const suspended = await suspendedIds(env);
+  const rows = (await mRes.json()).filter(r => r.user_id === viewerId || !suspended.has(r.user_id));
   const ids = rows.map(r => r.user_id);
   if (!ids.length) return [];
 
@@ -87,7 +107,7 @@ async function membersOf(groupId, env) {
 
   return rows.map(r => {
     const p = byId.get(r.user_id) || {};
-    const { climb, counted, split } = memberScore(p, baselines.get(r.user_id));
+    const { climb, counted, split } = memberScore(p, baselines.get(r.user_id), r.joined_at);
     return {
       userId: r.user_id,
       role: r.role,
@@ -119,8 +139,9 @@ async function divisionStandings(division, env) {
   if (!groups.length) return [];
 
   const mRes = await sb(env.supabaseUrl, env.serviceKey,
-    `/rest/v1/group_members?group_id=in.(${groups.map(g => g.id).join(',')})&select=group_id,user_id`);
-  const memberships = mRes.ok ? await mRes.json() : [];
+    `/rest/v1/group_members?group_id=in.(${groups.map(g => g.id).join(',')})&select=group_id,user_id,joined_at`);
+  const suspended = await suspendedIds(env);
+  const memberships = (mRes.ok ? await mRes.json() : []).filter(m => !suspended.has(m.user_id));
   const ids = Array.from(new Set(memberships.map(m => m.user_id)));
 
   let byId = new Map(), baselines = new Map();
@@ -134,12 +155,14 @@ async function divisionStandings(division, env) {
   const scored = groups.map(g => {
     const mine = memberships.filter(m => m.group_id === g.id).map(m => {
       const p = byId.get(m.user_id) || {};
-      const { climb, counted } = memberScore(p, baselines.get(m.user_id));
+      const { climb, counted } = memberScore(p, baselines.get(m.user_id), m.joined_at);
       return { userId: m.user_id, name: p.display_name || (p.handle ? '@' + p.handle : 'Someone'), climb, counted };
     });
     const top = mine.slice().sort((a, b) => b.counted - a.counted)[0];
     return {
-      id: g.id, name: g.name, crestColor: g.crest_color || null,
+      // Names from before the filter existed are masked on the public
+      // table rather than rewritten — the group's own row is untouched.
+      id: g.id, name: checkPublicText(g.name).ok ? g.name : 'Unnamed group', crestColor: g.crest_color || null,
       /* Only an APPROVED picture goes out on a division table. A
          pending or rejected one is the group's own business and is
          returned to its own members by the `group` block below —
@@ -158,7 +181,8 @@ async function divisionStandings(division, env) {
 
 async function createGroup(userId, body, env) {
   const name = cleanName(body.name);
-  if (name.length < 2) return fail(400, 'Give the group a name of at least 2 characters.');
+  const bad = nameProblem(name);
+  if (bad) return fail(400, bad);
   const crest = isHex(body.crestColor) ? body.crestColor : null;
 
   const mine = await myGroup(userId, env);
@@ -229,22 +253,13 @@ async function leaveGroup(userId, env) {
   const isOwner = group.owner_id === userId;
 
   if (isOwner) {
-    /* The owner leaving hands the group to whoever has been in it
-       longest rather than deleting it under everyone. A group is other
-       people's week; one person quitting should not end it. */
-    const others = await sb(env.supabaseUrl, env.serviceKey,
-      `/rest/v1/group_members?group_id=eq.${group.id}&user_id=neq.${userId}&select=user_id&order=joined_at.asc&limit=1`);
-    const heir = others.ok ? (await others.json())[0] : null;
-    if (heir) {
-      await sb(env.supabaseUrl, env.serviceKey, `/rest/v1/groups?id=eq.${group.id}`, {
-        method: 'PATCH', headers: { Prefer: 'return=minimal' },
-        body: JSON.stringify({ owner_id: heir.user_id }),
-      });
-      await sb(env.supabaseUrl, env.serviceKey,
-        `/rest/v1/group_members?group_id=eq.${group.id}&user_id=eq.${heir.user_id}`, {
-          method: 'PATCH', headers: { Prefer: 'return=minimal' },
-          body: JSON.stringify({ role: 'owner' }),
-        });
+    // Heir logic lives in lib/leagues.js — delete-account runs it too.
+    // A failed hand-over now stops the leave rather than leaving the
+    // group owned by someone who is no longer in it.
+    try {
+      await handOverGroup(group.id, userId, env);
+    } catch {
+      return fail(500, 'Could not hand the group over — try again.');
     }
   }
 
@@ -273,7 +288,8 @@ async function ownerAction(userId, action, body, env) {
 
   if (action === 'rename') {
     const name = cleanName(body.name);
-    if (name.length < 2) return fail(400, 'Give the group a name of at least 2 characters.');
+    const bad = nameProblem(name);
+    if (bad) return fail(400, bad);
     const patch = { name };
     if (body.crestColor !== undefined) patch.crest_color = isHex(body.crestColor) ? body.crestColor : null;
     const res = await sb(env.supabaseUrl, env.serviceKey, `/rest/v1/groups?id=eq.${group.id}`, {
@@ -294,6 +310,8 @@ async function ownerAction(userId, action, body, env) {
   if (action === 'setCrest') {
     const img = parseDataUrl(body.image);
     if (!img.ok) return fail(400, img.error);
+    // Every upload is a paid screening call.
+    if (!(await withinDailyAiCap('crest', userId))) return overDailyCap(CORS);
 
     /* Stored pending FIRST, then screened. If the screening call hangs
        or the function is killed mid-flight, the picture exists in the
@@ -427,7 +445,7 @@ exports.handler = async (event) => {
     supabaseUrl: process.env.SUPABASE_URL,
     serviceKey: process.env.SUPABASE_SERVICE_ROLE_KEY,
   };
-  if (!env.supabaseUrl || !env.serviceKey) return fail(500, 'supabase env missing');
+  if (!env.supabaseUrl || !env.serviceKey) return fail(500, 'not configured');
 
   let body;
   try { body = JSON.parse(event.body || '{}'); } catch { body = {}; }
@@ -461,7 +479,7 @@ exports.handler = async (event) => {
        whatever table happens to be on screen would report a group as
        "1st of 15" the moment you browsed a division it is not in. */
     const [members, standings, awayStandings] = await Promise.all([
-      group ? membersOf(group.id, env) : Promise.resolve([]),
+      group ? membersOf(group.id, env, userId) : Promise.resolve([]),
       divisionStandings(division, env),
       group && group.division !== division
         ? divisionStandings(group.division, env)
@@ -506,6 +524,7 @@ exports.handler = async (event) => {
       standings,
     });
   } catch (e) {
-    return fail(500, e.message || 'groups failed');
+    console.error('groups:', action, e?.message);
+    return fail(500, 'Something went wrong — try again.');
   }
 };

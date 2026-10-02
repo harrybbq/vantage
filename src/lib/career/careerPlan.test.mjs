@@ -214,8 +214,8 @@ t('status map values are checked', () => {
 
 /* companies */
 t('parseMoney reads k, commas and pounds', () => {
-  assert.equal(parseMoney('£42k'), 42000);
-  assert.equal(parseMoney('≥ £48.5k (matches current)'), 48500);
+  assert.equal(parseMoney('£30k'), 30000);
+  assert.equal(parseMoney('≥ £32.5k (example)'), 32500);
   assert.equal(parseMoney('£45,000'), 45000);
   assert.equal(parseMoney('within 30 min'), null);
 });

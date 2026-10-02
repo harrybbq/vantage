@@ -16,8 +16,9 @@
   # server-side secrets (SUPABASE_SERVICE_ROLE_KEY, FCM_*, etc.) —
   # those should never appear in the bundle in the first place.
   #
-  # VITE_OWNER_EMAIL is a client-side UI gate (useIsOwner) — it's an
-  # email identifier bundled on purpose, not a credential.
+  # VITE_OWNER_EMAIL used to be the client-side UI gate (useIsOwner);
+  # the client no longer reads it, but some functions still fall back to
+  # it for OWNER_EMAIL. An email identifier, not a credential.
   #
   # SUPABASE_URL is the server-side twin of VITE_SUPABASE_URL — same
   # value (the public project endpoint), used by the Netlify functions
@@ -27,7 +28,13 @@
   # public endpoint, NOT a secret — the real secret is
   # SUPABASE_SERVICE_ROLE_KEY, which never enters the bundle and stays
   # scanned.
-  SECRETS_SCAN_OMIT_KEYS = "VITE_SUPABASE_URL,VITE_SUPABASE_ANON_KEY,VITE_REVENUECAT_API_KEY_IOS,VITE_REVENUECAT_API_KEY_ANDROID,VITE_OWNER_EMAIL,SUPABASE_URL"
+  #
+  # VITE_API_BASE (native build's function origin, the public site URL —
+  # also hard-coded as DEFAULT_API_BASE in src/lib/native/apiUrl.js) and
+  # VITE_NATIVE_BUILD (a "true"/"false" build flag) came in with the
+  # native work; both are public by design and would otherwise trip the
+  # value scan the moment they are set in the dashboard.
+  SECRETS_SCAN_OMIT_KEYS = "VITE_SUPABASE_URL,VITE_SUPABASE_ANON_KEY,VITE_REVENUECAT_API_KEY_IOS,VITE_REVENUECAT_API_KEY_ANDROID,VITE_OWNER_EMAIL,VITE_API_BASE,VITE_NATIVE_BUILD,SUPABASE_URL"
 
   # Smart detection scans for things that LOOK like secrets by
   # pattern (long base64 strings, JWT shapes, keys with known
@@ -110,7 +117,39 @@
     # would supersede that header once this policy is enforced, so
     # leaving it at 'none' would have re-broken the Rotation page the
     # day the CSP was promoted.
-    Content-Security-Policy-Report-Only = "default-src 'self'; script-src 'self'; worker-src 'self' blob:; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; font-src 'self' data:; connect-src 'self' https://*.supabase.co wss://*.supabase.co https://api.open-meteo.com https://archive-api.open-meteo.com https://geocoding-api.open-meteo.com https://api.frankfurter.app https://ipwho.is https://api.github.com https://ws.audioscrobbler.com; frame-ancestors 'self'; base-uri 'self'; form-action 'self'; object-src 'none'"
+    # ── 2026-09-30 (item 60): made enforceable, still Report-Only ──
+    #
+    # • Reports go to netlify/functions/csp-report (one compact log line
+    #   per violation). `report-uri` for Safari/Firefox, `report-to` +
+    #   the Reporting-Endpoints header below for Chromium. Without an
+    #   endpoint, "promote once quiet" could never be observed.
+    # • No inline script left in index.html: the boot fallback moved to
+    #   /boot-fallback.js and its onclick became a listener, so
+    #   script-src needs no 'unsafe-inline'.
+    # • Google Fonts: the stylesheet (fonts.googleapis.com, style-src)
+    #   and the font files it points at (fonts.gstatic.com, font-src).
+    # • connect-src lists only what the BROWSER calls: Supabase (REST,
+    #   auth, storage, realtime), the GitHub hub widget, and the site's
+    #   own origin by name — the native shell's apiUrl() base, harmless
+    #   on the web where it is also 'self'. Open-Meteo, Frankfurter,
+    #   ipwho.is and Last.fm were listed here but are only called by the
+    #   weather/destination-brief functions, server-side; dropped.
+    # • img-src stays `https:` — retailer images, Google's favicon
+    #   service (food BrandMark), YouTube thumbnails (i.ytimg.com) and
+    #   Supabase Storage all arrive from there, and the retailer set is
+    #   open-ended.
+    #
+    # Known before enforcing (not fixed here):
+    #   – src/lib/career/runner.js compiles code with `new Function` in a
+    #     blob: Worker, which inherits this policy → needs 'unsafe-eval'
+    #     in script-src (owner-only Upgrade → Career; compiled out of
+    #     native). Enforce without it and that runner breaks.
+    #   – style-src keeps 'unsafe-inline': React style={{}} and
+    #     framer-motion write inline styles everywhere.
+    Content-Security-Policy-Report-Only = "default-src 'self'; script-src 'self'; worker-src 'self' blob:; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data: blob: https:; font-src 'self' data: https://fonts.gstatic.com; connect-src 'self' https://*.supabase.co wss://*.supabase.co https://api.github.com https://vantagevision.netlify.app; frame-ancestors 'self'; base-uri 'self'; form-action 'self'; object-src 'none'; report-uri /.netlify/functions/csp-report; report-to csp-endpoint"
+    # The named group `report-to` points at. Relative URLs resolve
+    # against the page's origin.
+    Reporting-Endpoints = 'csp-endpoint="/.netlify/functions/csp-report"'
 
 # The service worker must never be cached, or a stale one can pin
 # clients to an old build — the failure mode behind the 2026-05-03
@@ -154,3 +193,12 @@
 # the wrong end of itself.
 [functions."settle-leagues"]
   schedule = "5 0 * * 1"
+
+# security-sweep raises tickets for the owner's Security console
+# (Upgrade → Security): DB down/slow, disk or connections > 80 %,
+# Security advisor errors, client-error spikes, reports open > 24 h, a
+# failed production deploy, poor real-user LCP, repeated AI-cap hits.
+# Writes only to security_tickets; reads no user state. Minute 23 keeps
+# it clear of the on-the-hour crons above.
+[functions."security-sweep"]
+  schedule = "23 * * * *"

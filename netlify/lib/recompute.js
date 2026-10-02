@@ -41,6 +41,100 @@ function toRating(points, k = RATING_SCALE) {
   return clamp(1 + Math.sqrt(points * k));
 }
 
+/* ── Which day keys count (mirror of derive.js) ──────────────────────
+   `logs`, `vitalsLog` and `burnLog` are client-written maps keyed by
+   day, and until 2026-09-30 every key counted as a day. So a state with
+   ten thousand junk keys, or ten years of dates before the account
+   existed, or dates in the future, scored as ten years of logging —
+   which is how anyone could reach global #1 without doing anything.
+
+   A key now counts only if it is a real calendar date (YYYY-MM-DD that
+   round-trips), not after tomorrow (one day of slack for timezones
+   ahead of UTC), and — when the account's creation time is known — not
+   before the day before it was created (slack the other way). Lifetime
+   day counts are also capped at the account's age in days, which the
+   window already implies; the cap is kept explicit so a future change
+   to the window cannot silently lift it.
+
+   Unknown creation time (createdAt null) keeps today's behaviour for
+   the lower bound: no floor, no cap. Honest users are unaffected either
+   way — their keys are real, past dates.
+
+   Achievements are NOT touched: undated ones still count unspaced,
+   because legitimate accounts older than the createdAt stamp would lose
+   rating they earned. That hole is known and waits on item 26.
+
+   Known cost: history imported from before sign-up (an Apple Health
+   export, a wearable's 30-day backfill on connect) stays in the user's
+   data but does not count toward the rating. A public ranking should
+   measure what happened while the account existed. */
+const DAY_KEY_RE = /^\d{4}-\d{2}-\d{2}$/;
+
+function toMs(v) {
+  if (v == null || v === '') return null;
+  const n = typeof v === 'number' ? v : Date.parse(v);
+  return Number.isFinite(n) && n > 0 ? n : null;
+}
+
+/* ── Vision stamps (mirror of derive.js, 2026-09-30, item 44) ─────────
+   Visions are stamped by the client (`S.visions[id] = { unlockedAt }`)
+   and the server cannot re-run their checks — the predicates live in
+   the app's module graph (see visionXp.js). So a state could stamp all
+   34 on a day-old account and bank 8,200 xp. Two limits, both from the
+   account's age, so an honest user never meets either:
+
+   · A stamp dated before the account existed (a day's slack, as for
+     day keys) or after tomorrow does not count. Undated stamps (none
+     are written today; tolerated for anything legacy) still count, but
+     inside the ceiling below.
+   · The xp counted in total is at most VISION_XP_BASE +
+     VISION_XP_PER_DAY × age in days. Past it, every counted vision is
+     scaled by the same factor, so no category is favoured by which
+     vision happened to be dropped.
+
+   Why these numbers: of the 8,200 xp catalogue, what an honest user
+   can meet on day one is ~4,550 — self-checks, savings, holidays,
+   habits, coins, 25 achievements, a wearable or food backfill (2,800),
+   plus all four habit-streak visions (1,750), because a habit's start
+   date is the user's to set and "I quit two years ago" is true for
+   some. The rest needs logged days in a row — 7, 30, 100 — and so
+   arrives no faster than the ceiling grows: ~5,700 xp is reachable by
+   day 30 against a ceiling of 8,000, the whole 8,200 by day 100
+   against 15,000. The ceiling only bites on a state that claims more
+   than its account could have done (a day-old account stamping all 34
+   counts 5,000 of the 8,200).
+
+   Unknown creation time: no floor, no ceiling, like the day keys. */
+const VISION_XP_BASE = 5000;
+const VISION_XP_PER_DAY = 100;
+
+function dayWindow(createdAt, now = Date.now()) {
+  const created = toMs(createdAt);
+  const known = created != null && created <= now;
+  return {
+    min: known ? ymd(created - DAY_MS) : null,
+    max: ymd(now + DAY_MS),
+    cap: known ? Math.floor((now - created) / DAY_MS) + 3 : Infinity,
+    stampFrom: known ? created - DAY_MS : null,
+    stampUntil: now + DAY_MS,
+    visionXpCap: known ? VISION_XP_BASE + VISION_XP_PER_DAY * Math.floor((now - created) / DAY_MS) : Infinity,
+  };
+}
+
+/** A vision stamp's time in ms: `{ unlockedAt }`, an ISO string or ms. Null = undated. */
+function stampMs(v) {
+  if (v == null || typeof v === 'boolean') return null;
+  return toMs(typeof v === 'object' ? v.unlockedAt : v);
+}
+
+function isCountableDay(key, win) {
+  if (!DAY_KEY_RE.test(key)) return false;
+  if (key > win.max) return false;
+  if (win.min && key < win.min) return false;
+  const t = Date.parse(key + 'T00:00:00Z');
+  return Number.isFinite(t) && ymd(t) === key;
+}
+
 // ── Point sources ────────────────────────────────────────────────────────
 function achievementPoints(state, category) {
   const list = state.achievements || [];
@@ -57,7 +151,16 @@ function achievementPoints(state, category) {
   return FULL_CREDIT_N + Math.sqrt((count - FULL_CREDIT_N) * FULL_CREDIT_N);
 }
 
-function trackerPoints(state, category) {
+// Mirror of src/lib/trackers/done.js: a number tracker with a daily
+// target (`dailyGoal`) is done at or above it, otherwise at any amount.
+function trackerDone(t, v) {
+  if (t.type === 'boolean') return !!v;
+  const n = Number(v) || 0;
+  const g = Number(t.dailyGoal);
+  return g > 0 ? n >= g : n > 0;
+}
+
+function trackerPoints(state, category, win) {
   const trackers = (state.trackers || []).filter(t => t.category === category);
   if (!trackers.length) return 0;
   const logs = state.logs || {};
@@ -67,9 +170,9 @@ function trackerPoints(state, category) {
     let hits = 0;
     for (let i = 0; i < TRACKER_HISTORY_DAYS; i++) {
       const k = ymd(today - i * DAY_MS);
+      if (win.min && k < win.min) break;
       const v = logs[k]?.[t.id];
-      const truthy = t.type === 'boolean' ? !!v : (Number(v) || 0) > 0;
-      if (truthy) hits++;
+      if (trackerDone(t, v)) hits++;
     }
     total += (hits / TRACKER_HISTORY_DAYS) * 10;
   }
@@ -82,12 +185,14 @@ function trackerPoints(state, category) {
    categoryDayPoints in derive.js. */
 const CATEGORY_DAY_POINTS = 0.6;
 
-function categoryDayPoints(state, category) {
+function categoryDayPoints(state, category, win) {
   const ids = new Set((state.trackers || []).filter(t => t.category === category).map(t => t.id));
   if (!ids.size) return 0;
   const logs = state.logs || {};
   let days = 0;
   for (const key of Object.keys(logs)) {
+    if (days >= win.cap) break;
+    if (!isCountableDay(key, win)) continue;
     const day = logs[key] || {};
     for (const id of ids) {
       const v = day[id];
@@ -125,13 +230,14 @@ const financeScorePoints    = s => selfCheckPoints(s.financeScore);
 const fitnessScorePoints    = s => selfCheckPoints(s.fitnessScore);
 const socialSelfCheckPoints = s => selfCheckPoints(s.socialScore);
 
-function socialPoints(state, friendCount = 0) {
+function socialPoints(state, friendCount = 0, win) {
   const friends = Math.min(friendCount, 20);
   const logs = state.logs || {};
   const today = Date.now();
   let activeDays = 0;
   for (let i = 0; i < 30; i++) {
     const k = ymd(today - i * DAY_MS);
+    if (win.min && k < win.min) break;
     if (logs[k] && Object.keys(logs[k]).length > 0) activeDays++;
   }
   return (friends / 20) * 12 + (activeDays / 30) * 16;
@@ -142,22 +248,27 @@ function socialPoints(state, friendCount = 0) {
 // consistency, never magnitudes).
 const BURN_DAY_CAP_KCAL = 600;
 
-function vitalsPoints(state) {
+function vitalsPoints(state, win) {
   const log = state.vitalsLog || {};
   let days = 0;
   for (const k of Object.keys(log)) {
+    if (days >= win.cap) break;
+    if (!isCountableDay(k, win)) continue;
     const e = log[k];
     if (e && (e.weight != null || e.sleep != null || e.rhr != null)) days++;
   }
   return days * 0.4;
 }
 
-function burnPoints(state) {
+function burnPoints(state, win) {
   const log = state.burnLog || {};
-  let pts = 0;
+  let pts = 0, days = 0;
   for (const k of Object.keys(log)) {
-    const kcal = (log[k] || []).reduce((sum, a) => sum + (Number(a.kcal) || 0), 0);
-    if (kcal > 0) pts += Math.min(kcal, BURN_DAY_CAP_KCAL) / BURN_DAY_CAP_KCAL * 0.5;
+    if (days >= win.cap) break;
+    if (!isCountableDay(k, win)) continue;
+    const list = Array.isArray(log[k]) ? log[k] : [];
+    const kcal = list.reduce((sum, a) => sum + (Number(a?.kcal) || 0), 0);
+    if (kcal > 0) { pts += Math.min(kcal, BURN_DAY_CAP_KCAL) / BURN_DAY_CAP_KCAL * 0.5; days++; }
   }
   return pts;
 }
@@ -209,20 +320,36 @@ async function fetchMacroDays(userId, { supabaseUrl, serviceKey }) {
  * stuck at the wrong number" bug — not staleness. See visionXp.js.
  *
  * A vision with no category counts a quarter toward each of the four,
- * exactly as on the client. Today no vision declares one, so all of
- * them land that way.
+ * exactly as on the client.
+ *
+ * Stamps outside the account's lifetime are dropped and the total is
+ * held to the age ceiling — see "Vision stamps" at dayWindow.
  */
-function visionPoints(state, category) {
+function countedVisions(state, win) {
   const stamped = state.visions || {};
-  let points = 0;
+  const ids = [];
+  let xp = 0;
   for (const id of Object.keys(stamped)) {
     const def = VISION_XP[id];
     if (!def || !def.xp) continue;
+    const t = stampMs(stamped[id]);
+    if (t != null && (t > win.stampUntil || (win.stampFrom != null && t < win.stampFrom))) continue;
+    ids.push(id);
+    xp += def.xp;
+  }
+  return { ids, scale: xp > win.visionXpCap ? win.visionXpCap / xp : 1 };
+}
+
+function visionPoints(state, category, win) {
+  const { ids, scale } = countedVisions(state, win);
+  let points = 0;
+  for (const id of ids) {
+    const def = VISION_XP[id];
     if (def.category && def.category !== category) continue;
     const weight = def.category ? 1 : 0.25;
     points += (def.xp / 4) * weight;
   }
-  return points;
+  return points * scale;
 }
 
 // ── Public API ───────────────────────────────────────────────────────────
@@ -230,37 +357,41 @@ function visionPoints(state, category) {
 /**
  * Raw per-category point sums BEFORE the sqrt rating curve. Exposed so
  * prestige-up.js can snapshot them as the new competitive baseline.
+ * `createdAt` (ISO string or ms) is when the account was created; null
+ * means unknown, which leaves day keys unfloored and uncapped.
  */
-function derivePoints(state, friendCount = 0, macroDays = 0) {
+function derivePoints(state, friendCount = 0, macroDays = 0, createdAt = null) {
+  const win = dayWindow(createdAt);
   return {
     brain:
       brainScorePoints(state) +
-      categoryDayPoints(state, 'brain') +
-      trackerPoints(state, 'brain') * 1.0 +
+      categoryDayPoints(state, 'brain', win) +
+      trackerPoints(state, 'brain', win) * 1.0 +
       achievementPoints(state, 'brain') * 2.5 +
-      visionPoints(state, 'brain'),
+      visionPoints(state, 'brain', win),
     finance:
       financeScorePoints(state) +
-      categoryDayPoints(state, 'finance') +
+      categoryDayPoints(state, 'finance', win) +
       savingsPoints(state) +
-      trackerPoints(state, 'finance') * 1.0 +
+      trackerPoints(state, 'finance', win) * 1.0 +
       achievementPoints(state, 'finance') * 2.5 +
-      visionPoints(state, 'finance'),
+      visionPoints(state, 'finance', win),
     fitness:
       fitnessScorePoints(state) +
-      categoryDayPoints(state, 'fitness') +
-      trackerPoints(state, 'fitness') * 1.2 +
+      categoryDayPoints(state, 'fitness', win) +
+      trackerPoints(state, 'fitness', win) * 1.2 +
       achievementPoints(state, 'fitness') * 2.5 +
-      visionPoints(state, 'fitness') +
-      vitalsPoints(state) +
-      burnPoints(state) +
-      macroPoints(macroDays),
+      visionPoints(state, 'fitness', win) +
+      vitalsPoints(state, win) +
+      burnPoints(state, win) +
+      // nutrition rows are client-written too, so the same age cap holds
+      macroPoints(Math.min(macroDays, win.cap)),
     social:
       socialSelfCheckPoints(state) +
-      categoryDayPoints(state, 'social') +
-      socialPoints(state, friendCount) +
+      categoryDayPoints(state, 'social', win) +
+      socialPoints(state, friendCount, win) +
       achievementPoints(state, 'social') * 2.5 +
-      visionPoints(state, 'social'),
+      visionPoints(state, 'social', win),
   };
 }
 
@@ -270,8 +401,8 @@ function derivePoints(state, friendCount = 0, macroDays = 0) {
  * prestige time, subtracted here so the post-prestige climb starts
  * from the floor without wiping any user data. {} = no prestige yet.
  */
-function deriveRatings(state, friendCount = 0, baseline = {}, macroDays = 0) {
-  const pts = derivePoints(state, friendCount, macroDays);
+function deriveRatings(state, friendCount = 0, baseline = {}, macroDays = 0, createdAt = null) {
+  const pts = derivePoints(state, friendCount, macroDays, createdAt);
   const adj = cat => Math.max(0, pts[cat] - (Number(baseline?.[cat]) || 0));
 
   const brain   = toRating(adj('brain'));
@@ -283,25 +414,61 @@ function deriveRatings(state, friendCount = 0, baseline = {}, macroDays = 0) {
   return { brain, finance, fitness, social, ovr };
 }
 
+/* The state keys the maths above reads — and nothing else. The state
+   is ~1 MB, most of it base64 images and logs the rating never looks
+   at, and this runs on every recompute and every stale leaderboard
+   open. A JSON-path projection hands back only these, which is the
+   difference between moving a megabyte and moving the part that
+   counts on a Micro instance. Add a key here when a point source
+   starts reading a new one, or it will silently read as empty. */
+const RATING_STATE_KEYS = [
+  'achievements', 'trackers', 'logs', 'savings', 'visions',
+  'brainScore', 'financeScore', 'fitnessScore', 'socialScore',
+  'vitalsLog', 'burnLog',
+];
+const RATING_STATE_SELECT = RATING_STATE_KEYS.map(k => `${k}:state->${k}`).join(',');
+
 /**
- * End-to-end recompute for one user: read raw user_data.state, count
- * accepted friendships, derive ratings, patch profiles. Used by both
- * recompute-ratings.js and get-leaderboard.js.
- *
- * Returns { ratings, computedAt } on success, throws on failure.
+ * When the account was created, from the auth server — profiles has no
+ * created_at. Callers that already verified the user's JWT hold this
+ * from /auth/v1/user and should pass it in instead; this is the
+ * fallback. Null on any failure, which means "no floor, no cap" rather
+ * than a wrong one.
  */
-async function recomputeUser(userId, { supabaseUrl, serviceKey }) {
+async function fetchCreatedAt(userId, { supabaseUrl, serviceKey }) {
+  try {
+    const res = await fetch(`${supabaseUrl}/auth/v1/admin/users/${userId}`, {
+      headers: { apikey: serviceKey, Authorization: `Bearer ${serviceKey}` },
+    });
+    if (!res.ok) return null;
+    return (await res.json())?.created_at || null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Everything the rating is computed from, read ONCE: the projected
+ * state, the friend count, the prestige row and the macro-day count.
+ * prestige-up uses this directly so the value it guards on and the
+ * baseline it stores come from the same read — reading twice is what
+ * let a state be emptied in between.
+ */
+async function loadRatingInputs(userId, { supabaseUrl, serviceKey }, { createdAt } = {}) {
+  const headers = { apikey: serviceKey, Authorization: `Bearer ${serviceKey}` };
+
   const stateRes = await fetch(
-    `${supabaseUrl}/rest/v1/user_data?id=eq.${userId}&select=state`,
-    { headers: { apikey: serviceKey, Authorization: `Bearer ${serviceKey}` } }
+    `${supabaseUrl}/rest/v1/user_data?id=eq.${userId}&select=${RATING_STATE_SELECT}`,
+    { headers }
   );
   if (!stateRes.ok) throw new Error('state read failed');
-  const stateRows = await stateRes.json();
-  const state = stateRows?.[0]?.state || {};
+  const row = (await stateRes.json())?.[0] || {};
+  const state = {};
+  for (const k of RATING_STATE_KEYS) if (row[k] != null) state[k] = row[k];
 
   const friendsRes = await fetch(
     `${supabaseUrl}/rest/v1/friendships?status=eq.accepted&or=(requester_id.eq.${userId},addressee_id.eq.${userId})&select=requester_id`,
-    { headers: { apikey: serviceKey, Authorization: `Bearer ${serviceKey}` } }
+    { headers }
   );
   const friends = friendsRes.ok ? (await friendsRes.json()).length : 0;
 
@@ -312,16 +479,27 @@ async function recomputeUser(userId, { supabaseUrl, serviceKey }) {
   // accepted skew; server value is canonical).
   const profRes = await fetch(
     `${supabaseUrl}/rest/v1/profiles?id=eq.${userId}&select=prestige,prestige_baseline`,
-    { headers: { apikey: serviceKey, Authorization: `Bearer ${serviceKey}` } }
+    { headers }
   );
   const prof = profRes.ok ? (await profRes.json())[0] : null;
-  const prestige = prof?.prestige || 0;
-  const baseline = prof?.prestige_baseline || {};
 
   const macroDays = await fetchMacroDays(userId, { supabaseUrl, serviceKey });
-  const ratings = deriveRatings(state, friends, baseline, macroDays);
-  const computedAt = new Date().toISOString();
+  const created = createdAt !== undefined ? createdAt : await fetchCreatedAt(userId, { supabaseUrl, serviceKey });
 
+  return {
+    state,
+    friends,
+    profile: prof,
+    prestige: prof?.prestige || 0,
+    baseline: prof?.prestige_baseline || {},
+    macroDays,
+    createdAt: created || null,
+  };
+}
+
+/** Write the canonical ratings to profiles. Throws on failure. */
+async function writeRatings(userId, ratings, { supabaseUrl, serviceKey }) {
+  const computedAt = new Date().toISOString();
   const patchRes = await fetch(
     `${supabaseUrl}/rest/v1/profiles?id=eq.${userId}`,
     {
@@ -340,13 +518,30 @@ async function recomputeUser(userId, { supabaseUrl, serviceKey }) {
     }
   );
   if (!patchRes.ok) {
+    // Detail stays in the server log; callers return a generic error.
     const detail = await patchRes.text().catch(() => '');
-    const e = new Error('profile patch failed');
-    e.detail = detail;
-    throw e;
+    console.error('recompute: profile patch failed', patchRes.status, detail.slice(0, 300));
+    throw new Error('profile patch failed');
   }
-
-  return { ratings, computedAt, prestige };
+  return computedAt;
 }
 
-module.exports = { deriveRatings, derivePoints, recomputeUser, fetchMacroDays };
+/**
+ * End-to-end recompute for one user: read the rating inputs, derive,
+ * patch profiles. Used by recompute-ratings.js and get-leaderboard.js.
+ * `opts.createdAt` — the account's creation time if the caller already
+ * has it (saves an auth round trip).
+ *
+ * Returns { ratings, computedAt, prestige } on success, throws on failure.
+ */
+async function recomputeUser(userId, env, opts = {}) {
+  const inp = await loadRatingInputs(userId, env, opts);
+  const ratings = deriveRatings(inp.state, inp.friends, inp.baseline, inp.macroDays, inp.createdAt);
+  const computedAt = await writeRatings(userId, ratings, env);
+  return { ratings, computedAt, prestige: inp.prestige };
+}
+
+module.exports = {
+  deriveRatings, derivePoints, recomputeUser, fetchMacroDays,
+  loadRatingInputs, writeRatings, fetchCreatedAt, RATING_STATE_KEYS,
+};

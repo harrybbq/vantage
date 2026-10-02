@@ -29,7 +29,7 @@ exports.handler = async (event) => {
 
   const env = process.env;
   if (!env.OURA_CLIENT_ID || !env.OURA_CLIENT_SECRET) {
-    return { statusCode: 500, headers: CORS, body: JSON.stringify({ error: 'Oura env missing' }) };
+    return { statusCode: 500, headers: CORS, body: JSON.stringify({ error: 'Oura is not set up on this site yet.' }) };
   }
 
   // Identity from the verified token, plus a per-account brake:

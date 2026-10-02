@@ -32,8 +32,13 @@ const CORS = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'Content-Type, Authorization',
   'Content-Type': 'application/json',
-  'Cache-Control': 'public, max-age=3600',
+  // 401/429/errors must never be cached — a cached 401 outlives the
+  // sign-in that would have fixed it.
+  'Cache-Control': 'no-store',
 };
+// Success only. Private: this sits behind a user's session, so no
+// shared cache may hold it.
+const OK_HEADERS = { ...CORS, 'Cache-Control': 'private, max-age=3600' };
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 const GEO_CACHE = new Map();     // "lisbon" → { at, loc }
@@ -172,9 +177,10 @@ exports.handler = async (event) => {
     if (fxRes.status === 'fulfilled' && fxRes.value) {
       out.fx = { from, to: home, rate: fxRes.value };
     }
-    return { statusCode: 200, headers: CORS, body: JSON.stringify(out) };
+    return { statusCode: 200, headers: OK_HEADERS, body: JSON.stringify(out) };
   } catch (e) {
     // Fail soft: the panel hides whatever it didn't get.
-    return { statusCode: 200, headers: CORS, body: JSON.stringify({ ...out, error: e.message || 'unavailable' }) };
+    console.error('destination-brief:', e?.message);
+    return { statusCode: 200, headers: CORS, body: JSON.stringify({ ...out, error: 'unavailable' }) };
   }
 };

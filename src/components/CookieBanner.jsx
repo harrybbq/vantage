@@ -1,9 +1,14 @@
 import { useState } from 'react';
+import { isNativeApp } from '../lib/native/platform';
 
 const KEY = 'vb4_cookie_consent';
 
+// Web only. The app shell sets no cookies and has no third-party
+// browser context to consent to; its storage is covered by the privacy
+// policy agreed at sign-up. A website's cookie banner inside a store
+// app reads as a wrapped web page.
 export default function CookieBanner({ onOpenLegal }) {
-  const [visible, setVisible] = useState(() => !localStorage.getItem(KEY));
+  const [visible, setVisible] = useState(() => !isNativeApp() && !localStorage.getItem(KEY));
 
   function accept() {
     localStorage.setItem(KEY, 'accepted');

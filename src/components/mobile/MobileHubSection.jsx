@@ -32,6 +32,7 @@ import { isRetiredWidget } from '../../lib/widgets/retired';
 import RatingsPanel from '../RatingsPanel';
 import HubDrawer, { EDGE_PX, OPEN_THRESHOLD } from './HubDrawer';
 import { useDailyBrief } from '../../hooks/useDailyBrief';
+import { trackerDone } from '../../lib/trackers/done';
 
 function pad2(n) { return String(n).padStart(2, '0'); }
 
@@ -124,7 +125,7 @@ export default function MobileHubSection({ S, update, visionState, hasPro, navig
     return {
       ...t, isBool,
       value: typeof v === 'number' ? v : undefined,
-      done: isBool ? !!v : (typeof v === 'number' && v > 0),
+      done: trackerDone(t, v),
     };
   });
 

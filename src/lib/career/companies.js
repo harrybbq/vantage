@@ -8,13 +8,13 @@
  *                source, url, asOf }       base pay, GBP / year
  *
  * The floor and target are read from the plan's guardrails ("Salary
- * floor · £42k", "Target · ≥ £48.5k") unless `plan.salaryGuard` gives
+ * floor · £NNk", "Target · ≥ £NNk") unless `plan.salaryGuard` gives
  * them as numbers — so they are edited in one place, not two.
  *
  * Pure. No React, no network.
  */
 
-/** '£42k' → 42000, '≥ £48.5k (matches current)' → 48500, '£45,000' → 45000. */
+/** '£30k' → 30000, '≥ £32.5k (example)' → 32500, '£25,000' → 25000. */
 export function parseMoney(s) {
   const t = String(s || '').replace(/,/g, '');
   const k = /£?\s*(\d+(?:\.\d+)?)\s*k\b/i.exec(t);

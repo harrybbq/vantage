@@ -6,8 +6,13 @@
  */
 import { authFetch } from '../authFetch';
 import { toLine } from './ingredients';
+import { requestConsent } from '../consent/request';
 
 export async function readVideoRecipe(url) {
+  // The caption goes to Anthropic's API — ask here so every caller asks.
+  if (!(await requestConsent('ai'))) {
+    return { error: 'Reading a video uses AI and needs your OK first (Settings → Privacy).' };
+  }
   try {
     const res = await authFetch('/.netlify/functions/recipe-from-video', {
       method: 'POST',

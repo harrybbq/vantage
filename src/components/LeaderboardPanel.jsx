@@ -52,6 +52,9 @@ export default function LeaderboardPanel({
   const [scope, setScope] = useState('friends');           // 'friends' | 'global'
   const [timeframe, setTimeframe] = useState('alltime');   // 'alltime' | 'weekly'
   const [selectedRow, setSelectedRow] = useState(null);
+  // Blocked from this panel → gone from it at once, before the server
+  // board next refreshes.
+  const [blocked, setBlocked] = useState(() => new Set());
   const { data, loading, error, refresh } = useLeaderboard({ scope, timeframe });
 
   // Relationship state so each row shows the right action (Add /
@@ -171,7 +174,7 @@ export default function LeaderboardPanel({
 
         {data && (data.rows || []).length > 0 && (
           <ul className="lb-rows">
-            {data.rows.map(row => {
+            {data.rows.filter(r => !blocked.has(r.userId)).map(row => {
               const prestige = ovrTier(row.ovr || 1);
               const primary = timeframe === 'weekly' ? row.climb : row.ovr;
               const secondary = timeframe === 'weekly'
@@ -215,7 +218,14 @@ export default function LeaderboardPanel({
         )}
       </div>
 
-      {selectedRow && <FriendRatingsModal row={selectedRow} onClose={() => setSelectedRow(null)} />}
+      {selectedRow && (
+        <FriendRatingsModal
+          row={selectedRow}
+          userId={userId}
+          onBlocked={t => setBlocked(b => new Set(b).add(t.id))}
+          onClose={() => setSelectedRow(null)}
+        />
+      )}
     </>
   );
 }

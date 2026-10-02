@@ -1,16 +1,20 @@
 /**
  * RevenueCat client wrapper.
  *
- * Status: SCAFFOLDED. Not yet a hard dependency — the RevenueCat
- * Capacitor plugin (`@revenuecat/purchases-capacitor`) is not in
- * package.json yet. We dynamic-import it here so:
- *   1. The web build still works (RC plugin is native-only).
- *   2. We can ship this skeleton before the plugin is installed,
- *      then enable end-to-end purchases by:
- *         a. `npm install @revenuecat/purchases-capacitor`
- *         b. Setting `VITE_REVENUECAT_API_KEY_IOS` /
- *            `..._ANDROID` env vars
- *         c. Configuring the iOS / Android offerings in RC dashboard
+ * The Capacitor plugins (`@revenuecat/purchases-capacitor`, `-ui`,
+ * `@capacitor/browser`) are imported with LITERAL specifiers so Vite
+ * bundles them as lazy chunks. They used to load through a variable
+ * plus a vite-ignore comment — a bare specifier only a bundler can
+ * resolve, so inside the native WebView the import always failed,
+ * `isAvailable()` was always false and Upgrade fell through to the
+ * waitlist. Nobody could buy anything.
+ *
+ * The web build never initialises the plugin: every path checks
+ * `Capacitor.isNativePlatform()` first, and the lazy chunks are only
+ * fetched after that passes. Still needed for purchases to work:
+ *   - `VITE_REVENUECAT_API_KEY_IOS` / `..._ANDROID` env vars
+ *   - iOS / Android offerings in the RC dashboard
+ *   - `npx cap sync` so the native halves are linked
  *
  * Until then `isAvailable()` returns false and every other call no-ops
  * gracefully — falling back to the existing `profiles.tier` source of
@@ -34,16 +38,13 @@ let _initFailed = false;
 async function getPurchases() {
   if (_purchases) return _purchases;
   try {
-    // Try the package once. If it's not installed (dev / web build)
-    // we cache the failure so we don't retry on every call.
-    //
-    // Path stored in a variable + /* @vite-ignore */ so Vite's
-    // dev-server import analysis skips it. The production build
-    // also externalizes this id via vite.config.js. Both layers
-    // are needed: rollupOptions.external only governs the bundle,
-    // not the dev server's pre-transform pass.
-    const pkg = '@revenuecat/purchases-capacitor';
-    const mod = await import(/* @vite-ignore */ pkg);
+    // Never off-platform: there's no store on the web to talk to.
+    // Checked here as well as in initRevenueCat so no caller can load
+    // the plugin in a browser. A failure is cached so we don't retry
+    // on every call.
+    const cap = await import('@capacitor/core');
+    if (!cap.Capacitor.isNativePlatform()) { _initFailed = true; return null; }
+    const mod = await import('@revenuecat/purchases-capacitor');
     _purchases = mod.Purchases || mod.default || mod;
     return _purchases;
   } catch {
@@ -261,19 +262,14 @@ export async function logoutRevenueCat() {
  * guidelines treat this as the canonical "manage subscription"
  * affordance, so we surface it from Settings → Subscription.
  *
- * Requires `@revenuecat/purchases-capacitor-ui` to be installed.
  * Falls back to `openManageSubscription` (App Store / Play Store
- * deep-link) if the UI plugin isn't present.
+ * deep-link) if the UI plugin fails to load or present.
  */
 export async function presentCustomerCenter() {
   try {
     const cap = await import('@capacitor/core');
     if (!cap.Capacitor.isNativePlatform()) return false;
-    // Same dev-server escape hatch as getPurchases() — variable +
-    // /* @vite-ignore */ keeps Vite's import analyzer from failing
-    // when the optional UI plugin isn't installed.
-    const uiPkg = '@revenuecat/purchases-capacitor-ui';
-    const mod = await import(/* @vite-ignore */ uiPkg).catch(() => null);
+    const mod = await import('@revenuecat/purchases-capacitor-ui').catch(() => null);
     if (!mod) {
       // Plugin not installed — fall back to the platform store page
       return openManageSubscription();
@@ -301,9 +297,7 @@ export async function openManageSubscription() {
     const url = platform === 'ios'
       ? 'https://apps.apple.com/account/subscriptions'
       : 'https://play.google.com/store/account/subscriptions';
-    // Same dev-server escape hatch as getPurchases() above — see comment there.
-    const browserPkg = '@capacitor/browser';
-    const { Browser } = await import(/* @vite-ignore */ browserPkg).catch(() => ({ Browser: null }));
+    const { Browser } = await import('@capacitor/browser').catch(() => ({ Browser: null }));
     if (Browser) {
       await Browser.open({ url });
       return true;

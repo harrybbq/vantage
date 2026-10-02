@@ -37,6 +37,7 @@ import { planDayFor, planGoalFor } from '../plan/planDay.js';
 import { VITAL_METRICS, fmtMetric } from '../vitals/metrics.js';
 import { visitedCountries, countryForTrip, ALL_COUNTRIES } from '../holiday/destinations.js';
 import { upcomingNew, visitedSummary } from '../holiday/visited.js';
+import { trackerDone } from '../trackers/done.js';
 
 /* ── Small shared shapes ──────────────────────────────────────────── */
 
@@ -291,12 +292,9 @@ const trackerBlocks = {
       dots: [], txt: 'No trackers yet', sub: 'Add one in Track' }, s: { fl: 'TODAY', fv: 'none yet' } };
     const today = (S.logs || {})[ymd(Date.now())] || {};
     /* A number tracker's `goal` is its MONTHLY target (the add form
-       labels it so), so one day's entry is never measured against it —
-       any amount logged today is today done. */
-    const done = t => {
-      const v = today[t.id];
-      return t.type === 'boolean' ? !!v : (Number(v) || 0) > 0;
-    };
+       labels it so), so one day's entry is never measured against it;
+       its daily target, when it has one, is (lib/trackers/done.js). */
+    const done = t => trackerDone(t, today[t.id]);
     const hit = list.filter(done).length;
     const rows = list.slice(0, 8).map(t => {
       const d = done(t);
@@ -346,7 +344,7 @@ const trackerBlocks = {
       let hits = 0;
       for (let d = new Date(monday); d <= new Date(now); d.setDate(d.getDate() + 1)) {
         const v = logs[ymd(d)]?.[t.id];
-        if (t.type === 'boolean' ? !!v : (Number(v) || 0) > 0) hits++;
+        if (trackerDone(t, v)) hits++;
       }
       const target = Number(t.weeklyTarget) || 1;
       return [`${t.name} · ${target}×`, pct(hits, target), potColor(t, i), `${hits} / ${target}`];
@@ -376,9 +374,8 @@ const trackerBlocks = {
       if (d > today) return -1;                      // hasn't happened yet
       const v = logs[ymd(d)]?.[t.id];
       if (t.type === 'boolean') return v ? 2 : 0;
-      const num = Number(v) || 0;
-      if (!num) return 0;
-      return num >= (Number(t.goal) || 1) ? 2 : 1;
+      if (!(Number(v) || 0)) return 0;
+      return trackerDone(t, v) ? 2 : 1;
     };
     const rows = list.map(t => ({ n: t.name || 'Tracker', cells: week.map(d => heatCell(cellFor(t, d))) }));
     const perfect = week.filter(d => d <= today && list.every(t => cellFor(t, d) === 2));

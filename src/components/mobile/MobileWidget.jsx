@@ -38,6 +38,7 @@ import NewsBody from '../widgets/NewsWidget';
 // Dead branch when the flag is set, so the chunk is never emitted.
 const TradingBody = TRADING_WIDGET_BUILD_EXCLUDED ? null : lazy(() => import('../widgets/TradingWidget'));
 import Icon from '../Icon';
+import WidgetBoundary from '../WidgetBoundary';
 import { PRIMES, primeOf, blocksOf, withBlocks, withBlockOpts } from '../../lib/hub/primeBlocks';
 import { PrimeFit } from '../widgets/prime/PrimeCard';
 import { PrimeEditorSheet } from '../widgets/prime/PrimeEditor';
@@ -494,6 +495,7 @@ export default function MobileWidget({ widget, S, update, onRemove, navigate, us
           </div>
           {P ? (
             <div className="m-widget-body is-prime">
+              <WidgetBoundary name={widget.type}>
               <PrimeFit
                 auto
                 head={false}
@@ -505,10 +507,15 @@ export default function MobileWidget({ widget, S, update, onRemove, navigate, us
                   if (act?.kind === 'logfood') setFoodMenu(cur => (cur ? null : { rect: act.rect || null }));
                 }}
               />
+              </WidgetBoundary>
             </div>
           ) : (
             <div className="m-widget-body">
-              {renderBody(widget, meta, S, update, navigate, userId, hasPro)}
+              {/* One widget throwing shows its own "Reload widget" card
+                  rather than taking the whole hub down with it. */}
+              <WidgetBoundary name={widget.type}>
+                {renderBody(widget, meta, S, update, navigate, userId, hasPro)}
+              </WidgetBoundary>
             </div>
           )}
         </div>

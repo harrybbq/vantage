@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import Icon from '../Icon';
 import { listThread, sendMessage, markThreadRead } from '../../lib/friends/messages';
-import { reportUser, blockUser } from '../../lib/friends/queries';
+import { reportUser, blockUser, reportSnapshot } from '../../lib/friends/queries';
 import ReportFriendModal from './ReportFriendModal';
 import { ClanInviteMenuItem, ClanInviteBubble } from './ClanInvite';
 import { parseInvite } from '../../lib/friends/clanInvite';
@@ -333,7 +333,8 @@ export default function MessagesModal({ open, userId, friend, onClose, onBlocked
         open={reporting}
         friend={friend}
         onSubmit={(reason, context) =>
-          reportUser(userId, friendId, reason, [context, reportEvidence()].filter(Boolean).join(' — recent messages: '))}
+          reportUser(userId, friendId, reason, [context, reportEvidence()].filter(Boolean).join(' — recent messages: '),
+            reportSnapshot({ handle: friend?.handle, name: friend?.name, where: 'messages' }))}
         onClose={() => setReporting(false)}
       />
     </>

@@ -15,6 +15,8 @@
  */
 
 const { recomputeUser } = require('../lib/recompute');
+const { suspendedIds } = require('../lib/suspended');
+const { inChunks } = require('../lib/pgPage');
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
@@ -77,17 +79,38 @@ function sb(supabaseUrl, serviceKey, path, init = {}) {
 // is at least SNAPSHOT_MIN_AGE_MS old. Implemented via PostgREST's
 // `in.(...)` + ORDER BY; we then keep only the newest qualifying row per
 // user in JS (DISTINCT ON would be ideal but isn't expressible in PostgREST).
+//
+// Chunked and paged (2026-09-30). The weekly pool is 500 ids — an 18 kB
+// `in.()` URL — and each has a snapshot a day, so the answer ran to
+// thousands of rows against PostgREST's silent 1000-row cap. Now ≤150
+// ids a request, each chunk paged newest-first until every id in it has
+// shown up (its first row IS its newest) — usually one page. `user_id`
+// breaks timestamp ties so pages are stable. Any failed read still
+// means "no climb data", as before.
+//
+// SNAPSHOT_LOOKBACK_MS bounds how far back a chunk can page. The cron
+// writes a row for every rated profile every day, so anyone with a
+// qualifying snapshot has one inside the fortnight before the cutoff
+// unless the cron was down for two weeks. Without the bound, one new
+// user in a chunk (no qualifying row, so the early stop never fires)
+// would page through every snapshot the other 149 ever had.
+const SNAPSHOT_LOOKBACK_MS = 14 * 24 * 60 * 60 * 1000;
 async function fetchSnapshotOvrs(supabaseUrl, serviceKey, userIds) {
   if (!userIds.length) return new Map();
-  const cutoffIso = new Date(Date.now() - SNAPSHOT_MIN_AGE_MS).toISOString();
-  const inClause = `(${userIds.join(',')})`;
-  const res = await sb(supabaseUrl, serviceKey,
-    `/rest/v1/rating_snapshots?user_id=in.${inClause}&snapshotted_at=lte.${cutoffIso}` +
-    `&snapshotted_at=gte.${FORMULA_EPOCH_ISO}` +
-    `&select=user_id,ovr,snapshotted_at&order=snapshotted_at.desc`
-  );
-  if (!res.ok) return new Map();
-  const rows = await res.json();
+  const cutoffMs = Date.now() - SNAPSHOT_MIN_AGE_MS;
+  const cutoffIso = new Date(cutoffMs).toISOString();
+  const lookbackIso = new Date(cutoffMs - SNAPSHOT_LOOKBACK_MS).toISOString();
+  let rows;
+  try {
+    rows = await inChunks(userIds, (csv, offset, limit) => sb(supabaseUrl, serviceKey,
+      `/rest/v1/rating_snapshots?user_id=in.(${csv})&snapshotted_at=lte.${cutoffIso}` +
+      `&snapshotted_at=gte.${FORMULA_EPOCH_ISO}&snapshotted_at=gte.${lookbackIso}` +
+      `&select=user_id,ovr,snapshotted_at&order=snapshotted_at.desc,user_id.asc` +
+      `&limit=${limit}&offset=${offset}`
+    ), { firstPer: 'user_id', what: 'leaderboard snapshots' });
+  } catch {
+    return new Map();
+  }
   const out = new Map();
   for (const r of rows) {
     if (!out.has(r.user_id)) out.set(r.user_id, r.ovr); // first = newest per user
@@ -125,16 +148,23 @@ function rowFromProfile(p, snapshotOvr, callerId) {
 // (profiles.leaderboard_color, opt-in via Settings). Kept as a separate
 // query so a missing column (migration not yet applied) can't break the
 // board — a 400 just means no colours this run.
+//
+// Pro and lifetime only, checked HERE against the server-owned tier: the
+// colour is a Pro customisation (CLAUDE.md tier line), and the column is
+// client-writable, so a free account that set it directly was showing a
+// paid feature to everyone.
 async function attachNameColors(supabaseUrl, serviceKey, rows) {
   const ids = Array.from(new Set(rows.map(r => r.userId).filter(Boolean)));
   if (!ids.length) return;
   try {
-    const res = await sb(supabaseUrl, serviceKey,
-      `/rest/v1/profiles?id=in.(${ids.join(',')})&select=id,leaderboard_color`
-    );
-    if (!res.ok) return;
-    const data = await res.json();
-    const byId = new Map(data.map(d => [d.id, d.leaderboard_color]));
+    // Chunked: ~101 ids today (board + pinned row), but the URL must not
+    // grow with the board. A failed chunk throws → no colours this run.
+    const data = await inChunks(ids, (csv, offset, limit) => sb(supabaseUrl, serviceKey,
+      `/rest/v1/profiles?id=in.(${csv})&select=id,leaderboard_color,tier&order=id&limit=${limit}&offset=${offset}`
+    ), { what: 'leaderboard colours' });
+    const byId = new Map(data
+      .filter(d => d.tier === 'pro' || d.tier === 'lifetime')
+      .map(d => [d.id, d.leaderboard_color]));
     for (const r of rows) {
       const c = byId.get(r.userId);
       if (c && /^#[0-9a-fA-F]{6}$/.test(c)) r.nameColor = c;
@@ -171,10 +201,14 @@ async function buildFriendsBoard({ supabaseUrl, serviceKey, callerId, timeframe 
   const friendIds = edges.map(e => e.requester_id === callerId ? e.addressee_id : e.requester_id);
   const ids = Array.from(new Set([callerId, ...friendIds]));
 
-  const pRes = await sb(supabaseUrl, serviceKey,
-    `/rest/v1/profiles?id=in.(${ids.join(',')})&select=id,handle,display_name,avatar_url,ratings,ratings_ovr,ratings_computed_at,prestige`
-  );
-  const profiles = pRes.ok ? await pRes.json() : [];
+  // Chunked — a well-connected user's friend list is an unbounded
+  // `in.()`. A failed read shows an empty board, as it always has.
+  const allProfiles = await inChunks(ids, (csv, offset, limit) => sb(supabaseUrl, serviceKey,
+    `/rest/v1/profiles?id=in.(${csv})&select=id,handle,display_name,avatar_url,ratings,ratings_ovr,ratings_computed_at,prestige` +
+    `&order=id&limit=${limit}&offset=${offset}`
+  ), { what: 'friends board profiles' }).catch(() => []);
+  const suspended = await suspendedIds({ supabaseUrl, serviceKey });
+  const profiles = allProfiles.filter(p => p.id === callerId || !suspended.has(p.id));
 
   const snaps = await fetchSnapshotOvrs(supabaseUrl, serviceKey, ids);
   const rows = profiles.map(p => rowFromProfile(p, snaps.get(p.id), callerId));
@@ -200,7 +234,11 @@ async function buildGlobalBoard({ supabaseUrl, serviceKey, callerId, timeframe }
   const candRes = await sb(supabaseUrl, serviceKey,
     `/rest/v1/profiles?leaderboard_optin=eq.true&ratings_ovr=not.is.null&select=id,handle,display_name,avatar_url,ratings,ratings_ovr,ratings_computed_at,prestige&order=lifetime_rating.desc&limit=${limit}`
   );
-  const candidates = candRes.ok ? await candRes.json() : [];
+  // Suspended users are removed from the public board (item 63). The
+  // caller's own pinned row below is unaffected — only others see less.
+  const suspended = await suspendedIds({ supabaseUrl, serviceKey });
+  const candidates = (candRes.ok ? await candRes.json() : [])
+    .filter(p => p.id === callerId || !suspended.has(p.id));
 
   const candIds = candidates.map(p => p.id);
   const snaps = await fetchSnapshotOvrs(supabaseUrl, serviceKey, candIds);
@@ -260,7 +298,7 @@ exports.handler = async (event) => {
   const supabaseUrl = process.env.SUPABASE_URL;
   const serviceKey  = process.env.SUPABASE_SERVICE_ROLE_KEY;
   if (!supabaseUrl || !serviceKey) {
-    return { statusCode: 500, headers: CORS, body: JSON.stringify({ error: 'supabase env missing' }) };
+    return { statusCode: 500, headers: CORS, body: JSON.stringify({ error: 'not configured' }) };
   }
 
   // Auth: verify the user's JWT
@@ -271,7 +309,8 @@ exports.handler = async (event) => {
     headers: { apikey: serviceKey, Authorization: `Bearer ${token}` },
   });
   if (!userRes.ok) return { statusCode: 401, headers: CORS, body: JSON.stringify({ error: 'invalid token' }) };
-  const callerId = (await userRes.json())?.id;
+  const caller = await userRes.json();
+  const callerId = caller?.id;
   if (!callerId) return { statusCode: 401, headers: CORS, body: JSON.stringify({ error: 'no user id' }) };
 
   // Body
@@ -290,7 +329,8 @@ exports.handler = async (event) => {
     const stale = !meRow?.ratings_computed_at ||
       (Date.now() - new Date(meRow.ratings_computed_at).getTime()) > STALE_MS;
     if (stale) {
-      await recomputeUser(callerId, { supabaseUrl, serviceKey }).catch(() => null);
+      await recomputeUser(callerId, { supabaseUrl, serviceKey }, { createdAt: caller?.created_at || null })
+        .catch(() => null);
     }
   } catch { /* non-fatal — the board still loads with whatever profile holds */ }
 
@@ -310,9 +350,10 @@ exports.handler = async (event) => {
       }),
     };
   } catch (e) {
+    console.error('get-leaderboard:', e?.message);
     return {
       statusCode: 500, headers: CORS,
-      body: JSON.stringify({ error: e.message || 'leaderboard build failed' }),
+      body: JSON.stringify({ error: 'leaderboard build failed' }),
     };
   }
 };

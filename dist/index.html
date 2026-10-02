@@ -29,8 +29,8 @@
 
     <!-- Fonts -->
     <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,700;0,900;1,700&family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
-    <script type="module" crossorigin src="/assets/index-Hxh0ljOI.js"></script>
-    <link rel="stylesheet" crossorigin href="/assets/index--mdYQcEj.css">
+    <script type="module" crossorigin src="/assets/index-DmxIbVCu.js"></script>
+    <link rel="stylesheet" crossorigin href="/assets/index-D83o19NX.css">
   </head>
   <body>
     <!-- Boot fallback.
@@ -47,42 +47,15 @@
         <div id="boot-error" style="display:none;max-width:34em;line-height:1.7;font-size:12px;color:#c9c9c2;">
           <p style="margin:0 0 12px;color:#d99114;">Vantage couldn't start.</p>
           <p id="boot-error-detail" style="margin:0 0 16px;font-size:11px;color:#8a8a85;word-break:break-word;"></p>
-          <button type="button" onclick="location.reload(true)" style="font:inherit;font-size:12px;padding:9px 18px;border-radius:8px;border:1px solid #2f6b4f;background:transparent;color:#3f9a6f;cursor:pointer;">Reload</button>
+          <button type="button" id="boot-reload" style="font:inherit;font-size:12px;padding:9px 18px;border-radius:8px;border:1px solid #2f6b4f;background:transparent;color:#3f9a6f;cursor:pointer;">Reload</button>
           <p style="margin:16px 0 0;font-size:10px;opacity:.75;">If this keeps happening, your saved data is safe — it lives on the server, not in the app.</p>
         </div>
       </div>
     </div>
-    <script>
-      // Surfaces a boot failure. Deliberately plain ES5 in an inline
-      // script: if the failure IS a parse error in the bundle, anything
-      // fancier here would die the same way.
-      (function () {
-        var best = '';
-        function paint() {
-          var box = document.getElementById('boot-error');
-          var detail = document.getElementById('boot-error-detail');
-          if (!box) return;                       // app mounted, nothing to do
-          if (detail) {
-            detail.textContent = (window.__vantageBootError || best ||
-              'The app failed to start. This is usually a temporary connection ' +
-              'problem \u2014 reloading normally fixes it.').slice(0, 300);
-          }
-          box.style.display = 'block';
-        }
-        // NOT latched. A failed image or font fires `error` first with an
-        // empty message, and latching on that buried the real cause the
-        // module threw a moment later.
-        window.addEventListener('error', function (e) {
-          if (e && e.message && !best) best = e.message;
-          paint();
-        }, true);
-        window.addEventListener('unhandledrejection', function (e) {
-          var r = e && e.reason;
-          if (r && !best) best = r.message || String(r);
-          paint();
-        });
-        setTimeout(function () { paint(); }, 12000);
-      })();
-    </script>
+    <!-- Surfaces a boot failure on the screen above. A file rather than
+         an inline script so the CSP needs no 'unsafe-inline' (item 60).
+         Classic and blocking on purpose: it must be listening before the
+         module below evaluates — no defer/async/type=module. -->
+    <script src="/boot-fallback.js"></script>
   </body>
 </html>

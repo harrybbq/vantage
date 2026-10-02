@@ -422,9 +422,10 @@ exports.handler = async (event) => {
     };
   } catch (err) {
     // Every upstream failure is already swallowed into an empty list by
-    // the fan-out, so reaching here means a genuine bug in our own code
-    // — exactly the case where a generic message costs a whole
-    // round-trip to diagnose. Send the real reason back.
+    // the fan-out, so reaching here means a genuine bug in our own code.
+    // The reason goes to the function log (redacted below); the client
+    // gets a generic message — error text is not for the public
+    // (2026-09-30, item 53).
     //
     // Redacted: a fetch error can carry the full URL, and the USDA one
     // has the API key in its query string.
@@ -434,7 +435,7 @@ exports.handler = async (event) => {
     console.error('food-search error:', detail, err && err.stack);
     return {
       statusCode: 502, headers: CORS,
-      body: JSON.stringify({ error: `Food search failed: ${detail}` }),
+      body: JSON.stringify({ error: 'Food search failed — try again.' }),
     };
   }
 };

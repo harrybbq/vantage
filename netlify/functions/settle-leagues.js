@@ -18,6 +18,17 @@
  * settled. That matters more here than anywhere else in the app —
  * a double-run without it would promote a group twice.
  *
+ * ── Reads must all succeed (2026-09-30, item 47) ─────────────────────
+ * Memberships, profiles and baselines are each required. A failed read
+ * used to degrade to an empty list, and an empty list is not an error
+ * here — it is a week settled at zero for everyone, written down for
+ * good, with promotions to match. Now any failed read stops the run
+ * before anything is written; the scheduler (or `?week=`) retries.
+ *
+ * Only members who had joined by the start of the week count
+ * (lib/leagues.js joinedByWeekStart), so a mid-week recruit cannot
+ * bring a week's climb earned elsewhere.
+ *
  * ── What it does NOT do ──────────────────────────────────────────────
  * It does not touch user_data.state. Coins are recorded as grants for
  * the client to claim, because the state JSON belongs to the user and
@@ -29,6 +40,7 @@ const { requireScheduler } = require('../lib/cronAuth');
 const {
   sb, fetchBaselines, memberScore, groupScore, rankGroups, weekStart, COIN_AWARD, DIVISIONS,
 } = require('../lib/leagues');
+const { pageAll, inChunks } = require('../lib/pgPage');
 
 const CORS = { 'Access-Control-Allow-Origin': '*', 'Content-Type': 'application/json' };
 const DAY_MS = 86_400_000;
@@ -42,7 +54,7 @@ exports.handler = async (event) => {
     serviceKey: process.env.SUPABASE_SERVICE_ROLE_KEY,
   };
   if (!env.supabaseUrl || !env.serviceKey) {
-    return { statusCode: 500, headers: CORS, body: JSON.stringify({ error: 'supabase env missing' }) };
+    return { statusCode: 500, headers: CORS, body: JSON.stringify({ error: 'not configured' }) };
   }
 
   /* The week being settled is the one that ENDED at this Monday, so its
@@ -63,33 +75,65 @@ exports.handler = async (event) => {
     return { statusCode: 200, headers: CORS, body: JSON.stringify({ ok: true, weekStart: weekKey, alreadySettled: true }) };
   }
 
-  const gRes = await sb(env.supabaseUrl, env.serviceKey,
-    '/rest/v1/groups?select=id,name,division,created_at');
-  if (!gRes.ok) {
-    return { statusCode: 500, headers: CORS, body: JSON.stringify({ error: 'groups read failed' }) };
+  /* Every multi-row read below is paged (lib/pgPage.js, 2026-09-30).
+     PostgREST returns at most 1000 rows and says nothing about the
+     rest, and here "the rest" would have been groups that were never
+     scored and members who were never counted — settled for good. A
+     page that fails fails the whole read, which stops the run before
+     anything is written, exactly like a failed single read did. */
+  let groups;
+  try {
+    groups = await pageAll((offset, limit) => sb(env.supabaseUrl, env.serviceKey,
+      `/rest/v1/groups?select=id,name,division,created_at&order=id&limit=${limit}&offset=${offset}`),
+    { what: 'settle groups' });
+  } catch (e) {
+    console.error('settle-leagues: groups read failed', e?.status);
+    return { statusCode: 500, headers: CORS, body: JSON.stringify({ error: 'read failed — not settled' }) };
   }
-  const groups = await gRes.json();
   if (!groups.length) {
     return { statusCode: 200, headers: CORS, body: JSON.stringify({ ok: true, weekStart: weekKey, groups: 0 }) };
   }
 
-  const mRes = await sb(env.supabaseUrl, env.serviceKey, '/rest/v1/group_members?select=group_id,user_id');
-  const memberships = mRes.ok ? await mRes.json() : [];
+  const readFailed = what => {
+    console.error(`settle-leagues: ${what} read failed — nothing settled`);
+    return { statusCode: 502, headers: CORS, body: JSON.stringify({ error: 'read failed — not settled' }) };
+  };
+
+  let memberships;
+  try {
+    // Ordered on the full row key so no membership repeats or slips
+    // between pages.
+    memberships = await pageAll((offset, limit) => sb(env.supabaseUrl, env.serviceKey,
+      `/rest/v1/group_members?select=group_id,user_id,joined_at&order=group_id,user_id&limit=${limit}&offset=${offset}`),
+    { what: 'settle memberships' });
+  } catch {
+    return readFailed('memberships');
+  }
   const ids = Array.from(new Set(memberships.map(m => m.user_id)));
 
   let byId = new Map(), baselines = new Map();
   if (ids.length) {
-    const pRes = await sb(env.supabaseUrl, env.serviceKey,
-      `/rest/v1/profiles?id=in.(${ids.join(',')})&select=id,ratings_ovr`);
-    byId = new Map((pRes.ok ? await pRes.json() : []).map(p => [p.id, p]));
-    baselines = await fetchBaselines(ids, env, from);
+    let profiles;
+    try {
+      profiles = await inChunks(ids, (csv, offset, limit) => sb(env.supabaseUrl, env.serviceKey,
+        `/rest/v1/profiles?id=in.(${csv})&select=id,ratings_ovr&order=id&limit=${limit}&offset=${offset}`),
+      { what: 'settle profiles' });
+    } catch {
+      return readFailed('profiles');
+    }
+    byId = new Map(profiles.map(p => [p.id, p]));
+    try {
+      baselines = await fetchBaselines(ids, env, from, { strict: true });
+    } catch {
+      return readFailed('baselines');
+    }
   }
 
   // Score every group, keeping each group's own member list for payouts.
   const membersByGroup = new Map();
   const scored = groups.map(g => {
     const mine = memberships.filter(m => m.group_id === g.id).map(m => {
-      const { climb, counted } = memberScore(byId.get(m.user_id), baselines.get(m.user_id));
+      const { climb, counted } = memberScore(byId.get(m.user_id), baselines.get(m.user_id), m.joined_at, from);
       return { userId: m.user_id, climb, counted };
     });
     membersByGroup.set(g.id, mine);
@@ -130,7 +174,8 @@ exports.handler = async (event) => {
   });
   if (!wRes.ok) {
     const detail = await wRes.text().catch(() => '');
-    return { statusCode: 500, headers: CORS, body: JSON.stringify({ error: 'week write failed', detail }) };
+    console.error('settle-leagues: week write failed', wRes.status, detail.slice(0, 300));
+    return { statusCode: 500, headers: CORS, body: JSON.stringify({ error: 'week write failed' }) };
   }
 
   /* Promotions after the week is written, never before: if this half

@@ -33,6 +33,7 @@ function checkRateLimit(ip) {
 }
 
 const { requireUser, underLimit, tooMany } = require('../lib/requireUser');
+const { withinDailyAiCap, overDailyCap } = require('../lib/aiQuota');
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
@@ -107,6 +108,9 @@ exports.handler = async (event) => {
   if (imageBase64.length > 4_000_000) {
     return { statusCode: 413, headers: CORS, body: JSON.stringify({ error: 'Image too large — reduce camera resolution' }) };
   }
+
+  // Durable per-day cap, charged only once the request is going ahead.
+  if (!(await withinDailyAiCap('food-detect', auth.userId))) return overDailyCap(CORS);
 
   try {
     const res = await fetch('https://api.anthropic.com/v1/messages', {

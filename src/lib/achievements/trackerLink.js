@@ -27,6 +27,7 @@
  * is what pays the coins, and keeping it there keeps every payout on
  * the one path that already enforces the rating rules.
  */
+import { trackerDone } from '../trackers/done.js';
 
 const ymd = d => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 const dayStart = t => { const d = new Date(t); d.setHours(0, 0, 0, 0); return d; };
@@ -38,11 +39,11 @@ export function weekStart(t) {
 }
 
 /** Did the tracker count as done on this day? Same rule as Track's
- *  weekly targets: a boolean tick, or any amount for a number tracker
- *  (whose `goal` is a MONTHLY figure, never a daily one). */
+ *  weekly targets (lib/trackers/done.js): a boolean tick, or a number
+ *  tracker at its daily target — any amount when it has none. Its
+ *  `goal` is a MONTHLY figure and is never read as a daily one. */
 function hitOn(tracker, logs, key) {
-  const v = logs?.[key]?.[tracker.id];
-  return tracker.type === 'number' ? (Number(v) || 0) > 0 : !!v;
+  return trackerDone(tracker, logs?.[key]?.[tracker.id]);
 }
 
 /** Normalise a stored link; null if it is not a usable one. */

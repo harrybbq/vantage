@@ -1,0 +1,4 @@
+{
+  "//": "The functions and their libs are CommonJS. The root package.json says \"type\": \"module\" for the Vite app, and Netlify's bundler refuses CommonJS functions under that — this file makes the closest package.json declare the truth.",
+  "type": "commonjs"
+}

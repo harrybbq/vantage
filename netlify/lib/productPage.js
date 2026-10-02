@@ -11,30 +11,55 @@
  * in-process.
  */
 
+const { assertPublicUrl, isBlockedAddress } = require('./ssrfGuard');
+
 const FETCH_TIMEOUT_MS = 8000;
 const MAX_HTML_BYTES = 1_000_000; // pages above this are truncated
+const MAX_REDIRECTS = 3;
 
 // ── Fetch with timeout + size cap ──────────────────────────────────────────
 
+/* Errors thrown from here are deliberately generic ('blocked',
+   'upstream', 'not_html', 'timeout'): callers used to echo e.message to
+   the client, which turned the scraper into an oracle for what an
+   internal address answered. */
 async function fetchWithTimeout(url) {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
   try {
-    const res = await fetch(url, {
-      signal: controller.signal,
-      // Pose as a regular browser — many e-commerce sites 403 on the
-      // default node fetch UA. Don't include cookies / credentials.
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (compatible; VisionBoardBot/1.0; +https://visionboard.app/bot)',
-        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-        'Accept-Language': 'en-GB,en;q=0.9',
-      },
-      redirect: 'follow',
-    });
-    if (!res.ok) throw new Error('HTTP ' + res.status);
+    // Redirects are followed by hand so every hop is re-checked — a
+    // public page 302-ing to http://169.254.169.254/ is the classic
+    // way past a check that only looks at the first URL.
+    let current = await assertPublicUrl(url);
+    let res;
+    for (let hop = 0; ; hop++) {
+      try {
+        res = await fetch(current.href, {
+          signal: controller.signal,
+          // Pose as a regular browser — many e-commerce sites 403 on the
+          // default node fetch UA. Don't include cookies / credentials.
+          headers: {
+            'User-Agent': 'Mozilla/5.0 (compatible; VisionBoardBot/1.0; +https://visionboard.app/bot)',
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+            'Accept-Language': 'en-GB,en;q=0.9',
+          },
+          redirect: 'manual',
+        });
+      } catch (e) {
+        throw new Error(e?.name === 'AbortError' ? 'timeout' : 'upstream');
+      }
+      if (res.status < 300 || res.status >= 400) break;
+      const loc = res.headers.get('location');
+      if (!loc || hop >= MAX_REDIRECTS) throw new Error('upstream');
+      try { res.body?.cancel(); } catch { /* nothing to release */ }
+      let next;
+      try { next = new URL(loc, current); } catch { throw new Error('upstream'); }
+      current = await assertPublicUrl(next);
+    }
+    if (!res.ok) throw new Error('upstream');
     const ct = res.headers.get('content-type') || '';
     if (!ct.includes('text/html') && !ct.includes('xml')) {
-      throw new Error('Not an HTML response');
+      throw new Error('not_html');
     }
 
     // Stream up to MAX_HTML_BYTES so a giant page doesn't OOM the lambda
@@ -47,26 +72,28 @@ async function fetchWithTimeout(url) {
       received += value.length;
       chunks.push(value);
     }
+    try { reader.cancel(); } catch { /* already done */ }
     return Buffer.concat(chunks).toString('utf8');
+  } catch (e) {
+    if (e?.name === 'AbortError') throw new Error('timeout');
+    throw e;
   } finally {
     clearTimeout(timer);
   }
 }
 
+/**
+ * Synchronous first pass for callers — the hostname alone. Kept so the
+ * callers can refuse obvious cases with a clear reason before any DNS;
+ * the authoritative check is assertPublicUrl inside fetchWithTimeout,
+ * which resolves the name and re-checks every redirect hop.
+ */
 function isBlockedHost(host) {
   if (!host) return true;
-  const lower = host.toLowerCase();
-  if (lower === 'localhost') return true;
-  if (lower.endsWith('.local')) return true;
-  if (lower.endsWith('.internal')) return true;
-  // RFC1918 + loopback + link-local IPv4
-  if (/^127\./.test(lower)) return true;
-  if (/^10\./.test(lower)) return true;
-  if (/^192\.168\./.test(lower)) return true;
-  if (/^172\.(1[6-9]|2\d|3[01])\./.test(lower)) return true;
-  if (/^169\.254\./.test(lower)) return true;
-  // Loopback IPv6
-  if (lower === '::1' || lower === '[::1]') return true;
+  const lower = host.toLowerCase().replace(/^\[|\]$/g, '').replace(/\.$/, '');
+  if (/(^|\.)(localhost|local|internal|localdomain|home\.arpa|intranet|lan)$/.test(lower)) return true;
+  // An IP literal is classified exactly; a name is left to the DNS check.
+  if (/^[\d.]+$/.test(lower) || lower.includes(':')) return isBlockedAddress(lower);
   return false;
 }
 

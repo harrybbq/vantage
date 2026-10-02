@@ -1,5 +1,7 @@
 import { useEffect, useRef, useCallback, useState, lazy, Suspense } from 'react';
 import { createRoot } from 'react-dom/client';
+import WidgetBoundary from './WidgetBoundary';
+import { readPhotoFile } from '../lib/image/compress';
 import { motion } from 'framer-motion';
 import { VitalsBody, BurnBody, MacrosBody } from './mobile/MobileWidget';
 import { BodyBody, SubscriptionsBody } from './widgets/LifeWidgets';
@@ -8,6 +10,7 @@ import { GoalsBody, BodyGoalBody } from './widgets/GoalsWidget';
 import { RotationBody } from './widgets/RotationWidget';
 import { tradingWidgetAvailable, TRADING_WIDGET_BUILD_EXCLUDED } from '../lib/trading/enabled';
 import { isRetiredWidget } from '../lib/widgets/retired';
+import { apiUrl } from '../lib/authFetch';
 import { applyRelapse } from '../lib/habits/relapse';
 import MarketBody from './widgets/MarketWidget';
 import NewsBody from './widgets/NewsWidget';
@@ -44,8 +47,10 @@ async function fetchGitHub(username, cache) {
   if (cache[username]) return cache[username];
   try {
     const [userRes, reposRes] = await Promise.all([
-      fetch(`https://api.github.com/users/${username}`),
-      fetch(`https://api.github.com/users/${username}/repos?sort=updated&per_page=5`),
+      // Encoded: the username is typed by the user, and a raw `../` or
+      // `?` in it would point the request somewhere else on the API.
+      fetch(`https://api.github.com/users/${encodeURIComponent(username)}`),
+      fetch(`https://api.github.com/users/${encodeURIComponent(username)}/repos?sort=updated&per_page=5`),
     ]);
     const user = await userRes.json();
     const repos = await reposRes.json();
@@ -690,7 +695,14 @@ export default function HubSection({ S, update, active, onOpenModal, onOpenWaitl
     onNavigate && onNavigate('diet');
   }, [onNavigate]);
 
+  // Every island body sits inside its own boundary: one widget throwing
+  // shows a "Reload widget" card in its own box instead of emptying the
+  // island (each island is a separate React root, so an uncaught throw
+  // unmounted it silently).
   function reactWidgetEl(hw) {
+    return <WidgetBoundary name={hw.type}>{reactWidgetBody(hw)}</WidgetBoundary>;
+  }
+  function reactWidgetBody(hw) {
     if (primeOf(hw)) {
       return (
         <PrimeFit
@@ -869,14 +881,18 @@ export default function HubSection({ S, update, active, onOpenModal, onOpenWaitl
   // write-back lands.
   const isOsLayout = isOsLayoutTheme(resolveEffectiveTheme(S.theme));
 
-  function handleUploadPhoto(e) {
+  // Downscaled to 512px before it reaches state — the raw camera file
+  // was ~5 MB and rode along with every save (see lib/image/compress).
+  async function handleUploadPhoto(e) {
     const file = e.target.files[0];
+    e.target.value = '';
     if (!file) return;
-    const r = new FileReader();
-    r.onload = ev => {
-      update(prev => ({ ...prev, profile: { ...prev.profile, photo: ev.target.result } }));
-    };
-    r.readAsDataURL(file);
+    const photo = await readPhotoFile(file);
+    if (!photo) {
+      alert('That image couldn\'t be read. Try a JPEG or PNG.');
+      return;
+    }
+    update(prev => ({ ...prev, profile: { ...prev.profile, photo } }));
   }
 
   function handleToggleSnap() {
@@ -1402,9 +1418,9 @@ export default function HubSection({ S, update, active, onOpenModal, onOpenWaitl
       const presetMeta = link.presetId ? APP_PRESETS.find(p => p.id === link.presetId) : null;
       const isLivePreset = !!(presetMeta && presetMeta.live);
       const bodyHtml = isGH
-        ? `<div class="link-island-body"><div class="gh-skeleton" id="gh-body-${link.id}"><div class="sk-stats"><div class="sk-stat"></div><div class="sk-stat"></div><div class="sk-stat"></div></div><div class="sk-repo"></div><div class="sk-repo"></div><div class="sk-repo"></div></div></div>`
+        ? `<div class="link-island-body"><div class="gh-skeleton" id="gh-body-${escapeHtml(link.id)}"><div class="sk-stats"><div class="sk-stat"></div><div class="sk-stat"></div><div class="sk-stat"></div></div><div class="sk-repo"></div><div class="sk-repo"></div><div class="sk-repo"></div></div></div>`
         : isLivePreset
-          ? `<div class="link-island-body link-island-live" id="lp-body-${link.id}"><div class="link-island-live-hero">Loading…</div>${link.notes ? `<div class="link-island-notes">${escapeHtml(link.notes)}</div>` : ''}</div>`
+          ? `<div class="link-island-body link-island-live" id="lp-body-${escapeHtml(link.id)}"><div class="link-island-live-hero">Loading…</div>${link.notes ? `<div class="link-island-notes">${escapeHtml(link.notes)}</div>` : ''}</div>`
           // escapeHtml, like the live-preset branch one line up. Notes
           // went into innerHTML raw here, so `<img src=x onerror=…>` in
           // a link's notes executed on every hub render — and notes ride
@@ -1478,7 +1494,7 @@ export default function HubSection({ S, update, active, onOpenModal, onOpenWaitl
         // Leaderboard is rendered as a placeholder shell; live data is
         // fetched async after mount (we don't have the leaderboard data
         // synchronously here). The body fills in via fetch + DOM patch.
-        leaderboard: { eyebrow: 'WIDGET · LEADERBOARD', icon: '⊿', title: 'Leaderboard', sub: 'Friends · all-time', body: () => `<div class="hub-widget-empty" data-lb-host="${hw.id}">Loading leaderboard…</div>` },
+        leaderboard: { eyebrow: 'WIDGET · LEADERBOARD', icon: '⊿', title: 'Leaderboard', sub: 'Friends · all-time', body: () => `<div class="hub-widget-empty" data-lb-host="${escapeHtml(hw.id)}">Loading leaderboard…</div>` },
         // Vitals / Macros / Calories are interactive React components
         // shared with the mobile hub — rendered as React islands into
         // hosts the mount pass below picks up (see reactRootsRef).
@@ -1813,34 +1829,41 @@ async function loadGHIsland(link, cache, update) {
     return;
   }
   const { user, repos } = data;
+  // Every field below is written by whoever owns the GitHub account —
+  // a repo description is anyone's free text — and this goes into
+  // outerHTML. Escape all of it; hrefs must also be http(s) (safeUrl),
+  // since escaping alone lets `javascript:` through. Counts are coerced
+  // to numbers so a non-numeric value can't carry markup either.
+  const num = v => (Number.isFinite(Number(v)) ? Number(v) : 0);
   const reposHtml = repos.map(r => `
-    <a class="gh-repo" href="${r.html_url}" target="_blank">
-      <div class="gh-repo-name">${r.name}</div>
-      <div class="gh-repo-desc">${r.description || 'No description'}</div>
+    <a class="gh-repo" href="${safeUrl(r.html_url)}" target="_blank" rel="noreferrer">
+      <div class="gh-repo-name">${escapeHtml(r.name)}</div>
+      <div class="gh-repo-desc">${escapeHtml(r.description || 'No description')}</div>
       <div class="gh-repo-meta">
-        ${r.language ? `<span style="display:inline-flex;align-items:center;gap:5px;"><span style="width:7px;height:7px;border-radius:7px;background:var(--gold,#c8970a);display:inline-block;"></span>${r.language}</span>` : ''}
-        <span>★ ${r.stargazers_count}</span>
-        <span>⑂ ${r.forks_count}</span>
+        ${r.language ? `<span style="display:inline-flex;align-items:center;gap:5px;"><span style="width:7px;height:7px;border-radius:7px;background:var(--gold,#c8970a);display:inline-block;"></span>${escapeHtml(r.language)}</span>` : ''}
+        <span>★ ${num(r.stargazers_count)}</span>
+        <span>⑂ ${num(r.forks_count)}</span>
       </div>
     </a>`).join('');
 
+  const lid = escapeHtml(link.id);
   bodyEl.outerHTML = `
-    <div class="link-island-body" id="gh-body-${link.id}">
+    <div class="link-island-body" id="gh-body-${lid}">
       <div class="gh-username-form">
-        <input id="gh-input-${link.id}" placeholder="Change username…" value="${link.ghUser}">
-        <button class="btn btn-primary btn-sm" data-gh-go="${link.id}">Go</button>
+        <input id="gh-input-${lid}" placeholder="Change username…" value="${escapeHtml(link.ghUser)}">
+        <button class="btn btn-primary btn-sm" data-gh-go="${lid}">Go</button>
       </div>
       <div class="gh-stats">
-        <div class="gh-stat"><div class="gh-stat-val">${user.public_repos}</div><div class="gh-stat-lbl">Repos</div></div>
-        <div class="gh-stat"><div class="gh-stat-val">${user.followers}</div><div class="gh-stat-lbl">Followers</div></div>
-        <div class="gh-stat"><div class="gh-stat-val">${user.following}</div><div class="gh-stat-lbl">Following</div></div>
+        <div class="gh-stat"><div class="gh-stat-val">${num(user.public_repos)}</div><div class="gh-stat-lbl">Repos</div></div>
+        <div class="gh-stat"><div class="gh-stat-val">${num(user.followers)}</div><div class="gh-stat-lbl">Followers</div></div>
+        <div class="gh-stat"><div class="gh-stat-val">${num(user.following)}</div><div class="gh-stat-lbl">Following</div></div>
       </div>
       <div class="gh-repos">${reposHtml}</div>
     </div>
   `;
 
   // Wire up "Go" button to change GitHub user
-  const goBtn = document.querySelector(`[data-gh-go="${link.id}"]`);
+  const goBtn = document.querySelector(`[data-gh-go="${CSS.escape(String(link.id))}"]`);
   if (goBtn) {
     goBtn.addEventListener('click', () => {
       const input = document.getElementById('gh-input-' + link.id);
@@ -1873,7 +1896,14 @@ async function loadLivePreviewIntoLink(linkId, url) {
     const hero = body.querySelector('.link-island-live-hero');
     if (!hero) return;
     if (data && data.imageUrl) {
-      hero.outerHTML = `<a class="link-island-live-hero" href="${url}" target="_blank" rel="noreferrer"><img src="${data.imageUrl}" alt="" loading="lazy" onerror="this.style.display='none'"></a>`;
+      // Both values come back from a scrape of a third-party page, so
+      // both go through safeUrl before reaching outerHTML.
+      hero.outerHTML = `<a class="link-island-live-hero" href="${safeUrl(url)}" target="_blank" rel="noreferrer"><img src="${safeUrl(data.imageUrl)}" alt="" loading="lazy"></a>`;
+      // Hide a broken image with a listener, not an inline onerror
+      // attribute — an enforced CSP (no 'unsafe-inline') blocks those.
+      // The error event is queued as a task, so attaching now is in time.
+      body.querySelector('.link-island-live-hero img')
+        ?.addEventListener('error', e => { e.currentTarget.style.display = 'none'; }, { once: true });
     } else if (data && data.notes) {
       hero.outerHTML = `<div class="link-island-notes">${escapeHtml(data.notes)}</div>`;
     } else {
@@ -1892,7 +1922,7 @@ async function loadLeaderboardIntoWidget(hwId) {
     const session = (await supabase.auth.getSession()).data?.session;
     const token = session?.access_token;
     if (!token) { host.textContent = 'Sign in to see the leaderboard.'; return; }
-    const res = await fetch('/.netlify/functions/get-leaderboard', {
+    const res = await fetch(apiUrl('/.netlify/functions/get-leaderboard'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
       body: JSON.stringify({ scope: 'friends', timeframe: 'alltime' }),
@@ -1909,10 +1939,10 @@ async function loadLeaderboardIntoWidget(hwId) {
         : '';
       return `
       <div class="hub-lb-row hub-row-go${r.isSelf ? ' is-self' : ''}">
-        <span class="hub-lb-rank">${r.rank}</span>
+        <span class="hub-lb-rank">${escapeHtml(r.rank)}</span>
         <span class="hub-lb-name">${escapeHtml(r.username)}</span>
         ${badgeHtml}
-        <span class="hub-lb-ovr">${r.ovr}</span>
+        <span class="hub-lb-ovr">${escapeHtml(r.ovr)}</span>
       </div>`;
     }).join('')}</div>`;
   } catch {

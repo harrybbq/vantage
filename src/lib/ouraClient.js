@@ -1,5 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { supabase } from './supabase';
+import { consentStatus } from './consent/consent';
+import { apiUrl } from './authFetch';
 
 /**
  * Client-side Oura sync, mirroring whoopClient. Calls the oura-sync
@@ -10,7 +12,7 @@ import { supabase } from './supabase';
  */
 export async function syncOura(update, days = 7) {
   const { data: { session } } = await supabase.auth.getSession();
-  const res = await fetch('/.netlify/functions/oura-sync', {
+  const res = await fetch(apiUrl('/.netlify/functions/oura-sync'), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session?.access_token}` },
     body: JSON.stringify({ days }),
@@ -42,7 +44,10 @@ export async function syncOura(update, days = 7) {
  * hammer the endpoint. No-op unless the user is Oura-connected.
  */
 export function useOuraAutoSync(S, update, { throttleMs = 10 * 60 * 1000 } = {}) {
-  const connected = !!S?.ouraConnected;
+  // Declined or withdrawn health consent stops the passive pull. Never
+  // asked (undefined) keeps today's behaviour until the one-time sheet
+  // has been answered.
+  const connected = !!S?.ouraConnected && consentStatus(S?.consent, 'health') !== 'declined';
   const updateRef = useRef(update);
   updateRef.current = update;
   const lastRef = useRef(0);
@@ -75,7 +80,7 @@ export function useOuraAutoSync(S, update, { throttleMs = 10 * 60 * 1000 } = {})
  */
 export async function disconnectWearable(update, provider) {
   const { data: { session } } = await supabase.auth.getSession();
-  const res = await fetch('/.netlify/functions/wearable-disconnect', {
+  const res = await fetch(apiUrl('/.netlify/functions/wearable-disconnect'), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session?.access_token}` },
     body: JSON.stringify({ provider }),

@@ -2,6 +2,8 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { buildSnapshot } from '../lib/coach/snapshot';
 import { heuristicBrief } from '../lib/coach/heuristicBrief';
 import { authFetch } from '../lib/authFetch';
+import { isGranted } from '../lib/consent/consent';
+import { requestConsent } from '../lib/consent/request';
 
 /**
  * Fetch the AI Coach daily brief once per UTC day per user, with the
@@ -15,6 +17,13 @@ import { authFetch } from '../lib/authFetch';
  *   S         — full app state (must already be loaded)
  *   update    — useVisionBoardState updater (so we can persist the cache)
  *   isPro     — when false the hook is a no-op (saves API calls)
+ *
+ * AI consent (UK GDPR): the snapshot sent to the model is health- and
+ * habit-derived, so being Pro is not permission to send it. The
+ * automatic fetch waits for S.consent.ai; until then the local
+ * heuristic brief is all that shows. A manual refresh asks for consent
+ * first, which is how the coach panel's refresh button becomes the way
+ * in for someone who said "not now" on the one-time sheet.
  *
  * Returns:
  *   { brief, loading, error, refresh }
@@ -41,8 +50,14 @@ export function useDailyBrief({ S, update, isPro }) {
   );
   const brief = llmBrief || heuristic;
 
+  const aiConsent = isGranted(S?.consent, 'ai');
+
   async function fetchBrief(force = false) {
     if (!isPro) return;
+    if (!aiConsent) {
+      if (!force) return;                          // never on page load
+      if (!(await requestConsent('ai'))) return;   // asked, and declined
+    }
     if (!force && cacheValid) return;
     if (inFlight.current) return;
     if (!S || !S.profile) return;
@@ -114,7 +129,7 @@ export function useDailyBrief({ S, update, isPro }) {
   useEffect(() => {
     fetchBrief(false);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isPro, today, S?.profile?.name]);
+  }, [isPro, today, S?.profile?.name, aiConsent]);
 
   // Suppress the error surface while a heuristic brief is available —
   // the panel still shows useful content, so an error banner would be

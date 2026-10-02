@@ -162,14 +162,15 @@ export const DEFAULT_STATE = {
   brainScore: null, // { result: 0-160, ts, testVersion: 1 }
   // ── Friend-card privacy (FEATURE 1 follow-up) ────────────────────
   // Per-field toggles for what friends see on the profile card.
-  // Defaults preserve existing behavior (everything visible).
+  // Defaults preserve existing behavior (visible), except the streak.
   // usePublishProfile reads these and zeros-out hidden fields when
   // it writes public_stats — so server-side data simply doesn't have
   // the value when a friend reads it. Toggling off a field clears
   // the value on the next debounced publish.
   privacy: {
     shareAvatar:   true,  // profile photo (vs @handle initial)
-    shareStreak:   true,  // current_streak + streak_habit
+    // shareStreak deliberately absent: absent reads as OFF (it publishes
+    // the habit's name). Accounts that already hold `true` keep it.
     shareHeatmap:  true,  // 91-day heatmap_days
     shareWins:     true,  // recent_wins (last 3 completed achievements)
     sharePresence: true,  // last_active_at + online dot heartbeat

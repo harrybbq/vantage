@@ -2,6 +2,10 @@
 -- Vantage — Body Recomposition Schema
 -- Run in Supabase SQL Editor. Idempotent — safe to re-run.
 --
+-- ⚠️ <owner-email> in the follow-up block at the bottom is a
+-- placeholder. Substitute the real address in the SQL editor when you
+-- run it, and NEVER commit it back — this repo is public.
+--
 -- Additive only. Creates five new tables and touches nothing that
 -- already exists: nutrition_macros, nutrition_log and
 -- nutrition_daily_summary are not altered, and no data is migrated,
@@ -267,13 +271,13 @@ $$;
 --   -- 2. Seed the nine day-type targets (safe to re-run). Either pass
 --   --    the id, or look it up inline by email:
 --   select seed_recomp_macro_targets(
---     (select id from auth.users where email = 'harrym3002@outlook.com')
+--     (select id from auth.users where email = '<owner-email>')
 --   );
 --
 --   -- 3. Set your rota anchor — ANY date you know was a Day 1 (the
 --   --    first DAY shift of a block). Replace the date if needed:
 --   insert into rota_config (user_id, anchor_date)
---   values ((select id from auth.users where email = 'harrym3002@outlook.com'),
+--   values ((select id from auth.users where email = '<owner-email>'),
 --           '2026-07-23')
 --   on conflict (user_id) do update set anchor_date = excluded.anchor_date;
 --

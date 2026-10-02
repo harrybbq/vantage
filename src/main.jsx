@@ -1,6 +1,7 @@
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { isNativeApp } from './lib/native/platform'
 import './index.css'
 import './hub-dark.css'
 import './theme-cream-pro.css'
@@ -17,6 +18,7 @@ import './boot.css'
 import './shop.css'
 import App from './App.jsx'
 import RootErrorBoundary from './components/RootErrorBoundary.jsx'
+import './lib/telemetry/webVitals.js' // anonymous 1-in-5 page-load performance beacon (prod web only)
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -49,7 +51,12 @@ createRoot(document.getElementById('root')).render(
 //   - First boot doesn't reload (no previous controller).
 //   - Subsequent updates reload after a tiny debounce so any
 //     in-flight save (1.5s debounce in useVisionBoardState) lands.
-if ('serviceWorker' in navigator && import.meta.env.PROD) {
+//
+// Never inside the Capacitor shell: the native app ships its bundle in
+// the binary, so a worker there can only add a second, stale copy of it
+// (and a cache that outlives sign-out). Store builds update through the
+// store.
+if ('serviceWorker' in navigator && import.meta.env.PROD && !isNativeApp()) {
   window.addEventListener('load', () => {
     navigator.serviceWorker.register('/sw.js', { scope: '/' })
       .catch(err => console.warn('SW registration failed:', err));

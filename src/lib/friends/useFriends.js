@@ -92,8 +92,8 @@ export function useFriends(userId, hasPro) {
     await refresh();
   }, [userId, refresh]);
 
-  const report = useCallback(async (otherUserId, reason, context) => {
-    await reportUser(userId, otherUserId, reason, context);
+  const report = useCallback(async (otherUserId, reason, context, snapshot) => {
+    await reportUser(userId, otherUserId, reason, context, snapshot);
   }, [userId]);
 
   const search = useCallback((q) => searchByHandle(q), []);

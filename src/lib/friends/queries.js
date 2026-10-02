@@ -1,4 +1,5 @@
 import { supabase } from '../supabase';
+import { publicNameProblem } from '../moderation/nameFilter.js';
 
 /**
  * Friends data layer — every Supabase call from the social feature
@@ -53,7 +54,10 @@ export function validateHandle(handle) {
   if (handle.length < 3) return 'Handle must be at least 3 characters.';
   if (handle.length > 20) return 'Handle must be 20 characters or fewer.';
   if (!HANDLE_RE.test(handle)) return 'Letters, numbers, and underscores only.';
-  return null;
+  // Strangers see handles (search, the global board), so they get the
+  // same public-text filter as group names (Apple 1.2). Every path that
+  // sets a handle comes through here.
+  return publicNameProblem(handle, 'handle');
 }
 
 /** Translate Supabase / Postgres errors into something a user can act
@@ -117,6 +121,15 @@ export async function updateOwnProfile(userId, patch) {
   const clean = Object.fromEntries(
     Object.entries(patch).filter(([k]) => allowed.includes(k))
   );
+  // Last line of defence for the display name other people see: a name
+  // the public-text filter refuses is published as no name at all. The
+  // user's own S.profile.name is untouched — this only decides what
+  // leaves the device.
+  // 40 chars: the profiles_display_name_len check (audit SQL).
+  if (typeof clean.display_name === 'string') clean.display_name = clean.display_name.slice(0, 40);
+  if (typeof clean.display_name === 'string' && publicNameProblem(clean.display_name)) {
+    clean.display_name = null;
+  }
   if (Object.keys(clean).length === 0) return null;
   const { data, error } = await supabase
     .from('profiles')
@@ -329,14 +342,45 @@ export async function blockUser(currentUserId, blockedUserId) {
   if (error) throw new Error(friendlyError(error, 'Could not block.'));
 }
 
-export async function reportUser(currentUserId, reportedUserId, reason, context) {
-  const { error } = await supabase
-    .from('reports')
-    .insert({
-      reporter_id: currentUserId,
-      reported_id: reportedUserId,
-      reason: reason || null,
-      context: context || null,
-    });
+/**
+ * File a report. `snapshot` ({ handle, display_name, where }) is a copy
+ * of what the reporter was looking at: `reported_id` goes null when the
+ * reported account is deleted, and a report that no longer says who or
+ * what it was about can't be acted on or recognised as repeat abuse.
+ *
+ * The column arrives with supabase/audit_schema_2026_10.sql. Until that
+ * has been run, PostgREST refuses the insert with "column not found"
+ * (PGRST204 / 42703) — so it is retried once without the snapshot and
+ * the report still lands exactly as it did before.
+ */
+export async function reportUser(currentUserId, reportedUserId, reason, context, snapshot) {
+  const row = {
+    reporter_id: currentUserId,
+    reported_id: reportedUserId,
+    reason: reason || null,
+    context: context || null,
+  };
+  let { error } = snapshot
+    ? await supabase.from('reports').insert({ ...row, reported_snapshot: snapshot })
+    : await supabase.from('reports').insert(row);
+  if (error && snapshot && isMissingColumn(error, 'reported_snapshot')) {
+    ({ error } = await supabase.from('reports').insert(row));
+  }
   if (error) throw new Error(friendlyError(error, 'Could not submit report.'));
+}
+
+function isMissingColumn(error, column) {
+  const text = `${error?.message || ''} ${error?.details || ''} ${error?.hint || ''}`;
+  return error?.code === 'PGRST204' || error?.code === '42703' || text.includes(column);
+}
+
+/** The snapshot a report carries — what the reporter could see. */
+export function reportSnapshot({ handle, name, displayName, where } = {}) {
+  const snap = {
+    handle: handle ? String(handle).replace(/^@/, '').slice(0, 64) : null,
+    display_name: (displayName || name) ? String(displayName || name).slice(0, 120) : null,
+    where: where || null,
+    at: new Date().toISOString(),
+  };
+  return snap;
 }

@@ -26,7 +26,7 @@ function Ul({ items }) {
   );
 }
 
-const LAST_UPDATED = '16 July 2026';
+const LAST_UPDATED = '2 October 2026';
 
 function Updated() {
   return (
@@ -38,38 +38,64 @@ function Updated() {
   );
 }
 
+// Placeholders still to be filled in before launch. Styled so nobody can
+// mistake one for finished text — a policy that quietly says "[Company
+// name]" in body type reads as an oversight; this reads as a TODO.
+function Todo({ children }) {
+  return (
+    <span style={{
+      fontFamily: 'var(--mono)', fontSize: '12px', padding: '1px 5px', borderRadius: '4px',
+      background: 'rgba(200,151,10,.16)', color: '#e0b43c', border: '1px dashed rgba(200,151,10,.5)',
+    }}>{children}</span>
+  );
+}
+
+function Mono({ children }) {
+  return <span style={{ fontFamily: 'var(--mono)', color: 'var(--em-light, #4dc485)' }}>{children}</span>;
+}
+
 // ── Privacy Policy ───────────────────────────────────────────────────────
+// Section 8 is written from the code, not from memory: every host listed
+// is one the app or its Netlify functions actually contact (grep
+// netlify/ and src/ for https:// when adding a provider, and add it here
+// in the same change). It separates what your DEVICE contacts directly —
+// which hands that provider your IP address — from what our functions
+// contact on your behalf, which does not.
 function PrivacyPolicyContent() {
   return (
     <>
       <Section title="1. Who We Are">
-        <P>Vantage ("the App", "we", "us") is a personal productivity, goal-tracking and wellness application, available on the web and as a mobile app. We are the data controller for personal data processed through the App.</P>
-        <P>For any privacy question or request, contact us at the support email shown on the App's store listing, or via Settings inside the App. This policy is written for users in the United Kingdom and European Economic Area, but it applies to everyone who uses the App.</P>
+        <P>Vantage ("the App", "we", "us") is a personal productivity, goal-tracking and wellness application, available on the web and as a mobile app. The data controller for personal data processed through the App is <Todo>[Company name, registered address — to be completed on incorporation]</Todo>.</P>
+        <P>For any privacy question or request, contact us at the support email shown on the App's store listing, or via Settings inside the App. To report a security vulnerability, email <Todo>security@[domain — to be confirmed]</Todo>. This policy is written for users in the United Kingdom and European Economic Area, but it applies to everyone who uses the App.</P>
       </Section>
 
       <Section title="2. Data We Collect">
         <P>We collect only what is needed to provide the service:</P>
         <Ul items={[
           'Account data — your email address, used to create and authenticate your account.',
-          'Profile & social data (optional) — a display name, a unique @handle you may claim, a profile picture, your level, and — if you enable them — an activity streak, a 91-day activity heatmap, recent achievement wins, and an online-status indicator. These are only ever shown to people you accept as friends, except where you opt in to the leaderboard (section 6).',
-          'User-generated content — boards, trackers, achievements, shopping wish-list items, savings pots, holiday plans, habit entries and notes you create inside the App.',
+          'Profile & social data (optional) — a display name, a unique @handle you may claim, a profile picture, your level and ratings, and — if you enable them — an activity streak, a 91-day activity heatmap, recent achievement wins, and an online-status indicator. See section 6 for who can see what.',
+          'User-generated content — boards, trackers, achievements, shopping wish-list items, savings pots, holiday plans, habit entries, notes, group names and group pictures you create inside the App.',
           'Direct messages — messages you exchange with accepted friends are stored in our database so they can be delivered and shown in your conversation history. They are transmitted over TLS but are not end-to-end encrypted; treat them like email, not like a sealed letter.',
           'Nutrition data — food log entries, macro targets and goals you record, stored in our database and linked to your account.',
-          'Health & fitness data (optional, with your explicit consent) — if you connect WHOOP, connect an Oura Ring, or import Apple Health data, we store daily metrics such as sleep duration, resting heart rate, heart-rate variability, recovery/readiness score, strain, energy expenditure (calories) and workout summaries. See section 3.',
-          'Payment & subscription data — if you purchase Vantage Pro, the purchase is processed by Apple (App Store), Google (Google Play) and/or RevenueCat. We receive your subscription status and an anonymised transaction reference. We never receive or store your card number.',
+          'Health & fitness data (optional, with your explicit consent) — vitals you enter yourself, and, if you connect WHOOP, connect an Oura Ring, or import Apple Health data, daily metrics such as sleep duration, resting heart rate, heart-rate variability, recovery/readiness score, strain, energy expenditure (calories) and workout summaries. See section 3.',
+          'Reports and blocks — if you report or block someone, we store who reported whom, the reason you chose and any note you add. A report can include a copy of the reported person\'s handle and display name at the time, and recent messages from them if you report from a conversation.',
+          'Payment & subscription data — if you purchase Vantage Pro, the purchase is processed by Apple (App Store), Google (Google Play) and RevenueCat. We receive your subscription status and a transaction reference. We never receive or store your card number.',
           'Device & notification data — if you enable push notifications, we store a device push token so notifications can be delivered via Apple/Google push services (Firebase Cloud Messaging).',
-          'Camera images (Pro, optional) — if you use the AI food scanner, a single camera frame is sent to Anthropic\'s API to identify the food. The image is not stored by us and is not retained by Anthropic beyond the duration of the API request.',
-          'Third-party sign-in data (optional) — if you sign in with Google or Apple, we receive a minimal profile from that provider (section 8).',
+          'Camera images (Pro, optional) — if you use the AI food scanner, a single camera frame is sent to Anthropic\'s API to identify the food (section 7). We do not store the image.',
+          'Approximate location — to show local weather, our server looks up the approximate city for your IP address (section 8). We do not store the result against your account, and we never collect precise (GPS) location.',
+          'Third-party sign-in data (optional) — if you sign in with Google or Apple, we receive a minimal profile from that provider (section 9).',
           'Session data — a session token kept by our authentication provider to keep you signed in.',
-          'Preferences — colour scheme, background and similar choices, stored in your browser\'s / device\'s localStorage.',
+          'Preferences — colour scheme, background and similar choices, stored in your browser\'s / device\'s localStorage and in your account.',
+          'Anonymous performance measurements (web app only) — on about one page load in five, the browser measures how quickly the page loaded and responded and sends us those timings with the page path and a coarse device type (phone, tablet or desktop); they are stored without your account, IP address or any other identifier and are used only to find and fix slow pages.',
+          'Problem reports — if you use Settings → Report a problem, we store what you write, the category you choose and the page you were on, linked to your account so we can follow up.',
         ]} />
-        <P>We do not collect precise location data, biometric identification data, advertising identifiers, or contact lists. We use no advertising or analytics trackers.</P>
+        <P>We do not collect precise location data, biometric identification data, advertising identifiers, contact lists or purchase history. We use no advertising or analytics trackers.</P>
       </Section>
 
       <Section title="3. Health Data & Your Explicit Consent">
-        <P>Vitals, sleep, heart-rate and nutrition information are health data — "special category" data under UK GDPR. We only process it with your explicit consent, which you give by actively connecting WHOOP, connecting an Oura Ring, importing Apple Health data, or logging vitals and food yourself.</P>
+        <P>Vitals, sleep, heart-rate and nutrition information are health data — "special category" data under UK GDPR. We ask for your explicit consent to health data on a consent screen that every account sees once, and again before you connect WHOOP or an Oura Ring or turn on Apple Health import — no connected source is set up without it. Saying no is fine: features that do not need health data keep working, and anything you choose to type in yourself (such as a weight or a meal) is still saved to your account and shown only to you.</P>
         <Ul items={[
-          'You can withdraw consent at any time: use Disconnect on the WHOOP or Oura panel in Track → Vitals & Macros (this immediately deletes that device\u2019s stored access tokens), stop importing Apple Health data, or delete individual entries or your whole account. Metrics already synced stay in your history until you delete them or your account.',
+          'You can withdraw consent at any time in Settings → Privacy → Consent. To stop a connected source sending anything further, also use Disconnect on its WHOOP or Oura panel (this immediately deletes that device’s stored access tokens) or turn off Apple Health sync. You can delete individual entries or your whole account at any time; metrics already recorded stay in your history until you do.',
           'Health data is used solely to show you your own trends, widgets and (if you use it) the daily AI brief. It is never shown to other users, never used for advertising, and never sold.',
           'WHOOP and Oura data is fetched from their respective APIs under your OAuth authorisation; Apple Health data only ever reaches us when you explicitly export or sync it.',
         ]} />
@@ -79,15 +105,17 @@ function PrivacyPolicyContent() {
         <Ul items={[
           'Performance of a contract — your email, account and app content are processed to deliver the service you signed up for.',
           'Explicit consent — health & fitness data (section 3), AI features (section 7) and push notifications. You can withdraw consent at any time without affecting the rest of the App.',
-          'Legitimate interests — storing preferences locally, keeping the service secure, and preventing abuse of social features.',
+          'Legitimate interests — storing preferences, keeping the service secure, screening uploaded group pictures and profile pictures, handling reports and preventing abuse of social features.',
+          'Legal obligation — keeping records we are required to keep, and responding to lawful requests.',
         ]} />
       </Section>
 
       <Section title="5. How We Use Your Data">
         <Ul items={[
           'To create and manage your account and sync your data across devices.',
-          'To operate the social features you choose to use (friends, messages, leaderboard, trending).',
+          'To operate the social features you choose to use (friends, messages, groups, leaderboard, trending).',
           'To provide optional AI features when you use them (section 7).',
+          'To review reports and act on accounts or content that break the Terms of Service.',
           'To send transactional emails (account confirmation, password reset) — we send no marketing emails.',
           'To deliver push notifications you have enabled.',
           'To verify subscription entitlements for Vantage Pro.',
@@ -95,37 +123,60 @@ function PrivacyPolicyContent() {
       </Section>
 
       <Section title="6. Social Features — What Others Can See">
-        <P>Everything social in Vantage is opt-in or opt-out, and controlled in Settings → Privacy:</P>
+        <P>Everything social in Vantage is controlled in Settings → Privacy:</P>
         <Ul items={[
-          'Handle search — you are only findable by @handle search while "Show me in handle search" is on. It requires a claimed handle.',
-          'Friends — people you accept as friends can see your profile card: display name, avatar, level, and any of streak / heatmap / recent wins / online status you have left enabled. Each has its own toggle.',
-          'Leaderboard — the global leaderboard shows your display name, level and rating. You can hide yourself entirely ("Show me on the global leaderboard" off). Pro users may optionally colour their name.',
+          'Handle search — you are only findable by @handle search while "Show me in handle search" is on. It is off by default for new accounts and needs a claimed handle. Accounts created before this default changed keep the setting they had — check it in Settings → Privacy.',
+          'Leaderboard — the global leaderboard shows your display name, profile picture, level, rating and prestige. You appear on it only while "Show me on the global leaderboard" is on; it is off by default for new accounts (older accounts: as above). Friends see you on the friends board regardless. Pro users may optionally colour their name.',
+          'Friends — people you accept as friends can see your profile card: display name, avatar, level, and any of streak / heatmap / recent wins / online status you have enabled. Each has its own toggle. The habit-streak card, which shows the habit\'s name, is off unless you turn it on.',
+          'Groups — if you join a group, its members see your display name, profile picture, rating and weekly climb. The group\'s name, picture and weekly score appear on its division\'s board to other groups.',
           'Trending (Shopping) — items on your wish-list may be aggregated into your friends\' "Trending" board and the app-wide "Global" board. This is anonymous: only the item name and a count are shown, never who wants it, and the Global board only ever shows items wanted by at least two different people. Turn "Share my wishlist in friends\' Trending" off to be excluded from both.',
-          'Direct messages — visible only to you and the recipient (and stored as described in section 2).',
+          'Direct messages — visible only to you and the recipient (and stored as described in section 2). If the recipient reports a conversation, recent messages from it are included in the report for review.',
         ]} />
       </Section>
 
       <Section title="7. AI Features (Anthropic)">
-        <P>Two optional features send data to Anthropic's API, our AI provider:</P>
+        <P>These optional features send data to Anthropic's API, our AI provider. We ask for your consent before the first one runs, and you can withdraw it in Settings → Privacy → Consent:</P>
         <Ul items={[
-          'AI food scanner (Pro) — one camera frame per scan, used solely to identify the food and estimate nutrition. Not retained after the request.',
-          'Daily brief / AI coach — a compact snapshot of your own App data (e.g. recent habits, goals, vitals and macro trends) is sent to generate your personal daily brief. It is not retained after the request.',
+          'AI food scanner (Pro) — one camera frame per scan, used to identify the food and estimate nutrition.',
+          'Daily brief / AI coach — a compact snapshot of your own App data (e.g. first name, recent habits, trackers, goals, vitals and macro trends) is sent to generate your personal daily brief.',
+          'Recipe from a video — the title and description of a YouTube or TikTok video you save are sent to extract the ingredient list and estimate macros.',
         ]} />
-        <P>Under our API terms with Anthropic, data sent via the API is not used to train their models. If you never use these features, no data is sent to Anthropic. AI output can be wrong — see the Terms of Service health disclaimer.</P>
+        <P>Separately, and not optional: when a group picture is uploaded, or before your profile picture is shown to other people, the image is sent to Anthropic's API to screen it for content that breaks the Terms. Until a picture passes, other people see your initial instead; the picture itself stays on your account. This is done on the basis of legitimate interests (keeping the App safe).</P>
+        <P>In each case the data is sent to Anthropic's API to generate the result and is handled by Anthropic under its commercial terms, under which data sent via the API is not used to train their models. We do not store the camera frame or the snapshot we send; the result (for example your brief) is saved in your account. If you never use the optional features, none of your data is sent to Anthropic by them. AI output can be wrong — see the Terms of Service health disclaimer.</P>
       </Section>
 
-      <Section title="8. Third Parties (Processors)">
-        <P>We use the following providers to run the App:</P>
+      <Section title="8. Third Parties (Processors and Services We Contact)">
+        <P><strong>Providers that run the App</strong> (they process your personal data on our behalf):</P>
         <Ul items={[
-          'Supabase — database and authentication (EU-hosted). Stores your account, app content, messages, nutrition and health data under a Data Processing Agreement.',
-          'Netlify — web hosting and the serverless functions that power sync, leaderboards, trending and integrations.',
-          'Anthropic — AI features only, as described in section 7.',
+          'Supabase — database and authentication, hosted in the EU. Stores your account, app content, messages, nutrition and health data.',
+          'Netlify — web hosting and the serverless functions that power sync, leaderboards, groups, trending and integrations. Receives your IP address when you use the App.',
+          'Anthropic — AI features and screening of group and profile pictures, as described in section 7.',
           'RevenueCat, Apple and Google — subscription billing and entitlement management for Vantage Pro. Payment details are handled by the platform you purchase through.',
           'Firebase Cloud Messaging (Google) — delivery of push notifications you enable; processes your device push token.',
-          'WHOOP — if you connect it, we access your WHOOP data via their API under your authorisation. WHOOP\'s own privacy policy governs their side.',
-          'Oura Health (Oura Ring) — if you connect it, we access your sleep, heart-rate, readiness and activity data via the Oura API under your authorisation. Oura\'s own privacy policy governs their side.',
-          'Open Food Facts (openfoodfacts.org) — food search results (CC BY-SA 4.0). Only your search text is sent; no personal data.',
           'Google / Apple sign-in — optional authentication only (section 9).',
+        ]} />
+        <P><strong>Services you connect</strong> (under your authorisation; their own privacy policies govern their side):</P>
+        <Ul items={[
+          'WHOOP — your WHOOP recovery, sleep, strain and workout data, fetched via their API.',
+          'Oura Health (Oura Ring) — your sleep, heart-rate, readiness and activity data, fetched via the Oura API.',
+        ]} />
+        <P><strong>Services our servers contact on your behalf</strong> (they see the request, not your account):</P>
+        <Ul items={[
+          <>ipwho.is — <strong>receives your IP address</strong> so our weather function can find your approximate city. Nothing else is sent.</>,
+          'Open-Meteo — weather forecasts for that approximate location, and historic weather and place lookups for holiday destinations you add.',
+          'Frankfurter (frankfurter.app) — currency exchange rates for holiday destinations.',
+          'Open Food Facts, USDA FoodData Central and FatSecret — food search. Only your search text or a scanned barcode is sent.',
+          'YouTube (Google) and TikTok — when you save a cooking video, the video\'s public page or oEmbed data is fetched to read its title and description.',
+          'GNews — news headlines for the news widget, including any topic you search for.',
+          'Finnhub — stock and market quotes for the ticker symbols you add to the market widget.',
+          'Shop websites — when you paste a product link, or open Shopping, our server fetches that product page to read its name, image and current price.',
+        ]} />
+        <P><strong>Services your device contacts directly</strong> (these receive your IP address, as any website you load does):</P>
+        <Ul items={[
+          'Google Fonts — the App\'s typefaces.',
+          'Google favicon service — small brand logos next to foods and shops; the brand\'s website name is sent.',
+          'GitHub API — only if you add the GitHub widget: the GitHub username you enter is looked up to show that public profile and its repositories.',
+          'YouTube image servers (i.ytimg.com) — thumbnails for cooking videos you save.',
         ]} />
         <P>We do not sell, rent, or share your data with advertisers or data brokers.</P>
       </Section>
@@ -138,27 +189,31 @@ function PrivacyPolicyContent() {
       </Section>
 
       <Section title="10. International Transfers">
-        <P>Your core data is stored in the EU (Supabase). Some processors (Anthropic, RevenueCat, Netlify, Google) may process data in the United States. Where data leaves the UK/EEA, transfers are protected by UK adequacy decisions, the UK International Data Transfer Addendum and/or EU Standard Contractual Clauses entered into with each processor.</P>
+        <P>Your core data is stored in the EU (Supabase). Several providers in section 8 are based in, or process data in, the United States or elsewhere outside the UK/EEA — including Anthropic, RevenueCat, Netlify, Google and GitHub. Where personal data leaves the UK/EEA, transfers are protected by UK adequacy regulations, the UK International Data Transfer Addendum and/or EU Standard Contractual Clauses entered into with each processor.</P>
       </Section>
 
       <Section title="11. Data Retention & Deletion">
         <Ul items={[
-          'Account & content — retained while your account is active. Delete your account at any time via Settings → Account → Danger zone; all associated data is permanently erased within 30 days.',
+          'Account & content — retained while your account is active. Delete your account at any time via Settings → Account → Delete account; your login and all associated data are permanently erased within 30 days.',
+          'History snapshots — to recover from accidental loss, we automatically keep up to 14 daily copies of your app data (without images). Older copies are replaced as new ones are made, and all of them are deleted with your account.',
           'WHOOP and Oura tokens — deleted immediately when you disconnect that device.',
           'Direct messages — retained until you delete them or your account.',
-          'Camera frames & AI snapshots — not stored; discarded after each request.',
-          'Data export — you can export your data as a JSON file at any time in Settings.',
+          'Reports — a report you make, or one made about you, may be kept after the account involved is deleted, only as long as needed to deal with it and with repeat abuse.',
+          'Problem reports — kept until the problem is dealt with; if you delete your account first, the report loses its link to you.',
+          'Camera frames & AI snapshots — not stored by us; discarded after each request.',
+          'Subscriptions — deleting your account does not cancel an App Store or Google Play subscription; cancel it in the store.',
+          'Data export — you can export your data at any time in Settings → Account.',
         ]} />
       </Section>
 
       <Section title="12. Security">
-        <P>All data is encrypted in transit (TLS). Database access is protected by row-level security so users can only read what they are entitled to; server-side keys never ship in the app. No system is perfectly secure — if we become aware of a breach affecting your personal data we will notify you and the ICO as required by law.</P>
+        <P>All data is encrypted in transit (TLS). Database access is protected by row-level security so users can only read what they are entitled to; server-side keys never ship in the app. No system is perfectly secure — if we become aware of a breach affecting your personal data we will notify you and the ICO as required by law. To report a vulnerability, email <Todo>security@[domain — to be confirmed]</Todo>.</P>
       </Section>
 
       <Section title="13. Cookies & Local Storage">
         <Ul items={[
           'Session tokens — set by our authentication provider to keep you signed in. Essential; the service cannot work without them.',
-          'localStorage — preferences (colour scheme, backgrounds, dismissals) stored locally on your device.',
+          'localStorage — preferences (colour scheme, backgrounds, dismissals) and a local backup of your data, stored on your device.',
           'No third-party tracking, advertising or analytics cookies are used.',
         ]} />
       </Section>
@@ -167,10 +222,10 @@ function PrivacyPolicyContent() {
         <Ul items={[
           'Access — request a copy of your personal data (or use the in-app export).',
           'Erasure — delete your account and all data in-app.',
-          'Portability — export your data as JSON in-app.',
+          'Portability — export your data in-app.',
           'Rectification — correct data by editing it in the App.',
           'Restriction & objection — ask us to limit or stop certain processing.',
-          'Withdraw consent — at any time, for health data, AI features or notifications, without affecting the rest of the App.',
+          'Withdraw consent — at any time, for health data, AI features or notifications, without affecting the rest of the App (Settings → Privacy → Consent).',
         ]} />
         <P>To exercise a right not available in-app, contact us as described in section 1. We respond within one month.</P>
       </Section>
@@ -185,7 +240,7 @@ function PrivacyPolicyContent() {
       </Section>
 
       <Section title="17. Complaints">
-        <P>If you are unhappy with how we handle your data, you can lodge a complaint with the UK Information Commissioner's Office at <span style={{ fontFamily: 'var(--mono)', color: 'var(--em-light, #4dc485)' }}>ico.org.uk</span> (0303 123 1113), or with your local EU supervisory authority.</P>
+        <P>If you are unhappy with how we handle your data, you can lodge a complaint with the UK Information Commissioner's Office at <Mono>ico.org.uk</Mono> (0303 123 1113), or with your local EU supervisory authority.</P>
       </Section>
     </>
   );
@@ -246,7 +301,18 @@ function TermsContent() {
           'Reverse-engineer, decompile or extract the App\'s source code, or use bots/scripts to scrape or interact with the App.',
           'Manipulate the leaderboard, coins, or trending boards through fake accounts or automated activity.',
         ]} />
-        <P>We may remove content, restrict features, or suspend or terminate accounts that violate these rules, with notice where reasonably possible. To report abusive content or behaviour, contact us via Settings or the support address on the store listing; we review reports promptly.</P>
+        <P>These rules apply to everything other people can see: display names, @handles, profile pictures, messages, group names and group pictures, and wish-list items that reach a Trending board.</P>
+      </Section>
+
+      <Section title="7a. Reporting, Blocking & Moderation">
+        <Ul items={[
+          'Report — you can report a person from their friend card, from a conversation, from a leaderboard row or from a group\'s member list. Reports are private: the person reported is not told who reported them.',
+          'Block — blocking removes the person from your friends, stops them messaging you and stops them sending you friend requests.',
+          'Review — every report is reviewed by a person. We aim to act within 24 hours. Group pictures and profile pictures are also screened automatically before others see them, and held back if the screen is unsure.',
+          'Action — depending on what we find we may remove or reset content (for example a display name, handle or group picture), hide an account from the leaderboard, search and group boards, suspend it, or close it. Serious or repeated breaches lead to permanent closure. Content that may be illegal can be reported to the police or other authorities.',
+          'Evidence — a report, with a copy of the reported handle and display name and any messages attached to it, may be kept after the account involved is deleted, so that repeat abuse can be recognised.',
+          'Disagree with a decision? Contact us via the support address on the store listing and we will look at it again.',
+        ]} />
       </Section>
 
       <Section title="8. Your Content">
@@ -286,7 +352,7 @@ function TermsContent() {
       </Section>
 
       <Section title="15. Termination">
-        <P>You may close your account at any time in Settings (Settings → Account → Danger zone), which deletes your data as described in the Privacy Policy. We may suspend or terminate accounts that violate these terms, with notice where reasonably possible. Sections that by their nature should survive termination (your content licence for anonymised aggregates, disclaimers, liability limits, governing law) survive.</P>
+        <P>You may close your account at any time in Settings (Settings → Account → Delete account), which deletes your data as described in the Privacy Policy. We may suspend or terminate accounts that violate these terms, with notice where reasonably possible. Sections that by their nature should survive termination (your content licence for anonymised aggregates, disclaimers, liability limits, governing law) survive.</P>
       </Section>
 
       <Section title="16. Changes to These Terms">

@@ -10,6 +10,8 @@
  *   Rotation — the pattern, now editable (sessions, leave)
  *   Diet     — the macro plan and the physique it is aimed at
  *   Career   — certifications, CV, and deliberate practice
+ *   Security — the owner's console: DB, Netlify, moderation, tickets
+ *              (formerly "Review"; the old id still opens it)
  *
  * It opens on a home menu (UpgradeHome): a large title and one card per
  * section with a live line, rather than a tab strip — Upgrade is a small
@@ -20,7 +22,7 @@
  *
  * Gating: entry points only render for the owner and this re-checks
  * isOwner, so a deep link shows nothing for anyone else. Owner identity
- * is a UI gate (VITE_OWNER_EMAIL) — everything here is personal
+ * is a UI gate (useIsOwner → is_app_owner()) — everything here is personal
  * planning data in the user's own state, so there is nothing to
  * server-side authorise, but do not put secrets in it.
  */
@@ -30,8 +32,8 @@ import Icon from '../Icon';
 import RotationTab from './RotationTab';
 import DietTab from './DietTab';
 import CareerTab from './CareerTab';
-import ReviewTab from './ReviewTab';
-import UpgradeHome, { SECTIONS } from './UpgradeHome';
+import SecurityTab from './security/SecurityTab';
+import UpgradeHome, { SECTIONS, resolveSection } from './UpgradeHome';
 import './Upgrade.css';
 
 export default function UpgradeSection({ S, update, active, isOwner, userId }) {
@@ -55,8 +57,9 @@ export default function UpgradeSection({ S, update, active, isOwner, userId }) {
       const y = rect.top + rect.height / 2 - box.top;
       setOrigin(`${x.toFixed(1)}% ${Math.max(0, y).toFixed(0)}px`);
     }
-    setTab(id);
-    try { window.history.pushState({ upgrade: id }, ''); pushed.current = true; } catch { /* sandboxed */ }
+    const next = resolveSection(id);
+    setTab(next);
+    try { window.history.pushState({ upgrade: next }, ''); pushed.current = true; } catch { /* sandboxed */ }
     window.scrollTo({ top: 0 });
   }, []);
   const back = useCallback(() => {
@@ -72,7 +75,7 @@ export default function UpgradeSection({ S, update, active, isOwner, userId }) {
     );
   }
 
-  const cur = SECTIONS.find(x => x.id === tab) || null;
+  const cur = SECTIONS.find(x => x.id === resolveSection(tab)) || null;
 
   return (
     <section id="upgrade" ref={root} className={`section upg-app${active ? ' active' : ''}${cur ? ' is-open' : ''}`}>
@@ -90,7 +93,7 @@ export default function UpgradeSection({ S, update, active, isOwner, userId }) {
           {tab === 'rotation' && <RotationTab S={S} update={update} isMobile={isMobile} />}
           {tab === 'diet' && <DietTab S={S} update={update} userId={userId} isMobile={isMobile} />}
           {tab === 'career' && <CareerTab S={S} update={update} userId={userId} isMobile={isMobile} />}
-          {tab === 'review' && <ReviewTab />}
+          {cur.id === 'security' && <SecurityTab />}
         </div>
       )}
     </section>

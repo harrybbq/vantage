@@ -1,0 +1,12 @@
+# Vantage - security contact (RFC 9116)
+#
+# PLACEHOLDER: replace [your-domain] with the real domain before launch,
+# and make sure the security@ inbox exists and reaches both owners.
+# Renew Expires before it passes - an expired file is treated as absent.
+# If the GitHub repo is made private, point Policy at a page on the site
+# instead, or it becomes a dead link.
+
+Contact: mailto:security@[your-domain]
+Expires: 2027-09-30T00:00:00.000Z
+Policy: https://github.com/harrybbq/VisionBoardREAL/blob/master/SECURITY.md
+Preferred-Languages: en

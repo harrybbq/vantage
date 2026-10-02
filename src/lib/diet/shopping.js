@@ -26,6 +26,17 @@
  */
 
 export const PRICES_AS_OF = 'Sep 2026';
+
+/**
+ * Shops whose own prices couldn't be checked, and whose verified table
+ * stands in for them. Lidl UK doesn't list grocery prices online, so
+ * the Sep 2026 refresh verified Tesco, Morrisons and Aldi only; left on
+ * guesses, Lidl undercut the checked prices and won every comparison.
+ * Aldi and Lidl price own-brand basics very closely, so Lidl reads
+ * Aldi's column until real Lidl prices are entered (per item, those
+ * always win). Remove the entry once the Lidl column is verified.
+ */
+export const PRICED_AS = { lidl: 'aldi' };
 export const STORES = [
   { id: 'tesco', name: 'Tesco' },
   { id: 'morrisons', name: 'Morrisons' },
@@ -38,14 +49,23 @@ export const storeName = id => (STORES.find(s => s.id === id) || STORES[0]).name
 export const AISLES = ['Meat & fish', 'Dairy & eggs', 'Fruit & veg', 'Rice, pasta & bread', 'Tins & jars', 'Other'];
 
 // One pack size, priced at each shop: SP(size, tesco, morrisons, aldi,
-// lidl). null = that shop doesn't sell that size. Order matters in
-// CATALOGUE: the first match wins, so specific items come first.
+// lidl). null = that shop doesn't sell that size; U = it does, but the
+// price hasn't been checked (the item shows as "no price yet" rather
+// than guessed or "not stocked"). Order matters in CATALOGUE: the first
+// match wins, so specific items come first.
+export const U = 'unchecked';
 const SP = (size, t, m, a, l, label) => ({ size, prices: { tesco: t, morrisons: m, aldi: a, lidl: l }, ...(label ? { label } : {}) });
 export const CATALOGUE = [
   // Meat & fish
   { re: /turkey mince/, aisle: 0, packs: { g: [SP(500, 4, 4.25, 2.99, 2.89)] } },
   { re: /chicken mince/, aisle: 0, packs: { g: [SP(500, 2.49, 2.49, 2.49, 3.19)] } },
   { re: /pork mince/, aisle: 0, packs: { g: [SP(500, 2.49, 2.49, 2.49, 2.49), SP(750, 4.25, null, null, null)] } },
+  // Lean (5%) beef mince before the catch-all: plain "beef mince" on the
+  // shelf is the 20% pack, and pricing a 5% recipe at 20% prices
+  // understated it by ~£1.80 a pack. Morrisons checked by hand (Sep 2026);
+  // Tesco and Aldi sell it but weren't checked, so they stay UNCHECKED.
+  { re: /(?:\b5%|\blean\b).*mince/, aisle: 0, packs: { g: [SP(500, U, 5.05, U, null)] } },
+  // Standard (20%) beef mince — and any other mince not matched above.
   { re: /mince/, aisle: 0, packs: { g: [SP(500, 3.25, 3.25, 3.25, 2.99), SP(750, 6, null, null, null), SP(1000, null, null, null, 5.49)] } },
   { re: /chicken breast/, aisle: 0, packs: {
     g: [SP(300, null, null, 2.29, 2.39), SP(330, null, 2.52, null, null), SP(350, 2.67, null, null, null), SP(650, 4.9, null, 4.69, 3.99), SP(1000, 6.69, 6.99, 6.69, 5.79)],
@@ -152,9 +172,10 @@ export function catalogueFor(ikey) {
 
 /** A catalogue entry's packs at one shop → [{ size, price, label }] (sizes it sells). */
 export function packsAt(entry, family, store) {
+  const col = PRICED_AS[store] || store;
   return ((entry && entry.packs[family]) || [])
-    .filter(p => p.prices[store] != null)
-    .map(p => ({ size: p.size, price: p.prices[store], ...(p.label ? { label: p.label } : {}) }));
+    .filter(p => typeof p.prices[col] === 'number')
+    .map(p => ({ size: p.size, price: p.prices[col], ...(p.label ? { label: p.label } : {}) }));
 }
 
 /**
@@ -217,8 +238,9 @@ export function picksLabel(picks, family) {
  * → { status: 'ok'|'out'|'unpriced', best, own, why }
  *   out       the shop doesn't have it: you said so, or it sells none of
  *             the item's pack sizes in the table
- *   unpriced  not in the table and no price of yours — counted as
- *             available, just without a price
+ *   unpriced  not in the table (or sold there but its price unchecked)
+ *             and no price of yours — counted as available, just
+ *             without a price
  */
 export function itemAt(it, store, prefs = {}) {
   const ikey = it.ikey || it.key;
@@ -229,7 +251,11 @@ export function itemAt(it, store, prefs = {}) {
   const packs = mine || (entry ? packsAt(entry, it.family, store) : null);
   if (mine && it.base != null) return { status: 'ok', best: bestPacks(it.base, mine), own: true };
   if (!entry || !entry.packs[it.family] || it.base == null) return { status: 'unpriced', best: null, own: false };
-  if (!packs.length) return { status: 'out', best: null, own: false, why: 'range' };
+  if (!packs.length) {
+    const col = PRICED_AS[store] || store;
+    if (entry.packs[it.family].some(p => p.prices[col] === U)) return { status: 'unpriced', best: null, own: false, why: 'unchecked' };
+    return { status: 'out', best: null, own: false, why: 'range' };
+  }
   return { status: 'ok', best: bestPacks(it.base, packs), own: false };
 }
 

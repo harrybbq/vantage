@@ -10,7 +10,7 @@ import ReportFriendModal from './ReportFriendModal';
 import MessagesModal from './MessagesModal';
 import FriendPanel from './FriendPanel';
 import { useFriends } from '../../lib/friends/useFriends';
-import { getFriendPublicStats } from '../../lib/friends/queries';
+import { getFriendPublicStats, reportSnapshot } from '../../lib/friends/queries';
 import { getUnreadCounts } from '../../lib/friends/messages';
 import { useSubscriptionContext } from '../../context/SubscriptionContext';
 
@@ -368,7 +368,8 @@ export default function FriendsRail({ userId, onUpgrade, panelSlot = null }) {
         friend={reportTarget}
         onSubmit={async (reason, context) => {
           if (!reportTarget) return;
-          await friends.report(reportTarget.id, reason, context);
+          await friends.report(reportTarget.id, reason, context,
+            reportSnapshot({ handle: reportTarget.handle, name: reportTarget.name, where: 'friend-card' }));
         }}
         onClose={() => setReportTarget(null)}
       />

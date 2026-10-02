@@ -9,9 +9,29 @@
  *
  * The user enables sync in-app, which stores a random token in their
  * synced state (state.healthToken). The Shortcut then POSTs here with
- * ?token=…; we resolve it to the user via a JSONB filter on user_data
- * (no schema change needed) and merge one day of samples into
+ * the token in the `x-health-token` header (preferred — a query string
+ * lands in access logs; `?token=` and a body `token` are still accepted
+ * so existing Shortcuts keep working); we resolve it to the user via a
+ * JSONB filter on user_data and merge one day of samples into
  * vitalsLog + burnLog.
+ *
+ * ── Hardening (2026-09-30, items 49/50) ─────────────────────────────
+ *   · Rate-limited per IP as well as per token. Keying only on the
+ *     caller-chosen token meant a script could try a fresh token every
+ *     request, and every unknown token is a full-table JSONB scan.
+ *     (The real fix is a hashed, indexed token table — item 49; the
+ *     lead's SQL adds an expression index on state->>'healthToken'.)
+ *   · The write is compare-and-set on updated_at (lib/stateWrite.js):
+ *     a client save that lands between our read and our write is no
+ *     longer overwritten. On a double conflict we answer 503 and the
+ *     Shortcut's next run delivers the same samples.
+ *   · Error bodies are generic; detail goes to the function log.
+ *
+ * Why the WHOLE state is still read and written: PostgREST can only
+ * replace the `state` column, not one key inside it. Reading just
+ * vitalsLog/burnLog would need a Postgres function that patches keys
+ * in place (jsonb_set) — a schema change for the lead, noted in the
+ * report. Until then the conditional write is what makes it safe.
  *
  * Payload (ingest) — all fields optional; run daily so `date` defaults
  * to the server's today:
@@ -33,6 +53,10 @@ function checkRate(key, max = 60) {
   if (now - e.t > 60_000) { e.count = 0; e.t = now; }
   e.count++;
   rateLimits.set(key, e);
+  // Keys include caller-chosen tokens, so bound the map.
+  if (rateLimits.size > 5000) {
+    for (const [k, v] of rateLimits) if (now - v.t > 60_000) rateLimits.delete(k);
+  }
   return e.count <= max;
 }
 
@@ -55,36 +79,50 @@ function latestWeight(vitalsLog) {
   return null;
 }
 
-async function sbFetch(url, opts, serviceKey) {
-  return fetch(url, {
-    ...opts,
-    headers: { apikey: serviceKey, Authorization: `Bearer ${serviceKey}`, ...(opts.headers || {}) },
-  });
+const { mergeStateCAS } = require('../lib/stateWrite');
+
+function clientIp(event) {
+  const h = event.headers || {};
+  return h['x-nf-client-connection-ip']
+    || String(h['x-forwarded-for'] || '').split(',')[0].trim()
+    || 'unknown';
 }
+
+const reply = (statusCode, body) => ({ statusCode, headers: CORS, body: JSON.stringify(body) });
 
 exports.handler = async (event) => {
   if (event.httpMethod === 'OPTIONS') return { statusCode: 204, headers: CORS, body: '' };
-  if (event.httpMethod !== 'POST') return { statusCode: 405, headers: CORS, body: JSON.stringify({ error: 'method not allowed' }) };
+  if (event.httpMethod !== 'POST') return reply(405, { error: 'method not allowed' });
 
-  const supabaseUrl = process.env.SUPABASE_URL;
-  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  if (!supabaseUrl || !serviceKey) return { statusCode: 500, headers: CORS, body: JSON.stringify({ error: 'supabase env missing' }) };
+  const env = process.env;
+  const supabaseUrl = env.SUPABASE_URL;
+  const serviceKey = env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!supabaseUrl || !serviceKey) return reply(500, { error: 'not configured' });
+
+  // Per IP first: this is checked before anything touches the database,
+  // so rotating tokens does not rotate the limit. A Shortcut runs a few
+  // times a day; 30 a minute from one address is already generous.
+  if (!checkRate('ip:' + clientIp(event), 30)) return reply(429, { error: 'rate limited' });
 
   const q = event.queryStringParameters || {};
   let body = {};
   try { body = JSON.parse(event.body || '{}'); } catch { /* tolerate empty */ }
 
-  // Resolve the sync token → user via a JSONB filter on user_data
-  // (state.healthToken), so no dedicated column/table is required.
-  const token = q.token || event.headers['x-health-token'] || body.token;
-  if (!token) return { statusCode: 401, headers: CORS, body: JSON.stringify({ error: 'missing sync token' }) };
-  if (!/^[A-Za-z0-9]{16,64}$/.test(token)) return { statusCode: 400, headers: CORS, body: JSON.stringify({ error: 'bad token' }) };
-  if (!checkRate(token, 60)) return { statusCode: 429, headers: CORS, body: JSON.stringify({ error: 'rate limited' }) };
+  // Header first; query string and body kept for Shortcuts already set up.
+  const token = event.headers?.['x-health-token'] || body.token || q.token;
+  if (!token) return reply(401, { error: 'missing sync token' });
+  if (typeof token !== 'string' || !/^[A-Za-z0-9]{16,64}$/.test(token)) return reply(400, { error: 'bad token' });
+  if (!checkRate('tok:' + token, 60)) return reply(429, { error: 'rate limited' });
 
-  const lookup = await sbFetch(`${supabaseUrl}/rest/v1/user_data?state->>healthToken=eq.${token}&select=id,state`, {}, serviceKey);
-  if (!lookup.ok) return { statusCode: 500, headers: CORS, body: JSON.stringify({ error: 'lookup failed' }) };
+  const lookup = await fetch(
+    `${supabaseUrl}/rest/v1/user_data?state->>healthToken=eq.${token}&select=id,state,updated_at`,
+    { headers: { apikey: serviceKey, Authorization: `Bearer ${serviceKey}` } });
+  if (!lookup.ok) {
+    console.error('health-sync: lookup failed', lookup.status);
+    return reply(500, { error: 'sync failed' });
+  }
   const row = (await lookup.json())[0];
-  if (!row?.id) return { statusCode: 403, headers: CORS, body: JSON.stringify({ error: 'unknown token' }) };
+  if (!row?.id) return reply(403, { error: 'unknown token' });
   const userId = row.id;
 
   const date = /^\d{4}-\d{2}-\d{2}$/.test(body.date || '') ? body.date : todayISO();
@@ -93,30 +131,40 @@ exports.handler = async (event) => {
   const rhr = num(body.rhr, 20, 250);
   const steps = num(body.steps, 0, 200000);
 
-  const state = row.state || {};
+  // Additive and idempotent, so it is safe to run again on a re-read.
+  const merge = (state) => {
+    // The token may have been revoked between the lookup and a re-read.
+    if (state.healthToken !== token) return null;
+    const vitalsLog = { ...(state.vitalsLog || {}) };
+    const dayVitals = { ...(vitalsLog[date] || {}) };
+    if (weight != null) dayVitals.weight = Math.round(weight * 10) / 10;
+    if (sleep != null) dayVitals.sleep = Math.round(sleep * 10) / 10;
+    if (rhr != null) dayVitals.rhr = Math.round(rhr);
+    if (Object.keys(dayVitals).length) vitalsLog[date] = dayVitals;
 
-  const vitalsLog = { ...(state.vitalsLog || {}) };
-  const dayVitals = { ...(vitalsLog[date] || {}) };
-  if (weight != null) dayVitals.weight = Math.round(weight * 10) / 10;
-  if (sleep != null) dayVitals.sleep = Math.round(sleep * 10) / 10;
-  if (rhr != null) dayVitals.rhr = Math.round(rhr);
-  if (Object.keys(dayVitals).length) vitalsLog[date] = dayVitals;
+    const burnLog = { ...(state.burnLog || {}) };
+    if (steps != null && steps > 0) {
+      const w = weight ?? dayVitals.weight ?? latestWeight(vitalsLog) ?? 70;
+      const kcal = Math.round(steps * w * STEPS_KCAL_PER_KG);
+      const others = (burnLog[date] || []).filter(a => !String(a.id || '').startsWith('ah-steps-') && a.label !== 'Apple Health');
+      burnLog[date] = [...others, { id: 'ah-steps-' + date, label: `${Math.round(steps).toLocaleString('en-GB')} steps`, kcal }];
+    }
+    return { ...state, vitalsLog, burnLog };
+  };
 
-  const burnLog = { ...(state.burnLog || {}) };
-  if (steps != null && steps > 0) {
-    const w = weight ?? dayVitals.weight ?? latestWeight(vitalsLog) ?? 70;
-    const kcal = Math.round(steps * w * STEPS_KCAL_PER_KG);
-    const others = (burnLog[date] || []).filter(a => !String(a.id || '').startsWith('ah-steps-') && a.label !== 'Apple Health');
-    burnLog[date] = [...others, { id: 'ah-steps-' + date, label: `${Math.round(steps).toLocaleString('en-GB')} steps`, kcal }];
+  let outcome;
+  try {
+    outcome = await mergeStateCAS(userId, merge, env, { state: row.state, updatedAt: row.updated_at ?? null });
+  } catch (e) {
+    console.error('health-sync: write failed', e?.message);
+    return reply(500, { error: 'sync failed' });
+  }
+  if (outcome === 'unchanged' || outcome === 'missing') return reply(403, { error: 'unknown token' });
+  if (outcome === 'conflict') {
+    // Never forced. The app saved twice while we worked — the next run
+    // brings the same samples.
+    return reply(503, { error: 'busy — try again shortly' });
   }
 
-  const newState = { ...state, vitalsLog, burnLog };
-  const write = await sbFetch(`${supabaseUrl}/rest/v1/user_data?id=eq.${userId}`, {
-    method: 'PATCH',
-    headers: { 'Content-Type': 'application/json', Prefer: 'return=minimal' },
-    body: JSON.stringify({ state: newState, updated_at: new Date().toISOString() }),
-  }, serviceKey);
-  if (!write.ok) return { statusCode: 500, headers: CORS, body: JSON.stringify({ error: 'write failed', detail: await write.text().catch(() => '') }) };
-
-  return { statusCode: 200, headers: CORS, body: JSON.stringify({ ok: true, date, wrote: { weight, sleep, rhr, steps } }) };
+  return reply(200, { ok: true, date, wrote: { weight, sleep, rhr, steps } });
 };

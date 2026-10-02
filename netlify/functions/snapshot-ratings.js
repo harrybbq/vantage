@@ -17,6 +17,7 @@
  */
 
 const { requireScheduler } = require('../lib/cronAuth');
+const { chunk } = require('../lib/pgPage');
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
@@ -46,7 +47,7 @@ exports.handler = async (event) => {
   const supabaseUrl = process.env.SUPABASE_URL;
   const serviceKey  = process.env.SUPABASE_SERVICE_ROLE_KEY;
   if (!supabaseUrl || !serviceKey) {
-    return { statusCode: 500, headers: CORS, body: JSON.stringify({ error: 'supabase env missing' }) };
+    return { statusCode: 500, headers: CORS, body: JSON.stringify({ error: 'not configured' }) };
   }
   const backfill = (event?.queryStringParameters?.backfill === 'true');
 
@@ -58,7 +59,8 @@ exports.handler = async (event) => {
     );
     if (!res.ok) {
       const detail = await res.text().catch(() => '');
-      return { statusCode: 500, headers: CORS, body: JSON.stringify({ error: 'profiles read failed', detail }) };
+      console.error('snapshot-ratings: profiles read failed', res.status, detail.slice(0, 300));
+      return { statusCode: 500, headers: CORS, body: JSON.stringify({ error: 'profiles read failed' }) };
     }
     const page = await res.json();
     if (!page.length) break;
@@ -69,12 +71,20 @@ exports.handler = async (event) => {
     let candidates = page;
     if (!backfill && page.length) {
       const cutoffIso = new Date(Date.now() - RECENT_SKIP_MS).toISOString();
-      const ids = page.map(p => p.id).join(',');
-      const recentRes = await sb(supabaseUrl, serviceKey,
-        `/rest/v1/rating_snapshots?user_id=in.(${ids})&snapshotted_at=gte.${cutoffIso}&select=user_id`
-      );
-      const recent = recentRes.ok ? await recentRes.json() : [];
-      const recentSet = new Set(recent.map(r => r.user_id));
+      // Asked in chunks of IN_CHUNK ids: a thousand uuids in one `in.()`
+      // is a ~37 kB URL, which gets refused — and a refused read here
+      // used to count as "nobody snapshotted recently". A failed chunk
+      // still degrades that way (the old behaviour: at worst a second
+      // row today, never a missing one), but it no longer fails by
+      // construction.
+      const recentSet = new Set();
+      for (const part of chunk(page.map(p => p.id))) {
+        const recentRes = await sb(supabaseUrl, serviceKey,
+          `/rest/v1/rating_snapshots?user_id=in.(${part.join(',')})&snapshotted_at=gte.${cutoffIso}&select=user_id`
+        );
+        const recent = recentRes.ok ? await recentRes.json() : [];
+        for (const r of recent) recentSet.add(r.user_id);
+      }
       const before = candidates.length;
       candidates = candidates.filter(p => !recentSet.has(p.id));
       skipped += before - candidates.length;
@@ -101,7 +111,8 @@ exports.handler = async (event) => {
       });
       if (!insRes.ok) {
         const detail = await insRes.text().catch(() => '');
-        return { statusCode: 500, headers: CORS, body: JSON.stringify({ error: 'snapshot insert failed', detail }) };
+        console.error('snapshot-ratings: insert failed', insRes.status, detail.slice(0, 300));
+        return { statusCode: 500, headers: CORS, body: JSON.stringify({ error: 'snapshot insert failed' }) };
       }
       written += chunk.length;
     }

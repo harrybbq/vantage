@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, lazy, Suspense } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { supabase } from './lib/supabase';
 import { useVisionBoardState, hasLocalStorageData, clearLocalStorageData } from './hooks/useVisionBoardState';
@@ -10,15 +10,8 @@ import Nav from './components/Nav';
 import PageHeader from './components/PageHeader';
 import HubSection from './components/HubSection';
 import MobileHubSection from './components/mobile/MobileHubSection';
-import AchievementsSection from './components/AchievementsSection';
-import TrackSection from './components/TrackSection';
-import ShopSection from './components/ShopSection';
-import HolidaySection from './components/HolidaySection';
-import HabitsSection from './components/HabitsSection';
-import MobileHabitsSection from './components/mobile/MobileHabitsSection';
-import MobileFriendsSection from './components/mobile/MobileFriendsSection';
 import SettingsSection from './components/SettingsSection';
-import UpgradeSection from './components/upgrade/UpgradeSection';
+import { OWNER_SURFACES_IN_BUILD } from './lib/native/ownerSurfaces';
 import { SCHEMES, applyScheme, applyTheme, resolveEffectiveTheme, schemeFromHex } from './components/SettingsSection';
 import { useSubscriptionContext } from './context/SubscriptionContext';
 import Modals from './components/Modals';
@@ -30,12 +23,11 @@ import ConnectToast from './components/ConnectToast';
 import CommandPalette from './components/CommandPalette';
 import ShortcutsModal from './components/ShortcutsModal';
 import LegalPage from './components/LegalPage';
+import ConsentHost from './components/consent/ConsentHost';
 import CookieBanner from './components/CookieBanner';
 import InstallPrompt from './components/InstallPrompt';
 import TutorialOverlay from './components/TutorialOverlay';
 import BackgroundCropModal from './components/BackgroundCropModal';
-import LeaderboardSection from './components/LeaderboardSection';
-import AdminEditModal from './components/AdminEditModal';
 import VisionsModal from './components/VisionsModal';
 import { useIsOwner } from './hooks/useIsOwner';
 import { useCapacitor, haptic } from './hooks/useCapacitor';
@@ -53,6 +45,64 @@ import MobileAppBar from './components/mobile/MobileAppBar';
 import { registerPushToken, handleIncomingPush } from './lib/push/handlers';
 import NotificationPermissionPrompt, { hasAskedPushPrePrompt } from './components/NotificationPermissionPrompt';
 import BootSequence from './components/BootSequence';
+import { compressImageDataUrl } from './lib/image/compress';
+import WidgetBoundary from './components/WidgetBoundary';
+import SaveStatusPill from './components/SaveStatusPill';
+import { clearLocalUserData } from './lib/state/clearLocal';
+import { installGlobalErrorHandlers } from './lib/telemetry/reportError';
+
+// window.onerror + unhandledrejection → client-error reports (item 77).
+installGlobalErrorHandlers();
+import { initDeepLinks } from './lib/native/deepLinks';
+import TermsAcceptanceSheet from './components/TermsAcceptanceSheet';
+
+// Owner-only surfaces, absent from native builds (lib/native/ownerSurfaces.js).
+// Lazy so the flag can drop them: with VITE_NATIVE_BUILD set these fold
+// to null and Rollup never emits their chunks.
+const UpgradeSection = OWNER_SURFACES_IN_BUILD ? lazy(() => import('./components/upgrade/UpgradeSection')) : null;
+const AdminEditModal = OWNER_SURFACES_IN_BUILD ? lazy(() => import('./components/AdminEditModal')) : null;
+
+// Sections that are not the first screen load on demand, so the hub
+// paints without first downloading Track, Shop, Achievements and the
+// rest. The Hub stays eager (it IS the first screen) and so does
+// Settings: App and HubSection import its theme helpers statically,
+// which would pin it in the main chunk anyway, and the WHOOP/Oura OAuth
+// return lands on it directly.
+//
+// Board warms every section at idle (see the prefetch effect), so a tap
+// normally finds its chunk already here — and a tab left open across a
+// deploy already holds its chunks rather than asking for hashes the new
+// deploy no longer serves.
+//
+// Why not plain lazy(): a lazy component suspends on its first render
+// even when its module has already arrived, and React holds a revealed
+// Suspense boundary back for up to ~500 ms — the page would fade in
+// empty and then pop. Once preloaded, lazySection renders the module
+// directly. The choice is made once per mount (useState) so a section
+// never swaps component type, and state, under itself.
+function lazySection(load) {
+  let loaded = null;
+  const preload = () => load().then(m => { loaded = m; return m; });
+  const Lazy = lazy(preload);
+  function Section(props) {
+    const [Impl] = useState(() => (loaded ? loaded.default : Lazy));
+    return <Impl {...props} />;
+  }
+  Section.preload = preload;
+  return Section;
+}
+const AchievementsSection  = lazySection(() => import('./components/AchievementsSection'));
+const TrackSection         = lazySection(() => import('./components/TrackSection'));
+const ShopSection          = lazySection(() => import('./components/ShopSection'));
+const HolidaySection       = lazySection(() => import('./components/HolidaySection'));
+const HabitsSection        = lazySection(() => import('./components/HabitsSection'));
+const MobileHabitsSection  = lazySection(() => import('./components/mobile/MobileHabitsSection'));
+const MobileFriendsSection = lazySection(() => import('./components/mobile/MobileFriendsSection'));
+const LeaderboardSection   = lazySection(() => import('./components/LeaderboardSection'));
+const LAZY_SECTIONS = [
+  AchievementsSection, TrackSection, ShopSection, HolidaySection,
+  HabitsSection, MobileHabitsSection, MobileFriendsSection, LeaderboardSection,
+];
 
 const pageMotion = {
   initial: { opacity: 0, y: 14 },
@@ -71,29 +121,8 @@ function loadLegacyBgs() {
   try { return JSON.parse(localStorage.getItem(LEGACY_BG_KEY) || '{}'); } catch { return {}; }
 }
 
-/**
- * Downscale a base64/data-URL image to a sane size so syncing it in the
- * state blob doesn't bloat every save. Max 1600px on the long edge,
- * JPEG @ 0.72. Resolves to a data URL (or the original on failure).
- */
-function compressImageDataUrl(dataUrl, max = 1600, quality = 0.72) {
-  return new Promise(resolve => {
-    try {
-      const img = new Image();
-      img.onload = () => {
-        const scale = Math.min(1, max / Math.max(img.width, img.height));
-        const w = Math.round(img.width * scale);
-        const h = Math.round(img.height * scale);
-        const canvas = document.createElement('canvas');
-        canvas.width = w; canvas.height = h;
-        canvas.getContext('2d').drawImage(img, 0, 0, w, h);
-        resolve(canvas.toDataURL('image/jpeg', quality));
-      };
-      img.onerror = () => resolve(dataUrl);
-      img.src = dataUrl;
-    } catch { resolve(dataUrl); }
-  });
-}
+// compressImageDataUrl moved to lib/image/compress.js so the profile
+// photo uploaders can share it.
 
 // Maps add-modal IDs to the free-tier cap key + a fn that counts current items
 // for that key. Anything not listed here is unmetered.
@@ -110,10 +139,25 @@ function Board({ userId, userEmail, onSignOut }) {
   const {
     S, update, loading, hydrated, justMigrated, dismissMigrationBanner,
     loadError, retryLoad, startFresh, restoreFromBackup, hasBackup,
+    saveStatus, flushNow,
   } = useVisionBoardState(userId);
+
+  // Explicit sign-out (the Nav and Settings buttons — never a session
+  // that simply expired): save anything pending, then remove this
+  // device's copies of the user's data (item 56). If the save can't
+  // land, ask before discarding it. On a load error the local backup
+  // may be the only good copy, so it is left in place.
+  async function handleExplicitSignOut() {
+    const flushed = await flushNow();
+    if (!flushed.ok && !window.confirm(
+      'Your latest changes haven\'t reached the cloud yet. Sign out anyway and discard them?'
+    )) return;
+    await onSignOut();
+    if (!loadError) await clearLocalUserData(userId);
+  }
   const { atLimit } = useTierLimits();
   const { hasPro } = useSubscriptionContext();
-  const { isOwner } = useIsOwner(userEmail);
+  const { isOwner } = useIsOwner(userId);
   // Passive WHOOP sync — refreshes vitals/burn whenever the app opens or
   // regains focus (throttled), so data stays fresh without visiting Track.
   useWhoopAutoSync(S, update);
@@ -318,7 +362,19 @@ function Board({ userId, userEmail, onSignOut }) {
   // public_stats heatmap + wins) to Supabase so friends can see it.
   // Debounced inside the hook; safely no-ops if the social schema
   // hasn't been applied yet.
-  usePublishProfile(userId, S, hasPro, visionState);
+  usePublishProfile(userId, S, hasPro, visionState, { hydrated, loadError, update });
+
+  // Warm the lazy section chunks once the hub is up and the browser is
+  // idle, so the first tap on Track or Shop doesn't wait on the network
+  // (see lazySection). A failed prefetch is harmless — the section
+  // simply loads when it is opened.
+  useEffect(() => {
+    if (!hydrated) return;
+    const warm = () => LAZY_SECTIONS.forEach(section => section.preload().catch(() => {}));
+    const ric = window.requestIdleCallback;
+    const id = ric ? ric(warm, { timeout: 4000 }) : setTimeout(warm, 2500);
+    return () => (ric ? window.cancelIdleCallback(id) : clearTimeout(id));
+  }, [hydrated]);
 
   // Ranked categories (F5 Sprint 3). Local recompute updates S.ratings
   // on a 1.5s debounce; server recompute fires the Netlify function on
@@ -705,7 +761,7 @@ function Board({ userId, userEmail, onSignOut }) {
       <div id="shop-overlay" className={activeSection === 'shop' && currentBg ? 'visible' : ''}></div>
 
       {/* Sidebar nav (desktop only — hidden via @media on mobile) */}
-      <Nav activeSection={activeSection} onNavigate={navigate} onSignOut={onSignOut} isOwner={isOwner} />
+      <Nav activeSection={activeSection} onNavigate={navigate} onSignOut={handleExplicitSignOut} isOwner={isOwner} />
 
       {/* Mobile chrome — bottom tab bar + app bar + More drawer.
           Only mounts on mobile viewports so we don't pay for these
@@ -762,10 +818,12 @@ function Board({ userId, userEmail, onSignOut }) {
         onBgFx={setBgFx}
       />
 
-      {/* Main sections */}
+      {/* Main sections — each in its own boundary, so one page throwing
+          leaves the nav and the other pages working (item 58). */}
       <AnimatePresence mode="wait">
         {activeSection === 'hub' && (
           <motion.div key="hub" {...pageMotion}>
+            <WidgetBoundary variant="section" name="hub">
             {isMobile ? (
               <MobileHubSection
                 S={S}
@@ -779,39 +837,62 @@ function Board({ userId, userEmail, onSignOut }) {
             ) : (
               <HubSection S={S} update={update} active onOpenModal={handleOpenModal} onOpenWaitlist={() => handleOpenModal('waitlistModal')} onNavigateSettings={() => navigate('settings')} onNavigateTrack={() => navigate('track')} onShowCoinToast={showCoinToast} onCoachAct={handleCoachAct} visionState={visionState} userId={userId} onUpgrade={() => handleOpenModal('paywall:friends')} onNavigate={navigate} />
             )}
+            </WidgetBoundary>
           </motion.div>
         )}
         {activeSection === 'achievements' && (
           <motion.div key="achievements" {...pageMotion}>
-            <AchievementsSection S={S} update={update} active onOpenModal={handleOpenModal} onShowCoinToast={showCoinToast} onOpenVisions={() => setVisionsOpen(true)} />
+            <WidgetBoundary variant="section" name="achievements">
+            <Suspense fallback={null}>
+              <AchievementsSection S={S} update={update} active onOpenModal={handleOpenModal} onShowCoinToast={showCoinToast} onOpenVisions={() => setVisionsOpen(true)} />
+            </Suspense>
+            </WidgetBoundary>
           </motion.div>
         )}
         {activeSection === 'track' && (
           <motion.div key="track" {...pageMotion}>
-            <TrackSection S={S} update={update} active onOpenModal={handleOpenModal} onShowCoinToast={showCoinToast} userId={userId} requestedTab={trackTab} />
+            <WidgetBoundary variant="section" name="track">
+            <Suspense fallback={null}>
+              <TrackSection S={S} update={update} active onOpenModal={handleOpenModal} onShowCoinToast={showCoinToast} userId={userId} requestedTab={trackTab} />
+            </Suspense>
+            </WidgetBoundary>
           </motion.div>
         )}
         {activeSection === 'shop' && (
           <motion.div key="shop" {...pageMotion}>
-            <ShopSection S={S} update={update} active onOpenModal={handleOpenModal} onShowCoinToast={showCoinToast} />
+            <WidgetBoundary variant="section" name="shop">
+            <Suspense fallback={null}>
+              <ShopSection S={S} update={update} active onOpenModal={handleOpenModal} onShowCoinToast={showCoinToast} />
+            </Suspense>
+            </WidgetBoundary>
           </motion.div>
         )}
         {activeSection === 'holiday' && (
           <motion.div key="holiday" {...pageMotion}>
-            <HolidaySection S={S} update={update} active onOpenModal={handleOpenModal} />
+            <WidgetBoundary variant="section" name="holiday">
+            <Suspense fallback={null}>
+              <HolidaySection S={S} update={update} active onOpenModal={handleOpenModal} />
+            </Suspense>
+            </WidgetBoundary>
           </motion.div>
         )}
         {activeSection === 'habits' && (
           <motion.div key="habits" {...pageMotion}>
+            <WidgetBoundary variant="section" name="habits">
+            <Suspense fallback={null}>
             {isMobile ? (
               <MobileHabitsSection S={S} update={update} onOpenModal={handleOpenModal} onShowCoinToast={showCoinToast} />
             ) : (
               <HabitsSection S={S} update={update} active onOpenModal={handleOpenModal} onShowCoinToast={showCoinToast} />
             )}
+            </Suspense>
+            </WidgetBoundary>
           </motion.div>
         )}
         {activeSection === 'leaderboard' && (
           <motion.div key="leaderboard" {...pageMotion}>
+            <WidgetBoundary variant="section" name="leaderboard">
+            <Suspense fallback={null}>
             <LeaderboardSection
               active
               userId={userId}
@@ -819,11 +900,15 @@ function Board({ userId, userEmail, onSignOut }) {
               onAddFriends={() => navigate('hub')}
               onOpenSettings={() => navigate('settings')}
             />
+            </Suspense>
+            </WidgetBoundary>
           </motion.div>
         )}
         {activeSection === 'settings' && (
           <motion.div key="settings" {...pageMotion}>
-            <SettingsSection S={S} update={update} active userId={userId} userEmail={userEmail} onSignOut={onSignOut} requestedTab={settingsTab} onOpenLegal={setLegalPage} onOpenPalette={() => setPaletteOpen(true)} onOpenShortcuts={() => setShortcutsOpen(true)} onOpenVisions={() => setVisionsOpen(true)} onOpenSchedule={isOwner ? () => navigate('upgrade') : null} />
+            <WidgetBoundary variant="section" name="settings">
+            <SettingsSection S={S} update={update} active userId={userId} userEmail={userEmail} onSignOut={handleExplicitSignOut} requestedTab={settingsTab} onOpenLegal={setLegalPage} onOpenPalette={() => setPaletteOpen(true)} onOpenShortcuts={() => setShortcutsOpen(true)} onOpenVisions={() => setVisionsOpen(true)} onOpenSchedule={isOwner ? () => navigate('upgrade') : null} />
+            </WidgetBoundary>
           </motion.div>
         )}
         {/* Upgrade — owner-only: rotation, diet, career. Reached from
@@ -832,9 +917,13 @@ function Board({ userId, userEmail, onSignOut }) {
             a deep link shows nothing for anyone else.
             'schedule' is the id this lived under before it grew tabs —
             still accepted so an old link or a stale tab doesn't 404. */}
-        {(activeSection === 'upgrade' || activeSection === 'schedule') && (
+        {UpgradeSection && (activeSection === 'upgrade' || activeSection === 'schedule') && (
           <motion.div key="upgrade" {...pageMotion}>
-            <UpgradeSection S={S} update={update} active isOwner={isOwner} userId={userId} />
+            <WidgetBoundary variant="section" name="upgrade">
+            <Suspense fallback={null}>
+              <UpgradeSection S={S} update={update} active isOwner={isOwner} userId={userId} />
+            </Suspense>
+            </WidgetBoundary>
           </motion.div>
         )}
         {/* Friends — mobile-only route. Desktop puts FriendsRail in
@@ -843,13 +932,19 @@ function Board({ userId, userEmail, onSignOut }) {
             but in practice the bottom-tab/drawer surface is mobile. */}
         {activeSection === 'friends' && (
           <motion.div key="friends" {...pageMotion}>
+            <WidgetBoundary variant="section" name="friends">
+            <Suspense fallback={null}>
             <MobileFriendsSection
               userId={userId}
               onUpgrade={() => handleOpenModal('paywall:friends')}
             />
+            </Suspense>
+            </WidgetBoundary>
           </motion.div>
         )}
       </AnimatePresence>
+
+      <SaveStatusPill status={saveStatus} />
 
       {/* Modals */}
       <Modals
@@ -869,6 +964,7 @@ function Board({ userId, userEmail, onSignOut }) {
         onClose={handleCloseModal}
         onUpgrade={() => { handleCloseModal(); handleOpenModal('waitlistModal'); }}
         onShowToast={showCoinToast}
+        onOpenLegal={setLegalPage}
       />
 
       <ConnectToast onCancel={handleCancelConnect} />
@@ -885,14 +981,18 @@ function Board({ userId, userEmail, onSignOut }) {
       <ShortcutsModal open={shortcutsOpen} onClose={() => setShortcutsOpen(false)} />
       <CookieBanner onOpenLegal={setLegalPage} />
       <InstallPrompt />
-      <AdminEditModal
-        open={!!adminEdit}
-        target={adminEdit}
-        userId={userId}
-        S={S}
-        update={update}
-        onClose={() => setAdminEdit(null)}
-      />
+      {AdminEditModal && isOwner && (
+        <Suspense fallback={null}>
+          <AdminEditModal
+            open={!!adminEdit}
+            target={adminEdit}
+            userId={userId}
+            S={S}
+            update={update}
+            onClose={() => setAdminEdit(null)}
+          />
+        </Suspense>
+      )}
       <VisionsModal
         open={visionsOpen}
         S={S}
@@ -923,6 +1023,9 @@ function Board({ userId, userEmail, onSignOut }) {
           </>
         )}
       />
+      {/* Health/AI consent sheet — one-time ask + requestConsent() host. */}
+      <ConsentHost S={S} update={update} hydrated={hydrated} onOpenLegal={setLegalPage} />
+      <TermsAcceptanceSheet S={S} update={update} hydrated={hydrated} onOpenLegal={setLegalPage} onSignOut={onSignOut} />
       {legalPage && <LegalPage page={legalPage} onClose={() => setLegalPage(null)} />}
 
       {/* Onboarding tutorial — shows once for new users, replayable
@@ -955,6 +1058,11 @@ export default function App() {
     // Drop the /privacy or /terms path so the app boots normally.
     try { window.history.replaceState(null, '', '/'); } catch { /* no-op */ }
   }
+
+  // Native only: the Google/Apple sign-in return (com.vantage.app://…).
+  // Registered here, above AuthScreen, so a callback that cold-starts
+  // the app is caught before any screen mounts. No-op on the web.
+  useEffect(() => { initDeepLinks(); }, []);
 
   useEffect(() => {
     let settled = false;
