@@ -21,17 +21,27 @@
  * Normalisation is NOT done here. makeEvent/cleanPatch own it, so the
  * same rules apply to anything that ever writes an event, not just this
  * form.
+ *
+ * ── Event memory ─────────────────────────────────────────────────────
+ * Typing a name the user has used before offers to finish it — name,
+ * location, times, colour — from how that event usually goes
+ * (lib/calendar/eventMemory.js has the rules). Picking a suggestion
+ * fills only fields the user has NOT typed into in this form, and says
+ * so with an Undo. Learned on open from S.calendarEvents, on the device;
+ * nothing is sent or stored.
  */
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import Icon from '../Icon';
 import { EVENT_COLOURS, addEvent, cleanPatch, eventColour, isTime, makeEvent, removeEvent, updateEvent } from '../../lib/calendar/events';
+import { completion, describe, fillPlan, learnEvents, locationCompletion, suggest, suggestLocations } from '../../lib/calendar/eventMemory';
+import SuggestInput from './SuggestInput';
 
 const prettyDate = iso => new Date(iso + 'T12:00').toLocaleDateString(undefined, {
   weekday: 'long', day: 'numeric', month: 'long',
 });
 
-export default function EventModal({ dates, event, update, onClose }) {
+export default function EventModal({ dates, event, calendarEvents, update, onClose }) {
   const editing = !!event;
   const nameRef = useRef(null);
 
@@ -41,11 +51,79 @@ export default function EventModal({ dates, event, update, onClose }) {
   const [location, setLocation] = useState(event?.location || '');
   const [colour, setColour] = useState(event?.colour || EVENT_COLOURS[0].hex);
 
+  // Fields the user has typed into in THIS form — a suggestion never
+  // overwrites one. When editing, whatever the event already holds counts
+  // as theirs too: picking a suggestion fills blanks, it does not rewrite
+  // an event's saved details.
+  const touched = useRef(null);
+  if (!touched.current) {
+    touched.current = new Set(editing
+      ? ['start', 'end', 'location', 'colour'].filter(k => !!(k === 'start' ? event.time : event[k]))
+      : []);
+  }
+  // { prev: { field: valueBeforeFill } } while the "Filled from…" note shows.
+  const [fill, setFill] = useState(null);
+
+  // Learned once per open. The modal only exists while it is open, so
+  // this is a single pass over the calendar per "Add event" tap.
+  const memory = useMemo(
+    () => learnEvents(calendarEvents, { excludeId: event?.id }),
+    [calendarEvents, event?.id],
+  );
+  const day = dates[0];
+  const titleSuggestions = useMemo(() => suggest(memory, title, { date: day }), [memory, title, day]);
+  const titleGhost = useMemo(() => completion(memory, title, { date: day }), [memory, title, day]);
+  const locSuggestions = useMemo(() => suggestLocations(memory, location, { title }), [memory, location, title]);
+  const locGhost = useMemo(() => locationCompletion(memory, location, { title }), [memory, location, title]);
+
+  const titleOptions = useMemo(() => titleSuggestions.map(e => ({
+    id: e.key, title: e.title, detail: describe(e), dot: e.colour || null,
+  })), [titleSuggestions]);
+  const locOptions = useMemo(() => locSuggestions.map(p => ({
+    id: p.key, title: p.location, detail: p.count === 1 ? 'Used once' : `Used ${p.count} times`,
+  })), [locSuggestions]);
+
+  const values = { title, start, end, location, colour };
+  const setters = { title: setTitle, start: setStart, end: setEnd, location: setLocation, colour: setColour };
+
+  /** A user edit: mark the field theirs, and drop it from any pending Undo. */
+  function userSet(k, v) {
+    touched.current.add(k);
+    setters[k](v);
+    if (fill && k in fill.prev && k !== 'title') {
+      const prev = { ...fill.prev };
+      delete prev[k];
+      setFill(Object.keys(prev).some(f => f !== 'title') ? { prev } : null);
+    }
+  }
+
+  function applyEntry(entry) {
+    const patch = fillPlan(entry, values, touched.current);
+    const prev = {};
+    for (const k of Object.keys(patch)) { prev[k] = values[k]; setters[k](patch[k]); }
+    // Only worth announcing when more than the name changed.
+    setFill(Object.keys(patch).some(k => k !== 'title') ? { prev } : null);
+  }
+
+  function undoFill() {
+    if (!fill) return;
+    for (const [k, v] of Object.entries(fill.prev)) setters[k](v);
+    setFill(null);
+    nameRef.current?.focus();
+  }
+
+  function pickLocation(loc) {
+    touched.current.add('location');
+    setLocation(loc);
+  }
+
   useEffect(() => {
     // The name is the only required field, so it is where the cursor
     // belongs — a modal that opens with nothing focused costs a tap.
     nameRef.current?.focus();
-    const esc = e => { if (e.key === 'Escape') onClose(); };
+    // defaultPrevented: a suggestion list claims the first Esc to close
+    // itself, and that press should not also close the form.
+    const esc = e => { if (e.key === 'Escape' && !e.defaultPrevented) onClose(); };
     document.addEventListener('keydown', esc);
     return () => document.removeEventListener('keydown', esc);
   }, [onClose]);
@@ -98,33 +176,49 @@ export default function EventModal({ dates, event, update, onClose }) {
         </div>
 
         <div className="ev-modal-body">
-          <label className="ev-field">
-            <span className="ev-field-lbl">Name</span>
-            <input ref={nameRef} value={title} maxLength={120}
-                   placeholder="Dentist, gym with Finlay, flight out…"
-                   onChange={e => setTitle(e.target.value)}
-                   onKeyDown={e => { if (e.key === 'Enter' && canSave) save(); }} />
-          </label>
+          <SuggestInput
+            inputRef={nameRef} label="Name" listLabel="Past events"
+            value={title} placeholder="Dentist, gym with Finlay, flight out…"
+            onType={v => userSet('title', v)}
+            options={titleOptions}
+            ghost={titleGhost}
+            onPick={i => applyEntry(titleSuggestions[i])}
+            // Accepting the greyed completion is the same choice as
+            // picking the top row, so it fills the same fields.
+            onAcceptGhost={() => titleSuggestions[0] && applyEntry(titleSuggestions[0])}
+            onEnter={() => { if (canSave) save(); }}
+          />
+          {fill && (
+            <div className="ev-filled" role="status">
+              <span>Filled from your past events</span>
+              <span aria-hidden="true">·</span>
+              <button type="button" className="ev-filled-undo" onClick={undoFill}>Undo</button>
+            </div>
+          )}
 
           <div className="ev-row">
             <label className="ev-field">
               <span className="ev-field-lbl">Starts</span>
-              <input type="time" value={start} onChange={e => setStart(e.target.value)} />
+              <input type="time" value={start} onChange={e => userSet('start', e.target.value)} />
             </label>
             <label className="ev-field">
               <span className="ev-field-lbl">Ends</span>
-              <input type="time" value={end} onChange={e => setEnd(e.target.value)} />
+              <input type="time" value={end} onChange={e => userSet('end', e.target.value)} />
             </label>
           </div>
           {endBackwards && <div className="ev-warn">Ends before it starts — the end time won&apos;t be saved.</div>}
           {endOrphan && <div className="ev-warn">An end time needs a start time.</div>}
           {!start && !end && <div className="ev-fine">Leave both blank for an all-day event.</div>}
 
-          <label className="ev-field">
-            <span className="ev-field-lbl">Location</span>
-            <input value={location} maxLength={120} placeholder="Optional"
-                   onChange={e => setLocation(e.target.value)} />
-          </label>
+          <SuggestInput
+            label="Location" listLabel="Past locations"
+            value={location} placeholder="Optional"
+            onType={v => userSet('location', v)}
+            options={locOptions}
+            ghost={locGhost}
+            onPick={i => pickLocation(locSuggestions[i].location)}
+            onAcceptGhost={() => locSuggestions[0] && pickLocation(locSuggestions[0].location)}
+          />
 
           <div className="ev-field">
             <span className="ev-field-lbl">Colour</span>
@@ -134,7 +228,7 @@ export default function EventModal({ dates, event, update, onClose }) {
                         aria-label={c.id}
                         className={'ev-swatch' + (colour === c.hex ? ' is-on' : '')}
                         style={{ background: c.hex }}
-                        onClick={() => setColour(c.hex)} />
+                        onClick={() => userSet('colour', c.hex)} />
               ))}
             </div>
           </div>

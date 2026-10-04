@@ -668,6 +668,7 @@ function CalendarView({ S, update, onShowCoinToast, nutritionMonthData }) {
         <EventModal
           dates={eventForm.dates}
           event={eventForm.event}
+          calendarEvents={S.calendarEvents}
           update={update}
           onClose={() => setEventForm(null)}
         />

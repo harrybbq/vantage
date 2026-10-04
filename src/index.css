@@ -8225,6 +8225,71 @@ div.m-hubdrawer-coach { cursor: default; display: flex; flex-direction: column; 
 .ev-btn.is-del{ margin-right:auto; color:#e06b5a; border-color:rgba(224,107,90,.4); }
 .ev-btn.is-del:hover{ background:rgba(224,107,90,.12); }
 
+/* ── Event memory: suggestion list + inline completion ────────────────
+   The list sits IN the flow under its field (not a floating popover) so
+   the sheet's own internal scroll carries it and nothing gets clipped.
+   Solid surface, ≥44px rows, 12px+ text, muted lines on --text-mid
+   (≥4.5:1 on both themes; --text-muted is not, on dark-os). */
+.ev-combo-box{ position:relative; }
+.ev-ghost{
+  position:absolute; inset:0; box-sizing:border-box;
+  display:flex; align-items:center; overflow:hidden; white-space:pre;
+  padding:10px 12px; border:1px solid transparent; border-radius:10px;
+  font-family:var(--sans); font-size:14px; pointer-events:none;
+}
+.ev-ghost-typed{ color:transparent; }
+.ev-ghost-rest{ color:var(--text-mid); }
+.ev-sr{
+  position:absolute; width:1px; height:1px; overflow:hidden;
+  clip:rect(0 0 0 0); clip-path:inset(50%); white-space:nowrap;
+}
+.ev-suggest{
+  list-style:none; margin:2px 0 0; padding:4px;
+  border-radius:10px; border:var(--border-card);
+  background:#faf5e9;
+  box-shadow:0 6px 18px rgba(28,26,23,.10);
+}
+.ev-suggest[hidden]{ display:none; }
+.ev-suggest-opt{
+  display:flex; align-items:center; gap:10px; min-width:0;
+  min-height:44px; box-sizing:border-box; padding:6px 10px;
+  border-radius:8px; cursor:pointer;
+}
+.ev-suggest-opt.is-active{
+  background:rgba(var(--em-rgb),.10);
+  box-shadow:inset 3px 0 0 var(--em);
+}
+.ev-suggest-dot{ width:9px; height:9px; border-radius:3px; flex:none; }
+.ev-suggest-dot.is-none{ box-shadow:inset 0 0 0 1.5px var(--text-mid); }
+.ev-suggest-text{ display:flex; flex-direction:column; gap:2px; min-width:0; flex:1; }
+.ev-suggest-title, .ev-suggest-detail{
+  overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+}
+.ev-suggest-title{ font-family:var(--sans); font-size:14px; font-weight:600; color:var(--text); }
+.ev-suggest-detail{
+  font-family:var(--mono); font-size:12px; color:var(--text-mid);
+  font-variant-numeric:tabular-nums;
+}
+.ev-filled{
+  display:flex; align-items:center; flex-wrap:wrap; gap:6px;
+  margin-top:-6px;
+  font-family:var(--mono); font-size:12px; color:var(--text-mid);
+}
+.ev-filled-undo{
+  min-height:32px; padding:0 8px; margin-left:-4px;
+  background:none; border:none; border-radius:8px; cursor:pointer;
+  font-family:var(--mono); font-size:12px; font-weight:700;
+  color:var(--text); text-decoration:underline; text-underline-offset:3px;
+  text-decoration-color:var(--em); text-decoration-thickness:2px;
+}
+.ev-filled-undo:hover{ background:rgba(var(--em-rgb),.1); }
+html[data-theme="dark-os"] .ev-suggest{ background:var(--os-surface2,#191917); box-shadow:0 6px 18px rgba(0,0,0,.4); }
+@media (max-width:768px){
+  /* Inputs go to 16px here (iOS zoom rule), so the ghost copy must too. */
+  .ev-ghost{ font-size:16px; }
+  .ev-filled-undo{ min-height:44px; }
+}
+
 /* ══ Shopping — one board ═════════════════════════════════════════════
    Same move as Track: a shell owns the border and the surface, the
    columns own a hairline between them. The rail is everything that was
