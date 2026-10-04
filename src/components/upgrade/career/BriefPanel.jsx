@@ -13,7 +13,7 @@ import { isOpen } from '../../../lib/career/pipeline';
 import { readiness, monthLabel, monthDiff, monthOf } from '../../../lib/career/money';
 import { statusOf } from '../../../lib/career/planTimeline';
 import { studyDays } from '../../../lib/career/pacing';
-import { holidayDaySet } from '../../../lib/rotation/pattern';
+import { holidayDaySet, scheduleOf } from '../../../lib/rotation/pattern';
 import { usePacing, useLatestVs, todayIso } from './careerData';
 
 const TAG_COL = { PIPELINE: '#d0498f', CERTS: '#5b8cff', PLAN: '#d99114', MONEY: '#1a7a4a' };
@@ -39,9 +39,11 @@ export default function BriefPanel({ oc, S, scenarioId, goTo }) {
     pacing: pacing.cert ? { cert: pacing.cert, plan: pacing.plan, examIso: pacing.examIso } : null,
   }, brief), [apps, d, plan, statusMap, vs, certs, today, pacing, brief]);
 
+  const schedule = scheduleOf(S);
   const days = useMemo(() => studyDays(week.monIso, 7, {
     overrides: (S.rotation && S.rotation.overrides) || {}, holidayDays: holidayDaySet((S.rotation && S.rotation.holidayBlocks) || []),
-  }), [week.monIso, S.rotation]);
+    schedule,
+  }), [week.monIso, S.rotation, schedule]);
 
   // Clocks
   const nowMonth = monthOf();

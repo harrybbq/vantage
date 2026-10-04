@@ -18,7 +18,7 @@
  *
  * Pure. No DOM, no network.
  */
-import { resolveDay, TRAIN_POS } from '../rotation/pattern.js';
+import { resolveDay, patternDay, DEFAULT_SCHEDULE } from '../rotation/pattern.js';
 import { aggregate } from './ingredients.js';
 
 const isoAdd = (iso, n) => {
@@ -27,19 +27,23 @@ const isoAdd = (iso, n) => {
   return t.toISOString().slice(0, 10);
 };
 
-/** The days of the plan, with shift and whether it is a training day. */
-export function planDays(start, n, overrides = {}) {
+/**
+ * The days of the plan, with shift and whether it is a training day.
+ * `train` follows the PATTERN's session (as TRAIN_POS did), not a
+ * swapped one, so the targets stay the plan's.
+ */
+export function planDays(start, n, overrides = {}, schedule = DEFAULT_SCHEDULE) {
   const out = [];
   for (let i = 0; i < n; i++) {
     const iso = isoAdd(start, i);
     const [y, m, d] = iso.split('-').map(Number);
-    const r = resolveDay(y, m - 1, d, overrides);
+    const r = resolveDay(y, m - 1, d, overrides, schedule);
     out.push({
       i, iso,
       shift: r.inPattern ? r.shift : 'unknown',
       shiftNum: r.shiftNum || null,
       session: r.session || 'Rest',
-      train: r.inPattern && TRAIN_POS.includes(r.pos),
+      train: r.inPattern && patternDay(y, m - 1, d, schedule).session !== 'Rest',
     });
   }
   return out;
@@ -50,8 +54,8 @@ export function planDays(start, n, overrides = {}) {
  * next one to start. → { start, days } — a block is its run of
  * consecutive day or night shifts; leave breaks it.
  */
-export function nextShiftBlock(todayIso, overrides = {}) {
-  const look = planDays(todayIso, 20, overrides);
+export function nextShiftBlock(todayIso, overrides = {}, schedule = DEFAULT_SCHEDULE) {
+  const look = planDays(todayIso, 20, overrides, schedule);
   const isShift = d => d.shift === 'day' || d.shift === 'night';
   const first = look.findIndex(isShift);
   if (first < 0) return { start: todayIso, days: 4 };

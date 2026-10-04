@@ -46,7 +46,7 @@
  * the day summary / owner rows / crest queue answered for the others,
  * null for the rotation (derived from the calendar, always current).
  */
-import { resolveDay } from '../rotation/pattern.js';
+import { resolveDay, scheduleOf } from '../rotation/pattern.js';
 import { num, toMs } from '../security/format.js';
 import { pillState } from '../security/status.js';
 
@@ -133,7 +133,7 @@ const nextIso = iso => {
 
 function dayOf(S, iso) {
   const [y, m, d] = iso.split('-').map(Number);
-  return resolveDay(y, m - 1, d, (S && S.rotation && S.rotation.overrides) || {});
+  return resolveDay(y, m - 1, d, (S && S.rotation && S.rotation.overrides) || {}, scheduleOf(S));
 }
 
 /** "Night 2" | "Day 1" | "Leave" | "Off", or null before the pattern starts. */

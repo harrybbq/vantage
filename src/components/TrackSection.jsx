@@ -15,6 +15,9 @@ import VitalsPanel from './track/VitalsPanel';
 import { markManual, isAutoFilled, autoProvenance, ruleLabel, ruleChip, sourceById } from '../lib/trackers/autoLog';
 import AutoFillModal from './track/AutoFillModal';
 import { trackerDone, trackerStep, dailyGoalOf, fmtTrackerValue } from '../lib/trackers/done';
+import { useIsOwner } from '../hooks/useIsOwner';
+import { OWNER_SURFACES_IN_BUILD } from '../lib/native/ownerSurfaces';
+import { shiftChipsInMonth, shiftOn, showsOnCalendar, setShowOnCalendar } from '../lib/rotation/pattern';
 
 function getWeekProgress(logs, tracker) {
   const count = countWeekLogs(logs, tracker.id, getTodayStr(), tracker);
@@ -201,7 +204,7 @@ const TRACK_TABS = [
  * overflow-hidden card; rendered in place it would be clipped by the
  * cell it belongs to.
  */
-function DayTickMenu({ x, y, dates, trackers, logs, events, onClose, update, onAddEvent, onAddSpan, onEditEvent }) {
+function DayTickMenu({ x, y, dates, trackers, logs, events, shift, onClose, update, onAddEvent, onAddSpan, onEditEvent }) {
   const ref = useRef(null);
 
   // Close on anything that is not this menu: outside click, Escape,
@@ -303,6 +306,15 @@ function DayTickMenu({ x, y, dates, trackers, logs, events, onClose, update, onA
         {label}
         {multi && <span className="daymenu-multi">applies to all</span>}
       </div>
+
+      {/* Owner only: the day on the rota, first, because on this
+          calendar it is the fact that decides everything else. */}
+      {shift && (
+        <div className={`daymenu-shift is-${shift.shift}`}>
+          {shift.chip && <span className="daymenu-shift-chip">{shift.chip}</span>}
+          <span className="daymenu-shift-lbl">{shift.label}</span>
+        </div>
+      )}
 
       {!trackers.length && <div className="daymenu-empty">No trackers yet.</div>}
 
@@ -442,7 +454,7 @@ function CellEvents({ all, lanes: allLanes, col }) {
   );
 }
 
-function CalendarView({ S, update, onShowCoinToast, nutritionMonthData }) {
+function CalendarView({ S, update, onShowCoinToast, nutritionMonthData, userId }) {
   // Events for the visible month, read in one pass rather than 42
   // lookups. Empty until the add-event UI exists; the grid is built to
   // carry them now so that UI is a form, not a redesign.
@@ -458,6 +470,19 @@ function CalendarView({ S, update, onShowCoinToast, nutritionMonthData }) {
   );
   const months = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
   const { calYear, calMonth, trackers, logs, multiSelectMode, multiSelectedDays } = S;
+
+  // The owner's shift pattern on the calendar (Upgrade → Rotation).
+  // Owner-only and compiled out of native builds; for anyone else the
+  // memo below never runs and nothing is drawn.
+  const { isOwner } = useIsOwner(OWNER_SURFACES_IN_BUILD ? userId : null);
+  const owner = OWNER_SURFACES_IN_BUILD && isOwner;
+  const shiftsOn = owner && showsOnCalendar(S);
+  const shiftChips = useMemo(
+    () => (shiftsOn ? shiftChipsInMonth(S, calYear, calMonth) : null),
+    // S.rotation carries the overrides and the schedule — nothing else matters here.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [shiftsOn, S.rotation, calYear, calMonth],
+  );
 
   function changeMonth(d) {
     update(prev => {
@@ -651,6 +676,14 @@ function CalendarView({ S, update, onShowCoinToast, nutritionMonthData }) {
       <div className="cal-header">
         <div className="cal-month-title">{months[calMonth]} {calYear}</div>
         <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
+          {owner && (
+            <button type="button"
+              className={`multi-toggle-btn cal-shift-toggle${shiftsOn ? ' active' : ''}`}
+              onClick={() => update(prev => setShowOnCalendar(prev, !showsOnCalendar(prev)))}
+              aria-pressed={shiftsOn}
+              title={shiftsOn ? 'Hide your shifts on the calendar' : 'Show your shifts on the calendar'}
+            ><span style={{display:'inline-flex',alignItems:'center',gap:6}}><Icon name={shiftsOn ? 'square-check-big' : 'square'} size={14} /> Shifts</span></button>
+          )}
           <button
             className={`multi-toggle-btn${multiSelectMode ? ' active' : ''}`}
             onClick={toggleMultiSelect}
@@ -689,7 +722,7 @@ function CalendarView({ S, update, onShowCoinToast, nutritionMonthData }) {
           return (
             <div
               key={cell.key}
-              className={`cal-cell${cell.isToday ? ' today' : ''}${cell.tids.length ? ' has-logs' : ''}${cell.isSelected ? ' selected' : ''}`}
+              className={`cal-cell${cell.isToday ? ' today' : ''}${cell.tids.length ? ' has-logs' : ''}${cell.isSelected ? ' selected' : ''}${shiftChips && shiftChips[cell.key] ? ' has-shift' : ''}`}
               onClick={() => handleDayClick(cell.key)}
               onContextMenu={e => handleDayContext(e, cell.key)}
               title={cell.isToday ? 'Today — right-click to tick trackers or add an event' : 'Right-click to tick trackers or add an event'}
@@ -708,6 +741,12 @@ function CalendarView({ S, update, onShowCoinToast, nutritionMonthData }) {
                 <div className="cal-date">{cell.day}</div>
                 {cell.isToday && <span className="cal-today-tag" aria-hidden="true">Today</span>}
               </div>
+              {shiftChips && shiftChips[cell.key] && (
+                <span className={`cal-shift is-${shiftChips[cell.key].shift}`} title={shiftChips[cell.key].label}
+                      data-tiny={shiftChips[cell.key].tiny}>
+                  <span className="cal-shift-txt">{shiftChips[cell.key].chip}</span>
+                </span>
+              )}
               <CellEvents all={monthEvents[cell.key]} lanes={bars[cell.key]?.lanes} col={cell.col} />
               {(cell.tids.length > 0 || (nutritionMonthData && nutritionMonthData[cell.key])) && (
                 <div className="cal-dots">
@@ -734,6 +773,7 @@ function CalendarView({ S, update, onShowCoinToast, nutritionMonthData }) {
           x={menu.x} y={menu.y} dates={menu.dates}
           trackers={trackers} logs={logs}
           events={menu.dates.length === 1 ? eventsOn(S, menu.dates[0]) : []}
+          shift={shiftsOn && menu.dates.length === 1 ? shiftOn(S, menu.dates[0]) : null}
           update={update}
           onClose={() => setMenu(null)}
           onAddEvent={() => { setEventForm({ dates: menu.dates, event: null }); setMenu(null); }}
@@ -908,7 +948,7 @@ export default function TrackSection({ S, update, active, onOpenModal, onShowCoi
             <div className="track-main"
                  data-hub-module="track-calendar"
                  data-hub-module-label="Calendar">
-              <CalendarView S={S} update={update} onShowCoinToast={onShowCoinToast} nutritionMonthData={nutritionMonthData} />
+              <CalendarView S={S} update={update} onShowCoinToast={onShowCoinToast} nutritionMonthData={nutritionMonthData} userId={userId} />
             </div>
           </div>
         )}

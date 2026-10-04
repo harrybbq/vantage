@@ -13,7 +13,7 @@
 import { useMemo } from 'react';
 import {
   chipText, holidayDaySet, leaveType, nextHoliday, resolveDay,
-  rotaDayIndex, dayTypeOf, loadScaleOf,
+  rotaDayIndex, dayTypeOf, loadScaleOf, scheduleOf,
 } from '../../lib/rotation/pattern';
 import { targetsForDay } from '../../data/trainingProgramme';
 
@@ -31,25 +31,29 @@ export function RotationBody({ S, navigate }) {
   const blocks = useMemo(() => rotation.holidayBlocks || [], [rotation.holidayBlocks]);
 
   const [y, m, d] = iso.split('-').map(Number);
-  const day = resolveDay(y, m - 1, d, overrides);
+  // The owner's pattern as stored (Rotation → Shift pattern), falling
+  // back to the original rota when nothing has been changed.
+  const schedule = scheduleOf(S);
+  const day = resolveDay(y, m - 1, d, overrides, schedule);
   const onHoliday = holidayDaySet(blocks).has(iso);
   const upcoming = nextHoliday(blocks, iso);
 
   // Tomorrow, because on a night shift "what's next" is the question
   // you're actually asking at 3am.
   const t = new Date(Date.UTC(y, m - 1, d + 1));
-  const next = resolveDay(t.getUTCFullYear(), t.getUTCMonth(), t.getUTCDate(), overrides);
+  const next = resolveDay(t.getUTCFullYear(), t.getUTCMonth(), t.getUTCDate(), overrides, schedule);
 
   if (!day.inPattern) {
     return (
       <div className="rw">
-        <div className="rw-empty">The rota starts 15 Jul 2026.</div>
+        <div className="rw-empty">The rota starts {new Date(schedule.versions[0].from + 'T12:00:00Z')
+          .toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' })}.</div>
       </div>
     );
   }
 
   const chip = chipText(day);
-  const dayIdx = rotaDayIndex(day.pos);
+  const dayIdx = rotaDayIndex(day.pos, schedule, day.iso);
   // Booked leave is an off day for fuelling: it is not a working night,
   // whatever the pattern underneath says it would have been.
   const dayType = day.shift === 'leave' ? 'off' : dayTypeOf(day.shift);

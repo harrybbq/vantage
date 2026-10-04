@@ -8203,6 +8203,56 @@ div.m-hubdrawer-coach { cursor: default; display: flex; flex-direction: column; 
   color:rgba(255,255,255,.42); padding:5px 6px 2px; text-align:center;
 }
 
+/* ── Owner shift overlay ─────────────────────────────────────────────
+   The owner's rota (Upgrade → Rotation) as a chip in the top-right of
+   each working day: N1–N4 nights, D1–D4 days, a leave code when
+   booked off. Off days draw nothing. Absolutely placed so it takes no
+   row from the events below the date; colours are the Rotation tab's
+   night blue and day amber, lifted for the calendar's dark surface
+   (dark in both themes — see the #track .cal-* rules). */
+.cal-shift{
+  position:absolute; top:6px; right:6px; z-index:2;
+  font-family:var(--mono); font-size:9.5px; font-weight:700; line-height:1.35; letter-spacing:.3px;
+  padding:0 5px; border-radius:5px; white-space:nowrap; pointer-events:none;
+  border:1px solid rgba(255,255,255,.28); background:#1d1d22; color:rgba(255,255,255,.85);
+}
+.cal-shift.is-night{ border-color:rgba(138,155,255,.6); background:#1c2140; color:#aab6ff; }
+.cal-shift.is-day{ border-color:rgba(231,166,58,.6); background:#3a2a10; color:#f2b955; }
+.cal-shift.is-leave{ border-color:rgba(77,196,133,.6); background:#123222; color:#7fdcaa; }
+.cal-shift-toggle.active{ background:#1c2140; border-color:rgba(138,155,255,.7); color:#cdd4ff; }
+#track .cal-shift-toggle.active{ background:#1c2140; border-color:rgba(138,155,255,.7); color:#cdd4ff; }
+@media (max-width:640px){
+  /* A 40px cell: the chip shrinks and tucks into the corner so the
+     date badge on the left keeps its room. */
+  .cal-shift{ top:3px; right:2px; font-size:7.5px; padding:0 2px; border-radius:3px; letter-spacing:0; }
+  /* Two characters at most here: "TOIL" beside "12" overran the date
+     in a 40px cell, so leave falls back to its two-letter form. */
+  .cal-shift-txt{ display:none; }
+  .cal-shift::after{ content:attr(data-tiny); }
+}
+/* Today's "Today" tag and a shift chip would share the top-right of
+   the head; the filled date badge already says today, so the tag gives
+   way. */
+.cal-cell.today.has-shift .cal-today-tag{ display:none; }
+@media (max-width:640px){
+  /* A 38–42px phone cell can't hold today's filled badge AND a chip side
+     by side, so today's chip sits on the corner like a notification
+     badge instead of touching the date. */
+  #track .track-main .cal-cell.today.has-shift .cal-shift{ top:-6px; right:-6px; z-index:3; }
+}
+.daymenu-shift{
+  display:flex; align-items:center; gap:8px; margin:0 0 4px; padding:7px 8px; border-radius:8px;
+  background:#1f1f25; border:1px solid rgba(255,255,255,.1); font-size:12.5px; color:rgba(255,255,255,.92);
+}
+.daymenu-shift-chip{
+  font-family:var(--mono); font-size:10px; font-weight:700; padding:1px 6px; border-radius:5px;
+  border:1px solid rgba(255,255,255,.28); color:rgba(255,255,255,.85);
+}
+.daymenu-shift.is-night .daymenu-shift-chip{ border-color:rgba(138,155,255,.6); background:#1c2140; color:#aab6ff; }
+.daymenu-shift.is-day .daymenu-shift-chip{ border-color:rgba(231,166,58,.6); background:#3a2a10; color:#f2b955; }
+.daymenu-shift.is-leave .daymenu-shift-chip{ border-color:rgba(77,196,133,.6); background:#123222; color:#7fdcaa; }
+.daymenu-shift-lbl{ min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+
 /* ── Day menu: events ────────────────────────────────────────────────
    The menu is portalled to <body> and paints its own dark surface (it
    would otherwise inherit the page's --text and put dark type on a dark

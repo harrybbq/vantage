@@ -24,7 +24,9 @@ import {
   chipText, datesBetween, holidayDaySet, leaveType, monthGrid, monthRange,
   nextHoliday, normaliseBlock, rangeStats, patternDay,
   resolveDay, rotaDayIndex, dayTypeOf, loadScaleOf, daysUntilReset,
+  scheduleOf, cycleShape,
 } from '../../lib/rotation/pattern';
+import ShiftPatternCard from './ShiftPatternCard';
 import {
   DAY_TYPE_LABEL, FLOOR_MACROS, NIGHT_LOAD_SCALE, STRETCH_GOAL,
   exercisesFor, stretchesFor, targetsForDay, commuteForDay,
@@ -52,13 +54,13 @@ const todayIso = () => {
  * and seeing one without the other is how the higher target starts
  * looking like a bug.
  */
-function TodayPanel({ overrides, S }) {
+function TodayPanel({ overrides, S, schedule }) {
   const iso = todayIso();
   const [y, m, d] = iso.split('-').map(Number);
-  const day = resolveDay(y, m - 1, d, overrides);
+  const day = resolveDay(y, m - 1, d, overrides, schedule);
   if (!day.inPattern) return null;
 
-  const dayIdx = rotaDayIndex(day.pos);
+  const dayIdx = rotaDayIndex(day.pos, schedule, day.iso);
   const dayType = day.shift === 'leave' ? 'off' : dayTypeOf(day.shift);
   const scale = day.shift === 'leave' ? 1 : loadScaleOf(day.shift);
   const t = targetsForDay(dayType, day.session);
@@ -202,20 +204,20 @@ function TodayPanel({ overrides, S }) {
  * question the page is actually opened for, "what's coming", without
  * scanning a grid. Each day opens the same editor as the calendar.
  */
-function NextDays({ overrides, holidayDays, today, onOpen }) {
+function NextDays({ overrides, holidayDays, today, onOpen, schedule }) {
   const days = useMemo(() => {
     const [y, m, d] = today.split('-').map(Number);
     return Array.from({ length: 16 }, (_, i) => {
       const dt = new Date(Date.UTC(y, m - 1, d + i));
-      return resolveDay(dt.getUTCFullYear(), dt.getUTCMonth(), dt.getUTCDate(), overrides);
+      return resolveDay(dt.getUTCFullYear(), dt.getUTCMonth(), dt.getUTCDate(), overrides, schedule);
     }).filter(c => c.inPattern);
-  }, [overrides, today]);
+  }, [overrides, today, schedule]);
   if (!days.length) return null;
   return (
     <section className="upg-card upg-next">
       <div className="upg-card-head">
         <h3>Next 16 days</h3>
-        <span className="upg-card-sub">one full cycle · tap a day to change it</span>
+        <span className="upg-card-sub">tap a day to change it</span>
       </div>
       <div className="upg-next-row">
         {days.map((c, i) => {
@@ -240,6 +242,9 @@ function NextDays({ overrides, holidayDays, today, onOpen }) {
 
 export default function RotationTab({ S, update, isMobile }) {
   const overrides = useMemo(() => (S.rotation && S.rotation.overrides) || {}, [S.rotation]);
+  // The stored shift pattern (validated; the original rota when unset).
+  // Cached per stored value, so its identity is stable between renders.
+  const schedule = scheduleOf(S);
   const [editing, setEditing] = useState(null);   // resolved day | null
   // Holiday range picker. `anchor` is the first date clicked; `hover`
   // drives the live preview so the block is visible before committing,
@@ -269,8 +274,8 @@ export default function RotationTab({ S, update, isMobile }) {
     ? `${MONTHS[shown[0][1]].slice(0, 3)} ${shown[0][0]}${shown.length > 1 ? ` – ${MONTHS[shown[shown.length - 1][1]].slice(0, 3)} ${shown[shown.length - 1][0]}` : ''}`
     : '';
   const stats = useMemo(
-    () => rangeStats(WINDOW.fromDate, WINDOW.toDate, overrides),
-    [overrides]);
+    () => rangeStats(WINDOW.fromDate, WINDOW.toDate, overrides, schedule),
+    [overrides, schedule]);
   const allowance = useMemo(
     // Scoped to the CURRENT leave year, which is what an allowance is.
     // Counting the whole override map meant the number could only fall,
@@ -278,8 +283,9 @@ export default function RotationTab({ S, update, isMobile }) {
     () => allowanceUsed(
       overrides,
       { ...ALLOWANCE_DEFAULT, ...((S.rotation || {}).allowance || {}) },
-      new Date().getFullYear()),
-    [overrides, S.rotation]);
+      new Date().getFullYear(),
+      schedule),
+    [overrides, S.rotation, schedule]);
   // Holiday blocks are a visual overlay, stored separately from the
   // per-day overrides. They shade the calendar and drive the countdown;
   // they book nothing and cost no allowance.
@@ -355,8 +361,9 @@ export default function RotationTab({ S, update, isMobile }) {
 
   return (
     <div className="upg-pane">
-      <TodayPanel overrides={overrides} S={S} />
-      <NextDays overrides={overrides} holidayDays={holidayDays} today={today} onOpen={setEditing} />
+      <TodayPanel overrides={overrides} S={S} schedule={schedule} />
+      <NextDays overrides={overrides} holidayDays={holidayDays} today={today} onOpen={setEditing} schedule={schedule} />
+      <ShiftPatternCard S={S} update={update} schedule={schedule} today={today} />
       <div className="upg-stats">
         {[
           { k: 'night', n: stats.night, label: 'Night shifts' },
@@ -390,7 +397,7 @@ export default function RotationTab({ S, update, isMobile }) {
       </div>
 
       <div className="upg-note">
-        16-day cycle · PPLUL slotted from the 1st shift to the 1st day off · cardio on upper days ·
+        {cycleShape(schedule, today).len}-day cycle · PPLUL from the 1st day of each shift block · cardio on upper days ·
         {' '}{stats.sessions} sessions ({stats.cardio} with cardio) · 15 Jul 2026 → 30 Sep 2027
         {editedCount > 0 && <> · <b>{editedCount} day{editedCount === 1 ? '' : 's'} edited</b></>}
       </div>
@@ -462,7 +469,7 @@ export default function RotationTab({ S, update, isMobile }) {
             <h3>{MONTHS[m]} <span>{y}</span></h3>
             <div className="upg-dow">{DOW.map(d => <span key={d}>{d}</span>)}</div>
             <div className="upg-grid">
-              {monthGrid(y, m, overrides).map((cell, i) => {
+              {monthGrid(y, m, overrides, schedule).map((cell, i) => {
                 if (!cell) return <div key={`e${i}`} className="upg-cell is-empty" />;
                 if (!cell.inPattern) {
                   return <div key={cell.iso} className="upg-cell is-empty"><span className="upg-dt">{cell.iso.slice(8)}</span></div>;
@@ -508,6 +515,7 @@ export default function RotationTab({ S, update, isMobile }) {
       {editing && (
         <DayEditor
           day={editing}
+          schedule={schedule}
           onClose={() => setEditing(null)}
           onSet={patch => setOverride(editing.iso, patch)}
           onClear={() => clearDay(editing.iso)}
@@ -522,11 +530,11 @@ export default function RotationTab({ S, update, isMobile }) {
  * expanding a cell in place would reflow the month under the finger
  * that just tapped it.
  */
-function DayEditor({ day, onClose, onSet, onClear }) {
+function DayEditor({ day, schedule, onClose, onSet, onClear }) {
   // What the pattern would say with nothing overridden — so the editor
   // can show what you are deviating FROM, and offer a way back.
   const [y, m, d] = day.iso.split('-').map(Number);
-  const base = patternDay(y, m - 1, d);
+  const base = patternDay(y, m - 1, d, schedule);
   const dateLabel = new Date(Date.UTC(y, m - 1, d))
     .toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', timeZone: 'UTC' });
 
