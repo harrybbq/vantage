@@ -29,11 +29,24 @@
  * fills only fields the user has NOT typed into in this form, and says
  * so with an Undo. Learned on open from S.calendarEvents, on the device;
  * nothing is sent or stored.
+ *
+ * ── Multi-day ────────────────────────────────────────────────────────
+ * A "Multi-day" switch under the date turns the form into a range: a
+ * start and an end date, no times (a holiday is all-day), and the header
+ * reads "Mon 5 Oct → Fri 9 Oct · 5 days". Saving writes ONE span to
+ * S.calendarSpans (lib/calendar/spans.js), never a copy per day. A span
+ * opened from the day menu is edited and deleted WHOLE here — the day
+ * you tapped is just the way in. Switching an existing event across
+ * (single ↔ multi-day) moves it in one update, so there is no moment
+ * where it exists twice or not at all.
  */
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import Icon from '../Icon';
 import { EVENT_COLOURS, addEvent, cleanPatch, eventColour, isTime, makeEvent, removeEvent, updateEvent } from '../../lib/calendar/events';
+import {
+  MAX_SPAN_DAYS, addDays, addSpan, findSpan, isRealDate, makeSpan, rangeLabel, removeSpan, spanLength, updateSpan,
+} from '../../lib/calendar/spans';
 import { completion, describe, fillPlan, learnEvents, locationCompletion, suggest, suggestLocations } from '../../lib/calendar/eventMemory';
 import SuggestInput from './SuggestInput';
 
@@ -41,9 +54,28 @@ const prettyDate = iso => new Date(iso + 'T12:00').toLocaleDateString(undefined,
   weekday: 'long', day: 'numeric', month: 'long',
 });
 
-export default function EventModal({ dates, event, calendarEvents, update, onClose }) {
+export default function EventModal({ dates, event, calendarEvents, calendarSpans, multiDay = false, update, onClose }) {
   const editing = !!event;
   const nameRef = useRef(null);
+
+  // Editing a span: the event handed in is ONE DAY of it, so read the
+  // span itself for the fields a day does not carry (its note, its real
+  // dates). Read once on open — if it has gone (deleted on another
+  // device) the form still opens from the day's copy rather than crashing.
+  const spanId = event?.source === 'span' ? event.spanId : null;
+  const [span] = useState(() => (spanId ? findSpan({ calendarSpans }, spanId) : null));
+  const editingSpan = !!spanId;
+  const sorted = useMemo(() => [...dates].sort(), [dates]);
+
+  const [multi, setMulti] = useState(editingSpan || multiDay);
+  const [startDate, setStartDate] = useState(span?.start || event?.spanStart || sorted[0]);
+  const [endDate, setEndDate] = useState(
+    span?.end || event?.spanEnd || (multiDay ? sorted[sorted.length - 1] : sorted[0]),
+  );
+  // The switch is offered where a range makes sense: one day, a run of
+  // days picked as one, or an existing event. Not for "add the same
+  // event to these five scattered Tuesdays", which is per-day by nature.
+  const canMulti = dates.length === 1 || multiDay || editing;
 
   const [title, setTitle] = useState(event?.title || '');
   const [start, setStart] = useState(event?.time || '');
@@ -133,11 +165,55 @@ export default function EventModal({ dates, event, calendarEvents, update, onClo
   // saying so before the save is what stops it looking like data loss.
   const endBackwards = !!end && !!start && end <= start;
   const endOrphan = !!end && !start;
-  const canSave = clean.length > 0;
+  // Same idea for dates — makeSpan swaps a backwards range and pulls in
+  // an over-long one, and the form says so before it happens.
+  const datesOk = isRealDate(startDate) && isRealDate(endDate);
+  const datesBackwards = datesOk && endDate < startDate;
+  const tooLong = datesOk && !datesBackwards && spanLength(startDate, endDate) > MAX_SPAN_DAYS;
+  const canSave = clean.length > 0 && (!multi || isRealDate(startDate));
+
+  function toggleMulti() {
+    // Turning it on with a one-day range would save a "multi-day" event
+    // of one day; start it at two so the end field means something the
+    // moment it appears.
+    if (!multi && isRealDate(startDate) && (!isRealDate(endDate) || endDate <= startDate)) {
+      setEndDate(addDays(startDate, 1));
+    }
+    setMulti(!multi);
+  }
 
   function save() {
     if (!canSave) return;
     const fields = { title: clean, time: start, end, location, colour };
+    if (multi) {
+      const spanFields = { title: clean, start: startDate, end: endDate, location, colour };
+      // Built outside the updater so a double-invoked updater (React dev
+      // mode) cannot mint two different ids.
+      const fresh = editingSpan ? null : makeSpan({ ...spanFields, note: event?.note || '' });
+      update(prev => {
+        if (editingSpan) return updateSpan(prev, spanId, spanFields);
+        // Single event → multi-day: drop the day's copy and add the span
+        // in ONE update. If the span would be refused, keep the event.
+        const added = addSpan(prev, fresh);
+        if (added === prev) return prev;
+        return editing ? removeEvent(added, dates[0], event.id) : added;
+      });
+      onClose();
+      return;
+    }
+    if (editingSpan) {
+      // Multi-day → one day: the span becomes a normal event on its first
+      // day, timed if times were given. Same one-update rule.
+      const single = makeEvent({ ...fields, note: span?.note || '' });
+      const day = isRealDate(startDate) ? startDate : dates[0];
+      update(prev => {
+        const added = addEvent(prev, day, single);
+        if (added === prev) return prev;
+        return removeSpan(added, spanId);
+      });
+      onClose();
+      return;
+    }
     update(prev => {
       if (editing) {
         return updateEvent(prev, dates[0], event.id, cleanPatch(fields));
@@ -152,23 +228,34 @@ export default function EventModal({ dates, event, calendarEvents, update, onClo
 
   function del() {
     if (!editing) return;
+    if (editingSpan) {
+      const n = span ? spanLength(span.start, span.end) : event.dayCount;
+      if (!window.confirm(`Delete “${event.title}”${n > 1 ? ` — all ${n} days` : ''}?`)) return;
+      update(prev => removeSpan(prev, spanId));
+      onClose();
+      return;
+    }
     if (!window.confirm(`Delete “${event.title}”?`)) return;
     update(prev => removeEvent(prev, dates[0], event.id));
     onClose();
   }
 
+  const heading = multi
+    ? (editing ? 'Edit multi-day event' : 'New multi-day event')
+    : (editing ? 'Edit event' : 'New event');
+  const sub = multi
+    ? (datesOk ? rangeLabel(startDate, endDate) : 'Pick the dates')
+    : dates.length > 1 ? `${dates.length} days — one copy on each` : prettyDate(dates[0]);
+  const days = datesOk ? spanLength(...(datesBackwards ? [endDate, startDate] : [startDate, endDate])) : 0;
+
   return createPortal(
     <div className="modal-overlay open" role="presentation" onClick={onClose}>
-      <div className="modal ev-modal" role="dialog" aria-modal="true" aria-label={editing ? 'Edit event' : 'Add event'}
+      <div className="modal ev-modal" role="dialog" aria-modal="true" aria-label={heading}
            onClick={e => e.stopPropagation()}>
         <div className="ev-modal-head">
           <div>
-            <div className="ev-modal-title">{editing ? 'Edit event' : 'New event'}</div>
-            <div className="ev-modal-sub">
-              {dates.length > 1
-                ? `${dates.length} days — one copy on each`
-                : prettyDate(dates[0])}
-            </div>
+            <div className="ev-modal-title">{heading}</div>
+            <div className="ev-modal-sub">{sub}</div>
           </div>
           <button type="button" className="ev-modal-x" onClick={onClose} aria-label="Close">
             <Icon name="x" size={15} />
@@ -196,19 +283,52 @@ export default function EventModal({ dates, event, calendarEvents, update, onClo
             </div>
           )}
 
-          <div className="ev-row">
-            <label className="ev-field">
-              <span className="ev-field-lbl">Starts</span>
-              <input type="time" value={start} onChange={e => userSet('start', e.target.value)} />
-            </label>
-            <label className="ev-field">
-              <span className="ev-field-lbl">Ends</span>
-              <input type="time" value={end} onChange={e => userSet('end', e.target.value)} />
-            </label>
-          </div>
-          {endBackwards && <div className="ev-warn">Ends before it starts — the end time won&apos;t be saved.</div>}
-          {endOrphan && <div className="ev-warn">An end time needs a start time.</div>}
-          {!start && !end && <div className="ev-fine">Leave both blank for an all-day event.</div>}
+          {canMulti && (
+            <button type="button" role="switch" aria-checked={multi}
+                    className={'ev-switch' + (multi ? ' is-on' : '')} onClick={toggleMulti}>
+              <span className="ev-switch-track" aria-hidden="true"><span className="ev-switch-knob" /></span>
+              <span className="ev-switch-text">
+                <span className="ev-switch-lbl">Multi-day</span>
+                <span className="ev-switch-hint">Holidays, trips, festivals — one event across several days</span>
+              </span>
+            </button>
+          )}
+
+          {multi ? (
+            <>
+              <div className="ev-row">
+                <label className="ev-field">
+                  <span className="ev-field-lbl">From</span>
+                  <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} />
+                </label>
+                <label className="ev-field">
+                  <span className="ev-field-lbl">Ends on</span>
+                  <input type="date" value={endDate} min={isRealDate(startDate) ? startDate : undefined}
+                         onChange={e => setEndDate(e.target.value)} />
+                </label>
+              </div>
+              {!isRealDate(startDate) && <div className="ev-warn">Pick a start date.</div>}
+              {datesBackwards && <div className="ev-warn">Ends before it starts — the dates will be swapped.</div>}
+              {tooLong && <div className="ev-warn">Longer than {MAX_SPAN_DAYS} days — it will end on day {MAX_SPAN_DAYS}.</div>}
+              {datesOk && !datesBackwards && !tooLong && <div className="ev-fine">All day, every day in between.</div>}
+            </>
+          ) : (
+            <>
+              <div className="ev-row">
+                <label className="ev-field">
+                  <span className="ev-field-lbl">Starts</span>
+                  <input type="time" value={start} onChange={e => userSet('start', e.target.value)} />
+                </label>
+                <label className="ev-field">
+                  <span className="ev-field-lbl">Ends</span>
+                  <input type="time" value={end} onChange={e => userSet('end', e.target.value)} />
+                </label>
+              </div>
+              {endBackwards && <div className="ev-warn">Ends before it starts — the end time won&apos;t be saved.</div>}
+              {endOrphan && <div className="ev-warn">An end time needs a start time.</div>}
+              {!start && !end && <div className="ev-fine">Leave both blank for an all-day event.</div>}
+            </>
+          )}
 
           <SuggestInput
             label="Location" listLabel="Past locations"
@@ -239,7 +359,10 @@ export default function EventModal({ dates, event, calendarEvents, update, onClo
           <div className="ev-preview">
             <span className="ev-preview-dot" style={{ background: eventColour({ colour }) }} />
             <span className="ev-preview-name">{clean || 'Untitled'}</span>
-            {isTime(start) && (
+            {multi && days > 0 && (
+              <span className="ev-preview-when">{Math.min(days, MAX_SPAN_DAYS)} days</span>
+            )}
+            {!multi && isTime(start) && (
               <span className="ev-preview-when">
                 {start}{end && !endBackwards ? ` – ${end}` : ''}
               </span>
@@ -254,7 +377,7 @@ export default function EventModal({ dates, event, calendarEvents, update, onClo
           )}
           <button type="button" className="ev-btn" onClick={onClose}>Cancel</button>
           <button type="button" className="ev-btn is-go" onClick={save} disabled={!canSave}>
-            {editing ? 'Save' : dates.length > 1 ? `Add to ${dates.length} days` : 'Add event'}
+            {editing ? 'Save' : multi ? 'Add multi-day event' : dates.length > 1 ? `Add to ${dates.length} days` : 'Add event'}
           </button>
         </div>
       </div>
