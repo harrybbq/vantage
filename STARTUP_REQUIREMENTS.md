@@ -401,7 +401,7 @@ can stop the bleeding in minutes, and you meet the legal clock.
     in-app "not saved" indicator. Weekly: Supabase security advisors +
     `npm audit` (a scheduled Claude routine can do this and report).
     *Status 2026-09-30: client crash reports → client_errors (needs audit SQL); /.netlify/functions/health for an uptime monitor. Owner: point an uptime monitor at it, set the Anthropic spend limit, Supabase usage alerts.*
-    *Status 2026-10-04: security_console_2026_10.sql run — the hourly security sweep raises tickets (DB slow/unreachable, disk, connections, error spikes, stale reports, slow LCP), real-user web vitals are recorded, and the Security console shows database health. Advisors, API traffic and Netlify deploys still need `SUPABASE_ACCESS_TOKEN` and `NETLIFY_AUTH_TOKEN` in Netlify env.*
+    *Status 2026-10-04: security_console_2026_10.sql run — the hourly security sweep raises tickets (DB slow/unreachable, disk, connections, error spikes, stale reports, slow LCP), real-user web vitals are recorded, and the Security console shows database health. `SUPABASE_ACCESS_TOKEN` set in Netlify env (advisors + API traffic, live after the next deploy); Netlify deploys/functions still need `NETLIFY_AUTH_TOKEN`.*
 78. `[~]` **Incident runbook (one page, both owners have it).**
     - *Contain:* Netlify → publish previous deploy (instant rollback);
       a `MAINTENANCE`/feature-flag env var that disables AI, social or
