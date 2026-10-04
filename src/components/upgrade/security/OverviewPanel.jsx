@@ -2,7 +2,9 @@
  * Overview: is anything wrong, and where. A one-sentence verdict first
  * ("All systems operational" / "2 issues need attention") with its
  * countdown, then the three systems, then six stat tiles that each open
- * their tab, then the newest tickets and reports.
+ * their tab, then the newest tickets and reports. A ticket row opens
+ * that ticket (its explanation) in Tickets; its Source control jumps
+ * straight to where the problem lives (go(tab, focus)).
  *
  * Polls while the page is visible: every `nextRefreshSec` the server
  * suggests (60 s by default, clamped 30 s – 5 min). The two lists load
@@ -36,6 +38,7 @@ export default function OverviewPanel({ go }) {
   const md = usePanel('moderation');
   const refresh = () => { ov.reload(); tk.reload(); md.reload(); };
 
+  const links = tk.res && tk.res.state === 'ok' && tk.res.data.links && typeof tk.res.data.links === 'object' ? tk.res.data.links : null;
   const tickets = useMemo(() => {
     const d = tk.res && tk.res.state === 'ok' ? tk.res.data : null;
     const raw = d && Array.isArray(d.tickets) ? d.tickets : [];
@@ -90,14 +93,14 @@ export default function OverviewPanel({ go }) {
               <Tile label="Open tickets" value={fmtInt(open)} of={n('totalTickets') != null ? `/ ${fmtInt(n('totalTickets'))}` : 'tickets'}
                     tone={tone(open, 'warn')} onClick={() => go('tickets')} />
               <Tile label="Open reports" value={fmtInt(n('openReports'))} of="reports" sub="aim to decide within 24 h"
-                    tone={tone(n('openReports'), 'warn')} onClick={() => go('moderation')} />
-              <Tile label="Suspended" value={fmtInt(n('suspended'))} of="accounts" tone="none" onClick={() => go('moderation')} />
+                    tone={tone(n('openReports'), 'warn')} onClick={() => go('moderation', 'reports')} />
+              <Tile label="Suspended" value={fmtInt(n('suspended'))} of="accounts" tone="none" onClick={() => go('moderation', 'suspended')} />
               <Tile label="Client errors" value={fmtInt(n('errors24h'))} of="in 24 h" tone={tone(n('errors24h'), 'warn')}
-                    spark={Array.isArray(series.errors) ? series.errors : null} />
+                    spark={Array.isArray(series.errors) ? series.errors : null} onClick={() => go('netlify', 'errors')} />
               <Tile label="Advisor errors" value={fmtInt(n('advisorsError'))}
                     of={n('advisorsTotal') != null ? `/ ${fmtInt(n('advisorsTotal'))} findings` : 'Supabase'}
                     sub={n('advisorsError') == null ? 'needs the Supabase token' : 'accepted findings excluded'}
-                    tone={tone(n('advisorsError'), 'bad')} onClick={() => go('database')} />
+                    tone={tone(n('advisorsError'), 'bad')} onClick={() => go('database', 'advisors')} />
             </div>
           </>
         );
@@ -109,7 +112,9 @@ export default function OverviewPanel({ go }) {
                     right={<button type="button" className="sec-link" onClick={() => go('tickets')}>All tickets <Icon name="arrow-right" size={11} /></button>} />
           <Gate res={tk.res}>
             {() => (tickets.length
-              ? <div className="sec-tlist">{tickets.map(t => <TicketLine key={t.id} t={t} raw={t.raw} onClick={() => go('tickets')} />)}</div>
+              ? <div className="sec-tlist">{tickets.map(t => (
+                <TicketLine key={t.id} t={t} raw={t.raw} links={links} go={go} onClick={() => go('tickets', `ticket:${t.id}`)} />
+              ))}</div>
               : <Calm>No open tickets. That is the normal state.</Calm>)}
           </Gate>
         </section>
@@ -121,7 +126,7 @@ export default function OverviewPanel({ go }) {
               ? (
                 <div className="sec-tlist">
                   {reports.map(r => (
-                    <button key={r.id} type="button" className="sec-row" onClick={() => go('moderation')}>
+                    <button key={r.id} type="button" className="sec-row" onClick={() => go('moderation', 'reports')}>
                       <span className="sec-row-main">
                         <span className="sec-row-top">
                           <b className="sec-row-id">{r.name || (r.handle ? `@${r.handle}` : 'Deleted account')}</b>

@@ -12,10 +12,15 @@
  * metric cards with the value coloured by web.dev's bands, then the
  * pages for the selected metric in three buckets — Poor / Needs
  * improvement / Great — with each bucket's threshold in its header.
+ * Last, the app's own error groups (message + first frame) — what an
+ * error spike points at. Alerts land here by focus key: deploy:<id>,
+ * deploys, vitals, errors.
  */
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import Icon from '../../Icon';
 import { usePanel } from './usePanel';
+import { useFocusTarget } from './useFocusTarget';
+import { ErrorGroups } from './AlertParts';
 import { Updated, Gate, CardHead, Pill, SetupCard, NoData } from './parts';
 import { part, deployPill, deployHeadline, deployDuration, safeHref } from '../../../lib/security/status';
 import { VITALS, rateVital, fmtVital, overallRating, RATING_LABEL, bucketHeads, bucketRows, vitalSentence } from '../../../lib/security/vitals';
@@ -40,9 +45,14 @@ function Current({ site }) {
   );
 }
 
-function Deploys({ list }) {
-  const [open, setOpen] = useState(null);
+function Deploys({ list, focusId }) {
   const rows = (Array.isArray(list) ? list : []).filter(d => d && typeof d === 'object');
+  // A failed-deploy alert's "go to source" opens that row's error.
+  const [open, setOpen] = useState(() => (focusId && rows.some(d => d.id === focusId && d.errorMessage) ? focusId : null));
+  useEffect(() => {
+    if (focusId && rows.some(d => d.id === focusId && d.errorMessage)) setOpen(focusId);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [focusId]);
   if (!rows.length) return <NoData>No deploys reported yet.</NoData>;
   return (
     <div className="sec-tlist">
@@ -53,7 +63,7 @@ function Deploys({ list }) {
         const isOpen = open === id;
         const more = !!d.errorMessage;
         return (
-          <div key={id} className="sec-titem">
+          <div key={id} className="sec-titem" data-sec-focus={d.id ? `deploy:${d.id}` : undefined}>
             <button type="button" className={`sec-row sec-dep is-${p.key}${isOpen ? ' is-open' : ''}${more ? '' : ' is-static'}`}
                     onClick={() => more && setOpen(isOpen ? null : id)} aria-expanded={more ? isOpen : undefined}>
               <span className="sec-row-main">
@@ -154,8 +164,10 @@ function section(p, render, envs) {
   return <div className="sec-note is-warn"><b>Unavailable right now.</b> {p.hint || ''}</div>;
 }
 
-export default function NetlifyPanel() {
+export default function NetlifyPanel({ focus }) {
   const nf = usePanel('netlify');
+  useFocusTarget(focus, !!(nf.res && nf.res.state === 'ok'));
+  const focusDeploy = focus && typeof focus.key === 'string' && focus.key.startsWith('deploy:') ? focus.key.slice(7) : null;
   const links = nf.res && nf.res.state === 'ok' && nf.res.data.links && typeof nf.res.data.links === 'object' ? nf.res.data.links : {};
   const obs = safeHref(links.observability), waf = safeHref(links.security || links.webSecurity);
   return (
@@ -200,14 +212,19 @@ export default function NetlifyPanel() {
                 </section>
               </div>
 
-              <section className="sec-card">
+              <section className="sec-card" data-sec-focus="deploys" data-sec-focus-group="deploy">
                 <CardHead eyebrow="// newest first" title="Deploys" />
-                {section(deploys, d => <Deploys list={d} />, ENVS)}
+                {section(deploys, d => <Deploys list={d} focusId={focusDeploy} />, ENVS)}
               </section>
 
-              <section className="sec-card">
+              <section className="sec-card" data-sec-focus="vitals">
                 <CardHead eyebrow="// field data · our own beacon" title="Web vitals" />
                 {section(vitals, w => <Vitals w={w} />, [])}
+              </section>
+
+              <section className="sec-card" data-sec-focus="errors">
+                <CardHead eyebrow="// grouped by message + first frame · no user ids" title="App errors" />
+                <ErrorGroups initialWindow="24h" label={false} />
               </section>
             </>
           );

@@ -20,6 +20,7 @@ const { parsePrometheus, metricsHealth } = require('./prom');
 const {
   projectRefFromUrl, API_COUNT_INTERVALS, shapeApiCounts, shapeLints, apiCountsError,
   shapeDeploy, shapeSite, shapeFunctions, summariseVitals, netlifyLinks,
+  supabaseLinks, groupClientErrors,
 } = require('./securityShape');
 
 const TIMEOUT_MS = 8000;
@@ -470,9 +471,11 @@ async function readVitals(env, days = 7) {
 
 /**
  * Raise (or bump, or re-open) an auto ticket by fingerprint, atomically,
- * via public.security_ticket_raise. → 'ok' | 'missing' | 'failed'.
+ * via public.security_ticket_raise.
+ * → { result: 'ok'|'missing'|'failed', row: { id, status, count } | null }
+ * The RPC returns the row AFTER the upsert: count 1 means new.
  */
-async function raiseTicket(env, c) {
+async function raiseTicketRow(env, c) {
   try {
     const res = await rest(env, 'rpc/security_ticket_raise', {
       method: 'POST',
@@ -481,11 +484,111 @@ async function raiseTicket(env, c) {
         p_title: c.title, p_detail: c.detail || {},
       }),
     }, 5000);
-    if (missing(res)) return 'missing';
-    return res.ok ? 'ok' : 'failed';
+    if (missing(res)) return { result: 'missing', row: null };
+    if (!res.ok) return { result: 'failed', row: null };
+    let row = null;
+    try {
+      const b = await res.json();
+      const r = Array.isArray(b) ? b[0] : b;
+      if (r && typeof r === 'object' && r.id) row = { id: String(r.id), status: r.status || null, count: Number(r.count) || null };
+    } catch { /* an empty body still means it was written */ }
+    return { result: 'ok', row };
   } catch {
-    return 'failed';
+    return { result: 'failed', row: null };
   }
+}
+
+/** → 'ok' | 'missing' | 'failed' (the older shape, kept for callers). */
+async function raiseTicket(env, c) {
+  return (await raiseTicketRow(env, c)).result;
+}
+
+/**
+ * Current status of the tickets behind these fingerprints, BEFORE a
+ * sweep writes — the RPC's return cannot tell "re-opened" from "still
+ * open", and a re-opened critical is worth a ping. One small indexed
+ * read (fingerprint is unique), only for candidates at the alert
+ * threshold. → Map fingerprint → status; empty on any failure.
+ */
+async function ticketStatuses(env, fingerprints) {
+  const fps = [...new Set((fingerprints || []).filter(f => typeof f === 'string' && /^[a-z0-9_.:-]{1,200}$/.test(f)))].slice(0, 50);
+  if (!fps.length) return new Map();
+  try {
+    const list = fps.map(f => `"${f}"`).join(',');
+    const res = await rest(env, `security_tickets?fingerprint=in.(${encodeURIComponent(list)})&select=fingerprint,status`, {}, 3000);
+    if (!res.ok) return new Map();
+    return new Map((await res.json()).map(r => [r.fingerprint, r.status]));
+  } catch {
+    return new Map();
+  }
+}
+
+// ── Client error groups (public.client_errors) ───────────────────────
+
+const errorGroupsCache = new Map();   // window → { at, value }
+const ERROR_GROUPS_TTL = 60_000;
+const ERROR_ROW_CAP = 1000;
+const ERROR_WINDOWS = { '1h': 3600_000, '24h': 86400_000 };
+
+/**
+ * The top error groups for the last hour / day — what the
+ * client_errors_spike ticket points at, and what a triage agent needs to
+ * find the bug. user_id is NEVER selected. One bounded read (newest
+ * 1,000 rows of the window), cached a minute per warm instance.
+ * → { ok, window, total, sampled, capped, groups } | fail()
+ */
+async function readErrorGroups(env, windowKey = '24h') {
+  const w = ERROR_WINDOWS[windowKey] ? windowKey : '24h';
+  const hit = errorGroupsCache.get(w);
+  if (hit && Date.now() - hit.at < ERROR_GROUPS_TTL) return hit.value;
+  let value;
+  try {
+    const since = new Date(Date.now() - ERROR_WINDOWS[w]).toISOString();
+    const res = await rest(env,
+      `client_errors?occurred_at=gte.${encodeURIComponent(since)}&select=message,stack,url,release,kind,occurred_at` +
+      `&order=occurred_at.desc&limit=${ERROR_ROW_CAP}`, { headers: { Prefer: 'count=exact' } });
+    if (missing(res)) value = fail('not_configured', 'Run supabase/audit_schema_2026_10.sql (client_errors).');
+    else if (!res.ok) value = fail('unavailable', `client_errors read ${res.status}.`);
+    else {
+      const rows = await res.json();
+      const total = parseInt((res.headers.get('content-range') || '').split('/')[1], 10);
+      value = {
+        ok: true,
+        window: w,
+        total: Number.isFinite(total) ? total : rows.length,
+        sampled: rows.length,
+        capped: rows.length >= ERROR_ROW_CAP,
+        groups: groupClientErrors(rows, { limit: 10 }),
+      };
+    }
+  } catch {
+    value = fail('unavailable', 'client_errors unreachable.');
+  }
+  errorGroupsCache.set(w, { at: Date.now(), value });
+  return value;
+}
+
+// ── Links out (no tokens needed) ─────────────────────────────────────
+
+/**
+ * Where "go to source" may send the owner outside the app: the Netlify
+ * site's dashboard (SITE_NAME, a runtime variable — or the cached API
+ * answer when the token is set) and the Supabase project's dashboard
+ * (ref from SUPABASE_URL / SUPABASE_PROJECT_REF). Neither is secret;
+ * both are derived here so the client never hard-codes them.
+ */
+async function consoleLinks() {
+  let siteName = process.env.SITE_NAME || null;
+  if (!siteName && netlifyConfig().ok && netlifyCache.value && netlifyCache.value.ok) {
+    siteName = netlifyCache.value.site?.name || null;
+  }
+  const nl = netlifyLinks(siteName);
+  const ref = process.env.SUPABASE_PROJECT_REF || projectRefFromUrl(process.env.SUPABASE_URL);
+  return {
+    netlifySite: nl ? siteName : null,
+    netlify: nl,
+    supabase: supabaseLinks(ref),
+  };
 }
 
 module.exports = {
@@ -493,5 +596,6 @@ module.exports = {
   readMetrics, readDbStats, databaseHealth,
   mgmtConfig, readTraffic, readAdvisors, readAccepted, advisorsWithAcceptance, setAccepted,
   netlifyConfig, readNetlify, latestProductionDeploy, siteLinks,
-  readVitals, readVitalsRows, raiseTicket,
+  readVitals, readVitalsRows, raiseTicket, raiseTicketRow, ticketStatuses,
+  readErrorGroups, consoleLinks, ERROR_WINDOWS,
 };

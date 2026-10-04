@@ -8,15 +8,27 @@
  * left stripe; status is the pill. Every state change can carry a note
  * and every one is reversible (Reopen) — a resolved ticket also re-opens
  * by itself if the sweep sees the condition again.
+ *
+ * Each ticket explains itself (lib/security/explain.js): the row's bold
+ * line is the plain-English headline with its numbers, the drawer says
+ * what people feel, what to do, the facts behind it, and "Go to source"
+ * jumps to the meter / deploy / advisor / report it is about (or opens
+ * the Netlify / Supabase page). A client-error spike shows its top
+ * error groups right in the drawer.
+ *
+ * The alerts strip on top says whether critical tickets reach the
+ * owner's phone (ntfy / webhook — netlify/lib/alertNotify.js) and sends
+ * a test ping; it never shows the topic.
  */
 import { useMemo, useState } from 'react';
 import Icon from '../../Icon';
 import { usePanel } from './usePanel';
+import { useFocusTarget } from './useFocusTarget';
 import { Pill, Updated, Gate, Calm, CardHead } from './parts';
+import { Explanation, RowSource, ErrorGroups } from './AlertParts';
 import { postAction } from '../../../lib/security/api';
-import {
-  normaliseTicket, sortTickets, filterTickets, detailRows, ticketTrend, SEVERITIES,
-} from '../../../lib/security/status';
+import { normaliseTicket, sortTickets, filterTickets, ticketTrend, SEVERITIES } from '../../../lib/security/status';
+import { explain } from '../../../lib/security/explain';
 import { ago, stamp, fmtInt, fmtAge, num } from '../../../lib/security/format';
 
 const STATUS_PILL = {
@@ -29,56 +41,67 @@ const TITLE_MAX = 120, DETAIL_MAX = 2000;
 
 /**
  * One ticket as a dense row (Sentry's grammar) — also used by Overview:
- * bold title + status pill, a muted line of severity · source · kind,
- * then right-aligned last seen / age, the count ×N with a trend word
- * under it, and a chevron. Severity is the left stripe.
+ * the bold headline + status pill, a muted line of severity · source ·
+ * kind, then right-aligned last seen / age, the count ×N with a trend
+ * word under it, and a chevron. Severity is the left stripe. Beside the
+ * row (not inside its button), a "Source" control jumps to where the
+ * problem lives.
  */
-export function TicketLine({ t, raw, onClick, open }) {
+export function TicketLine({ t, raw, onClick, open, links, go }) {
   const trend = ticketTrend(t, Date.now(), raw || {});
+  const e = explain(t, { links });
+  const line = e.useHeadline ? e.headline : t.title;
+  const hasGo = !!(go && e.source && (e.source.tab || e.source.href));
   return (
-    <button type="button" className={`sec-row sec-tline sev-${t.severity}${open ? ' is-open' : ''}${t.status === 'resolved' ? ' is-done' : ''}`}
-            onClick={onClick} aria-expanded={open}>
-      <span className="sec-row-main">
-        <span className="sec-row-top">
-          <b className="sec-row-id">{t.title}</b>
-          <Pill p={STATUS_PILL[t.status]} />
+    <div className={`sec-tline-wrap${hasGo ? ' has-go' : ''}`} data-sec-focus={`ticket:${t.id}`}>
+      <button type="button" className={`sec-row sec-tline sev-${t.severity}${open ? ' is-open' : ''}${t.status === 'resolved' ? ' is-done' : ''}`}
+              onClick={onClick} aria-expanded={open} title={e.useHeadline ? t.title : undefined}>
+        <span className="sec-row-main">
+          <span className="sec-row-top">
+            <b className="sec-row-id">{line}</b>
+            <Pill p={STATUS_PILL[t.status]} />
+          </span>
+          <span className="sec-row-sub">
+            <span className={`sec-sev sev-${t.severity}`}>{t.severity}</span>
+            <span>{SOURCE[t.source] || t.source}{t.kind ? ` · ${t.kind}` : ''}</span>
+          </span>
         </span>
-        <span className="sec-row-sub">
-          <span className={`sec-sev sev-${t.severity}`}>{t.severity}</span>
-          <span>{SOURCE[t.source] || t.source}{t.kind ? ` · ${t.kind}` : ''}</span>
+        <span className="sec-row-side">
+          <span title={`Last seen ${stamp(t.lastSeenAt)}`}>{ago(t.lastSeenAt)}</span>
+          <span className="sec-row-faint" title={`Raised ${stamp(t.createdAt)}`}>age {fmtAge(t.createdAt)}</span>
         </span>
-      </span>
-      <span className="sec-row-side">
-        <span title={`Last seen ${stamp(t.lastSeenAt)}`}>{ago(t.lastSeenAt)}</span>
-        <span className="sec-row-faint" title={`Raised ${stamp(t.createdAt)}`}>age {fmtAge(t.createdAt)}</span>
-      </span>
-      <span className="sec-row-count">
-        <b title={`Seen ${t.count} time${t.count === 1 ? '' : 's'}`}>×{fmtInt(t.count)}</b>
-        {trend && <span className={`sec-trend is-${trend.toLowerCase()}`}>{trend}</span>}
-      </span>
-      <Icon name="chevron-right" size={14} className="sec-row-chev" />
-    </button>
+        <span className="sec-row-count">
+          <b title={`Seen ${t.count} time${t.count === 1 ? '' : 's'}`}>×{fmtInt(t.count)}</b>
+          {trend && <span className={`sec-trend is-${trend.toLowerCase()}`}>{trend}</span>}
+        </span>
+        <Icon name="chevron-right" size={14} className="sec-row-chev" />
+      </button>
+      {hasGo && <RowSource source={e.source} go={go} title={line} />}
+    </div>
   );
 }
 
-function Drawer({ t, onAct, busy }) {
+function Drawer({ t, onAct, busy, links, go }) {
   const [note, setNote] = useState(t.note || '');
-  const rows = detailRows(t.detail);
+  const e = explain(t, { links });
   const act = status => onAct(t, status, note.trim());
   return (
     <div className="sec-drawer">
-      <dl className="sec-dl">
-        <div><dt>Raised</dt><dd title={stamp(t.createdAt)}>{ago(t.createdAt)}</dd></div>
-        <div><dt>Last seen</dt><dd title={stamp(t.lastSeenAt)}>{ago(t.lastSeenAt)}</dd></div>
-        <div><dt>Seen</dt><dd>{fmtInt(t.count)}×</dd></div>
-        <div><dt>Source</dt><dd>{SOURCE[t.source] || t.source}</dd></div>
-        {rows.map(([k, v], i) => (
-          <div key={i} className={k ? '' : 'is-wide'}>{k && <dt>{k}</dt>}<dd>{v}</dd></div>
-        ))}
+      <Explanation e={e} t={t} go={go} />
+      {e.source && e.source.inline === 'errors' && (
+        <div className="sec-inline-src">
+          <ErrorGroups initialWindow="1h" compact />
+        </div>
+      )}
+      <dl className="sec-dl sec-dl-meta">
+        <div><dt>First seen</dt><dd title={stamp(t.createdAt)}>{ago(t.createdAt)} · {stamp(t.createdAt)}</dd></div>
+        <div><dt>Last seen</dt><dd title={stamp(t.lastSeenAt)}>{ago(t.lastSeenAt)} · {stamp(t.lastSeenAt)}</dd></div>
+        <div><dt>Seen</dt><dd>×{fmtInt(t.count)}</dd></div>
+        <div><dt>Raised by</dt><dd>{SOURCE[t.source] || t.source}</dd></div>
       </dl>
       <label className="sec-field">
         <span>Note (optional, kept with the ticket)</span>
-        <textarea rows={2} maxLength={500} value={note} onChange={e => setNote(e.target.value)}
+        <textarea rows={2} maxLength={1000} value={note} onChange={ev => setNote(ev.target.value)}
                   placeholder="What you found, what you did" />
       </label>
       <div className="sec-acts">
@@ -134,7 +157,53 @@ function RaiseForm({ onDone, onCancel }) {
   );
 }
 
-export default function TicketsPanel() {
+/**
+ * Phone alerts: on/off, the threshold, a test button — or, when nothing
+ * is set up, the env var and three steps. Never the topic itself.
+ */
+function AlertsStrip({ alerts }) {
+  const [open, setOpen] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState(null);
+  if (!alerts || typeof alerts !== 'object') return null;
+  const on = !!alerts.configured;
+  const channels = Array.isArray(alerts.channels) ? alerts.channels : [];
+  const min = alerts.minSeverity === 'high' ? 'high and critical' : 'critical';
+  async function test() {
+    setBusy(true); setMsg(null);
+    const out = await postAction({ action: 'alert.test' });
+    setBusy(false);
+    setMsg(out.ok
+      ? { text: `Test sent via ${(out.data.sent || []).join(' and ') || 'the alert channel'} — check your phone.` }
+      : { bad: true, text: out.error });
+  }
+  return (
+    <section className={`sec-alerts${on ? ' is-on' : ''}`} aria-label="Phone alerts">
+      <div className="sec-alerts-row">
+        <span className="sec-alerts-icon"><Icon name="bell" size={14} /></span>
+        <span className="sec-alerts-text">
+          <b>Phone alerts {on ? 'on' : 'not set up'}</b>
+          <span>{on
+            ? `New or re-opened ${min} tickets ping you via ${channels.join(' + ')}. Repeats don’t.`
+            : alerts.topicInvalid ? 'ALERT_NTFY_TOPIC is set but isn’t a valid topic name.' : 'Critical tickets only show up here until a channel is added.'}</span>
+        </span>
+        {on
+          ? <button type="button" className="sec-btn" onClick={test} disabled={busy}>{busy ? 'Sending…' : 'Send test alert'}</button>
+          : <button type="button" className="sec-link" onClick={() => setOpen(v => !v)} aria-expanded={open}>{open ? 'Hide setup' : 'How to set up'}</button>}
+      </div>
+      {!on && open && (
+        <ol className="sec-alerts-steps">
+          <li>Install the free <b>ntfy</b> app (iOS / Android) — no account needed.</li>
+          <li>Make a long random topic (<code>openssl rand -hex 16</code>) and subscribe to it in the app. The topic works like a password — keep it private.</li>
+          <li>Add <code>ALERT_NTFY_TOPIC</code> in Netlify → Site configuration → Environment variables (scope: <b>Functions</b>), redeploy, then press Send test alert here.</li>
+        </ol>
+      )}
+      {msg && <div className={`sec-note${msg.bad ? ' is-bad' : ''}`}>{msg.text}</div>}
+    </section>
+  );
+}
+
+export default function TicketsPanel({ go, focus }) {
   const [status, setStatus] = useState('open');
   const [severity, setSeverity] = useState('all');
   const [openId, setOpenId] = useState(null);
@@ -144,12 +213,27 @@ export default function TicketsPanel() {
   const tk = usePanel('tickets', { params: { status } });
 
   const data = tk.res && tk.res.state === 'ok' ? tk.res.data : null;
+  const links = data && data.links && typeof data.links === 'object' ? data.links : null;
   const all = useMemo(() => (data && Array.isArray(data.tickets) ? data.tickets : [])
     .map(t => { const n = normaliseTicket(t); return n && { ...n, raw: t }; }).filter(Boolean), [data]);
   const shown = useMemo(() => sortTickets(filterTickets(all, { status, severity })), [all, status, severity]);
   const counts = (data && data.counts) || {};
   const cnt = k => (k === 'all' ? ['open', 'ack', 'resolved'].reduce((s, x) => s + (num(counts[x]) || 0), 0) : num(counts[k]));
   const sevCount = s => all.filter(t => t.severity === s && (status === 'all' || t.status === status)).length;
+
+  // A deep link or an Overview row: open that ticket's drawer. If it is
+  // not in the current filter (already resolved, say), widen to All.
+  const ticketId = focus && typeof focus.key === 'string' && focus.key.startsWith('ticket:') ? focus.key.slice(7) : null;
+  const ready = !!data && !tk.loading;
+  useFocusTarget(ticketId ? focus : null, ready, () => {
+    if (!ticketId) return;
+    if (all.some(t => String(t.id) === ticketId)) {
+      setSeverity('all');
+      setOpenId(all.find(t => String(t.id) === ticketId).id);
+    } else if (status !== 'all') {
+      setStatus('all');
+    }
+  });
 
   async function act(t, next, note) {
     setBusyId(t.id); setMsg(null);
@@ -168,13 +252,16 @@ export default function TicketsPanel() {
     setMsg(null);
     const out = await postAction({ action: 'sweep.run' });
     if (!out.ok) { setMsg({ bad: true, text: out.error }); return; }
-    const raised = num(out.data && (out.data.raised ?? out.data.created));
-    setMsg({ text: raised != null ? `Sweep done — ${raised} new or re-opened.` : 'Sweep done.' });
+    const r = out.data || {};
+    const raised = Array.isArray(r.raised) ? r.raised.length : num(r.raised ?? r.created);
+    const pinged = r.alerts && num(r.alerts.sent);
+    setMsg({ text: `Sweep done — ${raised != null ? `${raised} condition${raised === 1 ? '' : 's'} raised or bumped` : 'checked'}${pinged ? `, ${pinged} phone alert${pinged === 1 ? '' : 's'} sent` : ''}.` });
     tk.reload();
   }
 
   return (
     <div className="sec-pane">
+      {data && <AlertsStrip alerts={data.alerts} />}
       <div className="sec-bar">
         <div className="sec-chips" role="group" aria-label="Status">
           {['open', 'ack', 'resolved', 'all'].map(s => (
@@ -215,8 +302,9 @@ export default function TicketsPanel() {
             <div className="sec-tlist is-full">
               {shown.map(t => (
                 <div key={t.id} className="sec-titem">
-                  <TicketLine t={t} raw={t.raw} open={openId === t.id} onClick={() => setOpenId(id => (id === t.id ? null : t.id))} />
-                  {openId === t.id && <Drawer t={t} onAct={act} busy={busyId === t.id} />}
+                  <TicketLine t={t} raw={t.raw} links={links} go={go} open={openId === t.id}
+                              onClick={() => setOpenId(id => (id === t.id ? null : t.id))} />
+                  {openId === t.id && <Drawer t={t} onAct={act} busy={busyId === t.id} links={links} go={go} />}
                 </div>
               ))}
             </div>

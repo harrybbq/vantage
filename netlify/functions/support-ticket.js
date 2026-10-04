@@ -5,7 +5,7 @@
  * the auto-raised security tickets (public.security_tickets) so the
  * owner reads one list. source 'user', severity 'medium'.
  *
- *   POST { title, body, category? }   (session required)
+ *   POST { title, body, category?, page?, release? }   (session required)
  *     title     3–120 chars
  *     body      ≤ 2000 chars
  *     category  'bug' | 'account' | 'privacy' | 'abuse' | 'other'
@@ -18,10 +18,15 @@
  * memory as a brake on bursts.
  *
  * Stored: the user id (so the owner can reply in-app or act on it), the
- * text they typed, the category and the page path they sent. Nothing
- * from their app state.
+ * text they typed, the category, the page path and the app build
+ * (`release`, the hashed bundle name) they sent. Nothing from their app
+ * state.
  */
 const { requireUser, underLimit, tooMany } = require('../lib/requireUser');
+const { alertConfig, atOrAbove, notifyOwner } = require('../lib/alertNotify');
+const { headlineFor } = require('../lib/alertText');
+
+const SEVERITY = 'medium';
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
@@ -43,6 +48,12 @@ const clean = (v, n) => String(v == null ? '' : v).split('\u0000').join('').trim
 function pathOnly(p) {
   const s = clean(p, 300).split(/[?#]/)[0];
   return s.startsWith('/') ? s.slice(0, 120) : null;
+}
+
+/** The app build that sent it (the hashed bundle name) — a short token or null. */
+function releaseOnly(v) {
+  const s = clean(v, 64);
+  return /^[\w.-]{1,64}$/.test(s) ? s : null;
 }
 
 exports.handler = async (event) => {
@@ -88,9 +99,9 @@ exports.handler = async (event) => {
       body: JSON.stringify({
         source: 'user',
         kind: `user:${category}`,
-        severity: 'medium',
+        severity: SEVERITY,
         title,
-        detail: { text: text || null, category, page: pathOnly(b?.page) },
+        detail: { text: text || null, category, page: pathOnly(b?.page), release: releaseOnly(b?.release) },
         status: 'open',
         reporter_id: auth.userId,
         last_seen_at: now,
@@ -101,6 +112,13 @@ exports.handler = async (event) => {
     }
     if (!res.ok) throw new Error(`insert ${res.status}`);
     const id = (await res.json())[0]?.id || null;
+    // User tickets are 'medium' and the alert threshold is 'critical' or
+    // 'high', so this normally sends nothing; it is here so a threshold
+    // change reaches this path too. The ping is generic — never the
+    // person's words or who they are.
+    if (atOrAbove(SEVERITY, alertConfig().minSeverity)) {
+      await notifyOwner({ severity: SEVERITY, title: 'New problem report', headline: headlineFor(`user:${category}`, {}), ticketId: id, kind: `user:${category}` });
+    }
     return reply(200, { ok: true, id });
   } catch (e) {
     console.error('support-ticket:', e?.message);

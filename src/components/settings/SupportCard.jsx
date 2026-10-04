@@ -2,6 +2,7 @@ import { useState } from 'react';
 import Icon from '../Icon';
 import SettingsGroup from './SettingsGroup';
 import { authFetch } from '../../lib/authFetch';
+import { release } from '../../lib/telemetry/reportError';
 
 /**
  * Settings → Account → Report a problem.
@@ -51,6 +52,7 @@ export default function SupportCard() {
           title: title.trim().slice(0, TITLE_MAX),
           body: body.trim().slice(0, BODY_MAX),
           page: typeof window !== 'undefined' ? window.location.pathname : null,
+          release: release() || undefined,
         }),
       });
       let out = {};

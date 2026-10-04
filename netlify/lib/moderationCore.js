@@ -37,10 +37,10 @@ const missingSchema = res => res.status === 400 || res.status === 404;
  * few DMs between them. → [200, { ok, page, pageSize, total, items }]
  * or the not-installed 501.
  */
-async function listOpenReports(env, page) {
+async function listOpenReports(env, page, { oldestFirst = false } = {}) {
   const offset = page * PAGE_SIZE;
   const res = await sb(env,
-    `reports?status=eq.open&order=created_at.desc&limit=${PAGE_SIZE}&offset=${offset}` +
+    `reports?status=eq.open&order=created_at.${oldestFirst ? 'asc' : 'desc'}&limit=${PAGE_SIZE}&offset=${offset}` +
     '&select=id,reporter_id,reported_id,reason,context,created_at,reported_snapshot',
     { headers: { Prefer: 'count=exact' } });
   if (missingSchema(res)) return NOT_INSTALLED;

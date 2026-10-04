@@ -12,6 +12,14 @@
  * A repeating condition bumps its ticket's count instead of opening a
  * new one; a resolved ticket re-opens if the condition returns.
  *
+ * A ticket at or above ALERT_MIN_SEVERITY (default critical) that is NEW
+ * or RE-OPENED pings the owner's phone (lib/alertNotify.js — ntfy and/or
+ * a webhook, ≤ 6 per run); a repeat does not. Database unreachable pings
+ * even though its ticket cannot be stored, once per run. A failed ping is
+ * logged and never fails the sweep. The sweep is hourly: an external
+ * uptime monitor on /.netlify/functions/health is what catches "the
+ * whole site is down" faster than that.
+ *
  * Writes ONLY to security_tickets, through security_ticket_raise. Reads
  * nothing from any user's state. Until supabase/security_console_2026_10.sql
  * is run, the RPC is missing and the sweep reports ticketsInstalled:false.
@@ -37,7 +45,8 @@ exports.handler = async (event) => {
 
   const r = await runSweep(env);
   console.info(`security-sweep: ${r.ok ? 'ok' : 'failed'}; raised ${r.raised?.length ?? 0}; skipped ${r.skipped?.length ?? 0}` +
-    (r.ticketsInstalled === false ? '; tickets table not installed' : ''));
+    (r.ticketsInstalled === false ? '; tickets table not installed' : '') +
+    (r.alerts && r.alerts.queued ? `; alerts ${r.alerts.sent}/${r.alerts.queued} sent` : ''));
   // The body is for a manual run's caller; a scheduled run ignores it.
   return {
     statusCode: r.ok ? 200 : 503,

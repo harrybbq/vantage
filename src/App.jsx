@@ -12,6 +12,7 @@ import HubSection from './components/HubSection';
 import MobileHubSection from './components/mobile/MobileHubSection';
 import SettingsSection from './components/SettingsSection';
 import { OWNER_SURFACES_IN_BUILD } from './lib/native/ownerSurfaces';
+import { parseSecurityLink } from './lib/security/deepLink';
 import { SCHEMES, applyScheme, applyTheme, resolveEffectiveTheme, schemeFromHex } from './components/SettingsSection';
 import { useSubscriptionContext } from './context/SubscriptionContext';
 import Modals from './components/Modals';
@@ -217,10 +218,15 @@ function Board({ userId, userEmail, onSignOut }) {
   // a section that isn't mounted unless you're on it, so landing on the
   // hub would leave the redirect unread and the device unconnected.
   // SettingsSection runs the same test to pick the Tools tab.
-  const [activeSection, setActiveSection] = useState(() => (
-    typeof window !== 'undefined' && /[?&](whoop|oura)=/.test(window.location.search)
-      ? 'settings' : 'hub'
-  ));
+  // A Security deep link (/?upgrade=security&ticket=<id> — what the
+  // owner's phone alert opens) starts on Upgrade; UpgradeSection reads
+  // the rest and re-checks the owner before showing anything.
+  const [activeSection, setActiveSection] = useState(() => {
+    if (typeof window === 'undefined') return 'hub';
+    if (/[?&](whoop|oura)=/.test(window.location.search)) return 'settings';
+    if (OWNER_SURFACES_IN_BUILD && parseSecurityLink(window.location.search)) return 'upgrade';
+    return 'hub';
+  });
   const [openModal, setOpenModal] = useState(null);
   const [coinToast, setCoinToast] = useState({ message: '', type: '', visible: false });
   const [localDataExists, setLocalDataExists] = useState(() => hasLocalStorageData());

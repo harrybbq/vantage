@@ -542,3 +542,79 @@ html[data-theme="dark-os"] .sec {
 @media (prefers-reduced-motion: reduce) {
   .sec-refresh.is-busy svg, .sec-skel, .sec-sheet { animation: none; }
 }
+
+/* ── Alerts that explain themselves (TicketsPanel / AlertParts) ──
+   Row: the plain-English headline; a "Source" control sits over the
+   row's right edge as a SIBLING of the row button (never nested), so
+   the drawer still attaches flush underneath. */
+.sec-tline-wrap { position: relative; min-width: 0; border-radius: 10px; }
+.sec-tline-wrap.has-go > .sec-row { padding-right: 96px; }
+.sec-row-go { position: absolute; right: 8px; top: 50%; transform: translateY(-50%); z-index: 1;
+  display: inline-flex; align-items: center; gap: 5px; height: 28px; padding: 0 9px; border-radius: 7px;
+  border: 1px solid var(--border); background: var(--upg-solid, var(--card)); color: var(--text-mid); cursor: pointer;
+  font-family: var(--mono); font-size: 9.5px; letter-spacing: .8px; text-transform: uppercase; text-decoration: none; white-space: nowrap; }
+.sec-row-go:hover { color: var(--text); border-color: var(--em); }
+.sec-row-go:focus-visible { outline: 2px solid var(--em); outline-offset: 2px; }
+.sec-tline-wrap.has-go .sec-row-chev { display: none; }
+
+.sec-src-acts { display: flex; flex-wrap: wrap; gap: 8px; }
+.sec-src-acts .sec-btn { white-space: normal; text-align: left; min-height: 34px; padding: 6px 12px; line-height: 1.3; }
+.sec-explain { display: flex; flex-direction: column; gap: 10px; min-width: 0; padding-top: 8px; }
+.sec-explain-title { font-family: var(--mono); font-size: 10.5px; color: var(--text-muted); overflow-wrap: anywhere; }
+.sec-explain-why { margin: 0; font-size: 13px; line-height: 1.55; color: var(--text-mid); max-width: 72ch; }
+.sec-explain-steps { margin: 0; padding-left: 20px; display: flex; flex-direction: column; gap: 4px; font-size: 12.5px; line-height: 1.5;
+  color: var(--text); max-width: 72ch; }
+.sec-explain-steps li::marker { font-family: var(--mono); font-size: 10.5px; color: var(--text-muted); }
+.sec-dl dd.is-text { font-family: inherit; font-size: 12.5px; line-height: 1.5; white-space: pre-wrap; }
+.sec-dl-meta { padding-top: 10px; border-top: 1px dashed var(--border); }
+.sec-inline-src { border: 1px solid var(--border); border-radius: 10px; padding: 10px 12px; background: var(--upg-solid, var(--card)); }
+
+/* Client-error groups */
+.sec-errs { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+.sec-errs-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; }
+.sec-errlist { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.sec-err { display: flex; gap: 12px; align-items: flex-start; padding: 9px 11px; border-radius: 9px; border: 1px solid var(--border);
+  background: var(--sec-inner); min-width: 0; }
+.sec-err-n { flex: none; min-width: 38px; font-family: var(--mono); font-size: 12px; font-variant-numeric: tabular-nums; color: var(--text); padding-top: 1px; }
+.sec-err-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+.sec-err-msg { font-family: var(--mono); font-size: 11.5px; line-height: 1.45; color: var(--text); overflow-wrap: anywhere;
+  display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+.sec-err-frame { font-family: var(--mono); font-size: 10.5px; color: var(--text-mid); overflow-wrap: anywhere; }
+.sec-err-meta { display: flex; flex-wrap: wrap; gap: 2px 12px; font-family: var(--mono); font-size: 10px; color: var(--text-muted); min-width: 0; }
+.sec-err-meta > span { overflow-wrap: anywhere; }
+
+/* Phone alerts strip */
+.sec-alerts { display: flex; flex-direction: column; gap: 10px; padding: 10px 12px 10px 14px; border-radius: 11px; position: relative;
+  border: 1px solid var(--border); background: var(--upg-solid, var(--card)); overflow: hidden; }
+.sec-alerts::before { content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 3px; background: var(--gold, #c8970a); }
+.sec-alerts.is-on::before { background: var(--sec-good); }
+.sec-alerts-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; min-width: 0; }
+.sec-alerts-icon { flex: none; display: inline-flex; color: var(--text-mid); }
+.sec-alerts-text { flex: 1 1 240px; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.sec-alerts-text b { font-family: var(--mono); font-size: 10px; font-weight: 600; letter-spacing: 1.2px; text-transform: uppercase; color: var(--text); }
+.sec-alerts-text span { font-size: 12.5px; line-height: 1.45; color: var(--text-mid); }
+.sec-alerts-steps { margin: 0; padding-left: 20px; display: flex; flex-direction: column; gap: 5px; font-size: 12.5px; line-height: 1.5; color: var(--text); }
+.sec-alerts-steps code { font-size: 11px; padding: 1px 5px; border-radius: 5px; border: 1px solid var(--border); background: var(--sec-inner); overflow-wrap: anywhere; }
+
+/* Stale reports in the reused queue */
+.sec .mod-row.is-stale { border-left: 3px solid var(--sec-warn); }
+
+/* "Go to source" landing: a ring that pulses twice, then fades. */
+.sec .sec-target { outline: 2px solid var(--em); outline-offset: 3px; animation: sec-target-ring 1.2s ease-out 2; }
+.sec [data-sec-focused]:focus { outline: none; }
+.sec .sec-target[data-sec-focused]:focus { outline: 2px solid var(--em); }
+@keyframes sec-target-ring {
+  0% { box-shadow: 0 0 0 0 rgba(var(--em-rgb), .45); }
+  100% { box-shadow: 0 0 0 12px rgba(var(--em-rgb), 0); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .sec .sec-target { animation: none; }
+}
+@media (max-width: 700px) {
+  .sec-dl { grid-template-columns: repeat(auto-fill, minmax(128px, 1fr)); }
+  /* The control shares the row's second line (time · count) on a phone. */
+  .sec-tline-wrap.has-go > .sec-row { padding-right: 10px; }
+  .sec-tline-wrap.has-go > .sec-row .sec-row-count { margin-right: 86px; }
+  .sec-row-go { top: auto; bottom: 6px; transform: none; right: 8px; height: 26px; }
+  .sec-err { gap: 9px; padding: 8px 9px; }
+}
