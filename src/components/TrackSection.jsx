@@ -2,6 +2,7 @@ import { useState, useMemo, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { useHubModuleMenu } from './HubModuleMenu';
 import { eventColour, eventWhen, eventsInMonth, eventsOn } from '../lib/calendar/events';
+import { barLayout, isBarEvent, isContiguous } from '../lib/calendar/spans';
 import EventModal from './calendar/EventModal';
 import Icon from './Icon';
 import { motion } from 'framer-motion';
@@ -200,7 +201,7 @@ const TRACK_TABS = [
  * overflow-hidden card; rendered in place it would be clipped by the
  * cell it belongs to.
  */
-function DayTickMenu({ x, y, dates, trackers, logs, events, onClose, update, onAddEvent, onEditEvent }) {
+function DayTickMenu({ x, y, dates, trackers, logs, events, onClose, update, onAddEvent, onAddSpan, onEditEvent }) {
   const ref = useRef(null);
 
   // Close on anything that is not this menu: outside click, Escape,
@@ -237,6 +238,9 @@ function DayTickMenu({ x, y, dates, trackers, logs, events, onClose, update, onA
   }, [x, y, trackers.length, (events || []).length]);
 
   const multi = dates.length > 1;
+  // A run of neighbouring days picked together is usually ONE thing — a
+  // week away — so offer it as one multi-day event beside the per-day add.
+  const contiguous = multi && isContiguous(dates);
 
   /**
    * A tracker's state across the selected days: on, off, or mixed.
@@ -338,11 +342,15 @@ function DayTickMenu({ x, y, dates, trackers, logs, events, onClose, update, onA
               <span className="daymenu-ev-when">{ev.span}</span>
             </div>
           ) : (
+            /* A multi-day event opens the editor for the WHOLE span —
+               "Day 2 of 5" says which day of it this is, and that the
+               edit is not just today's. */
             <button key={ev.id} type="button" className="daymenu-ev"
+                    title={ev.source === 'span' ? `${ev.title} — ${ev.span}. Edits the whole event.` : undefined}
                     onClick={() => onEditEvent(ev)}>
               <span className="daymenu-ev-dot" style={{ background: eventColour(ev) }} />
               <span className="daymenu-ev-name">{ev.title}</span>
-              <span className="daymenu-ev-when">{eventWhen(ev) || 'All day'}</span>
+              <span className="daymenu-ev-when">{ev.source === 'span' ? ev.span : (eventWhen(ev) || 'All day')}</span>
             </button>
           )))}
         </div>
@@ -352,6 +360,12 @@ function DayTickMenu({ x, y, dates, trackers, logs, events, onClose, update, onA
         <span className="daymenu-add-plus" aria-hidden="true">+</span>
         Add event{multi ? ` to ${dates.length} days` : ''}
       </button>
+      {contiguous && (
+        <button type="button" className="daymenu-add is-span" onClick={onAddSpan}>
+          <span className="daymenu-add-plus" aria-hidden="true">↔</span>
+          Add as one multi-day event
+        </button>
+      )}
 
       {trackers.length > 0 && (
         <button type="button" className="daymenu-clear" onClick={clearAll}>
@@ -364,6 +378,70 @@ function DayTickMenu({ x, y, dates, trackers, logs, events, onClose, update, onA
   );
 }
 
+/** Rows of events a month cell shows before "+N more". */
+const MAX_ROWS = 2;
+
+/**
+ * What a month cell shows of its day: multi-day bars, then single events.
+ *
+ * Two rows then a count — a cell that lists everything stops being a
+ * month view. Bar lanes count as rows (including an empty lane held open
+ * so a bar on the lane below lines up with its neighbours in the week),
+ * then single events fill whatever is left.
+ *
+ * Each cell draws its own SEGMENT of a bar. What makes the segments read
+ * as one bar is the lane (same height across the row, from barLayout)
+ * and the CSS: a continuing edge runs out through the cell padding to
+ * the middle of the grid gap, where the next cell's segment meets it.
+ * The title is drawn once, on the first day and at the start of each
+ * week row, and runs across the segments after it (`--run` cells).
+ */
+function CellEvents({ all, lanes: allLanes, col }) {
+  if (!all || !all.length) return null;
+  const lanes = (allLanes || []).slice(0, MAX_ROWS);
+  const barsShown = lanes.filter(Boolean).length;
+  const singles = all.filter(ev => !isBarEvent(ev)).slice(0, Math.max(0, MAX_ROWS - lanes.length));
+  const more = all.length - barsShown - singles.length;
+  return (
+    <>
+      {lanes.length > 0 && (
+        <div className="cal-bars" style={{ '--lanes': lanes.length }}>
+          {lanes.map((seg, i) => seg && (
+            <span key={seg.key}
+                  className={'cal-bar'
+                    + (seg.isStart ? ' is-start' : '')
+                    + (seg.isEnd ? ' is-end' : '')
+                    + (col === 0 ? ' is-row-first' : '')
+                    + (col === 6 ? ' is-row-last' : '')}
+                  style={{ '--lane': i, '--bar': eventColour(seg.ev) }}
+                  title={[seg.ev.title, seg.ev.span, seg.ev.location].filter(Boolean).join(' · ')}>
+              {seg.showTitle && (
+                <span className="cal-bar-title" style={{ '--run': seg.run }}>{seg.ev.title}</span>
+              )}
+            </span>
+          ))}
+        </div>
+      )}
+      {(singles.length > 0 || more > 0) && (
+        <div className="cal-events">
+          {singles.map(ev => (
+            <span key={ev.id} className="cal-event"
+                  title={[ev.span || eventWhen(ev), ev.title, ev.location].filter(Boolean).join(' · ')}>
+              <span className="cal-event-dot" style={{ background: eventColour(ev) }} />
+              {/* The title needs its own box. text-overflow does
+                  nothing on a flex container, so a bare text node
+                  here was hard-clipped mid-word instead of
+                  ellipsised — "Flight to Dublin — ba". */}
+              <span className="cal-event-name">{ev.title}</span>
+            </span>
+          ))}
+          {more > 0 && <span className="cal-event-more">+{more} more</span>}
+        </div>
+      )}
+    </>
+  );
+}
+
 function CalendarView({ S, update, onShowCoinToast, nutritionMonthData }) {
   // Events for the visible month, read in one pass rather than 42
   // lookups. Empty until the add-event UI exists; the grid is built to
@@ -371,6 +449,12 @@ function CalendarView({ S, update, onShowCoinToast, nutritionMonthData }) {
   const monthEvents = useMemo(
     () => eventsInMonth(S, S.calYear, S.calMonth),
     [S, S.calYear, S.calMonth],
+  );
+  // Multi-day things (spans and trips) as bars: which lane each day of
+  // each bar sits in, per week row — see barLayout in lib/calendar/spans.
+  const bars = useMemo(
+    () => barLayout(monthEvents, S.calYear, S.calMonth),
+    [monthEvents, S.calYear, S.calMonth],
   );
   const months = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
   const { calYear, calMonth, trackers, logs, multiSelectMode, multiSelectedDays } = S;
@@ -455,7 +539,7 @@ function CalendarView({ S, update, onShowCoinToast, nutritionMonthData }) {
     const isToday = today.getFullYear() === calYear && today.getMonth() === calMonth && today.getDate() === day;
     const isSelected = multiSelectedDays.includes(key);
     const tids = Object.keys(dayLogs);
-    cells.push({ day, key, dayLogs, isToday, isSelected, tids });
+    cells.push({ day, key, dayLogs, isToday, isSelected, tids, col: (offset + day - 1) % 7 });
   }
 
   const selectedKey = S.selectedLogDate;
@@ -616,28 +700,15 @@ function CalendarView({ S, update, onShowCoinToast, nutritionMonthData }) {
                   enough, a "Today" tag. It used to share the 2px border with
                   the selected day — and the selected day starts as today, so
                   nothing told you which square was now. */}
-              <div className="cal-date">{cell.day}</div>
-              {cell.isToday && <span className="cal-today-tag" aria-hidden="true">Today</span>}
-              {/* Two titles then a count — a cell that lists everything
-                  stops being a month view. */}
-              {(monthEvents[cell.key] || []).length > 0 && (
-                <div className="cal-events">
-                  {monthEvents[cell.key].slice(0, 2).map(ev => (
-                    <span key={ev.id} className="cal-event"
-                          title={[ev.span || eventWhen(ev), ev.title, ev.location].filter(Boolean).join(' · ')}>
-                      <span className="cal-event-dot" style={{ background: eventColour(ev) }} />
-                      {/* The title needs its own box. text-overflow does
-                          nothing on a flex container, so a bare text node
-                          here was hard-clipped mid-word instead of
-                          ellipsised — "Flight to Dublin — ba". */}
-                      <span className="cal-event-name">{ev.title}</span>
-                    </span>
-                  ))}
-                  {monthEvents[cell.key].length > 2 && (
-                    <span className="cal-event-more">+{monthEvents[cell.key].length - 2} more</span>
-                  )}
-                </div>
-              )}
+              {/* A fixed-height head, so the bar lanes under it start at the
+                  same height in every cell of a row — today's badge is
+                  taller than a plain numeral, and a bar that stepped down
+                  12px on today would stop reading as one bar. */}
+              <div className="cal-cell-head">
+                <div className="cal-date">{cell.day}</div>
+                {cell.isToday && <span className="cal-today-tag" aria-hidden="true">Today</span>}
+              </div>
+              <CellEvents all={monthEvents[cell.key]} lanes={bars[cell.key]?.lanes} col={cell.col} />
               {(cell.tids.length > 0 || (nutritionMonthData && nutritionMonthData[cell.key])) && (
                 <div className="cal-dots">
                   {cell.tids.map(tid => {
@@ -666,6 +737,7 @@ function CalendarView({ S, update, onShowCoinToast, nutritionMonthData }) {
           update={update}
           onClose={() => setMenu(null)}
           onAddEvent={() => { setEventForm({ dates: menu.dates, event: null }); setMenu(null); }}
+          onAddSpan={() => { setEventForm({ dates: menu.dates, event: null, multiDay: true }); setMenu(null); }}
           onEditEvent={ev => { setEventForm({ dates: menu.dates, event: ev }); setMenu(null); }}
         />
       )}
@@ -675,6 +747,8 @@ function CalendarView({ S, update, onShowCoinToast, nutritionMonthData }) {
           dates={eventForm.dates}
           event={eventForm.event}
           calendarEvents={S.calendarEvents}
+          calendarSpans={S.calendarSpans}
+          multiDay={!!eventForm.multiDay}
           update={update}
           onClose={() => setEventForm(null)}
         />

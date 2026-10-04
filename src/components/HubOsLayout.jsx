@@ -319,10 +319,10 @@ export function OsSessionPanel({ name, trackers, logs, S }) {
                 <span key={ev.id}
                       className={`os-session-event${ev.past ? ' is-past' : ''}`}
                       role="listitem"
-                      title={[eventWhen(ev), ev.title, ev.location].filter(Boolean).join(' · ')}>
+                      title={[eventWhen(ev), ev.label || ev.title, ev.location].filter(Boolean).join(' · ')}>
                   <span className="os-session-event-dot" style={{ background: eventColour(ev) }} />
                   {ev.time && <span className="os-session-event-at">{ev.time}</span>}
-                  <span className="os-session-event-name">{ev.title}</span>
+                  <span className="os-session-event-name">{ev.label || ev.title}</span>
                 </span>
               ))}
               {agenda.length > shownEvents.length && (
