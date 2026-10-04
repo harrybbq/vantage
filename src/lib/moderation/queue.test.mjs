@@ -4,7 +4,7 @@
  * as an error or an empty-and-healthy queue.
  */
 import assert from 'node:assert/strict';
-import { readQueueResponse, normaliseReport, openCounts, sortQueue } from './queue.js';
+import { readQueueResponse, normaliseReport, openCounts, sortQueue, isStale } from './queue.js';
 
 let n = 0;
 const eq = (a, b, m) => { assert.deepEqual(a, b, m); n++; };
@@ -73,6 +73,9 @@ const ok = (c, m) => { assert.ok(c, m); n++; };
   eq(c.get('a'), 2, 'dismissed reports do not count');
   ok(!c.has(null), 'deleted accounts are not grouped under null');
   eq(sortQueue(rows).map(r => r.id), [2, 1, 4, 3], 'open newest first, then the rest');
+  eq(sortQueue(rows, { oldestFirst: true }).map(r => r.id), [4, 1, 2, 3], 'stale view: open oldest first, then the rest');
+  const now = Date.parse('2026-09-30T12:00:00Z');
+  eq([isStale(rows[0], 24, now), isStale(rows[1], 24, now), isStale(rows[2], 24, now)], [true, false, false], 'stale = open and over a day old');
 }
 
 console.log(`moderation queue: ${n} checks passed`);

@@ -111,6 +111,12 @@
  *       netlify:  &days=1..28 (web vitals window, default 7)
  *       moderation: &page=N
  *       tickets:  &status=open|ack|resolved|all &severity=critical|high|medium|low
+ *                 also { links, alerts } — where "go to source" may send the
+ *                 owner (Netlify site name, Supabase project pages, derived
+ *                 here) and which alert channels are set (booleans only)
+ *       errors:   &window=1h|24h — the top client-error groups (message +
+ *                 first stack frame, count, last seen, sample url, release);
+ *                 never a user id
  *   POST { action, ... }
  *       ticket.update { id, status:'open'|'ack'|'resolved', note? }
  *       ticket.create { severity, title, detail? }
@@ -122,6 +128,8 @@
  *       advisor.accept   { cache_key, note? }   — the finding stops counting
  *       advisor.unaccept { cache_key }
  *       sweep.run
+ *       alert.test       — one test ping through every configured channel
+ *                          (lib/alertNotify.js), past the severity threshold
  *
  * Sub-sections fail soft independently. Any part that cannot answer is
  * `{ ok:false, reason:'not_configured'|'unavailable', hint }` in place of
@@ -136,6 +144,7 @@ const D = require('../lib/securityData');
 const M = require('../lib/moderationCore');
 const { runSweep } = require('../lib/securitySweep');
 const { verdictOf } = require('../lib/securityShape');
+const { alertConfig, notifyOwner } = require('../lib/alertNotify');
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
@@ -299,7 +308,7 @@ async function banStates(env, ids) {
 async function moderationPanel(env, q) {
   const page = Math.max(0, Math.min(1000, parseInt(q.page, 10) || 0));
   const [[code, rep], suspendedRows, crests] = await Promise.all([
-    M.listOpenReports(env, page).catch(() => [503, null]),
+    M.listOpenReports(env, page, { oldestFirst: q.order === 'oldest' }).catch(() => [503, null]),
     M.listSuspended(env, 100).catch(() => undefined),
     crestCount(env),
   ]);
@@ -352,8 +361,11 @@ async function ticketsPanel(env, q) {
     if (pRes.ok) handles = new Map((await pRes.json()).map(p => [p.id, p]));
   }
 
-  const [open, ack, resolved] = await Promise.all(
-    STATUSES.map(s => D.countRows(env, `security_tickets?status=eq.${s}`)));
+  const [[open, ack, resolved], links] = await Promise.all([
+    Promise.all(STATUSES.map(s => D.countRows(env, `security_tickets?status=eq.${s}`))),
+    D.consoleLinks(),
+  ]);
+  const ac = alertConfig();
   return {
     ok: true,
     tickets: rows.map(r => ({
@@ -376,8 +388,29 @@ async function ticketsPanel(env, q) {
     })),
     counts: { open, ack, resolved },
     filter: { status, severity },
+    links,
+    // Booleans and the threshold only — never the topic or a URL.
+    alerts: { configured: ac.configured, channels: ac.channels, minSeverity: ac.minSeverity, topicInvalid: ac.topicInvalid },
     generatedAt: new Date().toISOString(),
   };
+}
+
+async function alertTest() {
+  const ac = alertConfig();
+  if (!ac.configured) {
+    return [409, { error: ac.topicInvalid
+      ? 'ALERT_NTFY_TOPIC is set but is not a valid ntfy topic (letters, digits, - and _ only, up to 64).'
+      : 'No alert channel is set up yet — add ALERT_NTFY_TOPIC in Netlify (Functions scope) and redeploy.' }];
+  }
+  const r = await notifyOwner({
+    severity: 'critical',
+    title: 'Test alert',
+    headline: 'If this reached your phone, critical alerts will too. Tap to open the Security console.',
+    test: true,
+    kind: 'test',
+  }, { force: true });
+  if (!r.sent.length) return [502, { error: `The ${r.failed.join(' and ') || 'alert'} channel did not accept the test — check the topic, server and token.` }];
+  return [200, { ok: true, sent: r.sent, failed: r.failed }];
 }
 
 async function ticketUpdate(env, ownerId, b) {
@@ -503,6 +536,7 @@ exports.handler = async (event) => {
         case 'netlify': return reply(200, await netlifyPanel(env, q));
         case 'moderation': return reply(200, await moderationPanel(env, q));
         case 'tickets': return reply(200, await ticketsPanel(env, q));
+        case 'errors': return reply(200, await D.readErrorGroups(env, q.window));
         default: return reply(400, { error: 'unknown panel' });
       }
     }
@@ -539,6 +573,11 @@ exports.handler = async (event) => {
         const r = await runSweep(env);
         overviewCache.at = 0;
         out = [r.ok ? 200 : 503, r];
+        break;
+      }
+      case 'alert.test': {
+        if (!underLimit('security-alert-test', auth.userId, 3)) return tooMany(CORS);
+        out = await alertTest();
         break;
       }
       default: return reply(400, { error: 'unknown action' });

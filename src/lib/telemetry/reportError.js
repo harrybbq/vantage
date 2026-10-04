@@ -23,8 +23,12 @@ const ENDPOINT = '/.netlify/functions/client-error';
 
 const allow = makeLimiter({ perMinute: 5 });
 
-/** The hashed bundle name identifies the build without a build step. */
-function release() {
+/**
+ * The hashed bundle name identifies the build without a build step.
+ * Also sent with Settings → Report a problem, so a ticket says which
+ * build the person was on.
+ */
+export function release() {
   try {
     const src = document.querySelector('script[type="module"][src*="/assets/"]')?.getAttribute('src') || '';
     return src.split('/').pop() || import.meta.env.MODE || '';

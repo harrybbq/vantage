@@ -18,7 +18,9 @@
  * app of its own inside Vantage. A card opens its section full-width with
  * a slim "‹ Upgrade" header; the browser's or phone's back gesture also
  * returns to the menu (one history entry per opened section). Which
- * section is open is not stored anywhere: the menu always comes first.
+ * section is open is not stored anywhere: the menu always comes first —
+ * except for a Security deep link (/?upgrade=security&ticket=<id>, what
+ * a phone alert opens), which lands on that ticket.
  *
  * Gating: entry points only render for the owner and this re-checks
  * isOwner, so a deep link shows nothing for anyone else. Owner identity
@@ -34,6 +36,7 @@ import DietTab from './DietTab';
 import CareerTab from './CareerTab';
 import SecurityTab from './security/SecurityTab';
 import UpgradeHome, { SECTIONS, resolveSection } from './UpgradeHome';
+import { parseSecurityLink, stripSecurityParams } from '../../lib/security/deepLink';
 import './Upgrade.css';
 
 export default function UpgradeSection({ S, update, active, isOwner, userId }) {
@@ -42,6 +45,21 @@ export default function UpgradeSection({ S, update, active, isOwner, userId }) {
   const [origin, setOrigin] = useState('50% 30%');
   const pushed = useRef(false);
   const root = useRef(null);
+  // A phone alert opens /?upgrade=security&ticket=<id>: straight to that
+  // ticket. Read once; consumed (and dropped from the URL) as soon as the
+  // owner check passes, so a reload doesn't re-open it.
+  const [deep, setDeep] = useState(() => (typeof window !== 'undefined' ? parseSecurityLink(window.location.search) : null));
+  const [secInit, setSecInit] = useState(null);
+  useEffect(() => {
+    if (!deep || !isOwner) return;
+    setSecInit(deep);
+    setTab('security');
+    setDeep(null);
+    try {
+      const clean = stripSecurityParams(window.location.href);
+      if (clean) window.history.replaceState(window.history.state, '', clean);
+    } catch { /* sandboxed */ }
+  }, [deep, isOwner]);
 
   // Back (browser or phone gesture) closes the open section.
   useEffect(() => {
@@ -93,7 +111,7 @@ export default function UpgradeSection({ S, update, active, isOwner, userId }) {
           {tab === 'rotation' && <RotationTab S={S} update={update} isMobile={isMobile} />}
           {tab === 'diet' && <DietTab S={S} update={update} userId={userId} isMobile={isMobile} />}
           {tab === 'career' && <CareerTab S={S} update={update} userId={userId} isMobile={isMobile} />}
-          {cur.id === 'security' && <SecurityTab />}
+          {cur.id === 'security' && <SecurityTab initialTab={secInit && secInit.tab} initialFocus={secInit && secInit.focus} />}
         </div>
       )}
     </section>

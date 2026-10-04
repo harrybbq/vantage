@@ -178,7 +178,7 @@ export function Sparkline({ values, max = null, w = 96, h = 26, label }) {
  * carry a chevron and open their sub-tab. On a phone the grid becomes
  * one column of Grafana's "horizontal with graph" rows.
  */
-export function Tile({ label, value, of, tone, sub, onClick, pct, spark, sparkMax }) {
+export function Tile({ label, value, of, tone, sub, onClick, pct, spark, sparkMax, focusKey }) {
   const bar = typeof pct === 'number' && Number.isFinite(pct) ? Math.max(0, Math.min(100, pct)) : null;
   const body = (
     <>
@@ -199,8 +199,8 @@ export function Tile({ label, value, of, tone, sub, onClick, pct, spark, sparkMa
     </>
   );
   return onClick
-    ? <button type="button" className="sec-tile is-link" onClick={onClick}>{body}</button>
-    : <div className="sec-tile">{body}</div>;
+    ? <button type="button" className="sec-tile is-link" onClick={onClick} data-sec-focus={focusKey}>{body}</button>
+    : <div className="sec-tile" data-sec-focus={focusKey}>{body}</div>;
 }
 
 /** "No data yet" — not healthy, not broken: a source that hasn't reported. */

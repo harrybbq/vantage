@@ -16,7 +16,9 @@
 .cp-edit { white-space: nowrap; }
 .cp-sub { display: block; font-family: var(--mono); font-size: 10px; color: var(--text-muted); line-height: 1.5; letter-spacing: .2px; }
 .cp-sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
-.is-bad { color: var(--danger, #e0796a) !important; }
+/* Not inside the Security console: its .is-bad means a border or a dot,
+   never red text (this rule used to leak there once Career had loaded). */
+.is-bad:not(.sec *) { color: var(--danger, #e0796a) !important; }
 
 .cp-card { background: var(--card, rgba(255,255,255,.02)); border: 1px solid var(--border); border-radius: 14px; padding: 14px 16px; min-width: 0; }
 .cp-card.is-flush { padding: 0; overflow: hidden; }

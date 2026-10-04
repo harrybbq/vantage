@@ -5,7 +5,8 @@
  * to report, a way to block, and someone who reads the reports and can
  * act. The first two shipped; nothing read `reports`. This is the third.
  *
- *   GET  ?page=N          open reports, newest first, 25 a page, each
+ *   GET  ?page=N[&order=oldest]
+ *                         open reports, newest first (or oldest), 25 a page, each
  *                         with both handles, the reason and context the
  *                         reporter gave, the reported_snapshot taken at
  *                         report time, and the last few DMs between the
@@ -61,7 +62,10 @@ exports.handler = async (event) => {
   try {
     if (event.httpMethod === 'GET') {
       const page = Math.max(0, Math.min(1000, parseInt(event.queryStringParameters?.page, 10) || 0));
-      const [code, out] = await listOpenReports(env, page);
+      // ?order=oldest — the Security console's "stale reports" link wants
+      // the longest-waiting first.
+      const oldestFirst = event.queryStringParameters?.order === 'oldest';
+      const [code, out] = await listOpenReports(env, page, { oldestFirst });
       return reply(code, out);
     }
     let body;
