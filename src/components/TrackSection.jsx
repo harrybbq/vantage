@@ -741,6 +741,9 @@ function CalendarView({ S, update, onShowCoinToast, nutritionMonthData, userId }
                 <div className="cal-date">{cell.day}</div>
                 {cell.isToday && <span className="cal-today-tag" aria-hidden="true">Today</span>}
               </div>
+              {/* Owner's shift chip: absolutely placed in the cell's
+                  top-right, outside the head, so it adds no row and the
+                  head keeps its fixed height. */}
               {shiftChips && shiftChips[cell.key] && (
                 <span className={`cal-shift is-${shiftChips[cell.key].shift}`} title={shiftChips[cell.key].label}
                       data-tiny={shiftChips[cell.key].tiny}>

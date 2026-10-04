@@ -8210,35 +8210,54 @@ div.m-hubdrawer-coach { cursor: default; display: flex; flex-direction: column; 
    row from the events below the date; colours are the Rotation tab's
    night blue and day amber, lifted for the calendar's dark surface
    (dark in both themes — see the #track .cal-* rules). */
+/* Centred on the fixed-height .cal-cell-head (24px, 19px on phones)
+   from multi-day events, inset by the cell's own padding. The cell is
+   position:relative; the chip sits inside it, so nothing relies on the
+   cell clipping it (it is overflow:visible for the bars). */
+.cal-cell{ position:relative; }
 .cal-shift{
-  position:absolute; top:6px; right:6px; z-index:2;
-  font-family:var(--mono); font-size:9.5px; font-weight:700; line-height:1.35; letter-spacing:.3px;
+  --chip-h:15px;
+  position:absolute; z-index:3;
+  top:calc(6px + (24px - var(--chip-h)) / 2); right:7px;
+  height:var(--chip-h); box-sizing:border-box;
+  font-family:var(--mono); font-size:9.5px; font-weight:700; line-height:13px; letter-spacing:.3px;
   padding:0 5px; border-radius:5px; white-space:nowrap; pointer-events:none;
   border:1px solid rgba(255,255,255,.28); background:#1d1d22; color:rgba(255,255,255,.85);
 }
 .cal-shift.is-night{ border-color:rgba(138,155,255,.6); background:#1c2140; color:#aab6ff; }
 .cal-shift.is-day{ border-color:rgba(231,166,58,.6); background:#3a2a10; color:#f2b955; }
 .cal-shift.is-leave{ border-color:rgba(77,196,133,.6); background:#123222; color:#7fdcaa; }
+/* Keep the head's content clear of the chip: reserve its width on the
+   right (the head is overflow:hidden, so at worst something is clipped,
+   never overlapped), and drop the "Today" word where date badge + word
+   + chip cannot share a cell — the filled badge still marks today. The
+   grid is a size container (multi-day events), so this tracks the real
+   cell width, not the viewport. */
+#track .track-main .cal-cell.has-shift .cal-cell-head{ padding-right:38px; box-sizing:border-box; }
+@container (max-width: 960px){
+  .cal-cell.today.has-shift .cal-today-tag{ display:none; }
+}
+@media (max-width:640px){
+  /* No reservation here: a 37-41px cell cannot give up 16px, and the
+     two-letter chip already clears a plain date. Today's badge is the
+     one wide thing, so it gives a little instead. */
+  #track .track-main .cal-cell.has-shift .cal-cell-head{ padding-right:0; }
+  /* Today's badge and a chip cannot share a 38px cell, so on today the
+     chip lifts onto the corner like a notification badge — into the
+     5px grid gap, clear of the neighbouring cells and of the head. */
+  #track .track-main .cal-cell.today.has-shift .cal-shift{ top:-5px; right:-4px; padding:0 1px; box-shadow:0 0 0 1px #0d0d0f; }
+}
 .cal-shift-toggle.active{ background:#1c2140; border-color:rgba(138,155,255,.7); color:#cdd4ff; }
 #track .cal-shift-toggle.active{ background:#1c2140; border-color:rgba(138,155,255,.7); color:#cdd4ff; }
 @media (max-width:640px){
   /* A 40px cell: the chip shrinks and tucks into the corner so the
      date badge on the left keeps its room. */
-  .cal-shift{ top:3px; right:2px; font-size:7.5px; padding:0 2px; border-radius:3px; letter-spacing:0; }
+  .cal-shift{ --chip-h:12px; top:calc(4px + (19px - var(--chip-h)) / 2); right:3px;
+    font-size:7.5px; line-height:10px; padding:0 2px; border-radius:3px; letter-spacing:0; }
   /* Two characters at most here: "TOIL" beside "12" overran the date
      in a 40px cell, so leave falls back to its two-letter form. */
   .cal-shift-txt{ display:none; }
   .cal-shift::after{ content:attr(data-tiny); }
-}
-/* Today's "Today" tag and a shift chip would share the top-right of
-   the head; the filled date badge already says today, so the tag gives
-   way. */
-.cal-cell.today.has-shift .cal-today-tag{ display:none; }
-@media (max-width:640px){
-  /* A 38–42px phone cell can't hold today's filled badge AND a chip side
-     by side, so today's chip sits on the corner like a notification
-     badge instead of touching the date. */
-  #track .track-main .cal-cell.today.has-shift .cal-shift{ top:-6px; right:-6px; z-index:3; }
 }
 .daymenu-shift{
   display:flex; align-items:center; gap:8px; margin:0 0 4px; padding:7px 8px; border-radius:8px;
