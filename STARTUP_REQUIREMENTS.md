@@ -166,8 +166,9 @@ code fails soft until it is run, so order doesn't matter.
 37. `[x]` **LAUNCH** `tracker_streaks` FK is NO ACTION — account deletion
     fails for anyone with a row. Breaks the item-20 rule.
 38. `[x]` **LAUNCH** `nutrition_log` has no `(user_id, log_date)` index.
-39. `[ ]` **LAUNCH** Enable **Leaked Password Protection** (Supabase →
+39. `[x]` **LAUNCH** Enable **Leaked Password Protection** (Supabase →
     Auth). Dashboard toggle.
+    *Status 2026-10-04: enabled by the owner.*
 
 ### Native build — nothing server-side works in the app shell yet
 40. `[~]` **BLOCKS** Every call is a relative `/.netlify/functions/…`
@@ -373,6 +374,7 @@ code fails soft until it is run, so order doesn't matter.
     moderation.
 72. `[ ]` **Support URL + support email** (both stores require one; the
     policy already promises it) and a written **subject-access** process.
+    *Status 2026-10-04: in-app channel live — Settings → Report a problem files a ticket into Upgrade → Security (security_console_2026_10.sql run). A public support URL + email are still needed.*
 73. `[ ]` **Reviewer kit** — demo account with Pro, sandbox testers,
     review notes (WHOOP/Oura need hardware).
 74. `[ ]` **Store forms** — Apple age-rating questionnaire, Play IARC,
@@ -399,6 +401,7 @@ can stop the bleeding in minutes, and you meet the legal clock.
     in-app "not saved" indicator. Weekly: Supabase security advisors +
     `npm audit` (a scheduled Claude routine can do this and report).
     *Status 2026-09-30: client crash reports → client_errors (needs audit SQL); /.netlify/functions/health for an uptime monitor. Owner: point an uptime monitor at it, set the Anthropic spend limit, Supabase usage alerts.*
+    *Status 2026-10-04: security_console_2026_10.sql run — the hourly security sweep raises tickets (DB slow/unreachable, disk, connections, error spikes, stale reports, slow LCP), real-user web vitals are recorded, and the Security console shows database health. `SUPABASE_ACCESS_TOKEN` set in Netlify env (advisors + API traffic, live after the next deploy); Netlify deploys/functions still need `NETLIFY_AUTH_TOKEN`.*
 78. `[~]` **Incident runbook (one page, both owners have it).**
     - *Contain:* Netlify → publish previous deploy (instant rollback);
       a `MAINTENANCE`/feature-flag env var that disables AI, social or
