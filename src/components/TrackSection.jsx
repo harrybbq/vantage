@@ -608,10 +608,16 @@ function CalendarView({ S, update, onShowCoinToast, nutritionMonthData }) {
               className={`cal-cell${cell.isToday ? ' today' : ''}${cell.tids.length ? ' has-logs' : ''}${cell.isSelected ? ' selected' : ''}`}
               onClick={() => handleDayClick(cell.key)}
               onContextMenu={e => handleDayContext(e, cell.key)}
-              title="Right-click to tick trackers or add an event"
+              title={cell.isToday ? 'Today — right-click to tick trackers or add an event' : 'Right-click to tick trackers or add an event'}
+              aria-current={cell.isToday ? 'date' : undefined}
             >
               {firstTracker && <div className="cal-cell-fill" style={{ background: firstTracker.color }}></div>}
+              {/* Today gets a filled date badge and, where the cell is wide
+                  enough, a "Today" tag. It used to share the 2px border with
+                  the selected day — and the selected day starts as today, so
+                  nothing told you which square was now. */}
               <div className="cal-date">{cell.day}</div>
+              {cell.isToday && <span className="cal-today-tag" aria-hidden="true">Today</span>}
               {/* Two titles then a count — a cell that lists everything
                   stops being a month view. */}
               {(monthEvents[cell.key] || []).length > 0 && (

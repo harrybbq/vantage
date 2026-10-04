@@ -8005,6 +8005,26 @@ div.m-hubdrawer-coach { cursor: default; display: flex; flex-direction: column; 
 #track .track-main .cal-dots{ margin-top:auto; max-width:100%; justify-content:flex-start; }
 #track .track-main .cal-dot{ width:5px; height:5px; }
 #track .track-main .cal-day-label{ font-size:10px; }
+/* Today: a filled badge on the date, so it reads at a glance and stays
+   distinct from the selected day (border + tint). After the has-logs
+   rule so a logged today keeps white-on-green. */
+.cal-cell.today .cal-date,
+#track .cal-cell.today .cal-date,
+#track .cal-cell.today.has-logs .cal-date{
+  display:inline-grid; place-items:center;
+  min-width:2em; height:2em; padding:0 .45em; border-radius:999px;
+  background:var(--em); color:#fff; font-weight:700; line-height:1;
+}
+.cal-today-tag{
+  position:relative; z-index:1; font-family:var(--mono); font-size:10px; font-weight:700;
+  letter-spacing:.08em; text-transform:uppercase; color:var(--em);
+}
+#track .cal-today-tag{ color:var(--em-light); }
+@media (max-width:640px){
+  /* A 36-52px cell holds the badge, not the word. */
+  .cal-today-tag{ display:none; }
+  #track .track-main .cal-cell.today .cal-date{ min-width:1.9em; height:1.9em; }
+}
 /* No min-height bump at 1200px any more — the ratio produces the same
    96px there on its own, and a floor that high fought the ratio on the
    way down. */
