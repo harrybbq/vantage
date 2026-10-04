@@ -48,7 +48,7 @@ export const MAX_SAFE_LOSS_FRACTION = 0.01;  // 1% of bodyweight per week
 
 import { bmrKcal, currentWeightKg } from '../burn.js';
 import { blendedDailyKcal } from '../diet/plan.js';
-import { plannedSessionsPerWeek } from '../rotation/pattern.js';
+import { plannedSessionsPerWeek, scheduleOf } from '../rotation/pattern.js';
 import { hasDeviceWorkout } from '../trackers/autoLog.js';
 
 /**
@@ -65,7 +65,7 @@ import { hasDeviceWorkout } from '../trackers/autoLog.js';
 function cadenceOf(S, goal) {
   const typed = (goal.weeklyWeights || 0) + (goal.weeklyCardio || 0);
   if (typed > 0) return typed;
-  return S && S.rotation ? plannedSessionsPerWeek() : 0;
+  return S && S.rotation ? plannedSessionsPerWeek(scheduleOf(S)) : 0;
 }
 
 const DAY = 86400000;

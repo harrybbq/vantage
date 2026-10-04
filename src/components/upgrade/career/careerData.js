@@ -9,7 +9,7 @@ import { studyDays, planStudy, examIsoOf, pacedCert, daysBetween } from '../../.
 import { weekOf } from '../../../lib/career/brief';
 import { project } from '../../../lib/career/money';
 import { actualSeries, versusPlan } from '../../../lib/savings/history';
-import { holidayDaySet } from '../../../lib/rotation/pattern';
+import { holidayDaySet, scheduleOf } from '../../../lib/rotation/pattern';
 
 export const todayIso = () => {
   const d = new Date();
@@ -35,6 +35,7 @@ export const paceOf = cert => {
 export function usePacing(S, certs, pickId) {
   const overrides = (S && S.rotation && S.rotation.overrides) || null;
   const blocks = (S && S.rotation && S.rotation.holidayBlocks) || null;
+  const schedule = scheduleOf(S);
   return useMemo(() => {
     const eligible = (certs || []).filter(c => !c.completed && ['studying', 'booked'].includes(c.status) && Number(c.studyHours) > 0 && examIsoOf(c));
     const cert = (pickId && eligible.find(c => c.id === pickId)) || pacedCert(certs);
@@ -43,13 +44,13 @@ export function usePacing(S, certs, pickId) {
     const { monIso } = weekOf(today);
     const examIso = examIsoOf(cert);
     const horizon = Math.min(400, Math.max(56, daysBetween(monIso, examIso) + 1));
-    const all = studyDays(monIso, horizon, { overrides: overrides || {}, holidayDays: holidayDaySet(blocks || []) });
+    const all = studyDays(monIso, horizon, { overrides: overrides || {}, holidayDays: holidayDaySet(blocks || []), schedule });
     const settings = paceOf(cert);
     const remaining = Math.max(0, Number(cert.studyHours) - settings.hoursLogged);
     const future = all.map(d => (d.iso < today ? { ...d, holiday: true, past: true } : d));   // no hours before today
     const plan = planStudy(future, { remaining, perShift: settings.perShift, days: settings.days, nights: settings.nights, examIso });
     return { cert, eligible, plan, examIso, monIso, today, settings, remaining };
-  }, [certs, pickId, overrides, blocks]);
+  }, [certs, pickId, overrides, blocks, schedule]);
 }
 
 /** The latest CLOSED month's actual vs the no-bonus plan, or null. */

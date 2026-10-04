@@ -5,7 +5,7 @@
  * reads it, and a projection importing a component would be the
  * dependency pointing the wrong way.
  */
-import { TRAIN_POS, CYCLE } from '../rotation/pattern.js';
+import { cycleShape, scheduleOf } from '../rotation/pattern.js';
 
 /** The plan as it stood on the original static rotation page. */
 export const DEFAULT_PLAN = {
@@ -26,20 +26,19 @@ export const planOf = S => ({ ...DEFAULT_PLAN, ...((S && S.dietPlan) || {}) });
  *
  * The plan has two numbers — a training day and a rest day — and a
  * projection needs one. Averaging them evenly would be wrong: the cycle
- * is 10 training days in 16, not 8. Deriving the weights from TRAIN_POS
- * means the blend follows the split; change the rotation and this
- * follows it rather than going quietly stale.
+ * is 10 training days in 16, not 8. Deriving the weights from the
+ * schedule in force today means the blend follows the split; change the
+ * rotation and this follows it rather than going quietly stale.
  *
  *   (2550 x 10 + 2350 x 6) / 16 = 2475
  */
 export function blendedDailyKcal(S) {
   const p = planOf(S);
   if (!p.trainKcal && !p.restKcal) return null;
-  const train = TRAIN_POS.length;
-  const rest = CYCLE - train;
+  const { train, rest, len } = cycleShape(scheduleOf(S));
   const train_ = p.trainKcal || p.restKcal;
   const rest_ = p.restKcal || p.trainKcal;
-  return Math.round((train_ * train + rest_ * rest) / CYCLE);
+  return Math.round((train_ * train + rest_ * rest) / len);
 }
 
 /** Protein target in grams, from bodyweight (or the goal if unweighed). */

@@ -1515,3 +1515,99 @@ html[data-theme="dark-os"] .upg-app .career-pane { --cp-bg: #171715; }
 .upg-out { display: flex; flex-direction: column; gap: 2px; margin: 3px 0 0 26px; font-size: 11.5px; color: var(--text-mid); }
 .upg-out > span:first-child { color: #e0796a; font-weight: 600; }
 @media (max-width: 700px) { .upg-stores { grid-template-columns: repeat(2, minmax(0, 1fr)); } .upg-running { gap: 14px; } }
+
+/* ── Shift pattern (Rotation) ──────────────────────────────────────
+   The rota as editable versions. Night and day keep the calendar's
+   colours (#6b8afd / #d99114) so a block here reads as the same thing
+   as a cell there. Everything sits on the card's solid surface. */
+.upg-pat-strip { display: flex; gap: 3px; width: 100%; min-width: 0; }
+.upg-pat-blk { flex-basis: 0; min-width: 0; padding: 7px 4px; border-radius: 6px; border: 1px solid var(--border);
+  font-family: var(--mono); font-size: 10.5px; font-weight: 700; text-align: center; white-space: nowrap;
+  overflow: hidden; text-overflow: ellipsis; color: var(--text-muted); }
+.upg-pat-strip.is-small .upg-pat-blk { padding: 4px 2px; font-size: 9px; }
+.upg-pat-blk.is-night { background: rgba(107,138,253,.16); border-color: rgba(107,138,253,.5); color: #6b8afd; }
+.upg-pat-blk.is-day { background: rgba(217,145,20,.16); border-color: rgba(217,145,20,.5); color: #c07f0e; }
+html[data-theme="dark-os"] .upg-pat-blk.is-day { color: #e0a13a; }
+.upg-pat-line { margin-top: 8px; font-family: var(--mono); font-size: 10.5px; color: var(--text-muted); line-height: 1.5; }
+.upg-pat-next { margin-top: 8px; display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
+  font-size: 12px; color: var(--text); }
+.upg-pat-next svg { color: var(--em); flex: none; }
+.upg-pat-versions { list-style: none; margin: 10px 0 0; padding: 0; display: flex; flex-direction: column; gap: 5px; }
+.upg-pat-versions li { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding: 6px 9px; border-radius: 8px;
+  border: 1px solid var(--border); background: var(--upg-solid, transparent); font-size: 12px; min-width: 0; }
+.upg-pat-versions li.is-past { opacity: .7; }
+.upg-pat-versions li.is-current { border-color: var(--em); }
+.upg-pat-vfrom { font-family: var(--mono); font-size: 10.5px; font-weight: 700; color: var(--text); white-space: nowrap; }
+.upg-pat-vsum { flex: 1 1 160px; min-width: 0; color: var(--text-mid, var(--text-muted)); overflow-wrap: anywhere; }
+.upg-pat-tag { font-family: var(--mono); font-size: 9px; letter-spacing: 1px; text-transform: uppercase;
+  padding: 1px 7px; border-radius: 999px; border: 1px solid var(--em); color: var(--em); }
+.upg-pat-tag.is-future { border-color: #6b8afd; color: #6b8afd; }
+.upg-pat-versions .upg-block-x { margin-left: auto; }
+.upg-pat-open { margin-top: 12px; display: inline-flex; align-items: center; gap: 6px; }
+
+.upg-pat-editor { margin-top: 14px; padding-top: 14px; border-top: 1px dashed var(--border);
+  display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+.upg-pat-row { display: flex; align-items: flex-end; gap: 12px; flex-wrap: wrap; }
+.upg-pat-field { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.upg-pat-field > span { font-family: var(--mono); font-size: 9px; letter-spacing: 1.2px; text-transform: uppercase; color: var(--text-muted); }
+.upg-pat-field input { padding: 7px 9px; border-radius: 8px; border: 1px solid var(--border);
+  background: var(--upg-solid); color: var(--text); font: inherit; font-size: 13px; min-width: 0; max-width: 100%; }
+.upg-pat-field.is-wide input { width: 100%; box-sizing: border-box; }
+.upg-pat-hint { flex: 1 1 200px; font-size: 11.5px; color: var(--text-muted); line-height: 1.4; padding-bottom: 6px; }
+.upg-pat-warn { display: flex; align-items: center; gap: 6px; font-size: 12px; color: #c4582f; line-height: 1.4; }
+html[data-theme="dark-os"] .upg-pat-warn { color: #e0796a; }
+.upg-pat-warn svg { flex: none; }
+.upg-pat-blocks { display: flex; flex-direction: column; gap: 5px; max-width: 560px; }
+.upg-pat-brow { display: flex; align-items: center; gap: 8px; padding: 5px 7px 5px 5px; border-radius: 9px;
+  border: 1px solid var(--border); border-left-width: 4px; background: var(--upg-solid); min-width: 0; }
+.upg-pat-brow.is-night { border-left-color: #6b8afd; }
+.upg-pat-brow.is-day { border-left-color: #d99114; }
+.upg-pat-bn { width: 18px; flex: none; text-align: center; font-family: var(--mono); font-size: 10px; color: var(--text-muted); }
+.upg-pat-brow select { flex: none; min-width: 5.6em; padding: 5px 6px; border-radius: 7px; border: 1px solid var(--border); background: var(--upg-solid);
+  color: var(--text); font: inherit; font-size: 12.5px; min-width: 0; }
+.upg-pat-step { flex: none; display: inline-flex; align-items: center; gap: 2px; border: 1px solid var(--border); border-radius: 7px; overflow: hidden; }
+.upg-pat-step span { min-width: 54px; text-align: center; font-family: var(--mono); font-size: 11.5px; color: var(--text); }
+.upg-pat-step button, .upg-pat-bact button { width: 28px; height: 28px; border: 0; background: transparent; color: var(--text);
+  font-size: 14px; cursor: pointer; display: grid; place-items: center; }
+.upg-pat-step button:disabled, .upg-pat-bact button:disabled { opacity: .3; cursor: default; }
+.upg-pat-step button:not(:disabled):hover, .upg-pat-bact button:not(:disabled):hover { color: var(--em); }
+.upg-pat-bact { margin-left: auto; display: inline-flex; gap: 0; flex: none; }
+.upg-pat-bact button { width: 26px; font-size: 12px; color: var(--text-muted); }
+.upg-pat-add { align-self: flex-start; }
+.upg-pat-add:disabled { opacity: .4; cursor: default; }
+.upg-pat-sum { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.upg-pat-sum .upg-pat-strip { flex: 1; }
+.upg-pat-total { font-family: var(--mono); font-size: 11px; font-weight: 700; color: var(--text); white-space: nowrap; }
+.upg-pat-total.is-bad { color: #c4582f; }
+.upg-pat-preview { display: grid; grid-template-columns: repeat(14, minmax(0, 1fr)); gap: 3px; }
+.upg-pat-day { display: flex; flex-direction: column; align-items: center; gap: 1px; padding: 4px 1px; border-radius: 6px;
+  border: 1px solid var(--border); background: var(--upg-solid); min-width: 0; }
+.upg-pat-day.is-night { background: rgba(107,138,253,.13); border-color: rgba(107,138,253,.4); }
+.upg-pat-day.is-day { background: rgba(217,145,20,.13); border-color: rgba(217,145,20,.38); }
+.upg-pat-day.is-none { opacity: .45; }
+.upg-pat-dow { font-family: var(--mono); font-size: 8px; color: var(--text-muted); text-transform: uppercase; }
+.upg-pat-dt { font-size: 12px; font-weight: 600; color: var(--text); line-height: 1.1; }
+.upg-pat-chip { font-family: var(--mono); font-size: 9px; font-weight: 700; color: var(--text-muted); }
+.upg-pat-day.is-night .upg-pat-chip { color: #6b8afd; }
+.upg-pat-day.is-day .upg-pat-chip { color: #c07f0e; }
+html[data-theme="dark-os"] .upg-pat-day.is-day .upg-pat-chip { color: #e0a13a; }
+.upg-pat-sess { font-family: var(--mono); font-size: 8.5px; color: var(--text-muted); }
+.upg-pat-actions { display: flex; align-items: center; justify-content: flex-end; gap: 14px; flex-wrap: wrap; }
+.upg-pat-actions .link-open-btn:disabled { opacity: .45; cursor: default; }
+@media (max-width: 700px) {
+  .upg-pat-preview { grid-template-columns: repeat(7, minmax(0, 1fr)); }
+  .upg-pat-blk { font-size: 9.5px; padding: 6px 2px; }
+  .upg-pat-step span { min-width: 46px; }
+  .upg-pat-brow { gap: 5px; }
+  .upg-pat-bn { width: 12px; }
+  .upg-pat-bact button { width: 24px; }
+  /* Date and tag on one line, the summary under them — at this width
+     the summary's own column pushed the tag onto a line of its own. */
+  .upg-pat-vsum { order: 3; flex-basis: 100%; }
+}
+.upg-pat-unit { font-style: normal; }
+@media (max-width: 420px) {
+  /* The row header says "days"; at 360 the word pushed ✕ off the row. */
+  .upg-pat-unit { display: none; }
+  .upg-pat-step span { min-width: 26px; }
+}

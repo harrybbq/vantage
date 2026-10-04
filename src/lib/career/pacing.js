@@ -13,7 +13,7 @@
  *
  * Pure apart from the calendar maths. No React, no network.
  */
-import { resolveDay } from '../rotation/pattern.js';
+import { resolveDay, DEFAULT_SCHEDULE } from '../rotation/pattern.js';
 
 const DAY = 86400000;
 const isoAt = (iso, n) => {
@@ -24,12 +24,12 @@ const isoAt = (iso, n) => {
 export const daysBetween = (a, b) => Math.round((Date.parse(b + 'T12:00:00Z') - Date.parse(a + 'T12:00:00Z')) / DAY);
 
 /** `n` days from `fromIso`: [{ iso, shift, holiday, dow (0 = Mon) }]. Days outside the pattern are 'unknown'. */
-export function studyDays(fromIso, n, { overrides = {}, holidayDays = new Set() } = {}) {
+export function studyDays(fromIso, n, { overrides = {}, holidayDays = new Set(), schedule = DEFAULT_SCHEDULE } = {}) {
   const out = [];
   for (let i = 0; i < n; i++) {
     const iso = isoAt(fromIso, i);
     const [y, m, d] = iso.split('-').map(Number);
-    const r = resolveDay(y, m - 1, d, overrides);
+    const r = resolveDay(y, m - 1, d, overrides, schedule);
     const dow = (new Date(Date.UTC(y, m - 1, d)).getUTCDay() + 6) % 7;
     out.push({ iso, dow, shift: r.inPattern ? r.shift : 'unknown', holiday: holidayDays.has(iso) });
   }
