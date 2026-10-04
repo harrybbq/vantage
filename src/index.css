@@ -575,43 +575,8 @@ nav:hover .nav-tab-label{opacity:1;}
 #shop-overlay{position:fixed;inset:0;background:linear-gradient(160deg,rgba(10,24,14,.62) 0%,rgba(10,24,14,.38) 100%);z-index:0;display:none;pointer-events:none;}
 #shop-overlay.visible{display:block;}
 #shop .shop-layout{position:relative;z-index:1;}
-/* Two columns: wishlist (fluid) + a Trending discovery board on the
-   right. Stacks with the board at the bottom on narrow screens. */
 .shop-page{display:flex;gap:18px;align-items:flex-start;}
 .shop-page > .shop-layout{flex:1;min-width:0;}
-.shop-trending{flex:0 0 250px;max-width:250px;min-width:0;position:sticky;top:12px;align-self:flex-start;
-  background:var(--bg-raised,rgba(255,255,255,.03));border:1px solid var(--border);
-  border-radius:14px;overflow:hidden;display:flex;flex-direction:column;box-sizing:border-box;}
-.shop-trending-head{padding:12px 14px 10px;border-bottom:1px solid var(--border);display:flex;align-items:baseline;gap:8px;}
-.shop-trending-title{font-family:var(--mono);font-size:11px;letter-spacing:2px;text-transform:uppercase;color:var(--em);font-weight:700;}
-.shop-trending-sub{font-family:var(--mono);font-size:9.5px;color:var(--text-muted);letter-spacing:.5px;}
-.shop-trending-toggle{margin-left:auto;display:inline-flex;gap:2px;background:var(--card,rgba(128,128,128,.12));border-radius:999px;padding:2px;}
-.shop-trending-tab{border:none;background:none;border-radius:999px;padding:3px 9px;font-family:var(--mono);font-size:9px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;color:var(--text-muted);cursor:pointer;}
-.shop-trending-tab.on{background:var(--em);color:#fff;}
-/* Rolling viewport — fixed height, content marquees vertically. */
-.shop-trending-viewport{position:relative;height:min(70vh,560px);overflow:hidden;
-  /* contain isolates the very wide marquee track so it can't inflate the
-     page's content width (iOS Safari would otherwise zoom out to fit it). */
-  contain:paint;max-width:100%;
-  -webkit-mask-image:linear-gradient(180deg,transparent,#000 22px,#000 calc(100% - 22px),transparent);
-  mask-image:linear-gradient(180deg,transparent,#000 22px,#000 calc(100% - 22px),transparent);}
-.shop-trending-track{display:flex;flex-direction:column;gap:10px;padding:12px;animation:shopRoll linear infinite;box-sizing:border-box;width:100%;}
-.shop-trending-viewport:hover .shop-trending-track{animation-play-state:paused;}
-@keyframes shopRoll{from{transform:translateY(-50%);}to{transform:translateY(0);}}
-@keyframes shopRollX{from{transform:translateX(0);}to{transform:translateX(-50%);}}
-.shop-trend-card{display:flex;align-items:center;gap:10px;padding:10px;border-radius:11px;min-width:0;box-sizing:border-box;
-  background:var(--card,rgba(128,128,128,.08));border:1px solid var(--border-lt,var(--border));}
-.shop-trend-emoji{font-size:22px;flex-shrink:0;width:34px;height:34px;display:flex;align-items:center;justify-content:center;
-  background:rgba(var(--em-rgb),.10);border-radius:9px;}
-.shop-trend-body{flex:1;min-width:0;}
-.shop-trend-name{font-family:var(--sans);font-size:12.5px;font-weight:600;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
-.shop-trend-meta{display:flex;align-items:center;gap:7px;margin-top:2px;}
-.shop-trend-cat{font-family:var(--mono);font-size:8.5px;letter-spacing:.6px;text-transform:uppercase;color:var(--text-muted);}
-.shop-trend-price{font-family:var(--mono);font-size:10px;color:var(--em);font-weight:700;}
-.shop-trend-blurb{font-family:var(--mono);font-size:9.5px;color:var(--text-muted);margin-top:3px;line-height:1.4;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
-.shop-trend-add{flex-shrink:0;border:1px solid var(--em);background:none;color:var(--em);border-radius:999px;
-  padding:4px 9px;font-family:var(--mono);font-size:9.5px;font-weight:700;cursor:pointer;white-space:nowrap;transition:all .14s ease;}
-.shop-trend-add:hover{background:var(--em);color:#fff;}
 @media (max-width:900px){
   /* Hard-clip horizontal overflow so the wide marquee can never make the
      page zoom-out / scroll sideways on phones. align-items:stretch is
@@ -621,14 +586,6 @@ nav:hover .nav-tab-label{opacity:1;}
      clipped-page bug) instead of ellipsising. */
   .shop-page{flex-direction:column;align-items:stretch;overflow-x:hidden;max-width:100%;}
   .shop-page > .shop-layout{width:100%;max-width:100%;}
-  .shop-trending{flex-basis:auto;max-width:100%;width:100%;position:static;margin-top:10px;order:2;}
-  .shop-trending-head{padding:10px 14px;}
-  .shop-trending-viewport{height:auto;
-    -webkit-mask-image:linear-gradient(90deg,transparent,#000 20px,#000 calc(100% - 20px),transparent);
-    mask-image:linear-gradient(90deg,transparent,#000 20px,#000 calc(100% - 20px),transparent);}
-  .shop-trending-track{flex-direction:row;width:max-content;gap:10px;animation-name:shopRollX;}
-  .shop-trend-card{width:230px;flex:0 0 230px;}
-  .shop-trend-blurb{display:none;}
 }
 
 /* Mobile shopping rules used to live here. They lost: this block sits
@@ -8506,7 +8463,6 @@ html[data-theme="dark-os"] .ev-suggest{ background:var(--os-surface2,#191917); b
 .shop-main{ border-radius:0 var(--radius-lg) 0 0; }
 .shop-rail:last-child, .shop-rail:nth-last-child(2){ border-bottom-left-radius:var(--radius-lg); }
 .shop-main:last-child{ border-bottom-right-radius:var(--radius-lg); }
-.shop-trend-strip:last-child{ border-radius:0 0 var(--radius-lg) var(--radius-lg); }
 @media (max-width:979px){
   .shop-rail{ border-radius:var(--radius-lg) var(--radius-lg) 0 0; }
   .shop-main{ border-radius:0; }
@@ -8596,29 +8552,11 @@ html[data-theme="dark-os"] .ev-suggest{ background:var(--os-surface2,#191917); b
 .shop-main .shop-controls{margin:0;}
 .shop-main .shop-grid{margin-top:0 !important;}
 
-/* Trending: a strip along the FULL width of the board's bottom edge —
-   it is a child of the grid, so it spans both columns rather than
-   sitting under the list only. That is the right shape for it: it is
-   context for the whole page, not a footnote to the item list. */
-.shop-trend-strip{
-  grid-column:1 / -1;
-  border-top:1px solid var(--border);
-  background:var(--surface);
-  backdrop-filter:blur(20px) saturate(1.1);
-  -webkit-backdrop-filter:blur(20px) saturate(1.1);
-  padding:12px 14px;
-}
-.shop-trend-strip[data-transparent="true"]{
-  background:transparent !important;
-  backdrop-filter:none !important; -webkit-backdrop-filter:none !important;
-}
-.shop-trend-strip .shop-trending{max-width:none;width:100%;}
-
 /* Above the mobile breakpoint the page no longer needs the old flex row
-   that held the grid and the Trending rail side by side — the board owns
+   that held the grid and a side rail — the board owns
    both. Below it, the board is not used and .shop-page goes back to
    being the flex column it was: `align-items:stretch` down there is
-   load-bearing (see the ≤900px block near .shop-trending), because
+   load-bearing (see the ≤900px .shop-page block), because
    without it one long nowrap product name shrink-to-fits the column and
    blows the layout past the viewport. */
 @media (min-width:769px){

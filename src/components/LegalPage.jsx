@@ -113,7 +113,7 @@ function PrivacyPolicyContent() {
       <Section title="5. How We Use Your Data">
         <Ul items={[
           'To create and manage your account and sync your data across devices.',
-          'To operate the social features you choose to use (friends, messages, groups, leaderboard, trending).',
+          'To operate the social features you choose to use (friends, messages, groups, leaderboard).',
           'To provide optional AI features when you use them (section 7).',
           'To review reports and act on accounts or content that break the Terms of Service.',
           'To send transactional emails (account confirmation, password reset) — we send no marketing emails.',
@@ -129,7 +129,6 @@ function PrivacyPolicyContent() {
           'Leaderboard — the global leaderboard shows your display name, profile picture, level, rating and prestige. You appear on it only while "Show me on the global leaderboard" is on; it is off by default for new accounts (older accounts: as above). Friends see you on the friends board regardless. Pro users may optionally colour their name.',
           'Friends — people you accept as friends can see your profile card: display name, avatar, level, and any of streak / heatmap / recent wins / online status you have enabled. Each has its own toggle. The habit-streak card, which shows the habit\'s name, is off unless you turn it on.',
           'Groups — if you join a group, its members see your display name, profile picture, rating and weekly climb. The group\'s name, picture and weekly score appear on its division\'s board to other groups.',
-          'Trending (Shopping) — items on your wish-list may be aggregated into your friends\' "Trending" board and the app-wide "Global" board. This is anonymous: only the item name and a count are shown, never who wants it, and the Global board only ever shows items wanted by at least two different people. Turn "Share my wishlist in friends\' Trending" off to be excluded from both.',
           'Direct messages — visible only to you and the recipient (and stored as described in section 2). If the recipient reports a conversation, recent messages from it are included in the report for review.',
         ]} />
       </Section>
@@ -149,7 +148,7 @@ function PrivacyPolicyContent() {
         <P><strong>Providers that run the App</strong> (they process your personal data on our behalf):</P>
         <Ul items={[
           'Supabase — database and authentication, hosted in the EU. Stores your account, app content, messages, nutrition and health data.',
-          'Netlify — web hosting and the serverless functions that power sync, leaderboards, groups, trending and integrations. Receives your IP address when you use the App.',
+          'Netlify — web hosting and the serverless functions that power sync, leaderboards, groups and integrations. Receives your IP address when you use the App.',
           'Anthropic — AI features and screening of group and profile pictures, as described in section 7.',
           'RevenueCat, Apple and Google — subscription billing and entitlement management for Vantage Pro. Payment details are handled by the platform you purchase through.',
           'Firebase Cloud Messaging (Google) — delivery of push notifications you enable; processes your device push token.',
@@ -293,15 +292,15 @@ function TermsContent() {
       </Section>
 
       <Section title="7. Social Features & Acceptable Use">
-        <P>Vantage includes friends, direct messages, handles, a leaderboard and anonymous trending boards. You agree not to:</P>
+        <P>Vantage includes friends, direct messages, handles, and a leaderboard. You agree not to:</P>
         <Ul items={[
           'Use the App for any unlawful purpose, or to harass, abuse, threaten, defame or impersonate anyone — including via messages, handles, display names or item names.',
           'Post content that is hateful, sexually explicit, infringing, or that exposes another person\'s private information.',
           'Attempt to access another user\'s account or data, or to circumvent privacy controls.',
           'Reverse-engineer, decompile or extract the App\'s source code, or use bots/scripts to scrape or interact with the App.',
-          'Manipulate the leaderboard, coins, or trending boards through fake accounts or automated activity.',
+          'Manipulate the leaderboard or coins through fake accounts or automated activity.',
         ]} />
-        <P>These rules apply to everything other people can see: display names, @handles, profile pictures, messages, group names and group pictures, and wish-list items that reach a Trending board.</P>
+        <P>These rules apply to everything other people can see: display names, @handles, profile pictures, messages, group names and group pictures.</P>
       </Section>
 
       <Section title="7a. Reporting, Blocking & Moderation">
@@ -316,7 +315,7 @@ function TermsContent() {
       </Section>
 
       <Section title="8. Your Content">
-        <P>You own the content you create in the App. You grant us a limited, worldwide, royalty-free licence to host, store, transmit and display it solely to operate the service — including showing your shared items to friends, the leaderboard and anonymised trending boards according to your privacy settings. The licence ends when you delete the content or your account, except for anonymised aggregates that contain no personal data.</P>
+        <P>You own the content you create in the App. You grant us a limited, worldwide, royalty-free licence to host, store, transmit and display it solely to operate the service — including showing your shared items to friends and the leaderboard according to your privacy settings. The licence ends when you delete the content or your account, except for anonymised aggregates that contain no personal data.</P>
       </Section>
 
       <Section title="9. Third-Party Services">
