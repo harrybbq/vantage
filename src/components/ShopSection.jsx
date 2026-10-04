@@ -8,7 +8,9 @@ import Icon from './Icon';
 import { useHubModuleMenu } from './HubModuleMenu';
 import { useIsMobile } from '../hooks/useIsMobile';
 import { SORTS, sortItems, searchItems, totalFor, fmtMoney } from '../lib/shop/list';
-import { sweepPrices, priceMovement } from '../lib/shop/priceWatch';
+import { sweepPrices, priceMovement, applySweepUpdates } from '../lib/shop/priceWatch';
+import { totalsFor } from '../lib/shop/price';
+import { markBought } from '../lib/shop/buy';
 
 const PRIORITY_LABEL = { high: 'High', med: 'Medium', low: 'Low' };
 const PRIORITY_CLASS = { high: 'priority-high', med: 'priority-med', low: 'priority-low' };
@@ -389,36 +391,29 @@ export default function ShopSection({ S, update, active, onOpenModal, onShowCoin
   const [moveTo, setMoveTo] = useState('');
 
   // One price sweep per mount, for items with a URL that haven't been
-  // checked lately. Fails soft and writes only if something moved.
+  // checked lately. Fails soft. The request takes seconds, so its
+  // results are applied to the LATEST list inside the updater, only to
+  // the items it actually read, and computed from each item as it is
+  // then — nothing from this render's `shopItems` is written back (that
+  // snapshot write-back reverted edits made while the sweep ran). It
+  // never writes `price`; see lib/shop/sweep.js.
   const swept = useRef(false);
   useEffect(() => {
     if (swept.current || !active) return;
     swept.current = true;
     let alive = true;
     (async () => {
-      const next = await sweepPrices(shopItems || []);
-      if (!alive || next === shopItems) return;   // identity = nothing changed
+      const { updates } = await sweepPrices(shopItems || []);
+      if (!alive || !updates.size) return;
       update(prev => {
-        // Re-map onto the LATEST items so a concurrent edit isn't lost.
-        const byId = new Map(next.map(i => [i.id, i]));
-        return {
-          ...prev,
-          shopItems: (prev.shopItems || []).map(it => {
-            const fresh = byId.get(it.id);
-            if (!fresh) return it;
-            return {
-              ...it,
-              price: fresh.price ?? it.price,
-              priceCheckedAt: fresh.priceCheckedAt,
-              ...(fresh.priceHistory ? { priceHistory: fresh.priceHistory } : {}),
-            };
-          }),
-        };
+        const items = prev.shopItems || [];
+        const next = applySweepUpdates(items, updates);
+        return next === items ? prev : { ...prev, shopItems: next };
       });
     })();
     return () => { alive = false; };
-    // Runs once per mount; shopItems intentionally not a dependency.
-  }, [active]);
+    // Runs once per mount; shopItems is only read to pick what to check.
+  }, [active]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const toggleSelect = id => setSelected(prev => {
     const next = new Set(prev);
@@ -436,14 +431,14 @@ export default function ShopSection({ S, update, active, onOpenModal, onShowCoin
     }));
     exitBulk();
   }
+  // Bulk bought/unbought goes through the same markBought() as the
+  // single toggle — coins spent, the gate respected, paidCoins pinned,
+  // refunds on un-buy, the original bought date kept. Bulk used to skip
+  // all of that, so bulk-buy then single-unbuy minted coins.
   function bulkBought(value) {
     if (!selected.size) return;
-    update(prev => ({
-      ...prev,
-      shopItems: (prev.shopItems || []).map(i => selected.has(i.id)
-        ? { ...i, bought: value, boughtAt: value ? Date.now() : undefined }
-        : i),
-    }));
+    const ids = shopItems.filter(i => selected.has(i.id)).map(i => i.id);
+    applyBought(ids, value);
     exitBulk();
   }
   function bulkDelete() {
@@ -504,10 +499,13 @@ export default function ShopSection({ S, update, active, onOpenModal, onShowCoin
 
   const total = shopItems.length;
   const bought = shopItems.filter(s => s.bought).length;
-  const totalVal = shopItems.filter(s => s.price).reduce((acc, s) => {
-    const n = parseFloat(s.price.replace(/[^0-9.]/g, ''));
-    return acc + (isNaN(n) ? 0 : n);
-  }, 0);
+  // One reader for every total on the page (lib/shop/price.js): what you
+  // still want, in pounds, with unreadable and $/€ prices counted rather
+  // than guessed. The old header stripped every non-digit ("£20–£30"
+  // became 2030) and summed bought items too, so it disagreed with the
+  // category totals on the same list.
+  const wantedTotals = totalsFor(shopItems.filter(s => !s.bought));
+  const totalVal = wantedTotals.sum;
 
   function setFilter(f) {
     update(prev => ({ ...prev, shopFilter: f }));
@@ -528,62 +526,53 @@ export default function ShopSection({ S, update, active, onOpenModal, onShowCoin
         imageUrl: item.imageUrl || '',
         url: item.url || '',
         bought: false,
+        addedAt: Date.now(),
       }],
     }));
     onShowCoinToast?.(`Added ${item.name} to your wishlist`, false);
   }
 
-  function handleToggleBought(id) {
+  /*
+   * Mark items bought (value=true) or not bought, through the one coin
+   * path in lib/shop/buy.js — spend, the Settings → Goals gate, pinned
+   * paidCoins, refunds, history rows. The state write runs markBought on
+   * the LATEST state inside the updater; the toast and confetti are
+   * worked out from the same call on the current render's state and
+   * fired OUTSIDE it, because React may run an updater twice and a side
+   * effect in there fires twice (double confetti, double toast).
+   */
+  function applyBought(ids, value) {
+    if (!ids.length) return;
+    const now = Date.now();
+    const { report } = markBought(S, ids, value, now);
     update(prev => {
-      const item = prev.shopItems.find(s => s.id === id);
-      if (!item) return prev;
-      // Opt-out of the balance gate (Settings → Goals). Default ON, so
-      // an absent key behaves exactly as before. It removes the BLOCK
-      // only — the coins are still spent and still refunded, because a
-      // purchase that costs nothing while the setting is off and
-      // refunds in full once it's back on would mint coins.
-      const requireCoins = prev.shopRequireCoins !== false;
-      let newCoins = prev.coins || 0;
-      let newHistory = [...(prev.coinHistory || [])];
-      if (!item.bought && item.coinCost > 0) {
-        if (requireCoins && newCoins < item.coinCost) {
-          onShowCoinToast('Need ' + item.coinCost + ' ⬡ — you have ' + newCoins, false);
-          return prev;
-        }
-        newCoins -= item.coinCost;
-        newHistory.unshift({ type: 'spend', label: item.name, amount: -item.coinCost, ts: Date.now() });
-        onShowCoinToast('-' + item.coinCost + ' ⬡ spent on ' + item.name + '!', false);
-      } else if (item.bought) {
-        // Refund what was actually PAID, not what the item costs now.
-        // Refunding the current price minted coins: buy at 0, edit the
-        // cost up to 5000, un-buy, collect 5000 you never spent. Items
-        // bought before paidCoins existed fall back to coinCost, which
-        // is what they were charged.
-        const paid = item.paidCoins != null ? item.paidCoins : item.coinCost;
-        if (paid > 0) {
-          newCoins += paid;
-          newHistory.unshift({ type: 'refund', label: item.name, amount: paid, ts: Date.now() });
-        }
-      }
-      if (!item.bought) firePurchase();
-      return {
-        ...prev,
-        // boughtAt drives the Archive view (sorted newest-first there);
-        // un-buying clears it and returns the item to the active list.
-        shopItems: prev.shopItems.map(s => s.id === id
-          ? {
-              ...s,
-              bought: !s.bought,
-              boughtAt: !s.bought ? Date.now() : undefined,
-              // Price paid, pinned at purchase so a later edit to
-              // coinCost can't change what a refund is worth.
-              paidCoins: !s.bought ? (s.coinCost || 0) : undefined,
-            }
-          : s),
-        coins: newCoins,
-        coinHistory: newHistory,
-      };
+      const r = markBought(prev, ids, value, now);
+      return r.changed ? { ...prev, ...r.slice } : prev;
     });
+
+    // One toast per action, so a bulk buy that ran short says both
+    // halves instead of the second message replacing the first.
+    const { bought: done, skipped, spent } = report;
+    let msg = '';
+    if (ids.length === 1) {
+      if (skipped.length) msg = 'Need ' + skipped[0].need + ' ⬡ — you have ' + skipped[0].have;
+      else if (spent > 0) msg = '-' + spent + ' ⬡ spent on ' + done[0].name + '!';
+    } else {
+      const parts = [];
+      if (spent > 0) parts.push('-' + spent + ' ⬡ spent on ' + done.length + ' item' + (done.length > 1 ? 's' : ''));
+      // "Need" at the start is what styles the toast as an error (App's
+      // showCoinToast), which is right when nothing could be bought.
+      if (skipped.length) parts.push(parts.length ? skipped.length + ' skipped, not enough ⬡' : 'Need more ⬡ — ' + skipped.length + ' not bought');
+      msg = parts.join(' · ');
+    }
+    if (msg) onShowCoinToast?.(msg, false);
+    if (done.length) firePurchase();
+  }
+
+  function handleToggleBought(id) {
+    const item = shopItems.find(s => s.id === id);
+    if (!item) return;
+    applyBought([id], !item.bought);
   }
 
   function handleDeleteItem(id) {

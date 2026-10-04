@@ -11,10 +11,11 @@ import Icon from '../Icon';
  *
  * Three sources, toggled in the header:
  *   • Friends  — what your accepted friends are saving for, aggregated
- *                by the friends-trending function (anonymous counts).
+ *                by the friends-trending function (anonymous counts,
+ *                only items ≥ 3 friends want).
  *   • Global   — what everyone on Vantage is saving for, aggregated by
  *                the global-trending function (anonymous; shown as an
- *                "N wishlists" count, only items on ≥ 2 wishlists).
+ *                "N wishlists" count, only items ≥ 5 people want).
  *   • Popular  — a curated catalogue (data/trendingItems), the evergreen
  *                fallback when there's no live data yet.
  * Default preference: Friends → Global → Popular.
@@ -36,9 +37,17 @@ export default function TrendingBoard({ onAdd }) {
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      const auth = { 'Content-Type': 'application/json', Authorization: `Bearer ${session?.access_token}` };
+      // Signed out, there is nothing to ask for: both functions need a
+      // token. This used to send "Authorization: Bearer undefined" and
+      // collect two 401s.
+      let token = null;
+      try {
+        const { data } = await supabase.auth.getSession();
+        token = data?.session?.access_token || null;
+      } catch { /* treat as signed out */ }
+      const auth = { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` };
       const load = async (fn) => {
+        if (!token) return [];
         try {
           const res = await fetch(apiUrl(`/.netlify/functions/${fn}`), { method: 'POST', headers: auth });
           const body = await res.json().catch(() => ({}));

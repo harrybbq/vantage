@@ -15,6 +15,8 @@ import Icon from './Icon';
 import { tradingWidgetAvailable } from '../lib/trading/enabled';
 import { widgetReadiness } from '../lib/widgets/readiness';
 import { authFetch } from '../lib/authFetch';
+import { parsePrice } from '../lib/shop/price';
+import { applyPriceEdit } from '../lib/shop/sweep';
 import { markManual } from '../lib/trackers/autoLog';
 import { addContribution } from '../lib/savings/contribute';
 import {
@@ -942,15 +944,13 @@ function MultiLogModal({ openId, onClose, trackers, multiSelectedDays, onSave })
   );
 }
 
-// Pull an integer coin value out of a free-text price ("£149.99",
-// "$1,299", "10") at £1 = 1 coin, rounded. Returns null if there's no
-// number to read.
+// Integer coin value of a free-text price ("£149.99", "$1,299", "10")
+// at £1 = 1 coin, rounded. Returns null if there's no price to read.
+// Same reader as every total on the Shop page (lib/shop/price.js), so
+// "1.299,99 €" mirrors as 1300, not 1.
 function priceToCoins(str) {
-  if (!str) return null;
-  const m = String(str).replace(/[,\s]/g, '').match(/\d+(?:\.\d+)?/);
-  if (!m) return null;
-  const n = parseFloat(m[0]);
-  return Number.isFinite(n) ? Math.round(n) : null;
+  const { value } = parsePrice(str);
+  return value == null ? null : Math.round(value);
 }
 
 // ── Add Shop Item ──
@@ -1028,6 +1028,10 @@ function AddShopModal({ openId, onClose, onAdd, categories = [] }) {
       notes: form.notes,
       coinCost: parseInt(form.coinCost) || 0,
       bought: false,
+      // When it joined the list: "Recently added" sorts by it, and price
+      // history seeds from it. Items from before this key keep sorting
+      // by list position.
+      addedAt: Date.now(),
     });
     setForm({ name: '', price: '', url: '', imageUrl: '', priority: 'med', notes: '', coinCost: '', categoryId: '' });
     setStatus('');
@@ -2070,9 +2074,13 @@ export default function Modals({ openModal, S, update, onClose, onOpen, onShowCo
     update(prev => ({ ...prev, shopItems: [...prev.shopItems, item] }));
   }
   function handleEditShopItem(id, patch) {
+    // applyPriceEdit = { ...item, ...patch }, plus a fresh price-history
+    // point when the typed price changed, so the drop badge measures from
+    // what you just wrote rather than a number you've since corrected.
+    const at = new Date().toISOString();
     update(prev => ({
       ...prev,
-      shopItems: prev.shopItems.map(s => s.id === id ? { ...s, ...patch } : s),
+      shopItems: prev.shopItems.map(s => s.id === id ? applyPriceEdit(s, patch, at) : s),
     }));
   }
   function handleDeleteShopItem(id) {
