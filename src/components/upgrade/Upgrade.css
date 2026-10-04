@@ -1306,8 +1306,11 @@ html[data-theme="dark-os"] .upg-app {
 }
 
 .uh { display: flex; flex-direction: column; gap: clamp(22px, 3vw, 36px); width: 100%; max-width: 1200px; margin: 0 auto 40px; }
-.upg-app .uh { background: var(--upg-solid); border: 1px solid var(--border); border-radius: 22px;
-  padding: 28px 32px 30px; box-shadow: 0 24px 60px -30px rgba(0,0,0,.5); }
+/* The cards float over the background photo (the owner's choice: no
+   sheet behind the menu). Each card is solid on its own, and only the
+   title block gets a panel, so no text ever sits on the photo. */
+.upg-app .uh-hero { align-self: flex-start; max-width: 100%; background: var(--upg-solid); border: 1px solid var(--border);
+  border-radius: 22px; padding: 20px 28px 18px; box-shadow: 0 24px 60px -30px rgba(0,0,0,.5); }
 
 .uh-hero { display: flex; flex-direction: column; gap: 8px; min-width: 0; animation: uh-in .6s cubic-bezier(.2,.8,.2,1) both; }
 .uh-eyebrow { display: inline-flex; align-items: center; gap: 8px; font-family: var(--mono); font-size: 12px; line-height: 16px;
@@ -1440,7 +1443,7 @@ html[data-theme="dark-os"] .upg-app .tone-em { --tone: var(--em-light); }
 /* Phone: one column of compact rows — icon, name + sentence, figure on
    the right. No tilt, stagger or bob here: rows need a straight edge. */
 @media (max-width: 543px) {
-  .upg-app .uh { padding: 18px 14px 16px; border-radius: 16px; }
+  .upg-app .uh-hero { align-self: stretch; padding: 16px 16px 14px; border-radius: 16px; }
   .uh { gap: 18px; }
   .uh-sub { font-size: 13px; }
   .uh-grid { grid-template-columns: minmax(0, 1fr); gap: 10px; }
