@@ -49,9 +49,17 @@
  * here, so every surface that already reads through `eventsOn` gets them
  * without knowing they exist.
  *
+ * ── Multi-day events are merged in on read too ───────────────────────
+ * A user's own holiday or festival is ONE range in S.calendarSpans, not
+ * a copy per day in this store — see lib/calendar/spans.js. Its days are
+ * merged here beside the trips, so the grid, the day menu and the hub's
+ * agenda all see them. The single-day writers below refuse their `sp:`
+ * ids; spans are edited whole, through the writers in spans.js.
+ *
  * Pure — no React, no DOM, no network.
  */
 import { holidayEventsInMonth, holidayEventsOn } from './holidayEvents.js';
+import { isSpanEventId, spanEventsInMonth, spanEventsOn, spansOf } from './spans.js';
 
 /** The kinds an event can be. `id` is stored; `label`/`colour` are display. */
 export const EVENT_KINDS = [
@@ -130,7 +138,8 @@ export function eventsOn(S, iso) {
   // above the 09:30 that sits inside it. sortEvents puts untimed events
   // last, which is right for "call Mum some time" and wrong for "you
   // are in Lisbon", so trips are prepended rather than merged into it.
-  return [...holidayEventsOn(S, iso), ...sortEvents(stored)];
+  // The user's own multi-day events sit with them, for the same reason.
+  return [...holidayEventsOn(S, iso), ...spanEventsOn(S, iso), ...sortEvents(stored)];
 }
 
 /**
@@ -172,11 +181,14 @@ export function eventsInMonth(S, year, month) {
   const prefix = `${year}-${String(month + 1).padStart(2, '0')}-`;
   const out = {};
   const trips = holidayEventsInMonth(S, year, month);
+  const spans = spanEventsInMonth(S, year, month);
 
-  // Union of the dates either source has something on. Iterating only
+  // Union of the dates any source has something on. Iterating only
   // the stored keys would have dropped a trip on a day with no stored
   // event, which is most days of most trips.
-  const dates = new Set([...Object.keys(typeof all === 'object' ? all : {}), ...Object.keys(trips)]);
+  const dates = new Set([
+    ...Object.keys(all && typeof all === 'object' ? all : {}), ...Object.keys(trips), ...Object.keys(spans),
+  ]);
   for (const iso of dates) {
     if (!iso.startsWith(prefix)) continue;
     const list = eventsOn(S, iso);
@@ -188,6 +200,10 @@ export function eventsInMonth(S, year, month) {
 /** Ids of derived events. Nothing in this store owns them, so the
  *  writers below refuse them rather than quietly doing nothing. */
 export const isDerivedId = id => typeof id === 'string' && id.startsWith('hol:');
+
+/** Ids the single-day writers must not touch: trips (read-only) and the
+ *  per-day view of a span (edited whole, in spans.js). */
+const notThisStore = id => isDerivedId(id) || isSpanEventId(id);
 
 const TIME_RE = /^([01]\d|2[0-3]):[0-5]\d$/;
 export const isTime = v => typeof v === 'string' && TIME_RE.test(v);
@@ -254,7 +270,7 @@ export function addEvent(prev, iso, event) {
 }
 
 export function removeEvent(prev, iso, eventId) {
-  if (!isIsoDate(iso) || isDerivedId(eventId)) return prev;
+  if (!isIsoDate(iso) || notThisStore(eventId)) return prev;
   const all = (prev && prev.calendarEvents) || {};
   const day = Array.isArray(all[iso]) ? all[iso] : [];
   const next = day.filter(e => e && e.id !== eventId);
@@ -265,7 +281,7 @@ export function removeEvent(prev, iso, eventId) {
 }
 
 export function updateEvent(prev, iso, eventId, patch) {
-  if (!isIsoDate(iso) || isDerivedId(eventId)) return prev;
+  if (!isIsoDate(iso) || notThisStore(eventId)) return prev;
   const all = (prev && prev.calendarEvents) || {};
   const day = Array.isArray(all[iso]) ? all[iso] : [];
   if (!day.some(e => e && e.id === eventId)) return prev;
@@ -310,13 +326,37 @@ export function todayAgenda(S, now = new Date()) {
   const hhmm = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
   return eventsToday(S, now).map(ev => {
     const over = ev.end ? ev.end < hhmm : (ev.time ? ev.time < hhmm : false);
-    return { ...ev, past: over };
+    return { ...ev, past: over, label: agendaLabel(ev) };
   });
 }
 
-/** Total events stored — for a future "you have N events" surface. */
+/**
+ * The line the hub shows for an event. A day in the middle of something
+ * longer says where in it you are — "Lisbon · day 2 of 5" — because
+ * "Lisbon" alone on a Wednesday reads like a new thing starting today.
+ */
+export function agendaLabel(ev) {
+  if (!ev) return '';
+  const title = ev.title || 'Untitled';
+  if ((ev.source === 'span' || ev.source === 'holiday') && ev.dayCount > 1) {
+    return `${title} · day ${ev.dayIndex} of ${ev.dayCount}`;
+  }
+  return title;
+}
+
+/**
+ * How many events the user has — for a future "you have N events"
+ * surface. Stored single-day events, plus each multi-day span ONCE (a
+ * fortnight away is one thing, not fourteen). Trips are not counted:
+ * they belong to the holiday planner, not to this store.
+ */
 export function eventCount(S) {
   const all = (S && S.calendarEvents) || {};
-  if (typeof all !== 'object') return 0;
-  return Object.keys(all).reduce((n, iso) => n + eventsOn(S, iso).length, 0);
+  let n = 0;
+  if (all && typeof all === 'object') {
+    for (const iso of Object.keys(all)) {
+      if (Array.isArray(all[iso])) n += all[iso].filter(e => e && typeof e === 'object').length;
+    }
+  }
+  return n + spansOf(S).length;
 }

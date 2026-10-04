@@ -22,6 +22,7 @@ import {
   planDays, nextShiftBlock, targetsFor, dayStatus, suggest, batchesOf, shoppingList, EMPTY_PLAN,
   portionOptions, planFood, rememberFood,
 } from '../../lib/diet/planner';
+import { scheduleOf } from '../../lib/rotation/pattern';
 import { shopPlan, packLabel, catalogueFor, packsAt, storeName, STORES, PRICES_AS_OF, PRICED_AS } from '../../lib/diet/shopping';
 import { searchByName, readCommunityPref } from '../../lib/diet/foodSearch';
 
@@ -49,13 +50,14 @@ export default function MealPlanner({ S, update, plan, proteinG }) {
   const recipes = useMemo(() => S.recipes || [], [S.recipes]);
   const overrides = useMemo(() => (S.rotation && S.rotation.overrides) || {}, [S.rotation]);
   const today = todayIso();
-  const block = useMemo(() => nextShiftBlock(today, overrides), [today, overrides]);
+  const schedule = scheduleOf(S);   // cached per stored value — stable identity
+  const block = useMemo(() => nextShiftBlock(today, overrides, schedule), [today, overrides, schedule]);
   const mp = S.mealPlan || null;
   const start = (mp && mp.start) || block.start;
   const n = Math.max(1, Math.min(14, (mp && mp.days) || block.days));
   const entries = useMemo(() => (mp && mp.entries) || [], [mp]);
   const bought = new Set((mp && mp.bought) || []);
-  const days = useMemo(() => planDays(start, n, overrides), [start, n, overrides]);
+  const days = useMemo(() => planDays(start, n, overrides, schedule), [start, n, overrides, schedule]);
   const [picker, setPicker] = useState(null);    // day index | 'all' | null
   const [copied, setCopied] = useState(false);
 

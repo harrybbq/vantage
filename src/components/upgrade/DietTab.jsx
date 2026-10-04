@@ -16,7 +16,7 @@ import Icon from '../Icon';
 import { RecipesPanel } from './MealLibrary';
 import MealPlanner from './MealPlanner';
 import { DEFAULT_PLAN, blendedDailyKcal } from '../../lib/diet/plan';
-import { SEQ, CARDIO_SESSIONS, TRAIN_POS, REST_POS, patternDay, ANCHOR } from '../../lib/rotation/pattern';
+import { SEQ, CARDIO_SESSIONS, cycleShape, scheduleOf } from '../../lib/rotation/pattern';
 import { weightSeries, pace } from '../../lib/diet/weightTrend';
 
 /* The Log Food panel's macro colours, so a macro is the same colour everywhere. */
@@ -41,6 +41,8 @@ const PANELS = [
 export default function DietTab({ S, update, userId }) {
   const [panel, setPanel] = useState('plan');
   const plan = useMemo(() => ({ ...DEFAULT_PLAN, ...(S.dietPlan || {}) }), [S.dietPlan]);
+  // The pattern in force today, for the prose below — follows a changed rota.
+  const shape = cycleShape(scheduleOf(S));
   const [editing, setEditing] = useState(false);
   const weight = latestWeight(S);
   const kg = weight ? weight.kg : null;
@@ -117,7 +119,7 @@ export default function DietTab({ S, update, userId }) {
         />
       </div>
 
-      <SplitCard />
+      <SplitCard S={S} />
 
       {/* The reasoning, kept but folded away: it is read once and then
           it is in the way. It used to be three paragraphs and a card of
@@ -132,14 +134,14 @@ export default function DietTab({ S, update, userId }) {
           actual waking hours — clock-time meals don&apos;t matter, totals do. The lean-athletic look
           comes from holding a small surplus and letting shoulder and back volume do the shaping,
           not from chasing bigger calorie numbers.</p>
-          <p><b>The split:</b> {SEQ.join(' → ')} is slotted from the first shift to the first day off, so one
-          block runs across the four shifts and finishes on the day you come off them — then {REST_POS.size / 2}{' '}
-          rest days before the next block. Every block is a complete PPLUL: Push always lands on the first
-          shift, Lower always on the first day off. Cardio rides on {[...CARDIO_SESSIONS].join(' / ')} days
+          <p><b>The split:</b> {SEQ.join(' → ')} starts on the first day of every shift block and runs
+          {' '}{SEQ.length} days — across the shifts and on into the days off — then rest until the next
+          block, so Push always lands on the first shift. On the current pattern that is {shape.train}{' '}
+          sessions and {shape.rest} rest days every {shape.len}. Cardio rides on {[...CARDIO_SESSIONS].join(' / ')} days
           to keep legs fresh.</p>
           <p><b>Elsewhere in the app:</b> the Body Goal projection needs one daily calorie figure and this plan
-          has two, so it uses the blend — {plan.trainKcal} on the {TRAIN_POS.length} training days and{' '}
-          {plan.restKcal} on the other {16 - TRAIN_POS.length}. That blend is a fallback: a calorie goal set
+          has two, so it uses the blend — {plan.trainKcal} on the {shape.train} training days and{' '}
+          {plan.restKcal} on the other {shape.rest}. That blend is a fallback: a calorie goal set
           in Track → Daily Macros wins, and once enough days are logged, what you actually ate beats both.</p>
         </div>
       </details>
@@ -314,21 +316,19 @@ function MacroCard({ title, kcal, protein, carbs, fat, accent, editing, onKcal, 
  * it cannot drift from what the calendar actually says. Shows one full
  * cycle, which is the shortest span that contains every session.
  */
-function SplitCard() {
-  const cycle = useMemo(() => {
-    return Array.from({ length: 16 }, (_, i) => {
-      const dt = new Date((ANCHOR + i) * 86400000);
-      const day = patternDay(dt.getUTCFullYear(), dt.getUTCMonth(), dt.getUTCDate());
-      return { i, ...day };
-    });
-  }, []);
+function SplitCard({ S }) {
+  // The cycle in force today, one cell per position — the same cells the
+  // calendar draws. Follows a changed pattern (Rotation → Shift pattern).
+  const schedule = scheduleOf(S);
+  const shape = useMemo(() => cycleShape(schedule), [schedule]);
+  const cycle = useMemo(() => shape.cells.map(c => ({ i: c.pos, ...c })), [shape]);
 
   return (
     <div className="upg-card">
       <div className="upg-card-head">
         <h3>Gym split</h3>
         <span className="upg-card-sub">
-          {TRAIN_POS.length} sessions / 16 days ≈ {(TRAIN_POS.length * 7 / 16).toFixed(1)} a week
+          {shape.train} sessions / {shape.len} days ≈ {(shape.train * 7 / shape.len).toFixed(1)} a week
         </span>
       </div>
       <div className="upg-split-row">

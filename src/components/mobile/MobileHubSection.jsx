@@ -190,7 +190,7 @@ export default function MobileHubSection({ S, update, visionState, hasPro, navig
               <span key={ev.id} className={`m-hub-event${ev.past ? ' is-past' : ''}`}>
                 <span className="m-hub-event-dot" style={{ background: eventColour(ev) }} />
                 {ev.time && <span className="m-hub-event-at">{ev.time}</span>}
-                <span className="m-hub-event-name">{ev.title}</span>
+                <span className="m-hub-event-name">{ev.label || ev.title}</span>
               </span>
             ))}
             {agenda.length > 3 && <span className="m-hub-events-meta">+{agenda.length - 3}</span>}

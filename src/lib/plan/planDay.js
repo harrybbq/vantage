@@ -28,7 +28,7 @@
  *
  * Pure — no React, no DOM, no network. Date and state in, verdict out.
  */
-import { resolveDay, rotaDayIndex, dayTypeOf, loadScaleOf } from '../rotation/pattern.js';
+import { resolveDay, rotaDayIndex, dayTypeOf, loadScaleOf, scheduleOf } from '../rotation/pattern.js';
 import { targetsForDay, DAY_TYPE_LABEL, exercisesFor } from '../../data/trainingProgramme.js';
 
 /** True when this build/session is the owner's. UI gate only. */
@@ -54,7 +54,8 @@ export function planDayFor(iso, S = {}, opts = {}) {
   if (parts.length !== 3 || parts.some(n => !Number.isFinite(n))) return { active: false };
   const [y, m, d] = parts;
 
-  const day = resolveDay(y, m - 1, d, rotation.overrides || {});
+  const schedule = scheduleOf(S);
+  const day = resolveDay(y, m - 1, d, rotation.overrides || {}, schedule);
   if (!day.inPattern) return { active: false };
 
   // Booked leave fuels as an off day: it is not a working night,
@@ -64,7 +65,7 @@ export function planDayFor(iso, S = {}, opts = {}) {
 
   return {
     active: true,
-    dayIndex: rotaDayIndex(day.pos),
+    dayIndex: rotaDayIndex(day.pos, schedule, day.iso),
     dayType,
     dayTypeLabel: DAY_TYPE_LABEL[dayType],
     session: day.session,

@@ -201,6 +201,15 @@ for (const [key, value] of Object.entries(alone)) {
   ok(!hasMeaningfulData(s), 'auto-set and settings scalars are not data');
 }
 
+{
+  // Multi-day events (lib/calendar/spans.js) are covered by the generic
+  // rule — no IGNORE entry, no SQL change.
+  const s = seed(); s.calendarSpans = [{ id: 'sp_1', title: 'Away', start: '2026-10-05', end: '2026-10-09' }];
+  ok(hasMeaningfulData(s) && meaningfulEvidence(s).includes('calendarSpans'), 'a multi-day event counts');
+  const e = seed(); e.calendarSpans = [];
+  ok(!hasMeaningfulData(e), 'an empty span list does not');
+}
+
 // ── Heavy user ──────────────────────────────────────────────────────
 {
   const h = heavyUser();
@@ -216,7 +225,7 @@ ok(!hasMeaningfulData(null) && !hasMeaningfulData(undefined) && !hasMeaningfulDa
 ok(!looksLikeFactoryDefault(null), 'and are not "factory default" either (nothing to compare)');
 ok(MEANINGFUL_IGNORE.every(k => typeof k === 'string'), 'the ignore list is plain strings (mirrored in SQL)');
 for (const k of ['vitalsLog', 'burnLog', 'bodyLog', 'moodLog', 'subscriptions', 'holidays', 'backgrounds',
-  'hubWidgets', 'savings', 'habits', 'shopItems', 'recipes', 'mealPlan', 'logs']) {
+  'hubWidgets', 'savings', 'habits', 'shopItems', 'recipes', 'mealPlan', 'logs', 'calendarEvents', 'calendarSpans']) {
   ok(!MEANINGFUL_IGNORE.includes(k), `${k} is never on the ignore list`);
 }
 

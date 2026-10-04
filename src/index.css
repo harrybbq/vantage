@@ -8069,6 +8069,82 @@ div.m-hubdrawer-coach { cursor: default; display: flex; flex-direction: column; 
 .cal-event-more{ font-family:var(--mono); font-size:8px; color:var(--text-muted); }
 #track .cal-event{ color:rgba(255,255,255,.82); }
 
+/* ── Multi-day bars (spans + trips) ───────────────────────────────────
+   One bar across the days it covers. Each cell draws its own segment
+   (lib/calendar/spans.js barLayout gives the lane); the segments read as
+   one bar because:
+     · every segment of a bar sits in the same lane across the week row,
+       and the cell head is a fixed height so lane 0 starts at the same
+       y in every cell — today's badge included;
+     · a CONTINUING edge runs out through the cell's padding and border
+       to the middle of the grid gap, where the neighbour's segment
+       meets it — squared. Only the bar's real first and last day are
+       inset and rounded;
+     · the title is drawn once per row and runs across the segments
+       after it (`--run` cells, measured in container units of the grid).
+   Opaque colours (colour-mixed onto a near-black) so the 1px where two
+   segments meet cannot show as a darker seam. The Track calendar is dark
+   in both themes, so one mix serves cream-pro and dark-os.
+   The cell's top-right corner (beside the date, in .cal-cell-head) is
+   left free for the owner's shift chip. */
+.cal-grid{ --cal-gap:3px; container-type:inline-size; isolation:isolate; }
+#track .cal-grid{ --cal-gap:2px; }
+#track .track-main .cal-grid{ --cal-gap:5px; }
+.cal-cell{ --cal-padx:0px; --cal-bw:1px; --bar-h:14px; --bar-pitch:16px; }
+.cal-cell.today, .cal-cell.selected{ --cal-bw:2px; }
+/* min-width:0 because overflow:visible brings back the grid item's
+   automatic minimum (min-content): a long event title would otherwise
+   widen its column and the seven 1fr tracks stop being equal. */
+#track .track-main .cal-cell{ --cal-padx:7px; overflow:visible; min-width:0; }
+/* The tracker tint used to be clipped to the rounded cell by the cell's
+   overflow:hidden, which the bars need gone. */
+.cal-cell-fill{ border-radius:inherit; }
+.cal-cell-head{
+  display:flex; align-items:center; gap:6px; min-width:0; max-width:100%;
+  overflow:hidden; white-space:nowrap; flex:none;
+}
+#track .track-main .cal-cell-head{ height:24px; width:100%; }
+.cal-bars{
+  position:relative; flex:none; align-self:stretch;
+  height:calc(var(--lanes) * var(--bar-pitch) - (var(--bar-pitch) - var(--bar-h)));
+}
+.cal-bar{
+  position:absolute; top:calc(var(--lane) * var(--bar-pitch)); height:var(--bar-h);
+  left:calc(-1 * (var(--cal-padx) + var(--cal-bw) + var(--cal-gap) / 2));
+  right:calc(-1 * (var(--cal-padx) + var(--cal-bw) + var(--cal-gap) / 2));
+  background:var(--bar);
+  background:color-mix(in srgb, var(--bar) 58%, #0d0d0f);
+  box-sizing:border-box;
+}
+/* Row edges that are not the bar's ends stop at the cell edge rather
+   than poking into the panel's padding. */
+.cal-bar.is-row-first{ left:calc(-1 * (var(--cal-padx) + var(--cal-bw))); }
+.cal-bar.is-row-last{ right:calc(-1 * (var(--cal-padx) + var(--cal-bw))); }
+.cal-bar.is-start{
+  left:0; border-top-left-radius:5px; border-bottom-left-radius:5px;
+  box-shadow:inset 3px 0 0 var(--bar);
+}
+.cal-bar.is-end{ right:0; border-top-right-radius:5px; border-bottom-right-radius:5px; }
+.cal-bar-title{
+  position:absolute; z-index:2; top:0; left:6px;
+  max-width:calc(var(--run) * (100cqw + var(--cal-gap)) / 7 - var(--cal-gap) - 2 * var(--cal-padx) - 8px);
+  overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+  font-family:var(--mono); font-size:9.5px; font-weight:600; line-height:var(--bar-h);
+  color:#fff; letter-spacing:.2px; pointer-events:none;
+}
+.cal-bar:not(.is-start) .cal-bar-title{ left:calc(var(--cal-padx) + var(--cal-bw) + 4px); }
+@media (max-width:640px){
+  .cal-cell{ --bar-h:12px; --bar-pitch:13px; }
+  #track .track-main .cal-cell{ --cal-padx:4px; }
+  #track .track-main .cal-cell-head{ height:19px; }
+  .cal-bar.is-start, .cal-bar.is-end{ border-radius:4px; }
+  .cal-bar.is-start{ border-top-right-radius:0; border-bottom-right-radius:0; }
+  .cal-bar.is-end{ border-top-left-radius:0; border-bottom-left-radius:0; }
+  .cal-bar.is-start.is-end{ border-radius:4px; }
+  .cal-bar-title{ font-size:8px; left:3px; font-weight:700; letter-spacing:0; }
+  .cal-bar:not(.is-start) .cal-bar-title{ left:calc(var(--cal-padx) + var(--cal-bw) + 2px); }
+}
+
 /* ── Day tick menu ────────────────────────────────────────────────────
    Right-click a calendar day. Every tick writes immediately — there is
    no Save because there is nothing to save, and an unsaved checkbox is
@@ -8127,6 +8203,75 @@ div.m-hubdrawer-coach { cursor: default; display: flex; flex-direction: column; 
   color:rgba(255,255,255,.42); padding:5px 6px 2px; text-align:center;
 }
 
+/* ── Owner shift overlay ─────────────────────────────────────────────
+   The owner's rota (Upgrade → Rotation) as a chip in the top-right of
+   each working day: N1–N4 nights, D1–D4 days, a leave code when
+   booked off. Off days draw nothing. Absolutely placed so it takes no
+   row from the events below the date; colours are the Rotation tab's
+   night blue and day amber, lifted for the calendar's dark surface
+   (dark in both themes — see the #track .cal-* rules). */
+/* Centred on the fixed-height .cal-cell-head (24px, 19px on phones)
+   from multi-day events, inset by the cell's own padding. The cell is
+   position:relative; the chip sits inside it, so nothing relies on the
+   cell clipping it (it is overflow:visible for the bars). */
+.cal-cell{ position:relative; }
+.cal-shift{
+  --chip-h:15px;
+  position:absolute; z-index:3;
+  top:calc(6px + (24px - var(--chip-h)) / 2); right:7px;
+  height:var(--chip-h); box-sizing:border-box;
+  font-family:var(--mono); font-size:9.5px; font-weight:700; line-height:13px; letter-spacing:.3px;
+  padding:0 5px; border-radius:5px; white-space:nowrap; pointer-events:none;
+  border:1px solid rgba(255,255,255,.28); background:#1d1d22; color:rgba(255,255,255,.85);
+}
+.cal-shift.is-night{ border-color:rgba(138,155,255,.6); background:#1c2140; color:#aab6ff; }
+.cal-shift.is-day{ border-color:rgba(231,166,58,.6); background:#3a2a10; color:#f2b955; }
+.cal-shift.is-leave{ border-color:rgba(77,196,133,.6); background:#123222; color:#7fdcaa; }
+/* Keep the head's content clear of the chip: reserve its width on the
+   right (the head is overflow:hidden, so at worst something is clipped,
+   never overlapped), and drop the "Today" word where date badge + word
+   + chip cannot share a cell — the filled badge still marks today. The
+   grid is a size container (multi-day events), so this tracks the real
+   cell width, not the viewport. */
+#track .track-main .cal-cell.has-shift .cal-cell-head{ padding-right:38px; box-sizing:border-box; }
+@container (max-width: 960px){
+  .cal-cell.today.has-shift .cal-today-tag{ display:none; }
+}
+@media (max-width:640px){
+  /* No reservation here: a 37-41px cell cannot give up 16px, and the
+     two-letter chip already clears a plain date. Today's badge is the
+     one wide thing, so it gives a little instead. */
+  #track .track-main .cal-cell.has-shift .cal-cell-head{ padding-right:0; }
+  /* Today's badge and a chip cannot share a 38px cell, so on today the
+     chip lifts onto the corner like a notification badge — into the
+     5px grid gap, clear of the neighbouring cells and of the head. */
+  #track .track-main .cal-cell.today.has-shift .cal-shift{ top:-5px; right:-4px; padding:0 1px; box-shadow:0 0 0 1px #0d0d0f; }
+}
+.cal-shift-toggle.active{ background:#1c2140; border-color:rgba(138,155,255,.7); color:#cdd4ff; }
+#track .cal-shift-toggle.active{ background:#1c2140; border-color:rgba(138,155,255,.7); color:#cdd4ff; }
+@media (max-width:640px){
+  /* A 40px cell: the chip shrinks and tucks into the corner so the
+     date badge on the left keeps its room. */
+  .cal-shift{ --chip-h:12px; top:calc(4px + (19px - var(--chip-h)) / 2); right:3px;
+    font-size:7.5px; line-height:10px; padding:0 2px; border-radius:3px; letter-spacing:0; }
+  /* Two characters at most here: "TOIL" beside "12" overran the date
+     in a 40px cell, so leave falls back to its two-letter form. */
+  .cal-shift-txt{ display:none; }
+  .cal-shift::after{ content:attr(data-tiny); }
+}
+.daymenu-shift{
+  display:flex; align-items:center; gap:8px; margin:0 0 4px; padding:7px 8px; border-radius:8px;
+  background:#1f1f25; border:1px solid rgba(255,255,255,.1); font-size:12.5px; color:rgba(255,255,255,.92);
+}
+.daymenu-shift-chip{
+  font-family:var(--mono); font-size:10px; font-weight:700; padding:1px 6px; border-radius:5px;
+  border:1px solid rgba(255,255,255,.28); color:rgba(255,255,255,.85);
+}
+.daymenu-shift.is-night .daymenu-shift-chip{ border-color:rgba(138,155,255,.6); background:#1c2140; color:#aab6ff; }
+.daymenu-shift.is-day .daymenu-shift-chip{ border-color:rgba(231,166,58,.6); background:#3a2a10; color:#f2b955; }
+.daymenu-shift.is-leave .daymenu-shift-chip{ border-color:rgba(77,196,133,.6); background:#123222; color:#7fdcaa; }
+.daymenu-shift-lbl{ min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+
 /* ── Day menu: events ────────────────────────────────────────────────
    The menu is portalled to <body> and paints its own dark surface (it
    would otherwise inherit the page's --text and put dark type on a dark
@@ -8158,6 +8303,7 @@ div.m-hubdrawer-coach { cursor: default; display: flex; flex-direction: column; 
   text-transform:uppercase; color:var(--em-light,#4dc485);
 }
 .daymenu-add:hover{ background:rgba(var(--em-rgb),.24); }
+.daymenu-add.is-span{ margin-top:4px; }
 .daymenu-add-plus{ font-size:13px; line-height:1; font-weight:700; }
 
 /* ══ Event modal ══════════════════════════════════════════════════════
@@ -8244,6 +8390,30 @@ div.m-hubdrawer-coach { cursor: default; display: flex; flex-direction: column; 
 .ev-btn.is-go:disabled{ opacity:.42; cursor:not-allowed; }
 .ev-btn.is-del{ margin-right:auto; color:#e06b5a; border-color:rgba(224,107,90,.4); }
 .ev-btn.is-del:hover{ background:rgba(224,107,90,.12); }
+/* Multi-day switch. A full-width row (not a bare checkbox) so the hint
+   can say what it is for and the whole thing is a 44px target. */
+.ev-switch{
+  display:flex; align-items:center; gap:12px; width:100%; min-height:44px;
+  padding:8px 12px; border-radius:10px; cursor:pointer; text-align:left;
+  border:var(--border-card); background:var(--surface); color:var(--text);
+}
+.ev-switch-track{
+  position:relative; flex:none; width:34px; height:20px; border-radius:999px;
+  background:var(--border); transition:background .15s;
+}
+.ev-switch-knob{
+  position:absolute; top:2px; left:2px; width:16px; height:16px; border-radius:50%;
+  background:#fff; box-shadow:0 1px 2px rgba(0,0,0,.25); transition:transform .15s;
+}
+.ev-switch.is-on .ev-switch-track{ background:var(--em); }
+.ev-switch.is-on .ev-switch-knob{ transform:translateX(14px); }
+.ev-switch-text{ display:flex; flex-direction:column; gap:2px; min-width:0; }
+.ev-switch-lbl{ font-family:var(--sans); font-size:13.5px; font-weight:600; }
+.ev-switch-hint{ font-family:var(--mono); font-size:10.5px; color:var(--text-mid); line-height:1.35; }
+.ev-field input[type="date"]{ font-family:var(--mono); font-variant-numeric:tabular-nums; padding-left:10px; padding-right:8px; }
+/* Two dates side by side on a 360px phone: mono digits at 16px plus the
+   picker icon only just fit a 145px field, so spend less on letterspace. */
+@media (max-width:420px){ .ev-field input[type="date"]{ letter-spacing:-.4px; } }
 
 /* ── Event memory: suggestion list + inline completion ────────────────
    The list sits IN the flow under its field (not a floating popover) so
