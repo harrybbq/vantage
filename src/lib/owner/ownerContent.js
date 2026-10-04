@@ -20,6 +20,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { supabase } from '../supabase';
 
 const cache = new Map();            // key → data
+const loadedAt = new Map();         // prefix → ms epoch of the last answer
 let inflight = null;
 
 export const SETUP_MESSAGE = 'Owner content isn’t set up yet — run supabase/owner_content.sql in the Supabase SQL editor, then the seed file.';
@@ -59,14 +60,16 @@ export async function saveKey(key, data) {
 }
 
 /**
- * React hook: { data, state: 'loading'|'ready'|'setup'|'error', message, save(key, value), reload() }.
- * `data` is { key: value } for the prefix. `save` is optimistic.
+ * React hook: { data, state: 'loading'|'ready'|'setup'|'error', message, at, save(key, value), reload() }.
+ * `data` is { key: value } for the prefix. `save` is optimistic. `at` is
+ * when the rows last arrived from the server (ms epoch, null until then).
  */
 export function useOwnerContent(prefix) {
   const cached = () => Object.fromEntries([...cache].filter(([k]) => k.startsWith(prefix)));
   const [data, setData] = useState(() => cached());
   const [state, setState] = useState(() => (Object.keys(cached()).length ? 'ready' : 'loading'));
   const [message, setMessage] = useState('');
+  const [at, setAt] = useState(() => loadedAt.get(prefix) ?? null);
   const alive = useRef(true);
 
   const reload = useCallback(async () => {
@@ -77,6 +80,8 @@ export function useOwnerContent(prefix) {
       setData(d);
       setState('ready');
       setMessage('');
+      loadedAt.set(prefix, Date.now());
+      setAt(loadedAt.get(prefix));
     } catch (err) {
       if (!alive.current) return;
       const e = describeError(err);
@@ -105,5 +110,5 @@ export function useOwnerContent(prefix) {
     }
   }, []);
 
-  return { data, state, message, save, reload };
+  return { data, state, message, at, save, reload };
 }

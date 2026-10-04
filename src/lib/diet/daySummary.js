@@ -26,14 +26,19 @@ function load(userId, day) {
   const hit = cache.get(key);
   if (hit && (hit.promise || Date.now() - hit.at < TTL)) return hit.promise || Promise.resolve(hit.data);
   const promise = (async () => {
+    // `error` and `at` are additive: older callers read only macros /
+    // summary / loaded and see exactly what they always did (empty on a
+    // failure). Upgrade's home menu reads them to tell "nothing logged"
+    // from "couldn't ask", and to say when the figures were fetched.
     try {
-      const [{ data: macros }, { data: summary }] = await Promise.all([
+      const [{ data: macros, error: mErr }, { data: summary, error: sErr }] = await Promise.all([
         supabase.from('nutrition_macros').select('*').eq('user_id', userId).order('display_order', { ascending: true }),
         supabase.from('nutrition_daily_summary').select('*').eq('user_id', userId).eq('log_date', day).maybeSingle(),
       ]);
-      return { macros: macros || [], summary: summary || null, loaded: true };
+      const err = sErr || mErr;
+      return { macros: macros || [], summary: summary || null, loaded: true, error: err ? (err.message || 'Couldn’t load today’s log.') : null, at: Date.now() };
     } catch {
-      return { macros: [], summary: null, loaded: true };
+      return { macros: [], summary: null, loaded: true, error: 'Couldn’t reach the server.', at: Date.now() };
     }
   })();
   cache.set(key, { at: 0, data: null, promise });
@@ -63,8 +68,10 @@ function peek(userId, day) {
 }
 
 /**
- * @returns { macros, summary, loaded }. `loaded` is true once the fetch
- * has answered (or immediately when there is no user to fetch for).
+ * @returns { macros, summary, loaded, error?, at? }. `loaded` is true once
+ * the fetch has answered (or immediately when there is no user to fetch
+ * for); `error` is a message when it failed (summary is then null), `at`
+ * the ms epoch it answered. Refetch with refreshDaySummary(userId).
  */
 export function useDaySummary(userId) {
   const day = getTodayStr();

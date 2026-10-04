@@ -4,211 +4,346 @@
    These lived in holiday.css, which was never right — they were put
    there because holiday.css was the LAST stylesheet main.jsx imported,
    so its rules win ties against index.css, and that load-order property
-   was what the mobile layout needed. Borrowing another page's file to
-   get it was a mistake: it hid shop rules where nobody would look for
-   them, in a file whose name says they aren't there.
-
-   This file is imported after holiday.css, so it keeps exactly that
-   property under an honest name. IMPORT ORDER IS LOAD-BEARING — the
-   mobile block at the bottom relies on being the last word on .shop-*.
+   was what the mobile layout needed. This file is imported after
+   holiday.css, so it keeps exactly that property under an honest name.
+   IMPORT ORDER IS LOAD-BEARING — the rules here are the last word on
+   .shop-*, and most are #shop-scoped so they also beat the theme files.
    ════════════════════════════════════════════════════════════════════ */
 
-/* ── Shopping: scroll-to-category + sticky trending ─────────────────
-   The category tabs scroll to a section rather than filtering the page
-   down to it. The landing offset lives here as scroll-margin-top so
-   scrollIntoView needs no JS measuring and each breakpoint can differ.
-   96px clears the .section top padding (68px) plus breathing room. */
-.shop-category-section{scroll-margin-top:96px;}
+/* ── Shop-scoped tokens ───────────────────────────────────────────────
+   Measured over a photo background with heavy data (Oct 2026): dark-os
+   muted text was 2.55:1, "+N" 1.78:1, green prices 3.2–3.5:1, cream
+   muted text 2.1–3.6:1. These are scoped to the Shop (and to the two
+   things it portals to <body>: the ⋯ menu and the Undo toast) so the
+   rest of the app is untouched. Every value here was checked against
+   the surface it sits on, at ≥4.5:1. */
+#shop, .shop-portal{
+  /* Opaque. Cream's --surface is 92% alpha, which over a photo is a
+     smeared photo, not a surface. */
+  --shop-solid: var(--bg-raised, #fdfaf3);
+  --shop-solid-2: #f3ecdc;
+  --surface: var(--shop-solid);
+  --text-muted: #675d52;
+  --shop-price: var(--em);
+  --shop-danger: #b42318;
+  --shop-down: #1b6f43;
+  --shop-up: #b42318;
+  --shop-gold: #7a5608;
+  --shop-focus: var(--em);
+}
+html[data-theme="cream-pro"] #shop, html[data-theme="cream-pro"] .shop-portal{
+  --shop-solid-2: #f1e9d6;
+  --text-muted: #665b4f;
+}
+html[data-theme="dark-os"] #shop, html[data-theme="dark-os"] .shop-portal{
+  --shop-solid-2: #1c1c19;
+  --text-muted: #9c978d;
+  /* Prices, drops and the danger red all move lighter on dark: the
+     default greens and reds are tuned for parchment. */
+  --shop-price: var(--em-light);
+  --shop-danger: #f2877e;
+  --shop-down: #5cd193;
+  --shop-up: #f2877e;
+  --shop-gold: #d9b25a;
+  --shop-focus: var(--em-light);
+}
 
+/* Visible focus everywhere on the page (several controls had none). */
+#shop :focus-visible, .shop-portal :focus-visible{
+  outline:2px solid var(--shop-focus);outline-offset:2px;
+}
+#shop .shop-search:focus-within{border-color:var(--shop-focus);box-shadow:0 0 0 1px var(--shop-focus);}
+#shop .shop-search input:focus-visible{outline:none;}
+
+.shop-sr{position:absolute!important;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;
+  clip:rect(0,0,0,0);white-space:nowrap;border:0;}
+
+/* ── Solid plates ─────────────────────────────────────────────────────
+   Nothing on this page is see-through over the user's photo: the title
+   block (desktop), the whole control stack (phone), category headings
+   on phones, and every empty-state message sit on one of these. */
+#shop .shop-plate{background:var(--shop-solid);border:var(--border-card);border-radius:var(--radius-lg);
+  box-shadow:var(--accent-glow);}
+#shop .shop-head{padding:16px 20px;margin-bottom:14px;}
+#shop .shop-toolbar{display:flex;align-items:flex-end;justify-content:space-between;gap:16px;flex-wrap:wrap;margin:0;}
+#shop .shop-titleblock{min-width:0;}
+#shop .eyebrow{font-size:12px;letter-spacing:2.4px;color:var(--text-muted);margin-bottom:4px;}
+#shop .sec-title{margin:0;color:var(--text);display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
+#shop .shop-headline{margin:6px 0 0;font-family:var(--mono);font-size:13px;letter-spacing:.2px;color:var(--text-mid);
+  font-variant-numeric:tabular-nums;}
+#shop .shop-toolbar-actions{display:flex;gap:10px;flex-wrap:wrap;}
+/* The "?" was styled white-on-glass for a title floating over a photo;
+   on the plate it measured 1.05:1. */
+#shop .section-help-btn{position:relative;isolation:isolate;width:26px;height:26px;font-size:13px;
+  border:1px solid var(--border);background:var(--shop-solid-2);color:var(--text-mid);}
+#shop .section-help-btn:hover{color:var(--text);border-color:var(--accent-line);background:var(--shop-solid-2);}
+#shop .section-help-title, #shop .section-help-row dt, #shop .section-help-foot{font-size:12px;}
+/* It lives inside the h2, so it was inheriting the title's display face
+   (italic on phones) — and anchored at its left edge it ran off a 390px
+   screen. Centred on the "?" it fits. */
+#shop .section-help-tooltip{left:50%;transform:translateX(-50%);font-style:normal;font-weight:400;letter-spacing:0;
+  text-transform:none;line-height:1.5;}
+#shop .section-help-arrow{left:calc(50% - 5px);}
+#shop .section-help-foot, #shop .section-help-title{color:rgba(255,255,255,.62);}
+#shop .shop-toolbar-actions .btn{display:inline-flex;align-items:center;justify-content:center;gap:7px;min-height:40px;}
+/* The theme's primary button is a gradient whose light top measured
+   3.4:1 behind white text. Flat em is 5.4:1. */
+#shop .btn-primary{background:var(--em);border-color:var(--em);color:#fff;}
+#shop .btn-ghost{background:var(--shop-solid);color:var(--text);}
+
+/* ── Wishlist / Purchased + Select ───────────────────────────────── */
+#shop .shop-viewrow{display:flex;align-items:center;justify-content:space-between;gap:10px;}
+#shop .shop-viewtabs{display:inline-flex;gap:2px;padding:3px;border-radius:12px;background:var(--shop-solid-2);border:var(--border-card);}
+#shop .shop-viewtab{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:36px;padding:0 14px;
+  border:0;border-radius:9px;background:transparent;color:var(--text-mid);cursor:pointer;
+  font-family:var(--mono);font-size:12px;font-weight:700;letter-spacing:1px;text-transform:uppercase;}
+#shop .shop-viewtab:hover{color:var(--text);}
+#shop .shop-viewtab.is-on{background:var(--em);color:#fff;}
+#shop .shop-viewtab-n{font-weight:500;font-variant-numeric:tabular-nums;opacity:.95;}
+#shop .shop-select-toggle{display:inline-flex;align-items:center;gap:7px;min-height:36px;padding:0 15px;border-radius:999px;
+  border:var(--border-card);background:var(--shop-solid);color:var(--text-mid);cursor:pointer;
+  font-family:var(--mono);font-size:12px;letter-spacing:1px;text-transform:uppercase;}
+#shop .shop-select-toggle:hover{color:var(--text);border-color:var(--accent-line);}
+#shop .shop-select-toggle.is-on{background:var(--em);border-color:var(--em);color:#fff;}
+
+/* ── Priority pills ─────────────────────────────────────────────── */
+#shop .shop-filters{display:flex;gap:6px;flex-wrap:wrap;}
+#shop .shop-filter-btn{display:inline-flex;align-items:center;gap:7px;min-height:34px;padding:0 14px;border-radius:999px;
+  border:1px solid var(--accent-line-soft);background:var(--shop-solid);color:var(--text-mid);
+  font-family:var(--body);font-size:13px;font-weight:500;cursor:pointer;}
+#shop .shop-filter-btn.active{background:var(--em);color:#fff;border-color:var(--em);}
+#shop .shop-filter-btn:hover:not(.active){border-color:var(--accent-line);color:var(--text);}
+
+/* ── Search + sort ──────────────────────────────────────────────── */
+#shop .shop-controls{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin:0;}
+#shop .shop-search{flex:1;min-width:180px;min-height:40px;display:flex;align-items:center;gap:8px;padding:0 6px 0 12px;
+  border-radius:10px;border:1px solid var(--border);background:var(--shop-solid);color:var(--text-muted);}
+/* #shop beats dark-os's (0,5,2) input rule, which painted a second box
+   inside this one. */
+#shop .shop-search input{flex:1;min-width:0;height:38px;background:transparent;border:0;outline:0;box-shadow:none;padding:0;
+  color:var(--text);font-family:var(--sans);font-size:14px;}
+#shop .shop-search input::placeholder{color:var(--text-muted);opacity:1;}
+#shop .shop-search input::-webkit-search-cancel-button{display:none;}
+#shop .shop-search-clear{background:transparent;border:0;color:var(--text-muted);cursor:pointer;display:inline-flex;
+  align-items:center;justify-content:center;width:32px;height:32px;border-radius:8px;}
+#shop .shop-search-clear:hover{color:var(--text);}
+#shop .shop-sort{display:inline-flex;align-items:center;gap:8px;font-family:var(--mono);font-size:12px;
+  letter-spacing:1px;text-transform:uppercase;color:var(--text-muted);}
+#shop .shop-sort select{min-height:40px;padding:0 10px;border-radius:10px;border:1px solid var(--border);
+  background:var(--shop-solid);color:var(--text);font-family:var(--sans);font-size:13px;cursor:pointer;}
+#shop .shop-search-note{font-family:var(--mono);font-size:12px;letter-spacing:.3px;color:var(--text-mid);}
+#shop .shop-search-note strong{color:var(--text);}
+
+/* ── Bulk bar ───────────────────────────────────────────────────── */
+#shop .shop-bulkbar{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin:0;padding:10px 12px;
+  border-radius:11px;border:1px solid var(--em);background:var(--shop-solid-2);}
+#shop .shop-bulkbar-count{font-family:var(--mono);font-size:12px;letter-spacing:1px;text-transform:uppercase;
+  color:var(--text);font-weight:700;margin-right:2px;}
+#shop .shop-bulkbar button, #shop .shop-bulkbar select{min-height:36px;padding:0 12px;border-radius:8px;border:1px solid var(--border);
+  background:var(--shop-solid);color:var(--text);font-family:var(--sans);font-size:13px;cursor:pointer;}
+#shop .shop-bulkbar button:disabled, #shop .shop-bulkbar select:disabled{color:var(--text-muted);cursor:not-allowed;}
+#shop .shop-bulkbar button:not(:disabled):hover{border-color:var(--em);}
+#shop .shop-bulkbar .shop-bulkbar-del:not(:disabled){color:var(--shop-danger);}
+#shop .shop-bulkbar .shop-bulkbar-del:not(:disabled):hover{border-color:var(--shop-danger);}
+
+/* ── The list ───────────────────────────────────────────────────── */
+.shop-category-section{scroll-margin-top:96px;}
+#shop .shop-list{display:block;margin:0;}
+#shop .shop-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:16px;padding:0;}
+#shop .shop-category-section{margin-bottom:26px;}
+#shop .shop-category-header{display:flex;align-items:center;gap:10px;margin:0 0 10px;}
+#shop .shop-category-label{margin:0;font-family:var(--mono);font-size:12px;font-weight:700;letter-spacing:1.6px;
+  text-transform:uppercase;color:var(--text-mid);}
+#shop .shop-category-count{font-family:var(--mono);font-size:12px;color:#fff;background:var(--em);padding:1px 8px;border-radius:999px;}
+#shop .shop-category-total{font-family:var(--mono);font-size:12px;color:var(--text);letter-spacing:.3px;
+  padding:1px 8px;border-radius:999px;background:var(--shop-solid);border:1px solid var(--border);
+  display:inline-flex;align-items:baseline;gap:4px;font-variant-numeric:tabular-nums;}
+#shop .shop-category-total-partial{font-size:12px;color:var(--text-muted);}
+#shop .shop-cat-menu .shop-menu-btn{flex:0 0 32px;width:32px;height:32px;}
+
+/* Drop targets: rendered only while a drag is in progress. */
+#shop .shop-drop-zone{min-height:64px;border:2px dashed var(--border);border-radius:12px;display:flex;align-items:center;
+  justify-content:center;background:var(--shop-solid);}
+#shop .shop-drop-zone.has-items{min-height:0;border:2px dashed transparent;display:block;background:none;margin:-2px;}
+#shop .shop-drop-zone.drag-over{border-color:var(--em);background:var(--shop-solid-2);}
+#shop .shop-drop-hint{font-family:var(--mono);font-size:12px;color:var(--text-muted);pointer-events:none;}
+
+/* ── Card ───────────────────────────────────────────────────────── */
+#shop .shop-item-card{position:relative;background:var(--shop-solid);backdrop-filter:none;-webkit-backdrop-filter:none;
+  transition:border-color .2s,box-shadow .2s,transform .2s;}
+@media (hover:hover){
+  #shop .shop-item-card:not(.is-selectable):hover{transform:translateY(-2px);border-color:var(--accent-line);box-shadow:var(--accent-glow-hi);}
+}
+#shop .shop-item-card.is-selectable{cursor:pointer;}
+#shop .shop-item-card.is-selected{border-color:var(--em);box-shadow:0 0 0 2px rgba(var(--em-rgb),.4);}
+#shop .shop-item-card:focus-visible{outline-offset:3px;}
+#shop .shop-item-card.dragging{opacity:.4;}
+/* Bought cards used to drop to 55% opacity, which took their text with
+   them (well under 4.5:1). The photo greys instead; the words stay. */
+#shop .shop-item-card.bought{opacity:1;filter:none;}
+#shop .shop-item-card.bought .shop-item-img{filter:grayscale(1);opacity:.75;}
+#shop .shop-select-dot{position:absolute;top:8px;left:8px;z-index:3;width:22px;height:22px;border-radius:50%;
+  border:2px solid var(--em);background:var(--shop-solid);display:flex;align-items:center;justify-content:center;color:#fff;}
+#shop .shop-select-dot.is-on{background:var(--em);}
+
+#shop .shop-item-img{position:relative;color:var(--text-muted);}
+#shop .shop-item-topline{display:flex;align-items:flex-start;justify-content:space-between;gap:8px;}
+#shop .shop-item-name{font-weight:700;font-size:14px;color:var(--text);line-height:1.3;min-width:0;}
+#shop button.shop-item-name{appearance:none;-webkit-appearance:none;background:none;border:0;margin:0;padding:0;
+  font-family:inherit;text-align:left;cursor:pointer;border-radius:4px;}
+#shop button.shop-item-name:hover{color:var(--shop-price);}
+#shop .shop-item-priority{display:inline-flex;align-items:center;gap:5px;flex-shrink:0;padding:2px 8px;border-radius:999px;
+  font-family:var(--mono);font-size:12px;font-weight:700;letter-spacing:.3px;text-transform:uppercase;}
+html[data-theme="dark-os"] #shop .priority-high{background:rgba(224,82,82,.16);color:#f2a09a;}
+html[data-theme="dark-os"] #shop .priority-med{background:rgba(217,145,20,.16);color:#e8b55a;}
+html[data-theme="dark-os"] #shop .priority-low{background:rgba(var(--em-rgb),.16);color:var(--em-light);}
+
+#shop .shop-item-priceline{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap;}
+#shop .shop-item-price{font-family:var(--mono);font-size:15px;font-weight:700;color:var(--shop-price);}
+#shop .shop-item-now{font-family:var(--mono);font-size:12px;color:var(--text-muted);white-space:nowrap;}
+#shop .shop-pricemove{position:static;display:inline-flex;align-items:center;padding:1px 7px;border-radius:999px;
+  font-family:var(--mono);font-size:12px;font-weight:700;letter-spacing:.3px;white-space:nowrap;
+  background:transparent;border:1px solid currentColor;}
+#shop .shop-pricemove-down{color:var(--shop-down);}
+#shop .shop-pricemove-up{color:var(--shop-up);}
+#shop .shop-item-bought-on{font-family:var(--mono);font-size:12px;color:var(--text-muted);}
+#shop .shop-coin-cost{font-size:12px;color:var(--shop-gold);}
+#shop .shop-coin-cost.cant-afford{color:var(--shop-danger);}
+#shop .shop-item-notes{font-size:13px;color:var(--text-muted);}
+
+#shop .shop-link-btn{height:34px;font-size:13px;background:var(--em);color:#fff;}
+#shop .shop-link-btn.no-link{background:transparent;color:var(--text-muted);}
+#shop .shop-icon-btn{flex:0 0 34px;width:34px;height:34px;color:var(--text-mid);background:var(--shop-solid);border-color:var(--border);}
+#shop .shop-icon-btn:hover{color:var(--shop-price);border-color:var(--accent-line);}
+#shop .shop-edit-btn{color:var(--shop-price);}
+#shop .shop-del-btn{color:var(--shop-danger);}
+#shop .shop-del-btn:hover{color:var(--shop-danger);border-color:var(--shop-danger);}
+#shop .shop-item-card.bought .shop-bought-btn{color:var(--shop-price);border-color:var(--em);}
+/* The card ⋯ is phone-only: desktop cards have room for every action. */
+#shop .shop-menu{position:relative;display:inline-flex;}
+#shop .shop-card-menu{display:none;}
+
+/* First Shop visit of the session only — see entryAnimates(). */
+#shop .shop-list.is-entering .shop-item-card{animation:shopCardIn .28s ease-out both;}
+@keyframes shopCardIn{from{opacity:0;transform:translateY(8px);}to{opacity:1;transform:none;}}
+
+/* ── Empty states ───────────────────────────────────────────────── */
+#shop .shop-empty{display:flex;flex-direction:column;align-items:center;gap:8px;text-align:center;padding:30px 20px;
+  font-family:var(--body);color:var(--text-mid);}
+#shop .shop-empty-icon{color:var(--text-muted);margin:0;font-size:inherit;}
+#shop .shop-empty-title{font-size:15px;font-weight:700;color:var(--text);}
+#shop .shop-empty-body{font-size:13px;color:var(--text-mid);max-width:340px;}
+#shop .shop-empty-cta{margin-top:6px;min-height:40px;}
+
+/* ── ⋯ menu (portalled to <body>) ───────────────────────────────── */
+/* z-index sits above the mobile tab bar (195) but below modals (500). */
+.shop-card-menu-pop{position:fixed;z-index:400;min-width:190px;
+  background:var(--shop-solid);border:1px solid var(--border);border-radius:13px;padding:5px;
+  box-shadow:0 18px 44px rgba(0,0,0,.34);display:flex;flex-direction:column;gap:2px;}
+.shop-card-menu-pop > *{display:flex;align-items:center;gap:10px;width:100%;min-height:44px;padding:0 12px;
+  border:0;border-radius:9px;background:transparent;color:var(--text);font-family:var(--sans);
+  font-size:14px;text-align:left;text-decoration:none;cursor:pointer;white-space:nowrap;}
+.shop-card-menu-pop > *:hover, .shop-card-menu-pop > *:focus-visible{background:rgba(var(--em-rgb),.13);}
+.shop-card-menu-pop > *:focus-visible{outline-offset:-2px;}
+.shop-card-menu-pop .is-disabled{color:var(--text-muted);cursor:default;}
+.shop-card-menu-pop .is-disabled:hover{background:transparent;}
+.shop-card-menu-pop .is-danger{color:var(--shop-danger);}
+.shop-card-menu-pop .is-danger:hover, .shop-card-menu-pop .is-danger:focus-visible{background:rgba(229,72,77,.13);}
+
+/* ── Undo toast (portalled to <body>) ───────────────────────────── */
+.shop-undo-wrap{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);z-index:590;
+  max-width:calc(100vw - 32px);pointer-events:none;}
+.shop-undo{pointer-events:auto;display:flex;align-items:center;gap:12px;padding:6px 6px 6px 16px;border-radius:14px;
+  background:var(--text);color:var(--shop-solid);box-shadow:0 12px 34px rgba(0,0,0,.32);
+  font-family:var(--sans);font-size:14px;max-width:100%;}
+.shop-undo-msg{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.shop-undo-btn{flex:none;display:inline-flex;align-items:center;gap:6px;min-height:44px;padding:0 14px;border-radius:10px;
+  border:0;background:var(--shop-solid);color:var(--text);cursor:pointer;
+  font-family:var(--mono);font-size:13px;font-weight:700;letter-spacing:.6px;text-transform:uppercase;}
+.shop-undo-btn:focus-visible{outline:2px solid var(--shop-solid);outline-offset:2px;}
+@media (max-width:768px){
+  .shop-undo-wrap{bottom:calc(var(--m-tabs-h,64px) + var(--m-safe-bottom,0px) + 12px);}
+}
+
+/* ── Trending ───────────────────────────────────────────────────── */
+#shop .shop-trending-head{align-items:center;}
+#shop .shop-trending-title{font-size:12px;color:var(--shop-price);}
+#shop .shop-trending-sub{font-family:var(--mono);font-size:12px;color:var(--text-muted);letter-spacing:.3px;}
+#shop .shop-trending-toggle{background:var(--shop-solid-2);}
+#shop .shop-trending-tab{min-height:28px;padding:0 11px;font-size:12px;color:var(--text-mid);}
+#shop .shop-trending-tab.on{background:var(--em);color:#fff;}
+#shop .shop-trend-card{background:var(--shop-solid);border:1px solid var(--border);}
+#shop .shop-trend-name{font-size:13px;}
+#shop .shop-trend-cat{font-size:12px;letter-spacing:.3px;color:var(--text-muted);}
+#shop .shop-trend-price{font-size:12px;color:var(--shop-price);}
+#shop .shop-trend-blurb{font-size:12px;color:var(--text-muted);}
+#shop .shop-trend-add{min-height:30px;padding:0 11px;font-size:12px;color:var(--shop-price);border-color:currentColor;}
+#shop .shop-trend-add:hover{background:var(--em);border-color:var(--em);color:#fff;}
+#shop .shop-trend-strip, #shop .shop-rail, #shop .shop-main{backdrop-filter:none;-webkit-backdrop-filter:none;}
+
+/* Phones: one closed line at the end of the list, opening in place. */
+#shop .shop-trending.is-collapsible{position:static;flex:none;max-width:none;width:100%;margin-top:6px;
+  background:var(--shop-solid);border:var(--border-card);border-radius:14px;box-shadow:var(--accent-glow);}
+#shop .shop-trending-line{display:flex;align-items:center;gap:8px;width:100%;min-height:48px;padding:0 14px;
+  border:0;background:transparent;color:var(--text);cursor:pointer;text-align:left;border-radius:14px;}
+#shop .shop-trending.is-collapsible:not(.is-collapsed) .shop-trending-line{border-bottom:1px solid var(--border);border-radius:14px 14px 0 0;}
+#shop .shop-trending-tabsrow{padding:10px 12px 0;}
+#shop .shop-trending-tabsrow .shop-trending-toggle{margin:0;}
+#shop .shop-trending-viewport.is-still{height:auto;overflow-x:auto;overflow-y:hidden;-webkit-mask-image:none;mask-image:none;
+  scroll-snap-type:x proximity;overscroll-behavior-x:contain;}
+#shop .shop-trending-viewport.is-still .shop-trending-track{flex-direction:row;width:max-content;animation:none;padding:10px 12px 12px;}
+#shop .shop-trending-viewport.is-still .shop-trend-card{width:240px;flex:0 0 240px;scroll-snap-align:start;}
+
+@media (prefers-reduced-motion: reduce){
+  #shop .shop-trending-track{animation:none!important;}
+  #shop .shop-trending-viewport{overflow:auto;}
+  #shop .shop-item-card, #shop .shop-item-card:hover{transition:none;transform:none;}
+  #shop .shop-list.is-entering .shop-item-card{animation:none;}
+}
+
+/* ── Desktop board: rail + main ─────────────────────────────────── */
+#shop .shop-main{gap:12px;}
+#shop .shop-rail-sticky{gap:20px;}
+#shop .shop-rail-h{margin:0 0 8px;font-family:var(--mono);font-size:12px;font-weight:500;letter-spacing:1.4px;
+  text-transform:uppercase;color:var(--text-muted);}
+#shop .shop-rail-group .shop-filters{flex-direction:column;flex-wrap:nowrap;gap:4px;}
+#shop .shop-rail-group .shop-filter-btn{width:100%;justify-content:flex-start;}
+#shop .shop-railcat{min-height:36px;font-size:13px;color:var(--text-mid);}
+#shop .shop-railcat.is-active{color:var(--text);}
+#shop .shop-railcat-sum{font-size:12px;color:var(--text-muted);}
+#shop .shop-railcat-sum i{opacity:1;margin-left:3px;}
+#shop .shop-railcat-n{font-size:12px;color:var(--text-muted);}
+#shop .shop-railcat.is-active .shop-railcat-n{color:var(--text);font-weight:700;}
+/* Narrow board (rail stacked above the list): priority runs across
+   instead of four full-width rows. */
+@media (max-width:979px){
+  #shop .shop-rail-group .shop-filters{flex-direction:row;flex-wrap:wrap;}
+  #shop .shop-rail-group .shop-filter-btn{width:auto;}
+}
+
+/* ══════════════════════════════════════════════════════════════════════
+   ≤900px — the single-row card. Applies to phones AND the narrow
+   desktop board (769–900), as it always has.
+   ══════════════════════════════════════════════════════════════════════ */
 @media (max-width:900px){
-  /* Clear the fixed mobile app bar and the notch. */
   .shop-category-section{
     scroll-margin-top:calc(var(--m-appbar-h,56px) + var(--m-safe-top,0px) + 14px);
   }
-
-  /* Sticky trending on mobile.
-     This could not work before: .shop-page set overflow-x:hidden, and a
-     box with overflow-x:hidden and overflow-y:visible computes
-     overflow-y to auto — making .shop-page a scroll container, which
-     stops a descendant sticking to the VIEWPORT. The horizontal clip it
-     was there for is already handled by .shop-trending-viewport's own
-     overflow:hidden, so dropping it here costs nothing.
-
-     Pinned to the bottom rather than the top: the wishlist is the point
-     of the page and shouldn't get pushed down the screen by an ad rail. */
-  .shop-page{overflow-x:visible;}
-  .shop-trending{
-    position:sticky;
-    bottom:calc(var(--m-tabs-h,64px) + var(--m-safe-bottom,0px) + 8px);
-    z-index:5;
-  }
-}
-
-/* ── Shopping: search, sort, bulk actions, totals, price movement ─── */
-.shop-controls{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin-top:10px;}
-.shop-search{flex:1;min-width:180px;display:flex;align-items:center;gap:8px;padding:8px 11px;
-  border-radius:10px;border:var(--border-card);background:var(--surface);color:var(--text-muted);}
-.shop-search input{flex:1;min-width:0;background:transparent;border:0;outline:0;color:var(--text);
-  font-family:var(--sans);font-size:13px;}
-.shop-search input::-webkit-search-cancel-button{display:none;}
-.shop-search-clear{background:transparent;border:0;color:var(--text-muted);cursor:pointer;display:flex;padding:2px;}
-.shop-search-clear:hover{color:var(--text);}
-.shop-sort{display:inline-flex;align-items:center;gap:7px;font-family:var(--mono);font-size:9px;
-  letter-spacing:1.2px;text-transform:uppercase;color:var(--text-muted);}
-.shop-sort select{padding:8px 10px;border-radius:9px;border:var(--border-card);background:var(--surface);
-  color:var(--text);font-family:var(--sans);font-size:12px;cursor:pointer;}
-.shop-select-toggle{display:inline-flex;align-items:center;gap:7px;padding:8px 15px;border-radius:999px;
-  border:var(--border-card);background:transparent;color:var(--text-muted);cursor:pointer;
-  font-family:var(--mono);font-size:9px;letter-spacing:1.2px;text-transform:uppercase;}
-.shop-select-toggle:hover{color:var(--text);border-color:var(--accent-line);}
-.shop-select-toggle.is-on{background:var(--em);border-color:var(--em);color:var(--on-em,#fff);}
-.shop-search-note{margin-top:8px;font-family:var(--mono);font-size:9px;letter-spacing:.6px;color:var(--text-muted);}
-
-.shop-bulkbar{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin-top:10px;padding:10px 12px;
-  border-radius:11px;border:1px solid var(--em);background:rgba(var(--em-rgb),.09);}
-.shop-bulkbar-count{font-family:var(--mono);font-size:10px;letter-spacing:1.2px;text-transform:uppercase;
-  color:var(--em);font-weight:700;margin-right:2px;}
-.shop-bulkbar button,.shop-bulkbar select{padding:7px 12px;border-radius:8px;border:var(--border-card);
-  background:var(--surface);color:var(--text);font-family:var(--sans);font-size:12px;cursor:pointer;}
-.shop-bulkbar button:disabled,.shop-bulkbar select:disabled{opacity:.45;cursor:not-allowed;}
-.shop-bulkbar button:not(:disabled):hover{border-color:var(--em);}
-.shop-bulkbar-del{color:var(--danger,#e5484d)!important;}
-.shop-bulkbar-del:not(:disabled):hover{border-color:var(--danger,#e5484d)!important;
-  background:rgba(229,72,77,.1)!important;}
-
-/* Selection affordance. The card is the hit target in bulk mode, so the
-   dot is a state indicator rather than a control of its own. */
-.shop-item-card.is-selectable{cursor:pointer;}
-.shop-item-card.is-selected{border-color:var(--em);box-shadow:0 0 0 2px rgba(var(--em-rgb),.35);}
-.shop-select-dot{position:absolute;top:8px;left:8px;z-index:3;width:20px;height:20px;border-radius:50%;
-  border:2px solid var(--em);background:var(--surface);display:flex;align-items:center;justify-content:center;
-  color:var(--on-em,#fff);}
-.shop-select-dot.is-on{background:var(--em);}
-
-.shop-category-total{font-family:var(--mono);font-size:10px;color:var(--text);letter-spacing:.4px;
-  padding:2px 8px;border-radius:999px;background:var(--surface);border:var(--border-card);
-  display:inline-flex;align-items:baseline;gap:3px;}
-.shop-category-total-partial{font-size:8px;color:var(--text-muted);}
-
-.shop-pricemove{position:absolute;top:8px;right:8px;z-index:3;padding:3px 7px;border-radius:999px;
-  font-family:var(--mono);font-size:9px;font-weight:700;letter-spacing:.5px;}
-.shop-pricemove-down{background:rgba(47,169,107,.16);color:#2fa96b;border:1px solid rgba(47,169,107,.45);}
-.shop-pricemove-up{background:rgba(229,72,77,.14);color:#e5484d;border:1px solid rgba(229,72,77,.4);}
-
-/* The card needs a positioning context for the badge/dot overlays. */
-.shop-item-card{position:relative;}
-.shop-item-priceline{display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
-.shop-item-topline{display:flex;align-items:flex-start;justify-content:space-between;gap:8px;}
-.shop-item-priority{display:inline-flex;align-items:center;gap:5px;}
-
-/* Overflow menu — the trigger is hidden until the mobile block below
-   shows it, because desktop cards have room for every action inline. */
-.shop-card-menu{position:relative;display:none;}
-/* Portalled to <body>, so it's positioned in viewport coordinates.
-   z-index sits above the pinned trending rail (5) and the mobile tab
-   bar (195) but below modals (500). */
-.shop-card-menu-pop{position:fixed;z-index:400;min-width:178px;
-  background:var(--bg-raised);border:var(--border-card);border-radius:13px;padding:5px;
-  box-shadow:0 18px 44px rgba(0,0,0,.34);display:flex;flex-direction:column;gap:2px;}
-.shop-card-menu-pop > *{display:flex;align-items:center;gap:10px;width:100%;padding:10px 11px;
-  border:0;border-radius:9px;background:transparent;color:var(--text);font-family:var(--sans);
-  font-size:13.5px;text-align:left;text-decoration:none;cursor:pointer;white-space:nowrap;}
-.shop-card-menu-pop > *:active,.shop-card-menu-pop > *:hover{background:rgba(var(--em-rgb),.13);}
-.shop-card-menu-pop .is-disabled{color:var(--text-muted);cursor:default;}
-.shop-card-menu-pop .is-disabled:hover{background:transparent;}
-.shop-card-menu-pop .is-danger{color:var(--danger,#e5484d);}
-.shop-card-menu-pop .is-danger:active,.shop-card-menu-pop .is-danger:hover{background:rgba(229,72,77,.13);}
-
-/* Collapse chevron for the trending rail — phones only (it's a fixed
-   side rail on desktop, where there's nothing to get out of the way of). */
-.shop-trending-collapse{display:none;margin-left:auto;padding:4px;background:transparent;border:0;
-  color:var(--text-muted);cursor:pointer;align-items:center;justify-content:center;}
-
-/* ══════════════════════════════════════════════════════════════════════
-   MOBILE SHOPPING — the single authoritative block.
-   holiday.css is the last stylesheet main.jsx imports, so everything
-   here wins on order without !important. The two blocks that used to do
-   this job lived in index.css ABOVE the base .shop-* rules and were
-   quietly losing to them; they're gone.
-
-   The problem being solved: on a 390px screen the page spent 627px —
-   three-quarters of the viewport — on chrome before the first item, and
-   the four action buttons squeezed every product name down to ~80px, so
-   the whole list read "Notedfy Thi…". Everything below is either
-   shrinking chrome or giving that width back to the name.
-   ══════════════════════════════════════════════════════════════════════ */
-@media (max-width:900px){
   #shop .shop-layout{max-width:none;}
 
-  /* ── Header ── */
-  .shop-toolbar{flex-direction:column;align-items:stretch;gap:10px;margin-bottom:12px;}
-  /* The app bar already says SHOPPING two rows up; the eyebrow doesn't
-     also need 14px of air under it. */
-  #shop .eyebrow{margin-bottom:5px!important;}
-  .shop-toolbar-actions{width:100%;gap:8px!important;}
-  .shop-toolbar-actions .btn{flex:1;min-height:42px;display:inline-flex;align-items:center;
-    justify-content:center;gap:7px;font-size:13px;padding:0 10px;}
-
-  /* ── Stats: one hairline-divided strip, not four floating cards ── */
-  .shop-summary{display:flex;flex-wrap:nowrap;gap:0;margin-bottom:10px;overflow:hidden;
-    border:var(--border-card);border-radius:12px;background:var(--surface);}
-  .shop-summary-stat{flex:1 1 0;min-width:0;padding:8px 4px;text-align:center;background:none;
-    border:0;border-left:1px solid var(--border);border-radius:0;box-shadow:none;}
-  .shop-summary-stat:first-child{border-left:0;}
-  .shop-summary-val{font-size:15px;line-height:1.15;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
-  .shop-summary-lbl{font-size:8.5px!important;letter-spacing:.7px;text-transform:uppercase;margin-top:2px;}
-
-  /* ── Filters: one scrolling row of small pills (it wrapped to two
-        rows of 42px pills, which is where a chunk of the 627px went) ── */
-  .shop-filters{display:flex;flex-wrap:nowrap;overflow-x:auto;-webkit-overflow-scrolling:touch;
-    scrollbar-width:none;gap:6px;padding:1px 2px 3px;margin:0 -2px;}
-  .shop-filters::-webkit-scrollbar{display:none;}
-  .shop-filter-btn{flex:0 0 auto;white-space:nowrap;min-height:32px;padding:0 13px;font-size:12.5px;
-    border-radius:999px;}
-
-  /* ── Search / sort / select ── */
-  .shop-controls{gap:8px;margin-top:8px;}
-  .shop-search{flex:1 1 100%;min-height:40px;padding:0 12px;border-radius:11px;}
-  .shop-sort{flex:1;min-width:0;gap:0;}
-  .shop-sort-lbl{display:none;}
-  .shop-sort select{flex:1;min-width:0;width:100%;height:40px;padding:0 10px;border-radius:11px;}
-  .shop-select-toggle{flex:0 0 auto;height:40px;padding:0 14px;border-radius:11px;font-size:10px;
-    display:inline-flex;align-items:center;gap:6px;}
-
-  /* ── Category tabs ── */
-  .shop-tabs{margin:10px 0;flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;}
-  .shop-tabs::-webkit-scrollbar{display:none;}
-  .shop-tab{padding:9px 11px;font-size:10px;letter-spacing:.8px;}
-
-  /* ── Bulk bar ── */
-  .shop-bulkbar{gap:6px;margin-top:8px;padding:9px 10px;}
-  .shop-bulkbar button,.shop-bulkbar select{flex:1 1 auto;min-width:0;font-size:11px;padding:8px 9px;}
-
-  /* ── Category headings ── */
-  .shop-category-section{margin-bottom:18px;}
-  .shop-category-header{gap:8px;margin-bottom:8px;}
-  .shop-category-label{font-size:9.5px!important;letter-spacing:1.4px;}
-  .shop-category-count{font-size:9.5px!important;padding:1px 7px;}
-  .shop-category-total{font-size:9.5px;padding:2px 7px;}
-  .shop-category-del-btn{width:20px;height:20px;}
-
   /* ══ The card: 44px thumb · name+price · bought · ⋯ ══════════════
-     Actions drop from four buttons to two, which is where the name's
-     width comes from. Link/Edit/Delete live in the ⋯ menu. */
-  #shop .shop-grid{grid-template-columns:1fr!important;gap:8px;}
+     Link/Edit/Delete live in the ⋯ menu; the two buttons that remain
+     are full 44px targets. */
+  #shop .shop-grid{grid-template-columns:1fr;gap:8px;}
   #shop .shop-item-card{
     display:grid;grid-template-columns:44px minmax(0,1fr) auto;
     grid-template-areas:'img body actions';align-items:center;gap:10px;
-    padding:8px 10px 8px 13px;border-radius:13px;backdrop-filter:none;
-    /* overflow:visible so the ⋯ popover isn't clipped by the card. */
-    overflow:visible;
-    box-shadow:0 2px 10px rgba(0,0,0,.10);
+    padding:6px 6px 6px 13px;border-radius:13px;
+    /* overflow:visible so the ⋯ trigger's focus ring isn't clipped. */
+    overflow:visible;box-shadow:0 2px 10px rgba(0,0,0,.10);
   }
   /* Priority as a coloured edge instead of a pill: same information,
-     zero horizontal cost. A pseudo-element rather than an inset shadow
-     or a border — framer-motion writes an inline box-shadow on hover
-     (which erased an inset rail), and a 4px border sits outside the
-     corner radius as a detached-looking stripe. */
+     zero horizontal cost. */
   #shop .shop-item-card::before{
     content:'';position:absolute;left:0;top:0;bottom:0;width:4px;
     border-radius:13px 0 0 13px;background:var(--prio-c,transparent);pointer-events:none;
@@ -219,40 +354,105 @@
   #shop .shop-item-priority{display:none;}
   #shop .shop-item-topline{gap:0;}
 
-  #shop .shop-item-img{grid-area:img;width:44px;height:44px;min-height:0;margin:0;border-radius:10px;}
-  #shop .shop-item-body{grid-area:body;padding:0;gap:2px;min-width:0;overflow:hidden;}
+  #shop .shop-item-img{grid-area:img;width:44px;height:44px;min-height:0;margin:0;border-radius:10px;overflow:hidden;}
+  /* No overflow:hidden here: the name button's hit area reaches past
+     the line box (below). Each line clips its own text instead. */
+  #shop .shop-item-body{grid-area:body;padding:0;gap:2px;min-width:0;}
   #shop .shop-item-name{
-    flex:1;min-width:0;font-size:13.5px;line-height:1.25;font-weight:700;
+    flex:1;min-width:0;font-size:14px;line-height:1.25;font-weight:700;
     white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
   }
+  /* The expander gets a ~44px-tall hit area without growing the row:
+     padding out, negative margin back. */
+  #shop button.shop-item-name{padding:13px 0;margin:-13px 0;display:block;width:100%;}
   #shop .shop-item-name.is-expanded{white-space:normal;}
-  #shop .shop-item-priceline{gap:7px;flex-wrap:nowrap;min-width:0;}
-  #shop .shop-item-price{font-size:12.5px;margin:0;}
-  /* Inline rather than pinned to the card corner, where it would land
-     on top of the buttons in a single-row card. */
-  #shop .shop-pricemove{position:static;padding:1px 6px;font-size:8.5px;flex-shrink:0;}
+  #shop .shop-item-priceline{gap:7px;flex-wrap:nowrap;min-width:0;overflow:hidden;}
+  #shop .shop-item-price{font-size:13px;margin:0;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  #shop .shop-pricemove{padding:0 6px;flex-shrink:0;}
   /* Coin chip + notes are noise in a tight list — they're on the card
      when you open it to edit. */
   #shop .shop-coin-cost{display:none;}
   #shop .shop-item-notes{display:none;}
 
   #shop .shop-item-footer{grid-area:actions;display:flex;flex-direction:row;align-items:center;
-    gap:6px;padding:0;border-top:none;}
-  #shop .shop-link-btn,#shop .shop-edit-btn,#shop .shop-del-btn{display:none;}
-  #shop .shop-card-menu{display:block;}
-  #shop .shop-icon-btn{flex:0 0 34px;width:34px;height:34px;border-radius:10px;font-size:14px;}
-  #shop .shop-select-dot{top:50%;left:6px;transform:translateY(-50%);width:18px;height:18px;}
-  #shop .shop-item-card.is-selectable{padding-left:26px;}
+    gap:4px;padding:0;border-top:none;}
+  #shop .shop-link-btn, #shop .shop-edit-btn, #shop .shop-del-btn{display:none;}
+  #shop .shop-card-menu{display:inline-flex;}
+  #shop .shop-icon-btn{flex:0 0 44px;width:44px;height:44px;border-radius:11px;}
+  #shop .shop-select-dot{top:50%;left:8px;transform:translateY(-50%);width:20px;height:20px;}
+  #shop .shop-item-card.is-selectable{padding-left:36px;min-height:58px;}
 
-  /* ── Trending rail: pinned above the tab bar, so it has to be small
-        and dismissible rather than a quarter of the screen ── */
-  .shop-trending{background:var(--bg-raised);box-shadow:0 -8px 26px rgba(0,0,0,.30);}
-  .shop-trending-head{padding:0 10px 0 13px;min-height:40px;align-items:center;}
-  .shop-trending-collapse{display:inline-flex;}
-  .shop-trending.is-collapsed .shop-trending-viewport{display:none;}
-  .shop-trending-track{padding:9px;gap:8px;}
-  .shop-trend-card{width:198px;flex:0 0 198px;padding:8px;gap:8px;}
-  .shop-trend-emoji{width:28px;height:28px;font-size:17px;border-radius:8px;}
-  .shop-trend-name{font-size:12px;}
-  .shop-trend-add{padding:4px 9px;font-size:9px;}
+  #shop .shop-trending-viewport:not(.is-still){height:auto;}
+}
+
+/* ══════════════════════════════════════════════════════════════════════
+   ≤768px — PHONES. Matches useIsMobile(), which swaps in the phone
+   markup: one solid head plate above the list, Trending at the end.
+   ══════════════════════════════════════════════════════════════════════ */
+@media (max-width:768px){
+  #shop .shop-head{display:flex;flex-direction:column;gap:10px;padding:12px;margin-bottom:12px;}
+  #shop .shop-head .shop-toolbar{flex-direction:column;align-items:stretch;gap:10px;}
+  /* The app bar already says SHOPPING two rows up. */
+  #shop .shop-head .eyebrow{display:none;}
+  #shop .sec-title{font-size:26px;}
+  /* A 44px target round a 26px disc, without growing the title row. */
+  #shop .section-help-btn{width:44px;height:44px;margin:-9px;border:0;background:transparent;}
+  #shop .section-help-btn::before{content:'';position:absolute;left:50%;top:50%;width:26px;height:26px;
+    transform:translate(-50%,-50%);border-radius:50%;background:var(--shop-solid-2);border:1px solid var(--border);z-index:-1;}
+  /* Sans on phones: the mono line wrapped at 390px. */
+  #shop .shop-headline{margin-top:4px;font-family:var(--sans);font-size:13px;letter-spacing:0;}
+
+  #shop .shop-toolbar-actions{display:grid;grid-template-columns:44px 1fr 1fr;gap:8px;width:100%;}
+  #shop .shop-toolbar-actions .btn{min-height:44px;font-size:14px;padding:0 10px;}
+  /* Hide/Show Trending goes icon-only; its words stay for screen readers. */
+  #shop .shop-trend-toggle{padding:0;}
+  #shop .shop-trend-toggle span{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;}
+
+  #shop .shop-viewtabs{flex:1 1 auto;min-width:0;}
+  #shop .shop-viewtab{flex:1 1 auto;min-width:0;min-height:44px;padding:0 8px;gap:6px;letter-spacing:.4px;}
+  #shop .shop-select-toggle{flex:none;min-height:44px;padding:0 11px;gap:6px;border-radius:12px;letter-spacing:.4px;}
+
+  /* One scrolling row of 44px pills. */
+  #shop .shop-filters{flex-wrap:nowrap;overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none;
+    gap:6px;margin:0 -12px;padding:0 12px;}
+  #shop .shop-filters::-webkit-scrollbar{display:none;}
+  #shop .shop-filter-btn{flex:0 0 auto;white-space:nowrap;min-height:44px;padding:0 16px;font-size:14px;}
+
+  #shop .shop-controls{flex-wrap:nowrap;gap:8px;}
+  #shop .shop-search{min-width:0;min-height:44px;border-radius:11px;}
+  /* 16px: iOS zooms the page into any focused field set smaller. */
+  #shop .shop-search input{height:42px;font-size:16px;}
+  #shop .shop-search-clear{width:40px;height:40px;}
+  #shop .shop-sort{flex:0 0 136px;min-width:0;gap:0;}
+  #shop .shop-sort-lbl{display:none;}
+  #shop .shop-sort select{width:100%;min-height:44px;font-size:16px;border-radius:11px;padding:0 8px;}
+
+  #shop .shop-bulkbar{gap:6px;padding:8px;}
+  #shop .shop-bulkbar button, #shop .shop-bulkbar select{flex:1 1 auto;min-width:0;min-height:44px;font-size:14px;padding:0 10px;}
+  #shop .shop-bulkbar-count{flex:1 0 100%;}
+
+  /* Category jump-tabs: the plate's bottom edge. */
+  #shop .shop-tabs{display:flex;flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;margin:0 -12px -12px;padding:0 6px;
+    border-top:1px solid var(--border);border-bottom:0;}
+  #shop .shop-tabs::-webkit-scrollbar{display:none;}
+  #shop .shop-tab{min-height:44px;padding:0 12px;font-size:12px;letter-spacing:.8px;color:var(--text-mid);}
+  #shop .shop-tab.is-active{color:var(--shop-price);}
+
+  /* Category headings sit between cards, over the photo: a slim solid
+     bar each, with the ⋯ as a full 44px target. */
+  #shop .shop-category-section{margin-bottom:16px;}
+  #shop .shop-category-header{gap:8px;margin-bottom:8px;padding:0 0 0 14px;min-height:44px;
+    background:var(--shop-solid);border:var(--border-card);border-radius:12px;}
+  #shop .shop-category-line{display:none;}
+  #shop .shop-category-label{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  #shop .shop-category-header > :last-child:not(.shop-cat-menu){margin-right:12px;}
+  #shop .shop-cat-menu .shop-menu-btn{flex:0 0 44px;width:44px;height:44px;border:0;background:transparent;}
+
+  #shop .shop-empty{padding:26px 16px;}
+  #shop .shop-empty-cta{min-height:44px;}
+
+  #shop .shop-trending-tab{min-height:44px;padding:0 14px;}
+  #shop .shop-trend-add{min-height:44px;min-width:56px;}
+  #shop .shop-trending-tabsrow .shop-trending-toggle{display:flex;}
+  #shop .shop-trending-tabsrow .shop-trending-tab{flex:1;}
 }
