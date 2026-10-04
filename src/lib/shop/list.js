@@ -6,7 +6,8 @@
  * `S`: they're a way of looking at the list for a minute, not a setting,
  * and every key added to state is paid for on every load and save.
  */
-import { priceToNumber } from './priceWatch';
+import { effectivePrice, totalsFor, fmtGBP } from './price.js';
+import { priceMovement } from './sweep.js';
 
 export const SORTS = [
   { key: 'added',    label: 'Recently added' },
@@ -20,30 +21,38 @@ export const SORTS = [
 
 const PRIORITY_RANK = { high: 0, med: 1, low: 2 };
 
-/** Drop percentage (negative = cheaper than it started), else 0. */
+/**
+ * Drop percentage (negative = cheaper), else 0. The same priceMovement
+ * the card uses, so the sort and the badge agree — including ignoring a
+ * misread (>90% down / >300% up) and measuring from the last typed price.
+ */
 function dropPct(item) {
-  const h = Array.isArray(item.priceHistory) ? item.priceHistory : [];
-  if (h.length < 2) return 0;
-  const first = h[0]?.p, now = h[h.length - 1]?.p;
-  if (!first || now == null || first <= 0) return 0;
-  return ((now - first) / first) * 100;
+  return priceMovement(item)?.pct ?? 0;
+}
+
+/** Sortable pounds value; non-£ and unreadable prices count as missing. */
+function sortValue(item) {
+  const { value, currency } = effectivePrice(item);
+  return value != null && (!currency || currency === 'GBP') ? value : null;
 }
 
 /**
- * Sort a COPY of items. `order` is the original array so 'added' can use
- * insertion order — items carry no timestamp, and inferring one from the
- * id would break for any item created before ids were time-based.
+ * Sort a COPY of items. `order` is the original array, for items that
+ * predate `addedAt`: those fall back to insertion order. Inferring a
+ * date from the id would break for any item created before ids were
+ * time-based.
  */
 export function sortItems(items, sortKey, order = items) {
   const index = new Map(order.map((it, i) => [it.id, i]));
   const list = [...items];
   const byName = (a, b) => (a.name || '').localeCompare(b.name || '');
+  const pos = it => index.get(it.id) ?? 0;
 
   switch (sortKey) {
     case 'priceHi':
-      return list.sort((a, b) => (priceToNumber(b.price) ?? -Infinity) - (priceToNumber(a.price) ?? -Infinity) || byName(a, b));
+      return list.sort((a, b) => (sortValue(b) ?? -Infinity) - (sortValue(a) ?? -Infinity) || byName(a, b));
     case 'priceLo':
-      return list.sort((a, b) => (priceToNumber(a.price) ?? Infinity) - (priceToNumber(b.price) ?? Infinity) || byName(a, b));
+      return list.sort((a, b) => (sortValue(a) ?? Infinity) - (sortValue(b) ?? Infinity) || byName(a, b));
     case 'priority':
       return list.sort((a, b) => (PRIORITY_RANK[a.priority] ?? 9) - (PRIORITY_RANK[b.priority] ?? 9) || byName(a, b));
     case 'coins':
@@ -55,8 +64,17 @@ export function sortItems(items, sortKey, order = items) {
       return list.sort((a, b) => dropPct(a) - dropPct(b) || byName(a, b));
     case 'added':
     default:
-      // Newest first — the array is append-ordered.
-      return list.sort((a, b) => (index.get(b.id) ?? 0) - (index.get(a.id) ?? 0));
+      // Newest first. Items with `addedAt` (everything added since it
+      // was introduced) sort by it and come before items without one,
+      // which were all added earlier; those keep list order, which is
+      // append order. Keyed this way the comparison stays consistent
+      // even if a merge has shuffled the array.
+      return list.sort((a, b) => {
+        const ta = Number(a.addedAt) || 0, tb = Number(b.addedAt) || 0;
+        if (ta && tb) return tb - ta || pos(b) - pos(a);
+        if (ta || tb) return ta ? -1 : 1;
+        return pos(b) - pos(a);
+      });
   }
 }
 
@@ -73,24 +91,27 @@ export function searchItems(items, term) {
 }
 
 /**
- * Summed price of a set of items, plus how many had an unreadable price.
- * The price field is free text, so "unknown" is a real outcome and the
- * UI says so rather than quietly under-reporting the total.
+ * Summed price of a set of items, plus how many had no price that could
+ * go into it. The old shape, kept for the category and rail totals; it
+ * is totalsFor() underneath, so it agrees with the header. `unknown`
+ * includes $/€ items (they're not in a £ sum); `unpriced` and
+ * `otherCurrency` say which is which.
  */
 export function totalFor(items) {
-  let sum = 0, counted = 0, unknown = 0;
-  for (const it of items || []) {
-    const n = priceToNumber(it.price);
-    if (n == null) { unknown++; continue; }
-    sum += n;
-    counted++;
-  }
-  return { sum, counted, unknown };
+  const t = totalsFor(items);
+  return {
+    sum: t.sum,
+    counted: t.priced,
+    unknown: t.unpriced + t.otherCurrency,
+    unpriced: t.unpriced,
+    otherCurrency: t.otherCurrency,
+  };
 }
 
 /** "£1,299" / "£1,299.50" — whole pounds unless the pennies matter. */
 export function fmtMoney(n, prefix = '£') {
   if (n == null) return '';
+  if (prefix === '£') return fmtGBP(n);
   const hasPence = Math.abs(n % 1) > 0.001;
   return prefix + n.toLocaleString('en-GB', {
     minimumFractionDigits: hasPence ? 2 : 0,

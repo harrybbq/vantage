@@ -1,137 +1,80 @@
 /**
- * Price-drop watching for wishlist items.
+ * Price-drop watching for wishlist items — the network half.
  *
- * Items keep a small `priceHistory` of points where the price actually
- * MOVED — not one row per check. A wishlist item is watched for months,
- * so recording every poll would grow state without adding information,
- * and state size is already the app's tightest constraint.
+ * The rules about what gets written (merge onto the latest list by id,
+ * never write `price`, a failed check isn't a check) live in the pure
+ * sweep.js, which is tested. This file only asks the function and keeps
+ * a per-device note of URLs that just failed.
  *
- * Everything here is additive: it only ever adds `priceHistory`,
- * `priceCheckedAt` and `price` to an item that has a URL. Items with no
- * URL, and every other field, are returned untouched.
+ * Re-exports the pure helpers so existing imports keep working.
  */
 import { authFetch } from '../authFetch';
+import { itemsDueCheck, planSweepResults, CHECK_INTERVAL_MS } from './sweep.js';
+import { parsePrice } from './price.js';
 
-const CHECK_INTERVAL_MS = 20 * 60 * 60 * 1000; // ~daily, but tolerant
-const MAX_PER_SWEEP = 8;                        // matches the function's cap
-const MAX_HISTORY = 12;                         // ~a year of real moves
+export { itemsDueCheck, planSweepResults, applySweepUpdates, applyCheck, applyPriceEdit, priceMovement } from './sweep.js';
 
-/** Numeric value of a formatted price string ("£1,299.00" → 1299). */
+/**
+ * Numeric value of a free-text price, or null. Kept for old callers;
+ * it is parsePrice() underneath, so "1.299,99 €" is 1299.99, not 1.3.
+ */
 export function priceToNumber(str) {
-  if (str == null) return null;
-  if (typeof str === 'number') return Number.isFinite(str) ? str : null;
-  const m = String(str).replace(/[,\s]/g, '').match(/-?\d+(?:\.\d+)?/);
-  if (!m) return null;
-  const n = parseFloat(m[0]);
-  return Number.isFinite(n) ? n : null;
+  return parsePrice(str).value;
 }
 
-/** Items due a re-check: has a URL, not bought, and not checked lately. */
-export function itemsDueCheck(items, now = Date.now()) {
-  return (items || [])
-    .filter(i => i && i.url && /^https?:\/\//i.test(i.url) && !i.bought)
-    .filter(i => {
-      const last = i.priceCheckedAt ? Date.parse(i.priceCheckedAt) : 0;
-      return !last || (now - last) > CHECK_INTERVAL_MS;
-    })
-    // Oldest check first, so the queue drains fairly across sessions.
-    .sort((a, b) => (Date.parse(a.priceCheckedAt || 0) || 0) - (Date.parse(b.priceCheckedAt || 0) || 0))
-    .slice(0, MAX_PER_SWEEP);
+// Failed URLs, per device: url → ms. A dead link would otherwise sit at
+// the front of the oldest-first queue forever (it never gets a
+// priceCheckedAt now that failures don't count), taking a slot from a
+// live one on every open. Browser storage is right for this: it is a
+// retry hint, losing it costs one extra request, and it never needs to
+// reach another device or the server.
+const FAIL_KEY = 'vantage.shopPriceFails';
+
+function readFails(now) {
+  try {
+    const raw = JSON.parse(window.localStorage.getItem(FAIL_KEY) || '{}');
+    const out = {};
+    for (const [url, at] of Object.entries(raw || {})) {
+      if (typeof at === 'number' && now - at <= CHECK_INTERVAL_MS) out[url] = at;
+    }
+    return out;
+  } catch { return {}; }
+}
+
+function writeFails(fails) {
+  try { window.localStorage.setItem(FAIL_KEY, JSON.stringify(fails)); } catch { /* private mode etc. */ }
 }
 
 /**
- * Merge fetched prices into items. Returns a NEW array, and returns the
- * original array untouched when nothing changed so callers can skip a
- * pointless state write.
+ * Run one sweep over `items` (a snapshot is fine — nothing from it is
+ * written back). Resolves to { updates: Map<id, update> } holding ONLY
+ * the items whose price was actually read; apply them to the latest
+ * list with applySweepUpdates. Never throws; offline → empty map.
  */
-export function applyPriceResults(items, results, nowIso = new Date().toISOString()) {
-  const byUrl = new Map();
-  for (const r of results || []) if (r && r.url) byUrl.set(r.url, r);
-  if (!byUrl.size) return items;
-
-  let changed = false;
-  const next = (items || []).map(item => {
-    const r = item?.url ? byUrl.get(item.url) : null;
-    if (!r) return item;
-
-    // A failed check still counts as "checked", or a dead URL would be
-    // retried on every single page open forever.
-    if (!r.ok || r.priceNum == null) {
-      changed = true;
-      return { ...item, priceCheckedAt: nowIso };
-    }
-
-    const history = Array.isArray(item.priceHistory) ? item.priceHistory : [];
-    const lastPoint = history[history.length - 1];
-    const known = lastPoint ? lastPoint.p : priceToNumber(item.price);
-
-    // Seed history from the price the item was saved with, so the first
-    // observed drop still has something to be a drop FROM.
-    let nextHistory = history;
-    if (!history.length && known != null) {
-      nextHistory = [{ at: item.addedAt || nowIso, p: known }];
-    }
-
-    const moved = known == null || Math.abs(r.priceNum - known) >= 0.01;
-    if (moved) {
-      nextHistory = [...nextHistory, { at: nowIso, p: r.priceNum }].slice(-MAX_HISTORY);
-    }
-
-    changed = true;
-    return {
-      ...item,
-      price: r.price || item.price,
-      priceCheckedAt: nowIso,
-      ...(nextHistory !== history ? { priceHistory: nextHistory } : {}),
-    };
-  });
-
-  return changed ? next : items;
-}
-
-/**
- * What the card should say about price movement, or null when there's
- * nothing interesting. `pct` is negative for a drop.
- */
-export function priceMovement(item) {
-  const history = Array.isArray(item?.priceHistory) ? item.priceHistory : [];
-  if (history.length < 2) return null;
-  const first = history[0]?.p;
-  const now = history[history.length - 1]?.p;
-  if (first == null || now == null || first <= 0) return null;
-  const delta = now - first;
-  if (Math.abs(delta) < 0.01) return null;
-
-  // Peak matters more than the starting point for "how good is this
-  // deal" — a price that rose then fell back is not a saving.
-  const peak = Math.max(...history.map(h => h.p).filter(p => p != null));
-  return {
-    direction: delta < 0 ? 'down' : 'up',
-    delta,
-    pct: (delta / first) * 100,
-    from: first,
-    to: now,
-    peak,
-    offPeak: peak > 0 ? ((now - peak) / peak) * 100 : 0,
-    at: history[history.length - 1].at,
-  };
-}
-
-/** Run one sweep. Returns the updated items array (or the original). */
 export async function sweepPrices(items) {
-  const due = itemsDueCheck(items);
-  if (!due.length) return items;
+  const now = Date.now();
+  const fails = readFails(now);
+  const due = itemsDueCheck(items, now, fails);
+  const empty = { updates: new Map() };
+  if (!due.length) return empty;
   try {
     const res = await authFetch('/.netlify/functions/shop-price-check', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ urls: due.map(i => i.url) }),
+      body: JSON.stringify({ urls: [...new Set(due.map(i => i.url))] }),
     });
-    if (!res.ok) return items;
+    if (!res.ok) return empty;
     const body = await res.json().catch(() => ({}));
-    return applyPriceResults(items, body.results);
+    const { updates, failedUrls } = planSweepResults(due, body.results, new Date().toISOString());
+    // Successes clear an old failure; failures start (or restart) one.
+    const next = { ...fails };
+    for (const u of updates.values()) delete next[u.url];
+    for (const url of failedUrls) next[url] = now;
+    writeFails(next);
+    return { updates };
   } catch {
-    // Offline or the function is down — leave everything alone.
-    return items;
+    // Offline or the function is down — not the links' fault, so no
+    // failures recorded and nothing written.
+    return empty;
   }
 }
