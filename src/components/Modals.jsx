@@ -34,7 +34,7 @@ import {
  * the native photo library / camera sheet; desktop keeps URL-only to
  * avoid tempting people into multi-MB uploads from disk.
  */
-function ImageField({ label, value, onChange, max = 900, placeholder }) {
+function ImageField({ label, value, onChange, max = 900, placeholder, id }) {
   const isMobile = useIsMobile();
   const inputRef = useRef(null);
   const isData = (value || '').startsWith('data:');
@@ -59,7 +59,7 @@ function ImageField({ label, value, onChange, max = 900, placeholder }) {
   }
   return (
     <div className="fg">
-      <label>{label}</label>
+      <label htmlFor={isData ? undefined : id}>{label}</label>
       {isData ? (
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
           <div style={{ width: 56, height: 56, borderRadius: 10, background: `center/cover no-repeat url(${value})`, border: '1px solid var(--border)', flexShrink: 0 }} />
@@ -68,7 +68,7 @@ function ImageField({ label, value, onChange, max = 900, placeholder }) {
         </div>
       ) : (
         <>
-          <input type="url" placeholder={placeholder} value={value} onChange={e => onChange(e.target.value)} />
+          <input id={id} type="url" placeholder={placeholder} value={value} onChange={e => onChange(e.target.value)} />
           {isMobile && (
             <>
               <input ref={inputRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={onFile} />
@@ -1043,37 +1043,37 @@ function AddShopModal({ openId, onClose, onAdd, categories = [] }) {
     <Modal id="addShopModal" openId={openId} onClose={onClose}>
       <h3>Add Item</h3>
       <div className="fg">
-        <label>Link (optional — paste to auto-fill)</label>
+        <label htmlFor="shop-add-url">Link (optional — paste to auto-fill)</label>
         <div style={{ display: 'flex', gap: '8px' }}>
-          <input type="url" placeholder="https://amazon.co.uk/..." style={{ flex: 1 }} value={form.url} onChange={e => handleUrlChange(e.target.value)} />
+          <input id="shop-add-url" aria-describedby="shop-add-status" type="url" placeholder="https://amazon.co.uk/..." style={{ flex: 1 }} value={form.url} onChange={e => handleUrlChange(e.target.value)} />
           <button className="btn btn-ghost btn-sm" disabled={fetching} onClick={() => runAutofill(form.url)} style={{ whiteSpace: 'nowrap', flexShrink: 0, display: 'inline-flex', alignItems: 'center', gap: 5 }}>Fill <Icon name="arrow-down" size={13} /></button>
         </div>
-        <div style={{ fontFamily: 'var(--mono)', fontSize: '10px', color: status.startsWith('✓') ? 'var(--em)' : 'var(--text-muted)', marginTop: '5px', minHeight: '14px' }}>{status}</div>
+        <div id="shop-add-status" role="status" style={{ fontFamily: 'var(--mono)', fontSize: '12px', color: status.startsWith('✓') ? 'var(--em)' : 'var(--text-muted)', marginTop: '5px', minHeight: '16px' }}>{status}</div>
       </div>
-      <div className="fg"><label>Item Name</label><input type="text" placeholder="e.g. AirPods Pro" value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} /></div>
-      <div className="fg"><label>Price (optional)</label><input type="text" placeholder="£149.99" value={form.price} onChange={e => setForm(f => applyPrice(f, e.target.value))} /></div>
-      <ImageField label="Image (optional)" placeholder="Auto-filled from link, or paste directly" max={600} value={form.imageUrl} onChange={v => setForm(f => ({ ...f, imageUrl: v }))} />
+      <div className="fg"><label htmlFor="shop-add-name">Item Name</label><input id="shop-add-name" type="text" placeholder="e.g. AirPods Pro" value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} /></div>
+      <div className="fg"><label htmlFor="shop-add-price">Price (optional)</label><input id="shop-add-price" type="text" placeholder="£149.99" value={form.price} onChange={e => setForm(f => applyPrice(f, e.target.value))} /></div>
+      <ImageField id="shop-add-image" label="Image (optional)" placeholder="Auto-filled from link, or paste directly" max={600} value={form.imageUrl} onChange={v => setForm(f => ({ ...f, imageUrl: v }))} />
       <div className="fg">
-        <label>Priority</label>
-        <select value={form.priority} onChange={e => setForm(f => ({ ...f, priority: e.target.value }))}>
+        <label htmlFor="shop-add-priority">Priority</label>
+        <select id="shop-add-priority" value={form.priority} onChange={e => setForm(f => ({ ...f, priority: e.target.value }))}>
           <option value="high">High — want soon</option>
           <option value="med">Medium</option>
           <option value="low">Low — nice to have</option>
         </select>
       </div>
       <div className="fg">
-        <label>Category</label>
-        <select value={form.categoryId} onChange={e => setForm(f => ({ ...f, categoryId: e.target.value }))}>
+        <label htmlFor="shop-add-category">Category</label>
+        <select id="shop-add-category" value={form.categoryId} onChange={e => setForm(f => ({ ...f, categoryId: e.target.value }))}>
           <option value="">Uncategorised</option>
           {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
         </select>
       </div>
-      <div className="fg"><label>Notes</label><input type="text" placeholder="Why you want it, alternatives..." value={form.notes} onChange={e => setForm(f => ({ ...f, notes: e.target.value }))} /></div>
+      <div className="fg"><label htmlFor="shop-add-notes">Notes</label><input id="shop-add-notes" type="text" placeholder="Why you want it, alternatives..." value={form.notes} onChange={e => setForm(f => ({ ...f, notes: e.target.value }))} /></div>
       <div className="fg">
-        <label>⬡ Coin Cost (optional)</label>
-        <input type="number" placeholder="e.g. 100" min="0" value={form.coinCost}
+        <label htmlFor="shop-add-coins">⬡ Coin Cost (optional)</label>
+        <input id="shop-add-coins" aria-describedby="shop-add-coins-hint" type="number" placeholder="e.g. 100" min="0" value={form.coinCost}
           onChange={e => { setCoinTouched(true); setForm(f => ({ ...f, coinCost: e.target.value })); }} />
-        <div style={{ fontFamily: 'var(--mono)', fontSize: '10px', color: 'var(--text-muted)', marginTop: '5px' }}>
+        <div id="shop-add-coins-hint" style={{ fontFamily: 'var(--mono)', fontSize: '12px', color: 'var(--text-muted)', marginTop: '5px' }}>
           {coinTouched ? 'Custom coin cost.' : 'Auto-matches the price (£1 = 1 ⬡). Edit to override.'}
         </div>
       </div>
@@ -1126,27 +1126,27 @@ function EditShopModal({ openId, onClose, shopItems, categories = [], onEdit, on
   return (
     <Modal id={openId} openId={openId} onClose={onClose}>
       <h3>Edit Item</h3>
-      <div className="fg"><label>Item Name</label><input type="text" value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} /></div>
-      <div className="fg"><label>Price (optional)</label><input type="text" placeholder="£149.99" value={form.price} onChange={e => setForm(f => ({ ...f, price: e.target.value }))} /></div>
-      <div className="fg"><label>Link (optional)</label><input type="url" placeholder="https://..." value={form.url} onChange={e => setForm(f => ({ ...f, url: e.target.value }))} /></div>
-      <ImageField label="Image (optional)" placeholder="https://..." max={600} value={form.imageUrl} onChange={v => setForm(f => ({ ...f, imageUrl: v }))} />
+      <div className="fg"><label htmlFor="shop-edit-name">Item Name</label><input id="shop-edit-name" type="text" value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} /></div>
+      <div className="fg"><label htmlFor="shop-edit-price">Price (optional)</label><input id="shop-edit-price" type="text" placeholder="£149.99" value={form.price} onChange={e => setForm(f => ({ ...f, price: e.target.value }))} /></div>
+      <div className="fg"><label htmlFor="shop-edit-url">Link (optional)</label><input id="shop-edit-url" type="url" placeholder="https://..." value={form.url} onChange={e => setForm(f => ({ ...f, url: e.target.value }))} /></div>
+      <ImageField id="shop-edit-image" label="Image (optional)" placeholder="https://..." max={600} value={form.imageUrl} onChange={v => setForm(f => ({ ...f, imageUrl: v }))} />
       <div className="fg">
-        <label>Priority</label>
-        <select value={form.priority} onChange={e => setForm(f => ({ ...f, priority: e.target.value }))}>
+        <label htmlFor="shop-edit-priority">Priority</label>
+        <select id="shop-edit-priority" value={form.priority} onChange={e => setForm(f => ({ ...f, priority: e.target.value }))}>
           <option value="high">High — want soon</option>
           <option value="med">Medium</option>
           <option value="low">Low — nice to have</option>
         </select>
       </div>
       <div className="fg">
-        <label>Category</label>
-        <select value={form.categoryId} onChange={e => setForm(f => ({ ...f, categoryId: e.target.value }))}>
+        <label htmlFor="shop-edit-category">Category</label>
+        <select id="shop-edit-category" value={form.categoryId} onChange={e => setForm(f => ({ ...f, categoryId: e.target.value }))}>
           <option value="">Uncategorised</option>
           {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
         </select>
       </div>
-      <div className="fg"><label>Notes</label><input type="text" value={form.notes} onChange={e => setForm(f => ({ ...f, notes: e.target.value }))} /></div>
-      <div className="fg"><label>⬡ Coin Cost (optional)</label><input type="number" min="0" value={form.coinCost} onChange={e => setForm(f => ({ ...f, coinCost: e.target.value }))} /></div>
+      <div className="fg"><label htmlFor="shop-edit-notes">Notes</label><input id="shop-edit-notes" type="text" value={form.notes} onChange={e => setForm(f => ({ ...f, notes: e.target.value }))} /></div>
+      <div className="fg"><label htmlFor="shop-edit-coins">⬡ Coin Cost (optional)</label><input id="shop-edit-coins" type="number" min="0" value={form.coinCost} onChange={e => setForm(f => ({ ...f, coinCost: e.target.value }))} /></div>
       <div className="modal-actions" style={{ justifyContent: 'space-between' }}>
         <button className="btn btn-ghost" onClick={handleDelete} style={{ color: 'rgb(220,60,60)' }}>Delete</button>
         <div style={{ display: 'flex', gap: '8px' }}>
