@@ -80,13 +80,30 @@ function readTab() {
   } catch { return 'overview'; }
 }
 
-export default function SecurityTab({ initialTab }) {
+/**
+ * ── Go to source ─────────────────────────────────────────────────────
+ * Every panel gets `go(tab, focus?)`: switch sub-tab and, when `focus`
+ * names an element (data-sec-focus — "disk", "deploy:<id>",
+ * "advisor:<name>", "stale", "ticket:<uuid>"…), scroll to it and pulse
+ * it (useFocusTarget). An alert's explanation (lib/security/explain.js)
+ * says which tab and which element its problem lives in.
+ * `initialTab` / `initialFocus` come from a deep link
+ * (/?upgrade=security&ticket=<id> — what a phone alert opens).
+ */
+export default function SecurityTab({ initialTab, initialFocus }) {
   const [tab, setTabState] = useState(() => (valid(initialTab) ? initialTab : readTab()));
+  const [focus, setFocus] = useState(() => (initialFocus ? { key: initialFocus, n: 1 } : null));
   const setTab = useCallback(id => {
     if (!valid(id)) return;
     setTabState(id);
     try { window.localStorage.setItem(KEY, id); } catch { /* private mode */ }
   }, []);
+  const go = useCallback((id, key) => {
+    if (!valid(id)) return;
+    setTab(id);
+    setFocus(key ? { key: String(key), n: Date.now() } : null);
+  }, [setTab]);
+  const pick = id => { setTab(id); setFocus(null); };
 
   return (
     <div className="upg-pane sec">
@@ -94,17 +111,17 @@ export default function SecurityTab({ initialTab }) {
         {SUBTABS.map(t => (
           <button key={t.id} type="button" role="tab" aria-selected={tab === t.id}
                   className={'settings-tab' + (tab === t.id ? ' settings-tab-active' : '')}
-                  onClick={() => setTab(t.id)}>
+                  onClick={() => pick(t.id)}>
             {t.label}
           </button>
         ))}
       </div>
       <WidgetBoundary key={tab} name={`security:${tab}`} variant="section">
-        {tab === 'overview' && <OverviewPanel go={setTab} />}
-        {tab === 'database' && <DatabasePanel />}
-        {tab === 'netlify' && <NetlifyPanel />}
-        {tab === 'moderation' && <ModerationPanel />}
-        {tab === 'tickets' && <TicketsPanel />}
+        {tab === 'overview' && <OverviewPanel go={go} />}
+        {tab === 'database' && <DatabasePanel go={go} focus={focus} />}
+        {tab === 'netlify' && <NetlifyPanel go={go} focus={focus} />}
+        {tab === 'moderation' && <ModerationPanel go={go} focus={focus} />}
+        {tab === 'tickets' && <TicketsPanel go={go} focus={focus} />}
       </WidgetBoundary>
     </div>
   );

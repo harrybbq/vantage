@@ -3,10 +3,12 @@
  * currently suspended or banned, and group pictures the screen couldn't
  * decide. The report queue and the crest queue are the existing
  * components, reused; this panel adds the suspended list (with Lift)
- * and the counts that tie them together.
+ * and the counts that tie them together. Reports waiting over a day are
+ * marked; a stale-reports alert opens the queue oldest first.
  */
 import { useMemo, useState } from 'react';
 import { usePanel } from './usePanel';
+import { useFocusTarget } from './useFocusTarget';
 import { Updated, CardHead, ConfirmButton, Calm, Gate } from './parts';
 import ModerationQueue from '../../moderation/ModerationQueue';
 import CrestQueue from './CrestQueue';
@@ -35,8 +37,12 @@ function Suspended({ list, onLift, busyId }) {
   );
 }
 
-export default function ModerationPanel() {
+export default function ModerationPanel({ focus }) {
   const md = usePanel('moderation');
+  // A stale-reports alert lands here: the queue switches to oldest first
+  // and the first report waiting over a day is highlighted.
+  const staleView = !!(focus && focus.key === 'stale');
+  useFocusTarget(focus, !!(md.res && md.res.state === 'ok'));
   const [busyId, setBusyId] = useState(null);
   const [err, setErr] = useState(null);
   const [lifted, setLifted] = useState(() => new Set());
@@ -68,9 +74,9 @@ export default function ModerationPanel() {
         <Updated at={md.updatedAt} loading={md.loading} onRefresh={md.reload} error={md.res && md.res.staleError} />
       </div>
 
-      <ModerationQueue className="sec-card" onChanged={md.reload} />
+      <ModerationQueue className="sec-card" onChanged={md.reload} oldestFirst={staleView} staleHours={24} />
 
-      <section className="sec-card">
+      <section className="sec-card" data-sec-focus="suspended">
         <CardHead eyebrow="// reversible" title={`Suspended & banned${suspended.length ? ` · ${suspended.length}` : ''}`} />
         <p className="sec-p">Hidden from every public board. Banned accounts also can&apos;t sign in. Lifting restores both.</p>
         {err && <div className="sec-note is-bad">{err}</div>}

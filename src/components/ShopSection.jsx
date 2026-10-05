@@ -3,7 +3,6 @@ import { createPortal } from 'react-dom';
 import { motion } from 'framer-motion';
 import { firePurchase } from '../utils/confetti';
 import SectionHelp from './SectionHelp';
-import TrendingBoard from './shop/TrendingBoard';
 import Icon from './Icon';
 import { useHubModuleMenu } from './HubModuleMenu';
 import { useIsMobile } from '../hooks/useIsMobile';
@@ -679,26 +678,6 @@ export default function ShopSection({ S, update, active, onOpenModal, onShowCoin
     update(prev => ({ ...prev, shopFilter: f }));
   }
 
-  // Add a Trending pick straight to the user's own wishlist.
-  function handleAddTrending(item) {
-    update(prev => ({
-      ...prev,
-      shopItems: [...(prev.shopItems || []), {
-        id: 's' + Date.now(),
-        name: item.name,
-        price: item.price || '',
-        coinCost: item.coins || 0,
-        priority: 'med',
-        categoryId: null,
-        notes: '',
-        imageUrl: item.imageUrl || '',
-        url: item.url || '',
-        bought: false,
-        addedAt: Date.now(),
-      }],
-    }));
-    onShowCoinToast?.(`Added ${item.name} to your wishlist`, false);
-  }
 
   /*
    * Mark items bought (value=true) or not bought, through the one coin
@@ -890,12 +869,6 @@ export default function ShopSection({ S, update, active, onOpenModal, onShowCoin
     return parts.join(' · ');
   })();
 
-  // Trending is opt-out, not permanent furniture. It is the one thing on
-  // this page that is about other people, and someone shopping their own
-  // list should be able to put it away. `!== false` so the absence of the
-  // key means shown — the same shape every other opt-out in S uses.
-  const showTrending = S.showTrending !== false;
-
   const toolbarNode = (
     <div className="shop-toolbar">
       <div className="shop-titleblock">
@@ -905,29 +878,11 @@ export default function ShopSection({ S, update, active, onOpenModal, onShowCoin
           rows={[
             { term: 'Wishlist', def: 'Paste a product link to fill in the name and price.' },
             { term: 'Coins', def: 'Unlock items with what you earn, or switch that off and keep a plain list.' },
-            { term: 'Trending', def: 'What other people are saving for. Counts only, no names.' },
           ]}
-          foot="You are counted in Trending anonymously. Opt out in Settings → Privacy."
         /></h2>
         <p className="shop-headline">{headline}</p>
       </div>
       <div className="shop-toolbar-actions">
-        {/* Show/hide Trending. A plain toggle beside the other two
-            actions rather than buried in Settings: it is a view
-            preference about this page, so it belongs on this page.
-            Settings → Privacy still governs whether you are COUNTED
-            in it, which is a different question. */}
-        <motion.button
-          type="button"
-          className="btn btn-ghost shop-trend-toggle"
-          onClick={() => update(prev => ({ ...prev, showTrending: prev.showTrending === false }))}
-          title={showTrending ? 'Hide the Trending board' : 'Show the Trending board'}
-          aria-pressed={showTrending}
-          whileHover={{ scale: 1.04 }} whileTap={{ scale: 0.96 }}
-          transition={{ type: 'spring', stiffness: 400, damping: 17 }}>
-          <Icon name={showTrending ? 'eye' : 'eye-off'} size={15} />
-          <span>{showTrending ? 'Hide Trending' : 'Show Trending'}</span>
-        </motion.button>
         <motion.button type="button" className="btn btn-ghost" onClick={() => onOpenModal('addCategoryModal')}
           whileHover={{ scale: 1.04 }} whileTap={{ scale: 0.96 }}
           transition={{ type: 'spring', stiffness: 400, damping: 17 }}>
@@ -1184,11 +1139,6 @@ export default function ShopSection({ S, update, active, onOpenModal, onShowCoin
             </div>
 
             {gridNode}
-
-            {/* Trending: one collapsed line at the END of the list on
-                phones, never pinned over it (it covered ~30% of the
-                screen). Expands in place. */}
-            {showTrending && <TrendingBoard collapsible onAdd={handleAddTrending} />}
           </>
         ) : (
           /* ── Desktop: title plate, then one board ──
@@ -1248,16 +1198,6 @@ export default function ShopSection({ S, update, active, onOpenModal, onShowCoin
                 {searchNoteNode}
                 {bulkBarNode}
                 {gridNode}
-
-                {/* Trending sits INSIDE the board, along the bottom, rather
-                    than as a rail beside it. It is the one part of this
-                    page about other people and it was getting the same
-                    billing as the list you came to read. */}
-                {showTrending && (
-                  <div className="shop-trend-strip" data-hub-module="shop-trending" data-hub-module-label="Trending">
-                    <TrendingBoard onAdd={handleAddTrending} />
-                  </div>
-                )}
               </div>
             </div>
           </>

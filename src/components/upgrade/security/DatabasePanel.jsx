@@ -13,9 +13,10 @@
  * opens a side panel with Entity · Issue · Description · Resolve, where
  * it can be accepted so it stops counting.
  */
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import Icon from '../../Icon';
 import { usePanel } from './usePanel';
+import { useFocusTarget } from './useFocusTarget';
 import { Updated, Gate, CardHead, Tile, SetupCard, Calm, NoData, Sheet } from './parts';
 import TrafficChart from './TrafficChart';
 import WidgetBoundary from '../../WidgetBoundary';
@@ -48,9 +49,9 @@ function Health({ h }) {
               tone={meterTone(h.cpuPct) || 'none'} pct={num(h.cpuPct)} />
         <Tile label="Memory" value={fmtPct(h.memPct)} of={memTotal ? `of ${fmtBytes(memTotal)}` : 'used'}
               tone={meterTone(h.memPct, 75, 90) || 'none'} pct={num(h.memPct)} />
-        <Tile label="Disk" value={fmtPct(h.diskUsedPct)} of={diskTotal ? `of ${fmtBytes(diskTotal)}` : 'used'}
+        <Tile label="Disk" focusKey="disk" value={fmtPct(h.diskUsedPct)} of={diskTotal ? `of ${fmtBytes(diskTotal)}` : 'used'}
               sub="a ticket is raised over 80%" tone={meterTone(h.diskUsedPct, 70, 80) || 'none'} pct={num(h.diskUsedPct)} />
-        <Tile label="Connections" value={fmtInt(used)} of={max ? `/ ${fmtInt(max)}` : 'open'}
+        <Tile label="Connections" focusKey="connections" value={fmtInt(used)} of={max ? `/ ${fmtInt(max)}` : 'open'}
               sub={`${fmtInt(active)} active · ${fmtInt(idle)} idle`} tone={meterTone(connPct, 60, 80) || 'none'} pct={connPct} />
         <Tile label="Database size" value={fmtBytes(dbSize)} of={diskTotal ? `of ${fmtBytes(diskTotal)} disk` : 'on disk'}
               tone="none" pct={dbSize != null && diskTotal ? (dbSize / diskTotal) * 100 : null} />
@@ -138,7 +139,7 @@ function AdvisorDetail({ l, onClose, onDone }) {
   );
 }
 
-function Advisors({ adv }) {
+function Advisors({ adv, focus }) {
   const [tab, setTab] = useState('bad');
   const [openKey, setOpenKey] = useState(null);
   const [local, setLocal] = useState({});             // cache_key → accepted (optimistic)
@@ -153,7 +154,24 @@ function Advisors({ adv }) {
     }
     return out;
   }, [adv, local]);
+  // "Go to source" for an advisor ticket names the lint: show the tab it
+  // is in, so its row is on screen to be highlighted.
+  const focusName = focus && typeof focus.key === 'string' && focus.key.startsWith('advisor:') ? focus.key.slice(8) : null;
+  const focusN = focus && focus.n;
+  useEffect(() => {
+    if (!focusName) return;
+    const hit = ADV_TABS.find(x => buckets[x.id].some(l => l.name === focusName));
+    if (hit) setTab(hit.id);
+    // buckets is derived from adv; re-run only for a new click
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [focusName, focusN]);
   const list = buckets[tab];
+  const firstOf = new Set();
+  const focusAttr = l => {
+    if (!l.name || firstOf.has(l.name)) return undefined;
+    firstOf.add(l.name);
+    return `advisor:${l.name}`;
+  };
   const open = openKey ? [...buckets.bad, ...buckets.warn, ...buckets.info, ...buckets.accepted].find(l => l.key === openKey) : null;
   const meta = ADV_TABS.find(t => t.id === tab);
   return (
@@ -171,7 +189,8 @@ function Advisors({ adv }) {
         : (
           <div className="sec-tlist">
             {list.map(l => (
-              <button key={l.key} type="button" className={`sec-row sec-advrow is-${l.accepted ? 'accepted' : l.level}`} onClick={() => setOpenKey(l.key)}>
+              <button key={l.key} type="button" className={`sec-row sec-advrow is-${l.accepted ? 'accepted' : l.level}`} onClick={() => setOpenKey(l.key)}
+                      data-sec-focus={focusAttr(l)}>
                 <span className="sec-row-main">
                   <span className="sec-row-top">
                     <b className="sec-row-id">{l.title}</b>
@@ -199,10 +218,11 @@ function sectionGate(p, render, { compactSetup } = {}) {
   return <div className="sec-note is-warn"><b>Unavailable right now.</b> {p.hint || ''}</div>;
 }
 
-export default function DatabasePanel() {
+export default function DatabasePanel({ focus }) {
   const [range, setRangeState] = useState(readRange);
   const setRange = id => { setRangeState(id); try { window.localStorage.setItem(RANGE_KEY, id); } catch { /* private mode */ } };
   const db = usePanel('database', { params: { range } });
+  useFocusTarget(focus, !!(db.res && db.res.state === 'ok'));
   return (
     <div className="sec-pane">
       <div className="sec-bar">
@@ -226,7 +246,7 @@ export default function DatabasePanel() {
           const series = traffic.state === 'ok' && Array.isArray(traffic.data.series) ? traffic.data.series : [];
           return (
             <>
-              <section className="sec-card">
+              <section className="sec-card" data-sec-focus="health" data-sec-focus-group="disk connections">
                 <CardHead eyebrow="// health · now" title="Postgres"
                           right={src.metrics && <span className="sec-src">via {src.metrics}</span>} />
                 {sectionGate(health, h => <Health h={h} />)}
@@ -249,9 +269,9 @@ export default function DatabasePanel() {
                   <CardHead eyebrow="// largest first" title="Tables" />
                   <Tables tables={data.tables} />
                 </section>
-                <section className="sec-card">
+                <section className="sec-card" data-sec-focus="advisors" data-sec-focus-group="advisor">
                   <CardHead eyebrow="// supabase advisors" title="Advisors" />
-                  {sectionGate(adv, a => <Advisors adv={a} />, { compactSetup: traffic.state === 'not_configured' })}
+                  {sectionGate(adv, a => <Advisors adv={a} focus={focus} />, { compactSetup: traffic.state === 'not_configured' })}
                 </section>
               </div>
             </>

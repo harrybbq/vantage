@@ -81,7 +81,7 @@ function PrivacyPolicyContent() {
           'Reports and blocks — if you report or block someone, we store who reported whom, the reason you chose and any note you add. A report can include a copy of the reported person\'s handle and display name at the time, and recent messages from them if you report from a conversation.',
           'Payment & subscription data — if you purchase Vantage Pro, the purchase is processed by Apple (App Store), Google (Google Play) and RevenueCat. We receive your subscription status and a transaction reference. We never receive or store your card number.',
           'Device & notification data — if you enable push notifications, we store a device push token so notifications can be delivered via Apple/Google push services (Firebase Cloud Messaging).',
-          'Camera images (Pro, optional) — if you use the AI food scanner, a single camera frame is sent to Anthropic\'s API to identify the food (section 7). We do not store the image.',
+          'Camera images (optional) — if you use the AI food scanner (3 free scans a week; unlimited on Pro), a single camera frame is sent to Anthropic\'s API to identify the food (section 7). We do not store the image.',
           'Approximate location — to show local weather, our server looks up the approximate city for your IP address (section 8). We do not store the result against your account, and we never collect precise (GPS) location.',
           'Third-party sign-in data (optional) — if you sign in with Google or Apple, we receive a minimal profile from that provider (section 9).',
           'Session data — a session token kept by our authentication provider to keep you signed in.',
@@ -113,7 +113,7 @@ function PrivacyPolicyContent() {
       <Section title="5. How We Use Your Data">
         <Ul items={[
           'To create and manage your account and sync your data across devices.',
-          'To operate the social features you choose to use (friends, messages, groups, leaderboard, trending).',
+          'To operate the social features you choose to use (friends, messages, groups, leaderboard).',
           'To provide optional AI features when you use them (section 7).',
           'To review reports and act on accounts or content that break the Terms of Service.',
           'To send transactional emails (account confirmation, password reset) — we send no marketing emails.',
@@ -129,7 +129,6 @@ function PrivacyPolicyContent() {
           'Leaderboard — the global leaderboard shows your display name, profile picture, level, rating and prestige. You appear on it only while "Show me on the global leaderboard" is on; it is off by default for new accounts (older accounts: as above). Friends see you on the friends board regardless. Pro users may optionally colour their name.',
           'Friends — people you accept as friends can see your profile card: display name, avatar, level, and any of streak / heatmap / recent wins / online status you have enabled. Each has its own toggle. The habit-streak card, which shows the habit\'s name, is off unless you turn it on.',
           'Groups — if you join a group, its members see your display name, profile picture, rating and weekly climb. The group\'s name, picture and weekly score appear on its division\'s board to other groups.',
-          'Trending (Shopping) — items on your wish-list may be aggregated into your friends\' "Trending" board and the app-wide "Global" board. This is anonymous: only the item name and a count are shown, never who wants it, and the Global board only ever shows items wanted by at least two different people. Turn "Share my wishlist in friends\' Trending" off to be excluded from both.',
           'Direct messages — visible only to you and the recipient (and stored as described in section 2). If the recipient reports a conversation, recent messages from it are included in the report for review.',
         ]} />
       </Section>
@@ -137,7 +136,7 @@ function PrivacyPolicyContent() {
       <Section title="7. AI Features (Anthropic)">
         <P>These optional features send data to Anthropic's API, our AI provider. We ask for your consent before the first one runs, and you can withdraw it in Settings → Privacy → Consent:</P>
         <Ul items={[
-          'AI food scanner (Pro) — one camera frame per scan, used to identify the food and estimate nutrition.',
+          'AI food scanner (3 free scans a week; unlimited on Pro) — one camera frame per scan, used to identify the food and estimate nutrition.',
           'Daily brief / AI coach — a compact snapshot of your own App data (e.g. first name, recent habits, trackers, goals, vitals and macro trends) is sent to generate your personal daily brief.',
           'Recipe from a video — the title and description of a YouTube or TikTok video you save are sent to extract the ingredient list and estimate macros.',
         ]} />
@@ -149,7 +148,7 @@ function PrivacyPolicyContent() {
         <P><strong>Providers that run the App</strong> (they process your personal data on our behalf):</P>
         <Ul items={[
           'Supabase — database and authentication, hosted in the EU. Stores your account, app content, messages, nutrition and health data.',
-          'Netlify — web hosting and the serverless functions that power sync, leaderboards, groups, trending and integrations. Receives your IP address when you use the App.',
+          'Netlify — web hosting and the serverless functions that power sync, leaderboards, groups and integrations. Receives your IP address when you use the App.',
           'Anthropic — AI features and screening of group and profile pictures, as described in section 7.',
           'RevenueCat, Apple and Google — subscription billing and entitlement management for Vantage Pro. Payment details are handled by the platform you purchase through.',
           'Firebase Cloud Messaging (Google) — delivery of push notifications you enable; processes your device push token.',
@@ -293,15 +292,15 @@ function TermsContent() {
       </Section>
 
       <Section title="7. Social Features & Acceptable Use">
-        <P>Vantage includes friends, direct messages, handles, a leaderboard and anonymous trending boards. You agree not to:</P>
+        <P>Vantage includes friends, direct messages, handles, and a leaderboard. You agree not to:</P>
         <Ul items={[
           'Use the App for any unlawful purpose, or to harass, abuse, threaten, defame or impersonate anyone — including via messages, handles, display names or item names.',
           'Post content that is hateful, sexually explicit, infringing, or that exposes another person\'s private information.',
           'Attempt to access another user\'s account or data, or to circumvent privacy controls.',
           'Reverse-engineer, decompile or extract the App\'s source code, or use bots/scripts to scrape or interact with the App.',
-          'Manipulate the leaderboard, coins, or trending boards through fake accounts or automated activity.',
+          'Manipulate the leaderboard or coins through fake accounts or automated activity.',
         ]} />
-        <P>These rules apply to everything other people can see: display names, @handles, profile pictures, messages, group names and group pictures, and wish-list items that reach a Trending board.</P>
+        <P>These rules apply to everything other people can see: display names, @handles, profile pictures, messages, group names and group pictures.</P>
       </Section>
 
       <Section title="7a. Reporting, Blocking & Moderation">
@@ -316,7 +315,7 @@ function TermsContent() {
       </Section>
 
       <Section title="8. Your Content">
-        <P>You own the content you create in the App. You grant us a limited, worldwide, royalty-free licence to host, store, transmit and display it solely to operate the service — including showing your shared items to friends, the leaderboard and anonymised trending boards according to your privacy settings. The licence ends when you delete the content or your account, except for anonymised aggregates that contain no personal data.</P>
+        <P>You own the content you create in the App. You grant us a limited, worldwide, royalty-free licence to host, store, transmit and display it solely to operate the service — including showing your shared items to friends and the leaderboard according to your privacy settings. The licence ends when you delete the content or your account, except for anonymised aggregates that contain no personal data.</P>
       </Section>
 
       <Section title="9. Third-Party Services">

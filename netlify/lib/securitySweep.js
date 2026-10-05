@@ -20,6 +20,10 @@ const D = require('./securityData');
 const { evaluateConditions, repeatCapHits, THRESHOLDS } = require('./sweepRules');
 const { percentile } = require('./securityShape');
 const { DAILY_CAPS } = require('./aiQuota');
+const { alertConfig, atOrAbove, createNotifier } = require('./alertNotify');
+const { headlineFor } = require('./alertText');
+
+const MAX_PINGS_PER_RUN = 6;
 
 const iso = msAgo => new Date(Date.now() - msAgo).toISOString();
 const enc = encodeURIComponent;
@@ -128,29 +132,80 @@ async function gather(env) {
 }
 
 /**
- * → { ok, raised:[{fingerprint, severity, title, result}], deferred, skipped, ticketsInstalled }
- * Never throws.
+ * Which raised tickets ping the owner (lib/alertNotify.js), decided from
+ * what security_ticket_raise answered:
+ *   · at or above ALERT_MIN_SEVERITY (default critical), AND
+ *   · NEW (count 1) or RE-OPENED (it was resolved before this write) —
+ *     never on every hourly repeat of a condition already known.
+ *   · Database unreachable is the exception: its ticket cannot be stored
+ *     (the database is what is down), so it pings anyway, once per run.
+ * Pure. → { alert, why } | null
  */
-async function runSweep(env, { budgetMs = DEFAULT_BUDGET_MS } = {}) {
+function alertFor(c, { result, row }, priorStatus, minSeverity) {
+  if (!atOrAbove(c.severity, minSeverity)) return null;
+  const headline = headlineFor(c.kind, c.detail, { title: c.title });
+  const base = { severity: c.severity, title: c.title, headline, kind: c.kind };
+  if (result === 'ok') {
+    const isNew = row && row.count === 1;
+    const reopened = priorStatus === 'resolved';
+    if (isNew || reopened) return { alert: { ...base, ticketId: row && row.id }, why: isNew ? 'new' : 'reopened' };
+    return null;
+  }
+  if (c.kind === 'db_unreachable') return { alert: { ...base, ticketId: null }, why: 'unstored' };
+  return null;
+}
+
+/**
+ * → { ok, raised:[{fingerprint, severity, title, result, ticketId?, count?}], deferred, skipped,
+ *     ticketsInstalled, alerts:{ queued, sent, dropped } }
+ * Never throws — and a failed ping never fails the sweep.
+ *
+ * `opts.gather` replaces the readings step (tests); `opts.env` is the
+ * process env the notifier reads; `opts.fetchImpl` is the notifier's fetch.
+ */
+async function runSweep(env, { budgetMs = DEFAULT_BUDGET_MS, gather: gatherImpl, alertEnv = process.env, fetchImpl } = {}) {
   const t0 = Date.now();
   const startedAt = new Date(t0).toISOString();
   try {
-    const { readings, skipped } = await gather(env);
+    const { readings, skipped } = await (gatherImpl || gather)(env);
     const candidates = evaluateConditions(readings);
     const raised = [];
     const deferred = [];
     let ticketsInstalled = true;
+
+    const cfg = alertConfig(alertEnv);
+    const notifier = createNotifier({ max: MAX_PINGS_PER_RUN, env: alertEnv, ...(fetchImpl ? { fetchImpl } : {}) });
+    const hot = cfg.configured ? candidates.filter(c => atOrAbove(c.severity, cfg.minSeverity)) : [];
+    const prior = hot.length && readings.db && readings.db.reachable !== false
+      ? await D.ticketStatuses(env, hot.map(c => c.fingerprint))
+      : new Map();
+    let unstoredPinged = false;
+
     // Most severe first (evaluateConditions sorts), so a deadline drops
     // the least important writes.
     for (const c of candidates) {
       if (Date.now() - t0 > budgetMs) { deferred.push(c.fingerprint); continue; }
-      const result = ticketsInstalled ? await D.raiseTicket(env, c) : 'missing';
-      if (result === 'missing') ticketsInstalled = false;
-      raised.push({ fingerprint: c.fingerprint, severity: c.severity, title: c.title, result });
+      const out = ticketsInstalled ? await D.raiseTicketRow(env, c) : { result: 'missing', row: null };
+      if (out.result === 'missing') ticketsInstalled = false;
+      raised.push({
+        fingerprint: c.fingerprint, severity: c.severity, title: c.title, result: out.result,
+        ...(out.row ? { ticketId: out.row.id, count: out.row.count } : {}),
+      });
+      if (!cfg.configured) continue;
+      const a = alertFor(c, out, prior.get(c.fingerprint), cfg.minSeverity);
+      if (!a) continue;
+      if (a.why === 'unstored') { if (unstoredPinged) continue; unstoredPinged = true; }
+      notifier.add(a.alert);
     }
+
+    // Pings go out together at the end, each with a 3 s timeout, so they
+    // add at most ~3 s to a run and never block a ticket write.
+    let alerts = { queued: 0, sent: 0, dropped: 0 };
+    try { if (notifier.size) alerts = await notifier.flush(); } catch { /* notify never fails the sweep */ }
+
     return {
       ok: true, startedAt, finishedAt: new Date().toISOString(), tookMs: Date.now() - t0,
-      raised, deferred, skipped, ticketsInstalled,
+      raised, deferred, skipped, ticketsInstalled, alerts,
     };
   } catch (e) {
     console.error('security sweep:', e?.message);
@@ -158,4 +213,4 @@ async function runSweep(env, { budgetMs = DEFAULT_BUDGET_MS } = {}) {
   }
 }
 
-module.exports = { runSweep, gather };
+module.exports = { runSweep, gather, alertFor, MAX_PINGS_PER_RUN };

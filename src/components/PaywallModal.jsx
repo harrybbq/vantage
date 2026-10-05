@@ -32,7 +32,7 @@ import { FREE_CAPS } from '../hooks/useTierLimits';
 import { useSubscriptionContext } from '../context/SubscriptionContext';
 import { getOfferings, purchasePackage, restorePurchases, isAvailable as rcIsAvailable } from '../lib/billing/revenuecat';
 import { platform as storePlatform } from '../lib/billing/manageSubscription';
-import { priceLine, renewalLine, storeName } from '../lib/billing/renewalWording';
+import { priceLine, renewalLine, storeName, yearlySaving, perMonthLine, introLine } from '../lib/billing/renewalWording';
 import Overlay from './ui/Overlay';
 import { isNativeApp } from '../lib/native/platform';
 
@@ -163,6 +163,13 @@ export default function PaywallModal({ openId, onClose, onUpgrade, onShowToast, 
   const hasPackages = packages.length > 0;
   const useStorefront = isOpen && proIsLive && hasPackages && !hasPro;
   const sortedPackages = hasPackages ? [...packages].sort((a, b) => packageWeight(a) - packageWeight(b)) : [];
+  // The yearly card's pitch, computed from the two store products: the
+  // saving and the per-month figure appear only when both prices are
+  // real numbers in one currency, otherwise the card keeps its plain
+  // "Best value" wording and claims nothing it can't back.
+  const monthlyPkg = packages.find(p => p.identifier === '$rc_monthly') || null;
+  const annualPkg = packages.find(p => p.identifier === '$rc_annual') || null;
+  const saving = yearlySaving(monthlyPkg, annualPkg);
   const plat = storePlatform();
 
   return (
@@ -255,6 +262,11 @@ export default function PaywallModal({ openId, onClose, onUpgrade, onShowToast, 
                 {sortedPackages.map(pkg => {
                   const meta = PACKAGE_META[pkg.identifier] || { label: pkg.product?.title || 'Plan', sub: pkg.product?.description || '' };
                   const busy = purchasingId === pkg.identifier;
+                  const isAnnual = pkg.identifier === '$rc_annual';
+                  const badge = isAnnual && saving ? `Save ${saving.pct}%` : meta.badge;
+                  const perMonth = isAnnual ? perMonthLine(pkg) : null;
+                  const sub = perMonth ? `${perMonth}, billed yearly.` : meta.sub;
+                  const offer = introLine(pkg);
                   return (
                     <button
                       key={pkg.identifier}
@@ -262,12 +274,13 @@ export default function PaywallModal({ openId, onClose, onUpgrade, onShowToast, 
                       onClick={() => handlePurchase(pkg)}
                       disabled={!!purchasingId}
                     >
-                      {meta.badge && <span className="paywall-pkg-badge">{meta.badge}</span>}
+                      {badge && <span className="paywall-pkg-badge">{badge}</span>}
                       <div className="paywall-pkg-label">{meta.label}</div>
                       <div className="paywall-pkg-price">
                         {priceLine(pkg) || ''}
                       </div>
-                      <div className="paywall-pkg-sub">{meta.sub}</div>
+                      {offer && <div className="paywall-pkg-offer">{offer}</div>}
+                      <div className="paywall-pkg-sub">{sub}</div>
                       {renewalLine(pkg, plat) && (
                         <div className="paywall-pkg-renew">{renewalLine(pkg, plat)}</div>
                       )}

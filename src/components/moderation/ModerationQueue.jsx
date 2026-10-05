@@ -24,7 +24,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import Icon from '../Icon';
 import { authFetch } from '../../lib/authFetch';
-import { readQueueResponse, openCounts, sortQueue } from '../../lib/moderation/queue';
+import { readQueueResponse, openCounts, sortQueue, isStale } from '../../lib/moderation/queue';
 import { postAction } from '../../lib/security/api';
 
 const ENDPOINT = '/.netlify/functions/moderation';
@@ -71,8 +71,13 @@ async function postModeration(body) {
  *   className — extra classes on the wrapper (the console's card).
  *   onChanged — called after any decision, so a parent can refresh
  *               counts or its suspended list.
+ *   oldestFirst — longest-waiting first (asks the function for
+ *               ?order=oldest, so the oldest are on the first page).
+ *   staleHours — mark open reports older than this ("Waiting 3 days");
+ *               the first gets data-sec-focus="stale" for the Security
+ *               console's "go to source".
  */
-export default function ModerationQueue({ className = '', onChanged } = {}) {
+export default function ModerationQueue({ className = '', onChanged, oldestFirst = false, staleHours = null } = {}) {
   const [state, setState] = useState('loading');   // loading | ok | not-installed | forbidden | error
   const [reports, setReports] = useState([]);
   const [total, setTotal] = useState(null);
@@ -86,7 +91,11 @@ export default function ModerationQueue({ className = '', onChanged } = {}) {
   const load = useCallback(async (p = 0) => {
     setError(null);
     try {
-      const res = await authFetch(`${ENDPOINT}${p ? `?page=${p}` : ''}`);
+      const q = new URLSearchParams();
+      if (p) q.set('page', String(p));
+      if (oldestFirst) q.set('order', 'oldest');
+      const qs = q.toString();
+      const res = await authFetch(`${ENDPOINT}${qs ? `?${qs}` : ''}`);
       const out = readQueueResponse(res.status, await res.text());
       setState(out.state);
       setReports(list => (p ? [...list, ...out.reports.filter(r => !list.some(x => x.id === r.id))] : out.reports));
@@ -97,7 +106,7 @@ export default function ModerationQueue({ className = '', onChanged } = {}) {
       setState('error');
       setError("Couldn't reach the server.");
     }
-  }, []);
+  }, [oldestFirst]);
 
   useEffect(() => { load(0); }, [load]);
 
@@ -133,9 +142,11 @@ export default function ModerationQueue({ className = '', onChanged } = {}) {
 
   const counts = useMemo(() => openCounts(reports), [reports]);
   const shown = useMemo(
-    () => sortQueue(reports).filter(r => showClosed || r.status === 'open'),
-    [reports, showClosed],
+    () => sortQueue(reports, { oldestFirst }).filter(r => showClosed || r.status === 'open'),
+    [reports, showClosed, oldestFirst],
   );
+  const now = Date.now();
+  let staleMarked = false;
   const openN = reports.filter(r => r.status === 'open').length;
   const more = total != null && reports.length < total;
   // `total` is the open count when the page loaded; decisions since then
@@ -156,7 +167,8 @@ export default function ModerationQueue({ className = '', onChanged } = {}) {
   }
 
   return (
-    <div className={`upg-review mod-queue ${className}`}>
+    <div className={`upg-review mod-queue ${className}`} data-sec-focus="reports"
+         data-sec-focus-group={staleHours && state === 'ok' ? 'stale' : undefined}>
       <div className="upg-review-head">
         <div>
           <div className="upg-review-title">
@@ -191,8 +203,13 @@ export default function ModerationQueue({ className = '', onChanged } = {}) {
         const msgs = r.messages || [];
         const long = (r.context || '').length > 160 || msgs.length > 0;
         const ask = pending && pending.id === r.id ? pending : null;
+        const stale = staleHours ? isStale(r, staleHours, now) : false;
+        const firstStale = stale && !staleMarked;
+        if (firstStale) staleMarked = true;
+        const waitH = stale ? Math.floor((now - Date.parse(r.at)) / 3600000) : 0;
         return (
-          <div key={r.id} className={`mod-row is-${r.status}${repeat > 1 ? ' is-repeat' : ''}`}>
+          <div key={r.id} className={`mod-row is-${r.status}${repeat > 1 ? ' is-repeat' : ''}${stale ? ' is-stale' : ''}`}
+               data-sec-focus={firstStale ? 'stale' : undefined}>
             <div className="mod-main">
               <div className="mod-who">
                 <span className="mod-name">{r.name || (r.handle ? `@${r.handle}` : 'Unknown')}</span>
@@ -202,6 +219,7 @@ export default function ModerationQueue({ className = '', onChanged } = {}) {
                 {r.suspended && !r.banned && <span className="mod-tag is-bad">Suspended</span>}
                 {repeat > 1 && <span className="mod-tag is-warn">{repeat} open reports</span>}
                 {r.status !== 'open' && <span className="mod-tag is-muted">{r.status}</span>}
+                {stale && <span className="mod-tag is-warn">Waiting {waitH < 48 ? `${waitH} h` : `${Math.floor(waitH / 24)} days`}</span>}
               </div>
               <div className="mod-meta">
                 {r.reason || 'No reason given'}

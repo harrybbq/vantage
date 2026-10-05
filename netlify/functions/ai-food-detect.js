@@ -34,10 +34,27 @@ function checkRateLimit(ip) {
 
 const { requireUser, underLimit, tooMany } = require('../lib/requireUser');
 const { withinDailyAiCap, overDailyCap } = require('../lib/aiQuota');
+const { FREE_WEEKLY, decide, usedThisWeek, noteLocalUse, isPaidUser, resetsOnIso } = require('../lib/freeAllowance');
+const { isOwnerEmail } = require('../lib/owner');
+
+// Free accounts get a small weekly allowance of AI scans; Pro and
+// lifetime are limited only by the daily cap (aiQuota). Barcode and text
+// search never come here and stay free for everyone.
+const FREE_LIMIT = FREE_WEEKLY['food-detect'];
+
+/** Where this caller stands: { paid, limit, used, left, resetsOn }. */
+async function allowanceFor(auth) {
+  const paid = isOwnerEmail(auth.email) || (await isPaidUser(auth.userId));
+  if (paid) return { paid: true, limit: null, used: null, left: null, resetsOn: null };
+  const { used } = await usedThisWeek('food-detect', auth.userId);
+  const d = decide({ paid: false, used, limit: FREE_LIMIT });
+  return { paid: false, limit: FREE_LIMIT, used, left: d.left, resetsOn: resetsOnIso() };
+}
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+  'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
   'Content-Type': 'application/json',
 };
 
@@ -71,6 +88,15 @@ Rules:
 exports.handler = async (event) => {
   if (event.httpMethod === 'OPTIONS') {
     return { statusCode: 204, headers: CORS, body: '' };
+  }
+  // GET → the caller's allowance, so the scanner can say "2 of 3 free
+  // scans left this week" before anyone spends one.
+  if (event.httpMethod === 'GET') {
+    const auth = await requireUser(event, CORS);
+    if (auth.error) return auth.error;
+    if (!underLimit('ai-food-quota', auth.userId, 30)) return tooMany(CORS);
+    const a = await allowanceFor(auth);
+    return { statusCode: 200, headers: { ...CORS, 'Cache-Control': 'no-store' }, body: JSON.stringify(a) };
   }
   if (event.httpMethod !== 'POST') {
 
@@ -109,8 +135,26 @@ exports.handler = async (event) => {
     return { statusCode: 413, headers: CORS, body: JSON.stringify({ error: 'Image too large — reduce camera resolution' }) };
   }
 
-  // Durable per-day cap, charged only once the request is going ahead.
-  if (!(await withinDailyAiCap('food-detect', auth.userId))) return overDailyCap(CORS);
+  // Free accounts: refuse once this week's allowance is used, BEFORE any
+  // money is spent. 402 + `free_limit` so the app opens the paywall
+  // rather than showing an error.
+  const allowance = await allowanceFor(auth);
+  if (!allowance.paid && allowance.left <= 0) {
+    return {
+      statusCode: 402,
+      headers: CORS,
+      body: JSON.stringify({
+        error: 'free_limit',
+        message: `You've used your ${FREE_LIMIT} free AI scans this week. Barcode and text search are still free — or go Pro for unlimited scans.`,
+        limit: FREE_LIMIT, left: 0, resetsOn: allowance.resetsOn,
+      }),
+    };
+  }
+
+  // Durable per-day cap. Pro is charged up front, as before. A free scan
+  // is charged once Anthropic has answered (below), so a network failure
+  // doesn't eat one of only three.
+  if (allowance.paid && !(await withinDailyAiCap('food-detect', auth.userId))) return overDailyCap(CORS);
 
   try {
     const res = await fetch('https://api.anthropic.com/v1/messages', {
@@ -146,6 +190,17 @@ exports.handler = async (event) => {
       throw new Error(`Anthropic ${res.status}`);
     }
 
+    // The model looked at the photo, so this counts — even if it then
+    // finds no food (that call still cost money, and counting it is what
+    // stops a free account scanning the ceiling for free).
+    let freeLeft = null;
+    if (!allowance.paid) {
+      const within = await withinDailyAiCap('food-detect', auth.userId);
+      noteLocalUse('food-detect', auth.userId);
+      freeLeft = Math.max(0, allowance.left - 1);
+      if (!within) return overDailyCap(CORS);
+    }
+
     const anthropicData = await res.json();
     const rawText = anthropicData.content?.[0]?.text?.trim() || '';
 
@@ -159,7 +214,7 @@ exports.handler = async (event) => {
       return {
         statusCode: 200,
         headers: CORS,
-        body: JSON.stringify({ error: 'Could not identify food in image — try pointing at the packaging or use text search', confidence: 'low' }),
+        body: JSON.stringify({ error: 'Could not identify food in image — try pointing at the packaging or use text search', confidence: 'low', freeScansLeft: freeLeft }),
       };
     }
 
@@ -172,7 +227,7 @@ exports.handler = async (event) => {
     return {
       statusCode: 200,
       headers: CORS,
-      body: JSON.stringify({ ...food, source: 'ai-vision' }),
+      body: JSON.stringify({ ...food, source: 'ai-vision', freeScansLeft: freeLeft }),
     };
   } catch (err) {
     console.error('ai-food-detect error:', err.message);

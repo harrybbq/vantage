@@ -35,6 +35,7 @@ import { supabase } from '../../lib/supabase';
 import { contributionProblem, toContribution } from '../../lib/diet/contribute';
 import { searchByBarcode, searchByName, readCommunityPref, writeCommunityPref } from '../../lib/diet/foodSearch';
 import { fetchRecentFoods, logFoodEntry } from '../../lib/diet/quickLog';
+import { useAiScanQuota, quotaLine } from '../../lib/diet/aiScanQuota';
 import {
   mealForTime, scaled, fromPer100, presetsFor, energySplit, logRow, savedMeal, mealAsFood,
   unitOf, baseOf,
@@ -107,6 +108,8 @@ export default function LogFoodPanel({
   totals = {}, goals = {},        // the day so far and its targets, for "after this"
   onLogged,                       // ({ id, day }) → the page reloads its figures
   canUseCamera = false,
+  hasPro = false,                 // known Pro → skip the allowance lookup
+  onOpenModal,                    // opens the paywall when free AI scans run out
 }) {
   const [present, setPresent] = useState(open);
   const panelRef = useRef(null);
@@ -115,6 +118,10 @@ export default function LogFoodPanel({
   const searchRef = useRef(null);
   const logBtnRef = useRef(null);
   const cameraRef = useRef(null);
+  // Free AI-scan allowance (server-enforced); only asked for once the
+  // Scan tab is opened by someone not already known to be Pro.
+  const [scanSeen, setScanSeen] = useState(false);
+  const quota = useAiScanQuota(scanSeen && !hasPro);
   const [top, setTop] = useState(52);
   const [wide, setWide] = useState(() => typeof window !== 'undefined' && window.innerWidth >= 1680);
 
@@ -128,6 +135,7 @@ export default function LogFoodPanel({
     return t === 'meals' || t === 'recent' || (t === 'scan' && canUseCamera) ? t : (savedMeals.length ? 'meals' : 'recent');
   });
   const [prevMode, setPrevMode] = useState(mode === 'name' ? 'recent' : mode);
+  useEffect(() => { if (mode === 'scan') setScanSeen(true); }, [mode]);
   const [query, setQuery] = useState('');
   const [search, setSearch] = useState('idle');   // idle | loading | results | error | none
   const [results, setResults] = useState([]);
@@ -683,8 +691,15 @@ export default function LogFoodPanel({
                     }}
                     onAIResult={food => openLog({ key: null, food: { ...food, __kind: 'search' } })}
                     onError={msg => { setSearchErr(msg); }}
+                    onQuota={quota.setLeft}
+                    onFreeLimit={() => onOpenModal?.('paywall:aiScans')}
                   />
                   <button type="button" className="lfp-btn-line" onClick={() => cameraRef.current && cameraRef.current.identify()}>Identify with AI</button>
+                  {quotaLine(quota) && (
+                    <span className="ai-scan-quota" role="status">
+                      {quotaLine(quota)} · <button type="button" className="ai-scan-quota-pro" onClick={() => onOpenModal?.('paywall:aiScans')}>Unlimited with Pro</button>
+                    </span>
+                  )}
                   <span className="lfp-mono-muted">Point at a barcode, or use AI to read a plate or packet.</span>
                 </div>
               )}

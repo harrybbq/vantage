@@ -6,6 +6,7 @@
 import assert from 'node:assert/strict';
 import {
   packagePeriod, priceLine, renewalLine, yearlySaving, storeName, money,
+  introOffer, introLine, perMonthLine,
 } from './renewalWording.js';
 
 let n = 0;
@@ -58,6 +59,34 @@ const annual  = { identifier: '$rc_annual',  product: { priceString: '£34.99', 
   eq(yearlySaving(null, annual), null, 'missing package');
   eq(money(18.89, 'GBP'), '£18.89', 'formats GBP');
   eq(money(3, null), '3.00', 'bare fallback');
+}
+
+// ── Intro offers: shown only when the store product carries one ──
+{
+  const trial = { identifier: '$rc_annual', product: { priceString: '£39.99', price: 39.99, currencyCode: 'GBP',
+    introPrice: { price: 0, priceString: '£0.00', cycles: 1, periodUnit: 'DAY', periodNumberOfUnits: 7 } } };
+  eq(introLine(trial), '7 days free, then £39.99 / year', 'free trial line');
+  ok(renewalLine(trial, 'ios').startsWith('7 days free, then £39.99 per year, auto-renews yearly until cancelled.'), 'trial leads the renewal sentence');
+  const firstYear = { identifier: '$rc_annual', product: { priceString: '£39.99', price: 39.99,
+    introPrice: { price: 19.99, priceString: '£19.99', cycles: 1, periodUnit: 'YEAR', periodNumberOfUnits: 1 } } };
+  eq(introLine(firstYear), '£19.99 for the first year, then £39.99 / year', 'discounted first year');
+  ok(renewalLine(firstYear, 'android').startsWith('£19.99 for the first year, then £39.99 per year,'), 'discount leads the sentence');
+  const payg = { identifier: '$rc_monthly', product: { priceString: '£4.99', price: 4.99,
+    introPrice: { price: 1.99, priceString: '£1.99', cycles: 3, periodUnit: 'MONTH', periodNumberOfUnits: 1 } } };
+  eq(introLine(payg), '£1.99 / month for 3 months, then £4.99 / month', 'pay-as-you-go intro');
+  eq(introOffer({ identifier: '$rc_annual', product: { priceString: '£39.99' } }), null, 'no introPrice → no offer');
+  eq(introOffer({ identifier: '$rc_annual', product: { introPrice: { price: 0, periodUnit: 'FORTNIGHT', periodNumberOfUnits: 1 } } }), null, 'unknown unit → no offer');
+  eq(introOffer({ identifier: '$rc_annual', product: { introPrice: { price: 5, periodUnit: 'MONTH', periodNumberOfUnits: 1 } } }), null, 'paid intro without a price string → no offer');
+  eq(introLine({ identifier: '$rc_annual', product: { introPrice: trial.product.introPrice } }), null, 'no main price → no line');
+  ok(renewalLine(annual, 'ios').startsWith('£34.99 per year, auto-renews yearly'), 'no offer → sentence unchanged');
+}
+
+// ── Per-month equivalent of a yearly plan ──
+{
+  eq(perMonthLine({ identifier: '$rc_annual', product: { price: 39.99, currencyCode: 'GBP' } }), '£3.33 / month', 'rounded down, never overstated');
+  eq(perMonthLine(annual), '£2.91 / month', '34.99 / 12');
+  eq(perMonthLine(monthly), null, 'only yearly plans');
+  eq(perMonthLine({ identifier: '$rc_annual', product: { priceString: '£39.99' } }), null, 'no numeric price → nothing');
 }
 
 console.log(`renewalWording: ${n} checks passed`);

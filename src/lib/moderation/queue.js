@@ -83,11 +83,22 @@ export function openCounts(reports) {
   return n;
 }
 
-/** Open first, then newest first. */
-export function sortQueue(reports) {
+/**
+ * Open first, then newest first — or, with `oldestFirst` (the Security
+ * console's "stale reports" link), longest-waiting first.
+ */
+export function sortQueue(reports, { oldestFirst = false } = {}) {
   return [...(reports || [])].sort((a, b) => {
     const ao = a.status === 'open' ? 0 : 1, bo = b.status === 'open' ? 0 : 1;
     if (ao !== bo) return ao - bo;
-    return String(b.at || '').localeCompare(String(a.at || ''));
+    const byTime = String(b.at || '').localeCompare(String(a.at || ''));
+    return oldestFirst ? -byTime : byTime;
   });
+}
+
+/** An open report older than `hours` — waiting too long for a decision. */
+export function isStale(r, hours = 24, now = Date.now()) {
+  if (!r || r.status !== 'open' || !r.at) return false;
+  const t = Date.parse(r.at);
+  return Number.isFinite(t) && now - t > hours * 3600_000;
 }

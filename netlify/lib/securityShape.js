@@ -131,6 +131,110 @@ function shapeLints(body) {
     .slice(0, MAX_LINTS);
 }
 
+/**
+ * Supabase dashboard pages for one project — where an alert's "go to
+ * source" sends the owner. The ref is derived server-side from
+ * SUPABASE_URL (projectRefFromUrl / SUPABASE_PROJECT_REF), so the client
+ * never needs it hard-coded. The project root always resolves; the
+ * sub-pages are where the dashboard keeps them today.
+ */
+function supabaseLinks(ref) {
+  const r = typeof ref === 'string' && /^[a-z0-9]{10,40}$/i.test(ref) ? ref.toLowerCase() : null;
+  if (!r) return null;
+  const root = `https://supabase.com/dashboard/project/${r}`;
+  return {
+    project: root,
+    reports: `${root}/reports/database`,
+    advisors: `${root}/advisors/security`,
+    tableEditor: `${root}/editor`,
+  };
+}
+
+// ── Client errors (public.client_errors) → issue groups ─────────────
+
+/**
+ * The first frame of a stack that points at code, normalised so the
+ * same bug groups together across visits: origin dropped (paths only),
+ * query strings and fragments dropped, line:column kept.
+ *   "TypeError: x\n    at Hub (https://site/assets/index-ab12.js:1:2345)"
+ *     → "Hub (/assets/index-ab12.js:1:2345)"
+ * → string, or null when there is no usable frame.
+ */
+function firstFrame(stack) {
+  if (typeof stack !== 'string' || !stack) return null;
+  const lines = stack.split('\n').map(l => l.trim()).filter(Boolean);
+  // Chrome puts the message on line 1 and frames as "at …"; Firefox and
+  // Safari write "fn@url:line:col".
+  const frame = lines.find(l => /^at\s/.test(l)) || lines.find(l => /@\S*:\d+/.test(l));
+  if (!frame) return null;
+  const out = frame
+    .replace(/^at\s+/, '')
+    .replace(/https?:\/\/[^/\s)]+/g, '')
+    .replace(/[?#][^:\s)]*(?=:\d)/g, '')
+    .replace(/\s+/g, ' ')
+    .slice(0, 160);
+  return out || null;
+}
+
+/** A message as a grouping key: trimmed, ids and long numbers collapsed. */
+function messageKey(m) {
+  return String(m || '').trim()
+    .replace(/\b[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\b/gi, ':id')
+    .replace(/\b\d{4,}\b/g, ':n')
+    .slice(0, 200);
+}
+
+/**
+ * rows [{ message, stack, url, release, kind, occurred_at }] → the top
+ * issue groups, most frequent first:
+ *   [{ message, frame, kind, count, firstSeen, lastSeen, sampleUrl, release, releases }]
+ * Grouped by message + first stack frame, the way Sentry groups by
+ * stack. Callers must not select user_id: nothing here would pass it on,
+ * but a column never read is a column that cannot leak. `sampleUrl` is
+ * the latest occurrence's URL (client-error.js already dropped its
+ * query and fragment).
+ */
+function groupClientErrors(rows, { limit = 10 } = {}) {
+  const groups = new Map();
+  for (const r of Array.isArray(rows) ? rows : []) {
+    if (!r || (!r.message && !r.stack)) continue;
+    const message = messageKey(r.message) || '(no message)';
+    const frame = firstFrame(r.stack);
+    const key = `${message}\u0000${frame || ''}`;
+    const at = Date.parse(r.occurred_at);
+    let g = groups.get(key);
+    if (!g) {
+      g = { message, frame, kind: r.kind ? String(r.kind).slice(0, 32) : null, count: 0, firstMs: Infinity, lastMs: -Infinity, sampleUrl: null, rel: new Map() };
+      groups.set(key, g);
+    }
+    g.count++;
+    const url = r.url ? String(r.url).slice(0, 300) : null;
+    if (Number.isFinite(at)) {
+      if (at < g.firstMs) g.firstMs = at;
+      if (at >= g.lastMs) { g.lastMs = at; g.sampleUrl = url || g.sampleUrl; }
+    } else if (!g.sampleUrl) g.sampleUrl = url;
+    const rel = r.release ? String(r.release).slice(0, 64) : null;
+    if (rel) g.rel.set(rel, (g.rel.get(rel) || 0) + 1);
+  }
+  return [...groups.values()]
+    .map(g => {
+      const releases = [...g.rel.entries()].sort((a, b) => b[1] - a[1]).map(([r]) => r);
+      return {
+        message: g.message,
+        frame: g.frame,
+        kind: g.kind,
+        count: g.count,
+        firstSeen: Number.isFinite(g.firstMs) ? new Date(g.firstMs).toISOString() : null,
+        lastSeen: Number.isFinite(g.lastMs) ? new Date(g.lastMs).toISOString() : null,
+        sampleUrl: g.sampleUrl,
+        release: releases[0] || null,
+        releases: releases.slice(0, 5),
+      };
+    })
+    .sort((a, b) => b.count - a.count || String(b.lastSeen).localeCompare(String(a.lastSeen)))
+    .slice(0, Math.max(1, limit));
+}
+
 // ── Netlify ──────────────────────────────────────────────────────────
 
 const str = (v, n = 300) => (v == null || v === '' ? null : String(v).slice(0, n));
@@ -342,7 +446,8 @@ function shapeVitalsRow(b) {
 }
 
 module.exports = {
-  projectRefFromUrl, API_COUNT_INTERVALS, toIso, shapeApiCounts, shapeLints,
+  projectRefFromUrl, supabaseLinks, firstFrame, groupClientErrors,
+  API_COUNT_INTERVALS, toIso, shapeApiCounts, shapeLints,
   shapeDeploy, shapeSite, shapeFunctions, deploySeconds, netlifyLinks, apiCountsError, verdictOf,
   VITALS, VITAL_THRESHOLDS, percentile, summariseVitals, shapeVitalsRow, cleanPath,
 };

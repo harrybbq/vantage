@@ -29,7 +29,7 @@ retired `cream`/`dark` ids map forward in `resolveEffectiveTheme`.
 ## Architecture pointers
 - All user data lives in one JSON state `S` in `user_data.state`, saved debounced. New features = new keys in `S` (no migrations). Key stores: `vitalsLog` (weight/sleep/rhr/recovery/strain — WHOOP + Apple Health + manual), `nutrition_log` table (food), `moodLog`, `bodyLog`, `subscriptions`, `savings`, `habits`, `shopItems`, `hubWidgets`, `privacy`.
 - Hub widgets: shared React bodies (see `src/components/widgets/LifeWidgets.jsx`, `savings/SavingsWidgets.jsx`) rendered by `mobile/MobileWidget.jsx` (mobile stack) and as React islands in `HubSection.jsx` (desktop draggable canvas). Add a widget = META entry + renderBody case + both pickers (`AddMobileWidgetModal`, `Modals.jsx`).
-- Netlify functions own anything cross-user or secret: leaderboard, friends-trending/global-trending (anonymous, `shareTrending` opt-out), WHOOP sync (`netlify/lib/whoop.js`), AI (`ai-food-detect`, `ai-coach-daily` — need `ANTHROPIC_API_KEY` env).
+- Netlify functions own anything cross-user or secret: leaderboard, WHOOP sync (`netlify/lib/whoop.js`), AI (`ai-food-detect`, `ai-coach-daily` — need `ANTHROPIC_API_KEY` env).
 - Social: `profiles`/`friendships`/`messages`/`blocks`/`reports` tables, RLS-gated direct queries in `src/lib/friends/`. Report+block UI exists (friend card + DM ⋯ menu).
 - Legal: `/privacy` and `/terms` deep-link pre-auth (store requirement). Tutorial: `TutorialOverlay.jsx`; per-page help: `SectionHelp`.
 

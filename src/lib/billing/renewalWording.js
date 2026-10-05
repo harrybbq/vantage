@@ -63,8 +63,77 @@ export function renewalLine(pkg, platform) {
   if (period === 'lifetime') return `${price}, one payment. Does not renew.`;
   const per = period ? ` per ${period}` : '';
   const how = period ? ` ${ADVERB[period]}` : '';
-  return `${price}${per}, auto-renews${how} until cancelled. `
+  // An intro offer changes what is charged first, so it leads the
+  // sentence: Apple wants the trial length and the price that follows
+  // it stated plainly before the buy button.
+  const intro = introOffer(pkg);
+  const lead = intro
+    ? (intro.free
+      ? `${intro.length} free, then ${price}${per}`
+      : `${intro.priceString} ${intro.cycles > 1 ? `per ${intro.unit} for ${intro.length}` : `for the first ${intro.lengthSingular}`}, then ${price}${per}`)
+    : `${price}${per}`;
+  return `${lead}, auto-renews${how} until cancelled. `
     + `Cancel at least 24 hours before renewal in ${storeName(platform)} subscription settings.`;
+}
+
+/* ── Intro offers (free trial / cheaper first period) ─────────────────
+ *
+ * Set up in App Store Connect / Play Console, carried on the product as
+ * RevenueCat's `introPrice` { price, priceString, cycles, periodUnit,
+ * periodNumberOfUnits }. Nothing here invents one: no introPrice, no
+ * offer shown. The store also decides who is ELIGIBLE (a trial is once
+ * per person), so the wording says what the offer is, not that the
+ * reader will get it — the store sheet confirms before charging.
+ */
+const UNIT = { DAY: 'day', WEEK: 'week', MONTH: 'month', YEAR: 'year' };
+const plural = (n, u) => `${n} ${u}${n === 1 ? '' : 's'}`;
+
+/** { free, priceString, length, lengthSingular, unit, cycles } | null */
+export function introOffer(pkg) {
+  const ip = pkg?.product?.introPrice;
+  if (!ip || typeof ip !== 'object') return null;
+  const unit = UNIT[String(ip.periodUnit || '').toUpperCase()];
+  const each = Number(ip.periodNumberOfUnits) || 0;
+  const cycles = Math.max(1, Number(ip.cycles) || 1);
+  if (!unit || each <= 0) return null;
+  const free = Number(ip.price) === 0;
+  if (!free && !ip.priceString) return null;
+  const total = each * cycles;
+  return {
+    free,
+    priceString: ip.priceString || null,
+    length: plural(total, unit),
+    // "the first year" / "the first 3 months" — singular reads naturally.
+    lengthSingular: total === 1 ? unit : plural(total, unit),
+    unit: each === 1 ? unit : plural(each, unit),
+    cycles,
+  };
+}
+
+/**
+ * Short offer line for a package card: "7 days free, then £39.99 / year",
+ * "£19.99 for the first year, then £39.99 / year". Null without an offer.
+ */
+export function introLine(pkg) {
+  const o = introOffer(pkg);
+  const after = priceLine(pkg);
+  if (!o || !after) return null;
+  if (o.free) return `${o.length} free, then ${after}`;
+  return o.cycles > 1
+    ? `${o.priceString} / ${o.unit} for ${o.length}, then ${after}`
+    : `${o.priceString} for the first ${o.lengthSingular}, then ${after}`;
+}
+
+/**
+ * What a yearly plan works out to per month: "£3.33 / month". Rounded
+ * DOWN to the penny so it never overstates the saving. Null unless the
+ * package is yearly and carries a numeric price.
+ */
+export function perMonthLine(pkg) {
+  if (packagePeriod(pkg) !== 'year') return null;
+  const p = pkg?.product;
+  if (!p || typeof p.price !== 'number' || !(p.price > 0)) return null;
+  return `${money(Math.floor((p.price / 12) * 100) / 100, p.currencyCode || null)} / month`;
 }
 
 /**

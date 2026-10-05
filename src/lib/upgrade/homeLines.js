@@ -19,7 +19,7 @@
  *   critical   act now (a system down, a critical ticket)
  *   neutral    information, not a status (the rotation; nothing to judge)
  *   unknown    we couldn't find out — ALWAYS carries `error`, and a retry
- * Hero = worst of the four: critical > attention > unknown > ok > neutral.
+ * Hero = worst of the cards: critical > attention > unknown > ok > neutral.
  *
  * ── Per card ──
  * Security (from the overview panel):
@@ -39,6 +39,11 @@
  * Career: attention when an open brief action is overdue, or an exam is
  *   ≤ 14 days away and the study pacing is 'late'; otherwise neutral;
  *   unknown when the owner store failed (setup-not-run is neutral).
+ * Books (this month's income and costs from the books function):
+ *   ok when this month is in profit; attention when costs beat income
+ *   three months running (this month and the two before); otherwise
+ *   neutral. Not installed / SQL not run → neutral "Set up"; a failed
+ *   or refused fetch → unknown.
  *
  * ── updatedAt ──
  * The ms epoch of the data the line is built from: the console's own
@@ -342,6 +347,59 @@ export function securityFailedCard(res, at = null) {
     : s === 'unavailable' ? (res.hint || 'The console is unavailable')
       : 'Couldn’t reach the console';
   return card({ text: 'Status unknown', state: 'unknown', error, updatedAt: toMs(at) });
+}
+
+// ── Books ─────────────────────────────────────────────────────────
+
+/**
+ * Pence → a card-sized pounds figure: '£1,240' from £1,000 up (whole
+ * pounds — the card is a glance, the tab has the pence), '£86.40' under.
+ * Always unsigned; the caption says profit or loss.
+ */
+export function cardPounds(pence) {
+  const p = Math.abs(Math.round(num(pence) ?? 0));
+  if (p >= 100000) return `£${Math.round(p / 100).toLocaleString('en-GB')}`;
+  return `£${Math.floor(p / 100).toLocaleString('en-GB')}.${String(p % 100).padStart(2, '0')}`;
+}
+
+/**
+ * @param res     readPanel's answer for `?view=overview` ({ state, error?, hint? })
+ * @param months  summarise(...).byMonth for this month and the two before
+ *                ([{ month:'YYYY-MM', income, expense }], any order, gaps allowed)
+ * @param today   local 'YYYY-MM-DD'
+ * @param at      when the answer arrived (ms)
+ */
+export function booksCard({ res, months = [], today, at = null }) {
+  const s = res && res.state;
+  if (!s) return loadingCard();
+  if (s === 'not-installed') return card({ figure: 'Set up', text: 'Revenue, costs and profit · not installed yet', updatedAt: toMs(at) });
+  if (s === 'not_configured') return card({ figure: 'Set up', text: 'Run supabase/books_2026_10.sql to start', updatedAt: toMs(at) });
+  if (s !== 'ok') {
+    const error = s === 'forbidden' ? 'Owner only — sign in again'
+      : s === 'unavailable' ? (res.hint || 'Books is unavailable') : 'Couldn’t load the books';
+    return card({ text: 'Profit unknown', state: 'unknown', error, updatedAt: toMs(at) });
+  }
+  const ym = String(today || '').slice(0, 7);
+  const by = Object.fromEntries((months || []).filter(Boolean).map(r => [r.month, r]));
+  const read = m => ({ income: Math.max(0, num(by[m] && by[m].income) ?? 0), expense: Math.max(0, num(by[m] && by[m].expense) ?? 0) });
+  const cur = read(ym);
+  const profit = cur.income - cur.expense;
+  const [y, mo] = ym.split('-').map(Number);
+  const back = n => { const t = y * 12 + (mo - 1) - n; return `${Math.floor(t / 12)}-${String((t % 12) + 1).padStart(2, '0')}`; };
+  const losing = [ym, back(1), back(2)].every(m => { const r = read(m); return r.expense > r.income; });
+  if (!cur.income && !cur.expense) {
+    return card({
+      figure: '£0', figureLabel: 'this month', text: 'Nothing booked yet this month',
+      state: losing ? 'attention' : 'neutral', updatedAt: toMs(at),
+    });
+  }
+  return card({
+    figure: cardPounds(profit),
+    figureLabel: profit >= 0 ? 'profit this month' : 'loss this month',
+    text: `${cardPounds(cur.income)} in · ${cardPounds(cur.expense)} out this month${losing ? ' · 3rd month of costs over income' : ''}`,
+    state: profit > 0 ? 'ok' : losing ? 'attention' : 'neutral',
+    updatedAt: toMs(at),
+  });
 }
 
 // ── Hero ──────────────────────────────────────────────────────────

@@ -1,7 +1,7 @@
 /**
  * Upgrade's home menu — what the section opens on. The big "Upgrade"
  * title with today's line under it, then one card per section (Career,
- * Diet, Rotation, Security), all on one solid sheet so nothing sits on
+ * Diet, Rotation, Security, Books), all on one solid sheet so nothing sits on
  * the page's background photo. Tapping a card opens that section.
  *
  * Every card reads from useHomeLines (home/useHomeLines.js), which owns
@@ -35,6 +35,7 @@ export const SECTIONS = [
   { id: 'diet', name: 'Diet', icon: 'utensils', tone: 'em' },
   { id: 'rotation', name: 'Rotation', icon: 'refresh-cw', tone: 'ink' },
   { id: 'security', name: 'Security', icon: 'shield', tone: 'em' },
+  { id: 'books', name: 'Books', icon: 'book-open', tone: 'gold' },
 ];
 
 /** Tab ids that used to exist, mapped forward (history entries, deep links). */
