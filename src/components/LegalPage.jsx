@@ -81,7 +81,7 @@ function PrivacyPolicyContent() {
           'Reports and blocks — if you report or block someone, we store who reported whom, the reason you chose and any note you add. A report can include a copy of the reported person\'s handle and display name at the time, and recent messages from them if you report from a conversation.',
           'Payment & subscription data — if you purchase Vantage Pro, the purchase is processed by Apple (App Store), Google (Google Play) and RevenueCat. We receive your subscription status and a transaction reference. We never receive or store your card number.',
           'Device & notification data — if you enable push notifications, we store a device push token so notifications can be delivered via Apple/Google push services (Firebase Cloud Messaging).',
-          'Camera images (Pro, optional) — if you use the AI food scanner, a single camera frame is sent to Anthropic\'s API to identify the food (section 7). We do not store the image.',
+          'Camera images (optional) — if you use the AI food scanner (3 free scans a week; unlimited on Pro), a single camera frame is sent to Anthropic\'s API to identify the food (section 7). We do not store the image.',
           'Approximate location — to show local weather, our server looks up the approximate city for your IP address (section 8). We do not store the result against your account, and we never collect precise (GPS) location.',
           'Third-party sign-in data (optional) — if you sign in with Google or Apple, we receive a minimal profile from that provider (section 9).',
           'Session data — a session token kept by our authentication provider to keep you signed in.',
@@ -136,7 +136,7 @@ function PrivacyPolicyContent() {
       <Section title="7. AI Features (Anthropic)">
         <P>These optional features send data to Anthropic's API, our AI provider. We ask for your consent before the first one runs, and you can withdraw it in Settings → Privacy → Consent:</P>
         <Ul items={[
-          'AI food scanner (Pro) — one camera frame per scan, used to identify the food and estimate nutrition.',
+          'AI food scanner (3 free scans a week; unlimited on Pro) — one camera frame per scan, used to identify the food and estimate nutrition.',
           'Daily brief / AI coach — a compact snapshot of your own App data (e.g. first name, recent habits, trackers, goals, vitals and macro trends) is sent to generate your personal daily brief.',
           'Recipe from a video — the title and description of a YouTube or TikTok video you save are sent to extract the ingredient list and estimate macros.',
         ]} />

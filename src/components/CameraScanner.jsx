@@ -52,7 +52,7 @@ const DECODE_WIDTH = 1024; // downscale target for canvas decode — 1D
                            // barcodes need line-level detail, so err
                            // toward resolution over CPU at ~3 fps
 
-const CameraScanner = forwardRef(function CameraScanner({ onBarcode, onAIResult, onError }, ref) {
+const CameraScanner = forwardRef(function CameraScanner({ onBarcode, onAIResult, onError, onQuota, onFreeLimit }, ref) {
   const videoRef = useRef(null);
   const canvasRef = useRef(null);      // AI capture canvas
   const decodeCanvasRef = useRef(null); // ZXing decode canvas
@@ -367,6 +367,17 @@ const CameraScanner = forwardRef(function CameraScanner({ onBarcode, onAIResult,
       });
       const data = await res.json();
 
+      // Free accounts: the server says how many scans are left this week
+      // (on every answer, found or not), and 402 once they're used up —
+      // the parent turns that into the paywall rather than an error.
+      if (typeof data.freeScansLeft === 'number') onQuota?.(data.freeScansLeft);
+      if (res.status === 402 && data.error === 'free_limit') {
+        onQuota?.(0);
+        setStatus('scanning');
+        setMsg(data.message || 'You’ve used this week’s free AI scans.');
+        onFreeLimit?.(data);
+        return;
+      }
       if (!res.ok || data.error) throw new Error(data.error || 'AI detection failed');
       if (!data.food_name) throw new Error('Could not identify food — point at the packaging or dish');
 

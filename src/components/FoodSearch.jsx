@@ -6,15 +6,18 @@ import CameraScanner from './CameraScanner';
 import { supabase } from '../lib/supabase';
 import { backdropClose } from '../utils/backdropClose';
 import { useSubscriptionContext } from '../context/SubscriptionContext';
+import { useAiScanQuota, quotaLine } from '../lib/diet/aiScanQuota';
 import { searchByBarcode, searchByName, readCommunityPref, writeCommunityPref } from '../lib/diet/foodSearch';
 
 export default function FoodSearch({ onSelectFood, onClose, onOpenModal, savedMeals = [], onDeleteMeal, userId }) {
-  // Camera scanning (barcode + AI identify) is a Pro feature — matches
-  // the privacy policy's "AI food scanner (Pro)" disclosure. The owner
-  // flag keeps it testable on the owner account regardless of tier.
-  // ZXing fallback means it works on iOS Safari and desktop webcams.
+  // The camera is open to everyone: barcode scanning runs on the device
+  // and costs nothing. AI identify (a frame sent to Anthropic) is 3 free
+  // scans a week, unlimited on Pro — the server counts and enforces it;
+  // the line under the button only reports it. ZXing fallback means it
+  // works on iOS Safari and desktop webcams.
   const { hasPro } = useSubscriptionContext();
-  const canUseCamera = hasPro || (typeof window !== 'undefined' && !!window.__vantageOwner);
+  const canUseCamera = true;
+  const quota = useAiScanQuota(!hasPro);
 
   const [query, setQuery] = useState('');
   const [results, setResults] = useState([]);
@@ -233,7 +236,7 @@ export default function FoodSearch({ onSelectFood, onClose, onOpenModal, savedMe
           ))}
         </div>
 
-        {/* Camera view (owner-only — the tab doesn't render otherwise) */}
+        {/* Camera view — barcode free for everyone, AI scans on the weekly allowance */}
         {mode === 'camera' && canUseCamera && (
           <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', gap: '10px' }}>
             <CameraScanner
@@ -241,6 +244,8 @@ export default function FoodSearch({ onSelectFood, onClose, onOpenModal, savedMe
               onBarcode={handleCameraBarcode}
               onAIResult={handleAIResult}
               onError={handleCameraError}
+              onQuota={quota.setLeft}
+              onFreeLimit={() => onOpenModal?.('paywall:aiScans')}
             />
             <p style={{ fontFamily: 'var(--mono)', fontSize: '11px', color: 'var(--text-muted)', textAlign: 'center', margin: 0 }}>
               Point at a barcode or product QR to auto-scan, or use AI to detect a plate / packaging in frame.
@@ -253,6 +258,11 @@ export default function FoodSearch({ onSelectFood, onClose, onOpenModal, savedMe
               style={{ padding: '12px', borderRadius: 'var(--radius-md)', border: 'none', background: identifying ? 'rgba(26,122,74,.6)' : 'var(--em)', color: '#fff', cursor: identifying ? 'default' : 'pointer', fontFamily: 'var(--sans)', fontSize: 'var(--text-sm)', fontWeight: 600 }}>
               {identifying ? 'Identifying…' : 'Identify with AI'}
             </button>
+            {quotaLine(quota) && (
+              <p className="ai-scan-quota" role="status">
+                {quotaLine(quota)} · <button type="button" className="ai-scan-quota-pro" onClick={() => onOpenModal?.('paywall:aiScans')}>Unlimited with Pro</button>
+              </p>
+            )}
             {error && (
               <div style={{ padding: '10px 14px', background: 'rgba(220,38,38,.08)', borderRadius: 'var(--radius-md)', color: '#e05252', fontSize: 'var(--text-sm)', fontFamily: 'var(--mono)' }}>
                 {error}

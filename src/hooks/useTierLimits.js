@@ -18,6 +18,9 @@ export const FREE_CAPS = {
   holidays:     { limit: 1,  label: 'holiday' },
   shopItems:    { limit: 50, label: 'shopping items' },
   trackers:     { limit: 5,  label: 'trackers' },
+  // AI food scans — 3 a week free (enforced server-side in
+  // ai-food-detect); barcode and text search are never limited.
+  aiScans:      { limit: 3,  label: 'AI food scans this week' },
   // Feature gate — the "Our Apps" widget presets (FloorplanStudio,
   // …) are a Pro bonus.
   ourApps: {

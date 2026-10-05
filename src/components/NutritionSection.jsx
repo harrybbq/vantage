@@ -301,7 +301,9 @@ export default function NutritionSection({ userId, S, selectedDate, calYear, cal
   const goalHitRef = useRef({});
   const desktop = useDesktop();
   const { hasPro } = useSubscriptionContext();
-  const canUseCamera = hasPro || (typeof window !== 'undefined' && !!window.__vantageOwner);
+  // Barcode scanning is free for everyone; AI scans run on the weekly
+  // allowance the server enforces (see lib/diet/aiScanQuota.js).
+  const canUseCamera = true;
   const [freshId, setFreshId] = useState(null);
 
   /* Saved meals — one set of writes for both the phone sheet and the
@@ -605,6 +607,8 @@ export default function NutritionSection({ userId, S, selectedDate, calYear, cal
             fat: macros.find(m => m.name === 'Fat')?.daily_goal,
           }}
           canUseCamera={canUseCamera}
+          hasPro={hasPro}
+          onOpenModal={onOpenModal}
           onLogged={({ id }) => {
             reload();
             freq.refresh();

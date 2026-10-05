@@ -9124,3 +9124,18 @@ html[data-theme="dark-os"] .ev-suggest{ background:var(--os-surface2,#191917); b
   .mod-acts{flex-direction:row;width:100%;}
   .mod-acts .btn{flex:1;min-height:40px;}
 }
+
+/* ── Free AI-scan allowance line (FoodSearch + Log food → Scan) ───────
+   Reports what the server counts: "2 of 3 free AI scans left this week
+   · Unlimited with Pro". Muted, readable, the Pro link a real button. */
+.ai-scan-quota{
+  display:block;margin:0;text-align:center;
+  font-family:var(--mono);font-size:12px;line-height:1.5;letter-spacing:.2px;
+  color:var(--text-mid);
+}
+.ai-scan-quota-pro{
+  font:inherit;color:var(--em);background:none;border:0;padding:6px 2px;margin:0;
+  text-decoration:underline;text-underline-offset:3px;cursor:pointer;
+  min-height:32px;
+}
+html[data-theme="dark-os"] .ai-scan-quota-pro{ color:var(--em-light); }
