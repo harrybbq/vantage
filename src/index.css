@@ -3890,6 +3890,13 @@ input,select,textarea,button{touch-action:manipulation;}
   font-family:var(--sans);font-size:11px;line-height:1.4;
   color:var(--text-mid);
 }
+/* An intro offer from the store (free trial / cheaper first period). */
+.paywall-pkg-offer{
+  align-self:flex-start;margin:2px 0;padding:3px 8px;border-radius:6px;
+  font-family:var(--sans);font-size:12px;font-weight:600;line-height:1.35;
+  color:color-mix(in srgb, var(--em) 70%, #000);background:rgba(var(--em-rgb),0.12);
+}
+html[data-theme="dark-os"] .paywall-pkg-offer{ color:var(--em-light); }
 .paywall-pkg-busy{
   font-family:var(--mono);font-size:10px;letter-spacing:.6px;
   color:var(--em);margin-top:2px;
