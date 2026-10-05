@@ -10,11 +10,13 @@
  *   career    the owner store the Career tab loads anyway
  *   security  the console's cheap `?panel=overview`; only when that
  *             function isn't installed, the crest queue stands in
+ *   books     the books function's `?view=overview` for this month and
+ *             the two before (a few dozen rows; summed here)
  * Nothing here writes anything. Every fetch fails soft into state
  * 'unknown' with an error string and a `retry` that re-fetches without
  * opening the section. No polling: the menu is opened, read, left.
  *
- * → { hero: { sub, state }, cards: { career, diet, rotation, security } }
+ * → { hero: { sub, state }, cards: { career, diet, rotation, security, books } }
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { planProteinG } from '../../../lib/diet/plan';
@@ -25,9 +27,12 @@ import { briefFor } from '../../../lib/career/brief';
 import { usePacing, useLatestVs, todayIso } from '../career/careerData';
 import { crestQueue } from '../../../lib/groups/api';
 import { fetchPanel } from '../../../lib/security/api';
+import { fetchBooks } from '../books/api';
+import { summarise } from '../../../lib/books/reports';
+import { addMonths } from '../../../lib/upgrade/booksView';
 import {
   loadingCard, worstState, rotationLine, rotationCard, dietCard, careerCard, daysUntil,
-  securityCard, securityHeroBit, crestFallbackCard, crestHeroBit, securityFailedCard, heroSub,
+  securityCard, securityHeroBit, crestFallbackCard, crestHeroBit, securityFailedCard, heroSub, booksCard,
 } from '../../../lib/upgrade/homeLines';
 
 function latestKg(S) {
@@ -139,6 +144,28 @@ function useSecurityCard() {
   return out;
 }
 
+/** This month's profit or loss from the books function (and the two months before, for the streak). */
+function useBooksCard() {
+  const [card, setCard] = useState(loadingCard());
+  const [tick, setTick] = useState(0);
+  const retry = useCallback(() => { setCard(loadingCard()); setTick(t => t + 1); }, []);
+  useEffect(() => {
+    let live = true;
+    (async () => {
+      const today = todayIso();
+      const from = `${addMonths(today.slice(0, 7), -2)}-01`;
+      const res = await fetchBooks('overview', { from, to: today });
+      if (!live) return;
+      const entries = res.state === 'ok' && res.data && Array.isArray(res.data.entries) ? res.data.entries : [];
+      const months = res.state === 'ok' ? summarise(entries, { from, to: today }).byMonth : [];
+      const c = booksCard({ res, months, today, at: Date.now() });
+      setCard(c.state === 'unknown' ? { ...c, retry } : c);
+    })();
+    return () => { live = false; };
+  }, [tick, retry]);
+  return card;
+}
+
 export function useHomeLines(S, userId) {
   const today = todayIso();
   const overrides = S && S.rotation && S.rotation.overrides;
@@ -147,9 +174,10 @@ export function useHomeLines(S, userId) {
   const diet = useDietCard(S, userId);
   const career = useCareerCard(S);
   const security = useSecurityCard();
+  const books = useBooksCard();
 
   return useMemo(() => {
-    const cards = { career, diet, rotation, security: security.card };
+    const cards = { career, diet, rotation, security: security.card, books };
     return {
       hero: {
         sub: heroSub({ date: new Date(), rotation: rotaLine, security: security.bit }),
@@ -157,7 +185,7 @@ export function useHomeLines(S, userId) {
       },
       cards,
     };
-  }, [career, diet, rotation, rotaLine, security]);
+  }, [career, diet, rotation, rotaLine, security, books]);
 }
 
 export default useHomeLines;

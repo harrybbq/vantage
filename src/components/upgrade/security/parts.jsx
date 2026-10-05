@@ -255,16 +255,23 @@ export function Verdict({ v, at, nextAt, loading, onRefresh, error }) {
  * its own scroll so the backdrop stays tappable). Portalled to <body>
  * and re-wrapped in .upg-app.sec so the theme tokens still apply.
  */
-export function Sheet({ title, eyebrow, onClose, children }) {
+export function Sheet({ title, eyebrow, onClose, children, className = '' }) {
+  const panel = useRef(null);
   useEffect(() => {
     const k = e => { if (e.key === 'Escape') onClose(); };
     document.addEventListener('keydown', k);
     return () => document.removeEventListener('keydown', k);
   }, [onClose]);
+  // Focus moves into the sheet on open and back to what opened it on close.
+  useEffect(() => {
+    const before = document.activeElement;
+    if (panel.current) panel.current.focus({ preventScroll: true });
+    return () => { if (before && typeof before.focus === 'function' && document.contains(before)) before.focus({ preventScroll: true }); };
+  }, []);
   return createPortal(
-    <div className="upg-app sec sec-sheet-root">
+    <div className={`upg-app sec sec-sheet-root${className ? ` ${className}` : ''}`}>
       <div className="sec-sheet-back" onClick={onClose} aria-hidden="true" />
-      <aside className="sec-sheet" role="dialog" aria-modal="true" aria-label={title}>
+      <aside ref={panel} tabIndex={-1} className="sec-sheet" role="dialog" aria-modal="true" aria-label={title}>
         <div className="sec-sheet-head">
           <div>
             {eyebrow && <span className="sec-eyebrow">{eyebrow}</span>}

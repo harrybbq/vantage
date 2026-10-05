@@ -12,6 +12,8 @@
  *   Career   — certifications, CV, and deliberate practice
  *   Security — the owner's console: DB, Netlify, moderation, tickets
  *              (formerly "Review"; the old id still opens it)
+ *   Books    — money in and out for Vantage: ledger, imports, bills
+ *              (its data is server-only, never in S — see BooksTab)
  *
  * It opens on a home menu (UpgradeHome): a large title and one card per
  * section with a live line, rather than a tab strip — Upgrade is a small
@@ -35,6 +37,7 @@ import RotationTab from './RotationTab';
 import DietTab from './DietTab';
 import CareerTab from './CareerTab';
 import SecurityTab from './security/SecurityTab';
+import BooksTab from './books/BooksTab';
 import UpgradeHome, { SECTIONS, resolveSection } from './UpgradeHome';
 import { parseSecurityLink, stripSecurityParams } from '../../lib/security/deepLink';
 import './Upgrade.css';
@@ -112,6 +115,7 @@ export default function UpgradeSection({ S, update, active, isOwner, userId }) {
           {tab === 'diet' && <DietTab S={S} update={update} userId={userId} isMobile={isMobile} />}
           {tab === 'career' && <CareerTab S={S} update={update} userId={userId} isMobile={isMobile} />}
           {cur.id === 'security' && <SecurityTab initialTab={secInit && secInit.tab} initialFocus={secInit && secInit.focus} />}
+          {tab === 'books' && <BooksTab />}
         </div>
       )}
     </section>

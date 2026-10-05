@@ -1322,9 +1322,19 @@ html[data-theme="dark-os"] .upg-app {
   color: var(--uh-soft); font-variant-numeric: tabular-nums; }
 .uh-sub > .uh-dot { margin-top: 6px; }
 
-.uh-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 24px; align-items: start; }
+/* Five cards. Wide (≥ 1600px): five across on staggered tops. Middle widths: 3 + 2
+   with the second row centred (a six-track grid, each card two tracks).
+   Tablet: 2 + 2 + 1, the last centred the same way. Phone: one column. */
+.uh-grid { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 24px; align-items: start; }
 .uh-slot { position: relative; min-width: 0; padding-bottom: 22px; animation: uh-in .7s cubic-bezier(.2,.8,.2,1) calc(.1s + var(--i) * .08s) both; }
-.uh-slot.is-1 { margin-top: 56px; } .uh-slot.is-2 { margin-top: 18px; } .uh-slot.is-3 { margin-top: 76px; }
+.uh-slot.is-1 { margin-top: 56px; } .uh-slot.is-2 { margin-top: 18px; } .uh-slot.is-3 { margin-top: 76px; } .uh-slot.is-4 { margin-top: 34px; }
+/* Five across only when there is room for five cards of the old width. */
+@media (min-width: 1600px) { .uh { max-width: 1440px; } }
+@media (max-width: 1599px) {
+  .uh-grid { grid-template-columns: repeat(6, minmax(0, 1fr)); }
+  .uh-slot { grid-column: span 2; }
+  .uh-slot.is-3 { grid-column: 2 / span 2; margin-top: 8px; } .uh-slot.is-4 { margin-top: 40px; }
+}
 .uh-floor { position: absolute; left: 14%; right: 14%; bottom: 0; height: 14px; border-radius: 50%;
   background: color-mix(in srgb, var(--text) 30%, transparent); filter: blur(7px); opacity: .4;
   animation: uh-shadow calc(5.6s + var(--i) * .7s) ease-in-out calc(var(--i) * -1.3s) 2; }
@@ -1339,6 +1349,7 @@ html[data-theme="dark-os"] .upg-app {
   transition: transform .18s ease-out, box-shadow .18s ease-out, border-color .18s, background-color .18s; }
 .uh-slot.is-0 .uh-card { --tilt: -1.4deg; } .uh-slot.is-1 .uh-card { --tilt: 1deg; }
 .uh-slot.is-2 .uh-card { --tilt: -.6deg; } .uh-slot.is-3 .uh-card { --tilt: 1.3deg; }
+.uh-slot.is-4 .uh-card { --tilt: -1deg; }
 .uh-card:hover { transform: translateY(-5px) rotate(var(--tilt)); background: var(--uh-card-hover);
   border-color: color-mix(in srgb, var(--tone) 45%, var(--border));
   box-shadow: 0 1px 0 color-mix(in srgb, #fff 6%, transparent) inset, 0 24px 44px -24px rgba(0,0,0,.5); }
@@ -1434,8 +1445,10 @@ html[data-theme="dark-os"] .upg-app .tone-em { --tone: var(--em-light); }
 .uh-open-name { margin: 0; font-family: var(--body); font-size: 18px; line-height: 24px; font-weight: 600; letter-spacing: -.01em; color: var(--text); }
 
 @media (max-width: 900px) {
-  .uh-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
-  .uh-slot.is-1 { margin-top: 30px; } .uh-slot.is-2 { margin-top: 6px; } .uh-slot.is-3 { margin-top: 36px; }
+  .uh-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; }
+  .uh-slot, .uh-slot.is-3 { grid-column: span 2; }
+  .uh-slot.is-4 { grid-column: 2 / span 2; }
+  .uh-slot.is-1 { margin-top: 30px; } .uh-slot.is-2 { margin-top: 6px; } .uh-slot.is-3 { margin-top: 36px; } .uh-slot.is-4 { margin-top: 8px; }
   .uh-card { min-height: 236px; }
   .uh-card-main { padding: 16px 16px 12px; gap: 14px 10px; }
   .uh-foot { margin: 0 16px; }
@@ -1447,10 +1460,10 @@ html[data-theme="dark-os"] .upg-app .tone-em { --tone: var(--em-light); }
   .uh { gap: 18px; }
   .uh-sub { font-size: 13px; }
   .uh-grid { grid-template-columns: minmax(0, 1fr); gap: 10px; }
-  .uh-slot, .uh-slot.is-1, .uh-slot.is-2, .uh-slot.is-3 { margin-top: 0; padding-bottom: 0; }
+  .uh-slot, .uh-slot.is-1, .uh-slot.is-2, .uh-slot.is-3, .uh-slot.is-4 { margin-top: 0; padding-bottom: 0; grid-column: auto; }
   .uh-floor { display: none; }
   .uh-bob { animation: none; }
-  .uh-slot.is-0 .uh-card, .uh-slot.is-1 .uh-card, .uh-slot.is-2 .uh-card, .uh-slot.is-3 .uh-card { --tilt: 0deg; }
+  .uh-slot.is-0 .uh-card, .uh-slot.is-1 .uh-card, .uh-slot.is-2 .uh-card, .uh-slot.is-3 .uh-card, .uh-slot.is-4 .uh-card { --tilt: 0deg; }
   .uh-card { min-height: 0; border-radius: 14px; }
   .uh-card:hover { transform: none; }
   .uh-card-main { grid-template-columns: auto minmax(0, 1fr) auto; grid-template-areas: "icon head fig" "icon text fig";
