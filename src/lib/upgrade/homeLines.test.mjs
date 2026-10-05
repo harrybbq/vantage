@@ -11,6 +11,7 @@ import {
   STATES, stateRank, worstState, card, loadingCard, ago, exactTime, dayLabel, localIso, daysUntil,
   shiftLabel, rotationLine, rotationCard, dietCard, DIET_LATE_HOUR, careerCard, EXAM_SOON_DAYS,
   overviewState, securityCard, securityHeroBit, crestFallbackCard, crestHeroBit, securityFailedCard, heroSub,
+  cardPounds, booksCard,
 } from './homeLines.js';
 import { briefFor } from '../career/brief.js';
 
@@ -334,6 +335,93 @@ t('hero state is the worst card: a failed console outranks a hit target', () => 
   assert.equal(worstState(cards), 'attention');
   cards[3] = securityCard(ov({ counts: counts({ criticalTickets: 1, openTickets: 1 }) }), NOW);
   assert.equal(worstState(cards), 'critical');
+});
+
+// ── Books ──
+const okRes = { state: 'ok', data: {} };
+const BT = '2026-10-05';
+t('cardPounds: whole pounds from £1,000, pence below, always unsigned', () => {
+  assert.equal(cardPounds(124000), '£1,240');
+  assert.equal(cardPounds(123456789), '£1,234,568');
+  assert.equal(cardPounds(99999), '£999.99');
+  assert.equal(cardPounds(8640), '£86.40');
+  assert.equal(cardPounds(-8640), '£86.40');
+  assert.equal(cardPounds(0), '£0.00');
+  assert.equal(cardPounds(null), '£0.00');
+});
+t('books: loading until an answer, set-up states are neutral', () => {
+  assert.equal(booksCard({ res: null, today: BT }).loading, true);
+  for (const state of ['not-installed', 'not_configured']) {
+    const c = booksCard({ res: { state }, today: BT, at: NOW });
+    honest(c);
+    assert.equal(c.state, 'neutral');
+    assert.equal(c.figure, 'Set up');
+    assert.equal(c.updatedAt, NOW);
+  }
+  assert.match(booksCard({ res: { state: 'not_configured' }, today: BT }).text, /books_2026_10\.sql/);
+});
+t('books: failures are unknown with a reason', () => {
+  const f = booksCard({ res: { state: 'forbidden' }, today: BT, at: NOW });
+  honest(f);
+  assert.equal(f.state, 'unknown');
+  assert.equal(f.error, 'Owner only — sign in again');
+  assert.equal(booksCard({ res: { state: 'error' }, today: BT }).error, 'Couldn’t load the books');
+  assert.equal(booksCard({ res: { state: 'unavailable', hint: 'Database busy' }, today: BT }).error, 'Database busy');
+});
+t('books: profit this month is ok, with in · out', () => {
+  const c = booksCard({ res: okRes, today: BT, at: NOW, months: [{ month: '2026-10', income: 210000, expense: 86000 }] });
+  honest(c);
+  assert.equal(c.figure, '£1,240');
+  assert.equal(c.figureLabel, 'profit this month');
+  assert.equal(c.text, '£2,100 in · £860.00 out this month');
+  assert.equal(c.state, 'ok');
+  assert.equal(c.updatedAt, NOW);
+});
+t('books: a loss is neutral until it is the third month running', () => {
+  const one = booksCard({ res: okRes, today: BT, months: [
+    { month: '2026-10', income: 1000, expense: 5000 },
+    { month: '2026-09', income: 9000, expense: 5000 },
+    { month: '2026-08', income: 0, expense: 4000 },
+  ] });
+  honest(one);
+  assert.equal(one.figure, '£40.00');
+  assert.equal(one.figureLabel, 'loss this month');
+  assert.equal(one.state, 'neutral');
+  const three = booksCard({ res: okRes, today: BT, months: [
+    { month: '2026-08', income: 0, expense: 4000 },
+    { month: '2026-10', income: 1000, expense: 5000 },
+    { month: '2026-09', income: 2000, expense: 5000 },
+  ] });
+  assert.equal(three.state, 'attention');
+  assert.match(three.text, /3rd month of costs over income$/);
+});
+t('books: losing streak crosses a year boundary', () => {
+  const c = booksCard({ res: okRes, today: '2027-01-12', months: [
+    { month: '2027-01', income: 0, expense: 100 }, { month: '2026-12', income: 0, expense: 100 }, { month: '2026-11', income: 50, expense: 100 },
+  ] });
+  assert.equal(c.state, 'attention');
+  const gap = booksCard({ res: okRes, today: '2027-01-12', months: [
+    { month: '2027-01', income: 0, expense: 100 }, { month: '2026-11', income: 50, expense: 100 },
+  ] });
+  assert.equal(gap.state, 'neutral', 'a month with nothing booked breaks the streak');
+});
+t('books: nothing booked this month says so, and break-even is not a loss', () => {
+  const none = booksCard({ res: okRes, today: BT, months: [] });
+  honest(none);
+  assert.equal(none.figure, '£0');
+  assert.equal(none.text, 'Nothing booked yet this month');
+  assert.equal(none.state, 'neutral');
+  const even = booksCard({ res: okRes, today: BT, months: [{ month: '2026-10', income: 5000, expense: 5000 }] });
+  assert.equal(even.figureLabel, 'profit this month');
+  assert.equal(even.state, 'neutral');
+  const junk = booksCard({ res: okRes, today: BT, months: [null, { month: '2026-10', income: 'x', expense: -40 }] });
+  assert.equal(junk.figure, '£0', 'junk and negatives read as zero');
+});
+t('hero: a three-month loss on Books outranks ok cards', () => {
+  const books = booksCard({ res: okRes, today: BT, months: [
+    { month: '2026-10', income: 0, expense: 1 }, { month: '2026-09', income: 0, expense: 1 }, { month: '2026-08', income: 0, expense: 1 },
+  ] });
+  assert.equal(worstState([dietCard({ target: 182, day: day(190), hour: 14 }), books]), 'attention');
 });
 
 console.log(`homeLines: ${n} tests passed`);

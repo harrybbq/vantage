@@ -73,7 +73,7 @@
     "check:secstatus": "node src/lib/security/status.test.mjs",
     "check:secvitals": "node src/lib/security/vitals.test.mjs",
     "check:secchart": "node src/lib/security/chart.test.mjs",
-    "check:homelines": "node src/lib/upgrade/homeLines.test.mjs",
+    "check:homelines": "node src/lib/upgrade/homeLines.test.mjs && node src/lib/upgrade/booksView.test.mjs",
     "check:eventmemory": "node src/lib/calendar/eventMemory.test.mjs",
     "check:spans": "node src/lib/calendar/spans.test.mjs",
     "check:rotation": "node src/lib/rotation/pattern.test.mjs",
