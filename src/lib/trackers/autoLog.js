@@ -65,8 +65,21 @@ export function hasDeviceWorkout(S, day) {
   });
 }
 
-/** Steps for a day, from whatever wrote them. */
+/**
+ * Steps for a day — the highest count any source reported.
+ *
+ * Three writers, three places, all kept: Apple Health imports a burnLog
+ * entry ("8,214 steps"); WHOOP's daily cycle and Oura's daily activity
+ * land on the vitals row as `stepsWhoop` / `stepsOura` (separate keys so
+ * one device's sync never overwrites the other's). The highest wins: a
+ * phone left on the desk under-counts, it never over-counts, and a
+ * tracker should not miss its 10,000 because the phone stayed home.
+ */
 export function stepsOn(S, day) {
+  let best = null;
+  const take = n => { if (Number.isFinite(n) && n > 0 && (best == null || n > best)) best = n; };
+  const v = (S && S.vitalsLog && S.vitalsLog[day]) || null;
+  if (v) { take(Number(v.stepsWhoop)); take(Number(v.stepsOura)); }
   const entries = (S && S.burnLog && S.burnLog[day]) || [];
   for (const e of entries) {
     if (!e) continue;
@@ -74,14 +87,11 @@ export function stepsOn(S, day) {
     // count in the label, so those are read back out of it rather than
     // being lost — a user with six months of history should not have to
     // re-import to use a steps rule.
-    if (Number.isFinite(e.steps)) return e.steps;
+    if (Number.isFinite(e.steps)) { take(e.steps); continue; }
     const m = /^([\d,]+)\s*steps$/i.exec(String(e.label || ''));
-    if (m) {
-      const n = parseInt(m[1].replace(/,/g, ''), 10);
-      if (Number.isFinite(n)) return n;
-    }
+    if (m) take(parseInt(m[1].replace(/,/g, ''), 10));
   }
-  return null;
+  return best;
 }
 
 const vital = key => (S, day) => {
@@ -153,8 +163,12 @@ export const AUTO_SOURCES = [
     id: 'steps',
     label: 'Walked at least',
     short: 'Steps',
-    hint: 'Steps imported from Apple Health.',
-    needs: 'health', unit: 'steps', dp: 0, threshold: 10000, step: 500, max: 60000,
+    hint: 'Steps from WHOOP, Oura or Apple Health — the highest count wins.',
+    needs: 'steps', unit: 'steps', dp: 0, threshold: 10000, step: 500, max: 60000,
+    // Today's count keeps climbing after the first sync, so a cell this
+    // rule filled itself may RISE as later syncs arrive (never fall, and
+    // never a cell the user touched). See proposeAutoLogs.
+    refresh: true,
     read: stepsOn,
   },
 ];
@@ -202,6 +216,49 @@ export function ruleFor(tracker) {
   return { source, threshold: Number.isFinite(t) ? t : source.threshold };
 }
 
+/* ── Step trackers switch themselves on ────────────────────────────────
+ *
+ * A tracker called "Steps" or "10k steps", or counted in steps, on an
+ * account whose WHOOP, Oura or Apple Health is already sending a step
+ * count, gets the steps rule attached once — the user asked for this to
+ * happen without visiting Auto-fill. It is still an ordinary rule: the
+ * chip on the tracker says so, Auto-fill can change or remove it, and
+ * removing it sets `autoOff`, which this never overrides. Never touches a
+ * tracker that already has a rule.
+ */
+
+/** Does this tracker look like it counts steps? */
+export function isStepTracker(t) {
+  if (!t) return false;
+  if (/^steps?$/i.test(String(t.unit || '').trim())) return true;
+  return /\bsteps?\b/i.test(String(t.name || ''));
+}
+
+/** Trackers that would get the steps rule now. */
+export function suggestStepRules(S, { now = new Date(), days = BACKFILL_DAYS } = {}) {
+  const trackers = (S && S.trackers) || [];
+  const candidates = trackers.filter(t => t && !t.auto && !t.autoOff && isStepTracker(t));
+  if (!candidates.length) return [];
+  const source = sourceById('steps');
+  if (!sourceHasData(S, source, days, now)) return [];
+  return candidates.map(t => t.id);
+}
+
+/** Attach the steps rule to those trackers. `prev` unchanged when none. */
+export function applyStepRules(prev, { now = new Date() } = {}) {
+  const ids = new Set(suggestStepRules(prev, { now }));
+  if (!ids.size) return prev;
+  return {
+    ...prev,
+    trackers: (prev.trackers || []).map(t => {
+      if (!ids.has(t.id)) return t;
+      const goal = Number(t.dailyGoal);
+      const threshold = t.type === 'boolean' ? (Number.isFinite(goal) && goal > 0 ? goal : 10000) : null;
+      return { ...t, auto: { source: 'steps', threshold, suggested: true } };
+    }),
+  };
+}
+
 /**
  * What the rules would write, given the state as it stands.
  *
@@ -221,13 +278,25 @@ export function proposeAutoLogs(S, { now = new Date(), days = BACKFILL_DAYS } = 
     const rule = ruleFor(t);
     if (!rule) continue;
     for (const day of recentDays(days, now)) {
-      // Rule 1: a cell with a value is the user's, or is already ours.
-      if (logs[day] && logs[day][t.id] !== undefined) continue;
-      // Rule 3: a cell the user has cleared stays cleared.
+      // Rule 3: a cell the user has touched stays exactly as they left it.
       if (auto[day] && auto[day][t.id] === MANUAL) continue;
+      const has = logs[day] && logs[day][t.id] !== undefined;
+      // Rule 1: a cell with a value is the user's, or is already ours.
+      // One exception, for counts that keep growing through the day
+      // (steps): a NUMBER cell this same source filled may be raised to
+      // a higher reading. Never lowered, never a boolean, never a cell
+      // marked as anyone else's.
+      const ours = has && auto[day] && auto[day][t.id] === rule.source.id;
+      if (has && !(ours && rule.source.refresh && t.type !== 'boolean')) continue;
 
       const reading = rule.source.read(S, day);
       if (reading == null) continue;
+      if (has) {
+        const next = round(reading, rule.source.dp);
+        if (!(next > Number(logs[day][t.id]))) continue;
+        out.push({ day, trackerId: t.id, value: next, source: rule.source.id, reading, raised: true });
+        continue;
+      }
 
       let value;
       if (t.type === 'boolean') {

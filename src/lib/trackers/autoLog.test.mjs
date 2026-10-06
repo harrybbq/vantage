@@ -12,6 +12,7 @@ import {
   AUTO_SOURCES, MANUAL, proposeAutoLogs, applyAutoLogs, markManual,
   hasDeviceWorkout, stepsOn, ruleFor, ruleLabel, isAutoFilled, autoProvenance,
   sourceHasData, sourceById, recentDays, dayKey, BACKFILL_DAYS,
+  isStepTracker, suggestStepRules, applyStepRules,
 } from './autoLog.js';
 
 let n = 0;
@@ -259,6 +260,75 @@ const numT = (id, auto, extra = {}) => ({ id, name: id, type: 'number', auto, ..
   ok(sourceHasData(S, sourceById('weight'), 30, NOW), 'weight has data');
   ok(!sourceHasData(S, sourceById('strain'), 30, NOW), 'strain does not');
   ok(!sourceHasData(S, null, 30, NOW), 'and no source has nothing');
+}
+
+// ── Steps from WHOOP and Oura ──
+{
+  eq(stepsOn(base({ vitalsLog: { [TODAY]: { stepsWhoop: 8123 } } }), TODAY), 8123, 'WHOOP steps are read');
+  eq(stepsOn(base({ vitalsLog: { [TODAY]: { stepsOura: 9050 } } }), TODAY), 9050, 'Oura steps are read');
+  eq(stepsOn(base({
+    vitalsLog: { [TODAY]: { stepsWhoop: 8123, stepsOura: 9050 } },
+    burnLog: { [TODAY]: [{ id: 'health-steps', label: '7,200 steps', steps: 7200, kcal: 250 }] },
+  }), TODAY), 9050, 'with several sources, the highest count wins');
+  eq(stepsOn(base({ vitalsLog: { [TODAY]: { stepsWhoop: 0, stepsOura: null } } }), TODAY), null, 'zero and null are no reading');
+  eq(stepsOn(base({ burnLog: { [TODAY]: [{ id: 'old', label: '6,001 steps' }] } }), TODAY), 6001, 'old label-only imports still read');
+  ok(sourceHasData(base({ vitalsLog: { [TODAY]: { stepsWhoop: 500 } } }), sourceById('steps'), 30, NOW), 'a WHOOP count makes the steps source live');
+}
+
+// ── A step count that keeps climbing ──
+{
+  // Morning sync fills 3,000; the afternoon sync says 9,400.
+  let S = base({ trackers: [numT('st', { source: 'steps' })], vitalsLog: { [TODAY]: { stepsWhoop: 3000 } } });
+  S = applyAutoLogs(S, proposeAutoLogs(S, { now: NOW }), { now: NOW });
+  eq(S.logs[TODAY].st, 3000, 'morning: the count so far');
+  S = { ...S, vitalsLog: { [TODAY]: { stepsWhoop: 9400 } } };
+  const later = proposeAutoLogs(S, { now: NOW });
+  eq(later.length, 1, 'afternoon: one raise proposed');
+  S = applyAutoLogs(S, later, { now: NOW });
+  eq(S.logs[TODAY].st, 9400, 'and the cell rises with it');
+  eq(S.logsAuto[TODAY].st, 'steps', 'still marked as filled from steps');
+  // A lower reading never lowers it.
+  const lower = { ...S, vitalsLog: { [TODAY]: { stepsWhoop: 9000 } } };
+  eq(proposeAutoLogs(lower, { now: NOW }).length, 0, 'a lower reading never lowers the cell');
+  // A value the user typed is never raised.
+  const typed = markManual({ ...S, logs: { [TODAY]: { st: 5000 } } }, TODAY, ['st']);
+  eq(proposeAutoLogs({ ...typed, vitalsLog: { [TODAY]: { stepsWhoop: 12000 } } }, { now: NOW }).length, 0,
+    'a number the user typed is never touched');
+  // A cell another source filled is not raised by steps.
+  const other = { ...S, logsAuto: { [TODAY]: { st: 'weight' } }, vitalsLog: { [TODAY]: { stepsWhoop: 20000 } } };
+  eq(proposeAutoLogs(other, { now: NOW }).length, 0, 'only a cell this source filled can rise');
+  // Boolean trackers tick once and are never rewritten.
+  let B = base({ trackers: [boolT('b', { source: 'steps', threshold: 10000 })], vitalsLog: { [TODAY]: { stepsOura: 4000 } } });
+  eq(proposeAutoLogs(B, { now: NOW }).length, 0, 'under the bar: no tick yet');
+  B = { ...B, vitalsLog: { [TODAY]: { stepsOura: 10500 } } };
+  B = applyAutoLogs(B, proposeAutoLogs(B, { now: NOW }), { now: NOW });
+  eq(B.logs[TODAY].b, true, 'over the bar later in the day: ticked');
+  eq(proposeAutoLogs({ ...B, vitalsLog: { [TODAY]: { stepsOura: 15000 } } }, { now: NOW }).length, 0, 'and left alone after');
+}
+
+// ── Step trackers switch themselves on ──
+{
+  ok(isStepTracker({ name: 'Steps' }), '"Steps" is a step tracker');
+  ok(isStepTracker({ name: '10k steps' }), '"10k steps" is a step tracker');
+  ok(isStepTracker({ name: 'Walk', unit: 'steps' }), 'a tracker counted in steps is one');
+  ok(!isStepTracker({ name: 'Stepmother call' }), '"Stepmother" is not');
+  ok(!isStepTracker({ name: 'Gym session' }), 'a gym tracker is not');
+
+  const withData = over => base({ vitalsLog: { [YDAY]: { stepsWhoop: 11000 } }, ...over });
+  const S = withData({ trackers: [numT('s', undefined, { name: 'Steps', unit: 'steps' }), boolT('k', undefined, { name: '10k steps', dailyGoal: 12000 }), boolT('g', undefined, { name: 'Gym' })] });
+  eq(suggestStepRules(S, { now: NOW }), ['s', 'k'], 'both step trackers are picked, the gym one is not');
+  const next = applyStepRules(S, { now: NOW });
+  eq(next.trackers[0].auto, { source: 'steps', threshold: null, suggested: true }, 'a number tracker takes the count itself');
+  eq(next.trackers[1].auto, { source: 'steps', threshold: 12000, suggested: true }, 'a tick tracker uses its own daily goal as the bar');
+  eq(next.trackers[2].auto, undefined, 'the gym tracker is untouched');
+  ok(applyStepRules(next, { now: NOW }) === next, 'running it again changes nothing');
+
+  const noData = base({ trackers: [numT('s', undefined, { name: 'Steps' })] });
+  ok(applyStepRules(noData, { now: NOW }) === noData, 'no step data anywhere → nothing switched on');
+  const off = withData({ trackers: [numT('s', undefined, { name: 'Steps', autoOff: true })] });
+  ok(applyStepRules(off, { now: NOW }) === off, 'a rule the user removed never comes back');
+  const own = withData({ trackers: [numT('s', { source: 'weight' }, { name: 'Steps' })] });
+  ok(applyStepRules(own, { now: NOW }) === own, 'a tracker with its own rule is left alone');
 }
 
 console.log(`tracker auto-fill: ${n} assertions passed`);

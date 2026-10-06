@@ -6,6 +6,7 @@
  *   2. Arm the plan ledger the first time there is a plan to post from
  *      (lib/savings/planPost) — nothing is ever posted without a tap
  *   3. Fill in trackers from readings already synced (lib/trackers/autoLog)
+ *      — first attaching the steps rule to step trackers that have none
  *
  * One write because they share a debounce and a save; three modules
  * because they share nothing else.
@@ -24,7 +25,7 @@
 import { useEffect, useRef } from 'react';
 import { rollSubscriptions } from '../lib/money/recurring';
 import { armPlanLedger } from '../lib/savings/planPost';
-import { proposeAutoLogs, applyAutoLogs, recentDays } from '../lib/trackers/autoLog';
+import { proposeAutoLogs, applyAutoLogs, applyStepRules, recentDays } from '../lib/trackers/autoLog';
 
 const recentTwo = () => recentDays(2);
 
@@ -33,6 +34,7 @@ const recentTwo = () => recentDays(2);
 export function runAutomations(prev, now = new Date()) {
   let next = rollSubscriptions(prev, now);
   next = armPlanLedger(next, now);
+  next = applyStepRules(next, { now });
   next = applyAutoLogs(next, proposeAutoLogs(next, { now }), { now });
   return next;
 }
@@ -46,7 +48,7 @@ export function useAutomations(S, update, loading) {
   const recent = recentTwo();
   const sig = [
     loading ? 'loading' : 'ready',
-    (S.trackers || []).map(t => `${t.id}:${t.auto ? t.auto.source + '/' + t.auto.threshold : ''}`).join(','),
+    (S.trackers || []).map(t => `${t.id}:${t.auto ? t.auto.source + '/' + t.auto.threshold : ''}:${t.autoOff ? 'off' : ''}:${t.name}:${t.unit || ''}`).join(','),
     Object.keys(S.vitalsLog || {}).length,
     Object.keys(S.burnLog || {}).length,
     recent.map(d => JSON.stringify((S.vitalsLog || {})[d] || null)).join(''),

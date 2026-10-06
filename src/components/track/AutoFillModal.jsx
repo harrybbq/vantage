@@ -30,6 +30,7 @@ const NEEDS = {
   wearable: 'WHOOP or Oura connected',
   whoop: 'WHOOP connected',
   health: 'an Apple Health import',
+  steps: 'WHOOP, Oura or an Apple Health import',
 };
 
 export default function AutoFillModal({ tracker, S, update, onClose }) {
@@ -60,9 +61,12 @@ export default function AutoFillModal({ tracker, S, update, onClose }) {
       ...prev,
       trackers: (prev.trackers || []).map(t => {
         if (t.id !== tracker.id) return t;
-        if (!sourceId) { const { auto, ...rest } = t; return rest; }
+        // Removing a rule remembers that it was removed, so a steps rule
+        // attached automatically (applyStepRules) never comes back.
+        if (!sourceId) { const { auto, ...rest } = t; return { ...rest, autoOff: true }; }
         const n = parseFloat(threshold);
-        return { ...t, auto: { source: sourceId, threshold: Number.isFinite(n) ? n : null } };
+        const { autoOff, ...rest } = t;
+        return { ...rest, auto: { source: sourceId, threshold: Number.isFinite(n) ? n : null } };
       }),
     }));
     onClose();

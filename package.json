@@ -20,7 +20,7 @@
     "check:training": "node src/data/trainingProgramme.test.mjs",
     "check:merge": "node src/lib/state/merge.test.mjs",
     "check:invite": "node src/lib/friends/clanInvite.test.mjs",
-    "check:autolog": "node src/lib/trackers/autoLog.test.mjs",
+    "check:autolog": "node src/lib/trackers/autoLog.test.mjs && node netlify/lib/wearableSteps.test.mjs",
     "check:recurring": "node src/lib/money/recurring.test.mjs",
     "check:planpost": "node src/lib/savings/planPost.test.mjs",
     "check:pathplayer": "node src/lib/achievements/pathPlayer.test.mjs",

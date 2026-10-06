@@ -27,6 +27,7 @@ import Icon from '../Icon';
 import { getTodayStr } from '../../utils/helpers';
 import { eventColour, todayAgenda } from '../../lib/calendar/events';
 import { recalcStreaks } from '../../utils/streaks';
+import { markManual } from '../../lib/trackers/autoLog';
 import MobileWidget from './MobileWidget';
 import { isRetiredWidget } from '../../lib/widgets/retired';
 import RatingsPanel from '../RatingsPanel';
@@ -113,7 +114,9 @@ export default function MobileHubSection({ S, update, visionState, hasPro, navig
       if (Object.keys(dayLog).length) newLogs[today] = dayLog;
       else delete newLogs[today];
       const newStreaks = recalcStreaks(newLogs, prev.trackers || [], prev.streaks || {});
-      return { ...prev, logs: newLogs, streaks: newStreaks };
+      // A tick or un-tick by hand — auto-fill must leave this cell alone
+      // from now on (lib/trackers/autoLog markManual).
+      return markManual({ ...prev, logs: newLogs, streaks: newStreaks }, today, [trackerId]);
     });
   }
 
