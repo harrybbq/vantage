@@ -360,7 +360,7 @@ export function SavingsProjectionBody({ S, navigate }) {
         {hv != null && (
           <div className="sw-proj-tt" style={{ left: `${(sx(hv) / W) * 100}%` }}>
             <div className="sw-proj-tt-m">{hv === 0 ? 'Now' : monthLabel(hv, true)}</div>
-            {showCash && <div className="sw-proj-tt-v" style={{ color: up ? 'var(--em)' : '#d0596a' }}>Cash {money(cashSeries[hv])}</div>}
+            {showCash && <div className="sw-proj-tt-v" style={{ color: up ? 'var(--em-text)' : '#d0596a' }}>Cash {money(cashSeries[hv])}</div>}
             {showSavings && <div className="sw-proj-tt-v" style={{ color: SAVINGS_COLOR }}>Savings {money(savingsSeries[hv])}</div>}
           </div>
         )}

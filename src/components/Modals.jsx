@@ -196,7 +196,7 @@ function AddLinkModal({ openId, onClose, onSwitchModal, onAddApp, onAddHubWidget
       <span className="aw-section-lbl" style={{ marginTop: 16, display: 'flex', alignItems: 'center', gap: 8 }}>
         Our Apps
         <span style={{
-          fontFamily: 'var(--mono)', fontSize: 8.5, fontWeight: 700,
+          fontFamily: 'var(--mono)', fontSize: 'var(--fs-floor)', fontWeight: 700,
           letterSpacing: 1, padding: '1px 6px', borderRadius: 4,
           background: 'rgba(200,151,10,.14)', color: 'var(--gold, #c8970a)',
           border: '1px solid rgba(200,151,10,.30)',
@@ -315,19 +315,19 @@ function CategoryPicker({ value, onChange }) {
               title={c.desc}
               style={{
                 padding: '6px 12px', borderRadius: 6,
-                fontFamily: 'var(--mono)', fontSize: 11,
+                fontFamily: 'var(--mono)', fontSize: 'var(--fs-floor)',
                 letterSpacing: 0.6, fontWeight: 600,
                 cursor: 'pointer',
                 border: active ? '2px solid var(--em)' : '2px solid var(--border)',
                 background: active ? 'rgba(var(--em-rgb), 0.12)' : 'transparent',
-                color: active ? 'var(--em)' : 'var(--text)',
+                color: active ? 'var(--em-text)' : 'var(--text)',
                 transition: 'all .12s',
               }}
             >{c.label}</button>
           );
         })}
       </div>
-      <div style={{ fontFamily: 'var(--mono)', fontSize: 10, color: 'var(--text-muted)', marginTop: 6 }}>
+      <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-floor)', color: 'var(--text-muted)', marginTop: 6 }}>
         {(CATEGORY_OPTIONS.find(c => c.id === (value || 'general')) || {}).desc}
       </div>
     </div>
@@ -484,7 +484,7 @@ function AddAchievementModal({ openId, onClose, onAdd, trackers }) {
         </div>
         <input type="text" placeholder="Or type a custom emoji…" maxLength={2} value={form.icon} onChange={e => setForm(f => ({ ...f, icon: e.target.value }))} />
       </div>
-      <div className="fg"><label>⬡ Coin Reward on Completion</label><input type="number" placeholder="e.g. 50" min="0" max={MAX_ACH_COINS} value={form.coins} onChange={e => setForm(f => ({ ...f, coins: e.target.value }))} /><span style={{ fontFamily: 'var(--mono)', fontSize: '10px', color: 'var(--text-muted)', marginTop: '4px', display: 'block' }}>Max {MAX_ACH_COINS.toLocaleString()} ⬡ per achievement.</span></div>
+      <div className="fg"><label>⬡ Coin Reward on Completion</label><input type="number" placeholder="e.g. 50" min="0" max={MAX_ACH_COINS} value={form.coins} onChange={e => setForm(f => ({ ...f, coins: e.target.value }))} /><span style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-floor)', color: 'var(--text-muted)', marginTop: '4px', display: 'block' }}>Max {MAX_ACH_COINS.toLocaleString()} ⬡ per achievement.</span></div>
       <CategoryPicker value={form.category} onChange={v => setForm(f => ({ ...f, category: v }))} />
       <TrackerLinkFields trackers={trackers} value={form.link} onChange={link => setForm(f => ({ ...f, link }))} />
       {/* The spacing rule, stated at the moment it starts applying.
@@ -574,7 +574,7 @@ function EditAchievementModal({ openId, onClose, achievements, onEdit, onDelete,
         </div>
         <input type="text" placeholder="Or type a custom emoji…" maxLength={2} value={form.icon} onChange={e => setForm(f => ({ ...f, icon: e.target.value }))} />
       </div>
-      <div className="fg"><label>⬡ Coin Reward on Completion</label><input type="number" min="0" max={MAX_ACH_COINS} value={form.coins} onChange={e => setForm(f => ({ ...f, coins: e.target.value }))} /><span style={{ fontFamily: 'var(--mono)', fontSize: '10px', color: 'var(--text-muted)', marginTop: '4px', display: 'block' }}>Max {MAX_ACH_COINS.toLocaleString()} ⬡ per achievement.</span></div>
+      <div className="fg"><label>⬡ Coin Reward on Completion</label><input type="number" min="0" max={MAX_ACH_COINS} value={form.coins} onChange={e => setForm(f => ({ ...f, coins: e.target.value }))} /><span style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-floor)', color: 'var(--text-muted)', marginTop: '4px', display: 'block' }}>Max {MAX_ACH_COINS.toLocaleString()} ⬡ per achievement.</span></div>
       <CategoryPicker value={form.category} onChange={v => setForm(f => ({ ...f, category: v }))} />
       {!ach.completed && (
         <TrackerLinkFields
@@ -588,7 +588,7 @@ function EditAchievementModal({ openId, onClose, achievements, onEdit, onDelete,
         <div style={{
           padding: '10px 12px', borderRadius: '8px', marginBottom: '12px',
           background: 'rgba(200,151,10,0.10)', border: '1px solid rgba(200,151,10,0.32)',
-          fontFamily: 'var(--mono)', fontSize: '11px', color: 'var(--text)',
+          fontFamily: 'var(--mono)', fontSize: 'var(--fs-floor)', color: 'var(--text)',
           lineHeight: 1.5,
         }}>
           This achievement is completed. Editing the coin reward won't refund or re-award coins —
@@ -648,7 +648,7 @@ function AddSavingsGoalModal({ openId, onClose, achievements, onAdd }) {
       <div className="fg">
         <label>Target date (optional)</label>
         <input type="date" value={form.targetDate} onChange={e => setForm(f => ({ ...f, targetDate: e.target.value }))} />
-        <div style={{ fontFamily: 'var(--mono)', fontSize: '10px', color: 'var(--text-muted)', marginTop: '4px' }}>
+        <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-floor)', color: 'var(--text-muted)', marginTop: '4px' }}>
           Lets the card show a monthly contribution target.
         </div>
       </div>
@@ -663,7 +663,7 @@ function AddSavingsGoalModal({ openId, onClose, achievements, onAdd }) {
             <option value="">— none —</option>
             {linkable.map(a => <option key={a.id} value={a.id}>{a.icon} {a.name}</option>)}
           </select>
-          <div style={{ fontFamily: 'var(--mono)', fontSize: '10px', color: 'var(--text-muted)', marginTop: '4px' }}>
+          <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-floor)', color: 'var(--text-muted)', marginTop: '4px' }}>
             Linked achievement auto-completes when this goal hits target.
           </div>
         </div>
@@ -723,7 +723,7 @@ function SavingsImagePicker({ image, onChange }) {
               ? `center/cover no-repeat url(${image})`
               : 'linear-gradient(135deg, rgba(var(--em-rgb),.18), rgba(var(--em-rgb),.06))',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
-            fontSize: 22, color: 'var(--em)', overflow: 'hidden',
+            fontSize: 22, color: 'var(--em-text)', overflow: 'hidden',
           }}
           title="Click to choose a photo"
         >{!image && <Icon name="image" size={26} strokeWidth={1.5} style={{ opacity: 0.5 }} />}</div>
@@ -887,12 +887,12 @@ function AddTrackerModal({ openId, onClose, onAdd }) {
       {isNumber && <div className="fg"><label>Monthly Target</label><input type="number" placeholder="500" value={form.goal} onChange={e => setForm(f => ({ ...f, goal: e.target.value }))} /></div>}
       <div className="fg"><label>Colour</label><input type="color" value={form.color} onChange={e => setForm(f => ({ ...f, color: e.target.value }))} /></div>
       <div style={{ borderTop: '1px solid var(--border-lt)', margin: '14px 0' }}></div>
-      <div style={{ fontFamily: 'var(--mono)', fontSize: '10px', color: 'var(--em-mid)', letterSpacing: '2px', textTransform: 'uppercase', marginBottom: '10px' }}>⬡ Weekly Coin Challenge (optional)</div>
+      <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-floor)', color: 'var(--em-mid)', letterSpacing: '2px', textTransform: 'uppercase', marginBottom: '10px' }}>⬡ Weekly Coin Challenge (optional)</div>
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
         <div className="fg" style={{ marginBottom: 0 }}><label>Times per week</label><input type="number" placeholder="e.g. 5" min="1" max="7" value={form.weeklyTarget} onChange={e => setForm(f => ({ ...f, weeklyTarget: e.target.value }))} /></div>
         <div className="fg" style={{ marginBottom: 0 }}><label>⬡ Coins reward</label><input type="number" placeholder="e.g. 10" min="1" max={WEEKLY_COINS_MAX} value={form.weeklyCoins} onChange={e => setForm(f => ({ ...f, weeklyCoins: e.target.value }))} /></div>
       </div>
-      <div style={{ fontFamily: 'var(--mono)', fontSize: '10px', color: 'var(--text-muted)', marginTop: '6px' }}>Hit the weekly target to earn coins every week.</div>
+      <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-floor)', color: 'var(--text-muted)', marginTop: '6px' }}>Hit the weekly target to earn coins every week.</div>
       <div style={{ borderTop: '1px solid var(--border-lt)', margin: '14px 0' }}></div>
       <CategoryPicker value={form.category} onChange={v => setForm(f => ({ ...f, category: v }))} />
       <div className="modal-actions">
@@ -1048,7 +1048,7 @@ function AddShopModal({ openId, onClose, onAdd, categories = [] }) {
           <input id="shop-add-url" aria-describedby="shop-add-status" type="url" placeholder="https://amazon.co.uk/..." style={{ flex: 1 }} value={form.url} onChange={e => handleUrlChange(e.target.value)} />
           <button className="btn btn-ghost btn-sm" disabled={fetching} onClick={() => runAutofill(form.url)} style={{ whiteSpace: 'nowrap', flexShrink: 0, display: 'inline-flex', alignItems: 'center', gap: 5 }}>Fill <Icon name="arrow-down" size={13} /></button>
         </div>
-        <div id="shop-add-status" role="status" style={{ fontFamily: 'var(--mono)', fontSize: '12px', color: status.startsWith('✓') ? 'var(--em)' : 'var(--text-muted)', marginTop: '5px', minHeight: '16px' }}>{status}</div>
+        <div id="shop-add-status" role="status" style={{ fontFamily: 'var(--mono)', fontSize: '12px', color: status.startsWith('✓') ? 'var(--em-text)' : 'var(--text-muted)', marginTop: '5px', minHeight: '16px' }}>{status}</div>
       </div>
       <div className="fg"><label htmlFor="shop-add-name">Item Name</label><input id="shop-add-name" type="text" placeholder="e.g. AirPods Pro" value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} /></div>
       <div className="fg"><label htmlFor="shop-add-price">Price (optional)</label><input id="shop-add-price" type="text" placeholder="£149.99" value={form.price} onChange={e => setForm(f => applyPrice(f, e.target.value))} /></div>
@@ -1185,10 +1185,10 @@ function CoinHistoryModal({ openId, onClose, coins, coinHistory }) {
     <Modal id="coinHistoryModal" openId={openId} onClose={onClose} style={{ maxWidth: '420px' }}>
       <h3>⬡ Coin Wallet</h3>
       <div style={{ textAlign: 'center', padding: '16px 0 8px' }}>
-        <div style={{ fontFamily: 'var(--mono)', fontSize: '42px', fontWeight: 700, color: 'var(--gold)' }}>{coins}</div>
-        <div style={{ fontFamily: 'var(--mono)', fontSize: '11px', color: 'var(--text-muted)', letterSpacing: '2px', textTransform: 'uppercase', marginTop: '4px' }}>Available Coins</div>
+        <div style={{ fontFamily: 'var(--mono)', fontSize: '42px', fontWeight: 700, color: 'var(--gold-text)' }}>{coins}</div>
+        <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-floor)', color: 'var(--text-muted)', letterSpacing: '2px', textTransform: 'uppercase', marginTop: '4px' }}>Available Coins</div>
       </div>
-      <div style={{ fontFamily: 'var(--mono)', fontSize: '10px', color: 'var(--text-muted)', letterSpacing: '1.5px', textTransform: 'uppercase', marginTop: '8px' }}>History</div>
+      <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-floor)', color: 'var(--text-muted)', letterSpacing: '1.5px', textTransform: 'uppercase', marginTop: '8px' }}>History</div>
       <div className="coin-history-list">
         {(!coinHistory || coinHistory.length === 0)
           ? <div style={{ textAlign: 'center', fontFamily: 'var(--mono)', fontSize: '12px', color: 'var(--text-muted)', padding: '20px' }}>No transactions yet — complete achievements to earn coins!</div>
@@ -1200,7 +1200,7 @@ function CoinHistoryModal({ openId, onClose, coins, coinHistory }) {
               <div key={i} className="coin-hist-row">
                 <div>
                   <div className="coin-hist-label">{label}{h.label}</div>
-                  <div style={{ fontFamily: 'var(--mono)', fontSize: '10px', color: 'var(--text-muted)' }}>{ts}</div>
+                  <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-floor)', color: 'var(--text-muted)' }}>{ts}</div>
                 </div>
                 <div className={`coin-hist-amount ${pos ? 'pos' : 'neg'}`}>{pos ? '+' : ''}{h.amount}</div>
               </div>
@@ -1546,7 +1546,7 @@ function AddHabitModal({ openId, onClose, onAdd }) {
                 <option value="ever">ever (total)</option>
               </select>
             </div>
-            <div style={{ fontSize: '11px', color: 'var(--text-muted)', lineHeight: 1.5 }}>
+            <div style={{ fontSize: 'var(--fs-floor)', color: 'var(--text-muted)', lineHeight: 1.5 }}>
               A slip-up always restarts your timer, but within your allowance the card shows amber instead of red. The allowance refills every Monday (weekly) or on the 1st (monthly). If the slips are part of the plan, choose Cut down instead.
             </div>
           </div>
@@ -1711,16 +1711,16 @@ function EditHabitModal({ openId, onClose, habits, onEdit, onDelete }) {
         )}
 
         <div style={{ borderTop: '1px solid var(--border-lt)', margin: '14px 0' }}></div>
-        <div style={{ fontFamily: 'var(--mono)', fontSize: '10px', color: 'var(--em-mid)', letterSpacing: '2px', textTransform: 'uppercase', marginBottom: '12px' }}>⬡ Reward Milestones</div>
+        <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-floor)', color: 'var(--em-mid)', letterSpacing: '2px', textTransform: 'uppercase', marginBottom: '12px' }}>⬡ Reward Milestones</div>
 
         {form.milestones.map((m, i) => (
           <div key={m._id} style={{ display: 'flex', gap: '8px', alignItems: 'flex-end', marginBottom: '10px' }}>
             <div className="fg" style={{ flex: '0 0 54px', marginBottom: 0 }}>
-              {i === 0 && <label style={{ fontSize: '9px' }}>After</label>}
+              {i === 0 && <label style={{ fontSize: 'var(--fs-floor)' }}>After</label>}
               <input type="number" min="1" value={m.amount} onChange={e => updateMs(m._id, 'amount', e.target.value)} style={{ textAlign: 'center' }} />
             </div>
             <div className="fg" style={{ flex: 1, marginBottom: 0 }}>
-              {i === 0 && <label style={{ fontSize: '9px' }}>Unit</label>}
+              {i === 0 && <label style={{ fontSize: 'var(--fs-floor)' }}>Unit</label>}
               <select value={m.unit} onChange={e => updateMs(m._id, 'unit', e.target.value)}>
                 <option value="hours">Hours</option>
                 <option value="days">Days</option>
@@ -1729,7 +1729,7 @@ function EditHabitModal({ openId, onClose, habits, onEdit, onDelete }) {
               </select>
             </div>
             <div className="fg" style={{ flex: '0 0 72px', marginBottom: 0 }}>
-              {i === 0 && <label style={{ fontSize: '9px' }}>⬡ Coins</label>}
+              {i === 0 && <label style={{ fontSize: 'var(--fs-floor)' }}>⬡ Coins</label>}
               <input type="number" min="1" value={m.coins} onChange={e => updateMs(m._id, 'coins', e.target.value)} />
             </div>
             <button
@@ -1748,7 +1748,7 @@ function EditHabitModal({ openId, onClose, habits, onEdit, onDelete }) {
           <input type="checkbox" checked={form.endless} onChange={e => setForm(f => ({ ...f, endless: e.target.checked }))} style={{ marginTop: '3px', accentColor: 'var(--em)', flexShrink: 0 }} />
           <div>
             <div style={{ fontWeight: 600, fontSize: '13px', color: 'var(--text)' }}>∞ Endless</div>
-            <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '2px' }}>Track this habit forever — the counter never ends, even after all milestones are earned</div>
+            <div style={{ fontSize: 'var(--fs-floor)', color: 'var(--text-muted)', marginTop: '2px' }}>Track this habit forever — the counter never ends, even after all milestones are earned</div>
           </div>
         </label>
 
@@ -1921,7 +1921,7 @@ function WaitlistModal({ openId, onClose, userId, userEmail }) {
       </div>
 
       {isDone ? (
-        <div style={{ textAlign: 'center', padding: '16px 0 20px', fontFamily: 'var(--mono)', fontSize: '14px', color: 'var(--em)' }}>
+        <div style={{ textAlign: 'center', padding: '16px 0 20px', fontFamily: 'var(--mono)', fontSize: '14px', color: 'var(--em-text)' }}>
           {status === 'already' ? "You're already on the list ✓" : "You're on the list ✓"}
         </div>
       ) : (
@@ -1947,14 +1947,14 @@ function WaitlistModal({ openId, onClose, userId, userEmail }) {
       )}
 
       {count != null && (
-        <div style={{ textAlign: 'center', fontFamily: 'var(--mono)', fontSize: '11px', color: 'var(--text-muted)', marginTop: '12px', letterSpacing: '0.5px' }}>
+        <div style={{ textAlign: 'center', fontFamily: 'var(--mono)', fontSize: 'var(--fs-floor)', color: 'var(--text-muted)', marginTop: '12px', letterSpacing: '0.5px' }}>
           {count} {count === 1 ? 'person' : 'people'} already waiting
         </div>
       )}
 
       {/* Subscription transparency */}
       <div style={{ marginTop: '16px', padding: '12px', background: 'rgba(255,255,255,.04)', borderRadius: '10px', border: '1px solid rgba(255,255,255,.07)' }}>
-        <div style={{ fontFamily: 'var(--mono)', fontSize: '10px', color: 'var(--text-muted)', lineHeight: 1.7, letterSpacing: '0.3px' }}>
+        <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-floor)', color: 'var(--text-muted)', lineHeight: 1.7, letterSpacing: '0.3px' }}>
           <strong style={{ color: 'var(--text)', display: 'block', marginBottom: '4px' }}>Subscription transparency</strong>
           Joining the waitlist is free — no payment details required. If AI Coach launches as a paid feature, you will be told the price and what is included before any charge. You can cancel at any time. Free features remain free.
         </div>

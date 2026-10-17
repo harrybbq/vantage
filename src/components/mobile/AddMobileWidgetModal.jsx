@@ -148,7 +148,7 @@ export default function AddMobileWidgetModal({ openId, onClose, existingTypes, o
                     fontSize: 13, fontWeight: 700, lineHeight: 1, flexShrink: 0,
                     background: meta.accent ? meta.accent + '1a' : 'rgba(var(--em-rgb),0.10)',
                     border: '1px solid ' + (meta.accent ? meta.accent + '55' : 'var(--border)'),
-                    color: meta.accent || 'var(--em)',
+                    color: meta.accent || 'var(--em-text)',
                   }}
                 >
                   {meta.svg ? <Icon name={meta.svg} size={16} /> : meta.icon}
@@ -161,7 +161,7 @@ export default function AddMobileWidgetModal({ openId, onClose, existingTypes, o
                     {meta.label}
                     {proLocked && (
                       <span style={{
-                        fontFamily: 'var(--mono)', fontSize: 8, fontWeight: 700,
+                        fontFamily: 'var(--mono)', fontSize: 'var(--fs-floor)', fontWeight: 700,
                         letterSpacing: 1, padding: '1px 5px', borderRadius: 4,
                         background: 'rgba(200,151,10,.14)', color: 'var(--gold, #c8970a)',
                         border: '1px solid rgba(200,151,10,.30)',
@@ -170,7 +170,7 @@ export default function AddMobileWidgetModal({ openId, onClose, existingTypes, o
                   </span>
                   <span style={{
                     display: 'block',
-                    fontFamily: 'var(--mono)', fontSize: 10,
+                    fontFamily: 'var(--mono)', fontSize: 'var(--fs-floor)',
                     letterSpacing: 0.4, color: 'var(--text-muted)',
                     marginTop: 2,
                   }}>

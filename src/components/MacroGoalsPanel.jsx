@@ -53,14 +53,14 @@ function MacroRow({ macro, isFirst, isLast, onSave, onDelete, onMove }) {
       </div>
       <div style={{ display: 'flex', gap: '4px', flexShrink: 0 }}>
         {!isFirst && (
-          <button onClick={() => onMove(macro, -1)} style={{ background: 'none', border: '1px solid var(--border)', color: 'var(--text-muted)', cursor: 'pointer', borderRadius: 'var(--radius-sm)', padding: '3px 7px', fontSize: '11px', display:'inline-flex' }} aria-label="Move up"><Icon name="arrow-up" size={12} /></button>
+          <button onClick={() => onMove(macro, -1)} style={{ background: 'none', border: '1px solid var(--border)', color: 'var(--text-muted)', cursor: 'pointer', borderRadius: 'var(--radius-sm)', padding: '3px 7px', fontSize: 'var(--fs-floor)', display:'inline-flex' }} aria-label="Move up"><Icon name="arrow-up" size={12} /></button>
         )}
         {!isLast && (
-          <button onClick={() => onMove(macro, 1)} style={{ background: 'none', border: '1px solid var(--border)', color: 'var(--text-muted)', cursor: 'pointer', borderRadius: 'var(--radius-sm)', padding: '3px 7px', fontSize: '11px', display:'inline-flex' }} aria-label="Move down"><Icon name="arrow-down" size={12} /></button>
+          <button onClick={() => onMove(macro, 1)} style={{ background: 'none', border: '1px solid var(--border)', color: 'var(--text-muted)', cursor: 'pointer', borderRadius: 'var(--radius-sm)', padding: '3px 7px', fontSize: 'var(--fs-floor)', display:'inline-flex' }} aria-label="Move down"><Icon name="arrow-down" size={12} /></button>
         )}
         <button onClick={() => setEditing(true)} style={{ background: 'none', border: '1px solid var(--border)', color: 'var(--text-mid)', cursor: 'pointer', borderRadius: 'var(--radius-sm)', padding: '3px 8px', fontSize: 'var(--text-xs)', fontFamily: 'var(--sans)' }}>Edit</button>
         {!macro.is_default && (
-          <button onClick={() => onDelete(macro)} style={{ background: 'none', border: '1px solid rgba(220,38,38,.3)', color: '#e05252', cursor: 'pointer', borderRadius: 'var(--radius-sm)', padding: '3px 7px', fontSize: '11px', display:'inline-flex' }} aria-label="Delete"><Icon name="x" size={12} /></button>
+          <button onClick={() => onDelete(macro)} style={{ background: 'none', border: '1px solid rgba(220,38,38,.3)', color: '#e05252', cursor: 'pointer', borderRadius: 'var(--radius-sm)', padding: '3px 7px', fontSize: 'var(--fs-floor)', display:'inline-flex' }} aria-label="Delete"><Icon name="x" size={12} /></button>
         )}
       </div>
     </div>

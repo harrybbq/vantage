@@ -817,7 +817,7 @@ function CalendarView({ S, update, onShowCoinToast, nutritionMonthData, userId }
           <div className="log-panel-header">{selectedDay} {shortMonths[calMonth]} {calYear}</div>
           <div id="logEntriesForm">
             {!trackers.length && (
-              <div style={{ fontFamily: 'var(--mono)', fontSize: '11px', color: 'var(--text-muted)' }}>Add trackers first.</div>
+              <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-floor)', color: 'var(--text-muted)' }}>Add trackers first.</div>
             )}
             {trackers.map(t => {
               const dayLogs = logs[selectedKey] || {};

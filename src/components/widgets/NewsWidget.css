@@ -4,11 +4,11 @@
 .nws-filter{display:flex;align-items:center;gap:6px;border:1px solid var(--line,var(--border));
   border-radius:8px;padding:4px 8px;color:var(--text-muted);}
 .nws-filter input{flex:1;min-width:0;background:transparent;border:0;outline:none;color:var(--text);
-  font-family:var(--sans);font-size:11.5px;}
+  font-family:var(--sans);font-size:max(11.5px, var(--fs-floor));}
 .nws-filter button{background:transparent;border:0;color:var(--text-muted);cursor:pointer;display:inline-flex;padding:2px;}
 .nws-filter button:hover{color:var(--danger,#c0563f);}
-.nws-locked{display:inline-flex;align-items:center;gap:5px;font-family:var(--mono);font-size:8.5px;
-  letter-spacing:.8px;text-transform:uppercase;color:var(--text-muted);opacity:.85;}
+.nws-locked{display:inline-flex;align-items:center;gap:5px;font-family:var(--mono);font-size:var(--fs-floor);
+  letter-spacing:.8px;text-transform:uppercase;color:var(--text-muted);}
 
 /* ── Scrolling headlines ──────────────────────────────────────────────
    Twelve headlines at 52px thumbnails is ~700px of list, and every
@@ -43,13 +43,13 @@
   /* Two lines max: a headline that wraps to four turns the widget into
      a wall and pushes everything else off the card. */
   display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;}
-.nws-list a:hover .nws-title{color:var(--em);}
-.nws-meta{display:block;font-family:var(--mono);font-size:8.5px;letter-spacing:.5px;color:var(--text-muted);
+.nws-list a:hover .nws-title{color:var(--em-text);}
+.nws-meta{display:block;font-family:var(--mono);font-size:var(--fs-floor);letter-spacing:.5px;color:var(--text-muted);
   margin-top:3px;}
 
-.nws-note,.nws-capped{font-family:var(--mono);font-size:10px;color:var(--text-muted);line-height:1.6;padding:4px 0;}
-.nws-note-sub{display:block;font-size:9px;margin-top:3px;opacity:.85;}
-.nws-capped{font-size:8.5px;letter-spacing:.4px;opacity:.8;}
+.nws-note,.nws-capped{font-family:var(--mono);font-size:var(--fs-floor);color:var(--text-muted);line-height:1.6;padding:4px 0;}
+.nws-note-sub{display:block;font-size:var(--fs-floor);margin-top:3px;opacity:.85;}
+.nws-capped{font-size:var(--fs-floor);letter-spacing:.4px;opacity:.8;}
 
 /* Inside the hub canvas the widget has a real, user-dragged height. The
    existing chain (#widgetCanvas .widget-wrapper > .link-island →

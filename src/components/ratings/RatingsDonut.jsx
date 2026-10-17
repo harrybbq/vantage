@@ -76,7 +76,7 @@ export default function RatingsDonut({
          the tier was said twice — once in colour, once in text. It is
          still on the accessible name and the tooltip, so nothing is
          lost to anyone who cannot use the colour. */
-      style={{ '--rt-tier': tier.color }}
+      style={{ '--rt-tier': tier.color, '--rt-scale': (VB / size).toFixed(3) }}
     >
       {/* Deliberately NO <title>: a browser renders it as a native
           tooltip, which meant hovering an arc produced two labels — the

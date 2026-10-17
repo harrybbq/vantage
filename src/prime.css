@@ -80,7 +80,7 @@ html[data-theme="dark-os"] {
   color: var(--text-mid);
   cursor: pointer;
 }
-.prime-count:hover { border-color: var(--em); color: var(--em); }
+.prime-count:hover { border-color: var(--em); color: var(--em-text); }
 .prime-count:focus-visible { outline: 2px solid var(--em); outline-offset: 2px; }
 
 /* A slot. The engine owns its rect; this owns its clipping and its own
@@ -119,7 +119,7 @@ html[data-theme="dark-os"] {
   background: rgba(192, 57, 43, .9);
   color: #fff;
   font-family: var(--mono);
-  font-size: 8px;
+  font-size: var(--fs-floor);
   line-height: 10px;
   white-space: nowrap;
 }
@@ -162,7 +162,7 @@ html[data-theme="dark-os"] {
   color: var(--text-mid);
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
-.pv-hero-sub b { color: var(--em); font-weight: 600; }
+.pv-hero-sub b { color: var(--em-text); font-weight: 600; }
 
 .pv-heroM { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
 .pv-heroM-big {
@@ -182,7 +182,7 @@ html[data-theme="dark-os"] {
   line-height: 1.35;
   white-space: nowrap;
 }
-.pv-heroM-side b { color: var(--em); font-weight: 600; }
+.pv-heroM-side b { color: var(--em-text); font-weight: 600; }
 
 /* ── vessels ──────────────────────────────────────────────────────── */
 .pv-vessels { display: flex; gap: 6px; }
@@ -311,7 +311,7 @@ html[data-theme="dark-os"] {
   border-radius: 4px;
   border: 1.5px solid var(--border);
   color: #fff;
-  font-size: 9px; line-height: 11px; text-align: center;
+  font-size: var(--fs-floor); line-height: 11px; text-align: center;
 }
 
 .pv-heat-head { flex: none; height: 22px; display: flex; align-items: center; }
@@ -384,7 +384,7 @@ html[data-theme="dark-os"] {
 .pv-seg-key i { width: 7px; height: 7px; border-radius: 2px; }
 .pv-segM { display: flex; flex-direction: column; justify-content: center; gap: 5px; }
 .pv-segM-head { display: flex; justify-content: space-between; font-size: var(--text-xs); color: var(--text-mid); }
-.pv-segM-head b { color: var(--em); }
+.pv-segM-head b { color: var(--em-text); }
 
 /* ── proposal card ────────────────────────────────────────────────── */
 .pv-card {
@@ -398,7 +398,7 @@ html[data-theme="dark-os"] {
 .pv-card-top { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
 .pv-card-eyebrow {
   font-family: var(--mono); font-size: var(--text-xs);
-  letter-spacing: 1.4px; text-transform: uppercase; color: var(--gold);
+  letter-spacing: 1.4px; text-transform: uppercase; color: var(--gold-text);
 }
 .pv-card-right { font-size: var(--text-xs); color: var(--text-mid); }
 .pv-card-title { font-size: var(--text-sm); font-weight: 600; }
@@ -424,7 +424,7 @@ html[data-theme="dark-os"] {
   font-size: var(--text-sm); font-weight: 600;
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
-.pv-cardM-r { font-family: var(--mono); font-size: var(--text-xs); color: var(--gold); }
+.pv-cardM-r { font-family: var(--mono); font-size: var(--text-xs); color: var(--gold-text); }
 
 /* ── fact ─────────────────────────────────────────────────────────── */
 .pv-fact {
@@ -445,7 +445,7 @@ html[data-theme="dark-os"] {
   font-size: var(--text-sm); font-weight: 600;
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
-.pv-fact-v b { color: var(--em); }
+.pv-fact-v b { color: var(--em-text); }
 
 /* ── The editor ───────────────────────────────────────────────────────
    One set of rules, two presentations: a popover beside the count chip
@@ -486,7 +486,7 @@ html[data-theme="dark-os"] {
   cursor: pointer;
   white-space: nowrap;
 }
-.pe-preset:hover { border-color: var(--em); color: var(--em); }
+.pe-preset:hover { border-color: var(--em); color: var(--em-text); }
 .pe-preset.is-on { background: var(--em); border-color: var(--em); color: #fff; }
 .pe-preset:focus-visible { outline: 2px solid var(--em); outline-offset: 2px; }
 
@@ -516,7 +516,7 @@ html[data-theme="dark-os"] {
   border: 1.5px solid var(--border);
   background: transparent;
   color: #fff;
-  font-size: 10px;
+  font-size: var(--fs-floor);
   line-height: 13px;
   text-align: center;
   padding: 0;
@@ -542,13 +542,13 @@ html[data-theme="dark-os"] {
   border: 1px solid var(--border);
   background: transparent;
   color: var(--text-mid);
-  font-size: 10px;
+  font-size: var(--fs-floor);
   cursor: pointer;
   padding: 0;
 }
 .pe-row.is-sheet .pe-arrow { width: 40px; height: 40px; font-size: 15px; border: none; }
 .pe-arrow:disabled { opacity: .3; cursor: default; }
-.pe-arrow:not(:disabled):hover { border-color: var(--em); color: var(--em); }
+.pe-arrow:not(:disabled):hover { border-color: var(--em); color: var(--em-text); }
 .pe-arrow:focus-visible { outline: 2px solid var(--em); outline-offset: 2px; }
 
 .pe-allon { font-size: var(--text-xs); color: var(--text-muted); }
@@ -640,7 +640,7 @@ html[data-theme="dark-os"] {
   border: 1px solid transparent;
   background: transparent;
   color: var(--text-muted);
-  font-size: 11px;
+  font-size: var(--fs-floor);
   line-height: 1;
   cursor: pointer;
   padding: 0;
@@ -691,7 +691,7 @@ html[data-theme="dark-os"] {
   max-width: 140px;
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
-.pe-pick.is-on { background: rgba(var(--em-rgb), .12); border-color: var(--em); color: var(--em); }
+.pe-pick.is-on { background: rgba(var(--em-rgb), .12); border-color: var(--em); color: var(--em-text); }
 .pe-pick:focus-visible { outline: 2px solid var(--em); outline-offset: 2px; }
 
 /* ── Mounting ─────────────────────────────────────────────────────── */
@@ -725,7 +725,7 @@ html[data-theme="dark-os"] {
   font-size: var(--text-xs);
   letter-spacing: 1.6px;
   text-transform: uppercase;
-  color: var(--em);
+  color: var(--em-text);
   font-weight: 700;
 }
 .pp-sub { font-size: var(--text-xs); color: var(--text-muted); }
@@ -844,8 +844,8 @@ html[data-theme="dark-os"] {
   font-size: var(--text-xs); color: var(--text-muted); line-height: 1.35;
   display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
 }
-.aw-tile-s.is-need { color: var(--em); }
-.aw-lock { position: absolute; top: 7px; right: 8px; font-size: 10px; }
+.aw-tile-s.is-need { color: var(--em-text); }
+.aw-lock { position: absolute; top: 7px; right: 8px; font-size: var(--fs-floor); }
 @media (max-width: 560px) { .aw-grid { grid-template-columns: 1fr 1fr; } .pp-grid { grid-template-columns: 1fr; } }
 
 /* A modal holding live previews needs the room; the default is sized
@@ -857,7 +857,7 @@ html[data-theme="dark-os"] {
 .pv-ring svg { width: 100%; height: 100%; display: block; }
 .pv-ring-in { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; line-height: 1.05; text-align: center; }
 .pv-ring-in b { font-family: var(--mono); font-weight: 500; color: var(--text); font-variant-numeric: tabular-nums; }
-.pv-ring-in small { font-family: var(--mono); font-size: 9px; letter-spacing: 1px; text-transform: uppercase; color: var(--text-muted); }
+.pv-ring-in small { font-family: var(--mono); font-size: var(--fs-floor); letter-spacing: 1px; text-transform: uppercase; color: var(--text-muted); }
 
 .pv-rings { display: flex; align-items: center; gap: 12px; position: relative; }
 .pv-rings-cal { display: flex; align-items: center; gap: 10px; min-width: 0; flex: none; }
@@ -891,7 +891,7 @@ html[data-theme="dark-os"] {
 .pv-ringsM { display: flex; align-items: center; justify-content: space-around; gap: 6px; }
 .pv-ringsM-i { display: flex; flex-direction: column; align-items: center; gap: 3px; min-width: 0; }
 .pv-ringsM-i .pv-ring { width: min(100cqh - 20px, 34px); }
-.pv-ringsM-t { font-size: 10.5px; color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+.pv-ringsM-t { font-size: var(--fs-floor); color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
 .pv-ringsM-t b { font-family: var(--mono); color: var(--text); font-weight: 500; }
 .pv-ringsM-n { margin-left: 3px; }
 @container (max-width: 230px) { .pv-ringsM-n { display: none; } }
@@ -928,22 +928,22 @@ html[data-theme="dark-os"] {
 .qf-row:focus-visible, .qf-meal:focus-visible, .qf-search:focus-visible { outline: 2px solid var(--em); outline-offset: -2px; }
 .qf-name { font-size: var(--text-sm); font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .qf-brand { color: var(--text-muted); font-weight: 400; }
-.qf-meta { grid-column: 1; font-family: var(--mono); font-size: 10.5px; color: var(--text-muted); }
+.qf-meta { grid-column: 1; font-family: var(--mono); font-size: var(--fs-floor); color: var(--text-muted); }
 .qf-add {
   grid-column: 2; grid-row: 1 / 3;
   width: 26px; height: 26px; border-radius: 13px;
   display: grid; place-items: center;
-  border: 1px solid var(--border); color: var(--em); font-weight: 600;
+  border: 1px solid var(--border); color: var(--em-text); font-weight: 600;
 }
 .qf-row.is-done .qf-add { background: var(--em); border-color: var(--em); color: #fff; }
 .qf-empty { padding: 16px 12px; font-size: var(--text-sm); color: var(--text-muted); }
-.qf-note { padding: 8px 12px; font-size: var(--text-xs); color: var(--em); border-top: 1px solid var(--border); }
+.qf-note { padding: 8px 12px; font-size: var(--text-xs); color: var(--em-text); border-top: 1px solid var(--border); }
 .qf-note.is-err { color: var(--danger); }
 .qf-search {
   flex: none; height: 38px; border: 0; border-top: 1px solid var(--border);
   background: transparent; color: var(--text-mid); font: 600 var(--text-sm) var(--sans); cursor: pointer;
 }
-.qf-search:hover { color: var(--em); }
+.qf-search:hover { color: var(--em-text); }
 
 /* ── Habit runner at the bar tip ─────────────────────────────────────
    Bars thicken to 18px when a runner rides them so the figure has a
@@ -975,11 +975,11 @@ html[data-theme="dark-os"] {
 }
 .pv-map-big {
   font-family: var(--serif, Georgia, serif); font-size: 22px; font-weight: 800; line-height: 1;
-  color: var(--gold, #c8970a); font-variant-numeric: tabular-nums;
+  color: var(--gold-text); font-variant-numeric: tabular-nums;
 }
-.pv-map-sub { font-family: var(--sans); font-size: 11px; color: var(--text-muted); overflow: hidden; text-overflow: ellipsis; }
+.pv-map-sub { font-family: var(--sans); font-size: var(--fs-floor); color: var(--text-muted); overflow: hidden; text-overflow: ellipsis; }
 .pv-map-next {
-  margin-left: auto; font-family: var(--sans); font-size: 11px; font-weight: 600; color: var(--em);
+  margin-left: auto; font-family: var(--sans); font-size: var(--fs-floor); font-weight: 600; color: var(--em-text);
   overflow: hidden; text-overflow: ellipsis;
 }
 

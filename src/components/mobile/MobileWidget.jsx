@@ -442,7 +442,7 @@ export default function MobileWidget({ widget, S, update, onRemove, navigate, us
               position: 'absolute', top: 0, right: 0, bottom: 0, width: REVEAL,
               border: 'none', background: 'rgb(214,69,69)', color: '#fff',
               display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-              gap: 5, fontFamily: 'var(--mono)', fontSize: 9.5, letterSpacing: 1.2,
+              gap: 5, fontFamily: 'var(--mono)', fontSize: 'var(--fs-floor)', letterSpacing: 1.2,
               textTransform: 'uppercase', fontWeight: 700, cursor: 'pointer',
             }}
           >

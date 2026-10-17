@@ -63,10 +63,10 @@ function MealGroup({ mealType, entries, onDeleteEntry }) {
         onClick={() => setExpanded(v => !v)}
         style={{ width: '100%', display: 'flex', alignItems: 'center', gap: '8px', background: 'none', border: 'none', padding: '6px 0', cursor: 'pointer', textAlign: 'left' }}
       >
-        <span style={{ width: 20, height: 20, borderRadius: 6, background: 'rgba(var(--em-rgb),.12)', border: '1px solid rgba(var(--em-rgb),.3)', color: 'var(--em)', fontFamily: 'var(--mono)', fontSize: '10px', fontWeight: 700, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>{MEAL_ICONS[mealType] || 'M'}</span>
+        <span style={{ width: 20, height: 20, borderRadius: 6, background: 'rgba(var(--em-rgb),.12)', border: '1px solid rgba(var(--em-rgb),.3)', color: 'var(--em-text)', fontFamily: 'var(--mono)', fontSize: 'var(--fs-floor)', fontWeight: 700, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>{MEAL_ICONS[mealType] || 'M'}</span>
         <span style={{ fontWeight: 600, fontSize: 'var(--text-sm)', color: 'var(--text)', textTransform: 'capitalize', flex: 1 }}>{mealType}</span>
         <span style={{ fontFamily: 'var(--mono)', fontSize: 'var(--text-xs)', color: 'var(--text-muted)' }}>{Math.round(total)} kcal</span>
-        <span style={{ fontSize: '10px', color: 'var(--text-muted)', marginLeft: '4px' }}><Icon name={expanded ? 'chevron-up' : 'chevron-down'} size={12} /></span>
+        <span style={{ fontSize: 'var(--fs-floor)', color: 'var(--text-muted)', marginLeft: '4px' }}><Icon name={expanded ? 'chevron-up' : 'chevron-down'} size={12} /></span>
       </button>
       {expanded && entries.map(entry => (
         <EntryRow key={entry.id} entry={entry} onDelete={onDeleteEntry} />
@@ -111,7 +111,7 @@ export default function FoodLogList({ logEntries, onDeleteEntry, onAddFood }) {
         </span>
         <button
           onClick={onAddFood}
-          style={{ background: 'none', border: 'none', color: 'var(--em)', cursor: 'pointer', fontSize: 'var(--text-xs)', fontFamily: 'var(--sans)', fontWeight: 600 }}>
+          style={{ background: 'none', border: 'none', color: 'var(--em-text)', cursor: 'pointer', fontSize: 'var(--text-xs)', fontFamily: 'var(--sans)', fontWeight: 600 }}>
           + Add
         </button>
       </div>

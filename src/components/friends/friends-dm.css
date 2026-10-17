@@ -44,7 +44,7 @@ html[data-theme="dark-os"] .dm-tabs { background: var(--os-surface); border-colo
   color: var(--text-mid);
 }
 .dm-tab:hover { color: var(--text); }
-.dm-tab.is-on { background: rgba(var(--em-rgb), .13); color: var(--em); font-weight: 600; }
+.dm-tab.is-on { background: rgba(var(--em-rgb), .13); color: var(--em-text); font-weight: 600; }
 html[data-theme="dark-os"] .dm-tab.is-on { color: var(--em-light); background: rgba(var(--em-rgb), .2); }
 .dm-tab:focus-visible { outline: 2px solid var(--em); outline-offset: 1px; }
 .dm-tab-n { opacity: .75; font-weight: 400; }
@@ -109,7 +109,7 @@ html[data-theme="dark-os"] .dm-inbox-list > li + li .dm-conv { border-top-color:
 .dm-head-text { min-width: 0; }
 .dm-head .msg-head-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .dm-head-sub { font-size: 12px; color: var(--text-mid); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.dm-typing-inline { color: var(--em); font-style: italic; }
+.dm-typing-inline { color: var(--em-text); font-style: italic; }
 html[data-theme="dark-os"] .dm-typing-inline { color: var(--em-light); }
 .dm-iconbtn {
   display: inline-flex; align-items: center; justify-content: center;
@@ -196,7 +196,7 @@ html[data-theme="dark-os"] .dm-quote { background: rgba(255, 255, 255, .06); bor
 html[data-theme="dark-os"] .dm-react { border-color: var(--os-border-md); background: var(--os-surface2, #191917); }
 .dm-react-n { font-family: var(--mono); font-size: 12px; font-weight: 600; color: var(--text-mid); }
 .dm-react.is-mine { border-color: var(--em); background: rgba(var(--em-rgb), .14); }
-.dm-react.is-mine .dm-react-n { color: var(--em); }
+.dm-react.is-mine .dm-react-n { color: var(--em-text); }
 html[data-theme="dark-os"] .dm-react.is-mine .dm-react-n { color: var(--em-light); }
 .dm-react:disabled { cursor: default; }
 .dm-react:focus-visible { outline: 2px solid var(--em); outline-offset: 1px; }
@@ -269,7 +269,7 @@ html[data-theme="dark-os"] .dm-composer-wrap { border-top-color: var(--os-border
 .msg-modal.dm .dm-input { font-size: 14px; }
 .dm-replying {
   display: flex; align-items: center; gap: 8px; padding: 8px 8px 0 14px;
-  font-family: var(--body); color: var(--em);
+  font-family: var(--body); color: var(--em-text);
 }
 html[data-theme="dark-os"] .dm-replying { color: var(--em-light); }
 .dm-replying-text { flex: 1; min-width: 0; display: flex; flex-direction: column; border-left: 3px solid currentColor; padding-left: 8px; }
@@ -339,7 +339,7 @@ html[data-theme="dark-os"] .dm-replying { color: var(--em-light); }
 .inv-qr-ph { font-family: var(--mono); font-size: 12px; color: #6f685f; text-align: center; }
 .inv-meta { flex: 1; min-width: 0; font-family: var(--body); font-size: 12.5px; line-height: 1.5; color: var(--text-mid); }
 .inv-meta strong { color: var(--text); font-weight: 600; }
-.inv-new { margin-top: 6px; padding: 0; min-height: 32px; border: none; background: none; cursor: pointer; font-family: var(--body); font-size: 13px; font-weight: 600; color: var(--em); text-decoration: underline; }
+.inv-new { margin-top: 6px; padding: 0; min-height: 32px; border: none; background: none; cursor: pointer; font-family: var(--body); font-size: 13px; font-weight: 600; color: var(--em-text); text-decoration: underline; }
 html[data-theme="dark-os"] .inv-new { color: var(--em-light); }
 .inv-note { padding: 12px; border-radius: 9px; background: var(--dm-chip-bg); font-family: var(--body); font-size: 13px; line-height: 1.5; color: var(--text-mid); }
 .inv-divider {
@@ -368,7 +368,7 @@ html[data-theme="dark-os"] .inv-new { color: var(--em-light); }
   border-radius: 16px; background: var(--bg-raised); border: 1px solid var(--border);
   box-shadow: 0 18px 50px rgba(0, 0, 0, .12); text-align: center; font-family: var(--body);
 }
-.inv-card-eyebrow { font-family: var(--mono); font-size: 12px; letter-spacing: 2px; text-transform: uppercase; color: var(--em); margin-bottom: 18px; }
+.inv-card-eyebrow { font-family: var(--mono); font-size: 12px; letter-spacing: 2px; text-transform: uppercase; color: var(--em-text); margin-bottom: 18px; }
 html[data-theme="dark-os"] .inv-card-eyebrow { color: var(--em-light); }
 .inv-card-avatar {
   width: 76px; height: 76px; margin: 0 auto 12px; border-radius: 50%; object-fit: cover;
@@ -390,7 +390,7 @@ html[data-theme="dark-os"] .inv-card-eyebrow { color: var(--em-light); }
 .inv-card-done-icon {
   width: 44px; height: 44px; margin: 0 auto 10px; border-radius: 50%;
   display: flex; align-items: center; justify-content: center;
-  background: rgba(var(--em-rgb), .14); color: var(--em);
+  background: rgba(var(--em-rgb), .14); color: var(--em-text);
 }
 .inv-pill {
   position: fixed; top: calc(10px + env(safe-area-inset-top, 0px)); left: 50%; transform: translateX(-50%); z-index: 2000;
@@ -406,5 +406,5 @@ html[data-theme="dark-os"] .inv-card-eyebrow { color: var(--em-light); }
 }
 
 /* Pending request that came through my invite link. */
-.fc-request-via { display: block; color: var(--em); font-weight: 600; }
+.fc-request-via { display: block; color: var(--em-text); font-weight: 600; }
 html[data-theme="dark-os"] .fc-request-via { color: var(--em-light); }

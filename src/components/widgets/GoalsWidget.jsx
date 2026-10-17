@@ -73,7 +73,7 @@ export function Gauge({ pct, size = 118, stroke = 9, label, sub, accent = 'var(-
       </svg>
       <div className="gw-gauge-mid">
         <span className="gw-gauge-num" style={{ fontSize: size * 0.26 }}>{label}</span>
-        {sub && <span className="gw-gauge-sub" style={{ fontSize: Math.max(7, size * 0.085) }}>{sub}</span>}
+        {sub && <span className="gw-gauge-sub" style={{ fontSize: `max(${(size * 0.085).toFixed(1)}px, var(--fs-floor))` }}>{sub}</span>}
       </div>
     </div>
   );
