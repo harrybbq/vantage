@@ -182,7 +182,7 @@ exports.handler = async (event, context) => {
       const deadTokens = [];
       for (const tk of tokens) {
         const result = await sendFcm(accessToken, tk.token, {
-          title: row.payload?.title || 'VisionBoard',
+          title: row.payload?.title || 'Vantage',
           body:  row.payload?.body  || '',
           data: {
             kind: row.kind,
