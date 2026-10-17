@@ -4,7 +4,24 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <title>Vantage</title>
-    <meta name="description" content="Your personal goal-tracking and vision board app." />
+    <meta name="description" content="Your goals, habits, money, trips and health in one place." />
+
+    <!-- Link previews (iMessage, WhatsApp, Slack, X, LinkedIn…). The
+         image is a static 1200×630 PNG in public/; its URL must be
+         absolute or most scrapers ignore it. -->
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Vantage" />
+    <meta property="og:title" content="Vantage" />
+    <meta property="og:description" content="Your goals, habits, money, trips and health in one place." />
+    <meta property="og:url" content="https://vantagevision.netlify.app/" />
+    <meta property="og:image" content="https://vantagevision.netlify.app/og-image.png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="Vantage — your goals, habits, money, trips and health in one place." />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="Vantage" />
+    <meta name="twitter:description" content="Your goals, habits, money, trips and health in one place." />
+    <meta name="twitter:image" content="https://vantagevision.netlify.app/og-image.png" />
 
     <!-- PWA manifest -->
     <link rel="manifest" href="/manifest.json" />
@@ -29,27 +46,32 @@
 
     <!-- Fonts -->
     <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,700;0,900;1,700&family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
-    <script type="module" crossorigin src="/assets/index-G4YGuRpW.js"></script>
-    <link rel="stylesheet" crossorigin href="/assets/index-DY5XNV_w.css">
+    <script type="module" crossorigin src="/assets/index-CyatSRY4.js"></script>
+    <link rel="stylesheet" crossorigin href="/assets/index-Bq6C8-xJ.css">
   </head>
   <body>
     <!-- Boot fallback.
          React replaces these children on mount, so this is only ever
-         visible when the app FAILED to start. Without it, any error
-         before the first render — a module-level throw, a chunk that
-         didn't download, a parse error on an older browser — presents
-         as a completely blank screen with nothing to report and
-         nothing to tap. That is the worst possible failure mode for a
-         phone app: indistinguishable from the device being broken. -->
+         visible while the bundle loads or when the app FAILED to start.
+         Without it, any error before the first render — a module-level
+         throw, a chunk that didn't download, a parse error on an older
+         browser — presents as a completely blank screen with nothing to
+         report and nothing to tap.
+
+         The markup holds no status text of its own: boot-fallback.js
+         writes the loading label and, only on a real failure, the
+         boot-error panel. A crawler or a browser without JavaScript
+         reads the noscript sentence instead of an error that never
+         happened (2026-10-17). -->
     <div id="root">
       <div id="boot-fallback" style="min-height:100dvh;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;padding:32px;text-align:center;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;color:#8a8a85;background:#141412;">
-        <div style="font-size:13px;letter-spacing:2px;">LOADING…</div>
-        <div id="boot-error" style="display:none;max-width:34em;line-height:1.7;font-size:12px;color:#c9c9c2;">
-          <p style="margin:0 0 12px;color:#d99114;">Vantage couldn't start.</p>
-          <p id="boot-error-detail" style="margin:0 0 16px;font-size:11px;color:#8a8a85;word-break:break-word;"></p>
-          <button type="button" id="boot-reload" style="font:inherit;font-size:12px;padding:9px 18px;border-radius:8px;border:1px solid #2f6b4f;background:transparent;color:#3f9a6f;cursor:pointer;">Reload</button>
-          <p style="margin:16px 0 0;font-size:10px;opacity:.75;">If this keeps happening, your saved data is safe — it lives on the server, not in the app.</p>
-        </div>
+        <noscript>
+          <div style="max-width:30em;font-family:'DM Sans',system-ui,sans-serif;line-height:1.6;">
+            <p style="margin:0 0 8px;font-size:22px;font-weight:600;color:#f4f2ec;">Vantage</p>
+            <p style="margin:0 0 12px;font-size:15px;color:#c9c9c2;">Your goals, habits, money, trips and health in one place.</p>
+            <p style="margin:0;font-size:13px;color:#8a8a85;">Vantage needs JavaScript turned on to run.</p>
+          </div>
+        </noscript>
       </div>
     </div>
     <!-- Surfaces a boot failure on the screen above. A file rather than
