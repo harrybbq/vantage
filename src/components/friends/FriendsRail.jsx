@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import Icon from '../Icon';
 import FriendsPanelList from './FriendsPanelList';
@@ -11,8 +11,33 @@ import MessagesModal from './MessagesModal';
 import FriendPanel from './FriendPanel';
 import { useFriends } from '../../lib/friends/useFriends';
 import { getFriendPublicStats, reportSnapshot } from '../../lib/friends/queries';
-import { getUnreadCounts } from '../../lib/friends/messages';
+import { listConversations } from '../../lib/friends/messages';
 import { useSubscriptionContext } from '../../context/SubscriptionContext';
+import { subscribeDMs, getRealtimeState, onRealtimeState } from '../../lib/friends/realtime';
+import { loadPartnerFacts } from '../../lib/friends/inboxPeople';
+import { buildInbox, bumpConversation, clearUnread, unreadTotal } from '../../lib/friends/dmView';
+import ConversationList, { FriendsTabs } from './ConversationList';
+import Overlay from '../ui/Overlay';
+import './friends-dm.css';
+
+/** Remembered per viewer: which tab the rail opens on. */
+const TAB_KEY = 'vantage.friends.tab';
+function readTab() {
+  try { return localStorage.getItem(TAB_KEY) === 'messages' ? 'messages' : 'friends'; } catch { return 'friends'; }
+}
+
+/** Inbox refresh while Realtime is unavailable: quicker while the inbox
+ *  or a conversation is on screen, slower while it is not. */
+const INBOX_POLL_ACTIVE_MS = 30_000;
+const INBOX_POLL_IDLE_MS = 60_000;
+
+/** Why a conversation opens read-only. */
+function readOnlyNoteFor(row) {
+  if (!row || row.canSend) return null;
+  if (row.note === 'Blocked') return 'You blocked this person. Their messages stay here for your records.';
+  if (row.note === 'Account suspended') return 'This account is suspended, so messages are paused.';
+  return 'You\'re not friends any more, so you can\'t send new messages.';
+}
 
 /**
  * Friends rail — orchestrates everything social on the cream hub:
@@ -34,7 +59,7 @@ import { useSubscriptionContext } from '../../context/SubscriptionContext';
  * a place to put it, which is why this is a DOM node rather than a
  * dozen props threaded through the layout.
  */
-export default function FriendsRail({ userId, onUpgrade, panelSlot = null }) {
+export default function FriendsRail({ userId, onUpgrade, panelSlot = null, layout = 'rail' }) {
   const { hasPro } = useSubscriptionContext();
   const friends = useFriends(userId, hasPro);
 
@@ -47,20 +72,111 @@ export default function FriendsRail({ userId, onUpgrade, panelSlot = null }) {
   // Report flow holds the friend being reported in state so the modal
   // doesn't have to re-look-up by id when opened.
   const [reportTarget, setReportTarget] = useState(null);
-  // Chat overlay target + per-friend unread counts (for the badge).
-  const [messageTarget, setMessageTarget] = useState(null);
-  const [unread, setUnread] = useState({});
+  // A conversation opened outside the hub's friend panel — the overlay on
+  // a desktop rail, the full-screen conversation on a phone. Also how a
+  // read-only conversation (a former friend) opens everywhere.
+  const [threadTarget, setThreadTarget] = useState(null); // { friend, readOnlyNote }
+  const [tab, setTabState] = useState(readTab);
+  const setTab = useCallback(t => {
+    setTabState(t);
+    try { localStorage.setItem(TAB_KEY, t); } catch { /* private mode */ }
+  }, []);
 
-  // Poll unread counts so the badge stays live without opening a chat.
-  // Cheap (one indexed query); fails soft if messaging isn't migrated.
+  // ── Inbox ──
+  // The realtime layer keeps ONE ref-counted channel per user; the rail
+  // and an open conversation both subscribe and share it.
+  const [rtState, setRtState] = useState(getRealtimeState);
+  useEffect(() => onRealtimeState(setRtState), []);
+  const [conversations, setConversations] = useState([]);
+  const [convLoading, setConvLoading] = useState(true);
+  const [facts, setFacts] = useState({ people: {}, blocked: new Set() });
+  const openId = panelSlot ? selectedId : (threadTarget?.friend?.id || null);
+  const openIdRef = useRef(openId);
+  openIdRef.current = openId;
+
+  const pullConversations = useCallback(async () => {
+    if (!userId) return;
+    try {
+      const list = await listConversations(userId);
+      if (Array.isArray(list)) {
+        const open = openIdRef.current;
+        setConversations(open ? clearUnread(list, open) : list);
+      }
+    } catch { /* keep what we have */ }
+    setConvLoading(false);
+  }, [userId]);
+
+  useEffect(() => { pullConversations(); }, [pullConversations]);
+
+  // Re-sync when the channel comes up (catch-up) and when the tab is
+  // shown again (a phone that slept may have missed events).
+  useEffect(() => { if (rtState === 'live') pullConversations(); }, [rtState, pullConversations]);
   useEffect(() => {
-    if (!userId) return undefined;
+    const onVis = () => { if (document.visibilityState === 'visible') pullConversations(); };
+    document.addEventListener('visibilitychange', onVis);
+    return () => document.removeEventListener('visibilitychange', onVis);
+  }, [pullConversations]);
+
+  // Without Realtime: a slow inbox poll (one RPC), never per-friend.
+  const inboxActive = tab === 'messages' || !!openId;
+  useEffect(() => {
+    if (rtState !== 'fallback') return undefined;
+    const id = setInterval(() => {
+      if (document.visibilityState !== 'hidden') pullConversations();
+    }, inboxActive ? INBOX_POLL_ACTIVE_MS : INBOX_POLL_IDLE_MS);
+    return () => clearInterval(id);
+  }, [rtState, inboxActive, pullConversations]);
+
+  // Live: fold each message into the inbox locally — no refetch. A
+  // DELETE reaches every subscriber with only { id }, so the inbox is
+  // re-read only when the unsent message was the preview on one of MY
+  // rows; anyone else's unsend costs nothing.
+  const deleteTimer = useRef(null);
+  const convRef = useRef(conversations);
+  convRef.current = conversations;
+  useEffect(() => subscribeDMs(userId, {
+    onMessage: m => setConversations(c => bumpConversation(c, m, userId, openIdRef.current)),
+    onDelete: ({ id } = {}) => {
+      if (id == null || !convRef.current.some(c => c.last && String(c.last.id) === String(id))) return;
+      clearTimeout(deleteTimer.current);
+      deleteTimer.current = setTimeout(pullConversations, 800);
+    },
+  }), [userId, pullConversations]);
+  useEffect(() => () => clearTimeout(deleteTimer.current), []);
+
+  // Opening a conversation reads it.
+  useEffect(() => { if (openId) setConversations(c => clearUnread(c, openId)); }, [openId]);
+
+  const onThreadActivity = useCallback(msg => {
+    setConversations(c => bumpConversation(c, msg, userId, openIdRef.current));
+  }, [userId]);
+  const onThreadRead = useCallback(fid => setConversations(c => clearUnread(c, fid)), []);
+
+  // Partner facts (blocked / suspended / former friends' names).
+  const partnerKey = conversations.map(c => c.friendId).sort().join(',');
+  useEffect(() => {
+    if (!userId || !partnerKey) return undefined;
     let cancelled = false;
-    const pull = () => getUnreadCounts(userId).then(c => { if (!cancelled) setUnread(c); }).catch(() => {});
-    pull();
-    const id = setInterval(pull, 15000);
-    return () => { cancelled = true; clearInterval(id); };
-  }, [userId, messageTarget]);
+    loadPartnerFacts(userId, partnerKey.split(','))
+      .then(f => { if (!cancelled) setFacts(f); })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, [userId, partnerKey]);
+
+  // Per-friend unread, for the list rows' message buttons.
+  const unread = useMemo(() => {
+    const m = {};
+    for (const c of conversations) if (c.unread > 0) m[c.friendId] = c.unread;
+    return m;
+  }, [conversations]);
+
+
+  // The chip asks the rail to show the inbox.
+  useEffect(() => {
+    const onTab = e => { if (e.detail === 'messages' || e.detail === 'friends') setTab(e.detail); };
+    window.addEventListener('vantage:friends-tab', onTab);
+    return () => window.removeEventListener('vantage:friends-tab', onTab);
+  }, [setTab]);
 
   // ── derived sets (used by AddFriendModal to suppress duplicates) ──
   const friendIds = useMemo(() => new Set(friends.friends.map(f => f.id)), [friends.friends]);
@@ -83,6 +199,23 @@ export default function FriendsRail({ userId, onUpgrade, panelSlot = null }) {
 
   function handleSelect(id) {
     setSelectedId(prev => (prev === id ? null : id));
+  }
+
+  // "Message this friend" — on the hub the friend panel already holds the
+  // conversation, so it opens that; elsewhere it opens the conversation
+  // on its own.
+  function openThreadFor(f) {
+    if (!f) return;
+    if (panelSlot) { setSelectedId(f.id); return; }
+    setThreadTarget({ friend: f, readOnlyNote: null });
+  }
+
+  function openConversation(row) {
+    if (row.canSend && row.friend && panelSlot) { setSelectedId(row.id); return; }
+    const friend = row.friend
+      ? rows.find(r => r.id === row.id) || { id: row.id, name: row.name, handle: row.handle, avatar_url: row.avatar_url }
+      : { id: row.id, name: row.name, handle: row.handle, avatar_url: row.avatar_url };
+    setThreadTarget({ friend, readOnlyNote: readOnlyNoteFor(row) });
   }
 
   // Named rather than written inline on the card, because the friend
@@ -228,6 +361,18 @@ export default function FriendsRail({ userId, onUpgrade, panelSlot = null }) {
     });
   }, [friends.friends, unread]);
 
+  // The inbox, joined with the friend list and partner facts. Unread
+  // only counts conversations you can act on (friends, not blocked).
+  const inbox = useMemo(() => buildInbox(conversations, rows, facts), [conversations, rows, facts]);
+  const total = useMemo(() => unreadTotal(inbox), [inbox]);
+  // The header chip listens for this, so it moves the moment the rail
+  // knows rather than on its own next poll. Not sent until the friend
+  // list has loaded — before then every conversation looks foreign.
+  useEffect(() => {
+    if (friends.loading) return;
+    try { window.dispatchEvent(new CustomEvent('vantage:dm-unread', { detail: total })); } catch { /* old browsers */ }
+  }, [total, friends.loading]);
+
   // ── handle claim gating ──
   // If the user has no handle yet, the rail itself is locked behind a
   // friendly empty state with a "Claim handle" CTA.
@@ -283,6 +428,42 @@ export default function FriendsRail({ userId, onUpgrade, panelSlot = null }) {
     );
   }
 
+  const threadNode = threadTarget && (
+    layout === 'page' ? (
+      <DMScreen>
+        <MessagesModal
+          inline
+          open
+          userId={userId}
+          friend={threadTarget.friend}
+          readOnlyNote={threadTarget.readOnlyNote}
+          onBack={() => setThreadTarget(null)}
+          onClose={() => setThreadTarget(null)}
+          onActivity={onThreadActivity}
+          onRead={onThreadRead}
+          onBlocked={() => { setSelectedId(null); friends.refresh().catch(() => {}); pullConversations(); }}
+        />
+      </DMScreen>
+    ) : (
+      <MessagesModal
+        open
+        userId={userId}
+        friend={threadTarget.friend}
+        readOnlyNote={threadTarget.readOnlyNote}
+        onClose={() => setThreadTarget(null)}
+        onActivity={onThreadActivity}
+        onRead={onThreadRead}
+        onBlocked={() => {
+          // Blocked from inside the conversation — the friendship row is
+          // gone, so drop the card and refresh the list.
+          setSelectedId(null);
+          friends.refresh().catch(() => {});
+          pullConversations();
+        }}
+      />
+    )
+  );
+
   return (
     <>
       <PendingRequestsList
@@ -302,24 +483,42 @@ export default function FriendsRail({ userId, onUpgrade, panelSlot = null }) {
         }}
       />
 
-      <FriendsPanelList
-        friends={rows}
-        selectedId={selectedId}
-        onSelect={handleSelect}
-        onMessage={setMessageTarget}
-        onlineCount={friends.onlineCount}
-        offlineCount={friends.offlineCount}
-      />
+      <FriendsTabs tab={tab} onTab={setTab} friendCount={rows.length} unread={total} />
+
+      {tab === 'messages' ? (
+        <ConversationList
+          rows={inbox}
+          userId={userId}
+          loading={convLoading}
+          selectedId={openId}
+          onOpen={openConversation}
+          onInvite={() => setShowAddModal(true)}
+        />
+      ) : (
+        <FriendsPanelList
+          friends={rows}
+          selectedId={selectedId}
+          onSelect={handleSelect}
+          onMessage={openThreadFor}
+          onlineCount={friends.onlineCount}
+          offlineCount={friends.offlineCount}
+        />
+      )}
 
       {/* Add-friend CTA — lives below the list so it doesn't compete
-          with the list when there are friends to look at. */}
-      <button
-        type="button"
-        className="btn btn-ghost fc-add-btn"
-        onClick={() => setShowAddModal(true)}
-      >
-        <span style={{display:'inline-flex',alignItems:'center',gap:6}}><Icon name="plus" size={14} /> Add a friend</span>
-      </button>
+          with the list when there are friends to look at. Invite links
+          live in the same modal, above handle search. */}
+      {/* The empty inbox carries its own invite button; a second one
+          straight under it would be the same offer twice. */}
+      {!(tab === 'messages' && inbox.length === 0 && !convLoading) && (
+        <button
+          type="button"
+          className="btn btn-ghost fc-add-btn"
+          onClick={() => setShowAddModal(true)}
+        >
+          <span style={{display:'inline-flex',alignItems:'center',gap:6}}><Icon name="plus" size={14} /> {tab === 'messages' ? 'Invite a friend' : 'Add a friend'}</span>
+        </button>
+      )}
 
       {selectedFriend && !panelSlot && (
         <div ref={cardRef} className="fc-card-slot">
@@ -328,7 +527,7 @@ export default function FriendsRail({ userId, onUpgrade, panelSlot = null }) {
             loading={statsLoading}
             statsMissing={!selectedStats && !statsLoading}
             unread={unread[selectedFriend.id] || 0}
-            onMessage={(f) => setMessageTarget(f)}
+            onMessage={(f) => openThreadFor(f)}
             onReport={(f) => setReportTarget(f)}
             onBlock={handleBlock}
             onUnfriend={handleUnfriend}
@@ -344,10 +543,12 @@ export default function FriendsRail({ userId, onUpgrade, panelSlot = null }) {
           loading={statsLoading}
           statsMissing={!selectedStats && !statsLoading}
           onClose={() => setSelectedId(null)}
-          onBlocked={() => { setSelectedId(null); friends.refresh().catch(() => {}); }}
+          onBlocked={() => { setSelectedId(null); friends.refresh().catch(() => {}); pullConversations(); }}
           onReport={(f) => setReportTarget(f)}
           onBlock={handleBlock}
           onUnfriend={handleUnfriend}
+          onActivity={onThreadActivity}
+          onRead={onThreadRead}
         />,
         panelSlot,
       )}
@@ -374,18 +575,27 @@ export default function FriendsRail({ userId, onUpgrade, panelSlot = null }) {
         onClose={() => setReportTarget(null)}
       />
 
-      <MessagesModal
-        open={!!messageTarget}
-        userId={userId}
-        friend={messageTarget}
-        onClose={() => setMessageTarget(null)}
-        onBlocked={() => {
-          // Blocked from inside the conversation — the friendship row is
-          // gone, so drop the card and refresh the list.
-          setSelectedId(null);
-          friends.refresh().catch(() => {});
-        }}
-      />
+      {threadNode}
     </>
+  );
+}
+
+/**
+ * A conversation on a phone: the whole screen, solid, above the app's own
+ * bars, with Back where a thumb expects it. Height follows the dynamic
+ * viewport so the composer rides up with the keyboard instead of hiding
+ * behind it.
+ */
+function DMScreen({ children }) {
+  useEffect(() => {
+    const html = document.documentElement;
+    const prev = html.style.overflow;
+    html.style.overflow = 'hidden';
+    return () => { html.style.overflow = prev; };
+  }, []);
+  return (
+    <Overlay>
+      <div className="dm-screen">{children}</div>
+    </Overlay>
   );
 }

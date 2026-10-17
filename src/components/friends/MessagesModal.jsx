@@ -1,21 +1,51 @@
-import { useEffect, useRef, useState, useCallback } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import Icon from '../Icon';
-import { listThread, sendMessage, markThreadRead } from '../../lib/friends/messages';
+import {
+  listThread, sendMessage, markThreadRead, unsendMessage, getMessagesByIds,
+  react as addReaction, unreact as removeReaction, listReactions,
+} from '../../lib/friends/messages';
+import { subscribeDMs, pollThread, joinTyping } from '../../lib/friends/realtime';
+import {
+  REACTION_EMOJI, MAX_BODY, isTempId as isTmp, snippet,
+  mergeMessages, makeOptimistic, confirmSent, markFailed, removeMessage,
+  applySeen, seenMessageId, resolveReplies, missingReplyIds,
+  summarizeReactions, applyReactionChange, oldestReal, newestReal,
+} from '../../lib/friends/dmModel';
+import { COUNTER_FROM, dayKey, dayLabel, timeLabel, endsCluster } from '../../lib/friends/dmView';
 import { reportUser, blockUser, reportSnapshot } from '../../lib/friends/queries';
+import { invalidatePartnerFacts } from '../../lib/friends/inboxPeople';
 import ReportFriendModal from './ReportFriendModal';
 import { ClanInviteMenuItem, ClanInviteBubble } from './ClanInvite';
 import { parseInvite } from '../../lib/friends/clanInvite';
+import './friends-dm.css';
 
 /**
- * MessagesModal — a 1:1 chat overlay with a single friend.
+ * MessagesModal — the 1:1 conversation, as an overlay or `inline`.
  *
- * Loads the thread, marks it read, and polls every 4s while open for
- * new messages (poll-based delivery — no Realtime dependency). Sending
- * is optimistic: the bubble appears immediately and reconciles when the
- * insert returns. Closes on backdrop click / Escape.
+ * ── Delivery ─────────────────────────────────────────────────────────
+ * The newest 50 messages load first; "Load earlier" pages back 50 at a
+ * time and holds your place. New messages arrive over the shared,
+ * ref-counted Realtime inbox channel (subscribeDMs — the rail and this
+ * thread hold one channel between them). pollThread keeps the thread
+ * current when that channel can't subscribe: rows newer than the newest
+ * one held, every 12 s — never the whole thread again, which is what the
+ * old 4 s poll of up to 200 rows did. Optimistic, realtime and polled
+ * copies of one message collapse into one (dmModel.mergeMessages), and an
+ * optimistic bubble keeps its React key (`_key`) when confirmed.
+ *
+ * ── Scroll ───────────────────────────────────────────────────────────
+ * Pinned to the bottom only while you are at the bottom. Scrolled up
+ * reading, a new message raises a "New messages ↓" pill instead of
+ * yanking you down.
+ *
+ * ── Inline ───────────────────────────────────────────────────────────
+ * `inline` drops the portal and the backdrop so the hub's friend panel
+ * and the phone's conversation screen host this same component — two
+ * chats would drift the first time either was touched.
  */
 
+const LONG_PRESS_MS = 450;
 const COLORS = ['#1a7a4a', '#2563eb', '#7c3aed', '#c2410c', '#0891b2', '#be185d', '#854d0e'];
 function avatarColor(name = '') {
   let h = 0;
@@ -23,169 +53,447 @@ function avatarColor(name = '') {
   return COLORS[h % COLORS.length];
 }
 function initials(name = '?') {
-  return name.split(' ').map(p => p[0]).join('').slice(0, 2).toUpperCase() || '?';
+  return name.replace(/^@/, '').split(' ').map(p => p[0]).join('').slice(0, 2).toUpperCase() || '?';
 }
-function fmtTime(iso) {
-  try {
-    const d = new Date(iso);
-    return d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
-  } catch { return ''; }
-}
-function fmtDay(iso) {
-  try {
-    const d = new Date(iso);
-    const today = new Date(); today.setHours(0, 0, 0, 0);
-    const that = new Date(d); that.setHours(0, 0, 0, 0);
-    const diff = Math.round((today - that) / 86400000);
-    if (diff === 0) return 'Today';
-    if (diff === 1) return 'Yesterday';
-    return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
-  } catch { return ''; }
+const coarsePointer = () => typeof window !== 'undefined' && !!window.matchMedia?.('(pointer: coarse)').matches;
+
+function ReplyGlyph({ size = 14 }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M9 17 4 12l5-5" /><path d="M20 18v-2a4 4 0 0 0-4-4H4" />
+    </svg>
+  );
 }
 
-export default function MessagesModal({ open, userId, friend, onClose, onBlocked, inline = false }) {
+export default function MessagesModal(props) {
+  if (!props.open || !props.friend) return null;
+  return <Conversation {...props} />;
+}
+
+function Conversation({
+  userId, friend, onClose, onBlocked, inline = false, onBack = null,
+  readOnlyNote = null, onActivity, onRead,
+}) {
+  const friendId = friend.id;
+  const name = friend.name || (friend.handle ? `@${friend.handle}` : 'Friend');
+  const first = name.replace(/^@/, '').split(' ')[0];
+
   const [messages, setMessages] = useState([]);
-  const [draft, setDraft] = useState('');
+  const [reactions, setReactions] = useState({});
+  const [quoted, setQuoted] = useState([]);     // rows fetched for quotes older than the page
   const [status, setStatus] = useState('loading'); // loading | ready | error
   const [errMsg, setErrMsg] = useState('');
-  const [sending, setSending] = useState(false);
-  // Moderation — report & block straight from the conversation (Apple
-  // Guideline 1.2 requires abuse reporting where the UGC is consumed).
+  const [toast, setToast] = useState('');
+  const [hasMore, setHasMore] = useState(false);
+  const [loadingEarlier, setLoadingEarlier] = useState(false);
+  const [draft, setDraft] = useState('');
+  const [replyTo, setReplyTo] = useState(null);
+  const [menu, setMenu] = useState(null);        // { id, below }
+  const [newCount, setNewCount] = useState(0);
+  const [typing, setTyping] = useState(false);
+  const [announce, setAnnounce] = useState('');
+  const [flashId, setFlashId] = useState(null);
   const [menuOpen, setMenuOpen] = useState(false);
   const [reporting, setReporting] = useState(false);
-  const menuRef = useRef(null);
+
   const scrollRef = useRef(null);
-  // Only auto-scroll to the newest message when the user is already at
-  // the bottom. Once they scroll up to read history, the 4s poll must
-  // NOT yank them back down. `sigRef` also skips redundant state updates
-  // when a poll returns an unchanged thread (no re-render, no scroll).
+  const inputRef = useRef(null);
+  const headMenuRef = useRef(null);
   const stickRef = useRef(true);
-  const sigRef = useRef('');
-  const friendId = friend?.id;
+  // "Load earlier" holds your place by pinning the row you were looking
+  // at, not a pixel height: reactions and quotes for the new page arrive
+  // a moment later and would otherwise push it down.
+  const anchorRef = useRef(null);    // { id, offset, until }
+  const msgsRef = useRef(messages);
+  msgsRef.current = messages;
+  const readTimer = useRef(null);
+  const announceRef = useRef({ n: 0, at: 0 });
+  const typingRef = useRef(null);
+  const pressTimer = useRef(null);
+  const returnFocusRef = useRef(null);
+
+  const toastTimer = useRef(null);
+  const flash = useCallback((text) => {
+    setToast(text);
+    window.clearTimeout(toastTimer.current);
+    toastTimer.current = window.setTimeout(() => setToast(''), 4000);
+  }, []);
+
+  const markRead = useCallback(() => {
+    window.clearTimeout(readTimer.current);
+    readTimer.current = window.setTimeout(() => {
+      if (typeof document !== 'undefined' && document.visibilityState === 'hidden') return;
+      markThreadRead(userId, friendId).then(() => onRead?.(friendId)).catch(() => {});
+    }, 400);
+  }, [userId, friendId, onRead]);
+
+  const loadReactionsFor = useCallback(async rows => {
+    const ids = rows.map(m => m.id).filter(id => !isTmp(id));
+    if (!ids.length) return;
+    try {
+      const got = await listReactions(ids);
+      setReactions(prev => {
+        const next = { ...prev };
+        for (const id of ids) { if (got[id]?.length) next[id] = got[id]; else delete next[id]; }
+        return next;
+      });
+    } catch { /* reactions are decoration; never block the thread */ }
+  }, []);
+
+  // Quotes that point above the loaded page: fetch those rows once.
+  useEffect(() => {
+    const want = missingReplyIds(messages, quoted).filter(id => !isTmp(id));
+    if (!want.length) return undefined;
+    let cancelled = false;
+    getMessagesByIds(want).then(rows => {
+      if (cancelled) return;
+      // Misses (unsent originals) are remembered too, so they aren't re-asked.
+      const got = new Set(rows.map(r => String(r.id)));
+      setQuoted(q => [...q, ...rows, ...want.filter(id => !got.has(String(id))).map(id => ({ id, _gone: true }))]);
+    }).catch(() => {});
+    return () => { cancelled = true; };
+  }, [messages, quoted]);
+
+  // ── initial load ──
+  useEffect(() => {
+    let cancelled = false;
+    setStatus('loading'); setMessages([]); setReactions({}); setQuoted([]); setDraft(''); setReplyTo(null);
+    setMenu(null); setNewCount(0); setHasMore(false); stickRef.current = true;
+    listThread(userId, friendId)
+      .then(rows => {
+        if (cancelled) return;
+        setMessages([...rows]);
+        setHasMore(!!rows.hasMore);
+        setStatus('ready');
+        loadReactionsFor(rows);
+        if (rows.some(m => m.sender_id === friendId && !m.read_at)) markRead();
+        else onRead?.(friendId);
+      })
+      .catch(e => { if (!cancelled) { setStatus('error'); setErrMsg(e.message || 'Could not load messages.'); } });
+    return () => { cancelled = true; window.clearTimeout(readTimer.current); };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [userId, friendId]);
+
+  const announceIncoming = useCallback(m => {
+    const now = Date.now();
+    const a = announceRef.current;
+    a.n = now - a.at < 4000 ? a.n + 1 : 1;
+    a.at = now;
+    setAnnounce(a.n > 1 ? `${a.n} new messages from ${first}` : `New message from ${first}: ${snippet(m.body, 120)}`);
+  }, [first]);
+
+  const inPair = useCallback(m => !!m && (
+    (m.sender_id === userId && m.recipient_id === friendId) ||
+    (m.sender_id === friendId && m.recipient_id === userId)), [userId, friendId]);
+
+  const ingest = useCallback((rows, { liveArrival = false } = {}) => {
+    const mine = rows.filter(inPair);
+    if (!mine.length) return;
+    const known = new Set(msgsRef.current.map(m => String(m.id)));
+    const fresh = mine.filter(m => !known.has(String(m.id)));
+    setMessages(list => mergeMessages(list, mine, { selfId: userId }));
+    const incoming = fresh.filter(m => m.sender_id === friendId);
+    if (incoming.length) {
+      setTyping(false);
+      markRead();
+      if (!stickRef.current) setNewCount(n => n + incoming.length);
+      if (liveArrival) incoming.forEach(announceIncoming);
+    }
+    if (fresh.length) loadReactionsFor(fresh);
+  }, [userId, friendId, inPair, markRead, announceIncoming, loadReactionsFor]);
+
+  // ── live: the shared inbox channel ──
+  // DELETE payloads carry only { id } and arrive for everyone's deletes;
+  // ids not on screen fall through removeMessage / applyReactionChange
+  // untouched.
+  useEffect(() => {
+    if (status !== 'ready') return undefined;
+    return subscribeDMs(userId, {
+      onMessage: m => ingest([m], { liveArrival: true }),
+      onUpdate: m => {
+        if (!inPair(m) || !msgsRef.current.some(x => String(x.id) === String(m.id))) return;
+        setMessages(list => mergeMessages(list, [m], { selfId: userId }));
+      },
+      onDelete: ({ id } = {}) => { if (id != null) setMessages(list => removeMessage(list, id)); },
+      onReaction: change => setReactions(r => applyReactionChange(r, change)),
+    });
+  }, [status, userId, inPair, ingest]);
+
+  // ── polling: 12 s while the channel is down, a 60 s safety net while
+  //    it is up, one catch-up whenever it comes (back) up. Carries "Seen".
+  useEffect(() => {
+    if (status !== 'ready') return undefined;
+    return pollThread(userId, friendId, {
+      getAfter: () => newestReal(msgsRef.current)?.created_at || null,
+      onRows: rows => ingest(rows, { liveArrival: true }),
+      onSeen: seen => setMessages(list => applySeen(list, seen, userId)),
+    });
+  }, [status, userId, friendId, ingest]);
+
+  // ── typing indicator (a no-op until the data layer's SQL is run) ──
+  useEffect(() => {
+    if (readOnlyNote) return undefined;
+    let handle = null;
+    try { handle = joinTyping(userId, friendId, on => setTyping(!!on)); } catch { handle = null; }
+    typingRef.current = handle;
+    return () => {
+      try { handle?.leave?.(); } catch { /* gone */ }
+      typingRef.current = null;
+      setTyping(false);
+    };
+  }, [userId, friendId, readOnlyNote]);
+
+  // ── scroll management ──
+  useLayoutEffect(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    const anchor = anchorRef.current;
+    if (anchor && Date.now() < anchor.until) {
+      const row = el.querySelector(`[data-mid="${CSS.escape(anchor.id)}"]`);
+      if (row) el.scrollTop += (row.getBoundingClientRect().top - el.getBoundingClientRect().top) - anchor.offset;
+    } else if (stickRef.current) {
+      el.scrollTop = el.scrollHeight;
+    }
+  }, [messages, reactions, quoted, status, typing]);
+
+  // Late layout (web fonts, a reaction row, an avatar) can grow the list
+  // after the pin above ran; re-pin once fonts settle if still at bottom.
+  useEffect(() => {
+    let alive = true;
+    document.fonts?.ready?.then(() => {
+      const el = scrollRef.current;
+      if (alive && el && stickRef.current) el.scrollTop = el.scrollHeight;
+    });
+    return () => { alive = false; };
+  }, [status]);
 
   function onScroll(e) {
     const el = e.currentTarget;
-    stickRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
+    const atBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
+    stickRef.current = atBottom;
+    if (atBottom && newCount) setNewCount(0);
+    if (menu) setMenu(null);
   }
 
-  const refresh = useCallback(async (markRead = true) => {
-    if (!userId || !friendId) return;
-    try {
-      const rows = await listThread(userId, friendId);
-      const sig = `${rows.length}:${rows[rows.length - 1]?.id ?? ''}`;
-      if (sig !== sigRef.current) { sigRef.current = sig; setMessages(rows); }
-      setStatus('ready');
-      if (markRead) markThreadRead(userId, friendId).catch(() => {});
-    } catch (e) {
-      setStatus('error');
-      setErrMsg(e.message || 'Could not load messages.');
-    }
-  }, [userId, friendId]);
-
-  // Load + poll while open.
-  useEffect(() => {
-    if (!open || !friendId) return undefined;
-    setStatus('loading'); setMessages([]); setDraft('');
-    sigRef.current = ''; stickRef.current = true;
-    refresh(true);
-    const id = setInterval(() => refresh(true), 4000);
-    return () => clearInterval(id);
-  }, [open, friendId, refresh]);
-
-  // Escape to close.
-  useEffect(() => {
-    if (!open) return undefined;
-    const onKey = e => { if (e.key === 'Escape') onClose?.(); };
-    document.addEventListener('keydown', onKey);
-    return () => document.removeEventListener('keydown', onKey);
-  }, [open, onClose]);
-
-  // Keep pinned to the newest message ONLY when the user is at the
-  // bottom — never interrupt them while they're scrolled up reading.
-  useEffect(() => {
+  function scrollToBottom() {
     const el = scrollRef.current;
-    if (el && stickRef.current) el.scrollTop = el.scrollHeight;
-  }, [messages, status]);
+    if (!el) return;
+    stickRef.current = true;
+    anchorRef.current = null;
+    setNewCount(0);
+    el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' });
+  }
 
-  async function handleSend() {
+  async function loadEarlier(limit = 50) {
+    const el = scrollRef.current;
+    const oldest = oldestReal(msgsRef.current);
+    if (!oldest || loadingEarlier) return { more: false };
+    setLoadingEarlier(true);
+    try {
+      const rows = await listThread(userId, friendId, { before: oldest, limit });
+      if (el) {
+        const rowEl = el.querySelector(`[data-mid="${CSS.escape(String(oldest.id))}"]`);
+        anchorRef.current = rowEl
+          ? { id: String(oldest.id), offset: rowEl.getBoundingClientRect().top - el.getBoundingClientRect().top, until: Date.now() + 2000 }
+          : null;
+      }
+      stickRef.current = false;
+      setMessages(list => mergeMessages(list, [...rows], { selfId: userId }));
+      setHasMore(!!rows.hasMore);
+      loadReactionsFor(rows);
+      return { more: !!rows.hasMore };
+    } catch (e) {
+      flash(e.message || 'Could not load earlier messages.');
+      return { more: false };
+    } finally {
+      setLoadingEarlier(false);
+    }
+  }
+
+  /** Tap a quote → scroll to the original, paging back for it if needed. */
+  async function jumpTo(id) {
+    let more = hasMore;
+    for (let i = 0; i < 8 && !msgsRef.current.some(m => String(m.id) === String(id)) && more; i++) {
+      // Bigger pages when hunting for a quoted message (the data layer caps at 200).
+      ({ more } = await loadEarlier(200));
+      await new Promise(r => requestAnimationFrame(r));
+    }
+    const el = scrollRef.current;
+    const target = el?.querySelector(`[data-mid="${CSS.escape(String(id))}"]`);
+    if (!el || !target) { flash('That message is no longer available.'); return; }
+    stickRef.current = false;
+    anchorRef.current = null;
+    const top = target.getBoundingClientRect().top - el.getBoundingClientRect().top + el.scrollTop - el.clientHeight / 3;
+    el.scrollTo({ top: Math.max(0, top), behavior: 'smooth' });
+    setFlashId(String(id));
+    window.setTimeout(() => setFlashId(null), 1600);
+    target.querySelector('.msg-bubble')?.focus({ preventScroll: true });
+  }
+
+  // ── sending ──
+  async function deliver(text, target) {
+    const temp = makeOptimistic({ selfId: userId, friendId, body: text, replyTo: target?.id ?? null });
+    stickRef.current = true;
+    anchorRef.current = null;
+    setNewCount(0);
+    setMessages(list => [...list, temp]);
+    try {
+      const saved = await sendMessage(userId, friendId, text, { replyTo: target?.id ?? null });
+      setMessages(list => confirmSent(list, temp.id, saved));
+      if (saved) onActivity?.(saved);
+    } catch (e) {
+      setMessages(list => markFailed(list, temp.id, e.message || 'Not sent'));
+    }
+  }
+
+  function handleSend() {
     const text = draft.trim();
-    if (!text || sending) return;
-    setSending(true);
+    if (!text || readOnlyNote) return;
+    const target = replyTo;
     setDraft('');
-    // Sending always jumps you to the newest message.
-    stickRef.current = true;
-    // Optimistic bubble.
-    const temp = { id: `tmp-${Date.now()}`, sender_id: userId, recipient_id: friendId, body: text, created_at: new Date().toISOString(), _pending: true };
-    sigRef.current = ''; // force the next poll to reconcile
-    setMessages(m => [...m, temp]);
-    try {
-      const saved = await sendMessage(userId, friendId, text);
-      setMessages(m => m.map(x => x.id === temp.id ? saved : x));
-    } catch (e) {
-      // Roll the optimistic bubble back and surface why.
-      setMessages(m => m.filter(x => x.id !== temp.id));
-      setDraft(text);
-      setErrMsg(e.message || 'Could not send.');
-      setStatus('ready');
-      window.setTimeout(() => setErrMsg(''), 4000);
-    }
-    setSending(false);
+    setReplyTo(null);
+    if (inputRef.current) inputRef.current.style.height = '';
+    deliver(text.slice(0, MAX_BODY), target);
   }
 
-  /**
-   * Send an already-composed body — the clan invite. Same optimistic
-   * bubble, same rollback, same error surface as a typed message; only
-   * the source of the text differs.
-   */
-  async function sendBody(text) {
-    if (!text || sending) return;
-    setSending(true);
-    stickRef.current = true;
-    const temp = { id: `tmp-${Date.now()}`, sender_id: userId, recipient_id: friendId, body: text, created_at: new Date().toISOString(), _pending: true };
-    sigRef.current = '';
-    setMessages(m => [...m, temp]);
-    try {
-      const saved = await sendMessage(userId, friendId, text);
-      setMessages(m => m.map(x => x.id === temp.id ? saved : x));
-    } catch (e) {
-      setMessages(m => m.filter(x => x.id !== temp.id));
-      setErrMsg(e.message || 'Could not send the invite.');
-      setStatus('ready');
-      window.setTimeout(() => setErrMsg(''), 4000);
-    }
-    setSending(false);
+  function retry(m) {
+    const target = m.reply_to != null ? (msgsRef.current.find(x => String(x.id) === String(m.reply_to)) || { id: m.reply_to }) : null;
+    setMessages(list => list.filter(x => x.id !== m.id));
+    deliver(m.body, target);
   }
 
-  // Close the ⋯ menu on any outside click.
+  function onDraftChange(e) {
+    const v = e.target.value.slice(0, MAX_BODY);
+    setDraft(v);
+    const el = e.target;
+    el.style.height = 'auto';
+    el.style.height = `${Math.min(el.scrollHeight, 120)}px`;
+    // sendTyping throttles itself (one broadcast per 2.5 s).
+    if (v.trim()) { try { typingRef.current?.sendTyping?.(); } catch { /* best effort */ } }
+  }
+
+  function onComposerKey(e) {
+    if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing && !coarsePointer()) {
+      e.preventDefault();
+      handleSend();
+    }
+  }
+
+  // ── reactions ──
+  async function toggleReaction(m, emoji) {
+    if (isTmp(m.id)) return;
+    const rows = reactions[m.id] || [];
+    const had = rows.some(r => r.user_id === userId && r.emoji === emoji);
+    const mine = { message_id: m.id, user_id: userId, emoji };
+    // Optimistic: an id-less row, which the realtime echo (with an id)
+    // replaces rather than duplicates.
+    setReactions(r => applyReactionChange(r, { type: had ? 'DELETE' : 'INSERT', row: mine }));
+    const res = had ? await removeReaction(m.id, emoji) : await addReaction(m.id, emoji);
+    if (res?.ok) {
+      if (!had && res.row) setReactions(r => applyReactionChange(r, { type: 'INSERT', row: res.row }));
+      return;
+    }
+    setReactions(r => applyReactionChange(r, { type: had ? 'INSERT' : 'DELETE', row: mine }));
+    flash(res?.reason === 'not_configured' ? 'Reactions aren\'t switched on yet.' : (res?.message || 'Could not react.'));
+  }
+
+  async function unsend(m) {
+    closeMenu();
+    if (!window.confirm('Unsend this message? It will be removed for both of you.')) return;
+    const before = msgsRef.current;
+    setMessages(list => removeMessage(list, m.id));
+    try { await unsendMessage(m.id); }
+    catch (e) { setMessages(before); flash(e.message || 'Could not unsend.'); }
+  }
+
+  async function copyText(m) {
+    closeMenu();
+    try { await navigator.clipboard.writeText(m.body); flash('Copied'); }
+    catch { flash('Copy isn\'t available here.'); }
+  }
+
+  function startReply(m) {
+    closeMenu(false);
+    setReplyTo(m);
+    window.setTimeout(() => inputRef.current?.focus(), 0);
+  }
+
+  // ── per-message menu ──
+  function openMenu(m, trigger) {
+    if (isTmp(m.id)) return;
+    returnFocusRef.current = trigger || null;
+    const el = scrollRef.current;
+    const row = el?.querySelector(`[data-mid="${CSS.escape(String(m.id))}"]`);
+    let below = false;
+    if (el && row) below = row.getBoundingClientRect().top - el.getBoundingClientRect().top < 120;
+    setMenu({ id: String(m.id), below });
+  }
+  function closeMenu(restore = true) {
+    setMenu(null);
+    if (restore) {
+      const t = returnFocusRef.current;
+      returnFocusRef.current = null;
+      if (t && typeof t.focus === 'function') window.setTimeout(() => t.focus({ preventScroll: true }), 0);
+    }
+  }
+  function pressStart(e, m) {
+    if (e.pointerType !== 'touch') return;
+    const t = e.currentTarget;
+    const x = e.clientX, y = e.clientY;
+    window.clearTimeout(pressTimer.current);
+    pressTimer.current = window.setTimeout(() => { navigator.vibrate?.(8); openMenu(m, t); }, LONG_PRESS_MS);
+    pressTimer.origin = { x, y };
+  }
+  function pressMove(e) {
+    const o = pressTimer.origin;
+    if (o && Math.hypot(e.clientX - o.x, e.clientY - o.y) > 10) window.clearTimeout(pressTimer.current);
+  }
+  function pressEnd() { window.clearTimeout(pressTimer.current); }
+
+  // Outside click closes the per-message menu / header menu.
+  useEffect(() => {
+    if (!menu) return undefined;
+    const onDown = e => { if (!e.target.closest?.('.dm-menu, .dm-actions')) setMenu(null); };
+    document.addEventListener('pointerdown', onDown);
+    return () => document.removeEventListener('pointerdown', onDown);
+  }, [menu]);
   useEffect(() => {
     if (!menuOpen) return undefined;
-    const onDown = e => { if (!menuRef.current?.contains(e.target)) setMenuOpen(false); };
+    const onDown = e => { if (!headMenuRef.current?.contains(e.target)) setMenuOpen(false); };
     document.addEventListener('mousedown', onDown);
     return () => document.removeEventListener('mousedown', onDown);
   }, [menuOpen]);
 
+  // Escape: menu → reply → header menu → close (overlay only).
+  useEffect(() => {
+    const onKey = e => {
+      if (e.key !== 'Escape') return;
+      if (menu) { e.stopPropagation(); closeMenu(); return; }
+      if (menuOpen) { setMenuOpen(false); return; }
+      if (replyTo) { setReplyTo(null); return; }
+      if (!inline) onClose?.();
+    };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [menu, menuOpen, replyTo, inline, onClose]);
+
   async function handleBlock() {
     setMenuOpen(false);
     const ok = window.confirm(
-      `Block ${friend?.name || 'this user'}? They'll be removed from your friends, won't be able to message you, and won't be able to find you again.`
+      `Block ${name}? They'll be removed from your friends, won't be able to message you, and won't be able to find you again.`
     );
     if (!ok) return;
     try {
       await blockUser(userId, friendId);
+      invalidatePartnerFacts();
       onBlocked?.(friend);
       onClose?.();
     } catch (e) {
-      setErrMsg(e.message || 'Could not block.');
-      window.setTimeout(() => setErrMsg(''), 4000);
+      flash(e.message || 'Could not block.');
     }
   }
 
-  if (!open || !friend) return null;
-
-  const name = friend.name || `@${friend.handle}`;
-
-  // Recent messages FROM the reported user, attached to the report as
-  // evidence for triage (capped well under the context column's limits).
+  // Recent messages FROM the reported user ride along as evidence.
   function reportEvidence() {
     return messages
       .filter(m => m.sender_id === friendId)
@@ -195,43 +503,156 @@ export default function MessagesModal({ open, userId, friend, onClose, onBlocked
       .slice(0, 400);
   }
 
-  /* Portalled to <body>.
-   *
-   * The chat is rendered from FriendsRail, which on the OS hub lives
-   * inside a pinned column. `position: sticky` creates a stacking
-   * context, so the overlay's z-index:1000 was resolved against its
-   * SIBLINGS inside that column rather than against the page — and the
-   * widget canvas, which comes after the column in DOM order, painted
-   * straight over the top of it. Raising the z-index cannot fix that;
-   * a descendant can never escape its ancestor's stacking context.
-   *
-   * Same reason FoodSearch and FoodLogSheet portal (see their notes).
-   * Rendering into <body> puts the overlay in the root stacking context
-   * where its z-index means what it says, in every hub layout.
-   */
-  /* `inline` drops the portal and the backdrop and returns the modal's
-     own body, so the hub's friend panel can host the very same
-     conversation rather than growing a second one. Everything above
-     this line — the poll, the optimistic send, read receipts, report
-     and block — is shared by both, which is the point: two chats would
-     have drifted the first time either was touched. */
+  const replies = useMemo(() => resolveReplies(messages, quoted.filter(q => !q._gone)), [messages, quoted]);
+  const seenId = seenMessageId(messages, userId);
+  const nowTs = Date.now();
+  const left = MAX_BODY - draft.length;
+
+  const bubbles = messages.map((m, i) => {
+    const mine = m.sender_id === userId;
+    const prev = messages[i - 1];
+    const showDay = !prev || dayKey(prev.created_at) !== dayKey(m.created_at);
+    const showTime = endsCluster(messages, i) || m._failed;
+    const invite = parseInvite(m.body);
+    const key = String(m.id);
+    const reply = m.reply_to != null ? replies[m.id] : null;
+    const summary = summarizeReactions(reactions[m.id], userId);
+    const seenHere = seenId != null && String(seenId) === key;
+    const menuHere = menu?.id === key;
+    const who = mine ? 'You' : first;
+    const label = `${who}: ${snippet(m.body, 200)}. ${timeLabel(m.created_at)}${summary.length ? `. Reactions ${summary.map(s => `${s.emoji} ${s.count}`).join(', ')}` : ''}`;
+    return (
+      <div key={m._key || m.id}>
+        {showDay && <div className="msg-daysep dm-daysep" role="separator">{dayLabel(m.created_at, nowTs)}</div>}
+        <div
+          className={`msg-row ${mine ? 'mine' : 'theirs'} dm-row${flashId === key ? ' is-flash' : ''}${menuHere ? ' has-menu' : ''}`}
+          data-mid={key}
+        >
+          <div className="dm-stack">
+            <div className="dm-line">
+              {invite ? (
+                <ClanInviteBubble invite={invite} mine={mine} time={timeLabel(m.created_at)} />
+              ) : (
+                <div
+                  className={`msg-bubble dm-bubble${m._pending ? ' pending' : ''}${m._failed ? ' failed' : ''}`}
+                  tabIndex={isTmp(m.id) ? -1 : 0}
+                  aria-label={label}
+                  aria-haspopup={isTmp(m.id) ? undefined : 'menu'}
+                  title={timeLabel(m.created_at)}
+                  onKeyDown={e => {
+                    if (e.target !== e.currentTarget) return;
+                    if (e.key === 'Enter' || e.key === ' ' || e.key === 'ContextMenu') { e.preventDefault(); openMenu(m, e.currentTarget); }
+                  }}
+                  onContextMenu={e => { if (!isTmp(m.id)) { e.preventDefault(); openMenu(m, e.currentTarget); } }}
+                  onPointerDown={e => pressStart(e, m)}
+                  onPointerMove={pressMove}
+                  onPointerUp={pressEnd}
+                  onPointerCancel={pressEnd}
+                >
+                  {m.reply_to != null && (
+                    <button
+                      type="button"
+                      className="dm-quote"
+                      onClick={e => { e.stopPropagation(); jumpTo(m.reply_to); }}
+                      aria-label={reply && !reply.missing ? `Replying to ${reply.sender_id === userId ? 'you' : first}: ${snippet(reply.body, 80)}. Show original` : 'Replying to a message that is no longer available'}
+                    >
+                      <span className="dm-quote-who">{reply && !reply.missing ? (reply.sender_id === userId ? 'You' : first) : 'Earlier message'}</span>
+                      <span className="dm-quote-body">{reply && !reply.missing ? reply.body : (quoted.some(q => String(q.id) === String(m.reply_to)) ? 'No longer available' : 'Loading…')}</span>
+                    </button>
+                  )}
+                  <span className="dm-body">{m.body}</span>
+                </div>
+              )}
+              {!isTmp(m.id) && !readOnlyNote && (
+                <div className="dm-actions" aria-hidden={menuHere ? undefined : true}>
+                  <button type="button" tabIndex={-1} className="dm-act" title="React" onClick={e => openMenu(m, e.currentTarget.closest('.dm-line')?.querySelector('.msg-bubble'))}>
+                    <Icon name="smile" size={14} />
+                  </button>
+                  <button type="button" tabIndex={-1} className="dm-act" title="Reply" onClick={() => startReply(m)}>
+                    <ReplyGlyph />
+                  </button>
+                </div>
+              )}
+            </div>
+
+            {menuHere && (
+              <MessageMenu
+                mine={mine}
+                below={menu.below}
+                readOnly={!!readOnlyNote}
+                rows={reactions[m.id]}
+                userId={userId}
+                onReact={emoji => { toggleReaction(m, emoji); closeMenu(); }}
+                onReply={() => startReply(m)}
+                onCopy={() => copyText(m)}
+                onUnsend={mine ? () => unsend(m) : null}
+                onClose={() => closeMenu()}
+              />
+            )}
+
+            {summary.length > 0 && (
+              <div className="dm-reacts">
+                {summary.map(s => (
+                  <button
+                    key={s.emoji}
+                    type="button"
+                    className={`dm-react${s.mine ? ' is-mine' : ''}`}
+                    aria-pressed={s.mine}
+                    aria-label={`${s.emoji} ${s.count}${s.mine ? ', including you' : ''}. ${s.mine ? 'Remove' : 'Add'} your reaction`}
+                    disabled={!!readOnlyNote}
+                    onClick={() => toggleReaction(m, s.emoji)}
+                  >
+                    <span aria-hidden="true">{s.emoji}</span>
+                    <span className="dm-react-n" aria-hidden="true">{s.count}</span>
+                  </button>
+                ))}
+              </div>
+            )}
+
+            {m._failed ? (
+              <div className="dm-failed" role="alert">
+                Not sent.
+                <button type="button" className="dm-linkbtn" onClick={() => retry(m)}>Retry</button>
+                <button type="button" className="dm-linkbtn" onClick={() => setMessages(list => list.filter(x => x.id !== m.id))}>Delete</button>
+              </div>
+            ) : showTime && !invite ? (
+              <div className="dm-time">
+                {m._pending ? 'Sending…' : timeLabel(m.created_at)}
+                {seenHere && <span className="dm-seen"> · Seen</span>}
+              </div>
+            ) : seenHere ? (
+              <div className="dm-time"><span className="dm-seen">Seen</span></div>
+            ) : null}
+          </div>
+        </div>
+      </div>
+    );
+  });
+
   const body = (
     <>
-      <div className={`msg-modal${inline ? ' msg-inline' : ''}`} role="dialog" aria-label={`Messages with ${name}`}>
-        <div className="msg-head">
+      <div className={`msg-modal dm${inline ? ' msg-inline' : ''}`} role={inline ? 'region' : 'dialog'} aria-label={`Messages with ${name}`}>
+        <div className="msg-head dm-head">
+          {onBack && (
+            <button type="button" className="dm-iconbtn dm-back" onClick={onBack} aria-label="Back to messages">
+              <Icon name="chevron-left" size={18} />
+            </button>
+          )}
           <div className="msg-head-who">
             {friend.avatar_url
               ? <img className="msg-avatar msg-avatar-img" src={friend.avatar_url} alt="" />
-              : <div className="msg-avatar" style={{ background: avatarColor(name) }}>{initials(name)}</div>}
-            <div>
+              : <div className="msg-avatar" style={{ background: avatarColor(name) }} aria-hidden="true">{initials(name)}</div>}
+            <div className="dm-head-text">
               <div className="msg-head-name">{name}</div>
-              <div className="msg-head-handle">@{friend.handle}</div>
+              <div className="msg-head-handle dm-head-sub">
+                {typing ? <span className="dm-typing-inline">typing…</span> : (friend.handle ? `@${friend.handle}` : '')}
+              </div>
             </div>
           </div>
-          <div className="fc-menu-wrap" ref={menuRef} style={{ marginLeft: 'auto' }}>
+          <div className="fc-menu-wrap" ref={headMenuRef} style={{ marginLeft: 'auto' }}>
             <button
               type="button"
-              className="msg-close"
+              className="msg-close dm-iconbtn"
               style={{ marginLeft: 0 }}
               onClick={() => setMenuOpen(o => !o)}
               aria-label="Conversation actions"
@@ -241,94 +662,103 @@ export default function MessagesModal({ open, userId, friend, onClose, onBlocked
             ><Icon name="ellipsis" size={16} /></button>
             {menuOpen && (
               <div className="fc-menu" role="menu">
-                {/* Mounted only while the menu is open, which is what
-                    keeps the board fetch off the app's start-up path. */}
-                <ClanInviteMenuItem
-                  disabled={sending}
-                  friendId={friendId}
-                  friendName={(friend.name || friend.handle || '').split(' ')[0]}
-                  onInvite={body => { setMenuOpen(false); sendBody(body); }}
-                />
-                <div className="fc-menu-sep" role="separator" />
-                <button
-                  type="button"
-                  role="menuitem"
-                  className="fc-menu-item"
-                  onClick={() => { setMenuOpen(false); setReporting(true); }}
-                >
+                {!readOnlyNote && (
+                  <>
+                    <ClanInviteMenuItem
+                      disabled={false}
+                      friendId={friendId}
+                      friendName={first}
+                      onInvite={text => { setMenuOpen(false); deliver(text, null); }}
+                    />
+                    <div className="fc-menu-sep" role="separator" />
+                  </>
+                )}
+                <button type="button" role="menuitem" className="fc-menu-item" onClick={() => { setMenuOpen(false); setReporting(true); }}>
                   Report abuse
                 </button>
-                <button
-                  type="button"
-                  role="menuitem"
-                  className="fc-menu-item fc-menu-item-warn"
-                  onClick={handleBlock}
-                >
+                <button type="button" role="menuitem" className="fc-menu-item fc-menu-item-warn" onClick={handleBlock}>
                   Block user
                 </button>
               </div>
             )}
           </div>
-          {/* Inline, the panel hosting this has its own close a few
-              pixels away; two of them is one too many. */}
           {!inline && (
-            <button type="button" className="msg-close" style={{ marginLeft: 0 }} onClick={() => onClose?.()} aria-label="Close"><Icon name="x" size={15} /></button>
+            <button type="button" className="msg-close dm-iconbtn" style={{ marginLeft: 0 }} onClick={() => onClose?.()} aria-label="Close"><Icon name="x" size={15} /></button>
           )}
         </div>
 
-        <div className="msg-scroll" ref={scrollRef} onScroll={onScroll}>
-          {status === 'loading' && <div className="msg-empty">Loading…</div>}
-          {status === 'error' && <div className="msg-empty msg-error">{errMsg}</div>}
-          {status === 'ready' && messages.length === 0 && (
-            <div className="msg-empty">No messages yet — say hi to {name.split(' ')[0]}.</div>
-          )}
-          {status === 'ready' && messages.map((m, i) => {
-            const mine = m.sender_id === userId;
-            const prev = messages[i - 1];
-            const showDay = !prev || fmtDay(prev.created_at) !== fmtDay(m.created_at);
-            // An invite is an ordinary message whose body happens to
-            // carry a join code; anything else falls through unchanged.
-            const invite = parseInvite(m.body);
-            return (
-              <div key={m.id}>
-                {showDay && <div className="msg-daysep">{fmtDay(m.created_at)}</div>}
-                <div className={`msg-row ${mine ? 'mine' : 'theirs'}`}>
-                  {invite ? (
-                    <ClanInviteBubble invite={invite} mine={mine} time={fmtTime(m.created_at)} />
-                  ) : (
-                    <div className={`msg-bubble${m._pending ? ' pending' : ''}`}>
-                      {m.body}
-                      <span className="msg-time">{fmtTime(m.created_at)}</span>
-                    </div>
-                  )}
-                </div>
+        <div className="dm-scroll-wrap">
+          <div
+            className="msg-scroll dm-scroll"
+            ref={scrollRef}
+            onScroll={onScroll}
+            onWheel={() => { anchorRef.current = null; }}
+            onTouchStart={() => { anchorRef.current = null; }}
+          >
+            {status === 'loading' && <div className="msg-empty">Loading…</div>}
+            {status === 'error' && <div className="msg-empty msg-error">{errMsg}</div>}
+            {status === 'ready' && hasMore && (
+              <button type="button" className="dm-earlier" onClick={() => loadEarlier()} disabled={loadingEarlier}>
+                {loadingEarlier ? 'Loading…' : 'Load earlier messages'}
+              </button>
+            )}
+            {status === 'ready' && messages.length === 0 && (
+              <div className="msg-empty">No messages yet — say hi to {first}.</div>
+            )}
+            {status === 'ready' && bubbles}
+            {typing && status === 'ready' && (
+              <div className="msg-row theirs dm-row" aria-hidden="true">
+                <div className="dm-typing"><span /><span /><span /></div>
               </div>
-            );
-          })}
+            )}
+          </div>
+          {newCount > 0 && (
+            <button type="button" className="dm-newpill" onClick={scrollToBottom}>
+              {newCount === 1 ? 'New message' : `${newCount} new messages`} <Icon name="arrow-down" size={13} />
+            </button>
+          )}
+          <div className="dm-sr" aria-live="polite" aria-atomic="true">{announce}</div>
         </div>
 
-        {errMsg && status === 'ready' && messages.length > 0 && (
-          <div className="msg-inline-err">{errMsg}</div>
+        {toast && <div className="msg-inline-err dm-toast" role="status">{toast}</div>}
+
+        {readOnlyNote ? (
+          <div className="dm-readonly">{readOnlyNote}</div>
+        ) : (
+          <div className="dm-composer-wrap">
+            {replyTo && (
+              <div className="dm-replying">
+                <ReplyGlyph size={13} />
+                <div className="dm-replying-text">
+                  <span className="dm-replying-who">Replying to {replyTo.sender_id === userId ? 'yourself' : first}</span>
+                  <span className="dm-replying-body">{snippet(replyTo.body, 120)}</span>
+                </div>
+                <button type="button" className="dm-iconbtn" onClick={() => setReplyTo(null)} aria-label="Cancel reply"><Icon name="x" size={14} /></button>
+              </div>
+            )}
+            <div className="msg-composer dm-composer">
+              <textarea
+                ref={inputRef}
+                className="msg-input dm-input"
+                placeholder={`Message ${first}…`}
+                aria-label={`Message ${first}`}
+                value={draft}
+                rows={1}
+                onChange={onDraftChange}
+                onKeyDown={onComposerKey}
+                maxLength={MAX_BODY}
+              />
+              <button type="button" className="msg-send dm-send" onClick={handleSend} disabled={!draft.trim()} aria-label="Send">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M22 2 11 13" /><path d="M22 2 15 22l-4-9-9-4Z" /></svg>
+              </button>
+            </div>
+            {draft.length >= COUNTER_FROM && (
+              <div className={`dm-counter${left <= 0 ? ' is-max' : ''}`} aria-live="polite">{draft.length}/{MAX_BODY}</div>
+            )}
+          </div>
         )}
-
-        <div className="msg-composer">
-          <textarea
-            className="msg-input"
-            placeholder={`Message ${name.split(' ')[0]}…`}
-            value={draft}
-            rows={1}
-            onChange={e => setDraft(e.target.value)}
-            onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend(); } }}
-            maxLength={2000}
-          />
-          <button type="button" className="msg-send" onClick={handleSend} disabled={!draft.trim() || sending} aria-label="Send">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 2 11 13" /><path d="M22 2 15 22l-4-9-9-4Z" /></svg>
-          </button>
-        </div>
       </div>
 
-      {/* Report flow — reuses the friend-card modal; recent messages
-          from the other user ride along as evidence for triage. */}
       <ReportFriendModal
         open={reporting}
         friend={friend}
@@ -342,10 +772,53 @@ export default function MessagesModal({ open, userId, friend, onClose, onBlocked
 
   if (inline) return body;
 
+  // Portalled to <body>: the rail lives in a sticky column, which is a
+  // stacking context no z-index can escape (see ui/Overlay).
   return createPortal(
     <div className="msg-overlay" onMouseDown={e => { if (e.target === e.currentTarget) onClose?.(); }}>
       {body}
     </div>,
     document.body
+  );
+}
+
+/** The long-press / hover / keyboard menu on one message. */
+function MessageMenu({ mine, below, readOnly, rows, userId, onReact, onReply, onCopy, onUnsend, onClose }) {
+  const ref = useRef(null);
+  useEffect(() => {
+    ref.current?.querySelector('button')?.focus({ preventScroll: true });
+  }, []);
+  const mineSet = new Set((rows || []).filter(r => r.user_id === userId).map(r => r.emoji));
+  function onKeyDown(e) {
+    const items = [...ref.current.querySelectorAll('button:not(:disabled)')];
+    const i = items.indexOf(document.activeElement);
+    if (e.key === 'ArrowRight' || e.key === 'ArrowDown') { e.preventDefault(); items[(i + 1) % items.length]?.focus(); }
+    else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') { e.preventDefault(); items[(i - 1 + items.length) % items.length]?.focus(); }
+    else if (e.key === 'Tab') { e.preventDefault(); items[(i + (e.shiftKey ? -1 : 1) + items.length) % items.length]?.focus(); }
+    else if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); onClose(); }
+  }
+  return (
+    <div ref={ref} className={`dm-menu ${mine ? 'is-mine' : 'is-theirs'}${below ? ' is-below' : ''}`} role="menu" aria-label="Message actions" onKeyDown={onKeyDown}>
+      {!readOnly && <div className="dm-menu-emoji">
+        {REACTION_EMOJI.map(e => (
+          <button
+            key={e}
+            type="button"
+            role="menuitemcheckbox"
+            aria-checked={mineSet.has(e)}
+            aria-label={`React ${e}`}
+            className={`dm-menu-emo${mineSet.has(e) ? ' is-on' : ''}`}
+            onClick={() => onReact(e)}
+          >{e}</button>
+        ))}
+      </div>}
+      <div className="dm-menu-items">
+        {!readOnly && <button type="button" role="menuitem" className="dm-menu-item" onClick={onReply}><ReplyGlyph /> Reply</button>}
+        <button type="button" role="menuitem" className="dm-menu-item" onClick={onCopy}><Icon name="copy" size={14} /> Copy text</button>
+        {onUnsend && !readOnly && (
+          <button type="button" role="menuitem" className="dm-menu-item is-warn" onClick={onUnsend}><Icon name="x" size={14} /> Unsend</button>
+        )}
+      </div>
+    </div>
   );
 }

@@ -12,6 +12,9 @@
  * cards. Reusing the rail (rather than re-implementing) means
  * mutations / RLS gates / handle-claim flow stay in lockstep with
  * desktop — fixing a bug in one fixes both.
+ *
+ * `layout="page"` tells the rail it owns the screen: a conversation
+ * opens full-screen with Back, not as a floating modal over the list.
  */
 import FriendsRail from '../friends/FriendsRail';
 
@@ -25,7 +28,7 @@ export default function MobileFriendsSection({ userId, onUpgrade }) {
             <div className="m-section-title">Friends</div>
           </div>
         </div>
-        <FriendsRail userId={userId} onUpgrade={onUpgrade} />
+        <FriendsRail userId={userId} onUpgrade={onUpgrade} layout="page" />
       </div>
     </section>
   );

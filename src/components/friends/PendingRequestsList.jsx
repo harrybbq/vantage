@@ -18,6 +18,7 @@ function avatarColor(seed) {
 }
 
 import Icon from '../Icon';
+import './friends-dm.css';
 
 function initials(name) {
   return (name || '').split(' ').map(p => p[0]).join('').slice(0, 2).toUpperCase() || '?';
@@ -44,7 +45,10 @@ export default function PendingRequestsList({ pending, onAccept, onDecline, busy
               </div>
               <div className="fc-row-info">
                 <div className="fc-row-name">{name}</div>
-                <div className="fc-row-status">@{p.handle}</div>
+                <div className="fc-row-status">
+                  @{p.handle}
+                  {p.via_invite && <span className="fc-request-via">via your invite</span>}
+                </div>
               </div>
               <div className="fc-request-actions">
                 <button

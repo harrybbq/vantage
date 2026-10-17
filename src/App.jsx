@@ -6,6 +6,7 @@ import { SubscriptionProvider } from './context/SubscriptionContext';
 import { useTierLimits } from './hooks/useTierLimits';
 import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts';
 import AuthScreen from './components/AuthScreen';
+import { parseInvitePath, peekPendingInvite, takePendingInvite } from './lib/friends/invites';
 import Nav from './components/Nav';
 import PageHeader from './components/PageHeader';
 import HubSection from './components/HubSection';
@@ -64,6 +65,9 @@ import TermsAcceptanceSheet from './components/TermsAcceptanceSheet';
 // to null and Rollup never emits their chunks.
 const UpgradeSection = OWNER_SURFACES_IN_BUILD ? lazy(() => import('./components/upgrade/UpgradeSection')) : null;
 const AdminEditModal = OWNER_SURFACES_IN_BUILD ? lazy(() => import('./components/AdminEditModal')) : null;
+// /invite/<code> — a friend's invite link. Lazy: almost no page load is one.
+const InviteLanding = lazy(() => import('./components/friends/InviteLanding'));
+const InvitePill = lazy(() => import('./components/friends/InviteLanding').then(m => ({ default: m.InvitePill })));
 
 // Sections that are not the first screen load on demand, so the hub
 // paints without first downloading Track, Shop, Achievements and the
@@ -1061,6 +1065,20 @@ export default function App() {
     return null;
   });
 
+  // Invite links deep-link pre-auth the same way. A code parked by the
+  // landing's button (sessionStorage) brings the visitor back to it after
+  // sign-in, where the request is sent without a second tap.
+  const [inviteCode, setInviteCode] = useState(() => {
+    try { return parseInvitePath(window.location.pathname) || peekPendingInvite(); } catch { return null; }
+  });
+  const [inviteAuth, setInviteAuth] = useState(false);
+  function closeInvite() {
+    takePendingInvite();
+    setInviteCode(null);
+    setInviteAuth(false);
+    try { if (window.location.pathname.startsWith('/invite/')) window.history.replaceState(null, '', '/'); } catch { /* no-op */ }
+  }
+
   function closeLegal() {
     setLegalPage(null);
     // Drop the /privacy or /terms path so the app boots normally.
@@ -1126,7 +1144,27 @@ export default function App() {
     );
   }
 
-  if (!session) return <AuthScreen onOpenLegal={setLegalPage} />;
+  if (inviteCode && !(inviteAuth && !session)) {
+    return (
+      <Suspense fallback={null}>
+        <InviteLanding
+          code={inviteCode}
+          session={session}
+          onSignIn={() => setInviteAuth(true)}
+          onDone={closeInvite}
+        />
+      </Suspense>
+    );
+  }
+
+  if (!session) {
+    return (
+      <>
+        {inviteCode && <Suspense fallback={null}><InvitePill onCancel={closeInvite} /></Suspense>}
+        <AuthScreen onOpenLegal={setLegalPage} />
+      </>
+    );
+  }
   return (
     <SubscriptionProvider userId={session.user.id}>
       <Board userId={session.user.id} userEmail={session.user.email} onSignOut={handleSignOut} />

@@ -1,8 +1,12 @@
 import { useEffect, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import Overlay from '../ui/Overlay';
+import InviteLinkSection from './InviteLinkSection';
 
 /**
+ * Invite link first (InviteLinkSection — the way a new user with no
+ * friends yet actually finds people), then search-by-handle below it.
+ *
  * Search-by-handle + send-request UI. The whole search runs through
  * the SECURITY DEFINER RPC (`search_profiles_by_handle`) so block
  * lists are honoured server-side without leaking blocker identity.
@@ -95,7 +99,7 @@ export default function AddFriendModal({
           style={{ display: 'flex' }}
         >
           <motion.div
-            className="modal add-friend-modal"
+            className="modal add-friend-modal has-invite"
             initial={{ opacity: 0, scale: 0.95, y: 14 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.97, y: 8 }}
@@ -105,8 +109,11 @@ export default function AddFriendModal({
             aria-modal="true"
             aria-labelledby="add-friend-title"
           >
-            <div className="handle-claim-eyebrow">Add a friend</div>
-            <h3 className="handle-claim-title" id="add-friend-title">Search by handle</h3>
+            <h3 className="handle-claim-title" id="add-friend-title">Add a friend</h3>
+
+            <InviteLinkSection open={open} />
+
+            <div className="inv-divider">Or search by handle</div>
 
             {atCap && (
               <div className="add-friend-cap-banner">
@@ -121,7 +128,6 @@ export default function AddFriendModal({
               <span className="handle-claim-prefix">@</span>
               <input
                 className="handle-claim-input"
-                autoFocus
                 value={q}
                 onChange={e => setQ(e.target.value)}
                 placeholder="handle"
