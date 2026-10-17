@@ -143,7 +143,7 @@ export function handleIncomingPush(msg, actions = {}) {
 
   switch (kind) {
     case 'vision-unlock':
-      if (showToast) showToast(`✦ ${msg.title || 'Vision unlocked'}`, true);
+      if (showToast) showToast(`✦ ${msg.title || 'Honour earned'}`, true);
       break;
     case 'friend-request':
       if (showToast) showToast(`◌ ${msg.title || 'New friend request'}`, true);

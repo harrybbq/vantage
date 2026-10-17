@@ -451,8 +451,8 @@ const achievementBlocks = {
   visions(S) {
     const stamped = Object.keys(S.visions || {});
     if (!stamped.length) {
-      return { d: { items: bars([['No visions yet', 0, PALETTE[2], '', 'keep logging']]) },
-               s: { fl: 'VISIONS', fv: 'none yet' } };
+      return { d: { items: bars([['No honours yet', 0, PALETTE[2], '', 'keep logging']]) },
+               s: { fl: 'HONOURS', fv: 'none yet' } };
     }
     const cats = ['brain', 'finance', 'fitness', 'social'];
     const r = S.ratings || {};
@@ -464,7 +464,7 @@ const achievementBlocks = {
       `${r[c] || 1}`,
     ]));
     const top = items.reduce((a, b) => (b.pct > a.pct ? b : a), items[0]);
-    return { d: { items }, s: { fl: 'VISIONS', fv: `${top.n} ${top.cur}` } };
+    return { d: { items }, s: { fl: 'HONOURS', fv: `${top.n} ${top.cur}` } };
   },
 };
 

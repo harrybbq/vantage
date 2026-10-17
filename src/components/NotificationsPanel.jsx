@@ -19,7 +19,7 @@ import SettingsGroup from './settings/SettingsGroup';
 const CATEGORIES = [
   {
     id: 'visionUnlock',
-    label: 'Vision unlocks',
+    label: 'Honours earned',
     desc: 'When you cross a milestone (Week One, Century, etc).',
   },
   {

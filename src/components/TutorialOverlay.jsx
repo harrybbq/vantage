@@ -93,7 +93,7 @@ const STEPS_CREAM = [
   {
     id: 'settings', label: 'Settings',
     title: 'Make it yours',
-    body: 'Colour schemes — some free, some unlocked by achieving Visions, more with Pro (plus a coloured leaderboard name). Connect a WHOOP band or Oura ring, or import Apple Health. Decide whether coins are required to buy shop items. Set macro goals, manage every privacy toggle (search, leaderboard, trending, what friends see), browse the Visions catalogue, export your data, and replay this tour.',
+    body: 'Colour schemes — some free, some unlocked by earning Honours, more with Pro (plus a coloured leaderboard name). Connect a WHOOP band or Oura ring, or import Apple Health. Decide whether coins are required to buy shop items. Set macro goals, manage every privacy toggle (search, leaderboard, trending, what friends see), browse the Honours catalogue, export your data, and replay this tour.',
     target: 'nav-tab-settings', placement: 'right', arrowDir: 'left',
   },
   {
@@ -165,7 +165,7 @@ const STEPS_DARK = [
   {
     id: 'settings', label: 'settings',
     title: 'settings',
-    body: 'Colour schemes: free tier + vision-unlocked + Pro (incl. coloured leaderboard name). WHOOP / Oura / Apple Health connections. Shop coin gate on/off. Macros, privacy toggles (search / leaderboard / trending / profile shares), Visions catalogue, data export, replay this tour.',
+    body: 'Colour schemes: free tier + honour-unlocked + Pro (incl. coloured leaderboard name). WHOOP / Oura / Apple Health connections. Shop coin gate on/off. Macros, privacy toggles (search / leaderboard / trending / profile shares), Honours catalogue, data export, replay this tour.',
     target: 'nav-tab-settings', placement: 'right', arrowDir: 'left',
   },
   {

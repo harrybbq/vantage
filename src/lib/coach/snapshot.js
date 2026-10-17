@@ -9,24 +9,42 @@
  * Tuesday and Wednesday produce identical advice.
  */
 import { habitElapsed } from '../habits/progress.js';
+import { cellFromBand, trackerUsesBandData } from './wearableProvenance.js';
 
 const DAY_MS = 86_400_000;
+
+/* WHOOP / Oura data and the AI coach (2026-10-17). Off unless BOTH this
+   build flag and the server's AI_WEARABLE_DATA_ALLOWED are 'true' — see
+   lib/coach/wearableProvenance.js for why and for what counts. Off, a
+   tracker carrying band data is left out of the snapshot entirely and
+   nothing in the snapshot mentions that it was. On, it is sent tagged
+   (`wearable: true`, cells `src: 'wearable'`) so the server can still
+   strip it if its own switch is off. */
+const WEARABLE_TO_AI = (import.meta.env || {}).VITE_AI_WEARABLE_DATA_ALLOWED === 'true';
 
 function ymd(d) {
   return d.toISOString().slice(0, 10);
 }
 
-function buildTrackerSummary(t, logs) {
-  const today = new Date();
+/** The 14 day keys the tracker series covers, newest first. */
+function seriesDays(today = new Date()) {
+  const out = [];
+  for (let i = 0; i < 14; i++) out.push(ymd(new Date(today - i * DAY_MS)));
+  return out;
+}
+
+function buildTrackerSummary(t, logs, S, tagBand = false) {
+  const days = seriesDays();
   const series = []; // newest-first daily values, last 14 days
   let last7 = 0, prior7 = 0;
-  for (let i = 0; i < 14; i++) {
-    const k = ymd(new Date(today - i * DAY_MS));
+  days.forEach((k, i) => {
     const v = logs[k]?.[t.id];
     const n = t.type === 'boolean' ? (v ? 1 : 0) : (Number(v) || 0);
-    series.push({ ymd: k, value: n });
+    const cell = { ymd: k, value: n };
+    if (tagBand && cellFromBand(S, k, t)) cell.src = 'wearable';
+    series.push(cell);
     if (i < 7) last7 += n; else prior7 += n;
-  }
+  });
   // Compute weekly target progress if applicable.
   let weekly_progress = null;
   if (t.weeklyTarget) {
@@ -117,11 +135,28 @@ function buildShopState(S) {
   };
 }
 
+/** Tracker summaries, with band data withheld or tagged (see top). */
+function buildTrackers(S, logs, allowWearable) {
+  const days = seriesDays();
+  const out = [];
+  for (const t of (S.trackers || [])) {
+    const band = trackerUsesBandData(S, t, days);
+    if (band && !allowWearable) continue;
+    const summary = buildTrackerSummary(t, logs, S, band);
+    if (band) summary.wearable = true;
+    out.push(summary);
+  }
+  return out;
+}
+
 /**
  * Build the snapshot. Most important callsite: useDailyBrief, which
  * passes the result to the Netlify function.
+ *
+ * `opts.allowWearable` overrides the build flag (tests only).
  */
-export function buildSnapshot(S) {
+export function buildSnapshot(S, opts = {}) {
+  const allowWearable = opts.allowWearable ?? WEARABLE_TO_AI;
   const logs = S.logs || {};
   const today = new Date();
   const memory = S.coachMemory || {};
@@ -157,7 +192,7 @@ export function buildSnapshot(S) {
     coins: S.coins || 0,
     habits: (S.habits || []).map(buildHabitSummary),
     achievements: (S.achievements || []).map(buildAchievementSummary),
-    trackers: (S.trackers || []).map(t => buildTrackerSummary(t, logs)),
+    trackers: buildTrackers(S, logs, allowWearable),
     holidays: buildHolidayCountdown(S),
     shop: buildShopState(S),
     recent_completions: buildRecentCompletions(S),

@@ -27,6 +27,8 @@ import LegalPage from './components/LegalPage';
 import ConsentHost from './components/consent/ConsentHost';
 import CookieBanner from './components/CookieBanner';
 import InstallPrompt from './components/InstallPrompt';
+import { hasLoggedSomething } from './lib/native/installPrompt';
+import { meaningfulEvidence } from './lib/state/meaningful';
 import TutorialOverlay from './components/TutorialOverlay';
 import BackgroundCropModal from './components/BackgroundCropModal';
 import VisionsModal from './components/VisionsModal';
@@ -986,7 +988,7 @@ function Board({ userId, userEmail, onSignOut }) {
       />
       <ShortcutsModal open={shortcutsOpen} onClose={() => setShortcutsOpen(false)} />
       <CookieBanner onOpenLegal={setLegalPage} />
-      <InstallPrompt />
+      <InstallPrompt engaged={hydrated && hasLoggedSomething(meaningfulEvidence(S))} />
       {AdminEditModal && isOwner && (
         <Suspense fallback={null}>
           <AdminEditModal
@@ -1018,11 +1020,11 @@ function Board({ userId, userEmail, onSignOut }) {
         onPushMessage={msg => handleIncomingPush(msg, {
           navigate, showToast: showCoinToast, prefs: S.notifications,
         })}
-        headline="Vision unlocked. Want a ping for the next one?"
+        headline="Honour earned. Want a ping for the next one?"
         body={(
           <>
             We'll only ping you for the categories you turn on in
-            Settings — vision unlocks, friend requests, streak warnings.
+            Settings — honours earned, friend requests, streak warnings.
             No marketing, no signup nudges.
             <br /><br />
             Quiet hours are honored. You can turn any of this off whenever.

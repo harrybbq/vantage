@@ -113,7 +113,7 @@ export default function NotificationPermissionPrompt({
               {body || (
                 <>
                   We'll only ping you for things you opt into in Settings —
-                  vision unlocks, friend requests, a streak that's about to
+                  honours earned, friend requests, a streak that's about to
                   break. No marketing. No sign-up nudges.
                   <br /><br />
                   Quiet hours are honored. You can turn any of this off at any time.

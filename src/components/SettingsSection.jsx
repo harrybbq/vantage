@@ -684,7 +684,7 @@ export default function SettingsSection({ S, update, active, userId, userEmail, 
         <>
         <SettingsGroup
           title="Colour scheme"
-          desc="An accent colour applied across the whole app. ✦ accents unlock by achieving visions; 🔒 accents are Pro."
+          desc="An accent colour applied across the whole app. ✦ accents unlock by earning honours; 🔒 accents are Pro."
         >
           <div className="scheme-grid">
             {SCHEMES.map(scheme => {
@@ -699,7 +699,7 @@ export default function SettingsSection({ S, update, active, userId, userEmail, 
               const lockHint = proLocked
                 ? 'Upgrade to Pro to unlock this accent'
                 : visionLocked
-                  ? `Unlock by achieving: ${VISIONS_BY_ID[scheme.unlockVision]?.title || 'a vision'}`
+                  ? `Unlock by earning: ${VISIONS_BY_ID[scheme.unlockVision]?.title || 'an honour'}`
                   : '';
               return (
                 <button
@@ -1023,7 +1023,7 @@ export default function SettingsSection({ S, update, active, userId, userEmail, 
 
         {/* Visions catalogue — milestones the user can chase. */}
         <SettingsGroup
-          title="Visions"
+          title="Honours"
           desc="See every system milestone and which ones you've unlocked. Each feeds your category ratings."
         >
           <button
@@ -1031,7 +1031,7 @@ export default function SettingsSection({ S, update, active, userId, userEmail, 
             className="tut-replay-btn"
             onClick={onOpenVisions}
           >
-            <span aria-hidden="true" style={{display:'inline-flex',marginRight:6}}><Icon name="sparkles" size={15} /></span>Open visions catalogue
+            <span aria-hidden="true" style={{display:'inline-flex',marginRight:6}}><Icon name="sparkles" size={15} /></span>Open honours catalogue
           </button>
         </SettingsGroup>
 

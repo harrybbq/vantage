@@ -46,7 +46,7 @@ export default function VisionsModal({ open, S, onClose }) {
             <div style={{
               fontFamily: 'var(--mono)', fontSize: 10, letterSpacing: 1.6,
               textTransform: 'uppercase', color: 'var(--em)', fontWeight: 700,
-            }}>// VISIONS</div>
+            }}>// HONOURS</div>
             <h3 style={{ margin: '2px 0 0' }}>What you've earned</h3>
           </div>
           <div style={{
