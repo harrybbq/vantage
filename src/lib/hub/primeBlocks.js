@@ -93,13 +93,13 @@ export const PRIMES = {
     presets: [
       ['Next up', ['next', 'coins', 'recent']],
       ['Coins', ['coins', 'recent', 'visions']],
-      ['Visions', ['visions', 'next']],
+      ['Honours', ['visions', 'next']],
     ],
     blocks: {
       next:    B('Next up', 'list', 102, 76, ['barsL', 'barsM'], { grow: 1, max: 136, row: 34 }),
       coins:   B('Coin ledger', 'hero', 66, 42, ['heroL', 'heroM']),
       recent:  B('Recent wins', 'list', 94, 44, ['listL', 'statM'], { grow: 1, max: 142, row: 24 }),
-      visions: B('Visions', 'gauge', 118, 76, ['vesselsL', 'barsM'], { grow: 2 }),
+      visions: B('Honours', 'gauge', 118, 76, ['vesselsL', 'barsM'], { grow: 2 }),
     },
   },
 

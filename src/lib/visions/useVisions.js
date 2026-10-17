@@ -104,7 +104,7 @@ export function useVisions(S, update, showToast, onUnlock) {
     const fireToast = showToastRef.current;
     const BURST = 3;
     if (newIds.length > BURST && fireToast) {
-      fireToast(`✦ ${newIds.length} visions unlocked — see them in Visions`, true, 4200);
+      fireToast(`✦ ${newIds.length} honours earned — see them in Honours`, true, 4200);
     }
     for (const id of newIds) {
       toastedRef.current.add(id);
@@ -113,7 +113,7 @@ export function useVisions(S, update, showToast, onUnlock) {
         // Re-uses CoinToast's "earn" affordance (haptic + green tint)
         // — feels right for a milestone unlock. Custom toast surface
         // can come later if visions deserve their own visual.
-        fireToast(`${def.icon} Vision unlocked: ${def.title}`, true, 3200);
+        fireToast(`${def.icon} Honour earned: ${def.title}`, true, 3200);
       }
       // Notify caller — used by App.jsx to fire the push pre-prompt
       // on the user's first vision unlock (a real celebratable moment

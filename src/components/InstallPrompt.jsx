@@ -1,171 +1,132 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useLayoutEffect, useRef } from 'react';
 import Icon from './Icon';
 import { isNativeApp } from '../lib/native/platform';
+import {
+  countSession, alreadyHandled, markShown, markDismissed, mayShowInstallPrompt,
+} from '../lib/native/installPrompt';
+import '../install-prompt.css';
 
-const DISMISSED_KEY = 'vb4_install_dismissed';
+/* "Add to Home Screen", asked once per browser and only after the
+   person has a reason to come back — the rules and their history live
+   in lib/native/installPrompt.js.
+
+   Phones get a slim bar docked above the tab bar that RESERVES its own
+   height (html.vb-install-bar pads .section by it), so nothing is left
+   underneath it. Desktop gets a compact card in the bottom-right corner
+   rather than bottom-centre over the content. */
 
 function isIOS() {
-  return /iphone|ipad|ipod/i.test(navigator.userAgent) ||
-    // iPad on iOS 13+ reports as MacIntel with touch
-    (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  try {
+    return /iphone|ipad|ipod/i.test(navigator.userAgent) ||
+      // iPad on iOS 13+ reports as MacIntel with touch
+      (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  } catch { return false; }
 }
 
 function isInStandaloneMode() {
-  return window.matchMedia('(display-mode: standalone)').matches ||
-    window.navigator.standalone === true;
+  try {
+    return window.matchMedia('(display-mode: standalone)').matches ||
+      window.navigator.standalone === true;
+  } catch { return false; }
 }
 
-export default function InstallPrompt() {
-  const [deferredPrompt, setDeferredPrompt] = useState(null); // Android Chrome
-  const [showIOSHint, setShowIOSHint] = useState(false);       // iOS Safari
+function safeStore(name) {
+  try { return window[name]; } catch { return null; }
+}
+
+export default function InstallPrompt({ engaged = false }) {
+  const [deferredPrompt, setDeferredPrompt] = useState(null); // Android / desktop Chrome
   const [visible, setVisible] = useState(false);
+  const [blocked] = useState(() =>
+    isNativeApp() || isInStandaloneMode() || alreadyHandled(safeStore('localStorage')));
+  const [sessions] = useState(() =>
+    (blocked ? 0 : countSession(safeStore('localStorage'), safeStore('sessionStorage'))));
+  const ios = useRef(isIOS()).current;
+  const barRef = useRef(null);
 
+  // Capture the browser's install event as early as possible — it fires
+  // once, often before the person counts as engaged.
   useEffect(() => {
-    // Don't show if already installed or previously dismissed — and
-    // never in the native app, which IS the installed thing.
-    if (isNativeApp()) return;
-    if (isInStandaloneMode()) return;
-    if (sessionStorage.getItem(DISMISSED_KEY)) return;
-
-    if (isIOS()) {
-      // Show iOS manual instructions after a short delay
-      const t = setTimeout(() => { setShowIOSHint(true); setVisible(true); }, 3000);
-      return () => clearTimeout(t);
-    }
-
-    // Android Chrome: capture the native install event
-    const handler = e => {
-      e.preventDefault();
-      setDeferredPrompt(e);
-      setVisible(true);
-    };
+    if (blocked || ios) return;
+    const handler = e => { e.preventDefault(); setDeferredPrompt(e); };
     window.addEventListener('beforeinstallprompt', handler);
     return () => window.removeEventListener('beforeinstallprompt', handler);
-  }, []);
+  }, [blocked, ios]);
+
+  const eligible = !blocked && mayShowInstallPrompt({
+    native: false, standalone: false, handled: false, sessions, engaged,
+  });
+
+  useEffect(() => {
+    if (!eligible || visible) return;
+    if (ios) {
+      // A short pause so it never lands on top of the boot animation.
+      const t = setTimeout(() => setVisible(true), 3000);
+      return () => clearTimeout(t);
+    }
+    if (deferredPrompt) setVisible(true);
+  }, [eligible, ios, deferredPrompt, visible]);
+
+  // At most once per browser: remember it the moment it appears.
+  useEffect(() => {
+    if (visible) markShown(safeStore('localStorage'));
+  }, [visible]);
+
+  // Reserve the bar's height on phones while it is up.
+  useLayoutEffect(() => {
+    const root = document.documentElement;
+    if (!visible || !barRef.current) return;
+    const el = barRef.current;
+    const apply = () => root.style.setProperty('--vb-install-h', `${Math.ceil(el.offsetHeight)}px`);
+    apply();
+    root.classList.add('vb-install-bar');
+    let ro = null;
+    if (typeof ResizeObserver === 'function') { ro = new ResizeObserver(apply); ro.observe(el); }
+    return () => {
+      if (ro) ro.disconnect();
+      root.classList.remove('vb-install-bar');
+      root.style.removeProperty('--vb-install-h');
+    };
+  }, [visible]);
 
   function dismiss() {
-    sessionStorage.setItem(DISMISSED_KEY, '1');
+    markDismissed(safeStore('localStorage'));
     setVisible(false);
   }
 
   async function handleInstall() {
     if (!deferredPrompt) return;
-    deferredPrompt.prompt();
-    const { outcome } = await deferredPrompt.userChoice;
-    if (outcome === 'accepted') setVisible(false);
+    try {
+      deferredPrompt.prompt();
+      await deferredPrompt.userChoice;
+    } catch { /* the browser declined to show it — nothing to do */ }
+    // Accepted or not, it has been asked: don't ask again.
+    markDismissed(safeStore('localStorage'));
+    setVisible(false);
     setDeferredPrompt(null);
   }
 
   if (!visible) return null;
 
   return (
-    <div style={{
-      position: 'fixed',
-      bottom: showIOSHint ? '80px' : '16px', // clear iOS nav bar
-      left: '50%',
-      transform: 'translateX(-50%)',
-      zIndex: 7500,
-      width: 'calc(100% - 32px)',
-      maxWidth: '400px',
-      background: 'rgba(15,17,24,0.97)',
-      backdropFilter: 'blur(16px)',
-      border: '1px solid rgba(255,255,255,.15)',
-      borderRadius: '16px',
-      padding: '16px 18px',
-      boxShadow: '0 8px 32px rgba(0,0,0,0.5)',
-      fontFamily: 'var(--sans, DM Sans, sans-serif)',
-      animation: 'sheet-up 300ms cubic-bezier(0.34,1.56,0.64,1) both',
-    }}>
-      <div style={{ display: 'flex', alignItems: 'flex-start', gap: '14px' }}>
-        {/* App icon */}
-        <img
-          src="/icon-192.png"
-          alt="Vantage"
-          style={{ width: '48px', height: '48px', borderRadius: '12px', flexShrink: 0 }}
-        />
-
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontWeight: 700, fontSize: '14px', color: '#fff', marginBottom: '3px' }}>
-            Add to Home Screen
+    <div className="vb-install" ref={barRef} role="region" aria-label="Install Vantage">
+      <img className="vb-install-icon" src="/icon-192.png" alt="" aria-hidden="true" />
+      <div className="vb-install-text">
+        <div className="vb-install-title">Add Vantage to your Home Screen</div>
+        {ios ? (
+          <div className="vb-install-sub">
+            Tap <strong>Share</strong> <span aria-hidden="true">⎙</span> then <strong>“Add to Home Screen”</strong>.
           </div>
-
-          {showIOSHint ? (
-            <div style={{ fontSize: '12px', color: 'rgba(255,255,255,.65)', lineHeight: 1.6 }}>
-              Tap <strong style={{ color: '#fff' }}>Share</strong>{' '}
-              <span style={{ fontSize: '14px' }}>⎙</span>{' '}
-              then <strong style={{ color: '#fff' }}>"Add to Home Screen"</strong> to install Vantage.
-            </div>
-          ) : (
-            <div style={{ fontSize: '12px', color: 'rgba(255,255,255,.65)', lineHeight: 1.6 }}>
-              Install for a faster, full-screen experience with offline support.
-            </div>
-          )}
-        </div>
-
-        {/* Dismiss */}
-        <button
-          onClick={dismiss}
-          style={{
-            background: 'none', border: 'none', color: 'rgba(255,255,255,.4)',
-            fontSize: '18px', cursor: 'pointer', padding: '0 2px', lineHeight: 1, flexShrink: 0,
-          }}
-          aria-label="Dismiss install prompt"
-        >
-          <Icon name="x" size={14} />
-        </button>
+        ) : (
+          <div className="vb-install-sub">Opens full-screen, works offline.</div>
+        )}
       </div>
-
-      {/* Android install button */}
-      {!showIOSHint && deferredPrompt && (
-        <div style={{ display: 'flex', gap: '8px', marginTop: '14px' }}>
-          <button
-            onClick={dismiss}
-            style={{
-              flex: 1, padding: '9px', borderRadius: '10px', border: '1px solid rgba(255,255,255,.15)',
-              background: 'transparent', color: 'rgba(255,255,255,.6)', fontSize: '13px',
-              cursor: 'pointer', fontFamily: 'var(--sans)',
-            }}
-          >
-            Not now
-          </button>
-          <button
-            onClick={handleInstall}
-            style={{
-              flex: 2, padding: '9px', borderRadius: '10px', border: 'none',
-              background: 'var(--em, #1a7a4a)', color: '#fff', fontSize: '13px',
-              fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--sans)',
-            }}
-          >
-            Install App
-          </button>
-        </div>
+      {!ios && deferredPrompt && (
+        <button type="button" className="vb-install-go" onClick={handleInstall}>Install</button>
       )}
-
-      {/* iOS: just a dismiss link */}
-      {showIOSHint && (
-        <button
-          onClick={dismiss}
-          style={{
-            display: 'block', width: '100%', marginTop: '12px', padding: '8px',
-            borderRadius: '10px', border: '1px solid rgba(255,255,255,.1)',
-            background: 'transparent', color: 'rgba(255,255,255,.5)', fontSize: '12px',
-            cursor: 'pointer', fontFamily: 'var(--sans)',
-          }}
-        >
-          Maybe later
-        </button>
-      )}
-
-      {/* iOS arrow pointing to share button */}
-      {showIOSHint && (
-        <div style={{
-          position: 'absolute', bottom: '-10px', left: '50%', transform: 'translateX(-50%)',
-          width: 0, height: 0,
-          borderLeft: '10px solid transparent',
-          borderRight: '10px solid transparent',
-          borderTop: '10px solid rgba(15,17,24,0.97)',
-        }} />
-      )}
+      <button type="button" className="vb-install-x" onClick={dismiss} aria-label="Dismiss install prompt">
+        <Icon name="x" size={16} />
+      </button>
     </div>
   );
 }
