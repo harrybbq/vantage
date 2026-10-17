@@ -234,11 +234,17 @@ export async function listRelationshipIds(userId) {
 
 /** Incoming pending requests (someone asked YOU). */
 export async function listPendingRequests(userId) {
-  const { data: edges, error } = await supabase
+  // via_invite (dm_upgrade_2026_10.sql) lets the list say "via your
+  // invite". Until that column exists, ask again without it.
+  const pending = cols => supabase
     .from('friendships')
-    .select('requester_id, created_at')
+    .select(cols)
     .eq('addressee_id', userId)
     .eq('status', 'pending');
+  let { data: edges, error } = await pending('requester_id, created_at, via_invite');
+  if (error && isMissingColumn(error, 'via_invite')) {
+    ({ data: edges, error } = await pending('requester_id, created_at'));
+  }
   if (error) throw new Error(friendlyError(error, 'Could not load requests.'));
   const ids = (edges || []).map(e => e.requester_id);
   if (ids.length === 0) return [];
@@ -247,10 +253,10 @@ export async function listPendingRequests(userId) {
     .select('id, handle, display_name, avatar_url, level, ratings_ovr')
     .in('id', ids);
   if (pErr) throw new Error(friendlyError(pErr, 'Could not load requesters.'));
-  return (profiles || []).map(p => ({
-    ...p,
-    requested_at: edges.find(e => e.requester_id === p.id)?.created_at,
-  }));
+  return (profiles || []).map(p => {
+    const edge = edges.find(e => e.requester_id === p.id);
+    return { ...p, requested_at: edge?.created_at, via_invite: !!edge?.via_invite };
+  });
 }
 
 /**
