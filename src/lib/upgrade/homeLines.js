@@ -44,6 +44,10 @@
  *   three months running (this month and the two before); otherwise
  *   neutral. Not installed / SQL not run → neutral "Set up"; a failed
  *   or refused fetch → unknown.
+ * Lifts (S.lifts, derived): always neutral — a PB is news, not a status.
+ *   Figure = the weight of the most recent PB set, captioned with the
+ *   lift ("180 kg" · "Leg press PB"), or "Log a lift" with nothing
+ *   logged; text = "3 PBs this month · last logged 2 d ago".
  *
  * ── updatedAt ──
  * The ms epoch of the data the line is built from: the console's own
@@ -52,6 +56,7 @@
  * null for the rotation (derived from the calendar, always current).
  */
 import { resolveDay, scheduleOf } from '../rotation/pattern.js';
+import { makeBwOf, pbTimeline, chrono, weightText, shortLiftName, daysBetween, isIso } from '../lifts/lifts.js';
 import { num, toMs } from '../security/format.js';
 import { pillState } from '../security/status.js';
 
@@ -399,6 +404,44 @@ export function booksCard({ res, months = [], today, at = null }) {
     text: `${cardPounds(cur.income)} in · ${cardPounds(cur.expense)} out this month${losing ? ' · 3rd month of costs over income' : ''}`,
     state: profit > 0 ? 'ok' : losing ? 'attention' : 'neutral',
     updatedAt: toMs(at),
+  });
+}
+
+// ── Lifts ─────────────────────────────────────────────────────────
+
+/**
+ * @param lifts      S.lifts ({ list, log }) — absent or empty reads as nothing logged
+ * @param vitalsLog  S.vitalsLog (bodyweight for dips' e1RM)
+ * @param today      local 'YYYY-MM-DD'
+ * A PB here is a set that beat the lift's e1RM or heaviest weight when
+ * it was lifted (pbTimeline) — rep-max PBs are in the tab, not the count.
+ */
+export function liftsCard({ lifts, vitalsLog, today }) {
+  const list = lifts && Array.isArray(lifts.list) ? lifts.list : [];
+  const log = lifts && Array.isArray(lifts.log) ? lifts.log : [];
+  const byId = new Map(list.map(l => [l.id, l]));
+  const sets = log.filter(e => e && byId.has(e.liftId) && isIso(e.date));
+  if (!sets.length) return card({ figure: 'Log a lift', text: 'Personal bests on your main lifts' });
+  const bwOf = makeBwOf(vitalsLog);
+  const ym = String(today || '').slice(0, 7);
+  let latest = null, month = 0;
+  for (const lift of list) {
+    for (const ev of pbTimeline(log, lift, { bwOf })) {
+      if (!ev.e1rm && !ev.heaviest) continue;
+      if (ev.entry.date.slice(0, 7) === ym) month++;
+      if (!latest || chrono(ev.entry, latest.entry) > 0) latest = { entry: ev.entry, lift };
+    }
+  }
+  let last = sets[0];
+  for (const e of sets) if (chrono(e, last) > 0) last = e;
+  const d = isIso(today) ? Math.max(0, daysBetween(last.date, today)) : null;
+  const when = d == null ? '' : d === 0 ? ' · last logged today' : ` · last logged ${d} d ago`;
+  const pbs = month ? `${plural(month, 'PB')} this month` : 'No PBs yet this month';
+  const shown = latest || { entry: last, lift: byId.get(last.liftId) };
+  return card({
+    figure: weightText(shown.entry, shown.lift).replace(/^BW \+/, '+'),
+    figureLabel: `${shortLiftName(shown.lift.name)} ${latest ? 'PB' : '· last set'}`,
+    text: pbs + when,
   });
 }
 

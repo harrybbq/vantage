@@ -11,7 +11,7 @@ import {
   STATES, stateRank, worstState, card, loadingCard, ago, exactTime, dayLabel, localIso, daysUntil,
   shiftLabel, rotationLine, rotationCard, dietCard, DIET_LATE_HOUR, careerCard, EXAM_SOON_DAYS,
   overviewState, securityCard, securityHeroBit, crestFallbackCard, crestHeroBit, securityFailedCard, heroSub,
-  cardPounds, booksCard,
+  cardPounds, booksCard, liftsCard,
 } from './homeLines.js';
 import { briefFor } from '../career/brief.js';
 
@@ -422,6 +422,54 @@ t('hero: a three-month loss on Books outranks ok cards', () => {
     { month: '2026-10', income: 0, expense: 1 }, { month: '2026-09', income: 0, expense: 1 }, { month: '2026-08', income: 0, expense: 1 },
   ] });
   assert.equal(worstState([dietCard({ target: 182, day: day(190), hour: 14 }), books]), 'attention');
+});
+
+// ── Lifts ──
+const LT = '2026-10-17';
+const LIST = [
+  { id: 'lp', name: 'Machine leg press', load: 'weight' },
+  { id: 'dp', name: 'Dip', load: 'bodyweight_plus' },
+  { id: 'gone', name: 'Old lift', load: 'weight', archived: true },
+];
+let ls = 0;
+const lset = (liftId, date, weight, reps, extra = {}) => ({ id: `s${++ls}`, liftId, date, weight, reps, createdAt: ls, ...extra });
+t('lifts: nothing logged says "Log a lift", neutral', () => {
+  for (const lifts of [undefined, null, {}, { list: LIST, log: [] }, { list: LIST, log: [lset('ghost', '2026-10-01', 50, 5)] }]) {
+    const c = liftsCard({ lifts, vitalsLog: {}, today: LT });
+    honest(c);
+    assert.equal(c.figure, 'Log a lift');
+    assert.equal(c.state, 'neutral');
+    assert.equal(c.updatedAt, null, 'derived — the footer says Live');
+  }
+});
+t('lifts: most recent PB, PBs this month, last logged', () => {
+  const log = [
+    lset('lp', '2026-08-01', 160, 8), lset('lp', '2026-09-20', 170, 8),        // Sep PB
+    lset('lp', '2026-10-03', 175, 8), lset('lp', '2026-10-10', 180, 6),        // two Oct PBs
+    lset('lp', '2026-10-12', 150, 8, { shift: 'night' }),                       // lighter night set, not a PB
+    lset('dp', '2026-10-01', 20, 8), lset('dp', '2026-10-15', 20, 8),           // tie: not a PB
+  ];
+  const c = liftsCard({ lifts: { list: LIST, log }, vitalsLog: { '2026-10-01': { weight: 80 } }, today: LT });
+  honest(c);
+  assert.equal(c.figure, '180 kg');
+  assert.equal(c.figureLabel, 'Leg press PB');
+  assert.equal(c.text, '2 PBs this month · last logged 2 d ago');
+  assert.equal(c.state, 'neutral');
+});
+t('lifts: dips read "+20 kg"; today and no-PB wording', () => {
+  const log = [lset('dp', '2026-09-01', 15, 8), lset('dp', '2026-09-08', 20, 8)];
+  const c = liftsCard({ lifts: { list: LIST, log }, vitalsLog: {}, today: '2026-09-08' });
+  assert.equal(c.figure, '+20 kg');
+  assert.equal(c.figureLabel, 'Dip PB');
+  assert.equal(c.text, '1 PB this month · last logged today');
+  const flat = liftsCard({ lifts: { list: LIST, log: [lset('lp', '2026-09-01', 100, 8)] }, vitalsLog: {}, today: LT });
+  assert.equal(flat.figure, '100 kg');
+  assert.equal(flat.figureLabel, 'Leg press · last set', 'one set is a baseline, not a PB');
+  assert.equal(flat.text, 'No PBs yet this month · last logged 46 d ago');
+});
+t('lifts: the card never colours the hero', () => {
+  const c = liftsCard({ lifts: { list: LIST, log: [lset('lp', '2026-10-01', 100, 8), lset('lp', '2026-10-02', 110, 8)] }, today: LT });
+  assert.equal(worstState([c, rotationCard({}, '2026-10-02')]), 'neutral');
 });
 
 console.log(`homeLines: ${n} tests passed`);
