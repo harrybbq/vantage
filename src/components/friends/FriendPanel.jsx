@@ -37,6 +37,8 @@ export default function FriendPanel({
   onReport,
   onBlock,
   onUnfriend,
+  onActivity,
+  onRead,
 }) {
   if (!friend) return null;
 
@@ -61,6 +63,8 @@ export default function FriendPanel({
             friend={friend}
             onClose={onClose}
             onBlocked={onBlocked}
+            onActivity={onActivity}
+            onRead={onRead}
           />
         </div>
         <div className="fr-panel-profile">

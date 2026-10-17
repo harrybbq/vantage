@@ -24,7 +24,7 @@ export default function FriendsPanelList({
   const offlineN = offlineCount ?? Math.max(0, friends.length - onlineN);
 
   return (
-    <div className="fc-panel">
+    <div className="fc-panel" id="fr-tabpanel-friends" role="tabpanel" aria-labelledby="fr-tab-friends">
       <div className="fc-panel-head">
         <span className="fc-panel-label">Friends</span>
         <span className="fc-panel-meta">
@@ -37,7 +37,7 @@ export default function FriendsPanelList({
       </div>
       {friends.length === 0 ? (
         <div className="fc-panel-empty">
-          Add a friend by their @handle to compare progress.
+          Invite a friend with your link, or add them by @handle, to compare progress.
         </div>
       ) : (
         <div className="fc-panel-body">
