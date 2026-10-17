@@ -945,7 +945,7 @@ function Board({ userId, userEmail, onSignOut }) {
           <motion.div key="upgrade" {...pageMotion}>
             <WidgetBoundary variant="section" name="upgrade">
             <Suspense fallback={null}>
-              <UpgradeSection S={S} update={update} active isOwner={isOwner} userId={userId} />
+              <UpgradeSection S={S} update={update} active isOwner={isOwner} userId={userId} hydrated={hydrated} />
             </Suspense>
             </WidgetBoundary>
           </motion.div>

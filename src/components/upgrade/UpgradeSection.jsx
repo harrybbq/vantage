@@ -14,6 +14,7 @@
  *              (formerly "Review"; the old id still opens it)
  *   Books    — money in and out for Vantage: ledger, imports, bills
  *              (its data is server-only, never in S — see BooksTab)
+ *   Lifts    — personal bests on the main lifts (S.lifts, additive)
  *
  * It opens on a home menu (UpgradeHome): a large title and one card per
  * section with a live line, rather than a tab strip — Upgrade is a small
@@ -38,11 +39,12 @@ import DietTab from './DietTab';
 import CareerTab from './CareerTab';
 import SecurityTab from './security/SecurityTab';
 import BooksTab from './books/BooksTab';
+import LiftsTab from './lifts/LiftsTab';
 import UpgradeHome, { SECTIONS, resolveSection } from './UpgradeHome';
 import { parseSecurityLink, stripSecurityParams } from '../../lib/security/deepLink';
 import './Upgrade.css';
 
-export default function UpgradeSection({ S, update, active, isOwner, userId }) {
+export default function UpgradeSection({ S, update, active, isOwner, userId, hydrated = true }) {
   const isMobile = useIsMobile();
   const [tab, setTab] = useState(null);           // null = the home menu
   const [origin, setOrigin] = useState('50% 30%');
@@ -116,6 +118,7 @@ export default function UpgradeSection({ S, update, active, isOwner, userId }) {
           {tab === 'career' && <CareerTab S={S} update={update} userId={userId} isMobile={isMobile} />}
           {cur.id === 'security' && <SecurityTab initialTab={secInit && secInit.tab} initialFocus={secInit && secInit.focus} />}
           {tab === 'books' && <BooksTab />}
+          {tab === 'lifts' && <LiftsTab S={S} update={update} hydrated={hydrated} />}
         </div>
       )}
     </section>

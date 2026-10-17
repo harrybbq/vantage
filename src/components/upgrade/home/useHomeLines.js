@@ -12,11 +12,12 @@
  *             function isn't installed, the crest queue stands in
  *   books     the books function's `?view=overview` for this month and
  *             the two before (a few dozen rows; summed here)
+ *   lifts     S.lifts + S.vitalsLog (derived, no request)
  * Nothing here writes anything. Every fetch fails soft into state
  * 'unknown' with an error string and a `retry` that re-fetches without
  * opening the section. No polling: the menu is opened, read, left.
  *
- * → { hero: { sub, state }, cards: { career, diet, rotation, security, books } }
+ * → { hero: { sub, state }, cards: { career, diet, rotation, security, books, lifts } }
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { planProteinG } from '../../../lib/diet/plan';
@@ -32,7 +33,7 @@ import { summarise } from '../../../lib/books/reports';
 import { addMonths } from '../../../lib/upgrade/booksView';
 import {
   loadingCard, worstState, rotationLine, rotationCard, dietCard, careerCard, daysUntil,
-  securityCard, securityHeroBit, crestFallbackCard, crestHeroBit, securityFailedCard, heroSub, booksCard,
+  securityCard, securityHeroBit, crestFallbackCard, crestHeroBit, securityFailedCard, heroSub, booksCard, liftsCard,
 } from '../../../lib/upgrade/homeLines';
 
 function latestKg(S) {
@@ -175,9 +176,12 @@ export function useHomeLines(S, userId) {
   const career = useCareerCard(S);
   const security = useSecurityCard();
   const books = useBooksCard();
+  const liftStore = S && S.lifts;
+  const vitals = S && S.vitalsLog;
+  const lifts = useMemo(() => liftsCard({ lifts: liftStore, vitalsLog: vitals, today }), [liftStore, vitals, today]);
 
   return useMemo(() => {
-    const cards = { career, diet, rotation, security: security.card, books };
+    const cards = { career, diet, rotation, security: security.card, books, lifts };
     return {
       hero: {
         sub: heroSub({ date: new Date(), rotation: rotaLine, security: security.bit }),
@@ -185,7 +189,7 @@ export function useHomeLines(S, userId) {
       },
       cards,
     };
-  }, [career, diet, rotation, rotaLine, security, books]);
+  }, [career, diet, rotation, rotaLine, security, books, lifts]);
 }
 
 export default useHomeLines;
