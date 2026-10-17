@@ -141,7 +141,7 @@ export default function LeaderboardPanel({
           <div className="lb-banner">
             <div>
               <strong>You're not on the global board.</strong>
-              <span style={{ display: 'block', marginTop: 2, color: 'var(--text-muted)', fontSize: 11 }}>
+              <span style={{ display: 'block', marginTop: 2, color: 'var(--text-muted)', fontSize: 'var(--fs-floor)' }}>
                 Enable in Settings → Privacy.
               </span>
             </div>
@@ -157,7 +157,7 @@ export default function LeaderboardPanel({
         {data && noFriends && (
           <div className="lb-empty">
             <div style={{ fontWeight: 600, marginBottom: 6 }}>Just you here.</div>
-            <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 10 }}>
+            <div style={{ fontSize: 'var(--fs-floor)', color: 'var(--text-muted)', marginBottom: 10 }}>
               Add friends to see how you compare.
             </div>
             {onAddFriends && (

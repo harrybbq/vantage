@@ -60,7 +60,7 @@ export default function FriendRatingsModal({ row, onClose, userId, onBlocked }) 
               {row.username}
               <PrestigeBadge prestige={row.prestige} size="sm" />
             </div>
-            <div style={{ fontFamily: 'var(--mono)', fontSize: 10, letterSpacing: 1.2, textTransform: 'uppercase', color: 'var(--text-muted)' }}>
+            <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-floor)', letterSpacing: 1.2, textTransform: 'uppercase', color: 'var(--text-muted)' }}>
               Updated {timeAgo(row.ratingsComputedAt)}
             </div>
           </div>
@@ -70,7 +70,7 @@ export default function FriendRatingsModal({ row, onClose, userId, onBlocked }) 
               fontSize: 42, lineHeight: 1, letterSpacing: -1,
             }}>{row.ovr}</div>
             <div style={{
-              fontFamily: 'var(--mono)', fontSize: 9, letterSpacing: 1.6, textTransform: 'uppercase',
+              fontFamily: 'var(--mono)', fontSize: 'var(--fs-floor)', letterSpacing: 1.6, textTransform: 'uppercase',
               color: prestige.color, fontWeight: 700, marginTop: 4,
             }}>{prestige.label}</div>
           </div>
@@ -90,7 +90,7 @@ export default function FriendRatingsModal({ row, onClose, userId, onBlocked }) 
                 <span style={{ fontSize: 16, color: t.color }}>{c.icon}</span>
                 <span style={{ flex: 1, fontFamily: 'var(--sans)', fontSize: 13, fontWeight: 600 }}>{c.label}</span>
                 <span style={{
-                  fontFamily: 'var(--mono)', fontSize: 9, letterSpacing: 1.2, textTransform: 'uppercase',
+                  fontFamily: 'var(--mono)', fontSize: 'var(--fs-floor)', letterSpacing: 1.2, textTransform: 'uppercase',
                   padding: '2px 7px', borderRadius: 4, color: t.color, fontWeight: 700,
                   background: `rgba(var(--em-rgb), 0.08)`, border: `1px solid ${t.color}55`,
                 }}>{t.label}</span>

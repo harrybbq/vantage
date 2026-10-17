@@ -572,6 +572,18 @@ function Board({ userId, userEmail, onSignOut }) {
     closeModal: handleCloseModal,
   });
 
+  // Tell the stylesheets when a photo is behind the current page, so the
+  // text that sits straight on the page (headers, tab rows, Settings)
+  // can take a reading plate — see "Text over a photo" in index.css.
+  // Presentation only: reads S.backgrounds, writes nothing to state.
+  const photoBehind = !!backgrounds[activeSection];
+  useEffect(() => {
+    const r = document.documentElement;
+    if (photoBehind) r.setAttribute('data-bg-photo', '1');
+    else r.removeAttribute('data-bg-photo');
+    return () => r.removeAttribute('data-bg-photo');
+  }, [photoBehind]);
+
   if (loading) {
     return (
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', color: 'var(--text-muted)', fontFamily: 'var(--mono)', fontSize: '13px', letterSpacing: '2px' }}>
@@ -614,13 +626,13 @@ function Board({ userId, userEmail, onSignOut }) {
           boxShadow: '0 14px 36px rgba(0,0,0,0.08)',
         }}>
           <div style={{
-            fontFamily: 'var(--mono)', fontSize: 9, letterSpacing: 2.5,
+            fontFamily: 'var(--mono)', fontSize: 'var(--fs-floor)', letterSpacing: 2.5,
             textTransform: 'uppercase', color: 'var(--em-mid, var(--em))',
             marginBottom: 8,
           }}>{eyebrow}</div>
           <h2 style={{
             fontFamily: 'var(--display)', fontSize: 24, fontStyle: 'italic',
-            fontWeight: 700, color: 'var(--em)', margin: '0 0 14px',
+            fontWeight: 700, color: 'var(--em-text)', margin: '0 0 14px',
           }}>
             {headline}
           </h2>

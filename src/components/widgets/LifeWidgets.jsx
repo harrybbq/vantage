@@ -65,7 +65,7 @@ function Sparkline({ series, goal, height = 44 }) {
   // Plot the raw entries of the last 30 days plus a dashed goal line.
   const cutoff = new Date(); cutoff.setDate(cutoff.getDate() - 30);
   const pts = series.filter(([d]) => new Date(d + 'T12:00') >= cutoff);
-  if (pts.length < 2) return <div style={{ ...mono, fontSize: 10, color: 'var(--text-muted)', padding: '8px 0' }}>Log a few days of weight to see your trend.</div>;
+  if (pts.length < 2) return <div style={{ ...mono, fontSize: 'var(--fs-floor)', color: 'var(--text-muted)', padding: '8px 0' }}>Log a few days of weight to see your trend.</div>;
   const ws = pts.map(([, w]) => w);
   const lo = Math.min(...ws, goal || Infinity) - 0.5;
   const hi = Math.max(...ws, goal || -Infinity) + 0.5;
@@ -112,16 +112,16 @@ export function BodyBody({ S, update, navigate, showLog = false }) {
             <span style={{ fontFamily: 'var(--sans)', fontSize: 22, fontWeight: 700, color: 'var(--text)' }}>
               {stats.avgNow.toFixed(1)}<span style={{ fontSize: 12, fontWeight: 500, color: 'var(--text-muted)' }}> kg</span>
             </span>
-            <span style={{ ...mono, fontSize: 10, color: 'var(--text-muted)', letterSpacing: 0.5 }}>7-day avg</span>
+            <span style={{ ...mono, fontSize: 'var(--fs-floor)', color: 'var(--text-muted)', letterSpacing: 0.5 }}>7-day avg</span>
             {stats.delta != null && (
-              <span style={{ ...mono, fontSize: 11, fontWeight: 700, color: stats.delta <= 0 ? 'var(--em)' : '#d99114' }}>
+              <span style={{ ...mono, fontSize: 'var(--fs-floor)', fontWeight: 700, color: stats.delta <= 0 ? 'var(--em-text)' : '#d99114' }}>
                 {stats.delta > 0 ? '+' : ''}{stats.delta.toFixed(1)} kg/wk
               </span>
             )}
           </div>
           <Sparkline series={stats.series} goal={stats.goal} />
           {stats.goal != null && stats.avgNow != null && (
-            <div style={{ ...mono, fontSize: 10.5, color: 'var(--text-mid)' }}>
+            <div style={{ ...mono, fontSize: 'var(--fs-floor)', color: 'var(--text-mid)' }}>
               Goal {stats.goal} kg · {Math.abs(stats.avgNow - stats.goal) < 0.3
                 ? <span style={{ color: 'var(--gold, #d4a017)', fontWeight: 700 }}>at goal ✦</span>
                 : `${Math.abs(stats.avgNow - stats.goal).toFixed(1)} kg to go`}
@@ -129,7 +129,7 @@ export function BodyBody({ S, update, navigate, showLog = false }) {
           )}
         </>
       ) : (
-        <div style={{ ...mono, fontSize: 11, color: 'var(--text-muted)', lineHeight: 1.6 }}>
+        <div style={{ ...mono, fontSize: 'var(--fs-floor)', color: 'var(--text-muted)', lineHeight: 1.6 }}>
           No weight logged yet — log it via the Vitals widget or the Body card on Track, and your trend, weekly rate and goal progress appear here.
         </div>
       )}
@@ -153,7 +153,7 @@ export function BodyBody({ S, update, navigate, showLog = false }) {
       )}
       {navigate && (
         <button type="button" onClick={() => navigate('track')}
-          style={{ ...mono, alignSelf: 'flex-start', background: 'none', border: 'none', padding: 0, fontSize: 10, letterSpacing: 0.8, color: 'var(--text-muted)', cursor: 'pointer', textDecoration: 'underline' }}>
+          style={{ ...mono, alignSelf: 'flex-start', background: 'none', border: 'none', padding: 0, fontSize: 'var(--fs-floor)', letterSpacing: 0.8, color: 'var(--text-muted)', cursor: 'pointer', textDecoration: 'underline' }}>
           Full history → Track
         </button>
       )}
@@ -190,13 +190,13 @@ export function BodyCard({ S, update }) {
   }, [S.vitalsLog, bodyLog]);
 
   const inputStyle = { width: '100%', padding: '7px 9px', border: '1px solid var(--border)', borderRadius: 8, background: 'transparent', color: 'var(--text)', fontFamily: 'var(--sans)', fontSize: 12.5, outline: 'none' };
-  const lbl = { ...mono, fontSize: 9.5, letterSpacing: 1, textTransform: 'uppercase', color: 'var(--text-muted)', display: 'block', marginBottom: 4 };
+  const lbl = { ...mono, fontSize: 'var(--fs-floor)', letterSpacing: 1, textTransform: 'uppercase', color: 'var(--text-muted)', display: 'block', marginBottom: 4 };
 
   return (
     <div className="card" style={{ padding: '18px', marginTop: 14 }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
         <h3 style={{ margin: 0, fontSize: 'var(--text-md)' }}>Body</h3>
-        {stats?.goal != null && <span style={{ ...mono, fontSize: 10, color: 'var(--text-muted)' }}>goal {stats.goal} kg</span>}
+        {stats?.goal != null && <span style={{ ...mono, fontSize: 'var(--fs-floor)', color: 'var(--text-muted)' }}>goal {stats.goal} kg</span>}
       </div>
       <BodyBody S={S} update={update} showLog />
       {/* Goal + today's measurements */}
@@ -226,7 +226,7 @@ export function BodyCard({ S, update }) {
         </div>
       </div>
       {recent.length > 0 && (
-        <table style={{ width: '100%', marginTop: 12, borderCollapse: 'collapse', ...mono, fontSize: 10.5 }}>
+        <table style={{ width: '100%', marginTop: 12, borderCollapse: 'collapse', ...mono, fontSize: 'var(--fs-floor)' }}>
           <thead>
             <tr style={{ color: 'var(--text-muted)', textAlign: 'left' }}>
               <th style={{ padding: '4px 0', fontWeight: 500 }}>Date</th>
@@ -278,9 +278,9 @@ export function SubscriptionsBody({ S, navigate }) {
   const { subs, monthly, upcoming } = subsStats(S);
   if (!subs.length) {
     return (
-      <div style={{ ...mono, fontSize: 11, color: 'var(--text-muted)', lineHeight: 1.6 }}>
+      <div style={{ ...mono, fontSize: 'var(--fs-floor)', color: 'var(--text-muted)', lineHeight: 1.6 }}>
         No subscriptions tracked yet.
-        {navigate && <> <button type="button" onClick={() => navigate('achievements')} style={{ ...mono, background: 'none', border: 'none', padding: 0, fontSize: 11, color: 'var(--em)', cursor: 'pointer', textDecoration: 'underline' }}>Add your recurring bills</button> to see your monthly burn and upcoming renewals.</>}
+        {navigate && <> <button type="button" onClick={() => navigate('achievements')} style={{ ...mono, background: 'none', border: 'none', padding: 0, fontSize: 'var(--fs-floor)', color: 'var(--em-text)', cursor: 'pointer', textDecoration: 'underline' }}>Add your recurring bills</button> to see your monthly burn and upcoming renewals.</>}
       </div>
     );
   }
@@ -288,21 +288,21 @@ export function SubscriptionsBody({ S, navigate }) {
     <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
       <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
         <span style={{ fontFamily: 'var(--sans)', fontSize: 22, fontWeight: 700, color: 'var(--text)' }}>{money(monthly)}</span>
-        <span style={{ ...mono, fontSize: 10, color: 'var(--text-muted)', letterSpacing: 0.5 }}>/month · {subs.length} subscription{subs.length === 1 ? '' : 's'}</span>
+        <span style={{ ...mono, fontSize: 'var(--fs-floor)', color: 'var(--text-muted)', letterSpacing: 0.5 }}>/month · {subs.length} subscription{subs.length === 1 ? '' : 's'}</span>
       </div>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
         {upcoming.slice(0, 3).map(x => (
           <div key={x.id} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <span style={{ width: 6, height: 6, borderRadius: '50%', flexShrink: 0, background: daysUntil(x.due) <= 3 ? '#d99114' : 'var(--em)' }} />
             <span style={{ flex: 1, minWidth: 0, fontFamily: 'var(--sans)', fontSize: 12, color: 'var(--text)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{x.name}</span>
-            <span style={{ ...mono, fontSize: 10.5, color: 'var(--text-mid)' }}>{money(parseFloat(x.amount) || 0)}</span>
-            <span style={{ ...mono, fontSize: 10, color: daysUntil(x.due) <= 3 ? '#d99114' : 'var(--text-muted)', minWidth: 52, textAlign: 'right' }}>{x.due.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })} · {dueLabel(x.due)}</span>
+            <span style={{ ...mono, fontSize: 'var(--fs-floor)', color: 'var(--text-mid)' }}>{money(parseFloat(x.amount) || 0)}</span>
+            <span style={{ ...mono, fontSize: 'var(--fs-floor)', color: daysUntil(x.due) <= 3 ? '#d99114' : 'var(--text-muted)', minWidth: 52, textAlign: 'right' }}>{x.due.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })} · {dueLabel(x.due)}</span>
           </div>
         ))}
       </div>
       {navigate && (
         <button type="button" onClick={() => navigate('achievements')}
-          style={{ ...mono, alignSelf: 'flex-start', background: 'none', border: 'none', padding: 0, fontSize: 10, letterSpacing: 0.8, color: 'var(--text-muted)', cursor: 'pointer', textDecoration: 'underline' }}>
+          style={{ ...mono, alignSelf: 'flex-start', background: 'none', border: 'none', padding: 0, fontSize: 'var(--fs-floor)', letterSpacing: 0.8, color: 'var(--text-muted)', cursor: 'pointer', textDecoration: 'underline' }}>
           Manage → Savings
         </button>
       )}
@@ -341,7 +341,7 @@ export function SubscriptionsManager({ S, update }) {
           {adding ? 'Cancel' : '+ Add'}
         </button>
       </div>
-      <p style={{ ...mono, fontSize: 10.5, color: 'var(--text-muted)', margin: '0 0 12px', lineHeight: 1.6 }}>
+      <p style={{ ...mono, fontSize: 'var(--fs-floor)', color: 'var(--text-muted)', margin: '0 0 12px', lineHeight: 1.6 }}>
         Recurring outgoings — see your total monthly burn and what renews next. Cancelling one is an instant saving.
       </p>
 
@@ -361,19 +361,19 @@ export function SubscriptionsManager({ S, update }) {
       )}
 
       {subs.length === 0 ? (
-        <div style={{ ...mono, fontSize: 11, color: 'var(--text-muted)' }}>Nothing tracked yet — add your first recurring bill above.</div>
+        <div style={{ ...mono, fontSize: 'var(--fs-floor)', color: 'var(--text-muted)' }}>Nothing tracked yet — add your first recurring bill above.</div>
       ) : (
         <>
           <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginBottom: 10 }}>
             <span style={{ fontFamily: 'var(--sans)', fontSize: 24, fontWeight: 700, color: 'var(--text)' }}>{money(monthly)}</span>
-            <span style={{ ...mono, fontSize: 10.5, color: 'var(--text-muted)' }}>/month · {money(monthly * 12)}/year</span>
+            <span style={{ ...mono, fontSize: 'var(--fs-floor)', color: 'var(--text-muted)' }}>/month · {money(monthly * 12)}/year</span>
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
             {subsStats(S).all.map(x => (
               <div key={x.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 10px', border: '1px solid var(--border)', borderRadius: 9 }}>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ fontFamily: 'var(--sans)', fontSize: 13, fontWeight: 600, color: 'var(--text)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{x.name}</div>
-                  <div style={{ ...mono, fontSize: 9.5, color: 'var(--text-muted)', marginTop: 1 }}>
+                  <div style={{ ...mono, fontSize: 'var(--fs-floor)', color: 'var(--text-muted)', marginTop: 1 }}>
                     {x.category || 'Other'} · {x.freq === 'week' ? 'weekly' : x.freq === 'year' ? 'yearly' : 'monthly'}
                     {x.due && <> · renews {x.due.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })} ({dueLabel(x.due)})</>}
                     {/* The date now carries itself forward rather than
@@ -385,7 +385,7 @@ export function SubscriptionsManager({ S, update }) {
                   </div>
                 </div>
                 <span style={{ ...mono, fontSize: 12, fontWeight: 700, color: 'var(--text-mid)' }}>{money(parseFloat(x.amount) || 0)}</span>
-                <span style={{ ...mono, fontSize: 9.5, color: 'var(--text-muted)' }}>{money(toMonthly(x.amount, x.freq))}/mo</span>
+                <span style={{ ...mono, fontSize: 'var(--fs-floor)', color: 'var(--text-muted)' }}>{money(toMonthly(x.amount, x.freq))}/mo</span>
                 <button type="button" onClick={() => remove(x.id)} aria-label={`Remove ${x.name}`}
                   style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', fontSize: 13, padding: '2px 6px' }}>✕</button>
               </div>

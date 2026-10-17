@@ -449,7 +449,7 @@ const CameraScanner = forwardRef(function CameraScanner({ onBarcode, onAIResult,
 
       {/* Diagnostics line — tiny, top-left, owner-only surface */}
       {diag && status !== 'error' && (
-        <div style={{ position: 'absolute', top: 6, left: 8, fontFamily: 'var(--mono)', fontSize: '9px', color: 'rgba(255,255,255,.55)', background: 'rgba(0,0,0,.45)', padding: '2px 7px', borderRadius: 6, pointerEvents: 'none' }}>
+        <div style={{ position: 'absolute', top: 6, left: 8, fontFamily: 'var(--mono)', fontSize: 'var(--fs-floor)', color: 'rgba(255,255,255,.55)', background: 'rgba(0,0,0,.45)', padding: '2px 7px', borderRadius: 6, pointerEvents: 'none' }}>
           {diag}
         </div>
       )}

@@ -102,7 +102,7 @@ export default function NotificationPermissionPrompt({
               background: 'var(--card, #fff)',
             }}
           >
-            <div style={{ marginBottom: '8px', display: 'flex', justifyContent: 'center', color: 'var(--em)' }}><Icon name="bell" size={30} strokeWidth={1.6} /></div>
+            <div style={{ marginBottom: '8px', display: 'flex', justifyContent: 'center', color: 'var(--em-text)' }}><Icon name="bell" size={30} strokeWidth={1.6} /></div>
             <h3 style={{ margin: '0 0 8px', fontSize: '18px', fontWeight: 700 }}>
               {headline || 'Want a ping when something good happens?'}
             </h3>
@@ -127,7 +127,7 @@ export default function NotificationPermissionPrompt({
                 background: 'rgba(220, 60, 60, 0.08)',
                 border: '1px solid rgba(220, 60, 60, 0.25)',
                 color: 'var(--text)',
-                fontFamily: 'var(--mono)', fontSize: '11px',
+                fontFamily: 'var(--mono)', fontSize: 'var(--fs-floor)',
                 lineHeight: '1.6',
                 marginBottom: '14px',
               }}>{error}</div>
@@ -141,7 +141,7 @@ export default function NotificationPermissionPrompt({
                 style={{
                   padding: '9px 14px', borderRadius: '8px',
                   background: 'transparent', border: '1px solid var(--border)',
-                  fontFamily: 'var(--mono)', fontSize: '11px',
+                  fontFamily: 'var(--mono)', fontSize: 'var(--fs-floor)',
                   letterSpacing: '1px', textTransform: 'uppercase',
                   cursor: busy ? 'wait' : 'pointer',
                   color: 'var(--text-muted)',
@@ -157,7 +157,7 @@ export default function NotificationPermissionPrompt({
                   padding: '9px 16px', borderRadius: '8px',
                   background: 'var(--em)', border: 'none',
                   color: 'var(--em-on, #fff)',
-                  fontFamily: 'var(--mono)', fontSize: '11px',
+                  fontFamily: 'var(--mono)', fontSize: 'var(--fs-floor)',
                   letterSpacing: '1px', textTransform: 'uppercase', fontWeight: 700,
                   cursor: busy ? 'wait' : 'pointer',
                 }}
@@ -213,7 +213,7 @@ export function PushPermissionStatusRow({ onAsk }) {
       }} />
       <span style={{
         flex: 1,
-        fontFamily: 'var(--mono)', fontSize: '11px',
+        fontFamily: 'var(--mono)', fontSize: 'var(--fs-floor)',
         color: 'var(--text)', letterSpacing: '0.4px',
       }}>{label}</span>
       {!isWeb && !isOn && state !== 'denied' && (
@@ -223,7 +223,7 @@ export function PushPermissionStatusRow({ onAsk }) {
             padding: '5px 10px', borderRadius: '6px',
             background: 'var(--em)', border: 'none',
             color: 'var(--em-on, #fff)',
-            fontFamily: 'var(--mono)', fontSize: '10px',
+            fontFamily: 'var(--mono)', fontSize: 'var(--fs-floor)',
             letterSpacing: '1px', textTransform: 'uppercase', fontWeight: 700,
             cursor: 'pointer',
           }}

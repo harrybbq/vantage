@@ -480,7 +480,7 @@ export default function AuthScreen({ onOpenLegal }) {
         {/* Legal footer */}
         <div style={S.legalFooter}>
           <button type="button" className="auth-legal-link" onClick={() => onOpenLegal?.('privacy')}>Privacy Policy</button>
-          <span style={{ color: 'var(--border)', fontSize: 11 }}>·</span>
+          <span style={{ color: 'var(--border)', fontSize: 'var(--fs-floor)' }}>·</span>
           <button type="button" className="auth-legal-link" onClick={() => onOpenLegal?.('terms')}>Terms of Service</button>
         </div>
       </div>
@@ -530,7 +530,7 @@ const S = {
   },
   logoSub: {
     fontFamily: 'var(--mono, "DM Mono", monospace)',
-    fontSize: 9, letterSpacing: '2.5px', textTransform: 'uppercase',
+    fontSize: 'var(--fs-floor)', letterSpacing: '2.5px', textTransform: 'uppercase',
     color: 'var(--text-muted, #8a8278)', marginTop: 2,
   },
 
@@ -549,7 +549,7 @@ const S = {
 
   eyebrow: {
     fontFamily: 'var(--mono, "DM Mono", monospace)',
-    fontSize: 10, letterSpacing: '2.5px', textTransform: 'uppercase',
+    fontSize: 'var(--fs-floor)', letterSpacing: '2.5px', textTransform: 'uppercase',
     color: 'var(--em-mid, #2a9e62)', marginBottom: 6, fontWeight: 500,
   },
   heading: {
@@ -628,7 +628,7 @@ const S = {
   },
   dividerText: {
     fontFamily: 'var(--mono, "DM Mono", monospace)',
-    fontSize: 9, letterSpacing: '2px',
+    fontSize: 'var(--fs-floor)', letterSpacing: '2px',
     color: 'var(--text-muted, #8a8278)',
   },
 
@@ -636,7 +636,7 @@ const S = {
   fg:   { display: 'flex', flexDirection: 'column', gap: 5 },
   label: {
     fontFamily: 'var(--mono, "DM Mono", monospace)',
-    fontSize: 10, letterSpacing: '1.8px', textTransform: 'uppercase',
+    fontSize: 'var(--fs-floor)', letterSpacing: '1.8px', textTransform: 'uppercase',
     color: 'var(--text-muted, #8a8278)', fontWeight: 500,
   },
   input: {
@@ -651,7 +651,7 @@ const S = {
   },
   capsHint: {
     fontFamily: 'var(--mono, "DM Mono", monospace)',
-    fontSize: 9, letterSpacing: '1px',
+    fontSize: 'var(--fs-floor)', letterSpacing: '1px',
     color: 'var(--text-muted, #8a8278)', marginTop: 3,
   },
 
@@ -669,7 +669,7 @@ const S = {
     marginTop: 4,
     background: 'linear-gradient(180deg, var(--em-mid, #2a9e62) 0%, var(--em, #1a7a4a) 100%)',
     color: '#fff', border: 'none', borderRadius: 10,
-    padding: '12px 16px', fontSize: 11, fontWeight: 500,
+    padding: '12px 16px', fontSize: 'var(--fs-floor)', fontWeight: 500,
     fontFamily: 'var(--mono, "DM Mono", monospace)', letterSpacing: '1.5px',
     cursor: 'pointer',
     boxShadow: '0 2px 10px rgba(26,122,74,0.28)',

@@ -54,7 +54,7 @@ export default function HubFooter({ visible, onOpenLegal }) {
             style={{
               background: 'none', border: 'none', cursor: 'pointer',
               fontFamily: 'var(--mono, DM Mono, monospace)',
-              fontSize: '10px', letterSpacing: '0.5px',
+              fontSize: 'var(--fs-floor)', letterSpacing: '0.5px',
               color: 'rgba(255,255,255,.3)',
               textDecoration: 'underline', padding: 0,
             }}

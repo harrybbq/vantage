@@ -267,7 +267,7 @@ export default function RatingsPanel({ S, update, compact = false }) {
           </button>
         )}
         {prestigeError && (
-          <div style={{ fontFamily: 'var(--mono)', fontSize: 10, color: 'rgb(220,60,60)' }}>
+          <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-floor)', color: 'rgb(220,60,60)' }}>
             {prestigeError}
           </div>
         )}
@@ -391,7 +391,7 @@ function BreakdownModal({ S, category, onClose, onTakeCheck }) {
           }}>{score}<span style={{ fontSize: 14, color: 'var(--text-muted)' }}>/99</span></span>
         </h3>
         <p style={{
-          fontFamily: 'var(--mono)', fontSize: 11, color: 'var(--text-muted)',
+          fontFamily: 'var(--mono)', fontSize: 'var(--fs-floor)', color: 'var(--text-muted)',
           margin: '0 0 14px', lineHeight: 1.65, letterSpacing: 0.4,
         }}>
           TIER · <span style={{ color: t.color }}>{t.label.toUpperCase()}</span> · {totalPoints.toFixed(1)} POINTS
@@ -408,15 +408,15 @@ function BreakdownModal({ S, category, onClose, onTakeCheck }) {
               }}>
                 <span style={{ flex: 1, fontFamily: 'var(--sans)', fontSize: 12.5 }}>{row.label}</span>
                 <span style={{
-                  fontFamily: 'var(--mono)', fontSize: 11,
-                  color: row.points > 0 ? 'var(--em)' : 'var(--text-muted)',
+                  fontFamily: 'var(--mono)', fontSize: 'var(--fs-floor)',
+                  color: row.points > 0 ? 'var(--em-text)' : 'var(--text-muted)',
                   fontWeight: 700, minWidth: 50, textAlign: 'right',
                   fontVariantNumeric: 'tabular-nums',
                 }}>
                   {row.points.toFixed(1)} pt
                 </span>
                 <span style={{
-                  fontFamily: 'var(--mono)', fontSize: 10,
+                  fontFamily: 'var(--mono)', fontSize: 'var(--fs-floor)',
                   color: 'var(--text-muted)',
                   minWidth: 36, textAlign: 'right',
                 }}>{pct.toFixed(0)}%</span>
@@ -425,7 +425,7 @@ function BreakdownModal({ S, category, onClose, onTakeCheck }) {
           })}
         </ul>
         <p style={{
-          fontFamily: 'var(--mono)', fontSize: 10, color: 'var(--text-muted)',
+          fontFamily: 'var(--mono)', fontSize: 'var(--fs-floor)', color: 'var(--text-muted)',
           marginTop: 14, lineHeight: 1.65, letterSpacing: 0.4,
         }}>
           Friends see a server-recomputed copy of these ratings — editing your local data won't change what they see.
@@ -439,12 +439,12 @@ function BreakdownModal({ S, category, onClose, onTakeCheck }) {
             border: '1px solid rgba(var(--em-rgb), 0.32)',
           }}>
             <div style={{
-              fontFamily: 'var(--mono)', fontSize: 10, letterSpacing: 1.2,
-              textTransform: 'uppercase', color: 'var(--em)', fontWeight: 700,
+              fontFamily: 'var(--mono)', fontSize: 'var(--fs-floor)', letterSpacing: 1.2,
+              textTransform: 'uppercase', color: 'var(--em-text)', fontWeight: 700,
               marginBottom: 4,
             }}>{checkCfg.ctaTitle}</div>
             <div style={{
-              fontFamily: 'var(--mono)', fontSize: 11, color: 'var(--text-muted)',
+              fontFamily: 'var(--mono)', fontSize: 'var(--fs-floor)', color: 'var(--text-muted)',
               lineHeight: 1.55, marginBottom: 10,
             }}>
               {cooldownActive
@@ -460,7 +460,7 @@ function BreakdownModal({ S, category, onClose, onTakeCheck }) {
                 background: cooldownActive ? 'transparent' : 'var(--em)',
                 color: cooldownActive ? 'var(--text-muted)' : 'var(--em-on, #fff)',
                 border: cooldownActive ? '1px solid var(--border)' : '1px solid var(--em)',
-                fontFamily: 'var(--mono)', fontSize: 10,
+                fontFamily: 'var(--mono)', fontSize: 'var(--fs-floor)',
                 letterSpacing: 1.2, textTransform: 'uppercase', fontWeight: 700,
                 cursor: cooldownActive ? 'not-allowed' : 'pointer',
               }}

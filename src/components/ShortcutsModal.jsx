@@ -23,7 +23,7 @@ function Key({ children }) {
   return (
     <kbd style={{
       display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-      padding: '2px 7px', borderRadius: '5px', fontSize: '11px', fontFamily: 'var(--mono)',
+      padding: '2px 7px', borderRadius: '5px', fontSize: 'var(--fs-floor)', fontFamily: 'var(--mono)',
       background: 'rgba(255,255,255,.1)', border: '1px solid rgba(255,255,255,.2)',
       color: 'var(--text)', lineHeight: '1.5',
     }}>{children}</kbd>
@@ -63,11 +63,11 @@ export default function ShortcutsModal({ open, onClose }) {
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
               {Object.entries(SHORTCUTS).map(([group, items]) => (
                 <div key={group}>
-                  <div style={{ fontFamily: 'var(--mono)', fontSize: '9px', letterSpacing: '1.5px', textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: '10px' }}>{group}</div>
+                  <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-floor)', letterSpacing: '1.5px', textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: '10px' }}>{group}</div>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                     {items.map(({ keys, desc }) => (
                       <div key={desc} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px' }}>
-                        <span style={{ fontFamily: 'var(--mono)', fontSize: '11px', color: 'var(--text)' }}>{desc}</span>
+                        <span style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-floor)', color: 'var(--text)' }}>{desc}</span>
                         <div style={{ display: 'flex', gap: '4px', flexShrink: 0 }}>
                           {keys.map(k => <Key key={k}>{k}</Key>)}
                         </div>

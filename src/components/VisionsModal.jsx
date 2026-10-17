@@ -44,13 +44,13 @@ export default function VisionsModal({ open, S, onClose }) {
         }}>
           <div>
             <div style={{
-              fontFamily: 'var(--mono)', fontSize: 10, letterSpacing: 1.6,
-              textTransform: 'uppercase', color: 'var(--em)', fontWeight: 700,
+              fontFamily: 'var(--mono)', fontSize: 'var(--fs-floor)', letterSpacing: 1.6,
+              textTransform: 'uppercase', color: 'var(--em-text)', fontWeight: 700,
             }}>// VISIONS</div>
             <h3 style={{ margin: '2px 0 0' }}>What you've earned</h3>
           </div>
           <div style={{
-            fontFamily: 'var(--mono)', fontSize: 11, color: 'var(--text-muted)',
+            fontFamily: 'var(--mono)', fontSize: 'var(--fs-floor)', color: 'var(--text-muted)',
             letterSpacing: .6, whiteSpace: 'nowrap',
           }}>
             {unlockedCount}/{total} unlocked
@@ -58,7 +58,7 @@ export default function VisionsModal({ open, S, onClose }) {
         </div>
 
         <p style={{
-          fontFamily: 'var(--mono)', fontSize: 11, color: 'var(--text-muted)',
+          fontFamily: 'var(--mono)', fontSize: 'var(--fs-floor)', color: 'var(--text-muted)',
           margin: '8px 0 14px', lineHeight: 1.55,
         }}>
           System-defined milestones — you can't fake them. Each one feeds your category ratings.
@@ -89,13 +89,13 @@ export default function VisionsModal({ open, S, onClose }) {
                     color: 'var(--text)',
                   }}>{v.title}</div>
                   <div style={{
-                    fontFamily: 'var(--mono)', fontSize: 10.5, color: 'var(--text-muted)',
+                    fontFamily: 'var(--mono)', fontSize: 'var(--fs-floor)', color: 'var(--text-muted)',
                     marginTop: 2, lineHeight: 1.5,
                   }}>{v.desc}</div>
                   {isOn && (
                     <div style={{
-                      fontFamily: 'var(--mono)', fontSize: 9, letterSpacing: 1,
-                      textTransform: 'uppercase', color: 'var(--em)',
+                      fontFamily: 'var(--mono)', fontSize: 'var(--fs-floor)', letterSpacing: 1,
+                      textTransform: 'uppercase', color: 'var(--em-text)',
                       marginTop: 4, fontWeight: 700,
                     }}>
                       ✓ Unlocked {fmtDate(stamp.unlockedAt)}
@@ -103,8 +103,8 @@ export default function VisionsModal({ open, S, onClose }) {
                   )}
                 </div>
                 <span style={{
-                  fontFamily: 'var(--mono)', fontSize: 10, letterSpacing: .8,
-                  color: isOn ? 'var(--em)' : 'var(--text-muted)', fontWeight: 700,
+                  fontFamily: 'var(--mono)', fontSize: 'var(--fs-floor)', letterSpacing: .8,
+                  color: isOn ? 'var(--em-text)' : 'var(--text-muted)', fontWeight: 700,
                   flexShrink: 0,
                 }}>+{v.xp} XP</span>
               </li>

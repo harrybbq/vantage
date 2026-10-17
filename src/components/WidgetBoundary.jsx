@@ -23,14 +23,14 @@ import { reportError } from '../lib/telemetry/reportError';
 const card = {
   display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 8,
   padding: '12px 14px', minWidth: 0, maxWidth: '100%', boxSizing: 'border-box',
-  fontFamily: 'var(--mono, ui-monospace, Menlo, monospace)', fontSize: 11,
+  fontFamily: 'var(--mono, ui-monospace, Menlo, monospace)', fontSize: 'var(--fs-floor)',
   lineHeight: 1.5, color: 'var(--text-muted, #8a8a85)',
 };
 const sectionCard = {
   ...card, alignItems: 'center', textAlign: 'center', padding: '48px 16px', gap: 12,
 };
 const btn = {
-  font: 'inherit', fontSize: 11, padding: '6px 12px', borderRadius: 8, cursor: 'pointer',
+  font: 'inherit', fontSize: 'var(--fs-floor)', padding: '6px 12px', borderRadius: 8, cursor: 'pointer',
   background: 'transparent', color: 'var(--em, #1a7a4a)',
   border: '1px solid var(--border, rgba(128,128,128,.35))',
 };

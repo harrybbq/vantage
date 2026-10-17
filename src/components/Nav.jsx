@@ -42,7 +42,7 @@ export default function Nav({ activeSection, onNavigate, onSignOut, isOwner }) {
           className="nav-tab"
           onClick={onSignOut}
           title="Sign out"
-          style={{ opacity: 0.6, fontSize: '11px' }}
+          style={{ opacity: 0.6, fontSize: 'var(--fs-floor)' }}
         >
           <div className="nav-tab-icon"><Icon name="log-out" size={20} strokeWidth={1.9} /></div>
           <span className="nav-tab-label">Sign out</span>

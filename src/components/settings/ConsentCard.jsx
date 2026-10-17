@@ -63,7 +63,7 @@ export default function ConsentCard({ S, update }) {
                 <div style={{ fontFamily: 'var(--sans)', fontSize: 12, color: 'var(--text-muted)', lineHeight: 1.5, marginTop: 2 }}>
                   {c.what}
                 </div>
-                <div style={{ fontFamily: 'var(--mono)', fontSize: 10, color: 'var(--text-muted)', letterSpacing: 0.4, marginTop: 6 }}>
+                <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-floor)', color: 'var(--text-muted)', letterSpacing: 0.4, marginTop: 6 }}>
                   {on
                     ? `Allowed ${when(consent[k])}.`
                     : c.ask}
@@ -71,8 +71,8 @@ export default function ConsentCard({ S, update }) {
                 </div>
               </div>
               <span style={{
-                fontFamily: 'var(--mono)', fontSize: 9, letterSpacing: 1.4,
-                textTransform: 'uppercase', color: on ? 'var(--em)' : 'var(--text-muted)',
+                fontFamily: 'var(--mono)', fontSize: 'var(--fs-floor)', letterSpacing: 1.4,
+                textTransform: 'uppercase', color: on ? 'var(--em-text)' : 'var(--text-muted)',
                 flexShrink: 0,
               }}>{on ? 'On' : 'Off'}</span>
             </label>

@@ -8,7 +8,7 @@
 /* ── Pick chip + list ─────────────────────────────────────────────── */
 .gw-chip{width:auto !important;padding:0 8px !important;display:inline-flex !important;
   align-items:center;gap:5px;}
-.gw-chip-caret{font-size:9px;opacity:.8;display:inline-block;transition:transform .15s ease;}
+.gw-chip-caret{font-size:var(--fs-floor);opacity:.8;display:inline-block;transition:transform .15s ease;}
 
 /* The picker must FIT the card. It is the only view where a control is
    mandatory — Done is how you get back to the widget — and it is the
@@ -18,7 +18,7 @@
    the picker became a room with no door.
    So: full height, and the ROW LIST is the only part allowed to give. */
 .gw-picklist{display:flex;flex-direction:column;gap:8px;flex:1 1 auto;min-height:0;}
-.gw-picklist-head{font-family:var(--mono);font-size:8.5px;letter-spacing:1.4px;
+.gw-picklist-head{font-family:var(--mono);font-size:var(--fs-floor);letter-spacing:1.4px;
   text-transform:uppercase;color:var(--text-muted);
   /* Clear the chip, which sits top-right of the body. */
   padding-right:44px;}
@@ -31,25 +31,25 @@
 .gw-picklist-note,.gw-picklist-foot{flex:0 0 auto;}
 .gw-picklist-scroll::-webkit-scrollbar{width:4px;}
 .gw-picklist-scroll::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px;}
-.gw-picklist-note{font-family:var(--mono);font-size:8px;color:var(--text-muted);line-height:1.5;}
+.gw-picklist-note{font-family:var(--mono);font-size:var(--fs-floor);color:var(--text-muted);line-height:1.5;}
 .gw-picklist-foot{display:flex;align-items:center;gap:12px;flex-wrap:wrap;}
 .gw-done{align-self:flex-start;}
 .gw-reset{color:var(--text-muted);}
-.gw-reset:hover{color:var(--em);}
+.gw-reset:hover{color:var(--em-text);}
 
 .gw-pickrow{display:flex;align-items:center;gap:9px;padding:7px 8px;border-radius:8px;
   border:1px solid var(--border);background:transparent;cursor:pointer;text-align:left;width:100%;}
 .gw-pickrow.is-on{border-color:var(--em);background:rgba(var(--em-rgb),.08);}
 .gw-pickrow.is-locked{opacity:.55;cursor:not-allowed;}
-.gw-pickrow.is-locked .gw-pickrow-tag{color:var(--gold,#c8970a);}
-.gw-pickbox{font-size:9px;}
+.gw-pickrow.is-locked .gw-pickrow-tag{color:var(--gold-text);}
+.gw-pickbox{font-size:var(--fs-floor);}
 .gw-pickbox{width:15px;height:15px;flex:none;border-radius:4px;border:1px solid var(--border);
-  color:#fff;font-size:10px;line-height:14px;text-align:center;}
+  color:#fff;font-size:var(--fs-floor);line-height:14px;text-align:center;}
 .gw-pickbox.is-on{border-color:var(--em);background:var(--em);}
 .gw-pickrow-text{display:flex;flex-direction:column;gap:1px;min-width:0;flex:1;}
-.gw-pickrow-name{font-family:var(--sans);font-size:11px;font-weight:600;color:var(--text);
+.gw-pickrow-name{font-family:var(--sans);font-size:var(--fs-floor);font-weight:600;color:var(--text);
   white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
-.gw-pickrow-tag{font-family:var(--mono);font-size:8px;letter-spacing:.4px;color:var(--text-muted);}
+.gw-pickrow-tag{font-family:var(--mono);font-size:var(--fs-floor);letter-spacing:.4px;color:var(--text-muted);}
 
 /* ── Goals list ───────────────────────────────────────────────────── */
 .gw-goals{position:relative;display:flex;flex-direction:column;min-height:0;}
@@ -61,12 +61,12 @@
 .gw-list::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px;}
 .gw-item{display:flex;flex-direction:column;gap:4px;}
 .gw-item-head{display:flex;align-items:baseline;gap:8px;}
-.gw-item-name{font-family:var(--sans);font-size:11.5px;font-weight:700;color:var(--text);
+.gw-item-name{font-family:var(--sans);font-size:max(11.5px, var(--fs-floor));font-weight:700;color:var(--text);
   flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
-.gw-item-pct{font-family:var(--mono);font-size:10px;font-weight:700;}
-.gw-item-meta{font-family:var(--mono);font-size:8.5px;letter-spacing:.4px;color:var(--text-muted);}
+.gw-item-pct{font-family:var(--mono);font-size:var(--fs-floor);font-weight:700;}
+.gw-item-meta{font-family:var(--mono);font-size:var(--fs-floor);letter-spacing:.4px;color:var(--text-muted);}
 
-.gw-empty{font-family:var(--mono);font-size:10px;color:var(--text-muted);line-height:1.6;}
+.gw-empty{font-family:var(--mono);font-size:var(--fs-floor);color:var(--text-muted);line-height:1.6;}
 
 /* ── Gauge ────────────────────────────────────────────────────────── */
 .gw-gauge{position:relative;flex:none;}
@@ -86,7 +86,7 @@
 .gw-hero.is-compact .gw-hero-side{align-items:flex-start;text-align:left;}
 .gw-hero.is-compact .gw-refusal{flex:1;min-width:0;}
 
-.gw-sessions{font-family:var(--mono);font-size:10px;letter-spacing:.4px;color:var(--text-muted);}
+.gw-sessions{font-family:var(--mono);font-size:var(--fs-floor);letter-spacing:.4px;color:var(--text-muted);}
 .gw-sessions b{font-family:var(--sans);font-size:15px;font-weight:700;color:var(--text);}
 /* Stands in for the session counts when there is no cadence to count
    against. A sentence, so it takes the tinted-note shape the widget
@@ -98,7 +98,7 @@
   border:1px solid rgba(var(--em-rgb),.28);
   background:rgba(var(--em-rgb),.06);
   color:var(--text-mid);
-  font-family:var(--mono);font-size:8.5px;letter-spacing:.3px;line-height:1.6;
+  font-family:var(--mono);font-size:var(--fs-floor);letter-spacing:.3px;line-height:1.6;
   transition:border-color .15s, background .15s;
 }
 .gw-sessions-missing:hover{
@@ -106,15 +106,15 @@
   background:rgba(var(--em-rgb),.1);
 }
 .gw-nums{display:flex;gap:12px;flex-wrap:wrap;justify-content:center;
-  font-family:var(--mono);font-size:9.5px;letter-spacing:.4px;color:var(--text-muted);}
+  font-family:var(--mono);font-size:var(--fs-floor);letter-spacing:.4px;color:var(--text-muted);}
 .gw-hero.is-compact .gw-nums{flex-direction:column;gap:3px;}
 .gw-nums b{font-family:var(--sans);font-size:12px;color:var(--text);font-weight:700;}
-.gw-nums b.is-rate{color:var(--em);}
-.gw-eta{font-family:var(--mono);font-size:9.5px;letter-spacing:.4px;color:var(--text-mid);
+.gw-nums b.is-rate{color:var(--em-text);}
+.gw-eta{font-family:var(--mono);font-size:var(--fs-floor);letter-spacing:.4px;color:var(--text-mid);
   text-align:center;line-height:1.6;}
 .gw-hero.is-compact .gw-eta{text-align:left;}
-.gw-eta strong{color:var(--em);}
-.gw-eta-sub{font-family:var(--mono);font-size:8px;color:var(--text-muted);
+.gw-eta strong{color:var(--em-text);}
+.gw-eta-sub{font-family:var(--mono);font-size:var(--fs-floor);color:var(--text-muted);
   text-align:center;line-height:1.5;opacity:.85;}
 .gw-hero.is-compact .gw-eta-sub{text-align:left;}
 
@@ -124,40 +124,40 @@
 .gw-goal::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px;}
 .gw-goal-head{display:flex;align-items:baseline;gap:8px;}
 .gw-goal-pct{font-family:var(--sans);font-size:22px;font-weight:700;color:var(--text);line-height:1;}
-.gw-goal-pct.is-gold{color:var(--gold,#d4af37);font-size:16px;}
+.gw-goal-pct.is-gold{color:var(--gold-text);font-size:16px;}
 .gw-goal-pct-sign{font-size:12px;}
-.gw-goal-sub,.gw-goal-type{font-family:var(--mono);font-size:9px;letter-spacing:.5px;
+.gw-goal-sub,.gw-goal-type{font-family:var(--mono);font-size:var(--fs-floor);letter-spacing:.5px;
   color:var(--text-muted);text-transform:uppercase;}
 .gw-goal-target{font-family:var(--sans);font-size:17px;font-weight:700;color:var(--text);}
-.gw-goal-weeks{margin-left:auto;font-family:var(--mono);font-size:9.5px;font-weight:700;color:var(--em);}
+.gw-goal-weeks{margin-left:auto;font-family:var(--mono);font-size:var(--fs-floor);font-weight:700;color:var(--em-text);}
 
 .gw-stats{display:flex;gap:8px;}
 .gw-stat{flex:1;min-width:0;padding:8px 6px;border-radius:9px;border:1px solid var(--border);
   display:flex;flex-direction:column;align-items:center;gap:2px;}
 .gw-stat b{font-family:var(--sans);font-size:19px;font-weight:700;color:var(--text);line-height:1;}
-.gw-stat i{font-family:var(--mono);font-size:7.5px;letter-spacing:1px;color:var(--em);font-style:normal;}
-.gw-stat em{font-family:var(--mono);font-size:7.5px;color:var(--text-muted);font-style:normal;}
+.gw-stat i{font-family:var(--mono);font-size:var(--fs-floor);letter-spacing:1px;color:var(--em-text);font-style:normal;}
+.gw-stat em{font-family:var(--mono);font-size:var(--fs-floor);color:var(--text-muted);font-style:normal;}
 
 .gw-how{display:flex;flex-direction:column;gap:4px;padding:8px 9px;border-radius:9px;
   border:1px solid var(--border);background:rgba(128,128,128,.06);}
-.gw-how-head{font-family:var(--mono);font-size:8px;letter-spacing:1.2px;text-transform:uppercase;
+.gw-how-head{font-family:var(--mono);font-size:var(--fs-floor);letter-spacing:1.2px;text-transform:uppercase;
   color:var(--text-muted);}
-.gw-how-row{display:flex;gap:8px;font-family:var(--mono);font-size:8.5px;}
+.gw-how-row{display:flex;gap:8px;font-family:var(--mono);font-size:var(--fs-floor);}
 .gw-how-row span{color:var(--text-muted);flex:1;min-width:0;}
 .gw-how-row b{color:var(--text);font-weight:700;white-space:nowrap;}
 
-.gw-refusal{font-family:var(--mono);font-size:9.5px;color:var(--text-mid);line-height:1.6;}
+.gw-refusal{font-family:var(--mono);font-size:var(--fs-floor);color:var(--text-mid);line-height:1.6;}
 /* What is known even when the timeline isn't — sits above the
    explanation, because it is the answer and the explanation is the
    caveat, not the other way round. */
 .gw-refusal-sessions{margin-bottom:1px;}
-.gw-refusal-nums{font-family:var(--mono);font-size:9px;letter-spacing:.4px;
+.gw-refusal-nums{font-family:var(--mono);font-size:var(--fs-floor);letter-spacing:.4px;
   color:var(--text-muted);margin-bottom:6px;}
 
 .gw-note{display:flex;gap:7px;padding:8px 9px;border-radius:8px;
-  font-family:var(--mono);font-size:8.5px;color:var(--text-mid);line-height:1.6;}
+  font-family:var(--mono);font-size:var(--fs-floor);color:var(--text-mid);line-height:1.6;}
 .gw-note.is-warn{border:1px solid rgba(217,145,20,.35);background:rgba(217,145,20,.07);}
-.gw-note-icon{color:#d99114;font-size:11px;line-height:1.3;flex:none;}
+.gw-note-icon{color:#d99114;font-size:var(--fs-floor);line-height:1.3;flex:none;}
 
 .gw-foot{display:flex;gap:6px;align-items:center;flex-wrap:wrap;}
 .gw-foot-btn{align-self:flex-start;}
@@ -173,17 +173,17 @@
   padding:4px 8px;border-radius:6px;cursor:pointer;
   background:transparent;border:1px solid var(--border);
   color:var(--text-mid);
-  font-family:var(--mono);font-size:8.5px;letter-spacing:1.1px;
+  font-family:var(--mono);font-size:var(--fs-floor);letter-spacing:1.1px;
   text-transform:uppercase;font-weight:700;
   transition:color .15s, border-color .15s, background .15s;
 }
 .gw-textbtn:hover{
-  color:var(--em);
+  color:var(--em-text);
   border-color:rgba(var(--em-rgb),.38);
   background:rgba(var(--em-rgb),.07);
 }
 .gw-edit{margin-left:auto;}
-.gw-disclaimer{font-family:var(--mono);font-size:7.5px;color:var(--text-muted);line-height:1.6;
+.gw-disclaimer{font-family:var(--mono);font-size:var(--fs-floor);color:var(--text-muted);line-height:1.6;
   opacity:.85;}
 
 /* ── Setup form ───────────────────────────────────────────────────── */
@@ -192,26 +192,26 @@
 .gw-setup::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px;}
 .gw-row{display:flex;gap:8px;}
 .gw-field{display:flex;flex-direction:column;gap:4px;flex:1;min-width:0;}
-.gw-label{font-family:var(--mono);font-size:8px;letter-spacing:1.1px;text-transform:uppercase;
+.gw-label{font-family:var(--mono);font-size:var(--fs-floor);letter-spacing:1.1px;text-transform:uppercase;
   color:var(--text-muted);}
 .gw-input{width:100%;box-sizing:border-box;padding:7px 9px;border-radius:8px;
   border:1px solid var(--border);background:transparent;color:var(--text);
-  font-family:var(--mono);font-size:11.5px;}
+  font-family:var(--mono);font-size:max(11.5px, var(--fs-floor));}
 .gw-input:focus{outline:none;border-color:var(--em);}
 .gw-seg{display:flex;gap:4px;}
 .gw-seg-btn{flex:1;padding:7px 4px;border-radius:8px;cursor:pointer;border:1px solid var(--border);
-  background:transparent;color:var(--text-mid);font-family:var(--mono);font-size:9.5px;
+  background:transparent;color:var(--text-mid);font-family:var(--mono);font-size:var(--fs-floor);
   letter-spacing:.4px;font-weight:700;}
-.gw-seg-btn.is-on{border-color:var(--em);background:rgba(var(--em-rgb),.10);color:var(--em);}
-.gw-hint{font-family:var(--mono);font-size:8px;color:var(--text-muted);line-height:1.5;}
+.gw-seg-btn.is-on{border-color:var(--em);background:rgba(var(--em-rgb),.10);color:var(--em-text);}
+.gw-hint{font-family:var(--mono);font-size:var(--fs-floor);color:var(--text-muted);line-height:1.5;}
 .gw-actions{display:flex;gap:12px;align-items:center;}
 
 /* ── Pro teaser ───────────────────────────────────────────────────── */
 .gw-locked{display:flex;flex-direction:column;gap:7px;align-items:flex-start;}
-.gw-locked-badge{font-family:var(--mono);font-size:7.5px;letter-spacing:1.4px;font-weight:700;
-  color:var(--gold,#c8970a);border:1px solid rgba(200,151,10,.45);border-radius:5px;padding:2px 6px;}
+.gw-locked-badge{font-family:var(--mono);font-size:var(--fs-floor);letter-spacing:1.4px;font-weight:700;
+  color:var(--gold-text);border:1px solid rgba(200,151,10,.45);border-radius:5px;padding:2px 6px;}
 .gw-locked-title{font-family:var(--sans);font-size:12.5px;font-weight:700;color:var(--text);}
-.gw-locked-text{font-family:var(--mono);font-size:9px;color:var(--text-muted);line-height:1.65;}
+.gw-locked-text{font-family:var(--mono);font-size:var(--fs-floor);color:var(--text-muted);line-height:1.65;}
 
 /* Inside the hub canvas the card has a real, user-dragged height —
    keep passing it down so these bodies scroll against the card rather
@@ -223,35 +223,35 @@
 
 /* ── Accuracy chip + modal ────────────────────────────────────────── */
 .gw-acc{background:transparent;border:1px solid var(--border);border-radius:5px;
-  padding:2px 6px;cursor:pointer;font-family:var(--mono);font-size:7.5px;
+  padding:2px 6px;cursor:pointer;font-family:var(--mono);font-size:var(--fs-floor);
   letter-spacing:1.2px;font-weight:700;color:var(--text-muted);}
-.gw-acc.is-measured{color:var(--em);border-color:rgba(var(--em-rgb),.45);}
+.gw-acc.is-measured{color:var(--em-text);border-color:rgba(var(--em-rgb),.45);}
 /* A pill can't be display:block — it would stretch to the refusal
    paragraph's full width. Inline-flex keeps it the size of its label. */
 .gw-refusal-link{display:inline-flex;margin-top:8px;}
 
 .gw-modal{width:440px;}
-.gw-modal-lede{font-family:var(--mono);font-size:11px;color:var(--text-muted);
+.gw-modal-lede{font-family:var(--mono);font-size:var(--fs-floor);color:var(--text-muted);
   line-height:1.7;margin:0 0 18px;}
 .gw-modal-rows{display:flex;flex-direction:column;gap:8px;margin-bottom:18px;}
 .gw-modal-row{display:flex;gap:10px;padding:10px 12px;border-radius:10px;
   border:1px solid var(--border);align-items:flex-start;}
 .gw-modal-row.is-on{border-color:rgba(var(--em-rgb),.40);background:rgba(var(--em-rgb),.05);}
 .gw-modal-tick{font-size:12px;line-height:1.4;color:var(--text-muted);flex:none;}
-.gw-modal-row.is-on .gw-modal-tick{color:var(--em);}
+.gw-modal-row.is-on .gw-modal-tick{color:var(--em-text);}
 .gw-modal-row b{display:block;font-family:var(--sans);font-size:12.5px;font-weight:700;
   color:var(--text);margin-bottom:2px;}
-.gw-modal-row em{display:block;font-family:var(--mono);font-size:10px;font-style:normal;
+.gw-modal-row em{display:block;font-family:var(--mono);font-size:var(--fs-floor);font-style:normal;
   color:var(--text-muted);line-height:1.6;}
-.gw-modal-note{font-family:var(--mono);font-size:10px;color:var(--text-mid);
+.gw-modal-note{font-family:var(--mono);font-size:var(--fs-floor);color:var(--text-mid);
   line-height:1.75;margin-bottom:14px;}
 .gw-modal-note b{color:var(--text);}
 .gw-modal-close{width:100%;margin-top:4px;}
 .gw-how-row b.is-over{color:#d99114;}
-.gw-how-row b.is-under{color:var(--em);}
+.gw-how-row b.is-under{color:var(--em-text);}
 .gw-toggle{display:flex;gap:9px;align-items:flex-start;cursor:pointer;padding:8px 9px;
   border:1px solid var(--border);border-radius:9px;}
 .gw-toggle input{margin:1px 0 0;flex:none;accent-color:var(--em);}
-.gw-toggle b{display:block;font-family:var(--sans);font-size:11px;font-weight:700;color:var(--text);}
-.gw-toggle em{display:block;font-family:var(--mono);font-size:8px;font-style:normal;
+.gw-toggle b{display:block;font-family:var(--sans);font-size:var(--fs-floor);font-weight:700;color:var(--text);}
+.gw-toggle em{display:block;font-family:var(--mono);font-size:var(--fs-floor);font-style:normal;
   color:var(--text-muted);line-height:1.6;margin-top:2px;}

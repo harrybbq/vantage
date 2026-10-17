@@ -71,16 +71,16 @@ function MacroBar({ macro, consumed, isCal, index, onMenuClick }) {
               where the number is, or 170 against a 165 floor looks like
               a miss in the other direction. */}
           {isFloor && (
-            <span style={{ fontFamily: 'var(--mono)', fontSize: '8px', letterSpacing: '.9px', textTransform: 'uppercase',
+            <span style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-floor)', letterSpacing: '.9px', textTransform: 'uppercase',
                            marginLeft: 6, padding: '1px 4px', borderRadius: 3, verticalAlign: 'middle',
-                           color: met ? 'var(--em)' : 'var(--text-muted)',
+                           color: met ? 'var(--em-text)' : 'var(--text-muted)',
                            border: `1px solid ${met ? 'rgba(var(--em-rgb),.35)' : 'var(--border)'}`,
                            background: met ? 'rgba(var(--em-rgb),.08)' : 'transparent' }}>
               {met ? 'floor met' : 'floor'}
             </span>
           )}
         </span>
-        <span style={{ fontFamily: 'var(--mono)', fontSize: '11px', color: valueColour, whiteSpace: 'nowrap', opacity: 0.9, fontVariantNumeric: 'tabular-nums' }}>
+        <span style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-floor)', color: valueColour, whiteSpace: 'nowrap', opacity: 0.9, fontVariantNumeric: 'tabular-nums' }}>
           {fmt(consumed)}<span style={{ color: 'var(--text-muted)' }}>/{fmt(goal)}{macro.unit}</span>
         </span>
         <span style={{ fontFamily: 'var(--mono)', fontSize: 'var(--text-xs)', color: over ? 'var(--amber)' : 'var(--text-mid)', minWidth: '34px', textAlign: 'right' }}>

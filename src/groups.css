@@ -33,24 +33,24 @@
 /* A labelled rule — the section header used all over this page. */
 .grp-rule{ display:flex; align-items:center; gap:9px; margin-bottom:12px; }
 .grp-rule span{
-  font-family:var(--mono); font-size:9px; letter-spacing:1.6px;
+  font-family:var(--mono); font-size:var(--fs-floor); letter-spacing:1.6px;
   text-transform:uppercase; color:var(--text-muted); white-space:nowrap;
 }
 .grp-rule i{ flex:1; height:1px; background:var(--border); }
 .grp-rule em{
-  font-family:var(--mono); font-size:8.5px; letter-spacing:1.2px; font-style:normal;
+  font-family:var(--mono); font-size:var(--fs-floor); letter-spacing:1.2px; font-style:normal;
   text-transform:uppercase; color:#c8970a; white-space:nowrap;
 }
 
 .grp-quiet{ font-size:12.5px; color:var(--text-muted); line-height:1.6; }
 .grp-quiet-pad{ padding:26px 18px; }
-.grp-quiet code{ font-family:var(--mono); font-size:11.5px; }
+.grp-quiet code{ font-family:var(--mono); font-size:max(11.5px, var(--fs-floor)); }
 .grp-error{
   font-size:12.5px; color:rgb(220,60,60); padding:12px 14px;
   border:1px solid rgba(220,60,60,.35); border-radius:12px; background:rgba(220,60,60,.06);
 }
 .grp-foot-note{
-  margin:12px 0 0; font-size:11.5px; line-height:1.6; color:var(--text-muted);
+  margin:12px 0 0; font-size:max(11.5px, var(--fs-floor)); line-height:1.6; color:var(--text-muted);
 }
 
 /* ── The hero: which group, and what kind of week ─────────────────── */
@@ -98,7 +98,7 @@
 
 .grp-crest-clear{
   white-space:nowrap;
-  font-family:var(--mono); font-size:9px; letter-spacing:.6px;
+  font-family:var(--mono); font-size:var(--fs-floor); letter-spacing:.6px;
   background:none; border:none; padding:0; cursor:pointer;
   color:var(--text-muted); text-decoration:underline;
 }
@@ -106,7 +106,7 @@
 /* Wider than the 56px column it sits under — the status is a sentence,
    not a label, and wrapping it into a 56px gutter makes it unreadable. */
 .grp-crest-note{
-  font-family:var(--mono); font-size:9.5px; line-height:1.45;
+  font-family:var(--mono); font-size:var(--fs-floor); line-height:1.45;
 }
 .grp-crest-note.is-wait{ color:var(--text-muted); }
 .grp-crest-note.is-bad{ color:rgb(199,44,72); }
@@ -117,15 +117,15 @@
   font-size:22px; font-weight:700; letter-spacing:-.3px; color:var(--text);
 }
 .grp-hero-meta{
-  font-family:var(--mono); font-size:9.5px; letter-spacing:1.2px;
+  font-family:var(--mono); font-size:var(--fs-floor); letter-spacing:1.2px;
   text-transform:uppercase; color:var(--text-muted); margin-top:4px;
 }
 .grp-hero-score{ text-align:right; flex:none; }
 .grp-hero-num{
-  font-size:38px; font-weight:800; line-height:1; letter-spacing:-1.2px; color:var(--em);
+  font-size:38px; font-weight:800; line-height:1; letter-spacing:-1.2px; color:var(--em-text);
 }
 .grp-hero-lbl{
-  font-family:var(--mono); font-size:8px; letter-spacing:1.4px;
+  font-family:var(--mono); font-size:var(--fs-floor); letter-spacing:1.4px;
   text-transform:uppercase; color:var(--text-muted); margin-top:4px;
 }
 
@@ -137,7 +137,7 @@
 .grp-zone.is-up{ border-color:rgba(var(--em-rgb),.42); background:rgba(var(--em-rgb),.09); }
 .grp-zone.is-down{ border-color:rgba(199,44,72,.4); background:rgba(199,44,72,.08); }
 .grp-zone-glyph{ font-size:14px; line-height:1; }
-.grp-zone.is-up .grp-zone-glyph, .grp-zone.is-up .grp-zone-posnum{ color:var(--em); }
+.grp-zone.is-up .grp-zone-glyph, .grp-zone.is-up .grp-zone-posnum{ color:var(--em-text); }
 .grp-zone.is-down .grp-zone-glyph, .grp-zone.is-down .grp-zone-posnum{ color:rgb(199,44,72); }
 .grp-zone.is-flat .grp-zone-glyph, .grp-zone.is-flat .grp-zone-posnum{ color:var(--text-muted); }
 .grp-zone-body{ flex:1; min-width:0; }
@@ -146,7 +146,7 @@
 .grp-zone-pos{ text-align:right; flex:none; }
 .grp-zone-posnum{ font-size:21px; font-weight:700; line-height:1; }
 .grp-zone-poslbl{
-  font-family:var(--mono); font-size:8px; letter-spacing:1.3px;
+  font-family:var(--mono); font-size:var(--fs-floor); letter-spacing:1.3px;
   text-transform:uppercase; color:var(--text-muted); margin-top:3px;
 }
 
@@ -165,7 +165,7 @@
 .grp-split-key{ display:flex; align-items:center; gap:7px; flex:0 0 auto; }
 .grp-split-key i{ width:9px; height:9px; flex:none; border-radius:3px; }
 .grp-split-key span{
-  font-family:var(--mono); font-size:9px; letter-spacing:1px;
+  font-family:var(--mono); font-size:var(--fs-floor); letter-spacing:1px;
   text-transform:uppercase; color:var(--text-muted); white-space:nowrap;
 }
 .grp-split-key b{ font-family:var(--mono); font-size:12px; color:var(--text); }
@@ -214,9 +214,9 @@
 .grp-pod-bar.is-p0 .grp-pod-place{ color:#c8970a; }
 .grp-pod-bar.is-p1 .grp-pod-place{ color:#8f9296; }
 .grp-pod-bar.is-p2 .grp-pod-place{ color:#b8732e; }
-.grp-pod-climb{ font-family:var(--mono); font-size:13px; color:var(--em); }
+.grp-pod-climb{ font-family:var(--mono); font-size:13px; color:var(--em-text); }
 .grp-pod-coins{
-  font-family:var(--mono); font-size:8.5px; letter-spacing:1px;
+  font-family:var(--mono); font-size:var(--fs-floor); letter-spacing:1px;
   text-transform:uppercase; color:#c8970a;
 }
 
@@ -231,7 +231,7 @@
 }
 .grp-mrow:last-of-type{ border-bottom:0; }
 .grp-mhead{
-  font-family:var(--mono); font-size:8.5px; letter-spacing:1.3px;
+  font-family:var(--mono); font-size:var(--fs-floor); letter-spacing:1.3px;
   text-transform:uppercase; color:var(--text-muted); padding-top:12px;
 }
 .grp-mrow.is-self{
@@ -245,16 +245,16 @@
 .grp-mav{
   width:26px; height:26px; flex:none; border-radius:50%; object-fit:cover;
   display:flex; align-items:center; justify-content:center;
-  font-family:var(--mono); font-size:9px; color:#fff;
+  font-family:var(--mono); font-size:var(--fs-floor); color:#fff;
 }
 .grp-mname{
   min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
   font-size:13px; color:var(--text);
 }
 .grp-tag{
-  font-family:var(--mono); font-size:7.5px; letter-spacing:1.1px; text-transform:uppercase;
+  font-family:var(--mono); font-size:var(--fs-floor); letter-spacing:1.1px; text-transform:uppercase;
   padding:2px 6px; border-radius:4px; white-space:nowrap; flex:none;
-  color:var(--em); border:1px solid rgba(var(--em-rgb),.4); background:rgba(var(--em-rgb),.1);
+  color:var(--em-text); border:1px solid rgba(var(--em-rgb),.4); background:rgba(var(--em-rgb),.1);
 }
 .grp-tag.is-mvp{ color:#8a6a06; border-color:rgba(200,151,10,.42); background:rgba(200,151,10,.12); }
 .grp-tag.is-idle{ color:var(--text-muted); border-color:var(--border); background:transparent; }
@@ -275,7 +275,7 @@
 .grp-mbar i{ display:block; height:100%; border-radius:3px; background:var(--em); }
 .grp-mbar i.is-top{ background:#c8970a; }
 .grp-num{ text-align:right; }
-.grp-mclimb{ font-family:var(--mono); font-size:14px; color:var(--em); }
+.grp-mclimb{ font-family:var(--mono); font-size:14px; color:var(--em-text); }
 .grp-mclimb.is-idle{ color:var(--text-muted); }
 
 .grp-actions{ display:flex; gap:8px; justify-content:flex-end; }
@@ -295,7 +295,7 @@
 .grp-divchip.is-d10, .grp-div-badge.is-d10, .grp-table-crest.is-d10{ --dcol:#8a8278; }
 
 .grp-div-badge{
-  font-family:var(--mono); font-size:9px; letter-spacing:1.3px; text-transform:uppercase;
+  font-family:var(--mono); font-size:var(--fs-floor); letter-spacing:1.3px; text-transform:uppercase;
   padding:4px 10px; border-radius:999px; white-space:nowrap;
   color:var(--dcol); border:1px solid var(--dcol); background:color-mix(in srgb, var(--dcol) 12%, transparent);
 }
@@ -314,7 +314,7 @@
 .grp-divchip.is-mine{ opacity:1; }
 .grp-divchip.is-active{ opacity:1; border-color:var(--dcol); background:color-mix(in srgb, var(--dcol) 10%, var(--surface)); }
 .grp-divchip-num{
-  font-family:var(--mono); font-size:8px; letter-spacing:1.4px;
+  font-family:var(--mono); font-size:var(--fs-floor); letter-spacing:1.4px;
   text-transform:uppercase; color:var(--text-muted);
 }
 .grp-divchip-name{
@@ -323,10 +323,10 @@
 }
 .grp-divchip-name i{ width:10px; height:10px; border-radius:3px; background:var(--dcol); }
 .grp-divchip-meta{
-  font-family:var(--mono); font-size:8px; letter-spacing:1.1px;
+  font-family:var(--mono); font-size:var(--fs-floor); letter-spacing:1.1px;
   text-transform:uppercase; color:var(--text-muted);
 }
-.grp-divchip.is-mine .grp-divchip-meta{ color:var(--em); }
+.grp-divchip.is-mine .grp-divchip-meta{ color:var(--em-text); }
 
 /* ── The division table ───────────────────────────────────────────── */
 .grp-table{ padding:0; overflow:hidden; }
@@ -337,16 +337,16 @@
 }
 .grp-table-name{ font-size:19px; font-weight:700; letter-spacing:-.2px; color:var(--text); }
 .grp-table-sub{
-  font-family:var(--mono); font-size:8.5px; letter-spacing:1.2px;
+  font-family:var(--mono); font-size:var(--fs-floor); letter-spacing:1.2px;
   text-transform:uppercase; color:var(--text-muted); margin-top:2px;
 }
 .grp-legend{
   margin-left:auto; display:flex; gap:14px;
-  font-family:var(--mono); font-size:8.5px; letter-spacing:1.2px; text-transform:uppercase;
+  font-family:var(--mono); font-size:var(--fs-floor); letter-spacing:1.2px; text-transform:uppercase;
 }
 .grp-legend span{ display:inline-flex; align-items:center; gap:6px; }
 .grp-legend i{ width:9px; height:9px; border-radius:2px; background:currentColor; }
-.grp-legend .is-up{ color:var(--em); }
+.grp-legend .is-up{ color:var(--em-text); }
 .grp-legend .is-down{ color:rgb(199,44,72); }
 
 .grp-grow{
@@ -356,7 +356,7 @@
   border-bottom:1px solid var(--border);
 }
 .grp-ghead{
-  font-family:var(--mono); font-size:8.5px; letter-spacing:1.3px;
+  font-family:var(--mono); font-size:var(--fs-floor); letter-spacing:1.3px;
   text-transform:uppercase; color:var(--text-muted); padding-top:6px; padding-bottom:6px;
 }
 .grp-grow.is-promoted{ background:rgba(var(--em-rgb),.06); box-shadow:inset 3px 0 0 var(--em); }
@@ -365,16 +365,16 @@
 .grp-grow.is-mine.is-relegated{ background:rgba(199,44,72,.12); }
 .grp-gpos{ display:flex; align-items:center; gap:6px; }
 .grp-gpos span{ font-family:var(--mono); font-size:14px; color:var(--text-muted); }
-.grp-gpos em{ font-style:normal; font-size:10px; }
-.grp-gpos em.is-up{ color:var(--em); }
+.grp-gpos em{ font-style:normal; font-size:var(--fs-floor); }
+.grp-gpos em.is-up{ color:var(--em-text); }
 .grp-gpos em.is-down{ color:rgb(199,44,72); }
-.grp-grow.is-promoted .grp-gpos span{ color:var(--em); }
+.grp-grow.is-promoted .grp-gpos span{ color:var(--em-text); }
 .grp-grow.is-relegated .grp-gpos span{ color:rgb(199,44,72); }
 .grp-gname{ display:flex; align-items:center; gap:10px; min-width:0; }
 .grp-gcrest{
   width:28px; height:28px; flex:none; border-radius:8px;
   display:flex; align-items:center; justify-content:center;
-  font-size:11px; font-weight:700; color:#fff;
+  font-size:var(--fs-floor); font-weight:700; color:#fff;
   overflow:hidden;
 }
 .grp-gcrest-img{ width:100%; height:100%; object-fit:cover; display:block; }
@@ -386,7 +386,7 @@
 .grp-gmembers, .grp-gclimber{ font-size:12px; color:var(--text-muted); min-width:0;
   overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .grp-gscore{ font-family:var(--mono); font-size:15px; color:var(--text); }
-.grp-grow.is-promoted .grp-gscore{ color:var(--em); }
+.grp-grow.is-promoted .grp-gscore{ color:var(--em-text); }
 /* The score of a relegated group is NOT red. Every score on this table
    is a positive number — how much the group grew — and painting +28
    red says it went backwards. The rail down the edge and the arrow by
@@ -400,7 +400,7 @@
 .grp-setup{ display:grid; grid-template-columns:1fr 1fr; gap:14px; }
 .grp-field{ display:block; margin-bottom:12px; }
 .grp-field > span{
-  display:block; font-family:var(--mono); font-size:8.5px; letter-spacing:1.3px;
+  display:block; font-family:var(--mono); font-size:var(--fs-floor); letter-spacing:1.3px;
   text-transform:uppercase; color:var(--text-muted); margin-bottom:6px;
 }
 .grp-field input{
@@ -417,7 +417,7 @@
 
 /* ── Invite ───────────────────────────────────────────────────────── */
 .grp-invite-eyebrow{
-  font-family:var(--mono); font-size:9px; letter-spacing:2.2px;
+  font-family:var(--mono); font-size:var(--fs-floor); letter-spacing:2.2px;
   text-transform:uppercase; color:var(--text-muted); margin-bottom:8px;
 }
 .grp-invite-title{ font-size:22px; font-weight:700; margin:0 0 6px; letter-spacing:-.3px; }
@@ -427,16 +427,16 @@
   border:1px dashed rgba(var(--em-rgb),.4); background:rgba(var(--em-rgb),.06); margin-bottom:12px;
 }
 .grp-code-value{
-  flex:1; font-family:var(--mono); font-size:17px; letter-spacing:3px; color:var(--em);
+  flex:1; font-family:var(--mono); font-size:17px; letter-spacing:3px; color:var(--em-text);
 }
-.grp-invite-note{ font-size:11.5px; line-height:1.6; color:var(--text-muted); margin:0 0 16px; }
+.grp-invite-note{ font-size:max(11.5px, var(--fs-floor)); line-height:1.6; color:var(--text-muted); margin:0 0 16px; }
 .grp-invite-actions{ display:flex; gap:8px; justify-content:flex-end; }
 
 /* ── The section head and its clock ───────────────────────────────── */
 .lb-section-head{ display:flex; align-items:flex-end; justify-content:space-between; gap:16px; }
 .lb-clock{ text-align:right; flex:none; }
 .lb-clock-lbl, .lb-clock-sub{
-  font-family:var(--mono); font-size:8.5px; letter-spacing:1.4px;
+  font-family:var(--mono); font-size:var(--fs-floor); letter-spacing:1.4px;
   text-transform:uppercase; color:var(--text-muted);
 }
 .lb-clock-num{ font-family:var(--mono); font-size:15px; color:var(--text); margin:3px 0; }
@@ -444,7 +444,7 @@
 
 .lb-toptabs{ display:flex; gap:6px; flex-wrap:wrap; }
 .lb-toptab{
-  font-family:var(--mono); font-size:10px; letter-spacing:1.4px; text-transform:uppercase;
+  font-family:var(--mono); font-size:var(--fs-floor); letter-spacing:1.4px; text-transform:uppercase;
   padding:9px 16px; border-radius:999px; cursor:pointer; white-space:nowrap;
   border:1px solid var(--border); background:transparent; color:var(--text-muted);
 }
@@ -479,5 +479,5 @@
 
   .lb-section-head{ align-items:flex-start; }
   .lb-clock-num{ font-size:13px; }
-  .lb-toptab{ flex:1; text-align:center; padding:9px 6px; font-size:9.5px; }
+  .lb-toptab{ flex:1; text-align:center; padding:9px 6px; font-size:var(--fs-floor); }
 }

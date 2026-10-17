@@ -117,7 +117,7 @@ export default function SubscriptionPanel() {
         marginBottom: '14px',
       }}>
         <div>
-          <div style={{ fontFamily: 'var(--mono)', fontSize: '10px', letterSpacing: '1.4px', textTransform: 'uppercase', color: 'var(--text-muted)' }}>
+          <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-floor)', letterSpacing: '1.4px', textTransform: 'uppercase', color: 'var(--text-muted)' }}>
             Current plan
           </div>
           <div style={{ fontFamily: 'var(--sans)', fontSize: '16px', fontWeight: 700, color: 'var(--text)', marginTop: '2px' }}>
@@ -128,7 +128,7 @@ export default function SubscriptionPanel() {
           <span style={{
             padding: '5px 10px', borderRadius: '6px',
             background: 'var(--em)', color: 'var(--em-on, #fff)',
-            fontFamily: 'var(--mono)', fontSize: '10px',
+            fontFamily: 'var(--mono)', fontSize: 'var(--fs-floor)',
             letterSpacing: '1px', textTransform: 'uppercase', fontWeight: 700,
           }}>{fromPrice}</span>
         )}
@@ -153,9 +153,9 @@ export default function SubscriptionPanel() {
         }}>
           <div style={{ flex: 1, minWidth: 200 }}>
             <div style={{
-              fontFamily: 'var(--mono)', fontSize: '10px',
+              fontFamily: 'var(--mono)', fontSize: 'var(--fs-floor)',
               letterSpacing: '1.4px', textTransform: 'uppercase',
-              color: 'var(--em)', marginBottom: '4px',
+              color: 'var(--em-text)', marginBottom: '4px',
             }}>{saving ? `Save ${money(saving.amount, saving.currency)} / year` : 'Yearly plan'}</div>
             <div style={{
               fontFamily: 'var(--sans)', fontSize: '13px',
@@ -177,7 +177,7 @@ export default function SubscriptionPanel() {
               padding: '9px 14px', borderRadius: '8px',
               background: 'var(--em)', border: '1px solid var(--em)',
               color: 'var(--em-on, #fff)',
-              fontFamily: 'var(--mono)', fontSize: '11px',
+              fontFamily: 'var(--mono)', fontSize: 'var(--fs-floor)',
               letterSpacing: '1px', textTransform: 'uppercase', fontWeight: 700,
               cursor: 'pointer',
               whiteSpace: 'nowrap',
@@ -196,7 +196,7 @@ export default function SubscriptionPanel() {
               background: 'var(--em)',
               border: '1px solid var(--em)',
               color: 'var(--em-on, #fff)',
-              fontFamily: 'var(--mono)', fontSize: '11px',
+              fontFamily: 'var(--mono)', fontSize: 'var(--fs-floor)',
               letterSpacing: '1px', textTransform: 'uppercase', fontWeight: 700,
               cursor: 'pointer',
             }}
@@ -212,7 +212,7 @@ export default function SubscriptionPanel() {
             background: 'transparent',
             border: '1px solid var(--border)',
             color: 'var(--text)',
-            fontFamily: 'var(--mono)', fontSize: '11px',
+            fontFamily: 'var(--mono)', fontSize: 'var(--fs-floor)',
             letterSpacing: '1px', textTransform: 'uppercase', fontWeight: 600,
             cursor: busy ? 'wait' : 'pointer',
           }}
@@ -228,7 +228,7 @@ export default function SubscriptionPanel() {
               background: 'transparent',
               border: '1px solid var(--border)',
               color: 'var(--text-muted)',
-              fontFamily: 'var(--mono)', fontSize: '11px',
+              fontFamily: 'var(--mono)', fontSize: 'var(--fs-floor)',
               letterSpacing: '1px', textTransform: 'uppercase', fontWeight: 600,
               cursor: 'pointer',
             }}
@@ -246,7 +246,7 @@ export default function SubscriptionPanel() {
                     : msgKind === 'ok'  ? 'rgba(var(--em-rgb), 0.10)'
                     : 'var(--card, rgba(255,255,255,0.04))',
           border: '1px solid ' + (msgKind === 'err' ? 'rgba(220, 60, 60, 0.25)' : 'var(--border)'),
-          fontFamily: 'var(--mono)', fontSize: '11px',
+          fontFamily: 'var(--mono)', fontSize: 'var(--fs-floor)',
           color: 'var(--text)',
           lineHeight: '1.6',
         }}>{msg}</div>

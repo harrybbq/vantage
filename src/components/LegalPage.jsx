@@ -31,7 +31,7 @@ const LAST_UPDATED = '2 October 2026';
 function Updated() {
   return (
     <P>
-      <span style={{ fontFamily: 'var(--mono)', fontSize: '11px', color: 'rgba(255,255,255,.4)' }}>
+      <span style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-floor)', color: 'rgba(255,255,255,.4)' }}>
         Last updated: {LAST_UPDATED}
       </span>
     </P>
@@ -408,7 +408,7 @@ export default function LegalPage({ page, onClose }) {
         {/* Header */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '32px' }}>
           <div>
-            <div style={{ fontFamily: 'var(--mono, DM Mono, monospace)', fontSize: '10px', letterSpacing: '2px', color: 'rgba(255,255,255,.4)', textTransform: 'uppercase', marginBottom: '4px' }}>
+            <div style={{ fontFamily: 'var(--mono, DM Mono, monospace)', fontSize: 'var(--fs-floor)', letterSpacing: '2px', color: 'rgba(255,255,255,.4)', textTransform: 'uppercase', marginBottom: '4px' }}>
               Vantage
             </div>
             <h1 style={{ fontFamily: 'var(--serif, Playfair Display, serif)', fontSize: '26px', fontWeight: 700, color: '#fff', margin: 0 }}>

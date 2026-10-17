@@ -39,12 +39,12 @@ html[data-theme="dark-os"] .lfp {
 .lfp input[type=number]::-webkit-inner-spin-button { -webkit-appearance: none; }
 .lfp :focus-visible { outline: 2px solid var(--lf-acc); outline-offset: 2px; }
 .lfp kbd {
-  font-family: var(--mono, 'DM Mono', monospace); font-size: 10.5px; line-height: 1;
+  font-family: var(--mono, 'DM Mono', monospace); font-size: var(--fs-floor); line-height: 1;
   padding: 2px 6px; border-radius: 4px; border: 1px solid var(--lf-hair2); color: var(--lf-muted);
 }
 .lfp-grow { flex: 1; min-width: 0; }
 .lfp-label, .lfp-mono-muted {
-  font-family: var(--mono, 'DM Mono', monospace); font-size: 11px; color: var(--lf-muted);
+  font-family: var(--mono, 'DM Mono', monospace); font-size: var(--fs-floor); color: var(--lf-muted);
 }
 .lfp-label { letter-spacing: 1.4px; }
 .lfp-right { text-align: right; }
@@ -81,7 +81,7 @@ html[data-theme="dark-os"] .lfp {
   display: flex; align-items: center; justify-content: center; gap: 6px; transition: color .2s;
 }
 .lfp-tab.is-on { color: var(--lf-ink); }
-.lfp-tab-n { font-family: var(--mono, 'DM Mono', monospace); font-size: 10px; font-weight: 400; color: var(--lf-muted); }
+.lfp-tab-n { font-family: var(--mono, 'DM Mono', monospace); font-size: var(--fs-floor); font-weight: 400; color: var(--lf-muted); }
 .lfp-tab-ind {
   position: absolute; bottom: -1px; height: 2px; border-radius: 1px; background: var(--lf-acc);
   transition: left 220ms cubic-bezier(.3,.7,.2,1), width 220ms cubic-bezier(.3,.7,.2,1);
@@ -99,7 +99,7 @@ html[data-theme="dark-os"] .lfp {
 }
 .lfp-cols {
   padding: 4px 10px 6px; font-family: var(--mono, 'DM Mono', monospace);
-  font-size: 10px; letter-spacing: 1.2px; color: var(--lf-muted);
+  font-size: var(--fs-floor); letter-spacing: 1.2px; color: var(--lf-muted);
 }
 .lfp-cols-name { grid-column: 1 / 3; }
 .lfp-row { min-height: 54px; padding: 8px 10px; border-radius: 9px; cursor: pointer; }
@@ -119,12 +119,12 @@ html[data-theme="dark-os"] .lfp {
 }
 .lfp-name-s {
   display: flex; align-items: center; gap: 6px; min-width: 0;
-  font-family: var(--mono, 'DM Mono', monospace); font-size: 11px; color: var(--lf-muted);
+  font-family: var(--mono, 'DM Mono', monospace); font-size: var(--fs-floor); color: var(--lf-muted);
 }
 .lfp-name-s > span:last-child { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .lfp-err-t { color: var(--lf-err); }
 .lfp-userbadge {
-  flex: none; font-family: var(--mono, 'DM Mono', monospace); font-size: 10px;
+  flex: none; font-family: var(--mono, 'DM Mono', monospace); font-size: var(--fs-floor);
   padding: 0 6px; height: 16px; line-height: 14px; border-radius: 8px;
   border: 1px solid var(--lf-gold); color: var(--lf-gold);
 }
@@ -143,7 +143,7 @@ html[data-theme="dark-os"] .lfp {
 .lfp-del:hover { color: var(--lf-err); background: var(--lf-errSoft); }
 .lfp-logged {
   height: 26px; padding: 0 8px; border-radius: 13px; background: var(--lf-accSoft); color: var(--lf-acc);
-  font-family: var(--mono, 'DM Mono', monospace); font-size: 11px; display: flex; align-items: center; white-space: nowrap;
+  font-family: var(--mono, 'DM Mono', monospace); font-size: var(--fs-floor); display: flex; align-items: center; white-space: nowrap;
 }
 .lfp-row.is-ghost { display: flex; justify-content: space-between; cursor: default; border: 1px dashed var(--lf-hair2); }
 .lfp-ghost-t { font-size: 13px; color: var(--lf-ink2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -154,7 +154,7 @@ html[data-theme="dark-os"] .lfp {
 
 .lfp-loading {
   padding: 4px 10px 8px; display: flex; align-items: center; gap: 8px;
-  font-family: var(--mono, 'DM Mono', monospace); font-size: 11px; letter-spacing: 1.2px; color: var(--lf-muted);
+  font-family: var(--mono, 'DM Mono', monospace); font-size: var(--fs-floor); letter-spacing: 1.2px; color: var(--lf-muted);
 }
 .lfp-spin {
   display: inline-block; width: 12px; height: 12px; border-radius: 50%;
@@ -178,7 +178,7 @@ html[data-theme="dark-os"] .lfp {
   display: flex; flex-direction: column; gap: 8px; font-size: 13.5px; line-height: 1.55;
 }
 .lfp-logbody .lfp-alert { margin: 0; padding: 12px 14px; font-size: 13px; }
-.lfp-alert-l { font-family: var(--mono, 'DM Mono', monospace); font-size: 11px; letter-spacing: 1.2px; color: var(--lf-err); }
+.lfp-alert-l { font-family: var(--mono, 'DM Mono', monospace); font-size: var(--fs-floor); letter-spacing: 1.2px; color: var(--lf-err); }
 .lfp-alert-acts { display: flex; gap: 8px; margin-top: 4px; }
 .lfp-btn-ink, .lfp-btn-line, .lfp-btn-acc {
   height: 32px; padding: 0 14px; border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer;
@@ -229,7 +229,7 @@ html[data-theme="dark-os"] .lfp {
 .lfp-unit button.is-on { background: var(--lf-acc); color: var(--lf-accInk); }
 .lfp-pill {
   height: 26px; padding: 0 10px; border-radius: 13px; border: 1px solid var(--lf-hair2); background: transparent;
-  color: var(--lf-ink2); font-family: var(--mono, 'DM Mono', monospace); font-size: 11px; cursor: pointer; white-space: nowrap;
+  color: var(--lf-ink2); font-family: var(--mono, 'DM Mono', monospace); font-size: var(--fs-floor); cursor: pointer; white-space: nowrap;
 }
 .lfp-pill.is-on { background: var(--lf-acc); border-color: var(--lf-acc); color: var(--lf-accInk); }
 .lfp-sum { display: flex; flex-direction: column; gap: 10px; padding: 14px; border-radius: 12px; background: var(--lf-raised); border: 1px solid var(--lf-hair); }
@@ -240,22 +240,22 @@ html[data-theme="dark-os"] .lfp {
   color: var(--lf-acc); font-variant-numeric: tabular-nums; line-height: 1;
 }
 .lfp-sum-kcal > span { font-family: var(--mono, 'DM Mono', monospace); font-size: 13px; color: var(--lf-ink2); }
-.lfp-sum-kcal em { margin-left: auto; font-style: normal; font-family: var(--mono, 'DM Mono', monospace); font-size: 11px; color: var(--lf-muted); }
+.lfp-sum-kcal em { margin-left: auto; font-style: normal; font-family: var(--mono, 'DM Mono', monospace); font-size: var(--fs-floor); color: var(--lf-muted); }
 .lfp-sum-kcal em.is-over { color: var(--lf-gold); }
 .lfp-sum-macros { display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: 12px; }
 .lfp-mc { display: flex; flex-direction: column; gap: 5px; min-width: 0; }
 .lfp-mc-n { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--lf-ink2); }
 .lfp-mc-n i { width: 7px; height: 7px; border-radius: 50%; }
 .lfp-mc-v { font-family: var(--mono, 'DM Mono', monospace); font-size: 17px; font-variant-numeric: tabular-nums; }
-.lfp-mc-v small { font-size: 11px; color: var(--lf-muted); }
+.lfp-mc-v small { font-size: var(--fs-floor); color: var(--lf-muted); }
 .lfp-mc-bar { display: flex; height: 5px; border-radius: 3px; background: var(--lf-track); overflow: hidden; }
 .lfp-mc-bar i { display: block; height: 100%; transition: width .16s linear; }
-.lfp-mc .lfp-mono-muted { font-size: 10.5px; }
+.lfp-mc .lfp-mono-muted { font-size: var(--fs-floor); }
 .lfp-micro { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; padding-top: 10px; border-top: 1px solid var(--lf-hair); }
 .lfp-micro span { display: flex; justify-content: space-between; gap: 6px; font-size: 12px; color: var(--lf-ink2); }
 .lfp-micro b { font-family: var(--mono, 'DM Mono', monospace); font-weight: 400; color: var(--lf-ink); font-variant-numeric: tabular-nums; }
 .lfp-manual { display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: 8px; }
-.lfp-manual label { min-width: 0; display: flex; flex-direction: column; gap: 4px; font-size: 11.5px; color: var(--lf-ink2); }
+.lfp-manual label { min-width: 0; display: flex; flex-direction: column; gap: 4px; font-size: max(11.5px, var(--fs-floor)); color: var(--lf-ink2); }
 .lfp .lfp-manual input { height: 34px; padding: 0 8px; border-radius: 7px; font-family: var(--mono, 'DM Mono', monospace); font-size: 13px; }
 .lfp-checks { display: flex; flex-direction: column; gap: 10px; }
 .lfp-check { display: flex; align-items: center; gap: 10px; border: 0; background: none; text-align: left; font-size: 13.5px; cursor: pointer; padding: 0; }
@@ -264,7 +264,7 @@ html[data-theme="dark-os"] .lfp {
 .lfp-check-s { font-size: 12px; line-height: 1.5; color: var(--lf-ink2); }
 .lfp-box {
   flex: none; width: 18px; height: 18px; border-radius: 5px; border: 1.5px solid var(--lf-hair2);
-  color: var(--lf-accInk); font-size: 11px; line-height: 15px; text-align: center;
+  color: var(--lf-accInk); font-size: var(--fs-floor); line-height: 15px; text-align: center;
 }
 .lfp-box.is-on { background: var(--lf-acc); border-color: var(--lf-acc); }
 .lfp-logfoot { flex: none; display: flex; gap: 10px; padding: 12px 18px; border-top: 1px solid var(--lf-hair); }

@@ -213,7 +213,7 @@ export default function FoodSearch({ onSelectFood, onClose, onOpenModal, savedMe
               padding: '8px 14px', borderRadius: '999px',
               border: '1px solid var(--border)', background: 'transparent',
               color: 'var(--text-mid)', cursor: 'pointer',
-              fontFamily: 'var(--mono)', fontSize: '10px', letterSpacing: '1.2px', textTransform: 'uppercase',
+              fontFamily: 'var(--mono)', fontSize: 'var(--fs-floor)', letterSpacing: '1.2px', textTransform: 'uppercase',
             }}
           ><Icon name="x" size={13} />Cancel</button>
         </div>
@@ -226,8 +226,8 @@ export default function FoodSearch({ onSelectFood, onClose, onOpenModal, savedMe
                 padding: '8px 18px', border: 'none',
                 borderRight: i < tabs.length - 1 ? '1px solid var(--border)' : 'none',
                 background: mode === m ? 'rgba(var(--em-rgb), .14)' : 'transparent',
-                color: mode === m ? 'var(--em)' : 'var(--text-muted)',
-                fontFamily: 'var(--mono)', fontSize: '11px', letterSpacing: '1.2px',
+                color: mode === m ? 'var(--em-text)' : 'var(--text-muted)',
+                fontFamily: 'var(--mono)', fontSize: 'var(--fs-floor)', letterSpacing: '1.2px',
                 textTransform: 'uppercase', fontWeight: mode === m ? 700 : 500,
                 cursor: 'pointer', transition: 'background .15s, color .15s',
               }}>
@@ -247,7 +247,7 @@ export default function FoodSearch({ onSelectFood, onClose, onOpenModal, savedMe
               onQuota={quota.setLeft}
               onFreeLimit={() => onOpenModal?.('paywall:aiScans')}
             />
-            <p style={{ fontFamily: 'var(--mono)', fontSize: '11px', color: 'var(--text-muted)', textAlign: 'center', margin: 0 }}>
+            <p style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-floor)', color: 'var(--text-muted)', textAlign: 'center', margin: 0 }}>
               Point at a barcode or product QR to auto-scan, or use AI to detect a plate / packaging in frame.
             </p>
             {/* Always-visible AI identify — lives outside the camera box
@@ -290,14 +290,14 @@ export default function FoodSearch({ onSelectFood, onClose, onOpenModal, savedMe
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ fontWeight: 600, fontSize: 'var(--text-sm)', color: 'var(--text)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{meal.name}</div>
                     <div style={{ display: 'flex', gap: '8px', marginTop: '4px', flexWrap: 'wrap' }}>
-                      <span style={{ fontFamily: 'var(--mono)', fontSize: '10px', color: 'var(--text-mid)' }}>{Math.round(parseFloat(meal.calories) || 0)} kcal</span>
-                      <span style={{ fontFamily: 'var(--mono)', fontSize: '10px', color: 'var(--text-muted)' }}>P {Math.round(parseFloat(meal.protein_g) || 0)}g</span>
-                      <span style={{ fontFamily: 'var(--mono)', fontSize: '10px', color: 'var(--text-muted)' }}>C {Math.round(parseFloat(meal.carbs_g) || 0)}g</span>
-                      <span style={{ fontFamily: 'var(--mono)', fontSize: '10px', color: 'var(--text-muted)' }}>F {Math.round(parseFloat(meal.fat_g) || 0)}g</span>
-                      <span style={{ fontFamily: 'var(--mono)', fontSize: '10px', color: 'var(--text-muted)' }}>{Math.round(parseFloat(meal.serving_g) || 0)}g serving</span>
+                      <span style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-floor)', color: 'var(--text-mid)' }}>{Math.round(parseFloat(meal.calories) || 0)} kcal</span>
+                      <span style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-floor)', color: 'var(--text-muted)' }}>P {Math.round(parseFloat(meal.protein_g) || 0)}g</span>
+                      <span style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-floor)', color: 'var(--text-muted)' }}>C {Math.round(parseFloat(meal.carbs_g) || 0)}g</span>
+                      <span style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-floor)', color: 'var(--text-muted)' }}>F {Math.round(parseFloat(meal.fat_g) || 0)}g</span>
+                      <span style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-floor)', color: 'var(--text-muted)' }}>{Math.round(parseFloat(meal.serving_g) || 0)}g serving</span>
                     </div>
                   </div>
-                  <span style={{ color: 'var(--em)', flexShrink: 0, display: 'inline-flex' }}><Icon name="plus" size={16} /></span>
+                  <span style={{ color: 'var(--em-text)', flexShrink: 0, display: 'inline-flex' }}><Icon name="plus" size={16} /></span>
                 </button>
                 <button onClick={() => onDeleteMeal?.(meal.id)} aria-label={`Delete ${meal.name}`}
                   style={{ flexShrink: 0, width: '40px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border)', background: 'transparent', color: 'var(--text-muted)', cursor: 'pointer', fontSize: '13px', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -322,14 +322,14 @@ export default function FoodSearch({ onSelectFood, onClose, onOpenModal, savedMe
                   <div style={{ fontWeight: 600, fontSize: 'var(--text-sm)', color: 'var(--text)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{item.food_name}</div>
                   {item.brand && <div style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)', marginTop: '1px' }}>{item.brand}</div>}
                   <div style={{ display: 'flex', gap: '8px', marginTop: '4px', flexWrap: 'wrap' }}>
-                    <span style={{ fontFamily: 'var(--mono)', fontSize: '10px', color: 'var(--text-mid)' }}>{Math.round(parseFloat(item.calories) || 0)} kcal</span>
-                    <span style={{ fontFamily: 'var(--mono)', fontSize: '10px', color: 'var(--text-muted)' }}>P {Math.round(parseFloat(item.protein_g) || 0)}g</span>
-                    <span style={{ fontFamily: 'var(--mono)', fontSize: '10px', color: 'var(--text-muted)' }}>C {Math.round(parseFloat(item.carbs_g) || 0)}g</span>
-                    <span style={{ fontFamily: 'var(--mono)', fontSize: '10px', color: 'var(--text-muted)' }}>F {Math.round(parseFloat(item.fat_g) || 0)}g</span>
-                    <span style={{ fontFamily: 'var(--mono)', fontSize: '10px', color: 'var(--text-muted)' }}>{Math.round(parseFloat(item.serving_g) || 0)}{item.serving_unit || 'g'}</span>
+                    <span style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-floor)', color: 'var(--text-mid)' }}>{Math.round(parseFloat(item.calories) || 0)} kcal</span>
+                    <span style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-floor)', color: 'var(--text-muted)' }}>P {Math.round(parseFloat(item.protein_g) || 0)}g</span>
+                    <span style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-floor)', color: 'var(--text-muted)' }}>C {Math.round(parseFloat(item.carbs_g) || 0)}g</span>
+                    <span style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-floor)', color: 'var(--text-muted)' }}>F {Math.round(parseFloat(item.fat_g) || 0)}g</span>
+                    <span style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-floor)', color: 'var(--text-muted)' }}>{Math.round(parseFloat(item.serving_g) || 0)}{item.serving_unit || 'g'}</span>
                   </div>
                 </div>
-                <span style={{ color: 'var(--em)', flexShrink: 0, display: 'inline-flex' }}><Icon name="plus" size={16} /></span>
+                <span style={{ color: 'var(--em-text)', flexShrink: 0, display: 'inline-flex' }}><Icon name="plus" size={16} /></span>
               </button>
             ))}
           </div>
@@ -367,7 +367,7 @@ export default function FoodSearch({ onSelectFood, onClose, onOpenModal, savedMe
               </span>
             </label>
 
-            <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: '10px', flexWrap: 'wrap', fontSize: '10px', color: 'var(--text-muted)', fontFamily: 'var(--mono)', marginBottom: '10px', flexShrink: 0 }}>
+            <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: '10px', flexWrap: 'wrap', fontSize: 'var(--fs-floor)', color: 'var(--text-muted)', fontFamily: 'var(--mono)', marginBottom: '10px', flexShrink: 0 }}>
               <span>Data: Open Food Facts (openfoodfacts.org) — CC BY-SA</span>
               {results.length > 0 && (
                 <span style={{ flexShrink: 0, letterSpacing: '.6px' }}>
@@ -406,16 +406,16 @@ export default function FoodSearch({ onSelectFood, onClose, onOpenModal, savedMe
                       {item.brand && (
                         <span style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)', flexShrink: 1, minWidth: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{item.brand}</span>
                       )}
-                      <span style={{ fontFamily: 'var(--mono)', fontSize: '10px', color: 'var(--text-muted)', whiteSpace: 'nowrap', flexShrink: 0 }}>
+                      <span style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-floor)', color: 'var(--text-muted)', whiteSpace: 'nowrap', flexShrink: 0 }}>
                         P {Math.round(item.protein_g)} · C {Math.round(item.carbs_g)} · F {Math.round(item.fat_g)}
                       </span>
                     </div>
                   </div>
                   <div style={{ flexShrink: 0, textAlign: 'right', fontFamily: 'var(--mono)' }}>
                     <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--text)', fontVariantNumeric: 'tabular-nums' }}>{Math.round(item.calories)}</div>
-                    <div style={{ fontSize: '8.5px', letterSpacing: '.8px', color: 'var(--text-muted)', textTransform: 'uppercase' }}>kcal</div>
+                    <div style={{ fontSize: 'var(--fs-floor)', letterSpacing: '.8px', color: 'var(--text-muted)', textTransform: 'uppercase' }}>kcal</div>
                   </div>
-                  <span style={{ color: 'var(--em)', flexShrink: 0, alignSelf: 'center', display: 'inline-flex' }}><Icon name="plus" size={16} /></span>
+                  <span style={{ color: 'var(--em-text)', flexShrink: 0, alignSelf: 'center', display: 'inline-flex' }}><Icon name="plus" size={16} /></span>
                 </button>
               ))}
               {!loading && !error && !results.length && query.trim().length >= 2 && mode === 'search' && (
