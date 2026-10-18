@@ -33,16 +33,11 @@ import {
   ALLOWANCE_DEFAULT, LEAVE_TYPES, SESSION_OPTIONS, WINDOW, allowanceUsed,
   chipText, datesBetween, holidayDaySet, leaveType, monthGrid, monthRange,
   nextHoliday, normaliseBlock, rangeStats, patternDay,
-  resolveDay, rotaDayIndex, dayTypeOf, loadScaleOf, daysUntilReset,
+  resolveDay, daysUntilReset,
   scheduleOf, cycleShape,
 } from '../../lib/rotation/pattern';
 import ShiftPatternCard from './ShiftPatternCard';
 import { effectiveOverrides, plannedSessions, plannedOn } from '../../lib/lifts/plan';
-import {
-  DAY_TYPE_LABEL, FLOOR_MACROS, NIGHT_LOAD_SCALE, STRETCH_GOAL,
-  exercisesFor, stretchesFor, targetsForDay, commuteForDay,
-} from '../../data/trainingProgramme';
-import { currentWeightKg } from '../../lib/burn';
 
 const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June',
   'July', 'August', 'September', 'October', 'November', 'December'];
@@ -52,161 +47,6 @@ const todayIso = () => {
   const n = new Date();
   return `${n.getFullYear()}-${String(n.getMonth() + 1).padStart(2, '0')}-${String(n.getDate()).padStart(2, '0')}`;
 };
-
-/**
- * Today, from the plan's point of view.
- *
- * The calendar answers "what does the next fortnight look like"; this
- * answers "what am I doing now" — which is the question being asked on
- * the day, and it was taking a scan of a 15-month grid to work out.
- *
- * Nutrition sits next to training because on this rota they move
- * together: a night shift is both the 2450 kcal day and the 80% day,
- * and seeing one without the other is how the higher target starts
- * looking like a bug.
- */
-function TodayPanel({ overrides, S, schedule }) {
-  const iso = todayIso();
-  const [y, m, d] = iso.split('-').map(Number);
-  const day = resolveDay(y, m - 1, d, overrides, schedule);
-  if (!day.inPattern) return null;
-
-  const dayIdx = rotaDayIndex(day.pos, schedule, day.iso);
-  const dayType = day.shift === 'leave' ? 'off' : dayTypeOf(day.shift);
-  const scale = day.shift === 'leave' ? 1 : loadScaleOf(day.shift);
-  const t = targetsForDay(dayType, day.session);
-  const exercises = exercisesFor(day.session);
-  // Rest days fall through to the longer flow inside stretchesFor().
-  const stretches = stretchesFor(day.session);
-  const isNight = dayType === 'night_shift';
-  // Five miles on every shift day. Weight comes from the vitals log, and
-  // when there is none the distance is shown without a calorie figure
-  // rather than one invented from an assumed body weight.
-  const commute = commuteForDay(dayType, currentWeightKg(S || {}));
-
-  return (
-    <div className="upg-today">
-      <div className="upg-today-head">
-        <span className={`upg-today-badge is-${day.shift}`}>Day {dayIdx}</span>
-        <span className="upg-today-type">{DAY_TYPE_LABEL[dayType]}</span>
-        <span className="upg-today-sep">·</span>
-        <span className="upg-today-session">{day.session}</span>
-        {scale !== 1 && (
-          <span className="upg-today-load">{Math.round(scale * 100)}% load · maintenance</span>
-        )}
-      </div>
-
-      {isNight && (
-        <p className="upg-today-note">
-          Nights run at maintenance on purpose — appetite regulation goes on a
-          night shift, and holding the deficit through one buys a binge rather
-          than a loss. Same sets and reps at {Math.round(NIGHT_LOAD_SCALE * 100)}% of the bar.
-        </p>
-      )}
-
-      {/* The session delta, said out loud. A leg day reading 2430 when
-          the plan says 2250 has to explain itself, and the fact that
-          the fortnight still averages 2300 is the reassurance. */}
-      <div className="upg-cycle">
-        {t.kcalDelta === 0 ? (
-          <span className="upg-cycle-flat">Baseline day &mdash; no session adjustment.</span>
-        ) : (
-          <>
-            <span className={'upg-cycle-d' + (t.kcalDelta > 0 ? ' is-up' : ' is-down')}>
-              {t.kcalDelta > 0 ? '+' : '\u2212'}{Math.abs(t.kcalDelta)} kcal
-            </span>
-            <span className="upg-cycle-why">
-              {t.kcalDelta > 0
-                ? `${day.session} day \u2014 ${t.carbDelta > 0 ? '+' : ''}${t.carbDelta}g carbs on top of the ${DAY_TYPE_LABEL[dayType].toLowerCase()} baseline`
-                : `Rest day \u2014 \u2212${Math.abs(t.carbDelta)}g carbs, paying back the training days`}
-            </span>
-            <span className="upg-cycle-avg">16-day average unchanged</span>
-          </>
-        )}
-      </div>
-
-      {/* The commute. It is on the rota, not in the burn log, so it can
-          be stated without being logged — and it is only ever shown on
-          the days it actually happens. */}
-      {commute && (
-        <div className="upg-commute">
-          <span className="upg-commute-icon" aria-hidden="true">&#8635;</span>
-          <span className="upg-commute-m">{commute.miles} miles</span>
-          <span className="upg-commute-w">by bike, to work and back &mdash; about {commute.minutes} min</span>
-          {commute.kcal != null && <span className="upg-commute-k">&asymp; {commute.kcal} kcal</span>}
-        </div>
-      )}
-
-      <div className="upg-macros">
-        {[
-          ['Calories', t.kcal, 'kcal', 'kcal'],
-          ['Protein', t.protein, 'g', 'protein'],
-          ['Fat', t.fat, 'g', 'fat'],
-          ['Carbs', t.carbs, 'g', 'carbs'],
-        ].map(([label, val, unit, key]) => (
-          <div key={key} className="upg-macro">
-            <div className="upg-macro-n">{val}<span className="upg-macro-u">{unit}</span></div>
-            <div className="upg-macro-l">
-              {label}
-              {FLOOR_MACROS.has(key) && <span className="upg-macro-floor">floor</span>}
-            </div>
-          </div>
-        ))}
-      </div>
-
-      {/* Session and stretch side by side on a wide screen: they are two
-          lists you read at the same moment, and stacked they made this
-          card the height of the screen before the calendar started. */}
-      <div className="upg-today-lists">
-      {exercises.length > 0 ? (
-        <div className="upg-exlist">
-          <div className="upg-exlist-h">
-            // {day.session} &middot; {exercises.length} exercises
-            {scale !== 1 && <span className="upg-exlist-scale">at {Math.round(scale * 100)}%</span>}
-          </div>
-          {exercises.map(ex => (
-            <div key={ex.name} className={`upg-ex${ex.optional ? ' is-optional' : ''}`}>
-              <span className="upg-ex-n">
-                {ex.name}
-                {/* "Sometimes" movements are part of the session when
-                    there is time, not a gap when they are missing. */}
-                {ex.optional && <em className="upg-ex-opt">sometimes</em>}
-              </span>
-              <span className="upg-ex-p">{ex.sets} &times; {ex.reps}</span>
-            </div>
-          ))}
-        </div>
-      ) : (
-        <div className="upg-exlist is-rest">
-          <div className="upg-exlist-h">// rest day</div>
-          <div className="upg-ex-rest">No session today. The rest days are the tail of each
-          off-block, so they run into going back in.</div>
-        </div>
-      )}
-
-      {/* Stretch block. Attached to the session rather than given a day
-          of its own, because five minutes on the end of something that
-          is already happening gets done and a mobility day does not. */}
-      <div className="upg-stretch">
-        <div className="upg-exlist-h">
-          // stretch &middot; {stretches.length} moves
-          <span className="upg-exlist-scale">Spider-Man</span>
-        </div>
-        <div className="upg-stretch-goal">{STRETCH_GOAL}</div>
-        {stretches.map(s => (
-          <div key={s.name} className="upg-stretchrow">
-            <div className="upg-stretchrow-top">
-              <span className="upg-ex-n">{s.name}</span>
-              <span className="upg-ex-p">{s.hold}</span>
-            </div>
-            <div className="upg-stretchrow-why">{s.why}</div>
-          </div>
-        ))}
-      </div>
-      </div>
-    </div>
-  );
-}
 
 /**
  * The next sixteen days — one full cycle from today.
@@ -410,7 +250,6 @@ export default function RotationTab({ S, update, isMobile }) {
 
   return (
     <div className="upg-pane">
-      <TodayPanel overrides={eff} S={S} schedule={schedule} />
       <NextDays overrides={eff} raw={overrides} holidayDays={holidayDays} today={today} onOpen={setEditing} schedule={schedule} />
       <ShiftPatternCard S={S} update={update} schedule={schedule} today={today} />
       <div className="upg-stats">

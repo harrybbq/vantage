@@ -468,37 +468,10 @@
   .upg-logrow { flex-direction: column; align-items: stretch; }
 }
 
-/* ── Today panel ──────────────────────────────────────────────────────
-   Sits above the calendar: what the plan says about today, so the
-   answer to "what am I doing now" isn't a scan of a 15-month grid.
-   Training and nutrition are one block because on this rota they move
-   together — a night shift is both the 2450 kcal day and the 80% day.
-   ──────────────────────────────────────────────────────────────────── */
-.upg-today{
-  border:1px solid var(--border); border-radius:14px; padding:14px 16px;
-  margin-bottom:14px; display:flex; flex-direction:column; gap:12px;
-}
-.upg-today-head{display:flex; align-items:center; gap:8px; flex-wrap:wrap;}
-.upg-today-badge{
-  font-family:var(--mono); font-size:var(--fs-floor); letter-spacing:1.2px; font-weight:700;
-  padding:3px 8px; border-radius:6px; border:1px solid var(--border); color:var(--text-mid);
-}
-.upg-today-badge.is-night{border-color:rgba(110,120,200,.5); color:#8a94d8;}
-.upg-today-badge.is-day{border-color:rgba(var(--em-rgb),.5); color:var(--em-text);}
-.upg-today-badge.is-off,.upg-today-badge.is-leave{border-color:var(--border); color:var(--text-muted);}
-.upg-today-type{font-family:var(--sans); font-size:14px; font-weight:700; color:var(--text);}
-.upg-today-sep{color:var(--text-muted);}
-.upg-today-session{font-family:var(--sans); font-size:14px; font-weight:700; color:var(--em-text);}
-.upg-today-load{
-  margin-left:auto; font-family:var(--mono); font-size:var(--fs-floor); letter-spacing:1.1px;
-  text-transform:uppercase; font-weight:700; padding:3px 8px; border-radius:6px;
-  color:var(--gold-text); border:1px solid rgba(200,151,10,.35);
-  background:rgba(200,151,10,.08);
-}
-.upg-today-note{
-  margin:0; font-family:var(--mono); font-size:var(--fs-floor); line-height:1.7;
-  color:var(--text-muted); border-left:2px solid rgba(200,151,10,.45); padding-left:11px;
-}
+/* ── Macro tiles, session rows and the stretch block ──────────────────
+   Once Rotation's today panel (removed Oct 2026). The macro tiles and
+   rows are still used elsewhere in Upgrade; the stretch block now sits
+   on the Lifts Today card (WorkoutToday). */
 .upg-macros{display:grid; grid-template-columns:repeat(4,1fr); gap:8px;}
 .upg-macro{border:1px solid var(--border); border-radius:10px; padding:9px 10px;}
 .upg-macro-n{font-family:var(--mono); font-size:18px; font-weight:700; color:var(--text); line-height:1;}
@@ -552,19 +525,8 @@
 }
 @media (max-width:640px){
   .upg-macros{grid-template-columns:repeat(2,1fr);}
-  .upg-today-load{margin-left:0;}
 }
 
-/* Session cycling — why today's number differs from the baseline, and
-   the reassurance that the fortnight still averages what it should. */
-.upg-cycle{display:flex; align-items:baseline; gap:9px; flex-wrap:wrap;
-  font-family:var(--mono); font-size:var(--fs-floor); color:var(--text-muted);}
-.upg-cycle-d{font-size:12px; font-weight:700;}
-.upg-cycle-d.is-up{color:var(--em-text);}
-.upg-cycle-d.is-down{color:var(--gold-text);}
-.upg-cycle-why{flex:1; min-width:0; line-height:1.6;}
-.upg-cycle-avg{letter-spacing:.8px; text-transform:uppercase; font-size:var(--fs-floor); opacity:.75;}
-.upg-cycle-flat{line-height:1.6;}
 
 
 /* ══ Runners — the editor, the Run button, the verdict ════════════════
@@ -945,23 +907,6 @@
 }
 .upg-ex.is-optional .upg-ex-p { color: var(--text-muted); }
 
-/* The commute — a property of the rota rather than something logged, so
-   it sits with the day's numbers and only appears on shift days. */
-.upg-commute {
-  display: flex;
-  align-items: baseline;
-  gap: 9px;
-  flex-wrap: wrap;
-  padding: 9px 12px;
-  margin-bottom: 12px;
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  background: rgba(128, 128, 128, .05);
-}
-.upg-commute-icon { color: var(--em-text); font-size: 13px; line-height: 1; }
-.upg-commute-m { font-family: var(--mono); font-size: 13px; color: var(--text); }
-.upg-commute-w { font-size: max(11.5px, var(--fs-floor)); color: var(--text-muted); flex: 1; min-width: 0; }
-.upg-commute-k { font-family: var(--mono); font-size: max(11.5px, var(--fs-floor)); color: var(--em-text); }
 
 /* ── Review: group pictures waiting on a person ───────────────────────
    Deliberately plain. This is a queue that should be empty most of the
@@ -1010,11 +955,6 @@
    Today reads as two lists side by side; the next sixteen days get a
    strip of their own; the calendar pages three months at a time with
    cells big enough to read. */
-.upg-today-lists { display: grid; grid-template-columns: 1fr; gap: 14px; }
-@media (min-width: 900px) {
-  .upg-today-lists { grid-template-columns: 1.1fr 1fr; gap: 22px; align-items: start; }
-  .upg-today-lists > .upg-stretch { margin-top: 0; padding-top: 0; border-top: 0; }
-}
 
 .upg-next-row { display: grid; grid-template-columns: repeat(16, minmax(0, 1fr)); gap: 5px; }
 @media (max-width: 1100px) { .upg-next-row { grid-template-columns: repeat(8, minmax(0, 1fr)); } }

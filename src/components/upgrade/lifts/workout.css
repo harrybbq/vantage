@@ -364,6 +364,21 @@ html[data-theme="cream-pro"] .lifts { --wk-muted: #5f554a; }
 .wk-block-s.is-done svg { color: var(--wk-good); }
 .wk-block-lbl { font-size: var(--lf-fs); color: var(--text-muted); line-height: 1.4; }
 
+/* The cool-down, folded under the session (from Rotation, Oct 2026). */
+.wk-stretch { border-top: 1px solid var(--border); padding-top: 8px; }
+.wk-stretch > summary { list-style: none; display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 44px; cursor: pointer; color: var(--text-muted); }
+.wk-stretch > summary::-webkit-details-marker { display: none; }
+.wk-stretch > summary svg { transition: transform .15s; }
+.wk-stretch[open] > summary svg { transform: rotate(180deg); }
+.wk-stretch-h { font-family: var(--mono); font-size: var(--lf-fs); letter-spacing: .8px; text-transform: uppercase; }
+.wk-stretch-goal { margin: 0 0 6px; font-size: var(--lf-fs); line-height: 1.6; color: var(--text-muted); }
+.wk-stretch-list { list-style: none; margin: 0; padding: 0; }
+.wk-stretch-list li { padding: 8px 0; border-top: 1px solid var(--border); }
+.wk-stretch-list li:first-child { border-top: 0; }
+.wk-stretch-top { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; font-size: 13.5px; color: var(--text); }
+.wk-stretch-hold { font-family: var(--mono); font-size: var(--lf-fs); color: var(--text-muted); white-space: nowrap; }
+.wk-stretch-why { margin: 3px 0 0; font-size: var(--lf-fs); line-height: 1.55; color: var(--text-muted); }
+@media (prefers-reduced-motion: reduce) { .wk-stretch > summary svg { transition: none; } }
 .wk-next { display: flex; flex-direction: column; gap: 6px; padding-top: 10px; border-top: 1px solid var(--border); }
 .wk-next-h { font-family: var(--mono); font-size: var(--lf-fs); letter-spacing: .8px; text-transform: uppercase; color: var(--text-muted); }
 .wk-next-row { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 5px; }

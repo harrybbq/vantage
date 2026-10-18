@@ -17,6 +17,7 @@ import { RecipesPanel } from './MealLibrary';
 import MealPlanner from './MealPlanner';
 import { DEFAULT_PLAN, blendedDailyKcal } from '../../lib/diet/plan';
 import { SEQ, CARDIO_SESSIONS, cycleShape, scheduleOf } from '../../lib/rotation/pattern';
+import { NIGHT_LOAD_SCALE, commuteForDay } from '../../data/trainingProgramme';
 import { weightSeries, pace } from '../../lib/diet/weightTrend';
 
 /* The Log Food panel's macro colours, so a macro is the same colour everywhere. */
@@ -46,6 +47,7 @@ export default function DietTab({ S, update, userId }) {
   const [editing, setEditing] = useState(false);
   const weight = latestWeight(S);
   const kg = weight ? weight.kg : null;
+  const commute = commuteForDay('day_shift', kg);
 
   // Protein is per-kg of CURRENT bodyweight, so it moves as the body
   // does. Falls back to the target weight when nothing is logged —
@@ -139,6 +141,15 @@ export default function DietTab({ S, update, userId }) {
           block, so Push always lands on the first shift. On the current pattern that is {shape.train}{' '}
           sessions and {shape.rest} rest days every {shape.len}. Cardio rides on {[...CARDIO_SESSIONS].join(' / ')} days
           to keep legs fresh.</p>
+          {/* Moved here from Rotation's old today card (removed Oct 2026):
+              the numbers live in the planner and Track, the reasons here. */}
+          <p><b>Nights</b> run at maintenance on purpose — appetite regulation goes on a night shift, and
+          holding the deficit through one buys a binge rather than a loss. Training on a night keeps the
+          same sets and reps at {Math.round(NIGHT_LOAD_SCALE * 100)}% of the load. Each session day adds
+          carbs for its session and rest days take them back, so the {shape.len}-day average, and the
+          deficit with it, does not move. Shift days also carry the {commute.miles}-mile bike commute (about
+          {' '}{commute.minutes} min{commute.kcal != null ? `, ≈${commute.kcal} kcal` : ''}). It is not logged
+          anywhere; it is simply part of every shift day.</p>
           <p><b>Elsewhere in the app:</b> the Body Goal projection needs one daily calorie figure and this plan
           has two, so it uses the blend — {plan.trainKcal} on the {shape.train} training days and{' '}
           {plan.restKcal} on the other {shape.rest}. That blend is a fallback: a calorie goal set

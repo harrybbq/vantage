@@ -13,6 +13,8 @@
  *     follow it for machines), night shift · 80% load when it is one,
  *     and Start workout. A rest day says so and leaves "Build my own
  *     workout" as the way in.
+ *   · the cool-down for the session (or a rest day's mobility flow),
+ *     folded: moved here from Rotation when its today card went.
  *   · the plan for the next five days: session, shift chip, and a
  *     "moved" mark where the plan has moved a session off the rota.
  *   · this week as a strip: Mon–Sun, the planned session, a dot on days
@@ -29,6 +31,7 @@ import { ConfirmButton } from '../security/parts';
 import { GymSwitch } from './parts';
 import { suggestWorkout, weekStrip, planStrip, minutesText, elapsedSec } from '../../../lib/lifts/workout';
 import { SEQ } from '../../../lib/rotation/pattern';
+import { STRETCH_GOAL, stretchesFor } from '../../../data/trainingProgramme';
 
 const SHORT = { Push: 'Push', Pull: 'Pull', Legs: 'Legs', Upper: 'Upr', Lower: 'Lwr', Extra: 'Any' };
 
@@ -37,6 +40,8 @@ const dowOf = iso => { const [y, m, d] = iso.split('-').map(Number); return DOW[
 
 export default function WorkoutToday({ S, today, nightOf = null, now, active, onStart, onBuild, onResume, onDiscard, gyms = [], gym = null, onGym, gymName = id => id }) {
   const sug = useMemo(() => suggestWorkout(S, today, { gym }), [S, today, gym]);
+  // Rest days fall through to the longer flow inside stretchesFor().
+  const stretches = stretchesFor(sug.restDay ? 'Rest' : sug.rotaSession);
   const week = useMemo(() => weekStrip(S, today), [S, today]);
   const next = useMemo(() => planStrip(S, today, 5), [S, today]);
   const [showAll, setShowAll] = useState(false);
@@ -114,6 +119,24 @@ export default function WorkoutToday({ S, today, nightOf = null, now, active, on
               </button>
             </>
           )}
+          {/* The cool-down. Moved here from Rotation's old today card: it
+              belongs to the session, so it sits with the session. Folded,
+              because it is read after the workout, not before it. */}
+          <details className="wk-stretch" data-testid="wk-stretch">
+            <summary>
+              <span className="wk-stretch-h">{sug.restDay ? 'Mobility for a rest day' : 'Stretch after'} · {stretches.length} moves</span>
+              <Icon name="chevron-down" size={14} />
+            </summary>
+            <p className="wk-stretch-goal">{STRETCH_GOAL}</p>
+            <ul className="wk-stretch-list">
+              {stretches.map(st => (
+                <li key={st.name}>
+                  <div className="wk-stretch-top"><span>{st.name}</span><span className="wk-stretch-hold">{st.hold}</span></div>
+                  <p className="wk-stretch-why">{st.why}</p>
+                </li>
+              ))}
+            </ul>
+          </details>
           {next.length > 0 && (
             <div className="wk-next" data-testid="wk-next">
               <span className="wk-next-h">Plan for the next {next.length} days</span>
