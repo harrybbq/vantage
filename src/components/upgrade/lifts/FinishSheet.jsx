@@ -1,7 +1,8 @@
 /**
  * Finish → the summary, before anything is written: duration, volume,
  * sets done, exercises, and the REAL-SET PBs this session hit ("New
- * best: Leg press 185 kg × 8 · new 8RM"). Sets that were never ticked
+ * best: Leg press 185 kg × 8 · new 8RM" — a machine's against the
+ * workout's gym only). Sets that were never ticked
  * are named — they are not saved.
  *
  * Save writes the workout in one go (finishWorkout: log entries +
@@ -14,12 +15,12 @@ import { Sheet, ConfirmButton } from '../security/parts';
 import Icon from '../../Icon';
 import { clock, volumeText } from '../../../lib/lifts/workout';
 
-export default function FinishSheet({ summary, saved, onSave, onKeepGoing, onDiscard, onSaveTemplate, onClose, templateSaved }) {
+export default function FinishSheet({ summary, saved, onSave, onKeepGoing, onDiscard, onSaveTemplate, onClose, templateSaved, gymLabel = null }) {
   const [name, setName] = useState(summary ? summary.session.name : '');
   if (!summary) return null;
   const nothing = summary.setsDone === 0;
   return (
-    <Sheet title={saved ? 'Workout saved' : nothing ? 'Nothing ticked yet' : 'Finish workout'} eyebrow={`// ${summary.session.name}`}
+    <Sheet title={saved ? 'Workout saved' : nothing ? 'Nothing ticked yet' : 'Finish workout'} eyebrow={`// ${summary.session.name}${gymLabel ? ` · ${gymLabel}` : ''}`}
            onClose={saved ? onClose : onKeepGoing} className="lifts wk-finish-sheet">
       <div className="wk-sum" data-testid="wk-summary">
         <dl className="wk-sum-grid">

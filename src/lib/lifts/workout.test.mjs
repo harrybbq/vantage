@@ -38,7 +38,8 @@ const LIST = [
   { id: 'bench', name: 'Bench press', load: 'weight', unit: 'kg', createdAt: 0 },
 ];
 let c = 0;
-const e = (liftId, date, weight, reps, extra = {}) => ({ id: `e${++c}`, liftId, date, weight, reps, createdAt: ++c, ...extra });
+// Every set in the fixture is at DXC (the default gym), so the machine lifts' history is in scope.
+const e = (liftId, date, weight, reps, extra = {}) => ({ id: `e${++c}`, liftId, date, weight, reps, createdAt: ++c, gym: 'dxc', ...extra });
 const LOG = [
   // a finished workout on a day shift: 3 sets of leg press
   e('seed-leg-press', '2026-10-05', 170, 10, { sessionId: 'old1' }), e('seed-leg-press', '2026-10-05', 180, 8, { sessionId: 'old1' }), e('seed-leg-press', '2026-10-05', 180, 7, { sessionId: 'old1' }),
@@ -49,9 +50,9 @@ const LOG = [
   e('seed-lat-pulldown', '2026-10-01', 70, 10, { shift: 'night' }),
 ];
 const SESSIONS = [
-  { id: 'old1', date: '2026-10-05', startedAt: 1, finishedAt: 100, durationSec: 3000, name: 'Legs', source: 'suggested', rotaSession: 'Legs', shift: 'day',
+  { id: 'old1', date: '2026-10-05', startedAt: 1, finishedAt: 100, durationSec: 3000, name: 'Legs', source: 'suggested', rotaSession: 'Legs', shift: 'day', gym: 'dxc',
     exercises: [{ liftId: 'seed-leg-press', sets: [{ reps: 10, weight: 170, done: true }, { reps: 8, weight: 180, done: true }, { reps: 7, weight: 180, done: true }] }] },
-  { id: 'old2', date: '2026-10-08', startedAt: 200, finishedAt: 300, durationSec: 2400, name: 'Legs', source: 'suggested', rotaSession: 'Legs', shift: 'night',
+  { id: 'old2', date: '2026-10-08', startedAt: 200, finishedAt: 300, durationSec: 2400, name: 'Legs', source: 'suggested', rotaSession: 'Legs', shift: 'night', gym: 'dxc',
     exercises: [{ liftId: 'seed-leg-press', sets: [{ reps: 8, weight: 145, done: true }, { reps: 8, weight: 145, done: true }] }] },
 ];
 const base = () => ({
@@ -107,8 +108,14 @@ t('previousSets: the last time the lift was trained, by session, else by date', 
 });
 
 // ── Suggested workout ──
+// The suggestion follows the session PLAN (plan.js): missed sessions in a
+// block carry forward once workouts are being logged. These tests check
+// the programme mapping itself, so they use the same log with no
+// finished workouts — the plan is then exactly the rota. (plan.test.mjs
+// covers the plan moving.)
+const noHistory = () => { const S = base(); S.lifts.sessions = []; return S; };
 t('suggestion: Legs on a day shift — the programme, last day weights', () => {
-  const S = base();
+  const S = noHistory();
   const s = suggestWorkout(S, LEGS_DAY);
   assert.equal(s.restDay, false);
   assert.equal(s.name, 'Legs');
@@ -131,10 +138,14 @@ t('suggestion: Legs on a day shift — the programme, last day weights', () => {
   assert.equal(s.exercises.find(x => x.name === 'Walking dumbbell lunge').optional, true);
   assert.ok(s.minutes >= 30 && s.minutes <= 90, `~${s.minutes} min`);
   assert.equal(s.minutes % 5, 0);
-  assert.match(s.reason, /Day 3 · Legs on your rota\. Last Legs/);
+  assert.match(s.reason, /Day 3 · Legs on your rota\. Your first Legs logged here\./);
+  const withHistory = suggestWorkout({ ...S, lifts: { ...S.lifts, sessions: SESSIONS, list: S.lifts.list } }, '2026-10-05');
+  assert.equal(withHistory.name, 'Legs done', 'a session already logged today says so');
+  assert.equal(withHistory.restDay, true);
+  assert.match(withHistory.reason, /^Legs logged today\. Next: Upper tomorrow\.$/);
 });
 t('suggestion: a NIGHT shift pre-fills at 80%, rounded to 2.5 kg, from the last DAY base', () => {
-  const S = base();
+  const S = noHistory();
   const s = suggestWorkout(S, LEGS_NIGHT);
   assert.equal(s.night, true);
   assert.equal(s.shift, 'night');
@@ -143,7 +154,7 @@ t('suggestion: a NIGHT shift pre-fills at 80%, rounded to 2.5 kg, from the last 
   assert.match(s.reason, /Night 3 · Legs/);
 });
 t('suggestion: a night base is used as it stands (no 64%)', () => {
-  const S = base();
+  const S = noHistory();
   S.lifts.log = S.lifts.log.filter(x => x.liftId !== 'seed-leg-press' || x.shift === 'night');
   const lp = suggestWorkout(S, LEGS_NIGHT).exercises.find(x => x.name === 'Machine leg press');
   assert.deepEqual(lp.rows.map(r => r.weight), [145, 145, 145, 145]);
@@ -151,7 +162,7 @@ t('suggestion: a night base is used as it stands (no 64%)', () => {
   assert.equal(pull.weight, 70, 'only a night set on record: 70 stays 70');
 });
 t('suggestion per session: each programme session maps to its exercises', () => {
-  const S = base();
+  const S = noHistory();
   const want = { '2026-10-11': 'Push', '2026-10-12': 'Pull', '2026-10-13': 'Legs', '2026-10-14': 'Upper', '2026-10-15': 'Lower' };
   for (const [iso, code] of Object.entries(want)) {
     const s = suggestWorkout(S, iso);
@@ -165,7 +176,7 @@ t('suggestion per session: each programme session maps to its exercises', () => 
   assert.equal(suggestWorkout(S, '2026-10-15').shift, 'off', 'Lower lands on the first day off');
 });
 t('suggestion: rest day, leave, off-pattern, a non-programme session', () => {
-  const S = base();
+  const S = noHistory();
   const r = suggestWorkout(S, REST);
   assert.equal(r.restDay, true);
   assert.equal(r.name, 'Rest day today');
@@ -192,7 +203,7 @@ t('estimateMinutes leaves optional exercises out', () => {
 t('start from the suggestion: programme lifts created additively, rows pre-filled', () => {
   idn = 0;
   const S = base();
-  const sug = suggestWorkout(S, LEGS_DAY);
+  const sug = suggestWorkout(noHistory(), LEGS_DAY);
   const next = startWorkout(S, { ...suggestedStart(sug), now: 1000, today: LEGS_DAY, ids });
   assert.equal(next.habits, S.habits, 'other keys untouched (same reference)');
   assert.equal(next.vitalsLog, S.vitalsLog);
@@ -218,8 +229,8 @@ t('start from the suggestion: programme lifts created additively, rows pre-fille
   assert.equal(startWorkout(next, { now: 2, today: LEGS_DAY, ids }), next, 'only one workout at a time');
 });
 t('start twice on two devices: programme lifts get the same ids', () => {
-  const a = startWorkout(base(), { ...suggestedStart(suggestWorkout(base(), LEGS_DAY)), now: 1, today: LEGS_DAY, ids });
-  const b = startWorkout(base(), { ...suggestedStart(suggestWorkout(base(), LEGS_DAY)), now: 2, today: LEGS_DAY, ids });
+  const a = startWorkout(base(), { ...suggestedStart(suggestWorkout(noHistory(), LEGS_DAY)), now: 1, today: LEGS_DAY, ids });
+  const b = startWorkout(base(), { ...suggestedStart(suggestWorkout(noHistory(), LEGS_DAY)), now: 2, today: LEGS_DAY, ids });
   assert.deepEqual(a.lifts.list.map(l => l.id), b.lifts.list.map(l => l.id));
 });
 t('blank start + add exercises: empty rows (Previous shows what to beat), no duplicates', () => {
@@ -237,7 +248,7 @@ t('blank start + add exercises: empty rows (Previous shows what to beat), no dup
 });
 
 // ── Editing the active workout ──
-const started = () => startWorkout(base(), { ...suggestedStart(suggestWorkout(base(), LEGS_DAY)), now: 10_000, today: LEGS_DAY, ids });
+const started = () => startWorkout(base(), { ...suggestedStart(suggestWorkout(noHistory(), LEGS_DAY)), now: 10_000, today: LEGS_DAY, ids });
 const lpIdx = S => activeOf(S).exercises.findIndex(x => x.liftId === 'seed-leg-press');
 
 t('addSet copies the last row; updateSet cleans numbers; same value → no write', () => {
@@ -424,7 +435,7 @@ t('clock words', () => {
 // ── PBs from a session: real sets only ──
 t('sessionPBs: a heavier real set and a rep max; text names the set', () => {
   const S = base();
-  const sess = { date: LEGS_DAY, exercises: [{ liftId: 'seed-leg-press', sets: [{ reps: 8, weight: 182.5, done: true }, { reps: 8, weight: 185, done: true }, { reps: 12, weight: 150, done: true }] }] };
+  const sess = { date: LEGS_DAY, gym: 'dxc', exercises: [{ liftId: 'seed-leg-press', sets: [{ reps: 8, weight: 182.5, done: true }, { reps: 8, weight: 185, done: true }, { reps: 12, weight: 150, done: true }] }] };
   const pbs = sessionPBs(S.lifts.log, sess, LIST);
   assert.equal(pbs.length, 1, 'the 185 × 8 holds both records; 182.5 was overtaken in the same session; 150 × 12 beat nothing that existed');
   assert.equal(pbs[0].heaviest, true);
@@ -434,7 +445,7 @@ t('sessionPBs: a heavier real set and a rep max; text names the set', () => {
 t('sessionPBs: a rep-max PB without a heavier set says "new 8RM"', () => {
   const S = base();
   S.lifts.log.push(e('seed-leg-press', '2026-10-09', 190, 3));
-  const pbs = sessionPBs(S.lifts.log, { date: LEGS_DAY, exercises: [{ liftId: 'seed-leg-press', sets: [{ reps: 8, weight: 185, done: true }] }] }, LIST);
+  const pbs = sessionPBs(S.lifts.log, { date: LEGS_DAY, gym: 'dxc', exercises: [{ liftId: 'seed-leg-press', sets: [{ reps: 8, weight: 185, done: true }] }] }, LIST);
   assert.equal(pbs.length, 1);
   assert.equal(pbs[0].heaviest, false);
   assert.equal(pbs[0].text, 'New best: Leg press 185 kg × 8 · new 8RM');
@@ -442,13 +453,13 @@ t('sessionPBs: a rep-max PB without a heavier set says "new 8RM"', () => {
 t('sessionPBs: an e1RM-only improvement is NOT a PB; ties are not; a first session is a baseline', () => {
   const S = base();
   // 180 × 9: e1RM 234 beats 180 × 8 (228), but heaviest (180) and 8RM (180) are only tied
-  const e1 = sessionPBs(S.lifts.log, { date: LEGS_DAY, exercises: [{ liftId: 'seed-leg-press', sets: [{ reps: 9, weight: 180, done: true }] }] }, LIST);
+  const e1 = sessionPBs(S.lifts.log, { date: LEGS_DAY, gym: 'dxc', exercises: [{ liftId: 'seed-leg-press', sets: [{ reps: 9, weight: 180, done: true }] }] }, LIST);
   assert.deepEqual(e1, []);
-  const tie = sessionPBs(S.lifts.log, { date: LEGS_DAY, exercises: [{ liftId: 'seed-leg-press', sets: [{ reps: 8, weight: 180, done: true }] }] }, LIST);
+  const tie = sessionPBs(S.lifts.log, { date: LEGS_DAY, gym: 'dxc', exercises: [{ liftId: 'seed-leg-press', sets: [{ reps: 8, weight: 180, done: true }] }] }, LIST);
   assert.deepEqual(tie, []);
-  const first = sessionPBs(S.lifts.log, { date: LEGS_DAY, exercises: [{ liftId: 'bench', sets: [{ reps: 5, weight: 100, done: true }] }] }, LIST);
+  const first = sessionPBs(S.lifts.log, { date: LEGS_DAY, gym: 'dxc', exercises: [{ liftId: 'bench', sets: [{ reps: 5, weight: 100, done: true }] }] }, LIST);
   assert.deepEqual(first, [], 'the first bench session sets the baseline');
-  const undone = sessionPBs(S.lifts.log, { date: LEGS_DAY, exercises: [{ liftId: 'seed-leg-press', sets: [{ reps: 8, weight: 300, done: false }] }] }, LIST);
+  const undone = sessionPBs(S.lifts.log, { date: LEGS_DAY, gym: 'dxc', exercises: [{ liftId: 'seed-leg-press', sets: [{ reps: 8, weight: 300, done: false }] }] }, LIST);
   assert.deepEqual(undone, [], 'an unticked set is not a set');
 });
 t('summariseWorkout matches what finish saves, and its PBs agree with the log afterwards', () => {
@@ -492,7 +503,11 @@ t('weekStrip: Mon–Sun with the rota session and trained days', () => {
   assert.equal(w.length, 7);
   assert.equal(w[0].iso, '2026-10-12');
   assert.equal(w[6].iso, '2026-10-18');
-  assert.deepEqual(w.map(d => d.session), ['Pull', 'Legs', 'Upper', 'Lower', null, null, null]);
+  assert.deepEqual(weekStrip(noHistory(), LEGS_DAY).map(d => d.session), ['Pull', 'Legs', 'Upper', 'Lower', null, null, null], 'no workouts logged: the rota');
+  // Workouts are being logged and Sun (Push) + Mon (Pull) passed without one:
+  // both carry forward, so the strip shows the PLAN.
+  assert.deepEqual(w.map(d => d.session), ['Pull', 'Push', 'Pull', 'Legs', null, null, null]);
+  assert.deepEqual(w.map(d => d.moved), [false, true, true, true, false, false, false]);
   assert.equal(w[1].today, true);
   assert.equal(w.filter(d => d.trained).length, 0);
   const w2 = weekStrip(S, '2026-10-05');

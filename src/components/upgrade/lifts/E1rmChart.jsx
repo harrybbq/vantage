@@ -11,15 +11,21 @@
  * are HOLLOW and off the line (it joins day-shift sets only), so a
  * lighter night never reads as a regression.
  *
+ * Per gym (`groups`, a machine lift's All view): one line per gym, each
+ * its own colour AND its own point shape (circle, square, diamond), with
+ * a legend naming them — never colour alone. A PB point is gold in its
+ * gym's shape, judged against that gym only.
+ *
  * Pointer or arrow keys pick a point; its set is read out under the
  * chart (and announced). A summary sits in the svg's aria-label.
  */
 import { useMemo, useState } from 'react';
 import { useWidth } from './parts';
-import { dayNo, fmtE1rm, setText, pbHeadline } from '../../../lib/lifts/lifts';
+import { dayNo, fmtE1rm, setText, pbHeadline, gymOf } from '../../../lib/lifts/lifts';
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 const dateLabel = iso => { const [y, m, d] = iso.split('-').map(Number); return `${d} ${MONTHS[m - 1]} ${y}`; };
+const SHAPES = ['circle', 'square', 'diamond'];
 
 function niceStep(range, target = 4) {
   const raw = range / target;
@@ -28,17 +34,30 @@ function niceStep(range, target = 4) {
   return (f <= 1 ? 1 : f <= 2 ? 2 : f <= 2.5 ? 2.5 : f <= 5 ? 5 : 10) * mag;
 }
 
-export default function E1rmChart({ series, lift, pbDays, from, to }) {
+/** One point in its group's shape. r is the circle radius; squares and diamonds match its area-ish. */
+export function Mark({ shape, x, y, r, className }) {
+  if (shape === 'square') { const h = r * 0.9; return <rect className={className} x={x - h} y={y - h} width={h * 2} height={h * 2} />; }
+  if (shape === 'diamond') { const h = r * 1.25; return <path className={className} d={`M${x} ${y - h}L${x + h} ${y}L${x} ${y + h}L${x - h} ${y}Z`} />; }
+  return <circle className={className} cx={x} cy={y} r={r} />;
+}
+
+export default function E1rmChart({ series, groups, lift, pbDays, from, to }) {
   const [ref, width] = useWidth(640);
   const [pick, setPick] = useState(null);
   const H = width < 480 ? 200 : 240;
   const pad = { l: 44, r: 14, t: 24, b: 28 };
+  const multi = Array.isArray(groups) && groups.length > 1;
+  const sets = useMemo(() => (Array.isArray(groups) && groups.length
+    ? groups.map((g, i) => ({ ...g, k: i, shape: SHAPES[i % SHAPES.length] }))
+    : [{ id: null, label: '', series: series || [], k: 0, shape: 'circle' }]), [groups, series]);
 
   const g = useMemo(() => {
-    if (!series.length) return null;
-    const x0 = from != null ? from : dayNo(series[0].date);
-    const x1 = Math.max(to != null ? to : dayNo(series[series.length - 1].date), x0 + 1);
-    const vals = series.map(p => p.value);
+    const all = sets.flatMap(s => s.series);
+    if (!all.length) return null;
+    const firstN = Math.min(...all.map(p => dayNo(p.date))), lastN = Math.max(...all.map(p => dayNo(p.date)));
+    const x0 = from != null ? from : firstN;
+    const x1 = Math.max(to != null ? to : lastN, x0 + 1);
+    const vals = all.map(p => p.value);
     let lo = Math.min(...vals), hi = Math.max(...vals);
     if (hi - lo < 4) { lo -= 2; hi += 2; }
     const step = niceStep(hi - lo);
@@ -60,30 +79,38 @@ export default function E1rmChart({ series, lift, pbDays, from, to }) {
     }
     const every = Math.max(1, Math.ceil(months.length / Math.max(1, Math.floor(iw / 70))));
     const mt = months.filter((_, i) => i % every === 0);
-    const pts = series.map(p => {
-      const evs = (pbDays && pbDays.get(p.date)) || null;
-      return { ...p, x: X(dayNo(p.date)), y: Y(p.value), pb: !!(evs && evs.length), evs };
+    const lines = sets.map(s => {
+      const pts = s.series.map(p => {
+        const evs = ((pbDays && pbDays.get(p.date)) || []).filter(ev => !multi || gymOf(ev.entry) === s.id);
+        return { ...p, x: X(dayNo(p.date)), y: Y(p.value), pb: evs.length > 0, evs, k: s.k, shape: s.shape, gym: s.id, gymLabel: s.label };
+      });
+      // The line runs through day-shift sets only: a night set (80% load)
+      // sits off the line as a hollow point instead of dragging it down.
+      const day = pts.filter(p => !p.night);
+      const line = (day.length >= 2 ? day : pts).map((p, i) => `${i ? 'L' : 'M'}${p.x.toFixed(1)} ${p.y.toFixed(1)}`).join(' ');
+      return { ...s, pts, line };
     });
-    // The line runs through day-shift sets only: a night set (80% load)
-    // sits off the line as a hollow point instead of dragging it down.
-    const day = pts.filter(p => !p.night);
-    const line = (day.length >= 2 ? day : pts).map((p, i) => `${i ? 'L' : 'M'}${p.x.toFixed(1)} ${p.y.toFixed(1)}`).join(' ');
-    return { X, Y, ticks, mt, pts, line, lo, hi, iw, ih };
+    const pts = lines.flatMap(l => l.pts).sort((a, b) => a.x - b.x || a.k - b.k);
+    return { X, Y, ticks, mt, pts, lines, lo, hi, iw, ih };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [series, width, H, from, to, pbDays]);
+  }, [sets, width, H, from, to, pbDays, multi]);
 
   if (!g) {
     return <div ref={ref} className="lf-chart is-empty"><p className="lf-muted">No e1RM to chart in this range{lift.load === 'bodyweight_plus' ? ' — dips need a bodyweight reading within 14 days of the set' : ''}.</p></div>;
   }
   const sel = pick != null ? g.pts[Math.min(pick, g.pts.length - 1)] : null;
-  const first = g.pts[0], last = g.pts[g.pts.length - 1];
-  const summary = `Estimated 1RM from about ${fmtE1rm(first.value)} kg on ${dateLabel(first.date)} to about ${fmtE1rm(last.value)} kg on ${dateLabel(last.date)}, ${g.pts.length} training days, ${g.pts.filter(p => p.pb).length} with a real PB set.`;
+  const summary = multi
+    ? `Estimated 1RM per gym: ${g.lines.filter(l => l.pts.length).map(l => `${l.label} from about ${fmtE1rm(l.pts[0].value)} to about ${fmtE1rm(l.pts[l.pts.length - 1].value)} kg over ${l.pts.length} training days`).join('; ')}.`
+    : (() => {
+      const first = g.pts[0], last = g.pts[g.pts.length - 1];
+      return `Estimated 1RM from about ${fmtE1rm(first.value)} kg on ${dateLabel(first.date)} to about ${fmtE1rm(last.value)} kg on ${dateLabel(last.date)}, ${g.pts.length} training days, ${g.pts.filter(p => p.pb).length} with a real PB set.`;
+    })();
 
   const nearest = ev => {
     const box = ev.currentTarget.getBoundingClientRect();
-    const x = ev.clientX - box.left;
+    const x = ev.clientX - box.left, y = ev.clientY - box.top;
     let best = 0, bd = Infinity;
-    g.pts.forEach((p, i) => { const d = Math.abs(p.x - x); if (d < bd) { bd = d; best = i; } });
+    g.pts.forEach((p, i) => { const d = Math.abs(p.x - x) + (multi ? Math.abs(p.y - y) * 0.35 : 0); if (d < bd) { bd = d; best = i; } });
     setPick(best);
   };
   const onKey = e => {
@@ -99,7 +126,7 @@ export default function E1rmChart({ series, lift, pbDays, from, to }) {
   };
 
   return (
-    <div ref={ref} className="lf-chart">
+    <div ref={ref} className={`lf-chart${multi ? ' is-multi' : ''}`}>
       <svg width={width} height={H} role="img" aria-label={summary} tabIndex={0} onKeyDown={onKey}
            onPointerMove={nearest} onPointerDown={nearest} onPointerLeave={e => { if (e.pointerType === 'mouse') setPick(null); }}>
         <g className="lf-grid">
@@ -115,18 +142,18 @@ export default function E1rmChart({ series, lift, pbDays, from, to }) {
             </text>
           ))}
         </g>
-        <path className="lf-line" d={g.line} />
-        {g.pts.map((p, i) => (
-          <circle key={p.date} cx={p.x} cy={p.y} r={p.pb ? 4.6 : 2.8}
-                  className={`lf-pt${p.night ? ' is-night' : ''}${p.pb ? ' is-pb' : ''}${sel && i === pick ? ' is-sel' : ''}`} />
-        ))}
+        {g.lines.map(l => <path key={`l${l.k}`} className={`lf-line is-g${l.k}`} d={l.line} />)}
+        {g.lines.map(l => l.pts.map(p => (
+          <Mark key={`${l.k}-${p.date}`} shape={l.shape} x={p.x} y={p.y} r={p.pb ? 4.6 : multi ? 3.2 : 2.8}
+                className={`lf-pt is-g${l.k}${p.night ? ' is-night' : ''}${p.pb ? ' is-pb' : ''}${sel && sel === p ? ' is-sel' : ''}`} />
+        )))}
         {sel && <line className="lf-cross" x1={sel.x} x2={sel.x} y1={pad.t} y2={H - pad.b} />}
         <text className="lf-unit" x={pad.l - 8} y={11} textAnchor="end">kg</text>
       </svg>
       <div className="lf-chart-read" aria-live="polite">
         {sel ? (
           <>
-            <b>{dateLabel(sel.date)}</b>
+            <b>{dateLabel(sel.date)}{multi ? ` · ${sel.gymLabel}` : ''}</b>
             <span>{setText(sel.entry, lift)} · est. 1RM ~{fmtE1rm(sel.value)} kg</span>
             {sel.pb && sel.evs.map(ev => (
               <span key={ev.entry.id} className="lf-tag is-pb">PB {setText(ev.entry, lift)} · {pbHeadline(ev)}</span>
@@ -135,7 +162,15 @@ export default function E1rmChart({ series, lift, pbDays, from, to }) {
           </>
         ) : (
           <span className="lf-legend">
-            <span><i className="lf-key is-line" />Estimated 1RM</span>
+            {multi ? g.lines.map(l => (
+              <span key={`k${l.k}`} data-testid="lf-gym-key">
+                <svg className="lf-key-svg" width="22" height="12" aria-hidden="true">
+                  <line className={`lf-line is-g${l.k}`} x1="1" x2="21" y1="6" y2="6" />
+                  <Mark shape={l.shape} x={11} y={6} r={3.4} className={`lf-pt is-g${l.k}`} />
+                </svg>
+                {l.label}
+              </span>
+            )) : <span><i className="lf-key is-line" />Estimated 1RM</span>}
             <span><i className="lf-key is-pb" />Real PB set that day</span>
             <span><i className="lf-key is-night" />Night shift · 80% load</span>
           </span>

@@ -1620,3 +1620,36 @@ html[data-theme="dark-os"] .upg-pat-day.is-day .upg-pat-chip { color: #e0a13a; }
   .upg-pat-unit { display: none; }
   .upg-pat-step span { min-width: 26px; }
 }
+
+/* ── The session plan on the rota (Oct 2026) ──────────────────────────
+   Days the lifts plan touched are told apart from hand edits by a glyph
+   (never colour alone): ● edited by you, ✓ workout logged, ↻ moved by
+   the plan (also a dashed border), – missed and carried forward. The
+   glyph replaces the old edited dot. */
+.upg-mark { font-family: var(--mono); font-size: var(--fs-floor); font-weight: 700; line-height: 1; pointer-events: none; }
+.upg-mark.is-edited { color: var(--gold-text, #8a6a05); }
+.upg-mark.is-done { color: #0b7a0b; }
+.upg-mark.is-dynamic { color: var(--em-text); }
+.upg-mark.is-missed { color: var(--text-muted); }
+html[data-theme="dark-os"] .upg-mark.is-done { color: #4cc765; }
+.upg-cell .upg-mark { position: absolute; bottom: 3px; right: 4px; }
+.upg-next-day .upg-mark { position: absolute; top: 6px; right: 7px; }
+.upg-cell.is-edited::after, .upg-next-day.is-edited::after { display: none; }
+.upg-cell.is-dynamic, .upg-next-day.is-dynamic { border-style: dashed; border-color: var(--em); }
+.upg-cell.is-done .upg-sess, .upg-next-day.is-done .upg-next-sess { color: var(--text); font-weight: 700; }
+.upg-cell.is-dynamic .upg-sess, .upg-next-day.is-dynamic .upg-next-sess { color: var(--em-text); font-weight: 700; }
+.upg-cell.is-missed .upg-sess { text-decoration: line-through; }
+.upg-cell .upg-sess { max-width: calc(100% - 9px); }
+.upg-legend-plan { margin-top: -4px; }
+.upg-legend-plan .upg-mark { display: inline-grid; place-items: center; width: 14px; height: 14px; border-radius: 4px; border: 1px solid var(--border); }
+.upg-day-plan { display: flex; gap: 8px; align-items: flex-start; margin-top: 8px; padding: 8px 10px; border-radius: 8px;
+  border: 1px dashed var(--em); font-size: var(--fs-floor); line-height: 1.45; color: var(--text); max-width: 46ch; }
+.upg-day-plan.is-done { border-style: solid; border-color: var(--border); }
+.upg-day-plan .upg-mark { flex: none; margin-top: 2px; }
+.upg-day-plan.is-done .upg-mark { color: #0b7a0b; }
+.upg-day-plan.is-dynamic .upg-mark { color: var(--em-text); }
+@media (max-width: 640px) {
+  /* Phone cells are ~44px wide: the mark shrinks to a corner glyph. */
+  .upg-cell .upg-mark { font-size: 10px; bottom: 2px; right: 2px; }
+  .upg-cell .upg-sess { max-width: calc(100% - 7px); }
+}

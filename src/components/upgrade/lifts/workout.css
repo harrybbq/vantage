@@ -336,3 +336,68 @@ html[data-theme="cream-pro"] .lifts { --wk-muted: #5f554a; }
   .wk-row, .wk-rest-bar span, .wk-switch-ui, .wk-switch-ui::after { transition: none; }
   .wk-live-dot { animation: none; }
 }
+
+/* ── Gyms + the session plan (Oct 2026) ───────────────────────────────
+   The gym switch at every start, the gym chip in the live header, the
+   block's progress (✓ done / ○ to do, with the label in words), and the
+   next five days — "moved" carries a ↻ glyph as well as its outline. */
+.wk-gymrow { display: flex; align-items: center; gap: 6px 10px; flex-wrap: wrap; }
+.wk-gymrow-lbl { font-family: var(--mono); font-size: var(--lf-fs); letter-spacing: .8px; text-transform: uppercase; color: var(--text-muted); }
+.wk-title-row { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.wk-title-row .wk-title { min-width: 0; }
+.wk-gymchip { flex: none; display: inline-flex; align-items: center; gap: 4px; height: 26px; padding: 0 8px; border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--em) 45%, var(--border)); background: color-mix(in srgb, var(--em) 9%, var(--upg-solid, var(--surface)));
+  color: var(--em-text); font-family: var(--mono); font-size: var(--lf-fs); font-weight: 700; cursor: pointer; white-space: nowrap; }
+.wk-gymchip:focus-visible { outline: 2px solid var(--em); outline-offset: 2px; }
+.wk-gymconfirm { display: flex; flex-direction: column; gap: 8px; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--border);
+  background: var(--wk-cell); }
+.wk-gymconfirm p { margin: 0; font-size: 13px; line-height: 1.5; color: var(--text); }
+
+.wk-moved-tag { gap: 4px; color: var(--em-text); border-color: color-mix(in srgb, var(--em) 50%, var(--border)); margin-right: auto; }
+.wk-sug-head .wk-moved-tag { align-self: center; }
+.wk-block { display: flex; flex-direction: column; gap: 5px; }
+.wk-block-row { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 4px; }
+.wk-block-s { display: inline-flex; align-items: center; gap: 4px; height: 22px; padding: 0 8px; border-radius: 999px; border: 1px dashed var(--border);
+  font-family: var(--mono); font-size: var(--lf-fs); color: var(--text-mid); white-space: nowrap; }
+.wk-block-s i { width: 7px; height: 7px; border-radius: 50%; border: 1.5px solid var(--text-muted); box-sizing: border-box; }
+.wk-block-s.is-done { border-style: solid; border-color: var(--wk-done-line); background: var(--wk-done); color: var(--text); }
+.wk-block-s.is-done svg { color: var(--wk-good); }
+.wk-block-lbl { font-size: var(--lf-fs); color: var(--text-muted); line-height: 1.4; }
+
+.wk-next { display: flex; flex-direction: column; gap: 6px; padding-top: 10px; border-top: 1px solid var(--border); }
+.wk-next-h { font-family: var(--mono); font-size: var(--lf-fs); letter-spacing: .8px; text-transform: uppercase; color: var(--text-muted); }
+.wk-next-row { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 5px; }
+.wk-nd { display: flex; flex-direction: column; gap: 3px; min-width: 0; padding: 7px 7px 6px; border-radius: 10px; border: 1px solid var(--border);
+  background: var(--wk-cell); }
+.wk-nd.is-moved { border-color: color-mix(in srgb, var(--em) 55%, var(--border)); }
+.wk-nd.is-rest { background: transparent; border-style: dashed; }
+.wk-nd-dow { display: flex; flex-wrap: wrap; gap: 0 4px; font-family: var(--mono); font-size: var(--lf-fs); color: var(--text-muted); line-height: 1.3; }
+.wk-nd-dow b { color: var(--text); font-weight: 700; }
+.wk-nd-ses { font-size: 13.5px; font-weight: 700; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.wk-nd.is-rest .wk-nd-ses { font-weight: 400; color: var(--text-muted); }
+.wk-nd-foot { display: flex; align-items: center; justify-content: space-between; gap: 4px; min-width: 0; }
+.wk-nd-foot svg { flex: none; color: var(--em-text); }
+.wk-nd-chip { font-family: var(--mono); font-size: var(--lf-fs); font-weight: 700; color: var(--text-muted); }
+.wk-nd-chip.is-night { color: var(--lf-night-ink); }
+.wk-nd-chip.is-day { color: #a8680a; }
+html[data-theme="dark-os"] .wk-nd-chip.is-day { color: #e0a33a; }
+.wk-day.is-moved .wk-day-ses { color: var(--em-text); font-weight: 700; }
+
+.wk-menu-txt { display: flex; flex-direction: column; gap: 2px; text-align: left; min-width: 0; padding: 6px 0; }
+.wk-menu-txt small { font-size: var(--lf-fs); color: var(--text-muted); line-height: 1.4; }
+.wk-menu button > .wk-menu-sw { margin-left: auto; }
+.wk-menu-sw.is-on { background: var(--wk-good); border-color: var(--wk-good); }
+.wk-menu-sw.is-on::after { transform: translateX(18px); }
+@media (max-width: 640px) {
+  .wk-gymchip { height: 32px; }
+  .wk-next-row { gap: 4px; }
+  .wk-nd { padding: 6px 5px; }
+  .wk-nd-ses { font-size: 12.5px; }
+  .wk-gymrow .lf-gymseg { flex: 1 1 auto; }
+  .wk-gymrow .lf-gymseg button { flex: 1 1 0; }
+}
+@media (max-width: 640px) {
+  /* The chip sits beside a short name and wraps under a long one. */
+  .wk-title-row { flex-wrap: wrap; row-gap: 2px; }
+  .wk-gymchip > svg:first-child { display: none; }
+}

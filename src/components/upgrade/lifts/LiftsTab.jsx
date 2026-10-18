@@ -27,6 +27,11 @@
  * open shows "Workout in progress · 23 min · Resume / Discard" rather
  * than throwing you into it. Finish writes its done sets to the same
  * log the PB tables read, so PBs keep one source of truth.
+ *
+ * Gyms (S.lifts.gyms, DXC / Greenock by default): every set and workout
+ * is tagged with one, defaulting to the last gym used. Machines compare
+ * within a gym, free weights across (lib/lifts/lifts.js). Manage lifts
+ * edits the gyms and each lift's per-gym switch.
  */
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import Icon from '../../Icon';
@@ -41,7 +46,8 @@ import { Toast, Celebrate } from './parts';
 import { useLiftsData, todayIso } from './useLifts';
 import {
   ensureLifts, withLifts, makeEntry, upsertEntry, removeEntry, restoreEntry, addLift, renameLift, setArchived,
-  moveLift, deleteLift, recentFirst, newId,
+  moveLift, deleteLift, recentFirst, newId, defaultGym, setLastGym, setPerGym, addGym, renameGym, setGymArchived, deleteGym,
+  gymName as gymNameOf,
 } from '../../../lib/lifts/store';
 import { pbMessage, pbKinds, setText, shortLiftName } from '../../../lib/lifts/lifts';
 import { shiftOn } from '../../../lib/rotation/pattern';
@@ -54,7 +60,10 @@ import './workout.css';
 
 export default function LiftsTab({ S, update, hydrated = true }) {
   const today = todayIso();
-  const { lifts, bwOf, summaries, totals, exists } = useLiftsData(S, today);
+  const { lifts, bwOf, summaries, totals, gyms, exists } = useLiftsData(S, today);
+  const activeGymList = useMemo(() => gyms.filter(g => !g.archived), [gyms]);
+  const curGym = defaultGym(lifts);
+  const gymName = useCallback(id => gymNameOf(lifts, id), [lifts]);
   const [open, setOpen] = useState(null);          // lift id in detail
   const [sheet, setSheet] = useState(null);        // { kind: 'log', liftId?, entry? } | { kind: 'manage' }
   const [toast, setToast] = useState(null);
@@ -90,6 +99,11 @@ export default function LiftsTab({ S, update, hydrated = true }) {
     for (const e of lifts.log) if (e && e.liftId) m.set(e.liftId, (m.get(e.liftId) || 0) + 1);
     return m;
   }, [lifts.log]);
+  const gymCounts = useMemo(() => {
+    const m = new Map();
+    for (const e of lifts.log) if (e && e.gym) m.set(e.gym, (m.get(e.gym) || 0) + 1);
+    return m;
+  }, [lifts.log]);
   const recentIds = useMemo(() => pickList.filter(l => counts.has(l.id)).map(l => l.id), [pickList, counts]);
   const cur = open ? summaries.get(open) : null;
   useEffect(() => { if (open && !cur) setOpen(null); }, [open, cur]);
@@ -98,7 +112,7 @@ export default function LiftsTab({ S, update, hydrated = true }) {
     const editing = sheet && sheet.entry;
     const entry = makeEntry({ ...(editing || {}), ...f, id: editing ? editing.id : undefined, createdAt: editing ? editing.createdAt : undefined },
       { id: newId('ls'), now: Date.now(), shift: shiftOf(f.date) || null });
-    write(l => upsertEntry(l, entry));
+    write(l => (entry.gym && !editing ? setLastGym(upsertEntry(l, entry), entry.gym) : upsertEntry(l, entry)));
     setSheet(null);
     const lift = lifts.list.find(l => l.id === entry.liftId);
     if (res && res.any && !res.first) {
@@ -142,7 +156,30 @@ export default function LiftsTab({ S, update, hydrated = true }) {
       else setToast({ text: out.error, n: Date.now() });
       return out;
     },
+    onPerGym: (id, on) => write(l => setPerGym(l, id, on)),
+    // Gyms: checked against the current store first so the sheet can show the error.
+    onAddGym: name => {
+      const out = addGym(lifts, name);
+      if (out.ok) write(l => addGym(l, name, { id: out.id }).lifts);
+      return out;
+    },
+    onRenameGym: (id, name) => {
+      const out = renameGym(lifts, id, name);
+      if (out.ok) write(l => renameGym(l, id, name).lifts);
+      return out;
+    },
+    onArchiveGym: (id, on) => {
+      const out = setGymArchived(lifts, id, on);
+      if (out.ok) write(l => setGymArchived(l, id, on).lifts);
+      return out;
+    },
+    onDeleteGym: id => {
+      const out = deleteGym(lifts, id);
+      if (out.ok) write(l => deleteGym(l, id).lifts);
+      return out;
+    },
   };
+  const pickGym = id => write(l => setLastGym(l, id));
 
   // ── Workout ──
   const goWorkout = () => { setOpen(null); setView('workout'); window.scrollTo({ top: 0 }); };
@@ -152,7 +189,7 @@ export default function LiftsTab({ S, update, hydrated = true }) {
   };
   const buildOwn = () => {
     const sh = shiftOf(today);
-    update(prev => startWorkout(prev, { source: 'blank', name: 'Workout', shift: sh, now: Date.now(), today }));
+    update(prev => startWorkout(prev, { source: 'blank', name: 'Workout', shift: sh, gym: curGym, now: Date.now(), today }));
     goWorkout();
   };
   const discard = () => { update(prev => discardWorkout(prev)); setToast({ text: 'Workout discarded — nothing was saved', n: Date.now() }); };
@@ -179,25 +216,27 @@ export default function LiftsTab({ S, update, hydrated = true }) {
 
   const logSheet = sheet && sheet.kind === 'log' && (
     <LogSheet entry={sheet.entry} liftId={sheet.liftId} lifts={lifts.list} pickList={pickList} log={lifts.log} bwOf={bwOf}
-              today={today} shiftOf={shiftOf} onClose={() => setSheet(null)} onSave={save} onDelete={del} />
+              today={today} shiftOf={shiftOf} onClose={() => setSheet(null)} onSave={save} onDelete={del}
+              gyms={activeGymList} gym={active && active.gym ? active.gym : curGym} gymName={gymName} />
   );
 
   return (
     <div className="upg-pane sec lifts">
       {cur ? (
-        <LiftDetail s={cur} today={today} bwOf={bwOf} onBack={() => setOpen(null)}
+        <LiftDetail s={cur} today={today} bwOf={bwOf} gyms={gyms} onPerGym={manage.onPerGym} onBack={() => setOpen(null)}
                     backLabel={view === 'workout' && active ? 'Back to workout' : 'All lifts'}
                     onLog={() => setSheet({ kind: 'log', liftId: cur.lift.id })}
                     onEdit={e => setSheet({ kind: 'log', entry: e })} onDelete={del} />
       ) : view === 'workout' && active ? (
-        <WorkoutLive S={S} update={update} list={lifts.list} recentIds={recentIds} today={today}
+        <WorkoutLive S={S} update={update} list={lifts.list} recentIds={recentIds} today={today} gyms={activeGymList} gymName={gymName}
+                     onPerGym={manage.onPerGym}
                      onMinimise={() => { setView('list'); window.scrollTo({ top: 0 }); }} onFinish={openFinish}
                      onQuickLog={() => setSheet({ kind: 'log' })} onHistory={showHistory} onCreateLift={manage.onAdd}
                      onToast={text => setToast({ text, n: Date.now() })} />
       ) : (
         <>
           <WorkoutToday S={S} today={today} now={now} active={active} onStart={startSuggested} onBuild={buildOwn}
-                        onResume={goWorkout} onDiscard={discard} />
+                        onResume={goWorkout} onDiscard={discard} gyms={activeGymList} gym={curGym} onGym={pickGym} gymName={gymName} />
           <div className="lf-bar">
             <div className="lf-bar-text">
               <span className="sec-eyebrow">// Personal bests</span>
@@ -219,7 +258,7 @@ export default function LiftsTab({ S, update, hydrated = true }) {
           {!inUse.length && <p className="lf-muted">No lifts in use — add one in Manage lifts.</p>}
           <ul className="lf-cards" aria-label="Lifts">
             {inUse.map(l => (
-              <LiftCard key={l.id} s={summaries.get(l.id)} today={today} onOpen={() => setOpen(l.id)}
+              <LiftCard key={l.id} s={summaries.get(l.id)} today={today} gyms={gyms} onOpen={() => setOpen(l.id)}
                         onLog={() => setSheet({ kind: 'log', liftId: l.id })} />
             ))}
           </ul>
@@ -230,7 +269,7 @@ export default function LiftsTab({ S, update, hydrated = true }) {
               </button>
               {showArchived && (
                 <ul className="lf-cards" aria-label="Archived lifts">
-                  {archived.map(l => <LiftCard key={l.id} s={summaries.get(l.id)} today={today} onOpen={() => setOpen(l.id)} />)}
+                  {archived.map(l => <LiftCard key={l.id} s={summaries.get(l.id)} today={today} gyms={gyms} onOpen={() => setOpen(l.id)} />)}
                 </ul>
               )}
             </div>
@@ -239,10 +278,11 @@ export default function LiftsTab({ S, update, hydrated = true }) {
       )}
       {logSheet}
       {sheet && sheet.kind === 'manage' && (
-        <ManageSheet lifts={lifts.list} counts={counts} onClose={() => setSheet(null)} {...manage} />
+        <ManageSheet lifts={lifts.list} counts={counts} onClose={() => setSheet(null)} gyms={gyms} gymCounts={gymCounts} {...manage} />
       )}
       {finish && (
         <FinishSheet summary={finish.summary} saved={finish.saved} templateSaved={finish.templateSaved}
+                     gymLabel={finish.summary.session.gym ? gymName(finish.summary.session.gym) : null}
                      onSave={saveWorkout} onKeepGoing={() => setFinish(null)} onClose={closeFinish} onSaveTemplate={saveAsTemplate}
                      onDiscard={() => { update(prev => discardWorkout(prev)); setFinish(null); setView('list'); setToast({ text: 'Workout discarded — nothing was saved', n: Date.now() }); }} />
       )}

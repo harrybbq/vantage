@@ -54,6 +54,23 @@ export function Spark({ points, from, to }) {
   );
 }
 
+/**
+ * The gym switch (DXC | Greenock …) — a segmented control. `value` null
+ * shows nothing selected (an unassigned set being edited).
+ */
+export function GymSwitch({ gyms, value, onChange, label = 'Gym', className = '', testId }) {
+  if (!gyms || !gyms.length) return null;
+  return (
+    <div className={`sec-seg lf-seg lf-gymseg${className ? ` ${className}` : ''}`} role="group" aria-label={label} data-testid={testId}>
+      {gyms.map(g => (
+        <button key={g.id} type="button" aria-pressed={value === g.id} className={value === g.id ? 'is-on' : ''} onClick={() => onChange(g.id)}>
+          {g.name}
+        </button>
+      ))}
+    </div>
+  );
+}
+
 /** − value + with a typed value in the middle. */
 export function Stepper({ id, label, value, onChange, step, min, max, decimal = false, unit, dataField }) {
   const n = Number(value);

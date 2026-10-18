@@ -39,14 +39,29 @@
  * use, with fixed ids (`prog-<slug>`) so two devices merge them by id,
  * a load type guessed from the name and muscle tags from PROGRAMME_MUSCLES.
  *
+ * ── Gyms ─────────────────────────────────────────────────────────────
+ * A workout is at one gym (`gym` on active / session / every set it
+ * writes), defaulting to S.lifts.lastGym. For a perGym lift (a machine)
+ * Previous, the pre-filled weights and the summary's PBs come from that
+ * gym only; free weights read across gyms (lifts.js has the rule).
+ *
+ * ── The day's session is the PLAN's (plan.js) ───────────────────────
+ * The suggestion follows plannedSessions(today): the rota, the owner's
+ * Rotation overrides (which win), and what was actually trained — Push
+ * on a Legs day moves Legs on. Nothing is written to S.rotation.
+ *
  * Not built (yet): supersets and unilateral logging.
  */
 import { PROGRAMME, SESSION_CODES, NIGHT_LOAD_SCALE } from '../../data/trainingProgramme.js';
 import { shiftOn } from '../rotation/pattern.js';
 import {
-  num, isIso, addDays, dayNo, personalBests, pbBasis, pbHeadline, setText, shortLiftName, entriesFor,
+  num, isIso, addDays, dayNo, personalBests, pbBasis, pbHeadline, setText, shortLiftName, entriesFor, perGymOf, gymOf,
 } from './lifts.js';
-import { liftsOf, withLifts, makeEntry, LIMITS, newId } from './store.js';
+import { liftsOf, withLifts, makeEntry, LIMITS, newId, defaultGym, setLastGym, withGyms, gymName, gymList } from './store.js';
+import { PROGRAMME_MUSCLES, musclesOf, norm } from './muscles.js';
+import { plannedSessions, blockProgress, EXTRA } from './plan.js';
+
+export { MUSCLES, PROGRAMME_MUSCLES, musclesOf } from './muscles.js';
 
 const EPS = 1e-9;
 export const DEFAULT_REST_SEC = 90;
@@ -54,66 +69,6 @@ export const REST_LIMITS = [15, 600];
 export const MAX_SESSIONS = 400;
 export const RECENT_N = 10;
 export const RPE_CHIPS = [5, 6, 7, 8, 9, 10];
-
-/** Muscle targets, in the order the picker lists them. */
-export const MUSCLES = ['Shoulders', 'Back', 'Lower back', 'Chest', 'Abs', 'Triceps', 'Biceps', 'Quads', 'Hamstrings', 'Glutes', 'Calves', 'Other'];
-
-/** Tags for every exercise in the programme (src/data/trainingProgramme.js). */
-export const PROGRAMME_MUSCLES = {
-  '45° hyperextension': ['Lower back', 'Glutes', 'Hamstrings'],
-  'Leg extension': ['Quads'],
-  'Machine leg press': ['Quads', 'Glutes'],
-  'Standing calf raise': ['Calves'],
-  'Walking dumbbell lunge': ['Quads', 'Glutes'],
-  'Ab crunch machine': ['Abs'],
-  'Dip': ['Chest', 'Triceps', 'Shoulders'],
-  'Incline dumbbell press': ['Chest', 'Shoulders'],
-  'Machine shoulder press': ['Shoulders', 'Triceps'],
-  'Dumbbell lateral raise': ['Shoulders'],
-  'Single-arm cable triceps pushdown (cuff)': ['Triceps'],
-  'Overhead cable bar extension': ['Triceps'],
-  'Lat pulldown': ['Back', 'Biceps'],
-  'Single-arm cable row': ['Back'],
-  'Cable bar pullover': ['Back'],
-  'Cable archer pull (rear delt)': ['Shoulders', 'Back'],
-  'Incline dumbbell curl, 21s': ['Biceps'],
-  'Reverse EZ-bar curl': ['Biceps'],
-  'Hip thrust': ['Glutes', 'Hamstrings'],
-  'Seated leg curl': ['Hamstrings'],
-  'Leg press, feet high': ['Glutes', 'Hamstrings', 'Quads'],
-  'Reverse lunge': ['Quads', 'Glutes'],
-  'Seated calf raise': ['Calves'],
-  'Pallof press': ['Abs'],
-  'Wide-grip cable row': ['Back'],
-};
-
-// Keyword fallback for lifts the owner added by hand without tags.
-const MUSCLE_WORDS = [
-  [/leg\s*curl|hamstring|\brdl\b|romanian/i, 'Hamstrings'],
-  [/calf/i, 'Calves'],
-  [/hyperextension|back\s*extension/i, 'Lower back'],
-  [/hip\s*thrust|glute/i, 'Glutes'],
-  [/squat|leg\s*press|lunge|leg\s*extension/i, 'Quads'],
-  [/^(?!.*leg\s*curl).*curl/i, 'Biceps'],
-  [/tricep|pushdown|skull|^(?!.*(leg|back|hyper)).*extension/i, 'Triceps'],
-  [/row|pulldown|pull-?\s*up|chin|pullover/i, 'Back'],
-  [/bench|chest|fly|\bdips?\b|push-?\s*up/i, 'Chest'],
-  [/shoulder|lateral|overhead\s*press|delt|arnold/i, 'Shoulders'],
-  [/crunch|\babs?\b|plank|pallof|sit-?\s*up/i, 'Abs'],
-];
-
-const norm = s => String(s || '').replace(/\s+/g, ' ').trim().toLowerCase();
-
-/** A lift's muscle tags: its own, else the programme's, else guessed from the name. */
-export function musclesOf(lift) {
-  if (!lift) return [];
-  if (Array.isArray(lift.muscles) && lift.muscles.length) return lift.muscles;
-  const p = Object.keys(PROGRAMME_MUSCLES).find(k => norm(k) === norm(lift.name));
-  if (p) return PROGRAMME_MUSCLES[p];
-  const out = [];
-  for (const [re, m] of MUSCLE_WORDS) if (re.test(String(lift.name || '')) && !out.includes(m)) out.push(m);
-  return out;
-}
 
 /** Load type from a name: a dip carries bodyweight, a dumbbell is per hand, else the number on the stack. */
 export function guessLoad(name) {
@@ -124,6 +79,8 @@ export function guessLoad(name) {
 }
 
 /** "Incline dumbbell curl, 21s" → "prog-incline-dumbbell-curl-21s" (stable across devices). */
+export { gymName };
+
 export const progId = name => `prog-${norm(name).replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')}`;
 
 /** A target rep string as one number: "8–12" → 8, "7 + 7 + 7" → 21, "10 per leg" → 10. */
@@ -150,10 +107,12 @@ const findByName = (list, name) => {
  * finished workout (entries sharing a sessionId) or, for sets logged one
  * at a time with Quick Log, one date. opts.skipNight: the last DAY-shift
  * time instead. opts.before: only times before this ISO date.
+ * opts.gym (when present): a perGym lift's times at that gym only.
  */
 export function previousSets(S, liftId, opts = {}) {
-  const log = liftsOf(S).log;
-  const all = entriesFor(log, { id: liftId });
+  const L = liftsOf(S);
+  let all = entriesFor(L.log, { id: liftId });
+  if ('gym' in opts && perGymOf(L.list.find(l => l.id === liftId))) all = all.filter(e => gymOf(e) === (opts.gym || null));
   const pool = all.filter(e => (!opts.skipNight || e.shift !== 'night') && (!opts.before || e.date < opts.before));
   if (!pool.length) return null;
   const last = pool[pool.length - 1];
@@ -179,12 +138,14 @@ const trim = v => String(Math.round(v * 100) / 100);
  * Pre-filled rows for `sets` sets of a lift: weights from the last
  * day-shift time (scaled to 80% on a night), reps from that time or the
  * target's first number. → { rows: [{ reps, weight }], base, scaled }
+ * `gym`: for a perGym lift, only that gym's history.
  */
-export function planFor(S, lift, { sets, reps, night = false } = {}) {
+export function planFor(S, lift, { sets, reps, night = false, gym } = {}) {
   const n = Math.max(1, Math.min(20, Math.round(num(sets) || 1)));
   const id = lift && lift.id;
-  const dayBase = id ? previousSets(S, id, { skipNight: true }) : null;
-  const anyBase = id ? previousSets(S, id) : null;
+  const g = gym === undefined ? {} : { gym };
+  const dayBase = id ? previousSets(S, id, { skipNight: true, ...g }) : null;
+  const anyBase = id ? previousSets(S, id, g) : null;
   const base = dayBase || anyBase;
   const scaled = !!(night && base && base.shift !== 'night');
   const target = parseReps(reps);
@@ -215,47 +176,93 @@ const agoWords = (iso, today) => {
 
 /**
  * → { name, rotaSession, shift, label, restDay, exercises:
- *     [{ liftKey, liftId, name, sets, reps, optional, weight, rows }], reason, minutes, night }
- * `weight` is the first set's pre-fill (null when the lift has never
- * been trained); `rows` every set's.
+ *     [{ liftKey, liftId, name, sets, reps, optional, weight, rows }], reason, minutes, night,
+ *     gym, plan, block }
+ * The session is the plan's for today (plan.js): `plan` is that entry
+ * (source, why, moved), `block` the block's progress. `weight` is the
+ * first set's pre-fill (null when the lift has never been trained at
+ * this gym — or anywhere, for a free weight); `rows` every set's.
+ * opts.gym: the gym to plan weights for (default: S.lifts.lastGym).
  */
-export function suggestWorkout(S, today) {
+export function suggestWorkout(S, today, opts = {}) {
   const day = isIso(today) ? shiftOn(S, today) : null;
-  const out = { name: 'Rest day today', rotaSession: null, shift: day ? day.shift : null, label: day ? day.label : '', restDay: true, exercises: [], reason: '', minutes: 0, night: false };
+  const L = liftsOf(S);
+  const gym = opts.gym !== undefined ? opts.gym : defaultGym(L);
+  const plan = day ? plannedSessions(S, { from: today, days: 1, today })[0] || null : null;
+  const block = day ? blockProgress(S, today) : null;
+  const out = { name: 'Rest day today', rotaSession: null, shift: day ? day.shift : null, label: day ? day.label : '', restDay: true, exercises: [], reason: '', minutes: 0, night: false, gym, plan, block };
   if (!day) return { ...out, reason: 'Today sits outside your rota pattern — build your own if you’re training.' };
+  const shiftWord = day.shift === 'off' ? 'Day off' : day.shift === 'leave' ? day.label.split(' · ')[0] : day.label.split(' · ')[0];
+  if (plan && plan.source === 'done') {
+    const next = plannedSessions(S, { from: addDays(today, 1), days: 7, today }).find(p => p.trainingDay);
+    return {
+      ...out, name: `${plan.done.join(' + ') || 'Workout'} done`,
+      reason: `${plan.why} today.${next ? ` Next: ${next.session} ${dayWord(next.iso, today)}.` : ''}`,
+    };
+  }
   if (day.shift === 'leave') return { ...out, reason: `${day.label.split(' · ')[0]} on your rota — rest, or build your own.` };
-  if (day.session === 'Rest') return { ...out, reason: `${day.shift === 'off' ? 'Off' : day.label.split(' · ')[0]} · rest day on your rota.` };
-  const prog = PROGRAMME[day.session];
+  const session = plan ? plan.session : day.session;
+  if (session === 'Rest') return { ...out, reason: `${day.shift === 'off' ? 'Off' : day.label.split(' · ')[0]} · rest day on your rota.` };
+  if (session === EXTRA) {
+    return { ...out, restDay: false, name: 'Extra session', rotaSession: null, reason: `${shiftWord} · ${plan.why}. Build your own, or take the day.` };
+  }
+  const prog = PROGRAMME[session];
   if (!prog) {
-    return { ...out, restDay: false, name: `${day.session} day`, rotaSession: day.session, reason: `${day.session} isn’t one of the five programme sessions — build your own.` };
+    return { ...out, restDay: false, name: `${session} day`, rotaSession: session, reason: `${session} isn’t one of the five programme sessions — build your own.` };
   }
   const night = day.shift === 'night';
-  const { list } = liftsOf(S);
   const exercises = prog.map(x => {
-    const lift = findByName(list, x.name);
-    const { rows } = planFor(S, lift, { sets: x.sets, reps: x.reps, night });
+    const lift = findByName(L.list, x.name);
+    const { rows } = planFor(S, lift, { sets: x.sets, reps: x.reps, night, gym });
     return {
       liftKey: lift ? lift.id : progId(x.name), liftId: lift ? lift.id : null, name: lift ? lift.name : x.name,
       sets: x.sets, reps: x.reps, optional: !!x.optional, weight: rows[0] ? rows[0].weight : null, rows,
     };
   });
-  const sessions = liftsOf(S).sessions || [];
+  const sessions = L.sessions || [];
   let last = null;
-  for (const s of sessions) if (s && s.rotaSession === day.session && isIso(s.date) && s.date < today && (!last || s.date > last.date)) last = s;
-  const shiftWord = day.shift === 'off' ? 'Day off' : day.label.split(' · ')[0];
-  const reason = `${shiftWord} · ${day.session} on your rota. ${last ? `Last ${day.session} ${agoWords(last.date, today)}.` : `Your first ${day.session} logged here.`}`;
+  for (const s of sessions) if (s && s.rotaSession === session && isIso(s.date) && s.date < today && (!last || s.date > last.date)) last = s;
+  const lastWords = last ? `Last ${session} ${agoWords(last.date, today)}.` : `Your first ${session} logged here.`;
+  const why = plan && plan.source === 'dynamic' ? `${plan.why}.` : `${session} on your rota.`;
+  const reason = `${shiftWord} · ${why} ${lastWords}`;
   return {
-    ...out, name: day.session, rotaSession: day.session, restDay: false, night, exercises, reason,
+    ...out, name: session, rotaSession: session, restDay: false, night, exercises, reason,
     minutes: estimateMinutes(exercises),
   };
 }
 
-/** Mon–Sun of the week holding `today`: [{ iso, dow, date, session, shift, chip, trained, today }]. */
+const DOW3 = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+const dayWord = (iso, today) => {
+  const d = dayNo(iso) - dayNo(today);
+  if (d === 0) return 'today';
+  if (d === 1) return 'tomorrow';
+  const [y, m, dd] = iso.split('-').map(Number);
+  return DOW3[new Date(Date.UTC(y, m - 1, dd)).getUTCDay()];
+};
+
+/**
+ * The plan for the `n` days after `today`, for the Today card's strip:
+ * [{ iso, dow, date, session, shift, chip, night, moved, source, why, trainingDay }].
+ */
+export function planStrip(S, today, n = 5) {
+  if (!isIso(today)) return [];
+  return plannedSessions(S, { from: addDays(today, 1), days: n, today }).map(p => {
+    const [y, m, d] = p.iso.split('-').map(Number);
+    return {
+      iso: p.iso, dow: DOW3[new Date(Date.UTC(y, m - 1, d)).getUTCDay()], date: d,
+      session: p.trainingDay || p.source === 'manual' ? p.session : 'Rest', shift: p.shift, chip: p.chip, night: p.night,
+      moved: p.moved, source: p.source, why: p.why, trainingDay: p.trainingDay,
+    };
+  });
+}
+
+/** Mon–Sun of the week holding `today`: [{ iso, dow, date, session (the plan's), shift, chip, trained, today, moved }]. */
 export function weekStrip(S, today) {
   if (!isIso(today)) return [];
   const [y, m, d] = today.split('-').map(Number);
   const dow = (new Date(Date.UTC(y, m - 1, d)).getUTCDay() + 6) % 7;
   const mon = addDays(today, -dow);
+  const plan = new Map(plannedSessions(S, { from: mon, days: 7, today }).map(p => [p.iso, p]));
   const trained = new Set();
   const L = liftsOf(S);
   for (const s of L.sessions || []) if (s && isIso(s.date)) trained.add(s.date);
@@ -264,8 +271,10 @@ export function weekStrip(S, today) {
   return Array.from({ length: 7 }, (_, i) => {
     const iso = addDays(mon, i);
     const r = shiftOn(S, iso);
-    const session = r && r.shift !== 'leave' && r.session !== 'Rest' ? r.session : null;
-    return { iso, dow: DOW[i], date: Number(iso.slice(8)), session, shift: r ? r.shift : null, chip: r ? r.chip : '', trained: trained.has(iso), today: iso === today };
+    const p = plan.get(iso);
+    const ses = p ? p.session : r && r.session;
+    const session = r && r.shift !== 'leave' && ses && ses !== 'Rest' ? ses : null;
+    return { iso, dow: DOW[i], date: Number(iso.slice(8)), session, shift: r ? r.shift : null, chip: r ? r.chip : '', trained: trained.has(iso), today: iso === today, moved: !!(p && p.moved) };
   });
 }
 
@@ -331,7 +340,8 @@ const row = (id, reps = null, weight = null) => ({ id, reps: num(reps), weight: 
 /**
  * Start a workout → next state. A no-op while one is in progress.
  * opts: { now, today, source: 'suggested'|'blank'|'recent'|'template', name,
- *         rotaSession?, shift?, exercises: [{ liftId? | liftKey?, name?, sets, reps?, rows? }], ids? }
+ *         rotaSession?, shift?, gym?, exercises: [{ liftId? | liftKey?, name?, sets, reps?, rows? }], ids? }
+ * `gym` defaults to the last gym; it is remembered as lastGym.
  * An exercise naming a lift the list doesn't have (a programme exercise
  * on first use) creates it — additively, with a fixed id.
  */
@@ -339,7 +349,9 @@ export function startWorkout(prev, opts = {}) {
   if (activeOf(prev)) return prev;
   const { now = 0, today, source = 'blank', name, rotaSession, shift, ids = newId } = opts;
   if (!isIso(today)) return prev;
-  return withLifts(prev, l => {
+  return withLifts(prev, l0 => {
+    const gym = opts.gym !== undefined ? opts.gym : defaultGym(l0);
+    const l = gym ? setLastGym(withGyms(l0), gym) : l0;
     let list = l.list;
     const exercises = [];
     for (const x of opts.exercises || []) {
@@ -365,6 +377,7 @@ export function startWorkout(prev, opts = {}) {
     };
     if (rotaSession) active.rotaSession = rotaSession;
     if (shift) active.shift = shift;
+    if (gym) active.gym = gym;
     return { ...l, list, active };
   }, now);
 }
@@ -378,7 +391,7 @@ export function fillEmptyWorkout(prev, opts = {}) {
   const a = activeOf(prev);
   if (!a || a.exercises.length) return prev;
   const next = startWorkout(withLifts(prev, l => ({ ...l, active: null })), {
-    ...opts, now: a.startedAt, today: a.date, ids: keepId(a.id, opts.ids || newId),
+    ...opts, now: a.startedAt, today: a.date, ids: keepId(a.id, opts.ids || newId), gym: a.gym || opts.gym,
   });
   return activeOf(next) ? next : prev;
 }
@@ -387,7 +400,7 @@ const keepId = (id, ids) => { let used = false; return p => (p === 'wk' && !used
 /** The suggestion, ready for startWorkout. */
 export function suggestedStart(sug) {
   return {
-    source: 'suggested', name: sug.name, rotaSession: sug.rotaSession, shift: sug.shift,
+    source: 'suggested', name: sug.name, rotaSession: sug.rotaSession, shift: sug.shift, ...(sug.gym ? { gym: sug.gym } : {}),
     exercises: sug.exercises.map(x => ({ liftId: x.liftId, liftKey: x.liftKey, name: x.name, sets: x.sets, reps: x.reps, optional: x.optional, rows: x.rows })),
   };
 }
@@ -404,7 +417,7 @@ export function addExercises(prev, liftIds, { ids = newId } = {}) {
     const add = [];
     for (const id of want) {
       if (!list.some(l => l.id === id) || a.exercises.some(e => e.liftId === id) || add.some(e => e.liftId === id)) continue;
-      const p = previousSets(prev, id);
+      const p = previousSets(prev, id, { gym: a.gym || null });
       const n = p ? Math.max(1, Math.min(10, p.sets.length)) : 1;
       add.push({ liftId: id, sets: Array.from({ length: n }, () => row(ids('st'))) });
     }
@@ -463,7 +476,7 @@ export function toggleDone(prev, ei, si, now = 0) {
   if (!st) return prev;
   if (st.done) return withActive(prev, x => mapSet(x, ei, si, s => ({ ...s, done: false })));
   const lift = liftsOf(prev).list.find(l => l.id === ex.liftId);
-  const p = previousSets(prev, ex.liftId);
+  const p = previousSets(prev, ex.liftId, { gym: a.gym || null });
   const pr = p && p.sets.length ? p.sets[Math.min(si, p.sets.length - 1)] : null;
   const filled = {
     ...st,
@@ -499,7 +512,7 @@ export function swapExercise(prev, ei, liftId) {
     if (a.exercises.some((e, i) => i !== ei && e.liftId === liftId)) return a;
     return mapEx(a, ei, ex => {
       if (ex.liftId === liftId) return ex;
-      const p = previousSets(prev, liftId);
+      const p = previousSets(prev, liftId, { gym: a.gym || null });
       const sets = ex.sets.map((s, i) => {
         const b = p && p.sets.length ? p.sets[Math.min(i, p.sets.length - 1)] : null;
         return { ...s, weight: b ? b.weight : null, rpe: null, done: false };
@@ -525,6 +538,42 @@ export function renameWorkout(prev, name) {
   const n = String(name || '').replace(/\s+/g, ' ').trim().slice(0, LIMITS.name);
   return withActive(prev, a => (!n || a.name === n ? a : { ...a, name: n }));
 }
+
+/**
+ * Move the workout to another gym. Before any set is ticked this is just
+ * a switch; with sets done the UI asks first — the done sets keep their
+ * numbers and are saved under the new gym (they're tagged on Finish).
+ * Not-done rows of a perGym lift still holding the old gym's pre-fill
+ * are re-filled from the new gym's history (a typed number is kept).
+ * Remembered as lastGym.
+ */
+export function setWorkoutGym(prev, gym) {
+  const a = activeOf(prev);
+  if (!a || !gym || (a.gym || null) === gym) return prev;
+  const L = liftsOf(prev);
+  if (!gymList(L).some(g => g.id === gym)) return prev;
+  const night = a.shift === 'night';
+  const exercises = a.exercises.map(ex => {
+    const lift = L.list.find(l => l.id === ex.liftId);
+    if (!perGymOf(lift)) return ex;
+    const target = ex.target || null;
+    const was = planFor(prev, lift, { sets: ex.sets.length, reps: target, night, gym: a.gym || null }).rows;
+    const now = planFor(prev, lift, { sets: ex.sets.length, reps: target, night, gym }).rows;
+    let changed = false;
+    const sets = ex.sets.map((st, i) => {
+      if (st.done || num(st.weight) !== num(was[i] && was[i].weight)) return st;
+      const w = now[i] ? num(now[i].weight) : null;
+      if (w === num(st.weight)) return st;
+      changed = true;
+      return { ...st, weight: w };
+    });
+    return changed ? { ...ex, sets } : ex;
+  });
+  return withLifts(prev, l => ({ ...setLastGym(withGyms(l), gym), active: { ...a, gym, exercises } }));
+}
+
+/** Done sets in the workout (how many would be re-tagged by a gym change). */
+export const doneSetCount = a => (a ? a.exercises.reduce((k, ex) => k + ex.sets.filter(st => st.done).length, 0) : 0);
 
 export const clampRest = s => Math.max(REST_LIMITS[0], Math.min(REST_LIMITS[1], Math.round(num(s) || DEFAULT_REST_SEC)));
 
@@ -591,7 +640,8 @@ export const volumeText = v => `${Math.round(num(v) || 0).toLocaleString('en-GB'
  * [{ liftId, lift, entry, heaviest, repMaxes, text }] — one per set that
  * holds a record when the session ends ("New best: Leg press 185 kg × 8 ·
  * new 8RM"). A lift's first ever session is a baseline, not a PB; a tie
- * is not a PB; the e1RM estimate plays no part.
+ * is not a PB; the e1RM estimate plays no part. A perGym lift is judged
+ * against its sets at the session's gym only.
  */
 export function sessionPBs(prevLog, session, list = [], { bwOf } = {}) {
   const out = [];
@@ -603,7 +653,8 @@ export function sessionPBs(prevLog, session, list = [], { bwOf } = {}) {
       .filter(s => num(s.reps) != null && num(s.weight) != null)
       .map((s, j) => ({ id: `__pb-${i}-${j}`, liftId: lift.id, date: session.date, weight: num(s.weight), reps: num(s.reps), createdAt: Number.MAX_SAFE_INTEGER - 1000 + j }));
     if (!mine.length) return;
-    const prior = entriesFor(before, lift);
+    // A machine's bests are this gym's only; a free weight's are everywhere's.
+    const prior = entriesFor(before, lift).filter(e => !perGymOf(lift) || gymOf(e) === gymOf(session));
     if (!prior.length) return;
     const basis = pbBasis([...prior, ...mine], lift, bwOf);
     const b = personalBests(prior, lift, { bwOf, basis });
@@ -676,12 +727,13 @@ function sessionOf(a, list, now) {
   };
   if (a.rotaSession) s.rotaSession = a.rotaSession;
   if (a.shift) s.shift = a.shift;
+  if (a.gym) s.gym = a.gym;
   return s;
 }
 
 /**
  * Finish → next state, in ONE write: every done set appended to the log
- * (with `sessionId`, the workout's date and shift tag), the session
+ * (with `sessionId`, the workout's date, shift and gym tags), the session
  * pushed to `sessions` (oldest dropped past 400 — never a log entry),
  * `active` cleared. Nothing ticked → prev (the UI offers Discard).
  * Idempotent: no active → prev; ids already in the log are not re-added.
@@ -704,7 +756,7 @@ export function finishWorkout(prev, now) {
       if (have.has(id)) return;
       const entry = makeEntry(
         { liftId: ex.liftId, date: a.date, weight: s.weight, reps: s.reps, rpe: s.rpe, notes: j === 0 ? ex.note : undefined },
-        { id, now: (num(now) || 0) + k, shift: a.shift || null },
+        { id, now: (num(now) || 0) + k, shift: a.shift || null, gym: a.gym || null },
       );
       add.push({ ...entry, sessionId: a.id });
     });
@@ -770,16 +822,18 @@ export function deleteTemplate(prev, id) {
   return withLifts(prev, l => ({ ...l, templates: l.templates.filter(t => t && t.id !== id) }));
 }
 
-/** A template (built-in or saved), ready for startWorkout. Night shift → 80% weights, as the suggestion does. */
-export function templateStart(S, tpl, today) {
-  const { list } = liftsOf(S);
+/** A template (built-in or saved), ready for startWorkout. Night shift → 80% weights, as the suggestion does; weights from the workout's gym. */
+export function templateStart(S, tpl, today, opts = {}) {
+  const L = liftsOf(S);
+  const { list } = L;
   const day = isIso(today) ? shiftOn(S, today) : null;
   const night = !!(day && day.shift === 'night');
+  const gym = opts.gym !== undefined ? opts.gym : (activeOf(S) && activeOf(S).gym) || defaultGym(L);
   return {
-    source: 'template', name: tpl.name, rotaSession: tpl.rotaSession || null, shift: day ? day.shift : null,
+    source: 'template', name: tpl.name, rotaSession: tpl.rotaSession || null, shift: day ? day.shift : null, ...(gym ? { gym } : {}),
     exercises: tpl.exercises.map(x => {
       const lift = (x.liftId && list.find(l => l.id === x.liftId)) || (x.name ? findByName(list, x.name) : null);
-      const { rows } = planFor(S, lift, { sets: x.sets, reps: x.reps, night });
+      const { rows } = planFor(S, lift, { sets: x.sets, reps: x.reps, night, gym });
       return { liftId: lift ? lift.id : null, liftKey: lift ? lift.id : x.name ? progId(x.name) : null, name: lift ? lift.name : x.name, sets: x.sets, reps: x.reps, optional: x.optional, rows };
     }).filter(x => x.liftId || x.name),
   };
@@ -792,15 +846,17 @@ export function recentWorkouts(S, n = RECENT_N) {
 }
 
 /** Repeat a finished workout: its lifts and set counts, the latest weights. */
-export function repeatStart(S, session, today) {
-  const { list } = liftsOf(S);
+export function repeatStart(S, session, today, opts = {}) {
+  const L = liftsOf(S);
+  const { list } = L;
   const day = isIso(today) ? shiftOn(S, today) : null;
   const night = !!(day && day.shift === 'night');
+  const gym = opts.gym !== undefined ? opts.gym : (activeOf(S) && activeOf(S).gym) || defaultGym(L);
   return {
-    source: 'recent', name: session.name, rotaSession: session.rotaSession || null, shift: day ? day.shift : null,
+    source: 'recent', name: session.name, rotaSession: session.rotaSession || null, shift: day ? day.shift : null, ...(gym ? { gym } : {}),
     exercises: session.exercises.filter(ex => list.some(l => l.id === ex.liftId)).map(ex => {
       const lift = list.find(l => l.id === ex.liftId);
-      const { rows } = planFor(S, lift, { sets: ex.sets.length, reps: repRange(ex.sets), night });
+      const { rows } = planFor(S, lift, { sets: ex.sets.length, reps: repRange(ex.sets), night, gym });
       return { liftId: lift.id, sets: ex.sets.length, rows };
     }),
   };

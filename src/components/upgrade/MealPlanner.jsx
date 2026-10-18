@@ -23,6 +23,7 @@ import {
   portionOptions, planFood, rememberFood,
 } from '../../lib/diet/planner';
 import { scheduleOf } from '../../lib/rotation/pattern';
+import { effectiveOverrides } from '../../lib/lifts/plan';
 import { shopPlan, packLabel, catalogueFor, packsAt, storeName, STORES, PRICES_AS_OF, PRICED_AS } from '../../lib/diet/shopping';
 import { searchByName, readCommunityPref } from '../../lib/diet/foodSearch';
 
@@ -48,8 +49,11 @@ const spareLabel = (left, family) => {
 
 export default function MealPlanner({ S, update, plan, proteinG }) {
   const recipes = useMemo(() => S.recipes || [], [S.recipes]);
-  const overrides = useMemo(() => (S.rotation && S.rotation.overrides) || {}, [S.rotation]);
   const today = todayIso();
+  // The rota as planned (lib/lifts/plan.js): the owner's edits win, then
+  // workouts logged (a rest day trained on is fuelled as a training day)
+  // and sessions the plan has moved. Memoised on its inputs.
+  const overrides = effectiveOverrides(S, { today });
   const schedule = scheduleOf(S);   // cached per stored value — stable identity
   const block = useMemo(() => nextShiftBlock(today, overrides, schedule), [today, overrides, schedule]);
   const mp = S.mealPlan || null;

@@ -61,8 +61,10 @@
  * null for the rotation (derived from the calendar, always current).
  */
 import { resolveDay, scheduleOf } from '../rotation/pattern.js';
-import { makeBwOf, pbTimeline, personalBests, chrono, weightText, shortLiftName, daysBetween, isIso } from '../lifts/lifts.js';
+import { makeBwOf, pbTimeline, personalBests, chrono, weightText, shortLiftName, daysBetween, isIso, perGymOf, gymOf } from '../lifts/lifts.js';
 import { activeOf, workoutsThisWeek, minutesText, elapsedSec } from '../lifts/workout.js';
+import { effectiveOverrides } from '../lifts/plan.js';
+import { gymName } from '../lifts/store.js';
 import { num, toMs } from '../security/format.js';
 import { pillState } from '../security/status.js';
 
@@ -147,9 +149,10 @@ const nextIso = iso => {
 
 // ── Rotation ──────────────────────────────────────────────────────
 
-function dayOf(S, iso) {
+/** A day as the plan has it: the owner's overrides win, then what was trained / is now planned (lifts plan). */
+function dayOf(S, iso, today = iso) {
   const [y, m, d] = iso.split('-').map(Number);
-  return resolveDay(y, m - 1, d, (S && S.rotation && S.rotation.overrides) || {}, scheduleOf(S));
+  return resolveDay(y, m - 1, d, effectiveOverrides(S, { today }), scheduleOf(S));
 }
 
 /** "Night 2" | "Day 1" | "Leave" | "Off", or null before the pattern starts. */
@@ -175,7 +178,7 @@ export function rotationLine(S, iso = localIso()) {
 export function rotationCard(S, iso = localIso()) {
   const r = dayOf(S, iso);
   if (!r.inPattern) return card({ text: 'Before the rotation starts' });
-  const next = shiftLabel(dayOf(S, nextIso(iso)));
+  const next = shiftLabel(dayOf(S, nextIso(iso), iso));
   return card({
     figure: shiftLabel(r),
     figureLabel: 'today',
@@ -422,7 +425,8 @@ export function booksCard({ res, months = [], today, at = null }) {
  * @param now        ms epoch, for the in-progress workout's minutes
  * A PB here is a REAL set that beat the lift's heaviest or one of its
  * rep maxes when it was lifted (pbTimeline). The e1RM estimate is never
- * a PB and never the figure.
+ * a PB and never the figure. A machine (perGym) lift's best is the one at
+ * the gym of that PB, and the label names it: "Leg press best · DXC".
  */
 export function liftsCard({ lifts, vitalsLog, today, now = null }) {
   const active = activeOf({ lifts });
@@ -453,7 +457,10 @@ export function liftsCard({ lifts, vitalsLog, today, now = null }) {
   let last = sets[0];
   for (const e of sets) if (chrono(e, last) > 0) last = e;
   const lift = latest ? latest.lift : byId.get(last.liftId);
-  const best = personalBests(log, lift, { bwOf }).heaviest;
+  // A machine's best is one gym's: the gym of that PB (or of the last set).
+  const perGym = perGymOf(lift);
+  const gym = perGym ? gymOf(latest ? latest.entry : last) : null;
+  const best = personalBests(log, lift, perGym ? { bwOf, gym } : { bwOf }).heaviest;
   const pbs = month ? `${plural(month, 'PB')} this month` : 'No PBs yet this month';
   const hasSessions = !!(lifts && Array.isArray(lifts.sessions) && lifts.sessions.length);
   let text;
@@ -465,7 +472,7 @@ export function liftsCard({ lifts, vitalsLog, today, now = null }) {
   }
   return card({
     figure: weightText(best.entry, lift).replace(/^BW \+/, '+'),
-    figureLabel: `${shortLiftName(lift.name)} best`,
+    figureLabel: `${shortLiftName(lift.name)} best${perGym && gym ? ` · ${gymName(lifts, gym)}` : ''}`,
     text,
   });
 }

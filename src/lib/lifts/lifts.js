@@ -39,6 +39,17 @@
  * Estimated 1RM (Epley) is kept as a TREND — the chart line, "est. 1RM
  * ~241 kg" — and is never a PB anywhere: not here, not in a badge, not
  * in a celebration, not on the home card.
+ *
+ * ── Gyms (Oct 2026) ──────────────────────────────────────────────────
+ * The owner trains at two gyms (DXC and Greenock) whose MACHINES are not
+ * the same machines: 192.5 kg on one leg press is not 192.5 kg on the
+ * other. Every set carries `gym` (an id from S.lifts.gyms), and a lift
+ * that is `perGym` compares ONLY within one gym — Previous, suggested
+ * weights, heaviest, rep maxes, "would be a PB", PB badges, the summary
+ * and the home card. A barbell is a barbell anywhere, so free-weight
+ * lifts compare across gyms. A set with no `gym` reads as unassigned:
+ * a bucket of its own, never rewritten. perGym defaults from the name
+ * (perGymByName) until the owner sets it on the lift.
  */
 import { BANNED_LIFTS } from '../../data/trainingProgramme.js';
 
@@ -49,6 +60,57 @@ export const LOAD_LABEL = { weight: 'Weight', bodyweight_plus: 'Bodyweight + add
 export const BW_WINDOW_DAYS = 14;
 const EPS = 1e-9;
 const DAY = 86400000;
+
+// ── Gyms ───────────────────────────────────────────────────────────
+
+/** The gym a set or workout was at, or null (unassigned). */
+export const gymOf = e => (e && typeof e.gym === 'string' && e.gym ? e.gym : null);
+
+/*
+ * Which lifts are a MACHINE (their numbers depend on the gym) — the rule:
+ *   1. "machine", "smith", "assisted", "cable", "selectorised" → machine,
+ *      whatever else the name says ("Hip thrust machine", "Assisted dip").
+ *   2. otherwise a free-weight word → free: dumbbell, barbell, EZ bar,
+ *      kettlebell, trap bar, bodyweight, dip, pull-up, chin-up, push-up,
+ *      lunge, hip thrust, plank, hyperextension.
+ *   3. otherwise a machine movement → machine: pulldown, leg press, leg
+ *      extension, leg curl, pec deck, hack squat, chest press, seated row,
+ *      row machine, calf raise, Pallof press, Hammer Strength.
+ *   4. anything else → free (compared across gyms).
+ */
+const MACHINE_STRONG = /\bmachine\b|\bsmith\b|\bassisted\b|\bcable\b|\bselectori[sz]ed\b/i;
+const FREE_WORDS = /dumbbell|\bdbs?\b|barbell|\bez[-\s]?bar\b|kettlebell|\btrap[-\s]?bar\b|bodyweight|\bdips?\b|pull-?\s*ups?\b|chin-?\s*ups?\b|push-?\s*ups?\b|\blunges?\b|hip\s*thrust|\bplank|hyperextension/i;
+const MACHINE_WORDS = /pull-?\s*down|leg\s*press|leg\s*extension|leg\s*curl|pec\s*deck|hack\s*squat|chest\s*press|seated\s*row|row\s*machine|calf\s*raise|pallof|hammer\s*strength/i;
+/** The default for `perGym`, from the lift's name (rule above). */
+export function perGymByName(name) {
+  const n = String(name || '');
+  if (MACHINE_STRONG.test(n)) return true;
+  if (FREE_WORDS.test(n)) return false;
+  return MACHINE_WORDS.test(n);
+}
+/** Does this lift compare within one gym? Its own `perGym` wins over the name rule. */
+export const perGymOf = lift => !!lift && (typeof lift.perGym === 'boolean' ? lift.perGym : perGymByName(lift.name));
+
+/**
+ * The log as one gym sees `lift`: for a perGym lift, only its sets at
+ * `gym` (null = the unassigned ones); other lifts' sets, and every set of
+ * a free-weight lift, pass through untouched.
+ */
+export function inGym(log, lift, gym) {
+  const arr = Array.isArray(log) ? log : [];
+  if (!lift || !perGymOf(lift)) return arr;
+  const g = gym || null;
+  return arr.filter(e => !e || e.liftId !== lift.id || gymOf(e) === g);
+}
+
+/** The gyms a lift's sets were logged at: ids in `order` first, others, then unassigned (null) last. */
+export function gymsUsed(log, lift, order = []) {
+  const seen = new Set();
+  for (const e of Array.isArray(log) ? log : []) if (e && lift && e.liftId === lift.id) seen.add(gymOf(e));
+  const known = order.filter(id => seen.has(id));
+  const rest = [...seen].filter(id => id && !order.includes(id)).sort();
+  return [...known, ...rest, ...(seen.has(null) ? [null] : [])];
+}
 
 // ── Small readers ──────────────────────────────────────────────────
 
@@ -226,9 +288,10 @@ function fold(pb, e, lift, bwOf) {
  * opts.bwOf: iso → kg | { kg } | null (makeBwOf), for bodyweight_plus.
  * opts.basis forces the comparison basis (isNewPB judges a candidate on
  * the basis of the whole lift including it).
+ * opts.gym (when present, even null): a perGym lift's bests at that gym only.
  */
 export function personalBests(log, lift, opts = {}) {
-  const sets = entriesFor(log, lift);
+  const sets = entriesFor('gym' in opts ? inGym(log, lift, opts.gym) : log, lift);
   const pb = emptyBests(opts.basis || pbBasis(sets, lift, opts.bwOf));
   for (const e of sets) fold(pb, e, lift, opts.bwOf);
   return pb;
@@ -244,9 +307,12 @@ export const isRealPB = res => !!res && (!!res.heaviest || (res.repMaxes || []).
  * lift's first set is a baseline.
  * → { first, heaviest, repMaxes: [N…], any, value, basis }
  * `value` is the set's estimated 1RM, for display — it plays no part in `any`.
+ * A perGym lift: only sets at the entry's gym count (a DXC PB is not a
+ * Greenock PB, and vice versa).
  */
 export function isNewPB(prevLog, entry, lift, opts = {}) {
-  const others = (Array.isArray(prevLog) ? prevLog : []).filter(e => e && e.id !== entry.id);
+  // A perGym lift is judged against its own gym only.
+  const others = inGym(prevLog, lift, gymOf(entry)).filter(e => e && e.id !== entry.id);
   const mine = entriesFor(others, lift);
   const basis = pbBasis([...mine, entry], lift, opts.bwOf);
   const pb = personalBests(mine, lift, { ...opts, basis });
@@ -266,9 +332,16 @@ export function isNewPB(prevLog, entry, lift, opts = {}) {
  * Sets that were a real-set PB WHEN THEY WERE LIFTED, oldest first:
  * [{ entry, heaviest, repMaxes }]. This is what the chart marks gold and
  * what the home card counts. (isNewPB judges against all other sets,
- * which differs only for a back-dated entry.)
+ * which differs only for a back-dated entry.) A perGym lift is judged
+ * gym by gym.
  */
 export function pbTimeline(log, lift, opts = {}) {
+  if (perGymOf(lift) && !opts.oneGym) {
+    // One timeline per gym, merged: a set is a PB against its own gym.
+    const out = [];
+    for (const g of gymsUsed(log, lift)) out.push(...pbTimeline(inGym(log, lift, g), lift, { ...opts, oneGym: true }));
+    return out.sort((a, b) => chrono(a.entry, b.entry));
+  }
   const sets = entriesFor(log, lift);
   const pb = emptyBests(pbBasis(sets, lift, opts.bwOf));
   const out = [];
