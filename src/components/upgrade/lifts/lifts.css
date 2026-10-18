@@ -296,3 +296,62 @@ html[data-theme="dark-os"] .lifts input[type="date"] { color-scheme: dark; }
   .lf-cele-icon i { display: none; }
   .lf-card { transition: none; }
 }
+
+/* ── Gyms (Oct 2026) ──────────────────────────────────────────────────
+   A machine lift compares within one gym. Gym lines on the chart differ
+   by colour AND point shape (circle / square / diamond), and the legend
+   names them, so the gym is never told by colour alone. The second
+   gym's copper: #a2561a on cream (5.3:1 as a line on #faf5e9), #e3a15e
+   on dark (8.1:1 on #131311). Unassigned sets draw in the muted ink. */
+.lifts { --lf-g1: #a2561a; --lf-g2: var(--text-muted); }
+html[data-theme="dark-os"] .lifts { --lf-g1: #e3a15e; }
+.lf-line.is-g1 { stroke: var(--lf-g1); stroke-dasharray: 5 3; }
+.lf-line.is-g2 { stroke: var(--lf-g2); stroke-dasharray: 2 3; }
+.lf-pt.is-g1 { fill: var(--lf-g1); }
+.lf-pt.is-g2 { fill: var(--lf-g2); }
+.lf-pt.is-g1.is-night, .lf-pt.is-g2.is-night { fill: var(--upg-solid, var(--surface)); }
+.lf-pt.is-g1.is-pb, .lf-pt.is-g2.is-pb { fill: var(--lf-pb); }
+.lf-pt.is-g1.is-pb.is-night, .lf-pt.is-g2.is-pb.is-night { fill: var(--upg-solid, var(--surface)); }
+.lf-key-svg { flex: none; overflow: visible; }
+.lf-key-svg .lf-line { stroke-width: 2; }
+
+.lifts .lf-gymseg { align-self: flex-start; max-width: 100%; overflow-x: auto; scrollbar-width: none; }
+.lifts .lf-gymseg button { white-space: nowrap; }
+.lf-dgym { margin-top: -2px; }
+.lf-dacts { display: flex; gap: 8px; flex-wrap: wrap; margin-left: auto; }
+.lf-dacts .sec-btn[aria-pressed="true"] { color: var(--em-text); border-color: color-mix(in srgb, var(--em) 50%, var(--border)); }
+
+.lf-gymtag { display: inline-flex; align-items: center; padding: 0 6px; height: 18px; border-radius: 5px; font-family: var(--mono);
+  font-size: var(--lf-fs); color: var(--text); border: 1px solid var(--border); background: var(--wk-cell, transparent); }
+.lf-gymtag.is-none { color: var(--text-muted); border-style: dashed; }
+
+.lf-fig-gyms { min-width: 0; }
+.lf-gymbests { display: flex; flex-wrap: wrap; gap: 0 10px; font-family: var(--mono); line-height: 26px; font-variant-numeric: tabular-nums; }
+.lf-gymbest { white-space: nowrap; }
+.lf-gymbest em { font-style: normal; font-size: var(--lf-fs); color: var(--text-muted); letter-spacing: .3px; }
+.lf-gymbest b { font-size: 18px; font-weight: 700; color: var(--text); }
+
+.lf-tile-gyms { gap: 6px; }
+.lf-tile-gymrow { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; min-width: 0; font-family: var(--mono); }
+.lf-tile-gymrow em { font-style: normal; font-size: var(--lf-fs); color: var(--text-muted); }
+.lf-tile-gymrow b { font-size: 16px; font-weight: 700; color: var(--text); font-variant-numeric: tabular-nums; white-space: nowrap; }
+
+.lf-rm-gyms td small { font-size: var(--lf-fs); color: var(--text-muted); }
+.lf-rm-gyms thead th:not(:first-child) { text-transform: none; letter-spacing: .3px; }
+
+.lf-pergym[aria-pressed="true"] { color: var(--em-text); border-color: color-mix(in srgb, var(--em) 50%, var(--border)); }
+.lf-check { display: flex; align-items: center; gap: 8px; min-height: 38px; font-size: 13px; color: var(--text-mid); cursor: pointer; grid-column: 1 / -1; }
+.lf-check input { width: 18px; height: 18px; accent-color: var(--em); flex: none; }
+.lf-gyms { display: flex; flex-direction: column; gap: 6px; }
+.lf-add-gym { margin-top: 4px; }
+@media (max-width: 640px) {
+  .lf-dacts { width: 100%; }
+  .lf-dacts > .sec-btn { flex: 1 1 0; justify-content: center; }
+  .lf-mrow-acts { flex-wrap: wrap; }
+  .lf-check { min-height: 44px; }
+}
+@media (max-width: 640px) {
+  /* Per-gym bests need the full width on a phone: three rows of "140 kg × 10". */
+  .lf-tile-gyms { grid-column: 1 / -1; }
+  .lf-tile-gymrow b { font-size: 15px; }
+}

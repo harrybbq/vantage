@@ -30,7 +30,11 @@ const isoAdd = (iso, n) => {
 /**
  * The days of the plan, with shift and whether it is a training day.
  * `train` follows the PATTERN's session (as TRAIN_POS did), not a
- * swapped one, so the targets stay the plan's.
+ * swapped one, so the targets stay the plan's — with one exception: a
+ * day a workout was actually logged on (`derived: 'done'`, from the
+ * lifts plan's effectiveOverrides) is fuelled as the training day it
+ * was. Callers pass effectiveOverrides(S), so `session` is what was done
+ * or is now planned; the owner's own overrides win inside it.
  */
 export function planDays(start, n, overrides = {}, schedule = DEFAULT_SCHEDULE) {
   const out = [];
@@ -38,12 +42,14 @@ export function planDays(start, n, overrides = {}, schedule = DEFAULT_SCHEDULE) 
     const iso = isoAdd(start, i);
     const [y, m, d] = iso.split('-').map(Number);
     const r = resolveDay(y, m - 1, d, overrides, schedule);
+    const ov = (overrides || {})[iso];
+    const trained = !!(ov && ov.derived === 'done' && ov.session && ov.session !== 'Rest');
     out.push({
       i, iso,
       shift: r.inPattern ? r.shift : 'unknown',
       shiftNum: r.shiftNum || null,
       session: r.session || 'Rest',
-      train: r.inPattern && patternDay(y, m - 1, d, schedule).session !== 'Rest',
+      train: r.inPattern && (patternDay(y, m - 1, d, schedule).session !== 'Rest' || trained),
     });
   }
   return out;

@@ -20,6 +20,13 @@
  * docked at the bottom with +15 s and Skip; it ends quietly (no sound).
  * Reduced motion: the bar steps instead of sliding.
  *
+ * Gym: the header carries the workout's gym as a chip. Before any set is
+ * ticked a tap just switches it (untouched pre-filled weights follow);
+ * once sets are done it asks first, then saves them under the new gym.
+ * The start screen (Blank / Recent / Library) has the same switch, and
+ * Recent / Library pre-fill from that gym's history for machines. The ⋯
+ * menu can switch a lift between per-gym and across-gyms.
+ *
  * Every edit goes through workout.js and is written to S.lifts.active
  * at once — the save upstream is debounced — so nothing typed is lost to
  * a refresh. The clock is local state and never writes.
@@ -28,15 +35,16 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Sheet, ConfirmButton } from '../security/parts';
 import Icon from '../../Icon';
+import { GymSwitch } from './parts';
 import ExerciseBlock from './ExerciseBlock';
 import ExercisePicker from './ExercisePicker';
 import NumPad from './NumPad';
 import {
   activeOf, elapsedSec, clock, volume, volumeText, previousSets, addExercises, addSet, updateSet, toggleDone, setProblem,
   removeSet, removeExercise, swapExercise, setNote, renameWorkout, setRestSec, extendRest, skipRest, restLeft, discardWorkout,
-  recentWorkouts, templatesOf, templateStart, repeatStart, fillEmptyWorkout, deleteTemplate, clampRest,
+  recentWorkouts, templatesOf, templateStart, repeatStart, fillEmptyWorkout, deleteTemplate, clampRest, setWorkoutGym, doneSetCount,
 } from '../../../lib/lifts/workout';
-import { shortLiftName } from '../../../lib/lifts/lifts';
+import { shortLiftName, perGymOf } from '../../../lib/lifts/lifts';
 
 const fmt = v => (v == null || v === '' ? '' : String(Math.round(Number(v) * 100) / 100));
 const SHORT = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
@@ -56,7 +64,7 @@ export function useCoarse() {
   return m;
 }
 
-export default function WorkoutLive({ S, update, list, recentIds, today, onMinimise, onFinish, onQuickLog, onHistory, onCreateLift, onToast }) {
+export default function WorkoutLive({ S, update, list, recentIds, today, onMinimise, onFinish, onQuickLog, onHistory, onCreateLift, onToast, gyms = [], gymName = id => id, onPerGym }) {
   const active = activeOf(S);
   const coarse = useCoarse();
   const [now, setNow] = useState(() => Date.now());
@@ -67,6 +75,7 @@ export default function WorkoutLive({ S, update, list, recentIds, today, onMinim
   const [settings, setSettings] = useState(false);
   const [problem, setProb] = useState(null);       // { ei, si, text }
   const [tab, setTab] = useState('blank');
+  const [gymSheet, setGymSheet] = useState(null);   // null | { pick: gymId | null }
   const padRef = useRef(null);
 
   useEffect(() => {
@@ -75,13 +84,14 @@ export default function WorkoutLive({ S, update, list, recentIds, today, onMinim
   }, []);
 
   const liftOf = useCallback(id => list.find(l => l.id === id) || null, [list]);
+  const gymNow = active ? active.gym || null : null;
   const prevs = useMemo(() => {
     const m = new Map();
-    if (active) for (const ex of active.exercises) m.set(ex.liftId, previousSets(S, ex.liftId));
+    if (active) for (const ex of active.exercises) m.set(ex.liftId, previousSets(S, ex.liftId, { gym: gymNow }));
     return m;
-  // previous sets only change when the log does
+  // previous sets only change when the log, the gym or a lift's per-gym switch does
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [S && S.lifts && S.lifts.log, active && active.exercises.map(e => e.liftId).join('|')]);
+  }, [S && S.lifts && S.lifts.log, S && S.lifts && S.lifts.list, gymNow, active && active.exercises.map(e => e.liftId).join('|')]);
 
   // ── Rest timer ──
   const left = active ? restLeft(active, now) : 0;
@@ -204,6 +214,12 @@ export default function WorkoutLive({ S, update, list, recentIds, today, onMinim
   const fill = opts => {
     update(prev => fillEmptyWorkout(prev, opts));
   };
+  const doneN = doneSetCount(active);
+  const moveGym = id => {
+    update(prev => setWorkoutGym(prev, id));
+    setGymSheet(null);
+    if (doneN) onToast && onToast(`Now at ${gymName(id)} — ${doneN} ${doneN === 1 ? 'set' : 'sets'} re-tagged`);
+  };
 
   return (
     <div className={`wk-live${pad ? ' has-pad' : ''}${resting ? ' has-rest' : ''}`} data-testid="wk-live">
@@ -214,7 +230,15 @@ export default function WorkoutLive({ S, update, list, recentIds, today, onMinim
           </button>
           <div className="wk-titles">
             <span className="sec-eyebrow">// {active.source === 'suggested' ? 'Suggested' : 'Workout'} · {dateShort(active.date)}{active.shift === 'night' ? ' · night · 80% load' : ''}</span>
-            <h3 className="wk-title">{active.name}</h3>
+            <div className="wk-title-row">
+              <h3 className="wk-title">{active.name}</h3>
+              {gyms.length > 0 && (
+                <button type="button" className="wk-gymchip" onClick={() => setGymSheet({ pick: null })} data-testid="wk-gymchip"
+                        aria-label={`Gym: ${gymNow ? gymName(gymNow) : 'none'} — change`}>
+                  <Icon name="locate-fixed" size={12} /> {gymNow ? gymName(gymNow) : 'No gym'} <Icon name="chevron-down" size={12} />
+                </button>
+              )}
+            </div>
           </div>
           <button type="button" className="sec-btn is-primary wk-btn wk-finish" onClick={onFinish} data-testid="wk-finish">Finish</button>
         </div>
@@ -228,11 +252,13 @@ export default function WorkoutLive({ S, update, list, recentIds, today, onMinim
 
       {active.exercises.length === 0 ? (
         <Chooser S={S} today={today} tab={tab} setTab={setTab} onAdd={() => setPicker({ mode: 'add' })} onQuickLog={onQuickLog} onFill={fill}
-                 onDeleteTemplate={id => update(prev => deleteTemplate(prev, id))} list={list} />
+                 onDeleteTemplate={id => update(prev => deleteTemplate(prev, id))} list={list}
+                 gyms={gyms} gym={gymNow} onGym={id => update(prev => setWorkoutGym(prev, id))} />
       ) : (
         <div className="wk-exs">
           {active.exercises.map((ex, ei) => (
             <ExerciseBlock key={`${ex.liftId}-${ei}`} ex={ex} ei={ei} lift={liftOf(ex.liftId)} prev={prevs.get(ex.liftId)} coarse={coarse}
+                           gymLabel={gymNow && perGymOf(liftOf(ex.liftId)) ? gymName(gymNow) : null}
                            editing={pad && pad.ei === ei ? pad : null} problem={problem && problem.ei === ei ? problem : null}
                            onCell={openCell} onChange={(a, b, patch) => update(prev => updateSet(prev, a, b, patch))}
                            onToggle={toggle} onRemoveSet={(a, b) => { setPad(null); update(prev => removeSet(prev, a, b)); }}
@@ -296,12 +322,44 @@ export default function WorkoutLive({ S, update, list, recentIds, today, onMinim
             <li><button type="button" onClick={() => { const ei = menu; setMenu(null); setPicker({ mode: 'swap', ei }); }}><Icon name="repeat" size={17} /> Swap exercise <Icon name="chevron-right" size={15} /></button></li>
             <li><button type="button" onClick={() => { setNoteOpen(menu); setMenu(null); }}><Icon name="notebook-pen" size={17} /> {menuEx.note ? 'Edit note' : 'Add note'} <Icon name="chevron-right" size={15} /></button></li>
             <li><button type="button" onClick={() => { const id = menuEx.liftId; setMenu(null); onHistory(id); }}><Icon name="chart-column" size={17} /> View history <Icon name="chevron-right" size={15} /></button></li>
+            {onPerGym && menuLift && (
+              <li>
+                <button type="button" aria-pressed={perGymOf(menuLift)} onClick={() => onPerGym(menuLift.id, !perGymOf(menuLift))} data-testid="wk-menu-pergym">
+                  <Icon name={perGymOf(menuLift) ? 'locate-fixed' : 'link'} size={17} />
+                  <span className="wk-menu-txt">{perGymOf(menuLift) ? 'Compared per gym' : 'Compared across gyms'}
+                    <small>{perGymOf(menuLift) ? 'A machine — each gym’s numbers stay its own. Tap for one record everywhere.' : 'A free weight — one record everywhere. Tap to keep each gym separate.'}</small></span>
+                  <span className={`wk-switch-ui wk-menu-sw${perGymOf(menuLift) ? ' is-on' : ''}`} aria-hidden="true" />
+                </button>
+              </li>
+            )}
           </ul>
           <div className="wk-menu-danger">
             <ConfirmButton label="Remove from workout" confirmLabel={`Remove ${menuLift ? shortLiftName(menuLift.name) : 'it'}`}
                            onConfirm={() => { const ei = menu; setMenu(null); setPad(null); update(prev => removeExercise(prev, ei)); }} className="wk-btn" />
           </div>
           <p className="lf-muted">Supersets and one-side-at-a-time logging aren&apos;t built yet.</p>
+        </Sheet>
+      )}
+
+      {gymSheet && (
+        <Sheet title="Which gym?" eyebrow="// Workout" onClose={() => setGymSheet(null)} className="lifts">
+          <div className="lf-form">
+            <div className="lf-field is-wide">
+              <span className="lf-field-lbl">Training at</span>
+              <GymSwitch gyms={gyms} value={gymSheet.pick || gymNow} label="Gym for this workout" testId="wk-gym-sheet"
+                         onChange={id => (doneN && id !== gymNow ? setGymSheet({ pick: id }) : moveGym(id))} />
+              <span className="lf-field-hint">Machines compare within one gym: Previous and the weights come from there.</span>
+            </div>
+            {gymSheet.pick && gymSheet.pick !== gymNow && (
+              <div className="wk-gymconfirm" role="alert">
+                <p>{doneN} done {doneN === 1 ? 'set' : 'sets'} will be saved under <b>{gymName(gymSheet.pick)}</b> instead of {gymNow ? gymName(gymNow) : 'no gym'}.</p>
+                <div className="lf-form-acts">
+                  <button type="button" className="sec-btn is-primary lf-btn-lg" onClick={() => moveGym(gymSheet.pick)} data-testid="wk-gym-confirm">Move workout to {gymName(gymSheet.pick)}</button>
+                  <button type="button" className="sec-btn is-quiet lf-btn-lg" onClick={() => setGymSheet({ pick: null })}>Keep {gymNow ? gymName(gymNow) : 'as is'}</button>
+                </div>
+              </div>
+            )}
+          </div>
         </Sheet>
       )}
 
@@ -327,7 +385,7 @@ function RestBar({ left, total, onAdd, onSkip }) {
   );
 }
 
-function Chooser({ S, today, tab, setTab, onAdd, onQuickLog, onFill, onDeleteTemplate, list }) {
+function Chooser({ S, today, tab, setTab, onAdd, onQuickLog, onFill, onDeleteTemplate, list, gyms = [], gym = null, onGym }) {
   const recent = useMemo(() => recentWorkouts(S), [S]);
   const tpls = useMemo(() => templatesOf(S), [S]);
   const nameOf = id => { const l = list.find(x => x.id === id); return l ? shortLiftName(l.name) : '—'; };
@@ -335,6 +393,12 @@ function Chooser({ S, today, tab, setTab, onAdd, onQuickLog, onFill, onDeleteTem
     <section className="wk-card wk-choose" aria-labelledby="wk-choose-h">
       <h4 id="wk-choose-h" className="wk-choose-h">Start your workout</h4>
       <p className="lf-muted">Choose how you&apos;d like to begin. The clock is already running.</p>
+      {gyms.length > 1 && (
+        <div className="wk-gymrow">
+          <span className="wk-gymrow-lbl">Training at</span>
+          <GymSwitch gyms={gyms} value={gym} onChange={onGym} label="Gym for this workout" testId="wk-choose-gym" />
+        </div>
+      )}
       <div className="sec-seg lf-seg wk-seg" role="tablist" aria-label="Start from">
         {[['blank', 'Blank'], ['recent', 'Recent'], ['library', 'Library']].map(([id, label]) => (
           <button key={id} type="button" role="tab" aria-selected={tab === id} className={tab === id ? 'is-on' : ''} onClick={() => setTab(id)}>{label}</button>

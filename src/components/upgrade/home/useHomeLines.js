@@ -169,9 +169,14 @@ function useBooksCard() {
 
 export function useHomeLines(S, userId) {
   const today = todayIso();
-  const overrides = S && S.rotation && S.rotation.overrides;
-  const rotation = useMemo(() => rotationCard({ rotation: { overrides } }, today), [overrides, today]);
-  const rotaLine = useMemo(() => rotationLine({ rotation: { overrides } }, today), [overrides, today]);
+  // The rota card reads the plan (homeLines → effectiveOverrides): the
+  // owner's edits, then what was trained / is now planned.
+  const rota = S && S.rotation;
+  const liftSessions = S && S.lifts && S.lifts.sessions;
+  const liftList = S && S.lifts && S.lifts.list;
+  const rotaS = useMemo(() => ({ rotation: rota, lifts: { sessions: liftSessions, list: liftList } }), [rota, liftSessions, liftList]);
+  const rotation = useMemo(() => rotationCard(rotaS, today), [rotaS, today]);
+  const rotaLine = useMemo(() => rotationLine(rotaS, today), [rotaS, today]);
   const diet = useDietCard(S, userId);
   const career = useCareerCard(S);
   const security = useSecurityCard();

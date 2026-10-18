@@ -3,7 +3,8 @@
  * note, and the set table — Set · Previous · Reps · KG · RPE · ✓.
  *
  *   Previous  the same set of the last time this lift was trained
- *             ("180 × 8"); tap it to copy it into the row
+ *             ("180 × 8") — at this gym, for a machine; tap it to copy it
+ *             into the row
  *   ✓         marks the set done (only done sets are saved on Finish);
  *             an empty row ticks with Previous's numbers
  *   delete    swipe a row left on a touch screen; a bin button on desktop
@@ -21,7 +22,7 @@ import { LOAD_LABEL } from '../../../lib/lifts/lifts';
 const fmt = v => (v == null || v === '' ? '' : String(Math.round(Number(v) * 100) / 100));
 
 export default function ExerciseBlock({
-  ex, ei, lift, prev, coarse, editing, problem, onCell, onChange, onToggle, onRemoveSet, onAddSet, onMenu, onNote, noteOpen, onHistory,
+  ex, ei, lift, prev, coarse, editing, problem, onCell, onChange, onToggle, onRemoveSet, onAddSet, onMenu, onNote, noteOpen, onHistory, gymLabel = null,
 }) {
   const per = lift && lift.load === 'per_hand';
   const bw = lift && lift.load === 'bodyweight_plus';
@@ -39,7 +40,7 @@ export default function ExerciseBlock({
         </button>
       </header>
       <p className="wk-ex-meta">
-        {[ex.target ? `Target ${ex.sets.length} × ${ex.target}` : null, musclesOf(lift).slice(0, 3).join(' · ') || null, lift && lift.load !== 'weight' ? LOAD_LABEL[lift.load] : null, ex.optional ? 'optional' : null].filter(Boolean).join(' · ')}
+        {[ex.target ? `Target ${ex.sets.length} × ${ex.target}` : null, musclesOf(lift).slice(0, 3).join(' · ') || null, lift && lift.load !== 'weight' ? LOAD_LABEL[lift.load] : null, ex.optional ? 'optional' : null, gymLabel ? `${gymLabel} machine` : null].filter(Boolean).join(' · ')}
       </p>
       {(noteOpen || ex.note) && <Note value={ex.note || ''} autoFocus={noteOpen && !ex.note} onSave={onNote} label={`Note for ${lift ? lift.name : 'exercise'}`} />}
       <div className={`wk-table${coarse ? ' is-touch' : ' is-desk'}`} role="table" aria-label={`${lift ? lift.name : 'Exercise'} sets`}>

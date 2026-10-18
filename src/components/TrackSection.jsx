@@ -18,6 +18,7 @@ import { trackerDone, trackerStep, dailyGoalOf, fmtTrackerValue } from '../lib/t
 import { useIsOwner } from '../hooks/useIsOwner';
 import { OWNER_SURFACES_IN_BUILD } from '../lib/native/ownerSurfaces';
 import { shiftChipsInMonth, shiftOn, showsOnCalendar, setShowOnCalendar } from '../lib/rotation/pattern';
+import { effectiveOverrides } from '../lib/lifts/plan';
 
 function getWeekProgress(logs, tracker) {
   const count = countWeekLogs(logs, tracker.id, getTodayStr(), tracker);
@@ -776,7 +777,9 @@ function CalendarView({ S, update, onShowCoinToast, nutritionMonthData, userId }
           x={menu.x} y={menu.y} dates={menu.dates}
           trackers={trackers} logs={logs}
           events={menu.dates.length === 1 ? eventsOn(S, menu.dates[0]) : []}
-          shift={shiftsOn && menu.dates.length === 1 ? shiftOn(S, menu.dates[0]) : null}
+          shift={shiftsOn && menu.dates.length === 1
+            // the day's label carries its session — the planned one (owner's edits win, then the lifts plan)
+            ? shiftOn({ ...S, rotation: { ...(S.rotation || {}), overrides: effectiveOverrides(S) } }, menu.dates[0]) : null}
           update={update}
           onClose={() => setMenu(null)}
           onAddEvent={() => { setEventForm({ dates: menu.dates, event: null }); setMenu(null); }}

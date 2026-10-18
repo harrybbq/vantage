@@ -16,6 +16,16 @@
  *   point it is decoration. Edits are sparse overrides keyed by ISO
  *   date, so the pattern stays the source of truth and only the
  *   deviations are stored.
+ *
+ * The session plan (Oct 2026, lib/lifts/plan.js): what the days SHOW is
+ * effectiveOverrides(S) — the owner's edits (which always win), then
+ * what was actually trained (✓ logged) and what the plan has moved
+ * since (↻ moved), e.g. Legs carried to the day after Push was done on a
+ * Legs day. None of that is written: S.rotation.overrides still holds
+ * only what was set here by hand. A legend tells the three apart, and
+ * the day editor still pins a session by hand — including the pattern's
+ * own, against the plan. Leave, shift counts and the allowance read the
+ * hand edits only: they are about shifts, not sessions.
  */
 import { useMemo, useState } from 'react';
 import Icon from '../Icon';
@@ -27,6 +37,7 @@ import {
   scheduleOf, cycleShape,
 } from '../../lib/rotation/pattern';
 import ShiftPatternCard from './ShiftPatternCard';
+import { effectiveOverrides, plannedSessions, plannedOn } from '../../lib/lifts/plan';
 import {
   DAY_TYPE_LABEL, FLOOR_MACROS, NIGHT_LOAD_SCALE, STRETCH_GOAL,
   exercisesFor, stretchesFor, targetsForDay, commuteForDay,
@@ -204,7 +215,7 @@ function TodayPanel({ overrides, S, schedule }) {
  * question the page is actually opened for, "what's coming", without
  * scanning a grid. Each day opens the same editor as the calendar.
  */
-function NextDays({ overrides, holidayDays, today, onOpen, schedule }) {
+function NextDays({ overrides, raw, holidayDays, today, onOpen, schedule }) {
   const days = useMemo(() => {
     const [y, m, d] = today.split('-').map(Number);
     return Array.from({ length: 16 }, (_, i) => {
@@ -225,13 +236,15 @@ function NextDays({ overrides, holidayDays, today, onOpen, schedule }) {
           const chip = chipText(c);
           return (
             <button key={c.iso} type="button" onClick={() => onOpen(c)}
-                    className={['upg-next-day', `is-${c.shift}`, c.cardio ? 'has-cardio' : '', c.edited ? 'is-edited' : '',
+                    className={['upg-next-day', `is-${c.shift}`, c.cardio ? 'has-cardio' : '',
+                      kindOf(overrides, raw, c.iso) ? `is-${kindOf(overrides, raw, c.iso)}` : '',
                       holidayDays.has(c.iso) ? 'is-holiday' : '', i === 0 ? 'is-today' : ''].filter(Boolean).join(' ')}
-                    aria-label={`${dt.toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' })}: ${c.shift === 'off' ? 'off' : chip}, ${c.session}`}>
+                    aria-label={`${dt.toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' })}: ${c.shift === 'off' ? 'off' : chip}, ${c.session}${KIND_WORDS[kindOf(overrides, raw, c.iso)] || ''}`}>
               <span className="upg-next-dow">{i === 0 ? 'Today' : DOW[(dt.getDay() + 6) % 7]}</span>
               <span className="upg-next-dt">{dt.getDate()}</span>
               <span className="upg-next-chip">{chip || 'Off'}</span>
               <span className={'upg-next-sess' + (c.session === 'Rest' ? ' is-rest' : '')}>{c.session}</span>
+              <Mark overrides={overrides} raw={raw} iso={c.iso} />
             </button>
           );
         })}
@@ -240,8 +253,27 @@ function NextDays({ overrides, holidayDays, today, onOpen, schedule }) {
   );
 }
 
+/** 'done' | 'dynamic' for a day the plan derived, else null. */
+const derivedOf = (eff, iso) => (eff[iso] && eff[iso].derived) || null;
+/** edited (by hand) › dynamic (moved by the plan) › done (a workout logged) › missed. */
+const kindOf = (eff, raw, iso, mark) => (raw[iso] ? 'edited'
+  : derivedOf(eff, iso) === 'dynamic' ? 'dynamic'
+  : derivedOf(eff, iso) === 'done' || mark === 'done' ? 'done'
+  : mark === 'missed' ? 'missed' : null);
+const KIND_WORDS = { edited: ' (edited by you)', dynamic: ' (moved by the plan)', done: ' (workout logged)', missed: ' (missed)' };
+/** The day's mark — a glyph, so it never rests on colour alone: ✓ logged, ↻ moved, ● edited by you. */
+function Mark({ overrides, raw, iso, mark }) {
+  const d = kindOf(overrides, raw, iso, mark);
+  if (!d) return null;
+  return <span className={`upg-mark is-${d}`} aria-hidden="true">{d === 'done' ? '✓' : d === 'dynamic' ? '↻' : d === 'missed' ? '–' : '●'}</span>;
+}
+
 export default function RotationTab({ S, update, isMobile }) {
+  // The owner's own edits: what the editor writes, and what leave, shift
+  // counts and the allowance are counted from.
   const overrides = useMemo(() => (S.rotation && S.rotation.overrides) || {}, [S.rotation]);
+  // What the days show: those edits, then logged workouts and the plan.
+  const eff = effectiveOverrides(S, { today: todayIso() });
   // The stored shift pattern (validated; the original rota when unset).
   // Cached per stored value, so its identity is stable between renders.
   const schedule = scheduleOf(S);
@@ -292,6 +324,23 @@ export default function RotationTab({ S, update, isMobile }) {
   const blocks = useMemo(() => (S.rotation && S.rotation.holidayBlocks) || [], [S.rotation]);
   const today = todayIso();
   const holidayDays = useMemo(() => holidayDaySet(blocks), [blocks]);
+  // Days a workout was logged (✓), and training days that passed with
+  // none once workouts are being logged (–, their session carries
+  // forward). Only the months on screen are asked.
+  const shownKey = shown.map(([y, m]) => `${y}-${m}`).join('|');
+  const marks = useMemo(() => {
+    const m = new Map();
+    if (!shown.length) return m;
+    const [y0, m0] = shown[0];
+    const from = `${y0}-${String(m0 + 1).padStart(2, '0')}-01`;
+    for (const p of plannedSessions(S, { from, days: 31 * shown.length + 6, today })) {
+      if (p.done.length || p.source === 'done') m.set(p.iso, 'done');
+      else if (p.missed) m.set(p.iso, 'missed');
+    }
+    return m;
+  // the plan reads the rota and the finished workouts only
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [shownKey, S.rotation, S.lifts && S.lifts.sessions, S.lifts && S.lifts.list, today]);
 
   // Additive: a new `rotation` key, and within it only the days that
   // deviate. Setting a day back to its pattern value deletes the entry
@@ -361,8 +410,8 @@ export default function RotationTab({ S, update, isMobile }) {
 
   return (
     <div className="upg-pane">
-      <TodayPanel overrides={overrides} S={S} schedule={schedule} />
-      <NextDays overrides={overrides} holidayDays={holidayDays} today={today} onOpen={setEditing} schedule={schedule} />
+      <TodayPanel overrides={eff} S={S} schedule={schedule} />
+      <NextDays overrides={eff} raw={overrides} holidayDays={holidayDays} today={today} onOpen={setEditing} schedule={schedule} />
       <ShiftPatternCard S={S} update={update} schedule={schedule} today={today} />
       <div className="upg-stats">
         {[
@@ -446,6 +495,12 @@ export default function RotationTab({ S, update, isMobile }) {
         <span><i className="upg-sw is-off" /> Off</span>
         <span><i className="upg-sw is-leave" /> Holiday</span>
         <span><i className="upg-sw is-cardio" /> Cardio day</span>
+      </div>
+      <div className="upg-legend upg-legend-plan" data-testid="rota-plan-legend">
+        <span><span className="upg-mark is-edited" aria-hidden="true">●</span> Edited by you — always wins</span>
+        <span><span className="upg-mark is-done" aria-hidden="true">✓</span> Workout logged</span>
+        <span><span className="upg-mark is-dynamic" aria-hidden="true">↻</span> Moved by the plan</span>
+        <span><span className="upg-mark is-missed" aria-hidden="true">–</span> Missed — carried forward</span>
         <span className="upg-legend-hint">
           <Icon name="pencil" size={11} /> Tap a day to change its session or book it off
         </span>
@@ -469,7 +524,7 @@ export default function RotationTab({ S, update, isMobile }) {
             <h3>{MONTHS[m]} <span>{y}</span></h3>
             <div className="upg-dow">{DOW.map(d => <span key={d}>{d}</span>)}</div>
             <div className="upg-grid">
-              {monthGrid(y, m, overrides, schedule).map((cell, i) => {
+              {monthGrid(y, m, eff, schedule).map((cell, i) => {
                 if (!cell) return <div key={`e${i}`} className="upg-cell is-empty" />;
                 if (!cell.inPattern) {
                   return <div key={cell.iso} className="upg-cell is-empty"><span className="upg-dt">{cell.iso.slice(8)}</span></div>;
@@ -479,7 +534,7 @@ export default function RotationTab({ S, update, isMobile }) {
                   'upg-cell', `is-${cell.shift}`,
                   holidayDays.has(cell.iso) ? 'is-holiday' : '',
                   cell.cardio ? 'has-cardio' : '',
-                  cell.edited ? 'is-edited' : '',
+                  kindOf(eff, overrides, cell.iso, marks.get(cell.iso)) ? `is-${kindOf(eff, overrides, cell.iso, marks.get(cell.iso))}` : '',
                   cell.iso === today ? 'is-today' : '',
                   cell.iso < today ? 'is-past' : '',
                   inPreview ? 'in-range' : '',
@@ -491,6 +546,7 @@ export default function RotationTab({ S, update, isMobile }) {
                           onClick={() => (booking ? pickDate(cell.iso) : setEditing(cell))}
                           onMouseEnter={() => booking && anchor && setHover(cell.iso)}
                           onFocus={() => booking && anchor && setHover(cell.iso)}
+                          aria-label={`${cell.iso}: ${chip || 'off'}, ${cell.session}${KIND_WORDS[kindOf(eff, overrides, cell.iso, marks.get(cell.iso))] || ''}`}
                           title={cell.shift === 'leave'
                             ? `${leaveType(cell.leave)?.label} — would have been ${cell.baseShift}${cell.baseShiftNum || ''}`
                             : undefined}>
@@ -504,6 +560,7 @@ export default function RotationTab({ S, update, isMobile }) {
                     </span>
                     <span className={'upg-sess' + (cell.session === 'Rest' ? ' is-rest' : '')}
                           data-short={cell.session.slice(0, 3)}><span>{cell.session}</span></span>
+                    <Mark overrides={eff} raw={overrides} iso={cell.iso} mark={marks.get(cell.iso)} />
                   </button>
                 );
               })}
@@ -516,6 +573,9 @@ export default function RotationTab({ S, update, isMobile }) {
         <DayEditor
           day={editing}
           schedule={schedule}
+          rawEdited={!!overrides[editing.iso]}
+          derived={derivedOf(eff, editing.iso)}
+          plan={plannedOn(S, editing.iso, today)}
           onClose={() => setEditing(null)}
           onSet={patch => setOverride(editing.iso, patch)}
           onClear={() => clearDay(editing.iso)}
@@ -530,7 +590,7 @@ export default function RotationTab({ S, update, isMobile }) {
  * expanding a cell in place would reflow the month under the finger
  * that just tapped it.
  */
-function DayEditor({ day, schedule, onClose, onSet, onClear }) {
+function DayEditor({ day, schedule, onClose, onSet, onClear, rawEdited = day.edited, derived = null, plan = null }) {
   // What the pattern would say with nothing overridden — so the editor
   // can show what you are deviating FROM, and offer a way back.
   const [y, m, d] = day.iso.split('-').map(Number);
@@ -548,6 +608,12 @@ function DayEditor({ day, schedule, onClose, onSet, onClear }) {
               Pattern: {base.shift === 'off' ? 'Off' : base.shift === 'night' ? `Night ${base.shiftNum}` : `Day ${base.shiftNum}`}
               {' · '}{base.session}
             </div>
+            {plan && !rawEdited && (plan.source === 'done' || plan.source === 'dynamic' || plan.missed) && (
+              <div className={`upg-day-plan is-${plan.missed ? 'missed' : plan.source}`} data-testid="day-plan">
+                <span className="upg-mark" aria-hidden="true">{plan.source === 'done' ? '✓' : plan.missed ? '–' : '↻'}</span>
+                {plan.why}. Pick a session below to pin it by hand — yours always wins.
+              </div>
+            )}
           </div>
           <button type="button" className="link-del-btn" onClick={onClose} aria-label="Close">✕</button>
         </div>
@@ -558,7 +624,7 @@ function DayEditor({ day, schedule, onClose, onSet, onClear }) {
             {SESSION_OPTIONS.map(s => (
               <button key={s} type="button"
                       className={'upg-opt' + (day.session === s ? ' is-on' : '')}
-                      onClick={() => onSet({ session: s === base.session ? null : s })}>{s}</button>
+                      onClick={() => onSet({ session: s === base.session && !derived ? null : s })}>{s}</button>
             ))}
           </div>
         </div>
@@ -589,8 +655,8 @@ function DayEditor({ day, schedule, onClose, onSet, onClear }) {
         </div>
 
         <div className="upg-day-actions">
-          {day.edited && (
-            <button type="button" className="upg-textbtn" onClick={onClear}>Reset to pattern</button>
+          {rawEdited && (
+            <button type="button" className="upg-textbtn" onClick={onClear}>{derived || (plan && plan.source === 'dynamic') ? 'Clear my edit' : 'Reset to pattern'}</button>
           )}
           <button type="button" className="link-open-btn" onClick={onClose}>Done</button>
         </div>
