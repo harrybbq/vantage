@@ -11,6 +11,16 @@ const TOKEN_URL = 'https://api.prod.whoop.com/oauth/oauth2/token';
 const KJ_TO_KCAL = 1 / 4.184;
 const dayOf = iso => (iso || '').slice(0, 10);
 
+// 'YYYY-MM-DDTHH:MM' wall clock where the workout happened, from WHOOP's
+// UTC start plus its timezone_offset ('+01:00'); UTC when no offset.
+function localStart(iso, offset) {
+  const t = Date.parse(iso || '');
+  if (!Number.isFinite(t)) return null;
+  const m = /^([+-])(\d{2}):?(\d{2})$/.exec(String(offset || ''));
+  const shift = m ? (m[1] === '-' ? -1 : 1) * (Number(m[2]) * 60 + Number(m[3])) * 60000 : 0;
+  return new Date(t + shift).toISOString().slice(0, 16);
+}
+
 function sb(path, opts, env) {
   return fetch(`${env.SUPABASE_URL}/rest/v1/${path}`, {
     ...opts,
@@ -202,10 +212,14 @@ function mapWhoop({ recoveries = [], sleeps = [], workouts = [], cycles = [] }) 
     if (!d || !kj) continue;
     const kcal = Math.round(kj * KJ_TO_KCAL);
     if (kcal <= 0) continue;
+    const start = localStart(w.start, w.timezone_offset);
     (burn[d] = burn[d] || []).push({
       id: `whoop-${w.id || d + '-' + (burn[d]?.length || 0)}`,
       label: 'WHOOP workout',
       kcal,
+      // Local wall clock it started at, so a 3:30am session after a night
+      // shift can count for the shift's day (src/lib/rotation/trainingDay.js).
+      ...(start ? { start } : {}),
     });
   }
 
@@ -269,4 +283,4 @@ function mergeWhoopIntoState(state, vitals, burn) {
   return { ...state, vitalsLog, burnLog, whoopConnected: true };
 }
 
-module.exports = { sb, getFreshToken, whoopList, whoopReason, mapWhoop, fetchWhoopData, mergeWhoopIntoState };
+module.exports = { sb, getFreshToken, whoopList, whoopReason, mapWhoop, fetchWhoopData, mergeWhoopIntoState, localStart };

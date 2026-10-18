@@ -17,6 +17,10 @@
  *     "moved" mark where the plan has moved a session off the rota.
  *   · this week as a strip: Mon–Sun, the planned session, a dot on days
  *     something was lifted, today ringed.
+ *   · in the early hours after a night shift `today` is the shift's day
+ *     (lib/rotation/trainingDay.js) and `nightOf` says so: the eyebrow
+ *     reads "Counts for Tuesday's night shift" so a 3:30am Wednesday
+ *     session plainly lands on Tuesday.
  * Nothing here writes to the rota; the gym switch writes S.lifts.lastGym.
  */
 import { useMemo, useState } from 'react';
@@ -28,7 +32,10 @@ import { SEQ } from '../../../lib/rotation/pattern';
 
 const SHORT = { Push: 'Push', Pull: 'Pull', Legs: 'Legs', Upper: 'Upr', Lower: 'Lwr', Extra: 'Any' };
 
-export default function WorkoutToday({ S, today, now, active, onStart, onBuild, onResume, onDiscard, gyms = [], gym = null, onGym, gymName = id => id }) {
+const DOW = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+const dowOf = iso => { const [y, m, d] = iso.split('-').map(Number); return DOW[new Date(Date.UTC(y, m - 1, d)).getUTCDay()]; };
+
+export default function WorkoutToday({ S, today, nightOf = null, now, active, onStart, onBuild, onResume, onDiscard, gyms = [], gym = null, onGym, gymName = id => id }) {
   const sug = useMemo(() => suggestWorkout(S, today, { gym }), [S, today, gym]);
   const week = useMemo(() => weekStrip(S, today), [S, today]);
   const next = useMemo(() => planStrip(S, today, 5), [S, today]);
@@ -56,7 +63,7 @@ export default function WorkoutToday({ S, today, now, active, onStart, onBuild, 
         </section>
       ) : (
         <section className="wk-card wk-sug" aria-labelledby="wk-sug-name" data-testid="wk-suggested">
-          <span className="sec-eyebrow">// Suggested workout for today</span>
+          <span className="sec-eyebrow" data-testid="wk-eyebrow">{nightOf ? `// Counts for ${dowOf(nightOf)}'s night shift` : '// Suggested workout for today'}</span>
           <div className="wk-sug-head">
             <h3 id="wk-sug-name" className="wk-sug-name">{sug.name}</h3>
             {sug.plan && sug.plan.source === 'dynamic' && <span className="lf-tag wk-moved-tag"><Icon name="repeat" size={11} /> moved</span>}

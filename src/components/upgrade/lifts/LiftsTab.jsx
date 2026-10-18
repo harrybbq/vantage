@@ -51,6 +51,7 @@ import {
 } from '../../../lib/lifts/store';
 import { pbMessage, pbKinds, setText, shortLiftName } from '../../../lib/lifts/lifts';
 import { shiftOn } from '../../../lib/rotation/pattern';
+import { trainingDayOf } from '../../../lib/rotation/trainingDay';
 import {
   activeOf, startWorkout, suggestedStart, discardWorkout, summariseWorkout, finishWorkout, saveTemplate, templateFromSession,
 } from '../../../lib/lifts/workout';
@@ -59,7 +60,12 @@ import './lifts.css';
 import './workout.css';
 
 export default function LiftsTab({ S, update, hydrated = true }) {
-  const today = todayIso();
+  // The training day, not the calendar day: a 3:30am session after a
+  // night shift belongs to the shift's day — its plan, its 80% load, and
+  // the date its sets and workout are saved under (trainingDay.js).
+  const calendarToday = todayIso();
+  const today = trainingDayOf(S, new Date());
+  const nightOf = today !== calendarToday ? today : null;
   const { lifts, bwOf, summaries, totals, gyms, exists } = useLiftsData(S, today);
   const activeGymList = useMemo(() => gyms.filter(g => !g.archived), [gyms]);
   const curGym = defaultGym(lifts);
@@ -216,7 +222,7 @@ export default function LiftsTab({ S, update, hydrated = true }) {
 
   const logSheet = sheet && sheet.kind === 'log' && (
     <LogSheet entry={sheet.entry} liftId={sheet.liftId} lifts={lifts.list} pickList={pickList} log={lifts.log} bwOf={bwOf}
-              today={today} shiftOf={shiftOf} onClose={() => setSheet(null)} onSave={save} onDelete={del}
+              today={today} maxDate={calendarToday} shiftOf={shiftOf} onClose={() => setSheet(null)} onSave={save} onDelete={del}
               gyms={activeGymList} gym={active && active.gym ? active.gym : curGym} gymName={gymName} />
   );
 
@@ -235,7 +241,7 @@ export default function LiftsTab({ S, update, hydrated = true }) {
                      onToast={text => setToast({ text, n: Date.now() })} />
       ) : (
         <>
-          <WorkoutToday S={S} today={today} now={now} active={active} onStart={startSuggested} onBuild={buildOwn}
+          <WorkoutToday S={S} today={today} nightOf={nightOf} now={now} active={active} onStart={startSuggested} onBuild={buildOwn}
                         onResume={goWorkout} onDiscard={discard} gyms={activeGymList} gym={curGym} onGym={pickGym} gymName={gymName} />
           <div className="lf-bar">
             <div className="lf-bar-text">

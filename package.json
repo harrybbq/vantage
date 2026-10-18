@@ -77,7 +77,7 @@
     "check:homelines": "node src/lib/upgrade/homeLines.test.mjs && node src/lib/upgrade/booksView.test.mjs",
     "check:eventmemory": "node src/lib/calendar/eventMemory.test.mjs",
     "check:spans": "node src/lib/calendar/spans.test.mjs",
-    "check:rotation": "node src/lib/rotation/pattern.test.mjs",
+    "check:rotation": "node src/lib/rotation/pattern.test.mjs && node src/lib/rotation/trainingDay.test.mjs",
     "check:alerts": "node src/lib/security/explain.test.mjs && node netlify/lib/alertNotify.test.mjs && node netlify/lib/securityAgent.test.mjs",
     "check:aifree": "node netlify/lib/freeAllowance.test.mjs && node netlify/lib/aiFoodAllowance.test.mjs",
     "check:installprompt": "node src/lib/native/installPrompt.test.mjs",

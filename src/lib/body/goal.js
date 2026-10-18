@@ -48,7 +48,8 @@ export const MAX_SAFE_LOSS_FRACTION = 0.01;  // 1% of bodyweight per week
 
 import { bmrKcal, currentWeightKg } from '../burn.js';
 import { blendedDailyKcal } from '../diet/plan.js';
-import { plannedSessionsPerWeek, scheduleOf } from '../rotation/pattern.js';
+import { plannedSessionsPerWeek, scheduleOf, isRealIso } from '../rotation/pattern.js';
+import { dayBefore } from '../rotation/trainingDay.js';
 import { hasDeviceWorkout } from '../trackers/autoLog.js';
 
 /**
@@ -362,7 +363,14 @@ export function deviceWorkoutDays(S) {
   // The predicate lives in lib/trackers/autoLog.js, where a tracker rule
   // asks the same question. Two copies would let the training plan and
   // the calendar disagree about whether you trained that day.
-  for (const d of Object.keys(burn)) if (hasDeviceWorkout(S, d)) out.add(d);
+  // A night-shift session filed under the next morning counts for the
+  // day before (lib/rotation/trainingDay.js), which may have no entries
+  // of its own — so each filed day's eve is asked too.
+  for (const d of Object.keys(burn)) {
+    for (const day of isRealIso(d) ? [dayBefore(d), d] : [d]) {
+      if (!out.has(day) && hasDeviceWorkout(S, day)) out.add(day);
+    }
+  }
   return out;
 }
 

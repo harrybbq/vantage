@@ -37,6 +37,8 @@
  */
 import { recalcStreaks } from '../../utils/streaks.js';
 import { getWeekKey, countWeekLogs, trackerWeeklyCoins } from '../../utils/helpers.js';
+import { isRealIso } from '../rotation/pattern.js';
+import { trainingDayFor, wallClock, dayBefore, dayAfter } from '../rotation/trainingDay.js';
 
 /** The marker meaning "the user has spoken; hands off this cell". */
 export const MANUAL = 'manual';
@@ -56,13 +58,34 @@ export const BACKFILL_DAYS = 14;
  * This is the one definition; deviceWorkoutDays in lib/body/goal.js
  * reads it too, so the training plan and a tracker tick cannot come to
  * different conclusions about whether you trained.
+ *
+ * The day a workout counts for is not always the day it is filed under.
+ * Entries synced since Oct 2026 carry `start` (local wall clock), and a
+ * 3:30am session after a night shift counts for the shift's day — see
+ * lib/rotation/trainingDay.js. So a day is answered from its own entries
+ * and both neighbours'. The entry stays where it is: calories burned are
+ * still that calendar day's.
  */
+const isDeviceWorkout = e => {
+  const id = String((e && e.id) || '');
+  return /^(whoop|oura)-/.test(id) && !/steps/i.test(id);
+};
+
+/** The day a wearable workout filed under `filedDay` counts for. */
+export function deviceWorkoutDayOf(S, entry, filedDay) {
+  const at = wallClock(entry && entry.start);
+  return at ? trainingDayFor(S, at.iso, at.hour) : filedDay;
+}
+
 export function hasDeviceWorkout(S, day) {
-  const entries = (S && S.burnLog && S.burnLog[day]) || [];
-  return entries.some(e => {
-    const id = String((e && e.id) || '');
-    return /^(whoop|oura)-/.test(id) && !/steps/i.test(id);
-  });
+  const burn = (S && S.burnLog) || {};
+  if (!isRealIso(day)) return (burn[day] || []).some(isDeviceWorkout);
+  for (const filed of [dayBefore(day), day, dayAfter(day)]) {
+    for (const e of burn[filed] || []) {
+      if (isDeviceWorkout(e) && deviceWorkoutDayOf(S, e, filed) === day) return true;
+    }
+  }
+  return false;
 }
 
 /**

@@ -25,7 +25,7 @@ import {
 const ORDER = ['liftId', 'weight', 'reps', 'date', 'rpe', 'notes'];
 const RPES = ['6', '6.5', '7', '7.5', '8', '8.5', '9', '9.5', '10'];
 
-export default function LogSheet({ entry, liftId, lifts, pickList, log, bwOf, today, shiftOf, onClose, onSave, onDelete, gyms = [], gym: gym0 = null, gymName = id => id }) {
+export default function LogSheet({ entry, liftId, lifts, pickList, log, bwOf, today, maxDate = today, shiftOf, onClose, onSave, onDelete, gyms = [], gym: gym0 = null, gymName = id => id }) {
   const editing = !!(entry && entry.id);
   // The last set of a lift — at `gym` when the lift is a machine.
   const lastOf = (id, gym) => {
@@ -76,7 +76,7 @@ export default function LogSheet({ entry, liftId, lifts, pickList, log, bwOf, to
 
   const submit = ev => {
     ev.preventDefault();
-    const v = validateEntry({ ...f, weight: f.weight === '' ? null : f.weight, reps: f.reps === '' ? null : f.reps }, today);
+    const v = validateEntry({ ...f, weight: f.weight === '' ? null : f.weight, reps: f.reps === '' ? null : f.reps }, maxDate);
     setErrors(v.errors);
     if (!v.ok) {
       const first = ORDER.find(k => v.errors[k]);
@@ -128,7 +128,7 @@ export default function LogSheet({ entry, liftId, lifts, pickList, log, bwOf, to
             <Stepper id={id('r')} label="Reps" value={f.reps} onChange={v => set('reps', v.replace(/[^\d]/g, ''))} step={1} min={1} max={50} dataField="reps" />
           </Field>
           <Field label="Date" id={id('d')} error={errors.date}>
-            <input id={id('d')} data-field="date" type="date" max={today} value={f.date} onChange={e => set('date', e.target.value)} />
+            <input id={id('d')} data-field="date" type="date" max={maxDate} value={f.date} onChange={e => set('date', e.target.value)} />
           </Field>
           <Field label="RPE (optional)" id={id('rpe')} error={errors.rpe}>
             <select id={id('rpe')} data-field="rpe" value={f.rpe} onChange={e => set('rpe', e.target.value)}>
