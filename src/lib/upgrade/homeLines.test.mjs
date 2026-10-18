@@ -451,8 +451,8 @@ t('lifts: most recent PB, PBs this month, last logged', () => {
   ];
   const c = liftsCard({ lifts: { list: LIST, log }, vitalsLog: { '2026-10-01': { weight: 80 } }, today: LT });
   honest(c);
-  assert.equal(c.figure, '180 kg');
-  assert.equal(c.figureLabel, 'Leg press PB');
+  assert.equal(c.figure, '180 kg', 'the heaviest real set');
+  assert.equal(c.figureLabel, 'Leg press best');
   assert.equal(c.text, '2 PBs this month · last logged 2 d ago');
   assert.equal(c.state, 'neutral');
 });
@@ -460,12 +460,49 @@ t('lifts: dips read "+20 kg"; today and no-PB wording', () => {
   const log = [lset('dp', '2026-09-01', 15, 8), lset('dp', '2026-09-08', 20, 8)];
   const c = liftsCard({ lifts: { list: LIST, log }, vitalsLog: {}, today: '2026-09-08' });
   assert.equal(c.figure, '+20 kg');
-  assert.equal(c.figureLabel, 'Dip PB');
+  assert.equal(c.figureLabel, 'Dip best');
   assert.equal(c.text, '1 PB this month · last logged today');
   const flat = liftsCard({ lifts: { list: LIST, log: [lset('lp', '2026-09-01', 100, 8)] }, vitalsLog: {}, today: LT });
   assert.equal(flat.figure, '100 kg');
-  assert.equal(flat.figureLabel, 'Leg press · last set', 'one set is a baseline, not a PB');
+  assert.equal(flat.figureLabel, 'Leg press best', 'one set is a baseline — still the best real set');
   assert.equal(flat.text, 'No PBs yet this month · last logged 46 d ago');
+});
+t('lifts: the figure is a REAL set, never the estimated 1RM', () => {
+  // 170 × 12 has the higher e1RM (238) but 180 × 3 is the heavier real set
+  const log = [lset('lp', '2026-10-01', 180, 3), lset('lp', '2026-10-05', 170, 12)];
+  const c = liftsCard({ lifts: { list: LIST, log }, vitalsLog: {}, today: LT });
+  assert.equal(c.figure, '180 kg');
+  assert.ok(!/e1RM|est\. 1RM|estimat/i.test(`${c.figure} ${c.figureLabel} ${c.text}`), 'no estimate anywhere on the card');
+  // an e1RM-only improvement is not a PB: 180 × 4 after 180 × 3
+  const e1 = liftsCard({ lifts: { list: LIST, log: [lset('lp', '2026-10-01', 180, 3), lset('lp', '2026-10-05', 180, 4)] }, vitalsLog: {}, today: LT });
+  assert.equal(e1.text, 'No PBs yet this month · last logged 12 d ago');
+});
+t('lifts: rep-max PBs count; workouts this week replace "last logged" once there are any', () => {
+  const log = [lset('lp', '2026-10-01', 180, 3), lset('lp', '2026-10-02', 160, 8), lset('lp', '2026-10-13', 170, 8, { sessionId: 'w1' })];   // 170 × 8 beats the 8RM
+  const sessions = [
+    { id: 'w0', date: '2026-10-08', exercises: [] },            // last week
+    { id: 'w1', date: '2026-10-13', exercises: [{ liftId: 'lp', sets: [{ reps: 8, weight: 170, done: true }] }] },
+    { id: 'w2', date: '2026-10-15', exercises: [] },
+  ];
+  const c = liftsCard({ lifts: { list: LIST, log, sessions }, vitalsLog: {}, today: LT });
+  assert.equal(c.figure, '180 kg');
+  assert.equal(c.figureLabel, 'Leg press best');
+  assert.equal(c.text, '2 workouts this week · 1 PB this month');
+  assert.equal(c.state, 'neutral');
+});
+t('lifts: a workout in progress is attention, with its minutes', () => {
+  const active = { id: 'wk', date: LT, startedAt: 1_000_000, name: 'Legs', exercises: [
+    { liftId: 'lp', sets: [{ reps: 8, weight: 170, done: true }, { reps: 8, weight: 170, done: true }, { reps: 8, weight: 170, done: false }] },
+  ] };
+  const c = liftsCard({ lifts: { list: LIST, log: [lset('lp', '2026-10-01', 180, 3)], active }, vitalsLog: {}, today: LT, now: 1_000_000 + 23 * 60_000 + 30_000 });
+  honest(c);
+  assert.equal(c.state, 'attention');
+  assert.equal(c.figure, '23 min');
+  assert.equal(c.figureLabel, 'Legs in progress');
+  assert.equal(c.text, 'Workout in progress · 23 min · 2 sets done');
+  assert.equal(worstState([c, rotationCard({}, '2026-10-02')]), 'attention', 'an open workout does colour the hero');
+  const none = liftsCard({ lifts: { list: LIST, log: [], active: null }, vitalsLog: {}, today: LT, now: 0 });
+  assert.equal(none.figure, 'Log a lift', 'active: null is no workout');
 });
 t('lifts: the card never colours the hero', () => {
   const c = liftsCard({ lifts: { list: LIST, log: [lset('lp', '2026-10-01', 100, 8), lset('lp', '2026-10-02', 110, 8)] }, today: LT });

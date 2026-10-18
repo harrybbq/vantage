@@ -178,7 +178,17 @@ export function useHomeLines(S, userId) {
   const books = useBooksCard();
   const liftStore = S && S.lifts;
   const vitals = S && S.vitalsLog;
-  const lifts = useMemo(() => liftsCard({ lifts: liftStore, vitalsLog: vitals, today }), [liftStore, vitals, today]);
+  // A workout in progress shows its minutes, so the card ticks once a
+  // minute — only while one is open; otherwise nothing runs.
+  const inProgress = !!(liftStore && liftStore.active);
+  const [minute, setMinute] = useState(() => Date.now());
+  useEffect(() => {
+    if (!inProgress) return undefined;
+    setMinute(Date.now());
+    const t = setInterval(() => setMinute(Date.now()), 30_000);
+    return () => clearInterval(t);
+  }, [inProgress]);
+  const lifts = useMemo(() => liftsCard({ lifts: liftStore, vitalsLog: vitals, today, now: minute }), [liftStore, vitals, today, minute]);
 
   return useMemo(() => {
     const cards = { career, diet, rotation, security: security.card, books, lifts };

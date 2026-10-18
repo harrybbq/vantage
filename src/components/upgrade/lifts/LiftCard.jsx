@@ -1,12 +1,13 @@
 /**
- * One lift in the list: name, best e1RM, heaviest set, × bodyweight
+ * One lift in the list: name, heaviest real set, the estimated 1RM
+ * (labelled as an estimate — it is a trend, never a PB), × bodyweight
  * where that means something, a 26-week e1RM sparkline, last logged.
  * The card body opens the lift; "Log" is a sibling button (never nested
  * inside the open button), so both are reachable by keyboard.
  */
 import Icon from '../../Icon';
 import { Spark } from './parts';
-import { dayNo, daysBetween, fmtE1rm, setText, bannedRule, BANNED_NOTE, LOAD_LABEL } from '../../../lib/lifts/lifts';
+import { dayNo, daysBetween, fmtE1rm, fmtKg, setText, bannedRule, BANNED_NOTE, LOAD_LABEL } from '../../../lib/lifts/lifts';
 
 export const agoText = (iso, today) => {
   const d = daysBetween(iso, today);
@@ -31,8 +32,8 @@ export default function LiftCard({ s, today, onOpen, onLog }) {
   const best = pb.bestE1rm;
   const label = [
     `Open ${lift.name}`,
-    best ? `best e1RM ${fmtE1rm(best.value)} kg` : 'no e1RM yet',
     pb.heaviest ? `heaviest ${setText(pb.heaviest.entry, lift)}` : null,
+    best ? `estimated 1RM about ${fmtE1rm(best.value)} kg` : null,
     ratio ? `${ratio} times bodyweight` : null,
     last ? `last logged ${agoText(last.date, today)}` : 'no sets yet',
   ].filter(Boolean).join(', ');
@@ -49,12 +50,12 @@ export default function LiftCard({ s, today, onOpen, onLog }) {
           <>
             <span className="lf-card-figs">
               <span className="lf-fig">
-                <span className="lf-fig-lbl">Best e1RM</span>
-                <span className="lf-fig-val">{best ? <>{best.low ? '≈' : ''}{fmtE1rm(best.value)}<small> kg</small></> : '—'}</span>
+                <span className="lf-fig-lbl">Heaviest</span>
+                <span className="lf-fig-val">{pb.heaviest ? <>{lift.load === 'bodyweight_plus' ? (Number(pb.heaviest.entry.weight) ? `+${fmtKg(pb.heaviest.entry.weight)}` : 'BW') : fmtKg(pb.heaviest.entry.weight)}<small> {lift.load === 'per_hand' ? 'kg/hand' : lift.load === 'bodyweight_plus' && !Number(pb.heaviest.entry.weight) ? '' : 'kg'} × {pb.heaviest.entry.reps}</small></> : '—'}</span>
               </span>
               <span className="lf-fig">
-                <span className="lf-fig-lbl">Heaviest</span>
-                <span className="lf-fig-val is-set">{pb.heaviest ? setText(pb.heaviest.entry, lift) : '—'}</span>
+                <span className="lf-fig-lbl">Est. 1RM</span>
+                <span className="lf-fig-val is-set">{best ? `${best.low ? '≈' : '~'}${fmtE1rm(best.value)} kg` : '—'}</span>
               </span>
               {ratio != null && (
                 <span className="lf-fig">

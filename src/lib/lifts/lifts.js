@@ -19,15 +19,26 @@
  *                    (it still counts for heaviest and the rep maxes).
  *   per_hand         shown per dumbbell; e1RM is on the per-hand weight.
  *
- * ── What counts as a PB ──────────────────────────────────────────────
- * Raw weight, always. A night-shift set (the programme runs nights at
- * 80% load) is tagged so it never reads as regression, but it is never
- * scaled up: a PB is what was on the bar.
- *   bestE1rm   highest e1RM (needs a bodyweight for bodyweight_plus)
- *   heaviest   heaviest weight (the added load for bodyweight_plus)
+ * ── What counts as a PB (owner decision, Oct 2026: REAL SETS ONLY) ───
+ * A PB is a set that was actually lifted, never a number worked out
+ * from one. A night-shift set (the programme runs nights at 80% load)
+ * is tagged so it never reads as regression, but it is never scaled
+ * up: a PB is what was on the bar.
+ *   heaviest   heaviest weight lifted, any reps
  *   repMaxes   N-rep max = heaviest weight lifted for ≥ N reps
+ *              (N ∈ 1/3/5/8/10/12; the 1RM is the heaviest, so it is
+ *              only named separately when heaviest isn't)
+ * Bodyweight-plus (dips) compares the TOTAL load when every set of the
+ * lift has a bodyweight reading within 14 days, else the added weight —
+ * one basis per lift, so two sets are never compared on different
+ * scales (`basis` on the result says which). Per-hand compares the
+ * weight of one dumbbell.
  * A PB must BEAT something: strictly greater, so a tie is not a PB, and
  * the first set of a lift is a baseline, not a PB.
+ *
+ * Estimated 1RM (Epley) is kept as a TREND — the chart line, "est. 1RM
+ * ~241 kg" — and is never a PB anywhere: not here, not in a badge, not
+ * in a celebration, not on the home card.
  */
 import { BANNED_LIFTS } from '../../data/trainingProgramme.js';
 
@@ -160,85 +171,117 @@ export function entriesFor(log, lift) {
   return (Array.isArray(log) ? log : []).filter(e => valid(e) && e.liftId === lift.id).sort(chrono);
 }
 
-// ── Personal bests ─────────────────────────────────────────────────
+// ── Personal bests (real sets only) ─────────────────────────────────
 
-function emptyBests() {
+/**
+ * Which load a lift's PBs are compared on: 'total' (bodyweight + added)
+ * for a dip when every one of `sets` has a bodyweight, else 'weight'
+ * (the logged number — added load for a dip, one dumbbell per hand).
+ */
+export function pbBasis(sets, lift, bwOf) {
+  if (!lift || lift.load !== 'bodyweight_plus' || !bwOf) return 'weight';
+  const list = (sets || []).filter(Boolean);
+  if (!list.length) return 'weight';
+  return list.every(e => { const b = bwKg(bwOf, e.date); return b != null && b > 0; }) ? 'total' : 'weight';
+}
+/** The load a set's PBs are judged on, under `basis`. */
+export function pbLoad(entry, lift, basis, bwOf) {
+  const w = num(entry && entry.weight);
+  if (w == null) return null;
+  if (basis !== 'total') return w;
+  const bw = bwKg(bwOf, entry.date);
+  return bw == null ? w : bw + w;
+}
+
+function emptyBests(basis = 'weight') {
   const repMaxes = {};
   for (const n of REP_MAX_NS) repMaxes[n] = null;
-  return { bestE1rm: null, heaviest: null, repMaxes };
+  return { heaviest: null, repMaxes, repLoads: {}, bestE1rm: null, basis };
 }
 /** Fold one set into running bests (mutates `pb`). Ties keep the earlier set. */
 function fold(pb, e, lift, bwOf) {
-  const w = num(e.weight), r = num(e.reps);
+  const r = num(e.reps);
+  const load = pbLoad(e, lift, pb.basis, bwOf);
+  // The e1RM estimate rides along for the trend tiles — it is NOT a PB.
   const bw = bwKg(bwOf, e.date);
   const v = entryE1rm(e, lift, bw);
   if (v != null && (!pb.bestE1rm || v > pb.bestE1rm.value + EPS)) {
     pb.bestE1rm = { value: v, entry: e, low: isLowConfidence(r), bodyweight: bw };
   }
-  // Heaviest is by weight; at equal weight the set with more reps is the
+  // Heaviest is by load; at equal load the set with more reps is the
   // one worth showing (it is not a new PB — see isNewPB).
-  if (!pb.heaviest || w > pb.heaviest.value + EPS || (Math.abs(w - pb.heaviest.value) <= EPS && r > num(pb.heaviest.entry.reps))) {
-    pb.heaviest = { value: w, entry: e };
+  if (!pb.heaviest || load > pb.heaviest.value + EPS || (Math.abs(load - pb.heaviest.value) <= EPS && r > num(pb.heaviest.entry.reps))) {
+    pb.heaviest = { value: load, entry: e };
   }
   for (const n of REP_MAX_NS) {
-    if (r >= n && (!pb.repMaxes[n] || w > num(pb.repMaxes[n].weight) + EPS)) pb.repMaxes[n] = e;
+    if (r >= n && (!pb.repMaxes[n] || load > pb.repLoads[n] + EPS)) { pb.repMaxes[n] = e; pb.repLoads[n] = load; }
   }
 }
 
 /**
- * → { bestE1rm: { value, entry, low, bodyweight } | null,
- *     heaviest: { value, entry } | null,
- *     repMaxes: { 1, 3, 5, 8, 10, 12 → entry | null } }
+ * → { heaviest: { value, entry } | null,
+ *     repMaxes: { 1, 3, 5, 8, 10, 12 → entry | null },
+ *     repLoads: { N → load compared }, basis: 'weight'|'total',
+ *     bestE1rm: { value, entry, low, bodyweight } | null }   ← an ESTIMATE, not a PB
  * opts.bwOf: iso → kg | { kg } | null (makeBwOf), for bodyweight_plus.
+ * opts.basis forces the comparison basis (isNewPB judges a candidate on
+ * the basis of the whole lift including it).
  */
 export function personalBests(log, lift, opts = {}) {
-  const pb = emptyBests();
-  for (const e of entriesFor(log, lift)) fold(pb, e, lift, opts.bwOf);
+  const sets = entriesFor(log, lift);
+  const pb = emptyBests(opts.basis || pbBasis(sets, lift, opts.bwOf));
+  for (const e of sets) fold(pb, e, lift, opts.bwOf);
   return pb;
 }
 
+/** True when `res` (isNewPB / a pbTimeline event) beat a real-set record. */
+export const isRealPB = res => !!res && (!!res.heaviest || (res.repMaxes || []).length > 0);
+
 /**
- * Which PBs `entry` sets against every OTHER set of the lift in
+ * Which real-set PBs `entry` sets against every OTHER set of the lift in
  * `prevLog` (the entry's own id is ignored, so an edit is judged against
  * the rest, not itself). Strictly greater only: a tie is not a PB, and a
  * lift's first set is a baseline.
- * → { first, e1rm, heaviest, repMaxes: [N…], any, value }
+ * → { first, heaviest, repMaxes: [N…], any, value, basis }
+ * `value` is the set's estimated 1RM, for display — it plays no part in `any`.
  */
 export function isNewPB(prevLog, entry, lift, opts = {}) {
   const others = (Array.isArray(prevLog) ? prevLog : []).filter(e => e && e.id !== entry.id);
-  const pb = personalBests(others, lift, opts);
+  const mine = entriesFor(others, lift);
+  const basis = pbBasis([...mine, entry], lift, opts.bwOf);
+  const pb = personalBests(mine, lift, { ...opts, basis });
   const first = !pb.heaviest;
   const value = entryE1rm(entry, lift, bwKg(opts.bwOf, entry.date));
-  const out = { first, e1rm: false, heaviest: false, repMaxes: [], any: false, value };
-  const w = num(entry.weight), r = num(entry.reps);
-  if (first || w == null || r == null || r < 1) return out;
-  out.e1rm = value != null && !!pb.bestE1rm && value > pb.bestE1rm.value + EPS;
-  out.heaviest = w > pb.heaviest.value + EPS;
-  out.repMaxes = REP_MAX_NS.filter(n => r >= n && pb.repMaxes[n] && w > num(pb.repMaxes[n].weight) + EPS);
-  out.any = out.e1rm || out.heaviest || out.repMaxes.length > 0;
+  const out = { first, heaviest: false, repMaxes: [], any: false, value, basis };
+  const r = num(entry.reps);
+  const load = pbLoad(entry, lift, basis, opts.bwOf);
+  if (first || load == null || r == null || r < 1) return out;
+  out.heaviest = load > pb.heaviest.value + EPS;
+  out.repMaxes = REP_MAX_NS.filter(n => r >= n && pb.repMaxes[n] && load > pb.repLoads[n] + EPS);
+  out.any = isRealPB(out);
   return out;
 }
 
 /**
- * Sets that were a PB WHEN THEY WERE LIFTED, oldest first:
- * [{ entry, e1rm, heaviest, repMaxes }]. This is what the chart marks and
+ * Sets that were a real-set PB WHEN THEY WERE LIFTED, oldest first:
+ * [{ entry, heaviest, repMaxes }]. This is what the chart marks gold and
  * what the home card counts. (isNewPB judges against all other sets,
  * which differs only for a back-dated entry.)
  */
 export function pbTimeline(log, lift, opts = {}) {
-  const pb = emptyBests();
+  const sets = entriesFor(log, lift);
+  const pb = emptyBests(pbBasis(sets, lift, opts.bwOf));
   const out = [];
-  for (const e of entriesFor(log, lift)) {
+  for (const e of sets) {
     if (pb.heaviest) {
-      const w = num(e.weight), r = num(e.reps);
-      const v = entryE1rm(e, lift, bwKg(opts.bwOf, e.date));
+      const r = num(e.reps);
+      const load = pbLoad(e, lift, pb.basis, opts.bwOf);
       const ev = {
         entry: e,
-        e1rm: v != null && !!pb.bestE1rm && v > pb.bestE1rm.value + EPS,
-        heaviest: w > pb.heaviest.value + EPS,
-        repMaxes: REP_MAX_NS.filter(n => r >= n && pb.repMaxes[n] && w > num(pb.repMaxes[n].weight) + EPS),
+        heaviest: load > pb.heaviest.value + EPS,
+        repMaxes: REP_MAX_NS.filter(n => r >= n && pb.repMaxes[n] && load > pb.repLoads[n] + EPS),
       };
-      if (ev.e1rm || ev.heaviest || ev.repMaxes.length) out.push(ev);
+      if (isRealPB(ev)) out.push(ev);
     }
     fold(pb, e, lift, opts.bwOf);
   }
@@ -248,7 +291,8 @@ export function pbTimeline(log, lift, opts = {}) {
 // ── Trend ──────────────────────────────────────────────────────────
 
 /**
- * e1RM over time, best set per day → { series, current, change4w, change12w }.
+ * Estimated 1RM over time, best set per day → { series, current, change4w, change12w }.
+ * A trend, not a record: nothing here is a PB.
  *   series     [{ date, value, entry, night }] oldest first; `weeks` keeps
  *              only the last N weeks (omit for all of it)
  *   current    best e1RM in the 28 days to `today` ("form"), or null
@@ -321,6 +365,8 @@ export function fmtKg(v, dp = 1) {
 }
 /** e1RM to the nearest kg. */
 export const fmtE1rm = v => (num(v) == null ? '—' : String(Math.round(num(v))));
+/** Every e1RM the owner reads says it is an estimate: "est. 1RM ~241 kg" (≈ past 12 reps). */
+export const estText = (v, low = false) => (num(v) == null ? 'est. 1RM —' : `est. 1RM ${low ? '≈' : '~'}${fmtE1rm(v)} kg`);
 
 /** The weight of a set as the lift reads it: "180 kg", "+20 kg", "BW", "32 kg/hand". */
 export function weightText(entry, lift) {
@@ -339,13 +385,26 @@ export function shortLiftName(name) {
   return s ? s[0].toUpperCase() + s.slice(1) : '';
 }
 
-/** "New PB: Leg press 180 kg × 6 (e1RM 216 kg)" */
-export function pbMessage(entry, lift, value) {
-  const e = num(value) != null ? ` (e1RM ${fmtE1rm(value)} kg)` : '';
-  return `New PB: ${shortLiftName(lift && lift.name)} ${setText(entry, lift)}${e}`;
+/** "New PB: Leg press 180 kg × 6" — the real set, nothing estimated. */
+export function pbMessage(entry, lift) {
+  return `New PB: ${shortLiftName(lift && lift.name)} ${setText(entry, lift)}`;
 }
-/** Which PBs, in words: ["e1RM", "heaviest", "5RM"]. */
+/**
+ * Which real-set PBs, in words: ["heaviest", "5RM"]. The 1RM is the
+ * heaviest weight for ≥ 1 rep, so beside `heaviest` it would say the
+ * same thing twice and is left out.
+ */
 export function pbKinds(res) {
   if (!res) return [];
-  return [res.e1rm && 'e1RM', res.heaviest && 'heaviest', ...(res.repMaxes || []).map(n => `${n}RM`)].filter(Boolean);
+  const reps = (res.repMaxes || []).filter(n => !(res.heaviest && n === 1));
+  return [res.heaviest && 'heaviest', ...reps.map(n => `${n}RM`)].filter(Boolean);
+}
+/** The short words for a PB set: "heaviest ever", "new 8RM", or both. */
+export function pbHeadline(res) {
+  if (!res) return '';
+  const reps = (res.repMaxes || []).filter(n => n > 1);
+  const top = reps.length ? reps[reps.length - 1] : null;
+  if (res.heaviest) return top ? `heaviest ever · new ${top}RM` : 'heaviest ever';
+  if (top) return `new ${top}RM`;
+  return (res.repMaxes || []).includes(1) ? 'new 1RM' : '';
 }

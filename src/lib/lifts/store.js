@@ -2,8 +2,14 @@
  * Lifts — the `S.lifts` store and every write to it.
  *
  *   S.lifts = {
- *     list: [{ id, name, load: 'weight'|'bodyweight_plus'|'per_hand', unit: 'kg', archived?: true, createdAt }],
- *     log:  [{ id, liftId, date: 'YYYY-MM-DD', weight, reps, notes?, rpe?, shift?, createdAt }],
+ *     list: [{ id, name, load: 'weight'|'bodyweight_plus'|'per_hand', unit: 'kg', archived?: true, createdAt,
+ *              muscles?: string[] }],
+ *     log:  [{ id, liftId, date: 'YYYY-MM-DD', weight, reps, notes?, rpe?, shift?, createdAt, sessionId? }],
+ *     // the workout logger (workout.js) — all additive:
+ *     sessions?:  finished workouts, newest last (at most 400; the log is never trimmed)
+ *     active?:    the workout in progress, or null
+ *     templates?: [{ id, name, exercises: [{ liftId, sets, reps? }] }]
+ *     restSec?:   the rest timer length last chosen
  *   }
  *
  * DATA SAFETY (CLAUDE.md #1). `lifts` is a NEW key: nothing existing is
@@ -149,13 +155,15 @@ const cleanName = s => String(s || '').replace(/\s+/g, ' ').trim();
 const sameName = (a, b) => cleanName(a).toLowerCase() === cleanName(b).toLowerCase();
 
 /** → { ok, lifts, error?, id? } */
-export function addLift(lifts, { name, load }, { id, now = 0 } = {}) {
+export function addLift(lifts, { name, load, muscles }, { id, now = 0 } = {}) {
   const n = cleanName(name);
   if (!n) return { ok: false, lifts, error: 'Give it a name' };
   if (n.length > LIMITS.name) return { ok: false, lifts, error: `Names are up to ${LIMITS.name} characters` };
   if (!LOAD_TYPES.includes(load)) return { ok: false, lifts, error: 'Pick how it is loaded' };
   if ((lifts.list || []).some(l => sameName(l.name, n))) return { ok: false, lifts, error: 'You already have a lift with that name' };
   const lift = { id, name: n, load, unit: 'kg', createdAt: now };
+  const ms = Array.isArray(muscles) ? [...new Set(muscles.filter(m => typeof m === 'string' && m.trim()).map(m => m.trim()))].slice(0, 12) : [];
+  if (ms.length) lift.muscles = ms;
   return { ok: true, id, lifts: { ...lifts, list: [...(lifts.list || []), lift] } };
 }
 

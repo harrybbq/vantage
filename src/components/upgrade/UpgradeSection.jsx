@@ -14,7 +14,7 @@
  *              (formerly "Review"; the old id still opens it)
  *   Books    — money in and out for Vantage: ledger, imports, bills
  *              (its data is server-only, never in S — see BooksTab)
- *   Lifts    — personal bests on the main lifts (S.lifts, additive)
+ *   Lifts    — a workout logger + real-set personal bests (S.lifts, additive)
  *
  * It opens on a home menu (UpgradeHome): a large title and one card per
  * section with a live line, rather than a tab strip — Upgrade is a small
