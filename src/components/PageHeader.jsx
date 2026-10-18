@@ -3,6 +3,7 @@ import Logo from './Logo';
 import Icon from './Icon';
 import { useWeather, weatherGlyph } from '../hooks/useWeather';
 import { usePendingCount } from '../lib/friends/usePendingCount';
+import { useUnreadTotal } from '../lib/friends/useUnreadTotal';
 import { coinsTodayLabel } from '../lib/coins/daily';
 import { ledgerRows } from '../lib/coins/ledger';
 
@@ -56,6 +57,31 @@ function RequestsChip({ userId, nudge, onOpen }) {
       aria-label={`${count} friend request${count === 1 ? '' : 's'} waiting`}
     >
       <Icon name="user-plus" size={14} />
+      <span className="header-requests-n">{count > 9 ? '9+' : count}</span>
+    </button>
+  );
+}
+
+/**
+ * Unread direct messages — beside the requests chip, same rules: absent
+ * at zero, opens the friends rail, and asks it to show the Messages tab.
+ */
+function MessagesChip({ userId, onOpen }) {
+  const count = useUnreadTotal(userId);
+  if (!count) return null;
+  const label = `${count} unread message${count === 1 ? '' : 's'}`;
+  return (
+    <button
+      type="button"
+      className="header-requests"
+      onClick={() => {
+        onOpen?.();
+        try { window.dispatchEvent(new CustomEvent('vantage:friends-tab', { detail: 'messages' })); } catch { /* old browsers */ }
+      }}
+      title={label}
+      aria-label={label}
+    >
+      <Icon name="mail" size={14} />
       <span className="header-requests-n">{count > 9 ? '9+' : count}</span>
     </button>
   );
@@ -334,6 +360,7 @@ export default function PageHeader({
       {/* Requests, then the canvas menu, then the wallet — left to right,
           asking / adjusting / reporting. */}
       <RequestsChip userId={userId} nudge={requestNudge} onOpen={onOpenRequests} />
+      <MessagesChip userId={userId} onOpen={onOpenRequests} />
 
       <BackgroundMenu
         hasBg={!!onRemoveBg}

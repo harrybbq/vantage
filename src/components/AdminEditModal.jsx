@@ -116,7 +116,7 @@ export default function AdminEditModal({ open, target, userId, S, update, onClos
     <div className="modal-overlay open" {...backdropClose(() => onClose())}>
       <div className="modal" style={{ maxWidth: 420 }}>
         <div style={{
-          fontFamily: 'var(--mono)', fontSize: 10, letterSpacing: 1.6,
+          fontFamily: 'var(--mono)', fontSize: 'var(--fs-floor)', letterSpacing: 1.6,
           textTransform: 'uppercase', color: 'var(--gold, #c8970a)', fontWeight: 700,
           marginBottom: 4,
         }}>// ADMIN · OWNER ONLY</div>
@@ -153,13 +153,13 @@ export default function AdminEditModal({ open, target, userId, S, update, onClos
                 </div>
               ))}
             </div>
-            <p style={{ fontFamily: 'var(--mono)', fontSize: 10, color: 'var(--text-muted)', marginTop: 12, lineHeight: 1.5 }}>
+            <p style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-floor)', color: 'var(--text-muted)', marginTop: 12, lineHeight: 1.5 }}>
               Writes profiles.* directly. The next server recompute (≈30 s after a rating-relevant edit) will overwrite this with the derived value.
             </p>
           </>
         )}
 
-        {error && <div style={{ color: 'rgb(220,60,60)', fontFamily: 'var(--mono)', fontSize: 11 }}>{error}</div>}
+        {error && <div style={{ color: 'rgb(220,60,60)', fontFamily: 'var(--mono)', fontSize: 'var(--fs-floor)' }}>{error}</div>}
 
         <div className="modal-actions">
           <button className="btn btn-ghost" onClick={onClose}>Cancel</button>

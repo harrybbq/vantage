@@ -153,8 +153,8 @@ export default function SelfCheck({
       <div className="modal-overlay open" {...backdropClose(() => onClose())}>
         <div className="modal" style={{ maxWidth: 460 }}>
           <div style={{
-            fontFamily: 'var(--mono)', fontSize: 10, letterSpacing: 1.6,
-            textTransform: 'uppercase', color: 'var(--em)', fontWeight: 700,
+            fontFamily: 'var(--mono)', fontSize: 'var(--fs-floor)', letterSpacing: 1.6,
+            textTransform: 'uppercase', color: 'var(--em-text)', fontWeight: 700,
             marginBottom: 4,
           }}>// {completeEyebrow}</div>
           <h2 style={{
@@ -163,7 +163,7 @@ export default function SelfCheck({
             color: 'var(--text)', letterSpacing: -1,
           }}>{result}</h2>
           <p style={{
-            fontFamily: 'var(--mono)', fontSize: 11, letterSpacing: 0.6,
+            fontFamily: 'var(--mono)', fontSize: 'var(--fs-floor)', letterSpacing: 0.6,
             color: 'var(--text-muted)', margin: '0 0 16px',
           }}>
             {correct}/{total} correct · {feedsLabel}
@@ -191,11 +191,11 @@ export default function SelfCheck({
       <div className="modal" style={{ maxWidth: 520 }}>
         <div style={{
           display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-          fontFamily: 'var(--mono)', fontSize: 10, letterSpacing: 1.6,
+          fontFamily: 'var(--mono)', fontSize: 'var(--fs-floor)', letterSpacing: 1.6,
           textTransform: 'uppercase', color: 'var(--text-muted)',
           marginBottom: 4,
         }}>
-          <span style={{ color: 'var(--em)', fontWeight: 700 }}>
+          <span style={{ color: 'var(--em-text)', fontWeight: 700 }}>
             // {eyebrow} · {String(idx + 1).padStart(2, '0')} / {questions.length}
           </span>
           <span style={{ fontVariantNumeric: 'tabular-nums' }}>
@@ -240,7 +240,7 @@ export default function SelfCheck({
                 width: 24, height: 24, borderRadius: '50%',
                 background: 'var(--bg-base)', border: '1px solid var(--border)',
                 display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-                fontFamily: 'var(--mono)', fontSize: 11, fontWeight: 700,
+                fontFamily: 'var(--mono)', fontSize: 'var(--fs-floor)', fontWeight: 700,
                 color: 'var(--text-muted)', flexShrink: 0,
               }}>{String.fromCharCode(65 + i)}</span>
               <span style={{ flex: 1 }}>{choice}</span>
@@ -249,7 +249,7 @@ export default function SelfCheck({
         </div>
 
         <p style={{
-          fontFamily: 'var(--mono)', fontSize: 9, letterSpacing: 0.6,
+          fontFamily: 'var(--mono)', fontSize: 'var(--fs-floor)', letterSpacing: 0.6,
           color: 'var(--text-muted)', marginTop: 14, marginBottom: 0,
           textAlign: 'center',
         }}>

@@ -24,7 +24,9 @@ html[data-theme="cream-pro"] {
   --surface2:     #f4eddb;
   --surface-deep: #ede4ce;
   --cream:        #faf5e9;
-  --card:         rgba(255, 250, 240, 0.85);
+  /* Solid: at .85 a photo behind a card set the contrast of its text.
+     #fdf8ed is what the .85 used to composite to over --bg-base. */
+  --card:         #fdf8ed;
 
   /* OS panel tokens — referenced by hub-dark.css layout rules now
      that those are scoped on [data-hub-os] (theme-agnostic). We
@@ -39,8 +41,11 @@ html[data-theme="cream-pro"] {
 
   /* Text — keep cream's near-black ink, slightly warmer */
   --text:        #2a2622;
-  --text-mid:    #6a5f53;
-  --text-muted:  #8a7f73;
+  /* Muted was #8a7f73 — 3.6:1 on the parchment. Both steps move down
+     together so the hierarchy survives: muted is now 5:1 on the deepest
+     surface (#ede4ce), and mid stays a step darker than it. */
+  --text-mid:    #51473d;
+  --text-muted:  #685e53;
 
   /* Borders — warmer tan than free cream, more sculpted */
   --border:      #d8c89a;
@@ -49,6 +54,11 @@ html[data-theme="cream-pro"] {
   /* Gold is the signature — pull it forward */
   --gold:        #b8861a;
   --gold-lt:     #dfb053;
+  /* Accent text, darkened toward ink so a scheme clears 4.5:1 on the
+     deepest parchment; gold as text is its own darker shade (6:1, 4.9:1
+     on the gold-tinted chips). */
+  --em-text:     color-mix(in srgb, var(--em) 80%, #000);
+  --gold-text:   #7a580e;
 
   /* Accent emphasis — wider use of em in surfaces */
   --accent-line:    rgba(var(--em-rgb), 0.40);
@@ -81,9 +91,9 @@ html[data-theme="cream-pro"] .panel-title {
   font-family: var(--mono);
   text-transform: uppercase;
   letter-spacing: 1.4px;
-  font-size: 11px;
+  font-size: var(--fs-floor);
   font-weight: 700;
-  color: var(--em);
+  color: var(--em-text);
 }
 
 /* Section titles keep the serif but in deeper warm tone */

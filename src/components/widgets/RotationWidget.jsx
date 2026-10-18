@@ -16,6 +16,7 @@ import {
   rotaDayIndex, dayTypeOf, loadScaleOf, scheduleOf,
 } from '../../lib/rotation/pattern';
 import { targetsForDay } from '../../data/trainingProgramme';
+import { effectiveOverrides } from '../../lib/lifts/plan';
 
 const todayIso = () => {
   const n = new Date();
@@ -27,7 +28,10 @@ const SHIFT_LABEL = { night: 'Night shift', day: 'Day shift', off: 'Off', leave:
 export function RotationBody({ S, navigate }) {
   const iso = todayIso();
   const rotation = S.rotation || {};
-  const overrides = rotation.overrides || {};
+  // The day as planned: the owner's edits win, then what was trained and
+  // what the lifts plan has moved since (lib/lifts/plan.js) — so the
+  // session and its fuel follow Legs moved to the day after Push.
+  const overrides = effectiveOverrides(S, { today: iso });
   const blocks = useMemo(() => rotation.holidayBlocks || [], [rotation.holidayBlocks]);
 
   const [y, m, d] = iso.split('-').map(Number);

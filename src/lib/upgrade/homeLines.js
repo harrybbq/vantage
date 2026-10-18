@@ -44,6 +44,15 @@
  *   three months running (this month and the two before); otherwise
  *   neutral. Not installed / SQL not run → neutral "Set up"; a failed
  *   or refused fetch → unknown.
+ * Lifts (S.lifts, derived): a workout in progress is `attention` —
+ *   "23 min" · "Legs in progress", text "Workout in progress · 23 min ·
+ *   5 sets done" — because an open workout is something left running.
+ *   Otherwise neutral (a PB is news, not a status): figure = the
+ *   heaviest REAL set of the lift with the most recent PB (else the
+ *   lift last logged), "180 kg" · "Leg press best" — never an estimated
+ *   1RM; text = "2 workouts this week · 3 PBs this month" (with no
+ *   finished workouts yet: "3 PBs this month · last logged 2 d ago").
+ *   "Log a lift" with nothing logged.
  *
  * ── updatedAt ──
  * The ms epoch of the data the line is built from: the console's own
@@ -52,6 +61,10 @@
  * null for the rotation (derived from the calendar, always current).
  */
 import { resolveDay, scheduleOf } from '../rotation/pattern.js';
+import { makeBwOf, pbTimeline, personalBests, chrono, weightText, shortLiftName, daysBetween, isIso, perGymOf, gymOf } from '../lifts/lifts.js';
+import { activeOf, workoutsThisWeek, minutesText, elapsedSec } from '../lifts/workout.js';
+import { effectiveOverrides } from '../lifts/plan.js';
+import { gymName } from '../lifts/store.js';
 import { num, toMs } from '../security/format.js';
 import { pillState } from '../security/status.js';
 
@@ -136,9 +149,10 @@ const nextIso = iso => {
 
 // ── Rotation ──────────────────────────────────────────────────────
 
-function dayOf(S, iso) {
+/** A day as the plan has it: the owner's overrides win, then what was trained / is now planned (lifts plan). */
+function dayOf(S, iso, today = iso) {
   const [y, m, d] = iso.split('-').map(Number);
-  return resolveDay(y, m - 1, d, (S && S.rotation && S.rotation.overrides) || {}, scheduleOf(S));
+  return resolveDay(y, m - 1, d, effectiveOverrides(S, { today }), scheduleOf(S));
 }
 
 /** "Night 2" | "Day 1" | "Leave" | "Off", or null before the pattern starts. */
@@ -164,7 +178,7 @@ export function rotationLine(S, iso = localIso()) {
 export function rotationCard(S, iso = localIso()) {
   const r = dayOf(S, iso);
   if (!r.inPattern) return card({ text: 'Before the rotation starts' });
-  const next = shiftLabel(dayOf(S, nextIso(iso)));
+  const next = shiftLabel(dayOf(S, nextIso(iso), iso));
   return card({
     figure: shiftLabel(r),
     figureLabel: 'today',
@@ -399,6 +413,67 @@ export function booksCard({ res, months = [], today, at = null }) {
     text: `${cardPounds(cur.income)} in · ${cardPounds(cur.expense)} out this month${losing ? ' · 3rd month of costs over income' : ''}`,
     state: profit > 0 ? 'ok' : losing ? 'attention' : 'neutral',
     updatedAt: toMs(at),
+  });
+}
+
+// ── Lifts ─────────────────────────────────────────────────────────
+
+/**
+ * @param lifts      S.lifts ({ list, log, sessions?, active? }) — absent or empty reads as nothing logged
+ * @param vitalsLog  S.vitalsLog (bodyweight, for dips compared on total load)
+ * @param today      local 'YYYY-MM-DD'
+ * @param now        ms epoch, for the in-progress workout's minutes
+ * A PB here is a REAL set that beat the lift's heaviest or one of its
+ * rep maxes when it was lifted (pbTimeline). The e1RM estimate is never
+ * a PB and never the figure. A machine (perGym) lift's best is the one at
+ * the gym of that PB, and the label names it: "Leg press best · DXC".
+ */
+export function liftsCard({ lifts, vitalsLog, today, now = null }) {
+  const active = activeOf({ lifts });
+  if (active) {
+    const sec = now != null ? elapsedSec(active, now) : 0;
+    const done = active.exercises.reduce((k, ex) => k + (ex.sets || []).filter(st => st && st.done).length, 0);
+    const mins = minutesText(sec);
+    return card({
+      figure: mins, figureLabel: `${active.name || 'Workout'} in progress`,
+      text: `Workout in progress · ${mins} · ${plural(done, 'set')} done`,
+      state: 'attention',
+    });
+  }
+  const list = lifts && Array.isArray(lifts.list) ? lifts.list : [];
+  const log = lifts && Array.isArray(lifts.log) ? lifts.log : [];
+  const byId = new Map(list.map(l => [l.id, l]));
+  const sets = log.filter(e => e && byId.has(e.liftId) && isIso(e.date));
+  if (!sets.length) return card({ figure: 'Log a lift', text: 'Personal bests on your main lifts' });
+  const bwOf = makeBwOf(vitalsLog);
+  const ym = String(today || '').slice(0, 7);
+  let latest = null, month = 0;
+  for (const lift of list) {
+    for (const ev of pbTimeline(log, lift, { bwOf })) {
+      if (ev.entry.date.slice(0, 7) === ym) month++;
+      if (!latest || chrono(ev.entry, latest.entry) > 0) latest = { entry: ev.entry, lift };
+    }
+  }
+  let last = sets[0];
+  for (const e of sets) if (chrono(e, last) > 0) last = e;
+  const lift = latest ? latest.lift : byId.get(last.liftId);
+  // A machine's best is one gym's: the gym of that PB (or of the last set).
+  const perGym = perGymOf(lift);
+  const gym = perGym ? gymOf(latest ? latest.entry : last) : null;
+  const best = personalBests(log, lift, perGym ? { bwOf, gym } : { bwOf }).heaviest;
+  const pbs = month ? `${plural(month, 'PB')} this month` : 'No PBs yet this month';
+  const hasSessions = !!(lifts && Array.isArray(lifts.sessions) && lifts.sessions.length);
+  let text;
+  if (hasSessions) {
+    text = `${plural(isIso(today) ? workoutsThisWeek({ lifts }, today) : 0, 'workout')} this week · ${pbs}`;
+  } else {
+    const d = isIso(today) ? Math.max(0, daysBetween(last.date, today)) : null;
+    text = pbs + (d == null ? '' : d === 0 ? ' · last logged today' : ` · last logged ${d} d ago`);
+  }
+  return card({
+    figure: weightText(best.entry, lift).replace(/^BW \+/, '+'),
+    figureLabel: `${shortLiftName(lift.name)} best${perGym && gym ? ` · ${gymName(lifts, gym)}` : ''}`,
+    text,
   });
 }
 

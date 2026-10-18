@@ -96,7 +96,7 @@ export default function HubDrawer({
               <div className="m-hubdrawer-stat-l">Coins</div>
             </div>
             <div className="m-hubdrawer-stat">
-              <div className="m-hubdrawer-stat-v" style={{ color: 'var(--em)' }}>{streak}</div>
+              <div className="m-hubdrawer-stat-v" style={{ color: 'var(--em-text)' }}>{streak}</div>
               <div className="m-hubdrawer-stat-l">Day streak</div>
             </div>
           </div>

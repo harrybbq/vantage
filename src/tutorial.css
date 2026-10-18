@@ -98,7 +98,7 @@
 }
 .tut-step-label {
   font-family: var(--mono, 'DM Mono', monospace);
-  font-size: 8.5px;
+  font-size: var(--fs-floor);
   letter-spacing: 2px;
   text-transform: uppercase;
 }
@@ -111,17 +111,17 @@
   border: none;
   cursor: pointer;
   font-family: var(--mono, 'DM Mono', monospace);
-  font-size: 9px;
+  font-size: var(--fs-floor);
   letter-spacing: 1px;
   text-transform: uppercase;
   padding: 3px 7px;
   border-radius: 4px;
   transition: all 0.12s ease;
 }
-.tut-theme-cream .tut-skip { color: #8a8278; }
+.tut-theme-cream .tut-skip { color: #6e675d; }
 .tut-theme-cream .tut-skip:hover { color: #1c1a17; background: rgba(0, 0, 0, 0.05); }
-.tut-theme-dark  .tut-skip { color: #5a5650; }
-.tut-theme-dark  .tut-skip:hover { color: #8a8278; background: rgba(255, 255, 255, 0.05); }
+.tut-theme-dark  .tut-skip { color: #8a857c; }
+.tut-theme-dark  .tut-skip:hover { color: #b5b0a6; background: rgba(255, 255, 255, 0.05); }
 
 /* body */
 .tut-body { padding: 12px 14px 10px; }
@@ -174,7 +174,7 @@
   padding: 6px 14px;
   border-radius: 6px;
   font-family: var(--mono, 'DM Mono', monospace);
-  font-size: 9.5px;
+  font-size: var(--fs-floor);
   letter-spacing: 1.2px;
   text-transform: uppercase;
   cursor: pointer;
@@ -182,10 +182,10 @@
   border: 1px solid transparent;
 }
 .tut-btn-back { background: none; }
-.tut-theme-cream .tut-btn-back { color: #8a8278; border-color: #e2dccf; }
+.tut-theme-cream .tut-btn-back { color: #6e675d; border-color: #e2dccf; }
 .tut-theme-cream .tut-btn-back:hover { color: #1c1a17; border-color: #c8b89a; }
-.tut-theme-dark  .tut-btn-back { color: #5a5650; border-color: #252521; }
-.tut-theme-dark  .tut-btn-back:hover { color: #8a8278; border-color: #3a3a33; }
+.tut-theme-dark  .tut-btn-back { color: #8a857c; border-color: #252521; }
+.tut-theme-dark  .tut-btn-back:hover { color: #b5b0a6; border-color: #3a3a33; }
 
 .tut-btn-next { font-weight: 500; }
 .tut-theme-cream .tut-btn-next {
@@ -210,11 +210,11 @@
 
 .tut-step-counter {
   font-family: var(--mono, 'DM Mono', monospace);
-  font-size: 9px;
+  font-size: var(--fs-floor);
   letter-spacing: 1px;
 }
-.tut-theme-cream .tut-step-counter { color: #8a8278; }
-.tut-theme-dark  .tut-step-counter { color: #5a5650; }
+.tut-theme-cream .tut-step-counter { color: #6e675d; }
+.tut-theme-dark  .tut-step-counter { color: #8a857c; }
 
 /* ── Arrow ───────────────────────────────────────────────────────── */
 .tut-arrow {

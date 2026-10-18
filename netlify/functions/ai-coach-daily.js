@@ -3,7 +3,11 @@
  *
  * Generates a daily Morning Brief (3 lines) and, on Sundays, a Weekly
  * Review (~150 words) for a Pro user. Sends a structured snapshot of
- * the user's vision-board state to Claude Haiku and returns the JSON.
+ * the user's Vantage state to Claude Haiku and returns the JSON.
+ *
+ * WHOOP / Oura data is stripped from the snapshot before it is sent
+ * unless AI_WEARABLE_DATA_ALLOWED is exactly 'true' — see
+ * netlify/lib/coachWearableGuard.js for why and for what counts.
  *
  * The snapshot includes recent_briefs (last few days the model produced)
  * so we can ask Haiku to actively diverge from yesterday's advice. This
@@ -12,6 +16,9 @@
  *
  * Required Netlify env var:
  *   ANTHROPIC_API_KEY
+ * Optional:
+ *   AI_WEARABLE_DATA_ALLOWED  'true' lets band-derived values through.
+ *                             Unset (the default) strips them.
  *
  * The client is responsible for caching the result for the day (cheap
  * — saved in the user's cloud state). Server-side rate limiting just
@@ -37,6 +44,7 @@ function checkRateLimit(ip) {
 const { requireUser, underLimit, tooMany } = require('../lib/requireUser');
 const { withinDailyAiCap, overDailyCap } = require('../lib/aiQuota');
 const { isOwnerEmail } = require('../lib/owner');
+const { guardWearableData } = require('../lib/coachWearableGuard');
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
@@ -52,7 +60,7 @@ const CORS = {
 // real-world one. The panel labels every brief "AI-generated · not
 // medical advice" (CoachBriefPanel.jsx). Output schema is unchanged.
 
-const SYSTEM_PROMPT = `You are an AI life coach embedded inside a personal vision-board app called VisionBoard. The user pays for Pro and expects sharp, specific, encouraging guidance — not generic platitudes.
+const SYSTEM_PROMPT = `You are an AI life coach embedded inside a personal life app called Vantage. The user pays for Pro and expects sharp, specific, encouraging guidance — not generic platitudes.
 
 Your tone:
 - Warm, direct, and honest. Like a coach who knows them well.
@@ -237,7 +245,9 @@ exports.handler = async (event) => {
   if (!isValidSnapshot(body.snapshot)) {
     return { statusCode: 400, headers: CORS, body: JSON.stringify({ error: 'snapshot is required and must include name, habits, achievements, trackers' }) };
   }
-  const snapshot = fitSnapshot(body.snapshot);
+  // Band data out first, so it is never part of what gets sized,
+  // trimmed or sent. Unless the env allows it — see the guard.
+  const snapshot = fitSnapshot(guardWearableData(body.snapshot));
   if (!snapshot) {
     return { statusCode: 413, headers: CORS, body: JSON.stringify({ error: 'Snapshot too large' }) };
   }

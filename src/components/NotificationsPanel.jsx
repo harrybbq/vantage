@@ -19,7 +19,7 @@ import SettingsGroup from './settings/SettingsGroup';
 const CATEGORIES = [
   {
     id: 'visionUnlock',
-    label: 'Vision unlocks',
+    label: 'Honours earned',
     desc: 'When you cross a milestone (Week One, Century, etc).',
   },
   {
@@ -122,13 +122,13 @@ export default function NotificationsPanel({ S, update }) {
                 <div style={{ fontFamily: 'var(--sans)', fontSize: '13px', fontWeight: 600, color: 'var(--text)' }}>
                   {cat.label}
                 </div>
-                <div style={{ fontFamily: 'var(--mono)', fontSize: '10px', color: 'var(--text-muted)', letterSpacing: '0.5px', marginTop: '2px' }}>
+                <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-floor)', color: 'var(--text-muted)', letterSpacing: '0.5px', marginTop: '2px' }}>
                   {cat.desc}
                 </div>
               </div>
               <span style={{
-                fontFamily: 'var(--mono)', fontSize: '9px', letterSpacing: '1.4px',
-                textTransform: 'uppercase', color: on ? 'var(--em)' : 'var(--text-muted)',
+                fontFamily: 'var(--mono)', fontSize: 'var(--fs-floor)', letterSpacing: '1.4px',
+                textTransform: 'uppercase', color: on ? 'var(--em-text)' : 'var(--text-muted)',
               }}>
                 {on ? 'On' : 'Off'}
               </span>
@@ -147,7 +147,7 @@ export default function NotificationsPanel({ S, update }) {
         <div style={{ fontFamily: 'var(--sans)', fontSize: '13px', fontWeight: 600, color: 'var(--text)', marginBottom: '4px' }}>
           Quiet hours
         </div>
-        <div style={{ fontFamily: 'var(--mono)', fontSize: '10px', color: 'var(--text-muted)', letterSpacing: '0.5px', marginBottom: '12px' }}>
+        <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-floor)', color: 'var(--text-muted)', letterSpacing: '0.5px', marginBottom: '12px' }}>
           No notifications fire in this window. Leave both blank to disable.
         </div>
         {/* A `time` input sizes itself to its widest rendering (~137px in
@@ -170,7 +170,7 @@ export default function NotificationsPanel({ S, update }) {
               flex: '1 1 110px', minWidth: 0, maxWidth: 150,
             }}
           />
-          <span style={{ fontFamily: 'var(--mono)', fontSize: '11px', color: 'var(--text-muted)' }}>to</span>
+          <span style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-floor)', color: 'var(--text-muted)' }}>to</span>
           <input
             type="time"
             value={quiet.end}
@@ -199,7 +199,7 @@ export default function NotificationsPanel({ S, update }) {
         <div style={{ fontFamily: 'var(--sans)', fontSize: '13px', fontWeight: 600, color: 'var(--text)', marginBottom: '4px' }}>
           Daily log reminder
         </div>
-        <div style={{ fontFamily: 'var(--mono)', fontSize: '10px', color: 'var(--text-muted)', letterSpacing: '0.5px', marginBottom: '12px' }}>
+        <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-floor)', color: 'var(--text-muted)', letterSpacing: '0.5px', marginBottom: '12px' }}>
           Optional ping at this time if you haven't logged today. Leave blank to disable.
         </div>
         <input

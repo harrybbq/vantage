@@ -141,7 +141,7 @@ const st = {
   },
   eyebrow: {
     fontFamily: 'var(--mono, "DM Mono", monospace)',
-    fontSize: 10, letterSpacing: '2.5px', textTransform: 'uppercase',
+    fontSize: 'var(--fs-floor)', letterSpacing: '2.5px', textTransform: 'uppercase',
     color: 'var(--em-mid, #2a9e62)', marginBottom: 6,
   },
   heading: {
@@ -163,7 +163,7 @@ const st = {
     width: '100%', padding: '12px 16px', border: 'none', borderRadius: 10,
     background: 'linear-gradient(180deg, var(--em-mid, #2a9e62) 0%, var(--em, #1a7a4a) 100%)',
     color: '#fff', cursor: 'pointer',
-    fontFamily: 'var(--mono, "DM Mono", monospace)', fontSize: 11, letterSpacing: '1.5px',
+    fontFamily: 'var(--mono, "DM Mono", monospace)', fontSize: 'var(--fs-floor)', letterSpacing: '1.5px',
   },
   secondary: {
     width: '100%', marginTop: 8, padding: '10px 16px', borderRadius: 10,

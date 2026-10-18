@@ -146,6 +146,10 @@ function mapOura({ sleeps = [], readiness = [], activity = [], workouts = [] }) 
     // widget reads it identically.
     const total = num(a.total_calories);
     if (total > 0) at(a.day).burnKcal = Math.round(total);
+    // Daily step count — on the same daily_activity record we already
+    // fetch (Oura API v2 `steps`). Own key, like WHOOP's: see stepsOn.
+    const steps = num(a.steps);
+    if (steps > 0) at(a.day).stepsOura = Math.round(steps);
   }
 
   const burn = {};

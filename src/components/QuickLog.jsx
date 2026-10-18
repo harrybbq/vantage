@@ -40,7 +40,7 @@ function SavedBadge({ visible }) {
           exit={{ opacity: 0 }}
           transition={{ duration: 0.18 }}
           style={{
-            fontFamily: 'var(--mono)', fontSize: '9px', color: 'var(--em)',
+            fontFamily: 'var(--mono)', fontSize: 'var(--fs-floor)', color: 'var(--em-text)',
             letterSpacing: '.5px', marginLeft: '6px',
           }}
         ><span style={{display:'inline-flex',alignItems:'center',gap:4}}><Icon name="check" size={11} /> saved</span></motion.span>

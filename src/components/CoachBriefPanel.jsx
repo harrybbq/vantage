@@ -121,7 +121,7 @@ export default function CoachBriefPanel({ S, update, onCoachAct, userId }) {
       <p
         className="coach-brief-disclaimer"
         style={{
-          margin: '2px 0 0', fontFamily: 'var(--mono)', fontSize: 9,
+          margin: '2px 0 0', fontFamily: 'var(--mono)', fontSize: 'var(--fs-floor)',
           letterSpacing: 1, textTransform: 'uppercase', color: 'var(--text-muted)',
         }}
       >

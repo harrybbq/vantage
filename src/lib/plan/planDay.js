@@ -30,6 +30,7 @@
  */
 import { resolveDay, rotaDayIndex, dayTypeOf, loadScaleOf, scheduleOf } from '../rotation/pattern.js';
 import { targetsForDay, DAY_TYPE_LABEL, exercisesFor } from '../../data/trainingProgramme.js';
+import { effectiveOverrides } from '../lifts/plan.js';
 
 /** True when this build/session is the owner's. UI gate only. */
 export function isOwnerHere() {
@@ -39,7 +40,11 @@ export function isOwnerHere() {
 /**
  * @param iso   'YYYY-MM-DD'
  * @param S     app state
- * @param opts  { assumeOwner } — tests pass this rather than poking window
+ * @param opts  { assumeOwner, today } — tests pass these rather than poking window / the clock
+ *
+ * The session is the lifts plan's (effectiveOverrides): what was done
+ * that day, or what is now planned, with the owner's overrides winning —
+ * so the session carb delta follows the training that actually happens.
  * @returns {{active:boolean, dayIndex?, dayType?, dayTypeLabel?, session?,
  *            loadScale?, targets?, exercises?, isRest?, isNight?}}
  */
@@ -55,7 +60,7 @@ export function planDayFor(iso, S = {}, opts = {}) {
   const [y, m, d] = parts;
 
   const schedule = scheduleOf(S);
-  const day = resolveDay(y, m - 1, d, rotation.overrides || {}, schedule);
+  const day = resolveDay(y, m - 1, d, effectiveOverrides(S, opts.today ? { today: opts.today } : {}), schedule);
   if (!day.inPattern) return { active: false };
 
   // Booked leave fuels as an off day: it is not a working night,

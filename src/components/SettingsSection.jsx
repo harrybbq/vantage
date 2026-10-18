@@ -336,15 +336,15 @@ function FriendsPrivacyCard({ userId, S, update }) {
           <div style={{ fontFamily: 'var(--sans)', fontSize: '13px', fontWeight: 600, color: 'var(--text)' }}>
             Show me in handle search
           </div>
-          <div style={{ fontFamily: 'var(--mono)', fontSize: '10px', color: 'var(--text-muted)', letterSpacing: '0.5px', marginTop: '2px' }}>
+          <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-floor)', color: 'var(--text-muted)', letterSpacing: '0.5px', marginTop: '2px' }}>
             {handle
               ? `Other users can send you a friend request via @${handle}.`
               : 'Open the Friends rail on the hub to claim a handle first.'}
           </div>
         </div>
         <span style={{
-          fontFamily: 'var(--mono)', fontSize: '9px', letterSpacing: '1.4px',
-          textTransform: 'uppercase', color: searchable ? 'var(--em)' : 'var(--text-muted)',
+          fontFamily: 'var(--mono)', fontSize: 'var(--fs-floor)', letterSpacing: '1.4px',
+          textTransform: 'uppercase', color: searchable ? 'var(--em-text)' : 'var(--text-muted)',
         }}>
           {searchable ? 'On' : 'Off'}
         </span>
@@ -373,13 +373,13 @@ function FriendsPrivacyCard({ userId, S, update }) {
           <div style={{ fontFamily: 'var(--sans)', fontSize: '13px', fontWeight: 600, color: 'var(--text)' }}>
             Show me on the global leaderboard
           </div>
-          <div style={{ fontFamily: 'var(--mono)', fontSize: '10px', color: 'var(--text-muted)', letterSpacing: '0.5px', marginTop: '2px' }}>
+          <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-floor)', color: 'var(--text-muted)', letterSpacing: '0.5px', marginTop: '2px' }}>
             When off, you're hidden from the global board. Friends can still see your ratings.
           </div>
         </div>
         <span style={{
-          fontFamily: 'var(--mono)', fontSize: '9px', letterSpacing: '1.4px',
-          textTransform: 'uppercase', color: leaderboardOptin ? 'var(--em)' : 'var(--text-muted)',
+          fontFamily: 'var(--mono)', fontSize: 'var(--fs-floor)', letterSpacing: '1.4px',
+          textTransform: 'uppercase', color: leaderboardOptin ? 'var(--em-text)' : 'var(--text-muted)',
         }}>
           {leaderboardOptin ? 'On' : 'Off'}
         </span>
@@ -410,19 +410,19 @@ function FriendsPrivacyCard({ userId, S, update }) {
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontFamily: 'var(--sans)', fontSize: '13px', fontWeight: 600, color: 'var(--text)' }}>
             Colour my leaderboard name
             <span style={{
-              fontFamily: 'var(--mono)', fontSize: '8px', letterSpacing: '1.4px', textTransform: 'uppercase',
+              fontFamily: 'var(--mono)', fontSize: 'var(--fs-floor)', letterSpacing: '1.4px', textTransform: 'uppercase',
               padding: '2px 6px', borderRadius: '3px',
               background: hasPro ? 'rgba(var(--em-rgb),0.14)' : 'rgba(200,151,10,0.12)',
-              color: hasPro ? 'var(--em)' : 'var(--gold)',
+              color: hasPro ? 'var(--em-text)' : 'var(--gold-text)',
               border: `1px solid ${hasPro ? 'rgba(var(--em-rgb),0.28)' : 'rgba(200,151,10,0.28)'}`,
             }}>{hasPro ? 'Pro' : '🔒 Pro'}</span>
           </div>
-          <div style={{ fontFamily: 'var(--mono)', fontSize: '10px', color: 'var(--text-muted)', letterSpacing: '0.5px', marginTop: '2px' }}>
+          <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-floor)', color: 'var(--text-muted)', letterSpacing: '0.5px', marginTop: '2px' }}>
             Your name shows in <span style={{ color: accent, fontWeight: 700 }}>your accent colour</span> on the leaderboard.
           </div>
         </div>
         <span style={{
-          fontFamily: 'var(--mono)', fontSize: '9px', letterSpacing: '1.4px',
+          fontFamily: 'var(--mono)', fontSize: 'var(--fs-floor)', letterSpacing: '1.4px',
           textTransform: 'uppercase', color: (nameColorOn && hasPro) ? accent : 'var(--text-muted)',
         }}>
           {(nameColorOn && hasPro) ? 'On' : 'Off'}
@@ -443,7 +443,7 @@ function FriendsPrivacyCard({ userId, S, update }) {
         marginTop: 18, paddingTop: 14, borderTop: '1px solid var(--border)',
       }}>
         <div style={{
-          fontFamily: 'var(--mono)', fontSize: '10px', letterSpacing: '1.4px',
+          fontFamily: 'var(--mono)', fontSize: 'var(--fs-floor)', letterSpacing: '1.4px',
           textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: 8,
         }}>What friends see on your profile card</div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
@@ -470,13 +470,13 @@ function FriendsPrivacyCard({ userId, S, update }) {
                   <div style={{ fontFamily: 'var(--sans)', fontSize: 12.5, fontWeight: 600, color: 'var(--text)' }}>
                     {t.label}
                   </div>
-                  <div style={{ fontFamily: 'var(--mono)', fontSize: 10, color: 'var(--text-muted)', letterSpacing: 0.4, marginTop: 2 }}>
+                  <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-floor)', color: 'var(--text-muted)', letterSpacing: 0.4, marginTop: 2 }}>
                     {t.desc}
                   </div>
                 </div>
                 <span style={{
-                  fontFamily: 'var(--mono)', fontSize: 9, letterSpacing: 1.2,
-                  textTransform: 'uppercase', color: on ? 'var(--em)' : 'var(--text-muted)',
+                  fontFamily: 'var(--mono)', fontSize: 'var(--fs-floor)', letterSpacing: 1.2,
+                  textTransform: 'uppercase', color: on ? 'var(--em-text)' : 'var(--text-muted)',
                 }}>{on ? 'On' : 'Off'}</span>
               </label>
             );
@@ -684,7 +684,7 @@ export default function SettingsSection({ S, update, active, userId, userEmail, 
         <>
         <SettingsGroup
           title="Colour scheme"
-          desc="An accent colour applied across the whole app. ✦ accents unlock by achieving visions; 🔒 accents are Pro."
+          desc="An accent colour applied across the whole app. ✦ accents unlock by earning honours; 🔒 accents are Pro."
         >
           <div className="scheme-grid">
             {SCHEMES.map(scheme => {
@@ -699,7 +699,7 @@ export default function SettingsSection({ S, update, active, userId, userEmail, 
               const lockHint = proLocked
                 ? 'Upgrade to Pro to unlock this accent'
                 : visionLocked
-                  ? `Unlock by achieving: ${VISIONS_BY_ID[scheme.unlockVision]?.title || 'a vision'}`
+                  ? `Unlock by earning: ${VISIONS_BY_ID[scheme.unlockVision]?.title || 'an honour'}`
                   : '';
               return (
                 <button
@@ -719,7 +719,7 @@ export default function SettingsSection({ S, update, active, userId, userEmail, 
                   }}
                 >
                   {locked && (
-                    <span style={{ position: 'absolute', top: 6, right: 8, fontSize: 10, color: 'var(--gold)' }}
+                    <span style={{ position: 'absolute', top: 6, right: 8, fontSize: 'var(--fs-floor)', color: 'var(--gold-text)' }}
                       title={lockHint}>{visionLocked ? '✦' : '🔒'}</span>
                   )}
                   <div style={{
@@ -729,14 +729,14 @@ export default function SettingsSection({ S, update, active, userId, userEmail, 
                     transition: 'box-shadow .18s',
                   }} />
                   <span style={{
-                    fontFamily: 'var(--mono)', fontSize: '10px', letterSpacing: '0.5px',
+                    fontFamily: 'var(--mono)', fontSize: 'var(--fs-floor)', letterSpacing: '0.5px',
                     color: isActive ? 'var(--text)' : 'var(--text-muted)',
                     fontWeight: isActive ? 700 : 400,
                   }}>
                     {scheme.name}
                   </span>
                   {isActive && (
-                    <span style={{ fontFamily: 'var(--mono)', fontSize: '9px', color: scheme.mid, letterSpacing: '1px', textTransform: 'uppercase' }}>
+                    <span style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-floor)', color: scheme.mid, letterSpacing: '1px', textTransform: 'uppercase' }}>
                       Active
                     </span>
                   )}
@@ -754,14 +754,14 @@ export default function SettingsSection({ S, update, active, userId, userEmail, 
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontFamily: 'var(--sans)', fontSize: 14, fontWeight: 600, color: 'var(--text)' }}>
                 Custom colour
                 <span style={{
-                  fontFamily: 'var(--mono)', fontSize: '8px', letterSpacing: '1.4px',
+                  fontFamily: 'var(--mono)', fontSize: 'var(--fs-floor)', letterSpacing: '1.4px',
                   textTransform: 'uppercase', padding: '2px 6px', borderRadius: '3px',
                   background: hasPro ? 'rgba(var(--em-rgb),0.14)' : 'rgba(200,151,10,0.12)',
-                  color: hasPro ? 'var(--em)' : 'var(--gold)',
+                  color: hasPro ? 'var(--em-text)' : 'var(--gold-text)',
                   border: `1px solid ${hasPro ? 'rgba(var(--em-rgb),0.28)' : 'rgba(200,151,10,0.28)'}`,
                 }}>{hasPro ? 'Pro' : '🔒 Pro'}</span>
               </div>
-              <div style={{ fontFamily: 'var(--mono)', fontSize: '10px', color: 'var(--text-muted)', letterSpacing: '0.5px', marginTop: 4 }}>
+              <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-floor)', color: 'var(--text-muted)', letterSpacing: '0.5px', marginTop: 4 }}>
                 {hasPro ? 'Pick any accent — the app derives matching tones.' : 'Upgrade to choose any accent colour.'}
               </div>
             </div>
@@ -819,15 +819,15 @@ export default function SettingsSection({ S, update, active, userId, userEmail, 
                       {t.name}
                       {isActive && (
                         <span style={{
-                          fontFamily: 'var(--mono)', fontSize: '8px', letterSpacing: '1.4px',
-                          textTransform: 'uppercase', color: 'var(--em)', marginLeft: 'auto',
+                          fontFamily: 'var(--mono)', fontSize: 'var(--fs-floor)', letterSpacing: '1.4px',
+                          textTransform: 'uppercase', color: 'var(--em-text)', marginLeft: 'auto',
                         }}>
                           Active
                         </span>
                       )}
                     </div>
                     <div style={{
-                      fontFamily: 'var(--mono)', fontSize: '10px',
+                      fontFamily: 'var(--mono)', fontSize: 'var(--fs-floor)',
                       color: 'var(--text-muted)', letterSpacing: '0.5px', marginTop: '4px',
                     }}>
                       {t.tagline}
@@ -913,13 +913,13 @@ export default function SettingsSection({ S, update, active, userId, userEmail, 
                   <div style={{ fontFamily: 'var(--sans)', fontSize: '13px', fontWeight: 600, color: 'var(--text)' }}>
                     Require enough coins to buy
                   </div>
-                  <div style={{ fontFamily: 'var(--mono)', fontSize: '10px', color: 'var(--text-muted)', letterSpacing: '0.5px', marginTop: '2px' }}>
+                  <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-floor)', color: 'var(--text-muted)', letterSpacing: '0.5px', marginTop: '2px' }}>
                     On, an item you can't afford stays locked. Off, you can unlock anything and the list works as a plain wishlist — coins are still spent and still refunded if you un-buy, so your balance can go negative.
                   </div>
                 </div>
                 <span style={{
-                  fontFamily: 'var(--mono)', fontSize: '9px', letterSpacing: '1.4px',
-                  textTransform: 'uppercase', color: requireCoins ? 'var(--em)' : 'var(--text-muted)',
+                  fontFamily: 'var(--mono)', fontSize: 'var(--fs-floor)', letterSpacing: '1.4px',
+                  textTransform: 'uppercase', color: requireCoins ? 'var(--em-text)' : 'var(--text-muted)',
                 }}>
                   {requireCoins ? 'On' : 'Off'}
                 </span>
@@ -957,7 +957,7 @@ export default function SettingsSection({ S, update, active, userId, userEmail, 
                 >
                   <span aria-hidden="true" style={{display:'inline-flex'}}><Icon name="search" size={16} /></span>
                   Command palette
-                  <span style={{ fontFamily: 'var(--mono)', fontSize: '10px', opacity: 0.6, marginLeft: '4px' }}>
+                  <span style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-floor)', opacity: 0.6, marginLeft: '4px' }}>
                     ⌃K
                   </span>
                 </button>
@@ -977,7 +977,7 @@ export default function SettingsSection({ S, update, active, userId, userEmail, 
                 >
                   <span aria-hidden="true" style={{display:'inline-flex'}}><Icon name="keyboard" size={16} /></span>
                   Keyboard shortcuts
-                  <span style={{ fontFamily: 'var(--mono)', fontSize: '10px', opacity: 0.6, marginLeft: '4px' }}>
+                  <span style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-floor)', opacity: 0.6, marginLeft: '4px' }}>
                     ?
                   </span>
                 </button>
@@ -1023,7 +1023,7 @@ export default function SettingsSection({ S, update, active, userId, userEmail, 
 
         {/* Visions catalogue — milestones the user can chase. */}
         <SettingsGroup
-          title="Visions"
+          title="Honours"
           desc="See every system milestone and which ones you've unlocked. Each feeds your category ratings."
         >
           <button
@@ -1031,7 +1031,7 @@ export default function SettingsSection({ S, update, active, userId, userEmail, 
             className="tut-replay-btn"
             onClick={onOpenVisions}
           >
-            <span aria-hidden="true" style={{display:'inline-flex',marginRight:6}}><Icon name="sparkles" size={15} /></span>Open visions catalogue
+            <span aria-hidden="true" style={{display:'inline-flex',marginRight:6}}><Icon name="sparkles" size={15} /></span>Open honours catalogue
           </button>
         </SettingsGroup>
 
@@ -1053,7 +1053,7 @@ export default function SettingsSection({ S, update, active, userId, userEmail, 
                   rotation: { ...(prev.rotation || {}), planFuelling: e.target.checked },
                 }))}
               />
-              <span style={{ fontFamily: 'var(--mono)', fontSize: 11 }}>
+              <span style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-floor)' }}>
                 Targets follow the rota
               </span>
             </label>

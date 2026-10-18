@@ -525,7 +525,7 @@ export function categoryBreakdown(S, category, ctx = {}) {
         { label: 'Days logged (lifetime)', points: categoryDayPoints(S, 'brain', win) },
         { label: 'Brain trackers',   points: trackerPoints(S, 'brain', win) * 1.0 },
         { label: 'Brain achievements', points: achievementPoints(S, 'brain') * 2.5 },
-        { label: 'Brain visions',    points: visionPoints(S, 'brain', win) },
+        { label: 'Brain honours',    points: visionPoints(S, 'brain', win) },
       ];
     case 'finance':
       return [
@@ -534,7 +534,7 @@ export function categoryBreakdown(S, category, ctx = {}) {
         { label: 'Savings goals',    points: savingsPoints(S) },
         { label: 'Finance trackers', points: trackerPoints(S, 'finance', win) * 1.0 },
         { label: 'Finance achievements', points: achievementPoints(S, 'finance') * 2.5 },
-        { label: 'Finance visions',  points: visionPoints(S, 'finance', win) },
+        { label: 'Finance honours',  points: visionPoints(S, 'finance', win) },
       ];
     case 'fitness':
       return [
@@ -542,7 +542,7 @@ export function categoryBreakdown(S, category, ctx = {}) {
         { label: 'Days logged (lifetime)', points: categoryDayPoints(S, 'fitness', win) },
         { label: 'Fitness trackers', points: trackerPoints(S, 'fitness', win) * 1.2 },
         { label: 'Fitness achievements', points: achievementPoints(S, 'fitness') * 2.5 },
-        { label: 'Fitness visions',  points: visionPoints(S, 'fitness', win) },
+        { label: 'Fitness honours',  points: visionPoints(S, 'fitness', win) },
         { label: 'Vitals log days',  points: vitalsPoints(S, win) },
         { label: 'Activity burn',    points: burnPoints(S, win) },
         { label: 'On-target macro days', points: macroPoints(ctx.macroDays, win) },
@@ -553,7 +553,7 @@ export function categoryBreakdown(S, category, ctx = {}) {
         { label: 'Days logged (lifetime)', points: categoryDayPoints(S, 'social', win) },
         { label: 'Friends + activity', points: socialPoints(S, friendCount, win) },
         { label: 'Social achievements', points: achievementPoints(S, 'social') * 2.5 },
-        { label: 'Social visions',   points: visionPoints(S, 'social', win) },
+        { label: 'Social honours',   points: visionPoints(S, 'social', win) },
       ];
     default:
       return [];

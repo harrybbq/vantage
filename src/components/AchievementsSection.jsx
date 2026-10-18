@@ -913,7 +913,7 @@ export default function AchievementsSection({ S, update, active, onOpenModal, on
             whileTap={{ scale: 0.96 }}
             transition={{ type: 'spring', stiffness: 400, damping: 17 }}
           >
-            <span aria-hidden="true">◆</span> Visions
+            <span aria-hidden="true">◆</span> Honours
             <span className="ach-visions-count">{visionsUnlocked}/{VISIONS.length}</span>
           </motion.button>
         )}

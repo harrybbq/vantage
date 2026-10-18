@@ -32,6 +32,20 @@ function sb(env, path, init = {}) {
 
 const missingSchema = res => res.status === 400 || res.status === 404;
 
+/** Messages copied into reports.reported_snapshot at report time, in the
+ *  queue's { from, body, at } shape. Anything malformed is dropped. */
+function snapshotMessages(snap) {
+  const list = snap && typeof snap === 'object' && Array.isArray(snap.messages) ? snap.messages : [];
+  return list
+    .filter(m => m && typeof m === 'object' && typeof m.body === 'string')
+    .slice(-CONTEXT_MESSAGES)
+    .map(m => ({
+      from: m.from === 'reported' ? 'reported' : 'reporter',
+      body: m.body.slice(0, 2000),
+      at: m.at || null,
+    }));
+}
+
 /**
  * Open reports, newest first, with both parties' handles and the last
  * few DMs between them. → [200, { ok, page, pageSize, total, items }]
@@ -72,10 +86,13 @@ async function listOpenReports(env, page, { oldestFirst = false } = {}) {
   };
 
   // The last few DMs between the pair, both directions, oldest first.
+  // Prefer the copy taken AT REPORT TIME (reports_snapshot_messages in
+  // supabase/dm_upgrade_2026_10.sql) — it survives an unsend. Reports
+  // filed before that SQL fall back to a live read, as before.
   const items = [];
   for (const r of reports) {
-    let messages = [];
-    if (r.reporter_id && r.reported_id) {
+    let messages = snapshotMessages(r.reported_snapshot);
+    if (!messages.length && r.reporter_id && r.reported_id) {
       const a = r.reporter_id, b = r.reported_id;
       const mRes = await sb(env,
         `messages?or=(and(sender_id.eq.${a},recipient_id.eq.${b}),and(sender_id.eq.${b},recipient_id.eq.${a}))` +
@@ -182,6 +199,6 @@ async function listSuspended(env, limit = 100) {
 }
 
 module.exports = {
-  sb, missingSchema, listOpenReports, setSuspended, decideReport, listSuspended,
+  sb, missingSchema, listOpenReports, setSuspended, decideReport, listSuspended, snapshotMessages,
   PAGE_SIZE, UUID, NOT_INSTALLED,
 };

@@ -9,7 +9,7 @@ function KbdHint({ keys }) {
     <div style={{ display: 'flex', gap: '3px', flexShrink: 0 }}>
       {keys.map(k => (
         <kbd key={k} style={{
-          padding: '1px 5px', borderRadius: '4px', fontSize: '10px',
+          padding: '1px 5px', borderRadius: '4px', fontSize: 'var(--fs-floor)',
           fontFamily: 'var(--mono)', background: 'rgba(255,255,255,.1)',
           border: '1px solid rgba(255,255,255,.18)', color: 'rgba(255,255,255,.55)',
         }}>{k}</kbd>

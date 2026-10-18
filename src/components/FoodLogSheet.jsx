@@ -285,7 +285,7 @@ export default function FoodLogSheet({ userId, logDate, onClose, onSaved, prefil
                 <div style={{ display: 'inline-flex', border: '1px solid var(--border)', borderRadius: 'var(--radius-md)', overflow: 'hidden', flexShrink: 0 }}>
                   {['g', 'ml'].map(u => (
                     <button key={u} type="button" onClick={() => set('serving_unit', u)}
-                      style={{ padding: '0 10px', border: 'none', background: form.serving_unit === u ? 'var(--em)' : 'transparent', color: form.serving_unit === u ? '#fff' : 'var(--text-mid)', fontFamily: 'var(--mono)', fontSize: '11px', cursor: 'pointer' }}>
+                      style={{ padding: '0 10px', border: 'none', background: form.serving_unit === u ? 'var(--em)' : 'transparent', color: form.serving_unit === u ? '#fff' : 'var(--text-mid)', fontFamily: 'var(--mono)', fontSize: 'var(--fs-floor)', cursor: 'pointer' }}>
                       {u}
                     </button>
                   ))}
@@ -321,7 +321,7 @@ export default function FoodLogSheet({ userId, logDate, onClose, onSaved, prefil
         {/* Save as reusable meal template */}
         {onSaveMeal && (
           <button onClick={handleSaveMeal} type="button"
-            style={{ width: '100%', marginTop: '6px', padding: '10px', borderRadius: 'var(--radius-md)', border: '1px dashed var(--border)', background: 'transparent', color: savedMeal ? 'var(--em)' : 'var(--text-muted)', cursor: 'pointer', fontFamily: 'var(--mono)', fontSize: '11px', letterSpacing: '1px', textTransform: 'uppercase', transition: 'color .15s' }}>
+            style={{ width: '100%', marginTop: '6px', padding: '10px', borderRadius: 'var(--radius-md)', border: '1px dashed var(--border)', background: 'transparent', color: savedMeal ? 'var(--em-text)' : 'var(--text-muted)', cursor: 'pointer', fontFamily: 'var(--mono)', fontSize: 'var(--fs-floor)', letterSpacing: '1px', textTransform: 'uppercase', transition: 'color .15s' }}>
             {savedMeal ? 'Saved to your meals' : 'Save as a meal for later'}
           </button>
         )}

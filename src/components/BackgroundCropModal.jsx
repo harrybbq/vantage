@@ -146,8 +146,8 @@ export default function BackgroundCropModal({ src, onCancel, onConfirm }) {
     >
       <div className="modal" style={{ maxWidth: FRAME_W + 56 }}>
         <div style={{
-          fontFamily: 'var(--mono)', fontSize: 10, letterSpacing: 1.6,
-          textTransform: 'uppercase', color: 'var(--em)', fontWeight: 700,
+          fontFamily: 'var(--mono)', fontSize: 'var(--fs-floor)', letterSpacing: 1.6,
+          textTransform: 'uppercase', color: 'var(--em-text)', fontWeight: 700,
           marginBottom: 4,
         }}>// POSITION BACKGROUND</div>
         <h3 style={{ margin: '0 0 14px' }}>Crop & position</h3>
@@ -201,7 +201,7 @@ export default function BackgroundCropModal({ src, onCancel, onConfirm }) {
 
         {/* Zoom slider */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 14 }}>
-          <span style={{ fontFamily: 'var(--mono)', fontSize: 11, color: 'var(--text-muted)' }}>−</span>
+          <span style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-floor)', color: 'var(--text-muted)' }}>−</span>
           <input
             type="range"
             min={minScaleRef.current || 0.1}
@@ -212,11 +212,11 @@ export default function BackgroundCropModal({ src, onCancel, onConfirm }) {
             style={{ flex: 1, accentColor: 'var(--em)' }}
             aria-label="Zoom"
           />
-          <span style={{ fontFamily: 'var(--mono)', fontSize: 11, color: 'var(--text-muted)' }}>+</span>
+          <span style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-floor)', color: 'var(--text-muted)' }}>+</span>
         </div>
 
         <p style={{
-          fontFamily: 'var(--mono)', fontSize: 10, color: 'var(--text-muted)',
+          fontFamily: 'var(--mono)', fontSize: 'var(--fs-floor)', color: 'var(--text-muted)',
           margin: '10px 0 0', textAlign: 'center', letterSpacing: 0.4,
         }}>
           Drag to reposition · pinch or use the slider to zoom

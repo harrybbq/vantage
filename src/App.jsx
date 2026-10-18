@@ -6,6 +6,7 @@ import { SubscriptionProvider } from './context/SubscriptionContext';
 import { useTierLimits } from './hooks/useTierLimits';
 import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts';
 import AuthScreen from './components/AuthScreen';
+import { parseInvitePath, peekPendingInvite, takePendingInvite } from './lib/friends/invites';
 import Nav from './components/Nav';
 import PageHeader from './components/PageHeader';
 import HubSection from './components/HubSection';
@@ -27,6 +28,8 @@ import LegalPage from './components/LegalPage';
 import ConsentHost from './components/consent/ConsentHost';
 import CookieBanner from './components/CookieBanner';
 import InstallPrompt from './components/InstallPrompt';
+import { hasLoggedSomething } from './lib/native/installPrompt';
+import { meaningfulEvidence } from './lib/state/meaningful';
 import TutorialOverlay from './components/TutorialOverlay';
 import BackgroundCropModal from './components/BackgroundCropModal';
 import VisionsModal from './components/VisionsModal';
@@ -62,6 +65,9 @@ import TermsAcceptanceSheet from './components/TermsAcceptanceSheet';
 // to null and Rollup never emits their chunks.
 const UpgradeSection = OWNER_SURFACES_IN_BUILD ? lazy(() => import('./components/upgrade/UpgradeSection')) : null;
 const AdminEditModal = OWNER_SURFACES_IN_BUILD ? lazy(() => import('./components/AdminEditModal')) : null;
+// /invite/<code> — a friend's invite link. Lazy: almost no page load is one.
+const InviteLanding = lazy(() => import('./components/friends/InviteLanding'));
+const InvitePill = lazy(() => import('./components/friends/InviteLanding').then(m => ({ default: m.InvitePill })));
 
 // Sections that are not the first screen load on demand, so the hub
 // paints without first downloading Track, Shop, Achievements and the
@@ -572,6 +578,18 @@ function Board({ userId, userEmail, onSignOut }) {
     closeModal: handleCloseModal,
   });
 
+  // Tell the stylesheets when a photo is behind the current page, so the
+  // text that sits straight on the page (headers, tab rows, Settings)
+  // can take a reading plate — see "Text over a photo" in index.css.
+  // Presentation only: reads S.backgrounds, writes nothing to state.
+  const photoBehind = !!backgrounds[activeSection];
+  useEffect(() => {
+    const r = document.documentElement;
+    if (photoBehind) r.setAttribute('data-bg-photo', '1');
+    else r.removeAttribute('data-bg-photo');
+    return () => r.removeAttribute('data-bg-photo');
+  }, [photoBehind]);
+
   if (loading) {
     return (
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', color: 'var(--text-muted)', fontFamily: 'var(--mono)', fontSize: '13px', letterSpacing: '2px' }}>
@@ -614,13 +632,13 @@ function Board({ userId, userEmail, onSignOut }) {
           boxShadow: '0 14px 36px rgba(0,0,0,0.08)',
         }}>
           <div style={{
-            fontFamily: 'var(--mono)', fontSize: 9, letterSpacing: 2.5,
+            fontFamily: 'var(--mono)', fontSize: 'var(--fs-floor)', letterSpacing: 2.5,
             textTransform: 'uppercase', color: 'var(--em-mid, var(--em))',
             marginBottom: 8,
           }}>{eyebrow}</div>
           <h2 style={{
             fontFamily: 'var(--display)', fontSize: 24, fontStyle: 'italic',
-            fontWeight: 700, color: 'var(--em)', margin: '0 0 14px',
+            fontWeight: 700, color: 'var(--em-text)', margin: '0 0 14px',
           }}>
             {headline}
           </h2>
@@ -927,7 +945,7 @@ function Board({ userId, userEmail, onSignOut }) {
           <motion.div key="upgrade" {...pageMotion}>
             <WidgetBoundary variant="section" name="upgrade">
             <Suspense fallback={null}>
-              <UpgradeSection S={S} update={update} active isOwner={isOwner} userId={userId} />
+              <UpgradeSection S={S} update={update} active isOwner={isOwner} userId={userId} hydrated={hydrated} />
             </Suspense>
             </WidgetBoundary>
           </motion.div>
@@ -986,7 +1004,7 @@ function Board({ userId, userEmail, onSignOut }) {
       />
       <ShortcutsModal open={shortcutsOpen} onClose={() => setShortcutsOpen(false)} />
       <CookieBanner onOpenLegal={setLegalPage} />
-      <InstallPrompt />
+      <InstallPrompt engaged={hydrated && hasLoggedSomething(meaningfulEvidence(S))} />
       {AdminEditModal && isOwner && (
         <Suspense fallback={null}>
           <AdminEditModal
@@ -1018,11 +1036,11 @@ function Board({ userId, userEmail, onSignOut }) {
         onPushMessage={msg => handleIncomingPush(msg, {
           navigate, showToast: showCoinToast, prefs: S.notifications,
         })}
-        headline="Vision unlocked. Want a ping for the next one?"
+        headline="Honour earned. Want a ping for the next one?"
         body={(
           <>
             We'll only ping you for the categories you turn on in
-            Settings — vision unlocks, friend requests, streak warnings.
+            Settings — honours earned, friend requests, streak warnings.
             No marketing, no signup nudges.
             <br /><br />
             Quiet hours are honored. You can turn any of this off whenever.
@@ -1058,6 +1076,20 @@ export default function App() {
     if (path === '/terms' || hash === 'terms') return 'terms';
     return null;
   });
+
+  // Invite links deep-link pre-auth the same way. A code parked by the
+  // landing's button (sessionStorage) brings the visitor back to it after
+  // sign-in, where the request is sent without a second tap.
+  const [inviteCode, setInviteCode] = useState(() => {
+    try { return parseInvitePath(window.location.pathname) || peekPendingInvite(); } catch { return null; }
+  });
+  const [inviteAuth, setInviteAuth] = useState(false);
+  function closeInvite() {
+    takePendingInvite();
+    setInviteCode(null);
+    setInviteAuth(false);
+    try { if (window.location.pathname.startsWith('/invite/')) window.history.replaceState(null, '', '/'); } catch { /* no-op */ }
+  }
 
   function closeLegal() {
     setLegalPage(null);
@@ -1124,7 +1156,27 @@ export default function App() {
     );
   }
 
-  if (!session) return <AuthScreen onOpenLegal={setLegalPage} />;
+  if (inviteCode && !(inviteAuth && !session)) {
+    return (
+      <Suspense fallback={null}>
+        <InviteLanding
+          code={inviteCode}
+          session={session}
+          onSignIn={() => setInviteAuth(true)}
+          onDone={closeInvite}
+        />
+      </Suspense>
+    );
+  }
+
+  if (!session) {
+    return (
+      <>
+        {inviteCode && <Suspense fallback={null}><InvitePill onCancel={closeInvite} /></Suspense>}
+        <AuthScreen onOpenLegal={setLegalPage} />
+      </>
+    );
+  }
   return (
     <SubscriptionProvider userId={session.user.id}>
       <Board userId={session.user.id} userEmail={session.user.email} onSignOut={handleSignOut} />

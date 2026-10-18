@@ -74,7 +74,7 @@ export default class RootErrorBoundary extends Component {
           {error.message || String(error)}
         </div>
         {culprit && (
-          <div style={{ fontSize: 10.5, opacity: 0.8, wordBreak: 'break-word', maxWidth: '34em' }}>
+          <div style={{ fontSize: 'var(--fs-floor)', opacity: 0.8, wordBreak: 'break-word', maxWidth: '34em' }}>
             {culprit}
           </div>
         )}
@@ -93,7 +93,7 @@ export default class RootErrorBoundary extends Component {
                      color: 'var(--text-muted, #8a8a85)', cursor: 'pointer' }}
           >Try again</button>
         </div>
-        <div style={{ fontSize: 10, opacity: 0.75, maxWidth: '30em', lineHeight: 1.6 }}>
+        <div style={{ fontSize: 'var(--fs-floor)', opacity: 0.75, maxWidth: '30em', lineHeight: 1.6 }}>
           Your data is safe — it lives on the server, and nothing here writes to it.
         </div>
       </div>

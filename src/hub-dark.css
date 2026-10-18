@@ -29,7 +29,10 @@ html[data-theme="dark-os"] {
   /* Text — muted warm-grey instead of near-black */
   --text:        #ddd8ce;
   --text-mid:    #9a958c;
-  --text-muted:  #5a5650;
+  /* Was #5a5650 — 2.5:1 on the panel surface, under every contrast
+     floor. #8a857c is 5.1:1 on --surface and 4.5:1 on --surface-deep,
+     and still sits a clear step below --text-mid. */
+  --text-muted:  #8a857c;
 
   /* Borders — subtle hairlines instead of thick warm tan */
   --border:      #252521;
@@ -46,6 +49,14 @@ html[data-theme="dark-os"] {
   --os-surface:    #131311;
   --os-surface2:   #191917;
   --os-surface3:   #1f1f1c;
+  /* Cards that read var(--card) fell back to rgba(255,255,255,.02–.04)
+     here — near-transparent, so a background photo showed straight
+     through habit cards, Settings tiles and the like. Solid now. */
+  --card:          #131311;
+  /* Accent text: the scheme's light step (8:1 on panels for green). */
+  --em-text:       var(--em-light);
+  --gold-text:     var(--gold);
+  --gold-hi-text:  var(--gold-lt);
 
   /* Accent lines — re-tinted darker so they sit on dark surfaces */
   --accent-line:      rgba(var(--em-rgb), 0.28);
@@ -110,7 +121,7 @@ html[data-hub-os] #pageHeader {
   -webkit-backdrop-filter: none;
   gap: 18px;
   font-family: var(--mono);
-  font-size: 9px;
+  font-size: var(--fs-floor);
   letter-spacing: 1.5px;
   text-transform: uppercase;
   color: var(--text-muted);
@@ -120,9 +131,9 @@ html[data-hub-os] nav:hover ~ #pageHeader { left: 168px; }
 
 html[data-hub-os] #pageHeader-title {
   font-family: var(--mono);
-  font-size: 9px;
+  font-size: var(--fs-floor);
   letter-spacing: 2px;
-  color: var(--em-light);
+  color: var(--em-text);
   font-weight: 500;
 }
 
@@ -132,7 +143,7 @@ html[data-hub-os] #pageHeader-sub {
 
 html[data-hub-os] #pageHeader-section {
   font-family: var(--mono) !important;
-  font-size: 9px !important;
+  font-size: var(--fs-floor) !important;
   font-style: normal !important;
   letter-spacing: 1.5px;
   text-transform: uppercase;
@@ -157,18 +168,22 @@ html[data-hub-os] #coinWallet {
   gap: 6px;
   font-family: var(--mono);
 }
-html[data-hub-os] #coinWallet .cw-icon { color: var(--gold-lt); font-size: 11px; }
+html[data-hub-os] #coinWallet .cw-icon { color: var(--gold-hi-text); font-size: var(--fs-floor); }
 html[data-hub-os] #coinWallet .cw-amount {
-  font-size: 11px;
+  font-size: var(--fs-floor);
   font-family: var(--mono);
-  color: var(--gold-lt);
+  color: var(--gold-hi-text);
   letter-spacing: 0.5px;
 }
 html[data-hub-os] #coinWallet .cw-label {
-  font-size: 7px;
+  font-size: var(--fs-floor);
   letter-spacing: 1.2px;
   color: var(--text-muted);
 }
+/* Balance and label on one line: stacked at the floor size they were
+   taller than the 32px chrome bar and hung out of the bottom of it. */
+html[data-hub-os] #coinWallet { padding: 2px 9px; line-height: 1.2; }
+html[data-hub-os] #coinWallet > div { display: flex; align-items: baseline; gap: 6px; }
 
 /* The chips that joined the chrome bar. It sets uppercase/letter-spacing
    on itself, which is right for its labels and wrong for a menu of
@@ -182,8 +197,8 @@ html[data-hub-os] .header-weather {
   text-transform: none;
   letter-spacing: normal;
 }
-html[data-hub-os] .header-weather-temp { font-size: 11px; color: var(--text); }
-html[data-hub-os] .header-weather-city { font-size: 10px; color: var(--text-muted); }
+html[data-hub-os] .header-weather-temp { font-size: var(--fs-floor); color: var(--text); }
+html[data-hub-os] .header-weather-city { font-size: var(--fs-floor); color: var(--text-muted); }
 
 html[data-hub-os] .header-requests {
   border-radius: 4px;
@@ -199,13 +214,13 @@ html[data-hub-os] .header-bg-btn {
   color: var(--text-mid);
 }
 html[data-hub-os] .header-bg-btn:hover,
-html[data-hub-os] .header-bg-btn.is-open { border-color: var(--em); color: var(--em-light); }
+html[data-hub-os] .header-bg-btn.is-open { border-color: var(--em); color: var(--em-text); }
 html[data-hub-os] .header-bg-menu {
   background: var(--os-panel, #12140f);
   border-color: var(--os-border-md);
 }
 
-html[data-hub-os] #coinWallet .cw-today { font-size: 9.5px; }
+html[data-hub-os] #coinWallet .cw-today { font-size: var(--fs-floor); }
 html[data-hub-os] #coinWallet.is-open { border-color: var(--gold-lt); }
 /* Squarer corners and no glass, to match the other chrome menus. The
    text colours are NOT re-stated here: the chrome bar is near black in
@@ -319,7 +334,7 @@ html[data-hub-os] .fr-panel-close {
   color: var(--text-muted);
   cursor: pointer;
 }
-html[data-hub-os] .fr-panel-close:hover { color: var(--em-light); border-color: var(--em); }
+html[data-hub-os] .fr-panel-close:hover { color: var(--em-text); border-color: var(--em); }
 
 html[data-hub-os] .fr-panel-body {
   flex: 1;
@@ -384,7 +399,7 @@ html[data-hub-os] .nav-logo-icon {
   min-width: 48px;
   height: 28px;
   font-size: 16px;
-  color: var(--em-light);
+  color: var(--em-text);
 }
 html[data-hub-os] .nav-logo-text {
   font-family: var(--display);
@@ -401,7 +416,7 @@ html[data-hub-os] .nav-tab {
   padding: 0;
   gap: 10px;
   font-family: var(--mono);
-  font-size: 9.5px;
+  font-size: var(--fs-floor);
   letter-spacing: 1.2px;
   text-transform: uppercase;
   color: var(--text-muted);
@@ -416,7 +431,7 @@ html[data-hub-os] .nav-tab-icon {
 }
 html[data-hub-os] .nav-tab-label {
   font-family: var(--mono);
-  font-size: 9.5px;
+  font-size: var(--fs-floor);
   font-weight: 400;
   letter-spacing: 1.2px;
 }
@@ -430,13 +445,13 @@ html[data-hub-os] .nav-tab:hover:not(.active) .nav-tab-icon {
 }
 html[data-hub-os] .nav-tab.active {
   background: rgba(var(--em-rgb), 0.08);
-  color: var(--em-light);
+  color: var(--em-text);
 }
 html[data-hub-os] .nav-tab.active .nav-tab-icon {
   background: transparent;
-  color: var(--em-light);
+  color: var(--em-text);
 }
-html[data-hub-os] .nav-tab.active .nav-tab-label { color: var(--em-light); }
+html[data-hub-os] .nav-tab.active .nav-tab-label { color: var(--em-text); }
 
 html[data-hub-os] .nav-bottom {
   padding: 10px 4px;
@@ -482,7 +497,7 @@ html[data-hub-os] .os-panel[data-transparent="true"] .os-panel-body {
 html[data-hub-os] .os-panel-label,
 html[data-hub-os] .hub-os-top > .ratings-ledger .ratings-ledger-head {
   font-family: var(--mono);
-  font-size: 8.5px;
+  font-size: var(--fs-floor);
   letter-spacing: 2px;
   text-transform: uppercase;
   color: var(--text-muted);
@@ -508,13 +523,13 @@ html[data-hub-os] .hub-os-top > .ratings-ledger .ratings-ledger-eyebrow {
 html[data-hub-os] .os-panel-label-text::before,
 html[data-hub-os] .hub-os-top > .ratings-ledger .ratings-ledger-eyebrow::before {
   content: '//';
-  color: var(--em);
+  color: var(--em-text);
   opacity: 0.7;
 }
 html[data-hub-os] .os-panel-label-right,
 html[data-hub-os] .hub-os-top > .ratings-ledger .ratings-ledger-tag {
   color: var(--text-muted);
-  font-size: 8px;
+  font-size: var(--fs-floor);
   letter-spacing: 1.5px;
 }
 
@@ -611,16 +626,20 @@ html[data-hub-os] .hub-os-top > .ratings-ledger .ratings-legend-label {
   /* Small enough that FINANCE and FITNESS fit whole. A truncated word is
      worse than a small one here: the label is the only thing naming an
      arc now that the hover readout has gone. */
-  font-size: 8.5px;
+  font-size: var(--fs-floor);
   letter-spacing: 0.4px;
 }
 /* A slightly smaller ring buys the label the width it needs. */
 html[data-hub-os] .hub-os-top > .ratings-ledger .ratings-donut {
   width: 120px;
   height: 120px;
+  /* Drawn at 132 and shown at 120, so the hole's label needs scaling
+     back up to land on the floor. !important: it outranks the inline
+     value RatingsDonut sets from its size prop. */
+  --rt-scale: 1.1 !important;
 }
 html[data-hub-os] .hub-os-top > .ratings-ledger .ratings-legend-score {
-  font-size: 11.5px;
+  font-size: max(11.5px, var(--fs-floor));
 }
 
 html[data-hub-os] .hub-os-main {
@@ -812,7 +831,7 @@ html[data-hub-os] .os-profile-name {
 html[data-hub-os] .os-profile-name::placeholder { color: var(--text-muted); }
 html[data-hub-os] .os-profile-tagline {
   font-family: var(--mono);
-  font-size: 9px;
+  font-size: var(--fs-floor);
   letter-spacing: 1.5px;
   text-transform: uppercase;
   color: var(--text-muted);
@@ -831,14 +850,14 @@ html[data-hub-os] .os-profile-status {
 }
 html[data-hub-os] .os-status-badge {
   font-family: var(--mono);
-  font-size: 8px;
+  font-size: var(--fs-floor);
   letter-spacing: 1.2px;
   text-transform: uppercase;
   padding: 2px 7px;
   border-radius: 3px;
   background: rgba(var(--em-rgb), 0.08);
   border: 1px solid rgba(var(--em-rgb), 0.22);
-  color: var(--em-light);
+  color: var(--em-text);
 }
 
 /* ── Session panel ── */
@@ -858,14 +877,14 @@ html[data-hub-os] .os-session-greeting {
 }
 html[data-hub-os] .os-session-greeting em {
   font-style: italic;
-  color: var(--em-light);
+  color: var(--em-text);
 }
 html[data-hub-os] .os-session-main {
   min-width: 0;
 }
 html[data-hub-os] .os-session-date {
   font-family: var(--mono);
-  font-size: 9px;
+  font-size: var(--fs-floor);
   letter-spacing: 2px;
   text-transform: uppercase;
   color: var(--text-muted);
@@ -889,7 +908,7 @@ html[data-hub-os] .os-session-node {
   align-items: center;
   justify-content: center;
   font-family: var(--mono);
-  font-size: 9px;
+  font-size: var(--fs-floor);
   font-weight: 700;
   background: transparent;
   border: 1px solid var(--border-strong, var(--border));
@@ -904,7 +923,7 @@ html[data-hub-os] .os-session-node.is-hit {
 }
 html[data-hub-os] .os-session-trackers-meta {
   font-family: var(--mono);
-  font-size: 9px;
+  font-size: var(--fs-floor);
   letter-spacing: 1px;
   color: var(--text-muted);
   margin-left: 2px;
@@ -932,14 +951,17 @@ html[data-hub-os] .os-session-event {
   border: 1px solid var(--border-strong, var(--border));
   background: rgba(127, 127, 127, .07);
   font-family: var(--sans);
-  font-size: 11.5px;
+  font-size: max(11.5px, var(--fs-floor));
   color: var(--text);
 }
 html[data-hub-os] .os-session-event.is-past {
-  opacity: .45;
+  /* Struck through and muted says "done"; fading it to 45% on top of
+     that put the time at 2:1. */
   text-decoration: line-through;
   text-decoration-thickness: 1px;
 }
+html[data-hub-os] .os-session-event.is-past .os-session-event-name { color: var(--text-muted); }
+html[data-hub-os] .os-session-event.is-past .os-session-event-dot { opacity: .45; }
 html[data-hub-os] .os-session-event-dot {
   width: 7px;
   height: 7px;
@@ -948,7 +970,7 @@ html[data-hub-os] .os-session-event-dot {
 }
 html[data-hub-os] .os-session-event-at {
   font-family: var(--mono);
-  font-size: 9.5px;
+  font-size: var(--fs-floor);
   color: var(--text-muted);
   font-variant-numeric: tabular-nums;
   flex: none;
@@ -961,7 +983,7 @@ html[data-hub-os] .os-session-event-name {
 }
 html[data-hub-os] .os-session-events-meta {
   font-family: var(--mono);
-  font-size: 9px;
+  font-size: var(--fs-floor);
   letter-spacing: 1px;
   color: var(--text-muted);
 }
@@ -1007,7 +1029,7 @@ html[data-hub-os] .os-action-btn {
   cursor: pointer;
   color: var(--text-muted);
   font-family: var(--mono);
-  font-size: 9px;
+  font-size: var(--fs-floor);
   letter-spacing: 1.5px;
   text-transform: uppercase;
   transition: border-color 0.14s, color 0.14s, background 0.14s;
@@ -1016,12 +1038,12 @@ html[data-hub-os] .os-action-btn {
 }
 html[data-hub-os] .os-action-btn:hover {
   border-color: var(--em);
-  color: var(--em-light);
+  color: var(--em-text);
   background: rgba(var(--em-rgb), 0.05);
 }
 html[data-hub-os] .os-action-btn.primary {
   border-color: rgba(var(--em-rgb), 0.35);
-  color: var(--em-light);
+  color: var(--em-text);
   background: rgba(var(--em-rgb), 0.06);
   border-style: dashed;
 }
@@ -1038,12 +1060,12 @@ html[data-hub-os] .os-tracker-row {
   align-items: center;
   gap: 10px;
   font-family: var(--mono);
-  font-size: 10px;
+  font-size: var(--fs-floor);
 }
 html[data-hub-os] .os-tracker-name {
   flex: 1;
   color: var(--text-mid);
-  font-size: 10.5px;
+  font-size: var(--fs-floor);
   font-family: var(--body);
   white-space: nowrap;
   overflow: hidden;
@@ -1051,7 +1073,7 @@ html[data-hub-os] .os-tracker-name {
 }
 html[data-hub-os] .os-tracker-pill {
   font-family: var(--mono);
-  font-size: 8.5px;
+  font-size: var(--fs-floor);
   letter-spacing: 0.5px;
   padding: 2px 7px;
   border-radius: 3px;
@@ -1059,7 +1081,7 @@ html[data-hub-os] .os-tracker-pill {
   color: var(--text-muted);
 }
 html[data-hub-os] .os-tracker-pill.hit {
-  color: var(--em-light);
+  color: var(--em-text);
   border-color: rgba(var(--em-rgb), 0.35);
   background: rgba(var(--em-rgb), 0.08);
 }
@@ -1123,7 +1145,7 @@ html[data-hub-os] .os-habit-dot {
 html[data-hub-os] .os-habit-dot.danger { background: #c07070; }
 html[data-hub-os] .os-habit-name {
   flex: 1;
-  font-size: 11px;
+  font-size: var(--fs-floor);
   color: var(--text-mid);
   white-space: nowrap;
   overflow: hidden;
@@ -1131,12 +1153,12 @@ html[data-hub-os] .os-habit-name {
 }
 html[data-hub-os] .os-habit-streak {
   font-family: var(--mono);
-  font-size: 9px;
+  font-size: var(--fs-floor);
   color: var(--text-muted);
 }
 html[data-hub-os] .os-habits-empty {
   padding: 12px 10px;
-  font-size: 10.5px;
+  font-size: var(--fs-floor);
   color: var(--text-muted);
   text-align: center;
   font-style: italic;
@@ -1291,7 +1313,7 @@ html[data-theme="dark-os"] .sec-title { color: var(--text); }
 
   /* Chrome bar — thin on mobile with only essentials */
   html[data-theme="dark-os"] #pageHeader { padding: 0 10px; gap: 10px; }
-  html[data-theme="dark-os"] #pageHeader-title { font-size: 8.5px; }
+  html[data-theme="dark-os"] #pageHeader-title { font-size: var(--fs-floor); }
   html[data-theme="dark-os"] #coinWallet { padding: 2px 6px; }
 
   /* Sidebar inherits the existing bottom-tab-bar behavior from index.css */
@@ -1315,7 +1337,7 @@ html[data-theme="dark-os"] .os-cardio-row {
 }
 html[data-theme="dark-os"] .os-cardio-label {
   font-family: var(--mono);
-  font-size: 9.5px;
+  font-size: var(--fs-floor);
   text-transform: uppercase;
   letter-spacing: 1.4px;
   color: var(--text-muted);
@@ -1351,7 +1373,7 @@ html[data-theme="dark-os"] .os-cardio-unit {
   position: absolute;
   right: 10px;
   font-family: var(--mono);
-  font-size: 10px;
+  font-size: var(--fs-floor);
   color: var(--text-muted);
   letter-spacing: 1px;
   pointer-events: none;
@@ -1392,14 +1414,14 @@ html[data-theme="dark-os"] .os-cardio-kcal-val {
 }
 html[data-theme="dark-os"] .os-cardio-kcal-unit {
   font-family: var(--mono);
-  font-size: 10px;
+  font-size: var(--fs-floor);
   color: var(--text-muted);
   text-transform: uppercase;
   letter-spacing: 1.5px;
 }
 html[data-theme="dark-os"] .os-cardio-sub {
   font-family: var(--mono);
-  font-size: 9.5px;
+  font-size: var(--fs-floor);
   color: var(--text-muted);
   letter-spacing: 0.4px;
   text-align: center;
@@ -1413,7 +1435,7 @@ html[data-theme="dark-os"] .os-cardio-log-btn {
   padding: 8px 12px;
   border-radius: 6px;
   font-family: var(--mono);
-  font-size: 10.5px;
+  font-size: var(--fs-floor);
   font-weight: 600;
   letter-spacing: 1px;
   text-transform: uppercase;
@@ -1455,20 +1477,20 @@ html[data-theme="dark-os"] .fc-panel--pending{
   box-shadow: 0 0 0 1px rgba(var(--em-rgb), 0.08), 0 4px 14px rgba(0, 0, 0, 0.25);
 }
 html[data-theme="dark-os"] .fc-panel--pending .fc-panel-label::before{
-  color: var(--em-light);
+  color: var(--em-text);
   opacity: 1;
 }
 html[data-theme="dark-os"] .fc-panel--pending .fc-panel-meta{
-  color: var(--em-light);
+  color: var(--em-text);
   font-weight: 600;
 }
 html[data-theme="dark-os"] .fc-panel-head{
   border-bottom: 1px solid var(--os-border);
   color: var(--text-muted);
 }
-html[data-theme="dark-os"] .fc-panel-label::before{ color: var(--em-light); opacity: .7; }
+html[data-theme="dark-os"] .fc-panel-label::before{ color: var(--em-text); opacity: .7; }
 html[data-theme="dark-os"] .fc-panel-meta{ color: var(--text-muted); }
-html[data-theme="dark-os"] .fc-panel-meta-online{ color: var(--em-light); }
+html[data-theme="dark-os"] .fc-panel-meta-online{ color: var(--em-text); }
 html[data-theme="dark-os"] .fc-panel-meta-sep{ opacity: .4; }
 html[data-theme="dark-os"] .fc-panel-empty{ color: var(--text-muted); }
 
@@ -1486,7 +1508,7 @@ html[data-theme="dark-os"] .fc-row-status{ color: var(--text-muted); }
 html[data-theme="dark-os"] .fc-row-level{
   background: rgba(var(--em-rgb),.10);
   border-color: rgba(var(--em-rgb),.28);
-  color: var(--em-light);
+  color: var(--em-text);
 }
 
 /* Add button */
@@ -1495,13 +1517,13 @@ html[data-theme="dark-os"] .fc-add-btn{
   border: 1px solid var(--os-border);
   color: var(--text-muted);
   font-family: var(--mono);
-  font-size: 10px;
+  font-size: var(--fs-floor);
   letter-spacing: 1.2px;
   text-transform: uppercase;
 }
 html[data-theme="dark-os"] .fc-add-btn:hover{
   background: var(--os-surface2);
-  color: var(--em-light);
+  color: var(--em-text);
   border-color: var(--os-border-md);
 }
 
@@ -1518,7 +1540,7 @@ html[data-theme="dark-os"] .fc-request-btn{
 html[data-theme="dark-os"] .fc-request-btn-accept{
   background: rgba(var(--em-rgb),.18);
   border-color: rgba(var(--em-rgb),.45);
-  color: var(--em-light);
+  color: var(--em-text);
 }
 html[data-theme="dark-os"] .fc-request-btn-accept:hover{
   background: rgba(var(--em-rgb),.28);
@@ -1541,10 +1563,10 @@ html[data-theme="dark-os"] .fc-handle{ color: var(--text-muted); }
 html[data-theme="dark-os"] .fc-level{
   background: rgba(var(--em-rgb),.10);
   border-color: rgba(var(--em-rgb),.28);
-  color: var(--em-light);
+  color: var(--em-text);
 }
 html[data-theme="dark-os"] .fc-divider{ background: var(--os-surface3); }
-html[data-theme="dark-os"] .fc-streak-num{ color: var(--em-light); }
+html[data-theme="dark-os"] .fc-streak-num{ color: var(--em-text); }
 html[data-theme="dark-os"] .fc-streak-label{ color: var(--text-muted); }
 html[data-theme="dark-os"] .fc-streak-habit{ color: #9a958c; }
 html[data-theme="dark-os"] .fc-streak-quiet{ color: var(--text-muted); }
@@ -1581,8 +1603,8 @@ html[data-theme="dark-os"] .add-friend-modal{
   background: var(--os-surface);
   border: 1px solid var(--os-border);
 }
-html[data-theme="dark-os"] .handle-claim-eyebrow{ color: var(--em-light); }
-html[data-theme="dark-os"] .handle-claim-title{ color: var(--em-light); }
+html[data-theme="dark-os"] .handle-claim-eyebrow{ color: var(--em-text); }
+html[data-theme="dark-os"] .handle-claim-title{ color: var(--em-text); }
 html[data-theme="dark-os"] .handle-claim-sub{ color: #9a958c; }
 html[data-theme="dark-os"] .handle-claim-input-wrap{
   background: var(--os-surface2);
@@ -1644,7 +1666,7 @@ html[data-theme="dark-os"] .report-reason-chip:hover{
 html[data-theme="dark-os"] .report-reason-chip.selected{
   background: rgba(var(--em-rgb), .14);
   border-color: var(--em-light);
-  color: var(--em-light);
+  color: var(--em-text);
 }
 html[data-theme="dark-os"] .report-context-input{
   background: var(--os-surface2);
@@ -1757,7 +1779,7 @@ html[data-theme="dark-os"] .ach-progress-fill{
 html[data-theme="dark-os"] .ach-card.status-completed .ach-progress-fill{
   background: linear-gradient(90deg, #b08a3a, #d4a94e);
 }
-html[data-theme="dark-os"] .ach-progress-count{ color: var(--em-light); }
+html[data-theme="dark-os"] .ach-progress-count{ color: var(--em-text); }
 
 /* Action bar */
 html[data-theme="dark-os"] .ach-actions{ border-top-color: var(--os-border); }
@@ -1776,7 +1798,7 @@ html[data-theme="dark-os"] .ach-stats{
 }
 html[data-theme="dark-os"] .ach-stats-item{ border-right-color: var(--os-border); }
 html[data-theme="dark-os"] .ach-stats-val{ color: #ddd8ce; }
-html[data-theme="dark-os"] .ach-stats-val-em{ color: var(--em-light); }
+html[data-theme="dark-os"] .ach-stats-val-em{ color: var(--em-text); }
 html[data-theme="dark-os"] .ach-stats-val-gold{ color: #d4a94e; }
 html[data-theme="dark-os"] .ach-stats-lbl{ color: var(--text-muted); }
 
@@ -1788,7 +1810,7 @@ html[data-theme="dark-os"] .ach-zoom-btn{
 }
 html[data-theme="dark-os"] .ach-zoom-btn:hover{
   border-color: var(--em-mid);
-  color: var(--em-light);
+  color: var(--em-text);
 }
 html[data-theme="dark-os"] .ach-zoom-val{ color: var(--text-muted); }
 
@@ -1815,7 +1837,7 @@ html[data-theme="dark-os"] .hub-footer-label{
   color: var(--text-muted);
 }
 html[data-theme="dark-os"] .yc-val{
-  color: var(--em-light);
+  color: var(--em-text);
 }
 html[data-theme="dark-os"] .yc-lbl{
   color: var(--text-muted);
@@ -1844,7 +1866,7 @@ html[data-theme="dark-os"] .settings-tab:hover{
   color: #ddd8ce;
 }
 html[data-theme="dark-os"] .settings-tab-active{
-  color: var(--em-light);
+  color: var(--em-text);
   border-bottom-color: var(--em-light);
 }
 html[data-theme="dark-os"] .settings-empty{
@@ -1865,7 +1887,7 @@ html[data-theme="dark-os"] .m-appbar {
 html[data-theme="dark-os"] .m-appbar-logo {
   background: rgba(var(--em-rgb), 0.13);
   border-color: rgba(var(--em-rgb), 0.3);
-  color: var(--em-light);
+  color: var(--em-text);
 }
 html[data-theme="dark-os"] .m-appbar-eyebrow {
   color: var(--text-muted);
@@ -1881,7 +1903,7 @@ html[data-theme="dark-os"] .m-appbar-bg {
 }
 html[data-theme="dark-os"] .m-appbar-bg:hover,
 html[data-theme="dark-os"] .m-appbar-bg.m-appbar-bg-active {
-  color: var(--em-light);
+  color: var(--em-text);
   border-color: var(--em);
   background: rgba(var(--em-rgb), 0.14);
 }
@@ -1896,7 +1918,7 @@ html[data-theme="dark-os"] .m-tab-label {
 }
 html[data-theme="dark-os"] .m-tab-active .m-tab-icon,
 html[data-theme="dark-os"] .m-tab-active .m-tab-label {
-  color: var(--em-light);
+  color: var(--em-text);
 }
 
 html[data-theme="dark-os"] .m-drawer {
@@ -1923,7 +1945,7 @@ html[data-theme="dark-os"] .m-drawer-item-active {
 }
 html[data-theme="dark-os"] .m-drawer-item-icon {
   background: rgba(var(--em-rgb), 0.13);
-  color: var(--em-light);
+  color: var(--em-text);
 }
 html[data-theme="dark-os"] .m-drawer-item-label {
   color: #ddd8ce;

@@ -71,6 +71,7 @@ action outside the repo.
 15. `[ ]` **Set up push credentials** — an APNs key for iOS, FCM for
     Android. The `push-dispatch` function and `FCM_*` env vars already
     exist.
+    *Status 2026-10-05: no Firebase project exists on the owner's Google account (checked in the console; it now asks for 2-step verification). Create one, register `com.vantage.app`, then set `FCM_SERVICE_ACCOUNT_JSON` + `FCM_PROJECT_ID` in Netlify. Until then push-dispatch queues and never sends.*
 16. `[ ]` **Test the service worker inside the Capacitor shell.** The SW
     is network-first on HTML and assumes a server; in a native shell the
     app loads from the local bundle. Verify the two don't fight.
@@ -366,6 +367,31 @@ code fails soft until it is run, so order doesn't matter.
 87. `[ ]` **AFTER** `push-dispatch` runs every minute — ~44k invocations a
     month on credit-based pricing, mostly finding nothing. Consider
     every 5 minutes, or trigger it from the queue insert instead.
+88. `[ ]` **AFTER** Supabase compute is **Small**, not Micro — about $5/month
+    over the Pro plan's $10 compute credit. Micro covers today's load; Small
+    gives the whole-state saves headroom. Owner's call; switching restarts
+    the database for a few minutes (do it while traffic is near zero).
+89. `[ ]` **AFTER** The Netlify Pro team also hosts `gammonbeastshundred` and
+    `vantagetrader` — about a third of builds are Vantage's. Production
+    deploys cost 15 credits each (~970 used 27 Sep–5 Oct), so batch
+    releases; Personal's 1,000 credits would not cover the current pace.
+90. `[x]` **AFTER** `global-trending` read every user's state on each refresh
+    — the first thing to saturate the DB. *Done 2026-10-05 (#225): Trending removed.*
+91. `[ ]` **AFTER** `get-leaderboard` has no shared cache and pulls ~500
+    profiles with avatars per view. Cache 5–10 min; avatars for the top 100 only.
+92. `[ ]` **AFTER** Presence writes a `profiles` UPDATE every 60 s per open
+    app (`usePublishProfile.js`). Every 5 min is enough.
+93. `[ ]` **LAUNCH** `whoop-cron` syncs users one by one inside a 20 s
+    budget — only ~10–20 users a night. Batch in parallel or run every 2 h.
+94. `[ ]` **LAUNCH** Custom SMTP for Supabase Auth. The built-in mailer
+    allows a few emails an hour; signups and resets fail at ~50 users.
+95. `[ ]` **AFTER** `weather` has no auth and calls ipwho.is per request;
+    `client-error` and `vitals-beacon` are open writes. Require auth / cache
+    by IP / rate-limit (pairs with item 86).
+96. `[ ]` **AFTER** Retention: nothing prunes `client_errors`,
+    `rating_snapshots` or `web_vitals` — schedule a monthly delete of old rows.
+97. `[x]` **LAUNCH** AI food scans had no server-side tier check.
+    *Done 2026-10-05 (#225): 3 free a week, unlimited on Pro, enforced in ai-food-detect.*
 
 ### Non-code tasks missing until now
 71. `[ ]` **Online Safety Act 2023** — DMs, groups and the leaderboard
@@ -581,6 +607,25 @@ Standing rules for both wearables, so a third one doesn't relearn them:
   `auth.users(id)`, or account deletion leaves it behind (see item 20).
 - **Disconnect must delete the tokens**, because the privacy policy says
   it does — `wearable-disconnect` covers both providers.
+
+## Running costs — confirmed 2026-10-05
+
+From the Supabase and Netlify billing pages (read-only check by a local
+session). USD at ~£0.75. Record of cash out lives in Upgrade → Books.
+
+| Service | Plan | Monthly | Notes |
+|---|---|---|---|
+| Supabase | Pro + Small compute | $29.83–30.33 (~£22–23) | Spend cap on; next invoice 5th of the month |
+| Netlify | Pro | $20 (~£15) | Shared with two other sites (~⅓ Vantage) |
+| Domain | — | £0 | `vantagevision.netlify.app` |
+| Firebase / GCP | none | £0 | No project yet (item 15) |
+| Apple / Google Play / ICO | not yet paid | — | £79/yr, $25 once, £52/yr at launch |
+| Anthropic API | unknown | ? | Console moved to platform.claude.com — check per-scan cost there |
+
+Today ≈ **£37/month** (Vantage's share ≈ £28 with Netlify apportioned);
+≈ **£48/month** once Apple and ICO are paid. 12 months to date: $214.55.
+The owner's Claude subscription is a development cost, kept out of the
+per-user margin.
 
 ## Standing operational notes
 

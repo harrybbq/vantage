@@ -183,6 +183,16 @@ function mapWhoop({ recoveries = [], sleeps = [], workouts = [], cycles = [] }) 
     // so the Calories Burned widget can show it and the macros donut
     // can derive active energy from it.
     if (sc.kilojoule != null) at(d).burnKcal = Math.round(sc.kilojoule * KJ_TO_KCAL);
+    // Steps: WHOOP added a nullable top-level `Cycle.step_count` on
+    // 2026-09-23 under the read:cycles scope we already hold (API
+    // changelog; confirmed by two independent integrations — the
+    // developer site itself is not reachable from the build machine).
+    // Read defensively — top level first, inside `score` as a fallback —
+    // and skip null/0, which WHOOP uses when the band wasn't worn all day.
+    // Stored under its own key so a user with WHOOP AND Oura (or Apple
+    // Health) keeps both counts; the tracker rule takes the highest.
+    const steps = Number(c.step_count ?? sc.step_count);
+    if (Number.isFinite(steps) && steps > 0) at(d).stepsWhoop = Math.round(steps);
   }
 
   const burn = {};

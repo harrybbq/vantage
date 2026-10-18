@@ -18,7 +18,7 @@ const wrap = {
   bottom: 'calc(env(safe-area-inset-bottom, 0px) + 84px)', zIndex: 9000,
   display: 'flex', alignItems: 'center', gap: 8, maxWidth: 'calc(100vw - 32px)',
   boxSizing: 'border-box', padding: '6px 12px', borderRadius: 999,
-  fontFamily: 'var(--mono, ui-monospace, Menlo, monospace)', fontSize: 11, lineHeight: 1.4,
+  fontFamily: 'var(--mono, ui-monospace, Menlo, monospace)', fontSize: 'var(--fs-floor)', lineHeight: 1.4,
   background: 'var(--surface, #1c1c1a)', color: 'var(--text, #e8e8e2)',
   border: '1px solid #d99114', boxShadow: '0 4px 16px rgba(0,0,0,.25)',
   pointerEvents: 'none',
@@ -39,7 +39,7 @@ export default function SaveStatusPill({ status }) {
           type="button"
           onClick={() => window.location.reload()}
           style={{
-            pointerEvents: 'auto', font: 'inherit', fontSize: 11, padding: '2px 8px',
+            pointerEvents: 'auto', font: 'inherit', fontSize: 'var(--fs-floor)', padding: '2px 8px',
             borderRadius: 999, cursor: 'pointer', background: 'transparent',
             color: 'inherit', border: '1px solid currentColor',
           }}
