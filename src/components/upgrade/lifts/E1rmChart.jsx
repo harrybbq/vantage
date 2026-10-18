@@ -1,11 +1,13 @@
 /**
- * e1RM over time — hand-rolled SVG, drawn at the container's real pixel
- * width so circles stay round and text stays text-sized.
+ * Estimated 1RM over time — hand-rolled SVG, drawn at the container's
+ * real pixel width so circles stay round and text stays text-sized. The
+ * line is an ESTIMATE (a trend); gold points mark days with a real PB
+ * set (heaviest or a rep max) — PBs are never the estimate.
  *
  * To scale on both axes: x is calendar time (a three-week gap looks like
  * three weeks), y is kg on a linear axis with round gridlines. One point
- * per training day (the day's best set). PB sets — PBs when they were
- * lifted — are marked larger with a ring; night-shift sets (80% load)
+ * per training day (the day's best set). Days with a real PB set are
+ * marked larger in gold; night-shift sets (80% load)
  * are HOLLOW and off the line (it joins day-shift sets only), so a
  * lighter night never reads as a regression.
  *
@@ -14,7 +16,7 @@
  */
 import { useMemo, useState } from 'react';
 import { useWidth } from './parts';
-import { dayNo, fmtE1rm, setText } from '../../../lib/lifts/lifts';
+import { dayNo, fmtE1rm, setText, pbHeadline } from '../../../lib/lifts/lifts';
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 const dateLabel = iso => { const [y, m, d] = iso.split('-').map(Number); return `${d} ${MONTHS[m - 1]} ${y}`; };
@@ -26,7 +28,7 @@ function niceStep(range, target = 4) {
   return (f <= 1 ? 1 : f <= 2 ? 2 : f <= 2.5 ? 2.5 : f <= 5 ? 5 : 10) * mag;
 }
 
-export default function E1rmChart({ series, lift, pbIds, from, to }) {
+export default function E1rmChart({ series, lift, pbDays, from, to }) {
   const [ref, width] = useWidth(640);
   const [pick, setPick] = useState(null);
   const H = width < 480 ? 200 : 240;
@@ -58,21 +60,24 @@ export default function E1rmChart({ series, lift, pbIds, from, to }) {
     }
     const every = Math.max(1, Math.ceil(months.length / Math.max(1, Math.floor(iw / 70))));
     const mt = months.filter((_, i) => i % every === 0);
-    const pts = series.map(p => ({ ...p, x: X(dayNo(p.date)), y: Y(p.value), pb: !!(pbIds && pbIds.get(p.entry.id) && (pbIds.get(p.entry.id).e1rm)) }));
+    const pts = series.map(p => {
+      const evs = (pbDays && pbDays.get(p.date)) || null;
+      return { ...p, x: X(dayNo(p.date)), y: Y(p.value), pb: !!(evs && evs.length), evs };
+    });
     // The line runs through day-shift sets only: a night set (80% load)
     // sits off the line as a hollow point instead of dragging it down.
     const day = pts.filter(p => !p.night);
     const line = (day.length >= 2 ? day : pts).map((p, i) => `${i ? 'L' : 'M'}${p.x.toFixed(1)} ${p.y.toFixed(1)}`).join(' ');
     return { X, Y, ticks, mt, pts, line, lo, hi, iw, ih };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [series, width, H, from, to, pbIds]);
+  }, [series, width, H, from, to, pbDays]);
 
   if (!g) {
     return <div ref={ref} className="lf-chart is-empty"><p className="lf-muted">No e1RM to chart in this range{lift.load === 'bodyweight_plus' ? ' — dips need a bodyweight reading within 14 days of the set' : ''}.</p></div>;
   }
   const sel = pick != null ? g.pts[Math.min(pick, g.pts.length - 1)] : null;
   const first = g.pts[0], last = g.pts[g.pts.length - 1];
-  const summary = `e1RM from ${fmtE1rm(first.value)} kg on ${dateLabel(first.date)} to ${fmtE1rm(last.value)} kg on ${dateLabel(last.date)}, ${g.pts.length} training days, ${g.pts.filter(p => p.pb).length} PBs.`;
+  const summary = `Estimated 1RM from about ${fmtE1rm(first.value)} kg on ${dateLabel(first.date)} to about ${fmtE1rm(last.value)} kg on ${dateLabel(last.date)}, ${g.pts.length} training days, ${g.pts.filter(p => p.pb).length} with a real PB set.`;
 
   const nearest = ev => {
     const box = ev.currentTarget.getBoundingClientRect();
@@ -122,14 +127,16 @@ export default function E1rmChart({ series, lift, pbIds, from, to }) {
         {sel ? (
           <>
             <b>{dateLabel(sel.date)}</b>
-            <span>{setText(sel.entry, lift)} · e1RM {fmtE1rm(sel.value)} kg</span>
-            {sel.pb && <span className="lf-tag is-pb">PB</span>}
+            <span>{setText(sel.entry, lift)} · est. 1RM ~{fmtE1rm(sel.value)} kg</span>
+            {sel.pb && sel.evs.map(ev => (
+              <span key={ev.entry.id} className="lf-tag is-pb">PB {setText(ev.entry, lift)} · {pbHeadline(ev)}</span>
+            ))}
             {sel.night && <span className="lf-tag is-night">night shift · 80% load</span>}
           </>
         ) : (
           <span className="lf-legend">
-            <span><i className="lf-key is-pb" />PB</span>
-            <span><i className="lf-key" />Day&apos;s best set</span>
+            <span><i className="lf-key is-line" />Estimated 1RM</span>
+            <span><i className="lf-key is-pb" />Real PB set that day</span>
             <span><i className="lf-key is-night" />Night shift · 80% load</span>
           </span>
         )}

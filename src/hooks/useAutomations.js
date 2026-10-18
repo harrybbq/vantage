@@ -55,6 +55,8 @@ export function useAutomations(S, update, loading) {
     recent.map(d => ((S.burnLog || {})[d] || []).map(e => e && e.id).join('+')).join(''),
     (S.subscriptions || []).map(x => x.nextDate || '').join(','),
     ((S.projection || {}).items || []).length,
+    // A finished Vantage workout counts for the 'workout' rule.
+    (((S.lifts || {}).sessions) || []).length,
   ].join('|');
   const lastSig = useRef(null);
 

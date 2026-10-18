@@ -66,6 +66,19 @@ export function hasDeviceWorkout(S, day) {
 }
 
 /**
+ * A workout finished in Vantage's own logger (Upgrade → Lifts) on this
+ * day — S.lifts.sessions holds finished workouts only, so an abandoned
+ * or in-progress one never counts.
+ */
+export function hasVantageWorkout(S, day) {
+  const sessions = S && S.lifts && Array.isArray(S.lifts.sessions) ? S.lifts.sessions : [];
+  return sessions.some(s => s && s.date === day && Array.isArray(s.exercises) && s.exercises.length > 0);
+}
+
+/** A workout from either: a wearable, or a finished Vantage workout. */
+export const hasWorkout = (S, day) => hasDeviceWorkout(S, day) || hasVantageWorkout(S, day);
+
+/**
  * Steps for a day — the highest count any source reported.
  *
  * Three writers, three places, all kept: Apple Health imports a burnLog
@@ -129,11 +142,11 @@ export const AUTO_SOURCES = [
   },
   {
     id: 'workout',
-    label: 'A wearable recorded a workout',
+    label: 'A workout was recorded',
     short: 'Workout',
-    hint: 'Any WHOOP or Oura workout that day. Step counts do not count.',
+    hint: 'A workout was recorded — wearable or Vantage: any WHOOP or Oura workout, or a workout finished in Vantage, that day. Step counts do not count.',
     needs: 'wearable', unit: '', dp: 0, threshold: null,
-    read: (S, day) => (hasDeviceWorkout(S, day) ? 1 : null),
+    read: (S, day) => (hasWorkout(S, day) ? 1 : null),
   },
   {
     id: 'strain',

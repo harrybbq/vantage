@@ -12,7 +12,7 @@ import {
   AUTO_SOURCES, MANUAL, proposeAutoLogs, applyAutoLogs, markManual,
   hasDeviceWorkout, stepsOn, ruleFor, ruleLabel, isAutoFilled, autoProvenance,
   sourceHasData, sourceById, recentDays, dayKey, BACKFILL_DAYS,
-  isStepTracker, suggestStepRules, applyStepRules,
+  isStepTracker, suggestStepRules, applyStepRules, hasVantageWorkout, hasWorkout,
 } from './autoLog.js';
 
 let n = 0;
@@ -329,6 +329,44 @@ const numT = (id, auto, extra = {}) => ({ id, name: id, type: 'number', auto, ..
   ok(applyStepRules(off, { now: NOW }) === off, 'a rule the user removed never comes back');
   const own = withData({ trackers: [numT('s', { source: 'weight' }, { name: 'Steps' })] });
   ok(applyStepRules(own, { now: NOW }) === own, 'a tracker with its own rule is left alone');
+}
+
+// ── A finished Vantage workout counts as a workout ──
+{
+  const sess = (id, date, exercises = [{ liftId: 'lp', sets: [{ reps: 8, weight: 100, done: true }] }]) => ({ id, date, exercises });
+  const S = base({
+    trackers: [boolT('gym', { source: 'workout' })],
+    burnLog: { [D(2)]: [{ id: 'whoop-w9', label: 'Weightlifting', kcal: 380 }] },
+    lifts: {
+      list: [{ id: 'lp', name: 'Machine leg press', load: 'weight' }],
+      log: [],
+      sessions: [sess('wk1', D(1)), sess('wk0', D(5), [])],
+      // an in-progress workout is not a finished one
+      active: { id: 'wk2', date: TODAY, startedAt: 0, exercises: [{ liftId: 'lp', sets: [{ reps: 8, weight: 100, done: true }] }] },
+    },
+  });
+  ok(hasVantageWorkout(S, D(1)), 'a finished Vantage workout is a workout');
+  ok(!hasVantageWorkout(S, TODAY), 'the workout still in progress is not');
+  ok(!hasVantageWorkout(S, D(5)), 'nor a session with no exercises in it');
+  ok(hasWorkout(S, D(2)) && hasWorkout(S, D(1)), 'wearable or Vantage — either counts');
+  ok(!hasWorkout(base(), TODAY), 'no lifts store at all does not throw');
+  eq(sourceById('workout').label, 'A workout was recorded', 'the label no longer says wearable-only');
+  ok(/wearable or Vantage/.test(sourceById('workout').hint), 'and the hint names both');
+
+  const props = proposeAutoLogs(S, { now: NOW });
+  eq(props.map(p => p.day).sort(), [D(1), D(2)].sort(), 'both workout days are proposed — and only those');
+  const next = applyAutoLogs(S, props, { now: NOW });
+  eq(next.logs[D(1)].gym, true, 'the Vantage day is ticked');
+  eq(next.logsAuto[D(1)].gym, 'workout', 'and says where it came from');
+  ok(next.lifts === S.lifts, 'the lifts store is not touched');
+  eq(proposeAutoLogs(next, { now: NOW }).length, 0, 'and nothing more to do after');
+
+  // the rules still hold: manual wins, nothing is overwritten
+  const manual = base({ ...S, logs: { [D(1)]: { gym: false } }, logsAuto: { [D(1)]: { gym: MANUAL } } });
+  ok(!proposeAutoLogs(manual, { now: NOW }).some(p => p.day === D(1)), 'a day the user un-ticked stays un-ticked');
+  const filled = base({ ...S, logs: { [D(1)]: { gym: false } } });
+  ok(!proposeAutoLogs(filled, { now: NOW }).some(p => p.day === D(1)), 'a cell with a value is never overwritten');
+  ok(sourceHasData(S, sourceById('workout'), 14, NOW), 'a Vantage workout makes the rule live without a wearable');
 }
 
 console.log(`tracker auto-fill: ${n} assertions passed`);

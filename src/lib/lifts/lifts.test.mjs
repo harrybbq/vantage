@@ -9,6 +9,7 @@ import {
   e1rm, e1rmInfo, isLowConfidence, effectiveLoad, entryE1rm, personalBests, isNewPB, pbTimeline, trend,
   relativeToBodyweight, showsBodyweightRatio, makeBwOf, bodyweightOn, bannedRule, BANNED_NOTE, REP_MAX_NS,
   fmtKg, fmtE1rm, weightText, setText, shortLiftName, pbMessage, pbKinds, isIso, addDays, daysBetween,
+  pbBasis, pbLoad, isRealPB, pbHeadline, estText,
 } from './lifts.js';
 import {
   DEFAULT_LIFTS, seedLifts, ensureLifts, liftsOf, withLifts, validateEntry, makeEntry, upsertEntry, removeEntry,
@@ -108,6 +109,31 @@ t('bodyweight_plus bests: heaviest is the added load, e1RM needs bodyweight', ()
   assert.equal(pb.bestE1rm.bodyweight, 80);
   const bwPlain = personalBests(log, DIP, { bwOf: () => 80 });
   near(bwPlain.bestE1rm.value, 126, 'bwOf may answer a bare number too');
+  assert.equal(none.basis, 'weight', 'no bodyweight → PBs compare the added load');
+  assert.equal(pb.basis, 'total', 'bodyweight known → PBs compare bodyweight + added');
+  assert.equal(pb.heaviest.value, 105);
+  assert.equal(pb.heaviest.entry.weight, 25);
+});
+t('bodyweight_plus basis: one scale per lift — a single set without bodyweight drops to added', () => {
+  const log = [set('dp', '2026-02-02', 10, 10), set('dp', '2026-03-20', 12.5, 6)];
+  const bwOf = iso => (iso < '2026-03-01' ? { kg: 80 } : null);
+  assert.equal(pbBasis(log, DIP, bwOf), 'weight', 'mixed → added, never total vs added');
+  assert.equal(personalBests(log, DIP, { bwOf }).heaviest.value, 12.5);
+  // A lighter bodyweight can make a heavier total a PB even at the same added load
+  const bwDrop = iso => ({ kg: iso < '2026-03-01' ? 80 : 84 });
+  const r = isNewPB([set('dp', '2026-02-02', 20, 8)], { id: 'b1', liftId: 'dp', date: '2026-03-02', weight: 20, reps: 8 }, DIP, { bwOf: bwDrop });
+  assert.equal(r.basis, 'total');
+  assert.equal(r.heaviest, true, '84 + 20 beats 80 + 20 on total load');
+  assert.equal(pbLoad({ date: '2026-03-02', weight: 20 }, DIP, 'total', bwDrop), 104);
+  assert.equal(pbLoad({ date: '2026-03-02', weight: 20 }, DIP, 'weight', bwDrop), 20);
+  assert.equal(pbBasis(log, PRESS, bwDrop), 'weight', 'only dips ever use total');
+});
+t('per_hand PBs compare one dumbbell', () => {
+  const prev = [set('db', '2026-01-05', 30, 8)];
+  const r = isNewPB(prev, { id: 'h', liftId: 'db', date: '2026-01-12', weight: 32, reps: 8 }, DB);
+  assert.equal(r.heaviest, true);
+  assert.deepEqual(r.repMaxes, [1, 3, 5, 8]);
+  assert.equal(personalBests([...prev, set('db', '2026-01-12', 32, 8)], DB).heaviest.value, 32, 'never doubled');
 });
 t('heaviest: equal weight shows the set with more reps', () => {
   const log = [set('lp', '2026-01-05', 180, 4), set('lp', '2026-01-12', 180, 6)];
@@ -121,14 +147,33 @@ t('isNewPB: strictly greater; a tie is not a PB', () => {
   assert.equal(tie.any, false);
   assert.equal(tie.heaviest, false);
   const heavier = isNewPB(prev, { id: 'n2', liftId: 'lp', date: '2026-01-19', weight: 177.5, reps: 3 }, PRESS);
-  assert.equal(heavier.heaviest, true);
-  assert.equal(heavier.e1rm, false, '177.5×3 (195) is under 170×8 (215)');
+  assert.equal(heavier.heaviest, true, 'a heavier real set is a PB even with a LOWER e1RM (195 vs 215)');
+  assert.equal('e1rm' in heavier, false, 'there is no e1RM PB kind');
   assert.deepEqual(heavier.repMaxes, [1, 3]);
-  assert.deepEqual(pbKinds(heavier), ['heaviest', '1RM', '3RM']);
+  assert.deepEqual(pbKinds(heavier), ['heaviest', '3RM'], 'the 1RM is the heaviest — said once');
+  assert.equal(pbHeadline(heavier), 'heaviest ever · new 3RM');
+});
+t('an e1RM-only improvement is NOT a PB', () => {
+  const prev = [set('lp', '2026-01-05', 170, 8), set('lp', '2026-01-12', 175, 5)];
   const e1 = isNewPB(prev, { id: 'n3', liftId: 'lp', date: '2026-01-19', weight: 170, reps: 9 }, PRESS);
-  assert.equal(e1.e1rm, true);
+  assert.ok(e1.value > personalBests(prev, PRESS).bestE1rm.value, 'the estimate went up (221 vs 215)…');
+  assert.equal(e1.any, false, '…but no real record was beaten: the 8RM (170) is only tied');
   assert.equal(e1.heaviest, false);
-  assert.deepEqual(e1.repMaxes, [], 'same weight for more reps beats e1RM, but the 8RM (170) is only tied');
+  assert.deepEqual(e1.repMaxes, []);
+  assert.deepEqual(pbKinds(e1), []);
+  assert.equal(isRealPB(e1), false);
+  const tl = pbTimeline([...prev, { id: 'n3', liftId: 'lp', date: '2026-01-19', weight: 170, reps: 9, createdAt: 999 }], PRESS);
+  assert.equal(tl.length, 1, 'only the 175×5 heavier set is on the timeline');
+  assert.equal(tl[0].entry.weight, 175);
+});
+t('rep-max PB without a heaviest: the highest N names it', () => {
+  const prev = [set('lp', '2026-01-05', 180, 6), set('lp', '2026-01-12', 160, 8)];
+  const r = isNewPB(prev, { id: 'rm', liftId: 'lp', date: '2026-01-19', weight: 170, reps: 8 }, PRESS);
+  assert.equal(r.heaviest, false);
+  assert.deepEqual(r.repMaxes, [8]);
+  assert.equal(r.any, true);
+  assert.equal(pbHeadline(r), 'new 8RM');
+  assert.deepEqual(pbKinds(r), ['8RM']);
 });
 t('isNewPB: first set of a lift is a baseline, not a PB', () => {
   const r = isNewPB([set('db', '2026-01-01', 30, 8)], { id: 'f', liftId: 'lp', date: '2026-01-02', weight: 100, reps: 10 }, PRESS);
@@ -143,7 +188,7 @@ t('isNewPB: an edit is judged against the other sets, not itself', () => {
   // been compared with itself, 180 > 180 would be false.
   const same = isNewPB(log, { ...b }, PRESS);
   assert.equal(same.heaviest, true);
-  assert.equal(same.e1rm, true, '216 vs 215.3');
+  assert.equal(same.any, true);
   // a tie with ANOTHER set is still not a PB
   assert.equal(isNewPB([a, b, set('lp', '2026-01-19', 180, 6)], { ...b }, PRESS).any, false);
   // and editing b DOWN below a is not
@@ -156,20 +201,24 @@ t('isNewPB: rep maxes only when a real number is beaten', () => {
   const s = isNewPB(prev, { id: 's', liftId: 'lp', date: '2026-01-12', weight: 165, reps: 8 }, PRESS);
   assert.deepEqual(s.repMaxes, [1, 3, 5, 8]);
 });
-t('isNewPB: dips need bodyweight for e1RM; heaviest still works', () => {
+t('isNewPB: dips without bodyweight compare added load; with it, total', () => {
   const prev = [set('dp', '2026-02-02', 20, 8)];
   const noBw = isNewPB(prev, { id: 'd', liftId: 'dp', date: '2026-02-09', weight: 22.5, reps: 8 }, DIP);
   assert.equal(noBw.heaviest, true);
-  assert.equal(noBw.e1rm, false);
+  assert.equal(noBw.basis, 'weight');
+  assert.equal(noBw.value, null, 'no estimate without bodyweight');
   const bw = isNewPB(prev, { id: 'd', liftId: 'dp', date: '2026-02-09', weight: 22.5, reps: 8 }, DIP, { bwOf: () => 80 });
-  assert.equal(bw.e1rm, true);
+  assert.equal(bw.basis, 'total');
+  assert.equal(bw.heaviest, true);
+  assert.ok(bw.value > 0, 'the estimate is reported for display');
 });
 t('pbTimeline: PBs as lifted, oldest first; ties and the first set excluded', () => {
   const log = [set('lp', '2026-01-05', 160, 8), set('lp', '2026-01-12', 160, 8), set('lp', '2026-01-19', 165, 8), set('lp', '2026-01-26', 140, 12),
     set('lp', '2026-02-02', 170, 8, { shift: 'night' })];
   const tl = pbTimeline(log, PRESS);
   assert.deepEqual(tl.map(x => x.entry.date), ['2026-01-19', '2026-02-02']);
-  assert.equal(tl[1].e1rm && tl[1].heaviest, true, 'night sets count raw weight');
+  assert.equal(tl[1].heaviest, true, 'night sets count raw weight');
+  assert.equal('e1rm' in tl[1], false, 'no e1RM kind on the timeline');
 });
 
 // ── Trend ──
@@ -393,8 +442,11 @@ t('formatting', () => {
   assert.equal(shortLiftName('Machine leg press'), 'Leg press');
   assert.equal(shortLiftName('Dip'), 'Dip');
   assert.equal(shortLiftName('Single-arm cable row'), 'Cable row');
-  assert.equal(pbMessage({ weight: 180, reps: 6 }, PRESS, 216), 'New PB: Leg press 180 kg × 6 (e1RM 216 kg)');
-  assert.equal(pbMessage({ weight: 20, reps: 6 }, DIP, null), 'New PB: Dip BW +20 kg × 6');
+  assert.equal(pbMessage({ weight: 180, reps: 6 }, PRESS, 216), 'New PB: Leg press 180 kg × 6', 'no e1RM in a PB line');
+  assert.equal(pbMessage({ weight: 20, reps: 6 }, DIP), 'New PB: Dip BW +20 kg × 6');
+  assert.equal(estText(241.2), 'est. 1RM ~241 kg');
+  assert.equal(estText(50, true), 'est. 1RM ≈50 kg');
+  assert.equal(estText(null), 'est. 1RM —');
 });
 t('date helpers', () => {
   assert.equal(isIso('2026-02-29'), false);

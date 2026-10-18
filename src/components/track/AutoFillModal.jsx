@@ -27,7 +27,7 @@ import {
 
 const NEEDS = {
   vitals: 'a weight, sleep or heart-rate source — WHOOP, Oura, Apple Health, or entered by hand',
-  wearable: 'WHOOP or Oura connected',
+  wearable: 'WHOOP or Oura connected, or a workout finished in Vantage',
   whoop: 'WHOOP connected',
   health: 'an Apple Health import',
   steps: 'WHOOP, Oura or an Apple Health import',

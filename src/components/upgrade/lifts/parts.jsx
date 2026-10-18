@@ -27,7 +27,7 @@ export function useWidth(fallback = 600) {
 }
 
 /**
- * e1RM sparkline: the best day-shift set of each week, to scale on both
+ * Estimated-1RM sparkline (a trend, not PBs): the best day-shift set of each week, to scale on both
  * axes (x is time, not index), drawn at the card's real width; the last
  * point dotted. Night sets (80% load) are left out so the line is the
  * trend, not the rota. Decorative — the card states the numbers in words.
@@ -128,8 +128,8 @@ export function Toast({ toast, onUndo, onDone }) {
 }
 
 /**
- * The PB moment: a trophy, the line ("New PB: Leg press 180 kg × 6
- * (e1RM 216 kg)") and which records it beat. A short burst of sparks
+ * The PB moment: a trophy, the line ("New PB: Leg press 180 kg × 6") and
+ * which real-set records it beat ("heaviest · 5RM") — never an estimate. A short burst of sparks
  * behind the trophy; none under prefers-reduced-motion (CSS). Stays
  * 4.5 s, or until dismissed.
  */

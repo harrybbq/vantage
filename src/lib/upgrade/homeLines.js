@@ -44,10 +44,15 @@
  *   three months running (this month and the two before); otherwise
  *   neutral. Not installed / SQL not run → neutral "Set up"; a failed
  *   or refused fetch → unknown.
- * Lifts (S.lifts, derived): always neutral — a PB is news, not a status.
- *   Figure = the weight of the most recent PB set, captioned with the
- *   lift ("180 kg" · "Leg press PB"), or "Log a lift" with nothing
- *   logged; text = "3 PBs this month · last logged 2 d ago".
+ * Lifts (S.lifts, derived): a workout in progress is `attention` —
+ *   "23 min" · "Legs in progress", text "Workout in progress · 23 min ·
+ *   5 sets done" — because an open workout is something left running.
+ *   Otherwise neutral (a PB is news, not a status): figure = the
+ *   heaviest REAL set of the lift with the most recent PB (else the
+ *   lift last logged), "180 kg" · "Leg press best" — never an estimated
+ *   1RM; text = "2 workouts this week · 3 PBs this month" (with no
+ *   finished workouts yet: "3 PBs this month · last logged 2 d ago").
+ *   "Log a lift" with nothing logged.
  *
  * ── updatedAt ──
  * The ms epoch of the data the line is built from: the console's own
@@ -56,7 +61,8 @@
  * null for the rotation (derived from the calendar, always current).
  */
 import { resolveDay, scheduleOf } from '../rotation/pattern.js';
-import { makeBwOf, pbTimeline, chrono, weightText, shortLiftName, daysBetween, isIso } from '../lifts/lifts.js';
+import { makeBwOf, pbTimeline, personalBests, chrono, weightText, shortLiftName, daysBetween, isIso } from '../lifts/lifts.js';
+import { activeOf, workoutsThisWeek, minutesText, elapsedSec } from '../lifts/workout.js';
 import { num, toMs } from '../security/format.js';
 import { pillState } from '../security/status.js';
 
@@ -410,13 +416,26 @@ export function booksCard({ res, months = [], today, at = null }) {
 // ── Lifts ─────────────────────────────────────────────────────────
 
 /**
- * @param lifts      S.lifts ({ list, log }) — absent or empty reads as nothing logged
- * @param vitalsLog  S.vitalsLog (bodyweight for dips' e1RM)
+ * @param lifts      S.lifts ({ list, log, sessions?, active? }) — absent or empty reads as nothing logged
+ * @param vitalsLog  S.vitalsLog (bodyweight, for dips compared on total load)
  * @param today      local 'YYYY-MM-DD'
- * A PB here is a set that beat the lift's e1RM or heaviest weight when
- * it was lifted (pbTimeline) — rep-max PBs are in the tab, not the count.
+ * @param now        ms epoch, for the in-progress workout's minutes
+ * A PB here is a REAL set that beat the lift's heaviest or one of its
+ * rep maxes when it was lifted (pbTimeline). The e1RM estimate is never
+ * a PB and never the figure.
  */
-export function liftsCard({ lifts, vitalsLog, today }) {
+export function liftsCard({ lifts, vitalsLog, today, now = null }) {
+  const active = activeOf({ lifts });
+  if (active) {
+    const sec = now != null ? elapsedSec(active, now) : 0;
+    const done = active.exercises.reduce((k, ex) => k + (ex.sets || []).filter(st => st && st.done).length, 0);
+    const mins = minutesText(sec);
+    return card({
+      figure: mins, figureLabel: `${active.name || 'Workout'} in progress`,
+      text: `Workout in progress · ${mins} · ${plural(done, 'set')} done`,
+      state: 'attention',
+    });
+  }
   const list = lifts && Array.isArray(lifts.list) ? lifts.list : [];
   const log = lifts && Array.isArray(lifts.log) ? lifts.log : [];
   const byId = new Map(list.map(l => [l.id, l]));
@@ -427,21 +446,27 @@ export function liftsCard({ lifts, vitalsLog, today }) {
   let latest = null, month = 0;
   for (const lift of list) {
     for (const ev of pbTimeline(log, lift, { bwOf })) {
-      if (!ev.e1rm && !ev.heaviest) continue;
       if (ev.entry.date.slice(0, 7) === ym) month++;
       if (!latest || chrono(ev.entry, latest.entry) > 0) latest = { entry: ev.entry, lift };
     }
   }
   let last = sets[0];
   for (const e of sets) if (chrono(e, last) > 0) last = e;
-  const d = isIso(today) ? Math.max(0, daysBetween(last.date, today)) : null;
-  const when = d == null ? '' : d === 0 ? ' · last logged today' : ` · last logged ${d} d ago`;
+  const lift = latest ? latest.lift : byId.get(last.liftId);
+  const best = personalBests(log, lift, { bwOf }).heaviest;
   const pbs = month ? `${plural(month, 'PB')} this month` : 'No PBs yet this month';
-  const shown = latest || { entry: last, lift: byId.get(last.liftId) };
+  const hasSessions = !!(lifts && Array.isArray(lifts.sessions) && lifts.sessions.length);
+  let text;
+  if (hasSessions) {
+    text = `${plural(isIso(today) ? workoutsThisWeek({ lifts }, today) : 0, 'workout')} this week · ${pbs}`;
+  } else {
+    const d = isIso(today) ? Math.max(0, daysBetween(last.date, today)) : null;
+    text = pbs + (d == null ? '' : d === 0 ? ' · last logged today' : ` · last logged ${d} d ago`);
+  }
   return card({
-    figure: weightText(shown.entry, shown.lift).replace(/^BW \+/, '+'),
-    figureLabel: `${shortLiftName(shown.lift.name)} ${latest ? 'PB' : '· last set'}`,
-    text: pbs + when,
+    figure: weightText(best.entry, lift).replace(/^BW \+/, '+'),
+    figureLabel: `${shortLiftName(lift.name)} best`,
+    text,
   });
 }
 

@@ -4,9 +4,9 @@
  *
  * Lift picker (most recently logged first), weight with ± steppers
  * (2.5 kg; 1 kg for a per-dumbbell lift), reps stepper, date (today),
- * optional RPE and note. Before saving it shows the e1RM live and
- * whether this set would be a PB, judged by the same isNewPB the save
- * uses. Validation is the store's validateEntry, shown under each field;
+ * optional RPE and note. Before saving it shows the estimated 1RM live
+ * (labelled as an estimate) and whether this set would be a REAL-set PB
+ * (heaviest or a rep max), judged by the same isNewPB the save uses. Validation is the store's validateEntry, shown under each field;
  * the first bad field takes focus.
  */
 import { useMemo, useRef, useState } from 'react';
@@ -117,13 +117,14 @@ export default function LogSheet({ entry, liftId, lifts, pickList, log, bwOf, to
 
         <div className={`lf-live${pb && pb.any ? ' is-pb' : ''}`} aria-live="polite" data-testid="lift-live">
           <div className="lf-live-row">
-            <span className="lf-live-lbl">e1RM</span>
-            <b className="lf-live-val">{info ? `${fmtE1rm(info.value)} kg` : '—'}</b>
+            <span className="lf-live-lbl">Est. 1RM</span>
+            <b className="lf-live-val">{info ? `${info.low ? '≈' : '~'}${fmtE1rm(info.value)} kg` : '—'}</b>
+            {info && <span className="lf-live-note">an estimate, not a PB</span>}
             {info && info.low && <span className="lf-tag">low confidence · over 12 reps</span>}
           </div>
           {lift && lift.load === 'bodyweight_plus' && (
             <p className="lf-live-sub">
-              {bw ? `Bodyweight ${fmtKg(bw.kg)} kg (${bw.date})${load != null ? ` · total ${fmtKg(load)} kg` : ''}` : 'No bodyweight within 14 days — e1RM needs one. The set still counts for heaviest and rep maxes.'}
+              {bw ? `Bodyweight ${fmtKg(bw.kg)} kg (${bw.date})${load != null ? ` · total ${fmtKg(load)} kg` : ''}` : 'No bodyweight within 14 days — the estimate needs one. The set still counts for heaviest and rep maxes (on added weight).'}
             </p>
           )}
           {pb && pb.any && <p className="lf-live-pb"><Icon name="trophy" size={14} /> This would be a PB — {pbKinds(pb).join(' · ')}</p>}
