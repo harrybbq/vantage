@@ -40,7 +40,8 @@ export default function E1rmChart({ groups, accentId = null, pbKeys = null, lift
   const [pick, setPick] = useState(null);
   const W = Math.max(200, width);
   const H = height;
-  const pad = { l: 6, r: 44, t: 22, b: 24 };   // right: the Y tick labels; top: room for the end labels
+  const multiG = (groups || []).filter(gr => gr.points.length).length > 1;
+  const pad = { l: 6, r: multiG ? 70 : 52, t: 12, b: 24 };   // right: the Y ticks and the lines' end labels
 
   const g = useMemo(() => {
     const live = (groups || []).filter(gr => gr.points.length);
@@ -74,12 +75,14 @@ export default function E1rmChart({ groups, accentId = null, pbKeys = null, lift
       const pts = gr.points.map(p => ({ ...p, x: X(p.n), y: Y(p.value), pb: !!(pbKeys && pbKeys.has(p.key)), gid: gr.id, glabel: gr.label }));
       return { ...gr, k, accent, paths, end, pts };
     });
-    // End labels sit just above each line's right end; nudged apart so two gyms never print on top of each other.
-    const ends = lines.filter(l => l.end).map(l => ({ l, y: Y(l.end.value) - 10 })).sort((a, b) => a.y - b.y);
+    // End labels sit in the right gutter level with each line's end, nudged apart so two gyms never
+    // print on top of each other; a tick label they would collide with is dropped.
+    const ends = lines.filter(l => l.end).map(l => ({ l, y: Y(l.end.value) })).sort((a, b) => a.y - b.y);
     for (let i = 1; i < ends.length; i++) if (ends[i].y - ends[i - 1].y < 14) ends[i].y = ends[i - 1].y + 14;
     for (const e of ends) e.l.endY = Math.min(H - pad.b - 4, Math.max(8, e.y));
+    const tickHidden = v => ends.some(e => Math.abs(e.l.endY - Y(v)) < 13);
     const pts = lines.flatMap(l => l.pts).sort((a, b) => a.x - b.x);
-    return { X, Y, tk, mt, lines, pts, iw, ih, daySessions };
+    return { X, Y, tk, mt, lines, pts, iw, ih, daySessions, tickHidden };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [groups, W, H, from, to, pbKeys, accentId]);
 
@@ -134,7 +137,7 @@ export default function E1rmChart({ groups, accentId = null, pbKeys = null, lift
           {g.tk.ticks.map(v => (
             <g key={v}>
               <line x1={pad.l} x2={W - pad.r + 4} y1={g.Y(v)} y2={g.Y(v)} />
-              <text className="lh-tick" x={W - pad.r + 8} y={g.Y(v)} dy="0.35em">{fmtKg(v)}</text>
+              {!g.tickHidden(v) && <text className="lh-tick" x={W - pad.r + 8} y={g.Y(v)} dy="0.35em">{fmtKg(v)}</text>}
             </g>
           ))}
           {g.mt.map(t => (
@@ -148,7 +151,7 @@ export default function E1rmChart({ groups, accentId = null, pbKeys = null, lift
           return <circle key={`${l.k}-${p.key}`} className={`lh-pt${l.accent ? ' is-accent' : ''}${p.loose ? ' is-loose' : ''}`} cx={p.x} cy={p.y} r={p.loose ? 2.5 : 2} />;
         }))}
         {g.lines.filter(l => l.end).map(l => (
-          <text key={`e${l.k}`} className={`lh-endlbl${l.accent ? ' is-accent' : ''}`} x={g.X(l.end.n)} y={l.endY} dy="0.35em" textAnchor="end">
+          <text key={`e${l.k}`} className={`lh-endlbl${l.accent ? ' is-accent' : ''}`} x={W - pad.r + 8} y={l.endY} dy="0.35em">
             {multi ? `${l.label} ` : ''}{est(l.end.value)}
           </text>
         ))}

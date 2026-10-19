@@ -32,6 +32,8 @@ export const changeText = v => (v == null ? null : `${v >= 0 ? '+' : '−'}${Mat
 /** A gym's short tag: "DXC", "GRE" — ≤ 5 characters stay whole. */
 export const gymShort = name => { const n = String(name || '').trim(); return (n.length <= 5 ? n : n.slice(0, 3)).toUpperCase(); };
 const NEW_PB_DAYS = 14;
+/** Row 2 is 12 px mono in ~250 px: the load in a word or two. */
+const SHORT_LOAD = { weight: 'Weight', per_hand: 'Per DB', bodyweight_plus: 'BW + added' };
 
 /** The numbers a row / card shows, worked out once. */
 export function cardModel(s, { today, activeGym = null, gymOrder = [], gymName = id => id, bwOf } = {}) {
@@ -50,7 +52,7 @@ export function cardModel(s, { today, activeGym = null, gymOrder = [], gymName =
   return {
     lift, best, bestGym, fresh, spark, gymsLine, count: sets.length, last,
     ago: last ? agoShort(last.date, today) : '',
-    load: LOAD_LABEL[lift.load] || 'Weight',
+    load: SHORT_LOAD[lift.load] || LOAD_LABEL[lift.load] || 'Weight',
   };
 }
 

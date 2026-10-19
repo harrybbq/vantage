@@ -102,7 +102,7 @@ function Detail({ all, ctx, embedded, onClose, backLabel, desktop, bwOf, gyms, t
   const tiles = (
     <div className="lh-tiles" data-testid="lh-tiles">
       <div className="lh-tile">
-        <p className="lf-eyebrow">Heaviest · PB{gymLabel ? ` · ${gymShort(gymLabel)}` : ''}</p>
+        <p className="lf-eyebrow">Heaviest · PB</p>
         {s.pb.heaviest
           ? <RealBest entry={s.pb.heaviest.entry} lift={lift} pb today={today} size="lg" gymLabel={perGym && gymLabel ? gymShort(gymLabel) : null} />
           : <span className="lf-hero lh-dash">—</span>}

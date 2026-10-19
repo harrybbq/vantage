@@ -419,3 +419,11 @@
 .lifts .lh-addrow { display: flex; align-items: center; gap: 8px; width: 100%; min-height: 52px; padding: 0 12px; box-sizing: border-box; border: 1px dashed var(--lf-line-strong);
   border-radius: var(--lf-r-panel); background: transparent; color: var(--lf-accent-ink); font-family: var(--lf-font); font-size: 15px; font-weight: 600; cursor: pointer; }
 .lifts .lh-addform { display: flex; flex-direction: column; gap: 8px; padding: 12px; border: 1px solid var(--lf-line-strong); border-radius: var(--lf-r-panel); background: var(--lf-s1); }
+
+/* ── Coarse-pointer target fixes ── */
+@media (pointer: coarse) { .lifts .lf-segm > button { min-width: 44px; } }
+@media (max-width: 599px) {
+  /* The strip spans the full content width (7 × 46 + 6 × 6 = 358 at 390): no card chrome around it. */
+  .lifts .lh-week.lh-card { padding: 0; border: 0; background: transparent; border-radius: 0; }
+}
+@media (max-width: 380px) { .lifts .lh-week-row { gap: 3px; } .lifts .lh-cal { gap: 2px; } }

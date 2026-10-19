@@ -75,7 +75,7 @@ export default function WorkoutToday({
         {training && <span className="lh-sug-meta lf-num">{sug.exercises.length} ex · ~{sug.minutes} min</span>}
       </div>
       <p className="lh-sug-why" data-testid="wk-reason">
-        {sug.plan && sug.plan.source === 'dynamic' && <span className="lh-moved"><Icon name="repeat" size={12} /> moved · </span>}
+        {sug.plan && sug.plan.source === 'dynamic' && <span className="lh-moved" title="Moved by the plan"><Icon name="repeat" size={12} /> </span>}
         {noProgramme ? 'Today sits outside your rota pattern. Build your own workout, or log a set.' : restLine || reason}
       </p>
       {(sug.night || (showGym && !noProgramme)) && (
