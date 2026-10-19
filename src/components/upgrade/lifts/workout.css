@@ -165,7 +165,7 @@ html[data-lifts-focus] .m-tabs,
 html[data-lifts-focus] #pageHeader,
 html[data-lifts-focus] .uh-open-head { display: none !important; }
 html[data-lifts-focus] #upgrade.section { padding-top: env(safe-area-inset-top, 0px) !important; padding-bottom: 0 !important; }
-html[data-lifts-focus] .upg-app .uh-open { padding: 0; border: 0; border-radius: 0; background: transparent; box-shadow: none; animation: none; }
+html[data-lifts-focus] .upg-app .uh-open { margin: 0; padding: 0; border: 0; border-radius: 0; background: transparent; box-shadow: none; animation: none; }
 html[data-lifts-focus] .upg-pane.lifts { gap: 0; padding: 0; border: 0; background: transparent; }
 
 /* ── The live column ── */
