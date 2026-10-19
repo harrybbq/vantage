@@ -42,6 +42,7 @@ import BooksTab from './books/BooksTab';
 import LiftsTab from './lifts/LiftsTab';
 import UpgradeHome, { SECTIONS, resolveSection } from './UpgradeHome';
 import { parseSecurityLink, stripSecurityParams } from '../../lib/security/deepLink';
+import { peekLiftsResume, onLiftsResume } from '../../lib/lifts/liveBus';
 import './Upgrade.css';
 
 export default function UpgradeSection({ S, update, active, isOwner, userId, hydrated = true }) {
@@ -85,6 +86,15 @@ export default function UpgradeSection({ S, update, active, isOwner, userId, hyd
     try { window.history.pushState({ upgrade: next }, ''); pushed.current = true; } catch { /* sandboxed */ }
     window.scrollTo({ top: 0 });
   }, []);
+  // The Lifts mini-bar's Resume (liveBus): open Lifts; LiftsTab then opens the workout.
+  const tabRef = useRef(tab);
+  tabRef.current = tab;
+  useEffect(() => {
+    if (!isOwner) return undefined;
+    const go = () => { if (peekLiftsResume() && tabRef.current !== 'lifts') open('lifts'); };
+    go();
+    return onLiftsResume(go);
+  }, [isOwner, open]);
   const back = useCallback(() => {
     if (pushed.current) window.history.back();   // popstate closes it
     else setTab(null);
