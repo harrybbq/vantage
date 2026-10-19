@@ -132,6 +132,12 @@ export default function LogSheet({
     const i = FIELDS.indexOf(pad.field);
     if (i < FIELDS.length - 1) setPad({ field: FIELDS[i + 1], fresh: true }); else setPad(null);
   };
+  // Keep the cell being typed into in view above the docked pad.
+  useEffect(() => {
+    if (!pad || !form.current) return;
+    const el = form.current.querySelector(`[data-field="${pad.field}"]`);
+    if (el && el.scrollIntoView) el.scrollIntoView({ block: 'nearest' });
+  }, [pad && pad.field]); // eslint-disable-line react-hooks/exhaustive-deps
   // Esc closes the pad first (window capture runs before the sheet's document-capture Esc).
   useEffect(() => {
     if (!pad) return undefined;

@@ -80,13 +80,15 @@ function LiftRow({ lift, count, index, total, gyms, focus, onRename, onPerGym, o
       )}
       <div className="lh-mrow-main">
         <InlineName value={lift.name} label={lift.name} onSave={n => onRename(lift.id, n)} testId="lh-rename" />
-        <span className="lh-mmeta">{meta}</span>
       </div>
-      {!lift.archived && (
-        <Segmented label={`${lift.name}: compare`} size="sm" options={COMPARE} value={per ? 'gym' : 'all'} onChange={v => onPerGym(lift.id, v === 'gym')}
-                   className="lh-mcompare" testId="lh-compare" />
-      )}
       <IconButton icon="ellipsis" label={`More for ${lift.name}`} onClick={() => onMenu(lift)} data-testid="lh-mmore" />
+      <div className="lh-mrow-sub">
+        <span className="lh-mmeta">{meta}</span>
+        {!lift.archived && (
+          <Segmented label={`${lift.name}: compare`} size="sm" options={COMPARE} value={per ? 'gym' : 'all'} onChange={v => onPerGym(lift.id, v === 'gym')}
+                     className="lh-mcompare" testId="lh-compare" />
+        )}
+      </div>
     </li>
   );
 }

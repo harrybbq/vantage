@@ -54,6 +54,21 @@ export default function LiftDetail({ liftId, embedded = false, onClose, backLabe
                  bwOf={bwOf} gyms={gyms} today={today} gymName={gymName} activeGym={activeGym} />;
 }
 
+/**
+ * The detail in its own Sheet — "View history" over the live workout:
+ * <LiftHistorySheet liftId onClose />. Same contract as <LiftDetail embedded>,
+ * with the Sheet (title = the lift's name, Esc / × / scrim close) included.
+ */
+export function LiftHistorySheet({ liftId, onClose }) {
+  const { summaries } = useLiftsCtx();
+  const s = summaries.get(liftId);
+  return (
+    <Sheet title={s ? s.lift.name : 'Lift'} eyebrow="// History" onClose={onClose} width={560} testId="lh-history">
+      <LiftDetail liftId={liftId} embedded onClose={onClose} />
+    </Sheet>
+  );
+}
+
 function Detail({ all, ctx, embedded, onClose, backLabel, desktop, bwOf, gyms, today, gymName, activeGym }) {
   const { lift } = all;
   const perGym = perGymOf(lift);

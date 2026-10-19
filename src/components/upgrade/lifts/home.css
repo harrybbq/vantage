@@ -271,7 +271,7 @@
 .lifts .lh-trend.is-accent { stroke: var(--lf-accent); stroke-width: 2; }
 .lifts .lh-pt { fill: var(--lf-mid); }
 .lifts .lh-pt.is-accent { fill: var(--lf-accent); }
-.lifts .lh-pt.is-loose { fill: var(--lf-s1); stroke: var(--lf-mid); stroke-width: 1.25; stroke-dasharray: 1.5 1.5; }
+.lifts .lh-pt.is-loose { fill: var(--lf-s1); stroke: var(--lf-mid); stroke-width: 1.5; stroke-dasharray: 2 1.5; }
 .lifts .lh-pt.is-accent.is-loose { stroke: var(--lf-accent); }
 .lifts .lh-pt-night { fill: var(--lf-s1); stroke: var(--lf-night); stroke-width: 2; }
 .lifts .lh-pt-pb { fill: var(--lf-pb); stroke: var(--lf-s1); stroke-width: 1; }
@@ -398,18 +398,17 @@
 .lifts .lh-mlist { list-style: none; margin: 0; padding: 0; border: 1px solid var(--lf-line); border-radius: var(--lf-r-panel); background: var(--lf-s1); }
 .lifts .lh-mlist:empty { display: none; }
 .lifts .lh-mlist > li + li { border-top: 1px solid var(--lf-line); }
-.lifts .lh-mrow { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; grid-template-areas: "h main more" ". cmp cmp"; align-items: center; column-gap: 4px; row-gap: 4px;
-  min-height: 64px; box-sizing: border-box; padding: 6px 4px 8px 0; background: var(--lf-s1); position: relative; }
+.lifts .lh-mrow { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; grid-template-areas: "h main more" ". sub sub"; align-items: center; column-gap: 4px; row-gap: 2px;
+  min-height: 64px; box-sizing: border-box; padding: 4px 4px 8px 0; background: var(--lf-s1); position: relative; }
 .lifts .lh-mrow.is-gym, .lifts .lh-mrow.is-arch { grid-template-areas: "h main more"; padding-left: 12px; }
 .lifts .lh-mrow.is-focus { box-shadow: inset 3px 0 0 var(--lf-accent); }
 .lifts .lh-mrow.is-drag { z-index: 2; box-shadow: 0 8px 24px -10px rgba(0, 0, 0, .5); transition: none; }
 .lifts .lh-handle { grid-area: h; display: grid; place-items: center; width: 28px; height: 44px; color: var(--lf-muted); cursor: grab; touch-action: none; }
 .lifts .lh-mrow-main { grid-area: main; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
 .lifts .lh-mrow > .lf-iconbtn, .lifts .lh-mrow > .lf-chip { grid-area: more; }
-.lifts .lh-mcompare { grid-area: cmp; justify-self: start; margin-left: 0; }
-@media (min-width: 600px) {
-  .lifts .lh-mrow { grid-template-columns: auto minmax(0, 1fr) auto auto; grid-template-areas: "h main cmp more"; }
-}
+.lifts .lh-mrow-sub { grid-area: sub; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 4px 8px; min-width: 0; padding-right: 4px; }
+.lifts .lh-mrow-sub .lh-mmeta { flex: 1 1 120px; min-width: 0; }
+.lifts .lh-mcompare { flex: none; }
 .lifts .lh-mname { display: flex; align-items: center; gap: 2px; min-width: 0; }
 .lifts .lh-mname-txt { min-width: 0; font-size: 15px; line-height: 20px; font-weight: 600; color: var(--lf-text); overflow-wrap: anywhere; }
 .lifts .lh-mmeta { font-family: var(--lf-mono); font-size: var(--lf-fs-floor); line-height: 16px; text-transform: uppercase; letter-spacing: .03em; color: var(--lf-muted); }
@@ -427,3 +426,6 @@
   .lifts .lh-week.lh-card { padding: 0; border: 0; background: transparent; border-radius: 0; }
 }
 @media (max-width: 380px) { .lifts .lh-week-row { gap: 3px; } .lifts .lh-cal { gap: 2px; } }
+@media (max-width: 380px) { .lifts .lh-wide { display: none; } }
+/* The sheet panel takes focus on open (so Tab starts inside it); the panel itself needs no ring. */
+.lifts .lf-sheet:focus-visible { outline: none; }

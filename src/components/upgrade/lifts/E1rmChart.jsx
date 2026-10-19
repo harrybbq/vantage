@@ -148,11 +148,11 @@ export default function E1rmChart({ groups, accentId = null, pbKeys = null, lift
         {g.lines.map(l => l.pts.map(p => {
           if (p.night) return <circle key={`${l.k}-${p.key}`} className="lh-pt-night" cx={p.x} cy={p.y} r="4" />;
           if (p.pb) return <path key={`${l.k}-${p.key}`} className="lh-pt-pb" d={`M${p.x} ${p.y - 5}L${p.x + 5} ${p.y}L${p.x} ${p.y + 5}L${p.x - 5} ${p.y}Z`} />;
-          return <circle key={`${l.k}-${p.key}`} className={`lh-pt${l.accent ? ' is-accent' : ''}${p.loose ? ' is-loose' : ''}`} cx={p.x} cy={p.y} r={p.loose ? 2.5 : 2} />;
+          return <circle key={`${l.k}-${p.key}`} className={`lh-pt${l.accent ? ' is-accent' : ''}${p.loose ? ' is-loose' : ''}`} cx={p.x} cy={p.y} r={p.loose ? 3 : 2} />;
         }))}
         {g.lines.filter(l => l.end).map(l => (
           <text key={`e${l.k}`} className={`lh-endlbl${l.accent ? ' is-accent' : ''}`} x={W - pad.r + 8} y={l.endY} dy="0.35em">
-            {multi ? `${l.label} ` : ''}{est(l.end.value)}
+            {multi ? `${l.label} ` : ''}~{fmtKg(roundEstimate(l.end.value, 'tile'))}
           </text>
         ))}
         {sel && <line className="lh-rule" x1={sel.x} x2={sel.x} y1={pad.t} y2={H - pad.b} />}

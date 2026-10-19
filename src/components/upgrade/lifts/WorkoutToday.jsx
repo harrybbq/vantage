@@ -78,10 +78,10 @@ export default function WorkoutToday({
         {sug.plan && sug.plan.source === 'dynamic' && <span className="lh-moved" title="Moved by the plan"><Icon name="repeat" size={12} /> </span>}
         {noProgramme ? 'Today sits outside your rota pattern. Build your own workout, or log a set.' : restLine || reason}
       </p>
-      {(sug.night || (showGym && !noProgramme)) && (
+      {(sug.night || (showGym && training)) && (
         <div className="lh-chiprow">
           {sug.night && <NightChip className="lh-nightchip" />}
-          {showGym && !noProgramme && <GymSwitch gyms={gyms} value={gym} onChange={onGym} label="Gym for this workout" testId="wk-gym" />}
+          {showGym && training && <GymSwitch gyms={gyms} value={gym} onChange={onGym} label="Gym for this workout" testId="wk-gym" />}
         </div>
       )}
       {pips && pips.pips.length > 0 && <BlockPips bp={pips} />}
@@ -121,7 +121,7 @@ export default function WorkoutToday({
         )}
         <div className="lh-sec2">
           <Button variant="secondary" icon="plus" onClick={onBuild} disabled={!!active} data-testid="wk-build">Build my own</Button>
-          <Button variant="secondary" icon="zap" onClick={onQuickLog} disabled={!canQuickLog} data-testid="wk-quicklog">Quick log a set</Button>
+          <Button variant="secondary" icon="zap" onClick={onQuickLog} disabled={!canQuickLog} data-testid="wk-quicklog">Quick log<span className="lh-wide"> a set</span></Button>
         </div>
       </div>
     </section>
