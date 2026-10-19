@@ -42,6 +42,8 @@ import ManageSheet from './ManageSheet';
 import WorkoutToday from './WorkoutToday';
 import WorkoutLive from './WorkoutLive';
 import FinishSheet from './FinishSheet';
+import NewWorkoutSheet from './workout/NewWorkoutSheet';
+import { takeLiftsResume, onLiftsResume } from '../../../lib/lifts/liveBus';
 import { Toast, Celebrate } from './parts';
 import { LiftsScope, useLiftsScope } from './ui/scope';
 import { useLiftsData, todayIso } from './useLifts';
@@ -54,7 +56,7 @@ import { pbMessage, pbKinds, setText, shortLiftName } from '../../../lib/lifts/l
 import { shiftOn } from '../../../lib/rotation/pattern';
 import { trainingDayOf } from '../../../lib/rotation/trainingDay';
 import {
-  activeOf, startWorkout, suggestedStart, discardWorkout, summariseWorkout, finishWorkout, saveTemplate, templateFromSession,
+  activeOf, startWorkout, suggestedStart, discardWorkout, summariseWorkout, finishWorkout, saveTemplate, templateFromSession, deleteTemplate,
 } from '../../../lib/lifts/workout';
 import '../security/security.css';
 import './lifts.css';
@@ -79,6 +81,8 @@ export default function LiftsTab({ S, update, hydrated = true }) {
   const [showArchived, setShowArchived] = useState(false);
   const [view, setView] = useState('list');        // 'list' | 'workout'
   const [finish, setFinish] = useState(null);      // { summary, saved, templateSaved }
+  const [newSheet, setNewSheet] = useState(null);  // { tab } — the New workout sheet (nothing starts until its Start)
+  const [pickOnOpen, setPickOnOpen] = useState(false);
   const active = activeOf(S);
   // The user's accent and theme as Lifts tokens (--lf-accent / -ink / --lf-on-accent), live.
   const scope = useLiftsScope();
@@ -92,6 +96,13 @@ export default function LiftsTab({ S, update, hydrated = true }) {
   }, [active ? active.id : null]); // eslint-disable-line react-hooks/exhaustive-deps
   // Finished or discarded elsewhere (another device, the summary): back to the list.
   useEffect(() => { if (view === 'workout' && !active && !finish) setView('list'); }, [view, active, finish]);
+  // The mini-bar's Resume (liveBus): open the workout — no state write, navigation only.
+  const hasActive = !!active;
+  useEffect(() => {
+    const go = () => { if (takeLiftsResume() && hasActive) { setOpen(null); setView('workout'); window.scrollTo({ top: 0 }); } };
+    go();
+    return onLiftsResume(go);
+  }, [hasActive]);
 
   // Seed the defaults once, only when the store is absent and the cloud copy is in.
   useEffect(() => {
@@ -148,9 +159,9 @@ export default function LiftsTab({ S, update, hydrated = true }) {
   const donePb = useCallback(() => setPb(null), []);
 
   const manage = {
-    onAdd: ({ name, load, muscles }) => {
-      const out = addLift(lifts, { name, load, muscles }, { id: newId('lift'), now: Date.now() });
-      if (out.ok) write(l => addLift(l, { name, load, muscles }, { id: out.id, now: Date.now() }).lifts);
+    onAdd: ({ name, load, muscles, perGym }) => {
+      const out = addLift(lifts, { name, load, muscles, perGym }, { id: newId('lift'), now: Date.now() });
+      if (out.ok) write(l => addLift(l, { name, load, muscles, perGym }, { id: out.id, now: Date.now() }).lifts);
       return out;
     },
     onRename: (id, name) => {
@@ -193,13 +204,18 @@ export default function LiftsTab({ S, update, hydrated = true }) {
 
   // ── Workout ──
   const goWorkout = () => { setOpen(null); setView('workout'); window.scrollTo({ top: 0 }); };
+  // Rows start EMPTY: the live table shows Previous as placeholders and ✓ commits them.
   const startSuggested = sug => {
-    update(prev => startWorkout(prev, { ...suggestedStart(sug), now: Date.now(), today }));
+    update(prev => startWorkout(prev, { ...suggestedStart(sug, { prefill: false }), now: Date.now(), today }));
     goWorkout();
   };
-  const buildOwn = () => {
-    const sh = shiftOf(today);
-    update(prev => startWorkout(prev, { source: 'blank', name: 'Workout', shift: sh, gym: curGym, now: Date.now(), today }));
+  // "Build my own" / Blank / Recent / Library → the New workout sheet; the clock starts on its Start.
+  const buildOwn = tab => setNewSheet({ tab: typeof tab === 'string' ? tab : 'blank' });
+  const startNew = args => {
+    const { openPicker, ...startArgs } = args;
+    update(prev => startWorkout(prev, { ...startArgs, now: Date.now(), today }));
+    setNewSheet(null);
+    setPickOnOpen(!!openPicker);
     goWorkout();
   };
   const discard = () => { update(prev => discardWorkout(prev)); setToast({ text: 'Workout discarded — nothing was saved', n: Date.now() }); };
@@ -210,19 +226,27 @@ export default function LiftsTab({ S, update, hydrated = true }) {
   const saveWorkout = () => {
     const { summary } = finish;
     update(prev => finishWorkout(prev, summary.session.finishedAt));
+    // The sheet lists the PBs (and each was toasted when its set was ticked) — no second celebration.
     setFinish(f => ({ ...f, saved: true }));
-    if (summary.pbs.length) {
-      setPb({ text: summary.pbs.length === 1 ? summary.pbs[0].text : `${summary.pbs.length} new bests this workout`,
-        kinds: summary.pbs.length === 1 ? null : summary.pbs.map(x => x.text.replace(/^New best: /, '')), n: Date.now() });
-    }
   };
   const closeFinish = () => { const was = finish && finish.saved; setFinish(null); if (was) setView('list'); };
-  const saveAsTemplate = name => {
-    const tpl = templateFromSession(finish.summary.session, name, newId('tp'));
+  // Save as template; started from a saved one → "Update template" replaces it in place (same id).
+  const saveAsTemplate = (name, { update: replace = false } = {}) => {
+    const from = finish.summary.template;
+    const tpl = replace && from ? templateFromSession(finish.summary.session, from.name, from.id) : templateFromSession(finish.summary.session, name, newId('tp'));
     update(prev => saveTemplate(prev, tpl));
-    setFinish(f => ({ ...f, templateSaved: tpl.name }));
+    setFinish(f => ({ ...f, templateSaved: replace ? `Updated template “${tpl.name}”` : `Saved as template “${tpl.name}” — it’s in Library` }));
   };
-  const showHistory = id => { setOpen(id); window.scrollTo({ top: 0 }); };
+  // View history over the live workout: LiftDetail embedded in a sheet (the seam 2B's LiftDetail plugs into).
+  const renderHistory = (id, close) => {
+    const s = summaries.get(id);
+    if (!s) return <p className="lf-meta">No history for this lift yet.</p>;
+    return (
+      <LiftDetail s={s} liftId={id} embedded onClose={close} today={today} bwOf={bwOf} gyms={gyms} onPerGym={manage.onPerGym} onBack={close}
+                  backLabel="Back to workout" onLog={() => setSheet({ kind: 'log', liftId: id })}
+                  onEdit={e => setSheet({ kind: 'log', entry: e })} onDelete={del} />
+    );
+  };
 
   const logSheet = sheet && sheet.kind === 'log' && (
     <LogSheet entry={sheet.entry} liftId={sheet.liftId} lifts={lifts.list} pickList={pickList} log={lifts.log} bwOf={bwOf}
@@ -235,14 +259,14 @@ export default function LiftsTab({ S, update, hydrated = true }) {
     <div className="upg-pane sec lifts" style={scope.style}>
       {cur ? (
         <LiftDetail s={cur} today={today} bwOf={bwOf} gyms={gyms} onPerGym={manage.onPerGym} onBack={() => setOpen(null)}
-                    backLabel={view === 'workout' && active ? 'Back to workout' : 'All lifts'}
+                    backLabel="All lifts"
                     onLog={() => setSheet({ kind: 'log', liftId: cur.lift.id })}
                     onEdit={e => setSheet({ kind: 'log', entry: e })} onDelete={del} />
       ) : view === 'workout' && active ? (
-        <WorkoutLive S={S} update={update} list={lifts.list} recentIds={recentIds} today={today} gyms={activeGymList} gymName={gymName}
-                     onPerGym={manage.onPerGym}
-                     onMinimise={() => { setView('list'); window.scrollTo({ top: 0 }); }} onFinish={openFinish}
-                     onQuickLog={() => setSheet({ kind: 'log' })} onHistory={showHistory} onCreateLift={manage.onAdd}
+        <WorkoutLive S={S} update={update} list={lifts.list} recentIds={recentIds} today={today} bwOf={bwOf} gyms={activeGymList} gymName={gymName}
+                     initialPicker={pickOnOpen} renderHistory={renderHistory} onManage={() => setSheet({ kind: 'manage' })}
+                     onMinimise={() => { setPickOnOpen(false); setView('list'); window.scrollTo({ top: 0 }); }} onFinish={openFinish}
+                     onQuickLog={() => setSheet({ kind: 'log' })} onCreateLift={manage.onAdd}
                      onToast={text => setToast({ text, n: Date.now() })} />
       ) : (
         <>
@@ -290,6 +314,11 @@ export default function LiftsTab({ S, update, hydrated = true }) {
       {logSheet}
       {sheet && sheet.kind === 'manage' && (
         <ManageSheet lifts={lifts.list} counts={counts} onClose={() => setSheet(null)} gyms={gyms} gymCounts={gymCounts} {...manage} />
+      )}
+      {newSheet && (
+        <NewWorkoutSheet S={S} today={today} gyms={activeGymList} gym={curGym} gymName={gymName} list={lifts.list} initialTab={newSheet.tab}
+                         onStart={startNew} onClose={() => setNewSheet(null)} onQuickLog={() => { setNewSheet(null); setSheet({ kind: 'log' }); }}
+                         onDeleteTemplate={id => update(prev => deleteTemplate(prev, id))} />
       )}
       {finish && (
         <FinishSheet summary={finish.summary} saved={finish.saved} templateSaved={finish.templateSaved}
