@@ -1,56 +1,77 @@
 /**
- * Log a set (or edit one) in Upgrade's side sheet — a bottom sheet on a
- * phone, height-capped with its own scroll so the backdrop stays tappable.
+ * Quick log — log one set, or edit one (brief §3.10; A8, A13).
  *
- * Lift picker (most recently logged first), weight with ± steppers
- * (2.5 kg; 1 kg for a per-dumbbell lift), reps stepper, date (today),
- * optional RPE and note. Before saving it shows the estimated 1RM live
- * (labelled as an estimate) and whether this set would be a REAL-set PB
- * (heaviest or a rep max), judged by the same isNewPB the save uses. Validation is the store's validateEntry, shown under each field;
- * the first bad field takes focus.
+ *   // LIFTS · Log a set                                         [×]
+ *   LIFT   [ Machine leg press ▾ ]   → a searchable list sheet (recent first)
+ *          [Dip] [Lat pulldown] [Hip thrust]   three recent chips, no chip cloud
+ *   GYM    [ DXC | Greenock ]  COMPARED WITHIN DXC
+ *   [ KG ] [ REPS ] [ RPE ]     boxed cells: the live workout's NumPad on a
+ *                               coarse pointer (docked in the footer), plain
+ *                               inputs on a fine one
+ *   DATE   [Today ▾]            Today · Yesterday · a small in-app month
+ *                               sheet — never a native date input; nothing
+ *                               after the calendar day (maxDate). "Today" is
+ *                               the TRAINING day (after a night shift's midnight,
+ *                               the shift's day — LiftsTab passes it)
+ *   SET    [Normal | W | D | F]
+ *   NOTE   one line that grows
+ *   est. 1RM ~252 kg · ☾ Night shift · 80 % — a lighter set here isn't a regression
+ *   [ Log set · ◆ PB ]          when the set would be a REAL PB (never a warm-up)
  *
- * Gym: a switch (default: the last gym). For a machine (perGym) lift the
- * pre-fill and the PB hint are that gym's; a set being edited keeps its
- * gym (an unassigned one shows none picked until one is chosen).
+ * Saving goes through LiftsTab (makeEntry / editEntry — an edit keeps the
+ * set's id, createdAt, workout link and unknown keys). Validation is the
+ * store's validateEntry; the first bad field takes focus.
  */
-import { useMemo, useRef, useState } from 'react';
-import { Sheet } from '../security/parts';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import Icon from '../../Icon';
-import { Field, Stepper, GymSwitch } from './parts';
+import { Sheet, Button, Chip, Segmented, GymSwitch, CompareScope, NumPad, NightChip, useInputMode } from './ui';
 import { validateEntry } from '../../../lib/lifts/store';
+import { resolveLogDate, dateChipLabel, monthGrid, addMonths, agoShort } from '../../../lib/lifts/home';
+import { padInput, padStep, fmtEstimate, realSetText } from '../../../lib/lifts/ui';
 import {
-  isNewPB, effectiveLoad, e1rmInfo, fmtE1rm, fmtKg, pbKinds, bannedRule, BANNED_NOTE, isIso, LOAD_LABEL, perGymOf, gymOf,
+  isNewPB, effectiveLoad, e1rmInfo, fmtKg, pbKinds, bannedRule, BANNED_NOTE, isIso, LOAD_LABEL, perGymOf, gymOf, stepFor, isWarmup, SET_TYPES, SET_TYPE_LABEL,
 } from '../../../lib/lifts/lifts';
 
 const ORDER = ['liftId', 'weight', 'reps', 'date', 'rpe', 'notes'];
-const RPES = ['6', '6.5', '7', '7.5', '8', '8.5', '9', '9.5', '10'];
+const FIELDS = ['weight', 'reps', 'rpe'];
+const TYPE_OPTS = [{ value: '', label: 'Normal' }, ...SET_TYPES.map(t => ({ value: t, label: t, title: SET_TYPE_LABEL[t] }))];
 
-export default function LogSheet({ entry, liftId, lifts, pickList, log, bwOf, today, shiftOf, onClose, onSave, onDelete, gyms = [], gym: gym0 = null, gymName = id => id }) {
+export default function LogSheet({
+  entry, liftId, lifts, pickList, log, bwOf, today, maxDate = today, shiftOf, onClose, onSave, onDelete, gyms = [], gym: gym0 = null,
+  gymName = id => id, onManage = null,
+}) {
   const editing = !!(entry && entry.id);
-  // The last set of a lift — at `gym` when the lift is a machine.
+  const { coarse } = useInputMode();
+  // The last working set of a lift — at `gym` when the lift is a machine.
   const lastOf = (id, gym) => {
     const lift = lifts.find(l => l.id === id);
     const scoped = perGymOf(lift);
     let last = null;
     for (const e of log) {
-      if (!e || e.liftId !== id || (scoped && gymOf(e) !== (gym || null))) continue;
+      if (!e || e.liftId !== id || isWarmup(e) || (scoped && gymOf(e) !== (gym || null))) continue;
       if (!last || e.date > last.date || (e.date === last.date && (e.createdAt || 0) > (last.createdAt || 0))) last = e;
     }
     return last;
   };
   const [f, setF] = useState(() => {
-    if (editing) return { liftId: entry.liftId, weight: String(entry.weight), reps: String(entry.reps), date: entry.date, rpe: entry.rpe != null ? String(entry.rpe) : '', notes: entry.notes || '', gym: gymOf(entry) };
+    if (editing) {
+      return { liftId: entry.liftId, weight: String(entry.weight), reps: String(entry.reps), date: entry.date, rpe: entry.rpe != null ? String(entry.rpe) : '',
+        notes: entry.notes || '', gym: gymOf(entry), type: entry.type || '' };
+    }
     const id = liftId || (pickList[0] && pickList[0].id) || '';
     const last = id ? lastOf(id, gym0) : null;
-    return { liftId: id, weight: last ? String(last.weight) : '', reps: last ? String(last.reps) : '8', date: today, rpe: '', notes: '', gym: gym0 };
+    return { liftId: id, weight: last ? String(last.weight) : '', reps: last ? String(last.reps) : '8', date: resolveLogDate('today', { today, maxDate }),
+      rpe: '', notes: '', gym: gym0, type: '' };
   });
   const [errors, setErrors] = useState({});
+  const [pad, setPad] = useState(null);          // { field, fresh } — coarse pointers only
+  const [sub, setSub] = useState(null);          // 'lift' | 'date'
   const form = useRef(null);
   const set = (k, v) => setF(s => ({ ...s, [k]: v }));
   const lift = lifts.find(l => l.id === f.liftId) || null;
-  const step = lift && lift.load === 'per_hand' ? 1 : 2.5;
+  const perGym = perGymOf(lift);
+  const step = lift ? stepFor(lift, f.gym) : 2.5;
 
-  // Picking another lift (or, for a machine, another gym) pre-fills its last set there (new sets only).
   const pickLift = id => {
     if (editing) { set('liftId', id); return; }
     const last = lastOf(id, f.gym);
@@ -61,22 +82,35 @@ export default function LogSheet({ entry, liftId, lifts, pickList, log, bwOf, to
     const last = lastOf(f.liftId, g);
     setF(s => ({ ...s, gym: g, weight: last ? String(last.weight) : '', reps: last ? String(last.reps) : s.reps }));
   };
-  const perGym = perGymOf(lift);
+  const recent = useMemo(() => {
+    const seen = new Set();
+    const out = [];
+    for (const l of pickList) {
+      if (out.length >= 3) break;
+      if (l.id === f.liftId || seen.has(l.id)) continue;
+      if (!log.some(e => e && e.liftId === l.id)) continue;
+      seen.add(l.id); out.push(l);
+    }
+    return out;
+  }, [pickList, log, f.liftId]);
 
-  const draft = { id: editing ? entry.id : '__draft', liftId: f.liftId, date: f.date, weight: Number(f.weight), reps: Number(f.reps), ...(f.gym ? { gym: f.gym } : {}) };
+  const draft = { id: editing ? entry.id : '__draft', liftId: f.liftId, date: f.date, weight: Number(f.weight), reps: Number(f.reps),
+    ...(f.gym ? { gym: f.gym } : {}), ...(f.type ? { type: f.type } : {}) };
   const okNums = f.weight !== '' && Number.isFinite(draft.weight) && Number.isInteger(draft.reps) && draft.reps >= 1;
   const bw = lift && isIso(f.date) ? bwOf(f.date) : null;
   const load = okNums && lift ? effectiveLoad(draft, lift, bw && bw.kg) : null;
-  const info = load != null ? e1rmInfo(load, draft.reps) : null;
-  const pb = useMemo(() => (okNums && lift && isIso(f.date) ? isNewPB(log, draft, lift, { bwOf }) : null),
+  const info = load != null && f.type !== 'W' ? e1rmInfo(load, draft.reps) : null;
+  const pb = useMemo(() => (okNums && lift && isIso(f.date) && f.type !== 'W' ? isNewPB(log, draft, lift, { bwOf }) : null),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [okNums, lift, f.date, f.weight, f.reps, f.gym, log, bwOf]);
+    [okNums, lift, f.date, f.weight, f.reps, f.gym, f.type, log, bwOf]);
+  const realPb = !!(pb && pb.any && !pb.first);
   const shift = isIso(f.date) ? shiftOf(f.date) : null;
   const banned = lift ? bannedRule(lift) : null;
 
   const submit = ev => {
-    ev.preventDefault();
-    const v = validateEntry({ ...f, weight: f.weight === '' ? null : f.weight, reps: f.reps === '' ? null : f.reps }, today);
+    if (ev) ev.preventDefault();
+    setPad(null);
+    const v = validateEntry({ ...f, weight: f.weight === '' ? null : f.weight, reps: f.reps === '' ? null : f.reps }, maxDate);
     setErrors(v.errors);
     if (!v.ok) {
       const first = ORDER.find(k => v.errors[k]);
@@ -84,91 +118,231 @@ export default function LogSheet({ entry, liftId, lifts, pickList, log, bwOf, to
       if (el) el.focus();
       return;
     }
-    onSave(f, pb);
+    onSave({ ...f, type: f.type || null }, pb);
   };
 
-  const id = k => `lf-s-${k}`;
-  return (
-    <Sheet title={editing ? 'Edit set' : 'Log a set'} eyebrow={editing ? `// ${lift ? lift.name : 'Set'}` : '// Lifts'} onClose={onClose} className="lifts">
-      <form ref={form} className="lf-form" onSubmit={submit} noValidate>
-        <div className="lf-field is-wide">
-          <span className="lf-field-lbl" id={id('lift-lbl')}>Lift{!editing && pickList.length > 1 ? ' · recent first' : ''}</span>
-          <div className="lf-picks" role="radiogroup" aria-labelledby={id('lift-lbl')}>
-            {(editing && lift && !pickList.some(l => l.id === lift.id) ? [lift, ...pickList] : pickList).map((l, i) => (
-              <button key={l.id} type="button" role="radio" aria-checked={f.liftId === l.id}
-                      data-field={(f.liftId ? f.liftId === l.id : i === 0) ? 'liftId' : undefined}
-                      className={`lf-pick${f.liftId === l.id ? ' is-on' : ''}`} onClick={() => pickLift(l.id)}>
-                {l.name}
-              </button>
-            ))}
-          </div>
-          {errors.liftId && <span className="lf-field-err" role="alert">{errors.liftId}</span>}
-          {lift && lift.load !== 'weight' && (
-            <span className="lf-field-hint">{LOAD_LABEL[lift.load]}{lift.load === 'bodyweight_plus' ? ' — log the added weight (0 for bodyweight)' : ' — the weight of ONE dumbbell'}</span>
-          )}
-          {banned && <span className="lf-banned"><Icon name="octagon-alert" size={13} /> {BANNED_NOTE}</span>}
-        </div>
+  // ── The pad (coarse): keys into the field's buffer ──
+  const padKey = k => setF(s => {
+    const field = pad.field;
+    const nb = padInput(s[field], k, { field, fresh: pad.fresh });
+    if (pad.fresh) setPad(p => ({ ...p, fresh: false }));
+    return nb == null ? s : { ...s, [field]: nb };
+  });
+  const padNext = () => {
+    const i = FIELDS.indexOf(pad.field);
+    if (i < FIELDS.length - 1) setPad({ field: FIELDS[i + 1], fresh: true }); else setPad(null);
+  };
+  // Keep the cell being typed into in view above the docked pad.
+  useEffect(() => {
+    if (!pad || !form.current) return;
+    const el = form.current.querySelector(`[data-field="${pad.field}"]`);
+    if (el && el.scrollIntoView) el.scrollIntoView({ block: 'nearest' });
+  }, [pad && pad.field]); // eslint-disable-line react-hooks/exhaustive-deps
+  // Esc closes the pad first (window capture runs before the sheet's document-capture Esc).
+  useEffect(() => {
+    if (!pad) return undefined;
+    const k = e => { if (e.key === 'Escape' && !e.defaultPrevented) { e.preventDefault(); e.stopPropagation(); setPad(null); } };
+    window.addEventListener('keydown', k, true);
+    return () => window.removeEventListener('keydown', k, true);
+  }, [pad]);
+  const lastSet = lift ? lastOf(lift.id, f.gym) : null;
+  const unitLbl = lift && lift.load === 'per_hand' ? 'KG/hand' : lift && lift.load === 'bodyweight_plus' ? '+KG' : 'KG';
+  const padEl = pad && (
+    <NumPad field={pad.field} label={lift ? lift.name : 'Set'} fieldLabel={pad.field === 'weight' ? unitLbl : undefined}
+            placeholder={pad.field === 'weight' && lift && lift.load === 'bodyweight_plus' ? '+0' : '—'}
+            value={f[pad.field]} rpe={f.rpe} step={pad.field === 'weight' ? step : 1}
+            onKey={padKey}
+            onStep={dir => setF(s => ({ ...s, [pad.field]: padStep(s[pad.field], dir, pad.field === 'weight' ? step : 1, pad.field) }))}
+            onRpe={n => { set('rpe', String(n)); setPad(null); }}
+            onSet={v => { set(pad.field, String(v)); setPad(p => ({ ...p, fresh: false })); }}
+            prevValue={lastSet ? (pad.field === 'weight' ? lastSet.weight : lastSet.reps) : null}
+            prevText={lastSet ? realSetText(lastSet.weight, lastSet.reps, lift) : null}
+            onNext={padNext} onDone={() => setPad(null)} onClose={() => setPad(null)} hasNext={pad.field !== 'rpe'} testId="lh-log-pad" />
+  );
 
-        {gyms.length > 0 && (
-          <div className="lf-field is-wide">
-            <span className="lf-field-lbl" id={id('gym-lbl')}>Gym</span>
-            <GymSwitch gyms={gyms} value={f.gym} onChange={pickGym} label="Gym this set was at" testId="lf-log-gym" />
-            <span className="lf-field-hint">
-              {!f.gym ? 'No gym on this set — pick one to compare it with that gym.'
-                : perGym ? `A machine — compared with your sets at ${gymName(f.gym)} only.` : 'Free weight — compared across every gym.'}
-            </span>
+  const cell = (field, label, unit, err) => {
+    const val = f[field];
+    const id = `lh-log-${field}`;
+    const active = pad && pad.field === field;
+    return (
+      <div className={`lh-cell${err ? ' has-error' : ''}${field === 'weight' ? ' is-kg' : ''}`}>
+        <label className="lh-cell-lbl lf-eyebrow" htmlFor={id}>{label}</label>
+        {coarse ? (
+          <button id={id} type="button" data-field={field} className={`lh-cell-box lf-cellbox lf-st${active ? ' is-active' : ''}`}
+                  onClick={() => setPad({ field, fresh: true })} aria-label={`${label}: ${val || 'empty'} — open the number pad`} data-testid={`lh-cell-${field}`}>
+            <span className={`lf-num lh-cell-val${val === '' ? ' is-empty' : ''}`}>{val === '' ? (field === 'rpe' ? '—' : '—') : val}</span>
+            {unit && <span className="lh-cell-unit">{unit}</span>}
+          </button>
+        ) : (
+          <span className="lh-cell-box lf-cellbox">
+            <input id={id} data-field={field} className="lf-num lh-cell-input" inputMode={field === 'reps' ? 'numeric' : 'decimal'} autoComplete="off"
+                   value={val} placeholder={field === 'rpe' ? '—' : ''} data-testid={`lh-cell-${field}`}
+                   onChange={e => set(field, field === 'reps' ? e.target.value.replace(/[^\d]/g, '') : e.target.value.replace(',', '.').replace(/[^\d.]/g, ''))} />
+            {unit && <span className="lh-cell-unit">{unit}</span>}
+          </span>
+        )}
+        {err && <span className="lh-err" role="alert">{err}</span>}
+      </div>
+    );
+  };
+
+  const footer = padEl || (
+    <div className="lh-log-foot">
+      <Button type="submit" form="lh-log-form" variant="primary" size="lg" block data-testid="lh-log-save">
+        {editing ? 'Save changes' : 'Log set'}{realPb && <span className="lh-pbtag"> · ◆ PB</span>}
+      </Button>
+      {editing && onDelete && (
+        <Button variant="danger" icon="trash-2" onClick={() => onDelete(entry)} className="lh-log-del">Delete</Button>
+      )}
+    </div>
+  );
+
+  return (
+    <Sheet title={editing ? 'Edit set' : 'Log a set'} eyebrow={editing ? `// ${lift ? lift.name : 'Set'}` : '// Lifts'} onClose={onClose}
+           className="lh-logsheet" testId="lh-logsheet" width={440} footer={footer}>
+      <form id="lh-log-form" ref={form} className="lh-form" onSubmit={submit} noValidate>
+        <div className="lh-frow">
+          <span className="lh-flbl lf-eyebrow" id="lh-log-lift-lbl">Lift</span>
+          <button type="button" className="lh-picker lf-cellbox" data-field="liftId" onClick={() => setSub('lift')} aria-labelledby="lh-log-lift-lbl lh-log-lift-val"
+                  data-testid="lh-log-lift">
+            <span id="lh-log-lift-val" className="lh-picker-name">{lift ? lift.name : 'Pick a lift'}</span>
+            <Icon name="chevron-down" size={16} />
+          </button>
+        </div>
+        {!editing && recent.length > 0 && (
+          <div className="lh-recent" role="group" aria-label="Recent lifts">
+            {recent.map(l => <Chip key={l.id} onClick={() => pickLift(l.id)} className="lh-recent-chip">{l.name}</Chip>)}
           </div>
         )}
+        {errors.liftId && <span className="lh-err" role="alert">{errors.liftId}</span>}
+        {lift && lift.load !== 'weight' && (
+          <p className="lf-meta">{LOAD_LABEL[lift.load]}{lift.load === 'bodyweight_plus' ? ' — log the added weight (0 for bodyweight)' : ' — the weight of ONE dumbbell'}</p>
+        )}
+        {banned && <p className="lf-meta lh-banned"><Icon name="octagon-alert" size={13} /> {BANNED_NOTE}</p>}
 
-        <div className="lf-grid">
-          <Field as="div" label={lift && lift.load === 'bodyweight_plus' ? 'Added weight' : lift && lift.load === 'per_hand' ? 'Per dumbbell' : 'Weight'} id={id('w')} error={errors.weight}>
-            <Stepper id={id('w')} label="Weight" value={f.weight} onChange={v => set('weight', v)} step={step} min={0} max={1000} decimal unit="kg" dataField="weight" />
-          </Field>
-          <Field as="div" label="Reps" id={id('r')} error={errors.reps}>
-            <Stepper id={id('r')} label="Reps" value={f.reps} onChange={v => set('reps', v.replace(/[^\d]/g, ''))} step={1} min={1} max={50} dataField="reps" />
-          </Field>
-          <Field label="Date" id={id('d')} error={errors.date}>
-            <input id={id('d')} data-field="date" type="date" max={today} value={f.date} onChange={e => set('date', e.target.value)} />
-          </Field>
-          <Field label="RPE (optional)" id={id('rpe')} error={errors.rpe}>
-            <select id={id('rpe')} data-field="rpe" value={f.rpe} onChange={e => set('rpe', e.target.value)}>
-              <option value="">—</option>
-              {RPES.map(r => <option key={r} value={r}>{r}</option>)}
-            </select>
-          </Field>
-          <Field label="Note (optional)" id={id('n')} error={errors.notes} wide>
-            <textarea id={id('n')} data-field="notes" rows={2} maxLength={500} value={f.notes} placeholder="Seat 5, paused reps, felt strong…"
-                      onChange={e => set('notes', e.target.value)} />
-          </Field>
-        </div>
-
-        <div className={`lf-live${pb && pb.any ? ' is-pb' : ''}`} aria-live="polite" data-testid="lift-live">
-          <div className="lf-live-row">
-            <span className="lf-live-lbl">Est. 1RM</span>
-            <b className="lf-live-val">{info ? `${info.low ? '≈' : '~'}${fmtE1rm(info.value)} kg` : '—'}</b>
-            {info && <span className="lf-live-note">an estimate, not a PB</span>}
-            {info && info.low && <span className="lf-tag">low confidence · over 12 reps</span>}
+        {gyms.length > 0 && (
+          <div className="lh-frow lh-gymrow">
+            <span className="lh-flbl lf-eyebrow">Gym</span>
+            <div className="lh-gymrow-ctl">
+              <GymSwitch gyms={gyms} value={f.gym} onChange={pickGym} label="Gym this set was at" testId="lf-log-gym" />
+              {lift && <CompareScope lift={lift} gymLabel={f.gym ? gymName(f.gym) : null} onManage={onManage ? () => { onClose(); onManage(); } : null} />}
+            </div>
           </div>
-          {lift && lift.load === 'bodyweight_plus' && (
-            <p className="lf-live-sub">
-              {bw ? `Bodyweight ${fmtKg(bw.kg)} kg (${bw.date})${load != null ? ` · total ${fmtKg(load)} kg` : ''}` : 'No bodyweight within 14 days — the estimate needs one. The set still counts for heaviest and rep maxes (on added weight).'}
-            </p>
-          )}
-          {pb && pb.any && <p className="lf-live-pb"><Icon name="trophy" size={14} /> This would be a PB{perGym && f.gym ? ` at ${gymName(f.gym)}` : ''} — {pbKinds(pb).join(' · ')}</p>}
-          {pb && pb.first && <p className="lf-live-sub">{perGym && f.gym ? `First set of this lift at ${gymName(f.gym)} — it sets the baseline there.` : 'First set of this lift — it sets the baseline.'}</p>}
-          {shift === 'night' && <p className="lf-live-sub lf-night"><Icon name="moon" size={13} /> Night shift · 80% load — a lighter set here isn’t a regression.</p>}
+        )}
+        {!f.gym && gyms.length > 0 && <p className="lf-meta">No gym on this set — pick one to compare it with that gym.</p>}
+
+        <div className="lh-cells">
+          {cell('weight', lift && lift.load === 'per_hand' ? 'KG / hand' : lift && lift.load === 'bodyweight_plus' ? '+KG' : 'KG', null, errors.weight)}
+          {cell('reps', 'Reps', null, errors.reps)}
+          {cell('rpe', 'RPE', null, errors.rpe)}
         </div>
 
-        <div className="lf-form-acts">
-          <button type="submit" className="sec-btn is-primary lf-btn-lg">{editing ? 'Save changes' : 'Log set'}</button>
-          <button type="button" className="sec-btn is-quiet lf-btn-lg" onClick={onClose}>Cancel</button>
-          {editing && onDelete && (
-            <button type="button" className="sec-btn is-bad lf-btn-lg lf-del" onClick={() => onDelete(entry)}>
-              <Icon name="trash-2" size={14} /> Delete
-            </button>
+        <div className="lh-frow">
+          <span className="lh-flbl lf-eyebrow" id="lh-log-date-lbl">Date</span>
+          <div className="lh-datechips">
+            <Chip selected onClick={() => setSub('date')} className="lh-datechip" data-field="date" data-testid="lh-log-date"
+                  aria-label={`Date: ${dateChipLabel(f.date, today)} — change`}>
+              {dateChipLabel(f.date, today)} ▾
+            </Chip>
+            {f.date !== today && <Chip onClick={() => set('date', resolveLogDate('today', { today, maxDate }))}>Today</Chip>}
+            {f.date === today && <Chip onClick={() => set('date', resolveLogDate('yesterday', { today, maxDate }))}>Yesterday</Chip>}
+          </div>
+        </div>
+        {errors.date && <span className="lh-err" role="alert">{errors.date}</span>}
+
+        <div className="lh-frow">
+          <span className="lh-flbl lf-eyebrow" id="lh-log-type-lbl">Set</span>
+          <Segmented label="Set type" size="sm" options={TYPE_OPTS} value={f.type || ''} onChange={v => set('type', v)} testId="lh-log-type" />
+        </div>
+        {f.type === 'W' && <p className="lf-meta">Warm-ups are saved and count for volume, never for PBs or the chart.</p>}
+
+        <div className="lh-frow lh-noterow">
+          <label className="lh-flbl lf-eyebrow" htmlFor="lh-log-note">Note</label>
+          <textarea id="lh-log-note" data-field="notes" rows={1} maxLength={500} value={f.notes} placeholder="Seat 5, paused reps…" className="lh-note lf-cellbox"
+                    onChange={e => { set('notes', e.target.value); e.target.style.height = 'auto'; e.target.style.height = `${Math.min(140, e.target.scrollHeight)}px`; }} />
+        </div>
+        {errors.notes && <span className="lh-err" role="alert">{errors.notes}</span>}
+
+        <div className={`lh-liveline${realPb ? ' is-pb' : ''}`} aria-live="polite" data-testid="lift-live">
+          <span className="lh-muted lf-num">{info ? fmtEstimate(info.value, { low: info.low }) : f.type === 'W' ? 'warm-up — no estimate' : 'est. 1RM —'}</span>
+          {shift === 'night' && <span className="lh-liveline-night"> · <NightChip variant="inline" label="Night shift · 80 %" /> — a lighter set here isn’t a regression</span>}
+          {lift && lift.load === 'bodyweight_plus' && (
+            <span className="lf-meta lh-liveline-sub">{bw ? `Bodyweight ${fmtKg(bw.kg)} kg (${bw.date})${load != null ? ` · total ${fmtKg(load)} kg` : ''}` : 'No bodyweight within 14 days — the estimate needs one.'}</span>
           )}
+          {realPb && <span className="lh-liveline-pb">◆ This would be a PB{perGym && f.gym ? ` at ${gymName(f.gym)}` : ''} — {pbKinds(pb).join(' · ')}</span>}
+          {pb && pb.first && <span className="lf-meta lh-liveline-sub">{perGym && f.gym ? `First set of this lift at ${gymName(f.gym)} — it sets the baseline there.` : 'First set of this lift — it sets the baseline.'}</span>}
         </div>
       </form>
+      {sub === 'lift' && (
+        <LiftPicker list={pickList} current={editing && lift && !pickList.some(l => l.id === lift.id) ? [lift, ...pickList] : pickList} log={log} today={today}
+                    value={f.liftId} onPick={id => { pickLift(id); setSub(null); }} onClose={() => setSub(null)} />
+      )}
+      {sub === 'date' && (
+        <DateSheet value={f.date} today={today} maxDate={maxDate} onPick={iso => { set('date', iso); setSub(null); }} onClose={() => setSub(null)} />
+      )}
+    </Sheet>
+  );
+}
+
+/** The searchable lift list (recent first). */
+function LiftPicker({ current, log, today, value, onPick, onClose }) {
+  const [q, setQ] = useState('');
+  const lastBy = useMemo(() => {
+    const m = new Map();
+    for (const e of log) if (e && e.liftId && !isWarmup(e) && (!m.has(e.liftId) || e.date > m.get(e.liftId).date)) m.set(e.liftId, e);
+    return m;
+  }, [log]);
+  const shown = current.filter(l => !q.trim() || l.name.toLowerCase().includes(q.trim().toLowerCase()));
+  return (
+    <Sheet title="Pick a lift" eyebrow="// Log a set" onClose={onClose} testId="lh-liftpicker" initialFocus="input">
+      <div className="lh-search">
+        <Icon name="search" size={16} />
+        <input type="search" value={q} onChange={e => setQ(e.target.value)} placeholder="Search lifts" aria-label="Search lifts" data-testid="lh-liftpicker-q" />
+      </div>
+      <ul className="lh-picklist">
+        {shown.map(l => {
+          const last = lastBy.get(l.id);
+          return (
+            <li key={l.id}>
+              <button type="button" className={`lh-pickrow${l.id === value ? ' is-on' : ''}`} onClick={() => onPick(l.id)} aria-pressed={l.id === value}>
+                <span className="lh-pickrow-name">{l.name}</span>
+                <span className="lh-pickrow-meta lf-num">{LOAD_LABEL[l.load] || 'Weight'}{last ? ` · ${agoShort(last.date, today)} · ${realSetText(last.weight, last.reps, l)}` : ' · not logged yet'}</span>
+                {l.id === value && <Icon name="check" size={18} />}
+              </button>
+            </li>
+          );
+        })}
+        {!shown.length && <li className="lf-meta">No lift called “{q}”. Add it in Manage lifts.</li>}
+      </ul>
+    </Sheet>
+  );
+}
+
+/** Today · Yesterday · a month grid. Nothing after maxDate (the calendar day). */
+function DateSheet({ value, today, maxDate, onPick, onClose }) {
+  const [ym, setYm] = useState((isIso(value) ? value : today).slice(0, 7));
+  const g = monthGrid(ym, { maxDate, today });
+  const maxYm = (maxDate || today).slice(0, 7);
+  return (
+    <Sheet title="When was this set?" eyebrow="// Date" onClose={onClose} testId="lh-datesheet">
+      <div className="lh-datequick">
+        <Chip selected={value === today} onClick={() => onPick(resolveLogDate('today', { today, maxDate }))}>Today · {dateChipLabel(today, '')}</Chip>
+        <Chip selected={value === resolveLogDate('yesterday', { today, maxDate })} onClick={() => onPick(resolveLogDate('yesterday', { today, maxDate }))}>Yesterday</Chip>
+      </div>
+      <div className="lh-month-nav">
+        <button type="button" className="lf-iconbtn" onClick={() => setYm(addMonths(ym, -1))} aria-label="Previous month"><Icon name="chevron-left" size={18} /></button>
+        <b className="lh-month-title">{g.label}</b>
+        <button type="button" className="lf-iconbtn" onClick={() => setYm(addMonths(ym, 1))} aria-label="Next month" disabled={ym >= maxYm}><Icon name="chevron-right" size={18} /></button>
+      </div>
+      <div className="lh-cal" role="grid" aria-label={g.label}>
+        {['M', 'T', 'W', 'T', 'F', 'S', 'S'].map((d, i) => <span key={i} className="lh-cal-dow" aria-hidden="true">{d}</span>)}
+        {g.weeks.flat().map(d => (
+          <button key={d.iso} type="button" className={`lh-cal-d${d.inMonth ? '' : ' is-out'}${d.today ? ' is-today' : ''}${d.iso === value ? ' is-on' : ''}`}
+                  disabled={d.disabled} onClick={() => onPick(d.iso)} aria-label={dateChipLabel(d.iso, '')} aria-pressed={d.iso === value}>
+            {d.day}
+          </button>
+        ))}
+      </div>
     </Sheet>
   );
 }

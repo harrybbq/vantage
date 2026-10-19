@@ -1,0 +1,208 @@
+/* ── Lifts shared components (ui/) ────────────────────────────────────
+   Everything here is scoped to `.lifts` and reads the tokens in
+   ../lifts-tokens.css (imported by LiftsTab; components portalled to
+   <body> carry `.lifts` themselves). Hard rules: targets ≥ 44 × 44 on a
+   coarse pointer (--lf-hit), text ≥ 12 px (--lf-fs-floor), numbers
+   tabular, solid surfaces, motion off under prefers-reduced-motion. */
+
+/* ── Buttons ── */
+.lifts .lf-btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; box-sizing: border-box;
+  min-height: max(var(--lf-hit), 36px); padding: 0 16px; border-radius: var(--lf-r-cell); border: 1px solid transparent;
+  font-family: var(--lf-font); font-size: 15px; font-weight: 600; line-height: 1.2; cursor: pointer; text-align: center;
+  transition: background-color var(--lf-dur) var(--lf-ease), border-color var(--lf-dur) var(--lf-ease), color var(--lf-dur) var(--lf-ease);
+  touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
+.lifts .lf-btn.is-lg { min-height: var(--lf-btn-h); padding: 0 20px; font-size: 16px; }
+.lifts .lf-btn.is-md { min-height: max(var(--lf-hit), 40px); }
+.lifts .lf-btn.is-block { display: flex; width: 100%; }
+.lifts .lf-btn-txt { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.lifts .lf-btn.is-primary { background: var(--lf-accent); border-color: var(--lf-accent); color: var(--lf-on-accent); }
+.lifts .lf-btn.is-primary:hover:not(:disabled) { filter: brightness(1.06); }
+.lifts .lf-btn.is-secondary { background: var(--lf-s1); border-color: var(--lf-line-strong); color: var(--lf-text); }
+.lifts .lf-btn.is-secondary:hover:not(:disabled) { background: var(--lf-s2); }
+.lifts .lf-btn.is-quiet { background: transparent; color: var(--lf-mid); }
+.lifts .lf-btn.is-quiet:hover:not(:disabled) { color: var(--lf-text); background: var(--lf-s2); }
+.lifts .lf-btn.is-danger { background: transparent; color: var(--lf-danger); padding-inline: 12px; }
+.lifts .lf-btn.is-danger:hover:not(:disabled) { background: var(--lf-danger-tint); }
+.lifts .lf-btn:disabled { opacity: .45; cursor: default; }
+
+/* ── Icon button: a 44 px hit area around a small glyph ── */
+.lifts .lf-iconbtn { display: inline-grid; place-items: center; flex: none; box-sizing: border-box; width: max(var(--lf-hit), 36px);
+  height: max(var(--lf-hit), 36px); padding: 0; border: 0; border-radius: var(--lf-r-cell); background: transparent; color: var(--lf-mid);
+  cursor: pointer; touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
+.lifts .lf-iconbtn:hover { color: var(--lf-text); background: var(--lf-s2); }
+.lifts .lf-iconbtn.is-danger { color: var(--lf-danger); }
+.lifts .lf-iconbtn.is-accent { color: var(--lf-accent-ink); }
+
+/* ── Chips ── */
+.lifts .lf-chip { display: inline-flex; align-items: center; justify-content: center; gap: 6px; box-sizing: border-box; flex: none;
+  min-height: max(var(--lf-hit), 32px); padding: 0 12px; border-radius: var(--lf-r-chip); border: 1px solid var(--lf-line-strong);
+  background: var(--lf-s1); color: var(--lf-text); font-family: var(--lf-mono); font-size: var(--lf-fs-floor); font-weight: 500;
+  letter-spacing: .04em; white-space: nowrap; font-variant-numeric: tabular-nums; cursor: pointer; touch-action: manipulation; }
+.lifts .lf-chip.is-static { cursor: default; min-height: 28px; }
+.lifts .lf-chip.is-on { background: var(--lf-accent); border-color: var(--lf-accent); color: var(--lf-on-accent); }
+.lifts .lf-chip.is-accent { color: var(--lf-accent-ink); border-color: var(--lf-accent); }
+.lifts .lf-chip.is-pb { color: var(--lf-pb); border-color: var(--lf-pb); background: var(--lf-pb-tint); }
+.lifts .lf-chip.is-night { color: var(--lf-night); border-color: var(--lf-night); background: var(--lf-night-tint); }
+
+/* ── Segmented (one control for every switch, incl. the gym switch) ── */
+.lifts .lf-segm { display: inline-flex; max-width: 100%; box-sizing: border-box; padding: 3px; gap: 3px; border-radius: calc(var(--lf-r-cell) + 3px);
+  background: var(--lf-s2); border: 1px solid var(--lf-line-strong); overflow-x: auto; scrollbar-width: none; overscroll-behavior-x: contain; }
+.lifts .lf-segm::-webkit-scrollbar { display: none; }
+.lifts .lf-segm.is-full { display: flex; width: 100%; }
+.lifts .lf-segm > button { flex: 1 0 auto; min-width: 0; box-sizing: border-box; min-height: max(calc(var(--lf-hit) - 8px), 30px);
+  padding: 0 14px; border: 0; border-radius: var(--lf-r-cell); background: transparent; color: var(--lf-mid);
+  font-family: var(--lf-font); font-size: 14px; font-weight: 600; white-space: nowrap; cursor: pointer; touch-action: manipulation;
+  transition: background-color var(--lf-dur) var(--lf-ease), color var(--lf-dur) var(--lf-ease); }
+/* Coarse pointers: the segment itself is the 44 px target (the track adds the padding). */
+@media (pointer: coarse) { .lifts .lf-segm > button { min-height: 44px; } .lifts .lf-segm { padding: 2px; gap: 2px; } }
+.lifts .lf-segm.is-sm > button { font-size: 13px; padding: 0 10px; }
+.lifts .lf-segm > button:hover:not(.is-on):not(:disabled) { color: var(--lf-text); background: var(--lf-s3); }
+.lifts .lf-segm > button.is-on { background: var(--lf-accent); color: var(--lf-on-accent); }
+.lifts .lf-segm > button:disabled { opacity: .45; cursor: default; }
+.lifts .lf-segm-txt { display: block; overflow: hidden; text-overflow: ellipsis; }
+
+/* ── The three rules ── */
+.lifts .lf-realbest { display: inline-flex; align-items: baseline; flex-wrap: wrap; gap: 4px 8px; min-width: 0; color: var(--lf-text); }
+.lifts .lf-realbest-val { font-size: 16px; color: var(--lf-text); white-space: nowrap; }
+.lifts .lf-realbest.is-lg .lf-realbest-val { font-size: var(--lf-fs-hero); line-height: 32px; }
+.lifts .lf-realbest.is-sm .lf-realbest-val { font-size: 14px; }
+.lifts .lf-realbest-unit { margin-left: 3px; font-size: var(--lf-fs-floor); font-weight: 500; color: var(--lf-muted); }
+.lifts .lf-realbest.is-lg .lf-realbest-unit { font-size: 14px; }
+.lifts .lf-realbest-date { font-family: var(--lf-mono); font-size: var(--lf-fs-floor); color: var(--lf-muted); white-space: nowrap; }
+.lifts .lf-pbmark { color: var(--lf-pb); font-size: 1em; line-height: 1; }
+.lifts .lf-pbbadge { display: inline-flex; align-items: center; gap: 3px; padding: 1px 6px; border-radius: var(--lf-r-chip);
+  border: 1px solid var(--lf-pb); background: var(--lf-pb-tint); color: var(--lf-pb); font-family: var(--lf-mono);
+  font-size: var(--lf-fs-floor); font-weight: 600; line-height: 18px; letter-spacing: .04em; white-space: nowrap; }
+.lifts .lf-gymchip { display: inline-flex; align-items: center; padding: 0 6px; border-radius: var(--lf-r-pip); border: 1px solid var(--lf-line-strong);
+  font-family: var(--lf-mono); font-size: var(--lf-fs-floor); line-height: 18px; color: var(--lf-mid); letter-spacing: .04em; white-space: nowrap; }
+
+.lifts .lf-estimate { display: inline-flex; align-items: center; gap: 2px; min-width: 0; color: var(--lf-muted); }
+.lifts .lf-estimate-val { font-size: 14px; font-weight: 500; white-space: nowrap; color: var(--lf-muted); }
+.lifts .lf-estimate.is-boxed { padding: 4px 4px 4px 10px; border-radius: var(--lf-r-cell); }
+.lifts .lf-info { display: inline-grid; place-items: center; flex: none; width: max(var(--lf-hit), 32px); height: max(var(--lf-hit), 32px);
+  margin: calc((max(var(--lf-hit), 32px) - 22px) / -2) 0; padding: 0; border: 0; border-radius: 50%; background: transparent;
+  color: var(--lf-mid); font-size: 16px; line-height: 1; cursor: pointer; touch-action: manipulation; }
+.lifts .lf-info:hover { color: var(--lf-text); }
+.lf-pop-root { position: fixed; inset: 0; z-index: 2600; pointer-events: none; }
+.lifts .lf-pop { position: fixed; box-sizing: border-box; pointer-events: auto; padding: 10px 12px; border-radius: var(--lf-r-cell);
+  border: 1px solid var(--lf-line-strong); background: var(--lf-s1); color: var(--lf-text); box-shadow: 0 10px 30px -12px rgba(0, 0, 0, .45);
+  font-family: var(--lf-font); font-size: max(13px, var(--lf-fs-floor)); line-height: 1.45; }
+
+.lifts .lf-scope { display: inline-flex; align-items: center; max-width: 100%; box-sizing: border-box; padding: 0; border: 0; background: none;
+  color: var(--lf-muted); font-family: var(--lf-mono); font-size: var(--lf-fs-floor); line-height: 16px; font-weight: 500;
+  letter-spacing: .06em; text-transform: uppercase; text-align: left; cursor: pointer; touch-action: manipulation; }
+.lifts .lf-scope-txt { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-decoration: underline dotted;
+  text-decoration-color: var(--lf-line-strong); text-underline-offset: 3px; }
+.lifts .lf-scope:hover { color: var(--lf-text); }
+/* Coarse: a 44 px target that still only takes a 16 px line of layout. */
+@media (pointer: coarse) { .lifts .lf-scope { min-height: 44px; margin: -14px 0; } }
+
+.lifts .lf-nightmark { color: var(--lf-night); line-height: 1; }
+.lifts .lf-nightchip { display: inline-flex; align-items: center; gap: 5px; padding: 0 8px; min-height: 24px; border-radius: var(--lf-r-chip);
+  border: 1px solid var(--lf-night); background: var(--lf-night-tint); color: var(--lf-night); font-family: var(--lf-mono);
+  font-size: var(--lf-fs-floor); font-weight: 600; letter-spacing: .06em; text-transform: uppercase; white-space: nowrap; }
+.lifts .lf-night-inline { display: inline-flex; align-items: center; gap: 3px; color: var(--lf-night); font-family: var(--lf-mono);
+  font-size: var(--lf-fs-floor); white-space: nowrap; }
+
+.lifts .lf-explain { display: flex; flex-direction: column; gap: 10px; font-size: var(--lf-fs-body); line-height: 22px; color: var(--lf-text); }
+.lifts .lf-explain p { margin: 0; }
+
+/* ── Sheet ── */
+.lf-sheet-root { position: fixed; inset: 0; z-index: 2000; display: flex; }
+.lf-sheet-root.is-bottom { align-items: flex-end; justify-content: center; }
+.lf-sheet-root.is-right { justify-content: flex-end; }
+.lf-sheet-root.is-nonmodal { pointer-events: none; z-index: 1950; }
+.lifts .lf-sheet-scrim { position: absolute; inset: 0; background: var(--lf-scrim); animation: lf-fade var(--lf-dur-sheet) var(--lf-ease); }
+.lifts .lf-sheet { position: relative; display: flex; flex-direction: column; box-sizing: border-box; min-height: 0; pointer-events: auto;
+  background: var(--lf-s1); color: var(--lf-text); font-family: var(--lf-font); box-shadow: var(--lf-shadow); outline: none; }
+.lf-sheet-root.is-bottom .lf-sheet { width: min(640px, 100%); max-height: min(88vh, calc(100dvh - 24px)); border-radius: var(--lf-r-sheet) var(--lf-r-sheet) 0 0;
+  border: 1px solid var(--lf-line-strong); border-bottom: 0; animation: lf-up var(--lf-dur-sheet) var(--lf-ease); }
+.lf-sheet-root.is-right .lf-sheet { height: 100%; max-width: 100vw; border-left: 1px solid var(--lf-line-strong); animation: lf-in var(--lf-dur-sheet) var(--lf-ease); }
+.lifts .lf-sheet-handle { flex: none; display: grid; place-items: center; height: 48px; margin-bottom: -16px; cursor: grab; touch-action: none; }
+.lifts .lf-sheet-handle span { display: block; width: 36px; height: 4px; border-radius: 2px; background: var(--lf-line-strong); }
+.lifts .lf-sheet-head { flex: none; display: flex; align-items: center; gap: 12px; min-height: 52px; box-sizing: border-box; padding: 4px 6px 4px 16px; }
+.lf-sheet-root.is-right .lifts .lf-sheet-head, .lf-sheet-root.is-right .lf-sheet-head { padding-top: 12px; }
+.lifts .lf-sheet-titles { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.lifts .lf-sheet-title { margin: 0; font-family: var(--lf-font); font-size: 18px; line-height: 24px; font-weight: 700; color: var(--lf-text);
+  overflow-wrap: anywhere; }
+.lifts .lf-sheet-x { width: 44px; height: 44px; }
+.lifts .lf-sheet-body { flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch;
+  padding: 8px 16px 16px; }
+.lf-sheet-root.is-bottom .lf-sheet-body:last-child { padding-bottom: calc(16px + env(safe-area-inset-bottom, 0px)); }
+.lifts .lf-sheet-foot { flex: none; display: flex; flex-wrap: wrap; gap: 8px; padding: 12px 16px calc(12px + env(safe-area-inset-bottom, 0px));
+  border-top: 1px solid var(--lf-line); background: var(--lf-s1); }
+.lifts .lf-sheet-foot > * { flex: 1 1 auto; }
+.lf-sheet-root.is-nonmodal .lf-sheet { width: min(560px, 100%); }
+@keyframes lf-up { from { transform: translateY(24px); opacity: .4; } }
+@keyframes lf-in { from { transform: translateX(32px); opacity: .4; } }
+@keyframes lf-fade { from { opacity: 0; } }
+
+/* ── Toasts ── */
+.lf-utoast-root { position: fixed; left: 0; right: 0; bottom: calc(var(--lf-toast-bottom, 0px) + 16px + env(safe-area-inset-bottom, 0px));
+  z-index: 2400; display: flex; justify-content: center; padding: 0 16px; pointer-events: none; }
+.lifts .lf-utoast { display: flex; align-items: center; gap: 4px; width: min(520px, 100%); box-sizing: border-box; min-height: 52px;
+  padding: 4px 4px 4px 16px; border-radius: var(--lf-r-panel); border: 1px solid var(--lf-line-strong); background: var(--lf-s1);
+  color: var(--lf-text); box-shadow: 0 14px 36px -14px rgba(0, 0, 0, .5); pointer-events: auto; animation: lf-up var(--lf-dur-sheet) var(--lf-ease); }
+.lifts .lf-utoast-text { flex: 1; min-width: 0; font-family: var(--lf-font); font-size: 14px; line-height: 20px; overflow-wrap: anywhere; }
+.lifts .lf-utoast-undo { flex: none; display: inline-flex; align-items: center; gap: 6px; min-height: 44px; padding: 0 12px; border: 0;
+  border-radius: var(--lf-r-cell); background: transparent; color: var(--lf-accent-ink); font-family: var(--lf-font); font-size: 15px;
+  font-weight: 700; cursor: pointer; }
+.lifts .lf-utoast-undo:hover { background: var(--lf-s2); }
+.lifts .lf-utoast-left { font-size: var(--lf-fs-floor); font-weight: 500; color: var(--lf-muted); }
+.lf-pbtoast-root { position: fixed; left: 0; right: 0; top: calc(12px + env(safe-area-inset-top, 0px)); z-index: 2500; display: flex;
+  justify-content: center; padding: 0 16px; pointer-events: none; }
+.lifts .lf-pbtoast { display: flex; align-items: center; gap: 10px; width: min(520px, 100%); box-sizing: border-box; min-height: 56px;
+  padding: 6px 4px 6px 14px; border-radius: var(--lf-r-panel); border: 1px solid var(--lf-pb); background: var(--lf-s1);
+  box-shadow: inset 3px 0 0 var(--lf-pb), 0 14px 36px -14px rgba(0, 0, 0, .5); pointer-events: auto; animation: lf-down var(--lf-dur-sheet) var(--lf-ease); }
+.lifts .lf-pbtoast-mark { font-size: 20px; }
+.lifts .lf-pbtoast-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.lifts .lf-pbtoast-text { font-family: var(--lf-font); font-size: 15px; line-height: 20px; font-weight: 700; color: var(--lf-text); overflow-wrap: anywhere; }
+.lifts .lf-pbtoast-kinds { font-family: var(--lf-mono); font-size: var(--lf-fs-floor); color: var(--lf-pb); }
+@keyframes lf-down { from { transform: translateY(-16px); opacity: 0; } }
+
+/* ── Number pad (brief §3.5.6) ── */
+.lifts .lf-pad { display: flex; flex-direction: column; gap: 6px; box-sizing: border-box; width: 100%;
+  padding: 4px 8px calc(12px + env(safe-area-inset-bottom, 0px)); border: 1px solid var(--lf-line-strong); border-bottom: 0;
+  border-radius: var(--lf-r-sheet) var(--lf-r-sheet) 0 0; background: var(--lf-s1); color: var(--lf-text); box-shadow: var(--lf-shadow);
+  font-family: var(--lf-font); -webkit-user-select: none; user-select: none; }
+.lifts .wk-rest + .lf-pad { border-radius: 0; box-shadow: none; }
+.lifts .lf-pad-head { display: flex; align-items: center; gap: 8px; min-height: 48px; padding-left: 8px; min-width: 0; }
+.lifts .lf-pad-label { flex: 1; min-width: 0; font-family: var(--lf-mono); font-size: var(--lf-fs-floor); line-height: 16px; color: var(--lf-mid);
+  letter-spacing: .04em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.lifts .lf-pad-label b { color: var(--lf-text); font-weight: 600; text-transform: uppercase; }
+.lifts .lf-pad-val { flex: none; font-size: 28px; line-height: 32px; color: var(--lf-text); }
+.lifts .lf-pad-val.is-empty { color: var(--lf-muted); font-weight: 500; }
+.lifts .lf-pad-close { width: 44px; height: 44px; color: var(--lf-text); }
+.lifts .lf-pad-sub { margin: -6px 0 0; padding: 0 8px; font-family: var(--lf-mono); font-size: var(--lf-fs-floor); line-height: 16px;
+  color: var(--lf-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-variant-numeric: tabular-nums; }
+.lifts .lf-pad-chips { display: flex; gap: 4px; padding: 0 4px; overflow-x: auto; scrollbar-width: none; }
+.lifts .lf-pad-chips::-webkit-scrollbar { display: none; }
+.lifts .lf-padchip { flex: 1 0 auto; min-width: 44px; min-height: 44px; padding: 0 10px; border-radius: var(--lf-r-cell);
+  border: 1px solid var(--lf-line-strong); background: var(--lf-s2); color: var(--lf-text); font-family: var(--lf-mono); font-size: 14px;
+  font-weight: 600; white-space: nowrap; font-variant-numeric: tabular-nums; cursor: pointer; touch-action: manipulation; }
+.lifts .lf-padchip.is-night { color: var(--lf-night); border-color: var(--lf-night); background: var(--lf-night-tint); }
+.lifts .lf-padchip.is-on { background: var(--lf-accent); border-color: var(--lf-accent); color: var(--lf-on-accent); }
+.lifts .lf-pad-rpe { display: grid; grid-template-columns: repeat(8, minmax(0, 1fr)); gap: 2px; }
+/* 8 chips need 8 × 44 + 7 × 2 = 366 px inside the pad (viewport ≥ 384); below that, two rows of four keep every chip ≥ 44 wide. */
+@media (max-width: 383px) { .lifts .lf-pad-rpe { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 4px; } }
+.lifts .lf-rpechip { min-width: 0; min-height: 44px; padding: 0; border-radius: var(--lf-r-cell); border: 1px solid var(--lf-line-strong);
+  background: var(--lf-s2); color: var(--lf-text); font-family: var(--lf-mono); font-size: 15px; font-weight: 600; cursor: pointer;
+  font-variant-numeric: tabular-nums; touch-action: manipulation; }
+.lifts .lf-rpechip.is-on { background: var(--lf-accent); border-color: var(--lf-accent); color: var(--lf-on-accent); }
+.lifts .lf-pad-rpeline { margin: 0; padding: 0 8px; font-family: var(--lf-mono); font-size: var(--lf-fs-floor); line-height: 16px; color: var(--lf-mid); }
+.lifts .lf-pad-keys { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; padding: 2px 4px 0; }
+.lifts .lf-padkey { display: flex; align-items: center; justify-content: center; gap: 6px; min-width: 0; height: 52px; padding: 0;
+  border-radius: var(--lf-r-cell); border: 1px solid var(--lf-line-strong); background: var(--lf-s2); color: var(--lf-text);
+  font-family: var(--lf-mono); font-size: var(--lf-fs-key); line-height: 28px; font-weight: 500; font-variant-numeric: tabular-nums;
+  cursor: pointer; touch-action: manipulation; -webkit-tap-highlight-color: transparent; -webkit-user-select: none; user-select: none; }
+.lifts .lf-padkey.is-down { background: var(--lf-s3); border-color: var(--lf-text); }
+.lifts .lf-padkey:disabled { opacity: .4; cursor: default; }
+.lifts .lf-padkey.is-fn { font-size: 17px; font-weight: 600; color: var(--lf-mid); }
+.lifts .lf-padkey.is-done { font-family: var(--lf-font); font-size: 16px; font-weight: 600; color: var(--lf-text); background: var(--lf-s1); }
+.lifts .lf-padkey.is-next { font-family: var(--lf-font); font-size: 16px; font-weight: 700; background: var(--lf-accent); border-color: var(--lf-accent);
+  color: var(--lf-on-accent); }
+.lifts .lf-padkey.is-next.is-down { filter: brightness(.92); }
+
+@media (prefers-reduced-motion: reduce) {
+  .lifts .lf-sheet, .lifts .lf-sheet-scrim, .lifts .lf-utoast, .lifts .lf-pbtoast { animation: none; }
+}

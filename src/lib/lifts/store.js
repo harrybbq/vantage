@@ -31,7 +31,7 @@
  *
  * Pure: `now`, `today` and ids are parameters.
  */
-import { LOAD_TYPES, isIso, num } from './lifts.js';
+import { LOAD_TYPES, SET_TYPES, isIso, num } from './lifts.js';
 
 /** The programme's main compound movements (src/data/trainingProgramme.js). */
 export const DEFAULT_LIFTS = Object.freeze([
@@ -131,7 +131,24 @@ export function makeEntry(f, { id, now, shift, gym } = {}) {
   if (sh) out.shift = sh;
   const g = gym !== undefined ? gym : f.gym;
   if (typeof g === 'string' && g) out.gym = g;
+  if (SET_TYPES.includes(f.type)) out.type = f.type;
   return out;
+}
+
+/** The keys makeEntry writes; anything else on a set (sessionId, keys added later) belongs to it and survives an edit. */
+const MANAGED_KEYS = new Set(['id', 'liftId', 'date', 'weight', 'reps', 'createdAt', 'notes', 'rpe', 'shift', 'gym', 'type']);
+/**
+ * An edited set: `prev` with the form's fields `f` applied through
+ * makeEntry (so a cleared note / RPE / type is removed), keeping its id,
+ * createdAt and every key makeEntry doesn't manage — an edit must never
+ * drop the workout link (`sessionId`) or anything a newer build added.
+ */
+export function editEntry(prev, f, opts = {}) {
+  const base = prev && typeof prev === 'object' ? prev : {};
+  const made = makeEntry({ ...base, ...f, id: base.id, createdAt: base.createdAt }, { ...opts, id: base.id });
+  const extra = {};
+  for (const [k, v] of Object.entries(base)) if (!MANAGED_KEYS.has(k)) extra[k] = v;
+  return { ...extra, ...made };
 }
 
 /** Add a set, or replace the one with the same id in place. */
@@ -339,6 +356,63 @@ export function setPerGym(lifts, liftId, on) {
   const cur = list.find(l => l.id === liftId);
   if (!cur || cur.perGym === !!on) return lifts;
   return { ...lifts, list: list.map(l => (l.id === liftId ? { ...l, perGym: !!on } : l)) };
+}
+
+// ── Per-lift rest and weight step (additive, optional keys) ──────────
+
+/** The weight steps Manage offers (row ⋯ → Weight step). */
+export const STEP_CHOICES = [1, 1.25, 2, 2.5, 5];
+/** The rest presets (seconds). */
+export const REST_PRESETS = [60, 90, 120, 180];
+const patchLift = (lifts, id, fn) => {
+  const list = lifts.list || [];
+  const cur = list.find(l => l.id === id);
+  if (!cur) return lifts;
+  const next = fn(cur);
+  if (!next || next === cur) return lifts;
+  return { ...lifts, list: list.map(l => (l.id === id ? next : l)) };
+};
+/** This lift's own rest (15–600 s); null clears it back to the workout's. */
+export function setLiftRest(lifts, id, sec) {
+  return patchLift(lifts, id, l => {
+    if (sec == null) { if (!('restSec' in l)) return l; const o = { ...l }; delete o.restSec; return o; }
+    const v = Math.max(15, Math.min(600, Math.round(num(sec) || 0)));
+    if (!num(sec) || l.restSec === v) return l;
+    return { ...l, restSec: v };
+  });
+}
+/**
+ * This lift's ± step. With `gym`: that gym's step (lift.stepByGym[gym]) —
+ * a machine's stack differs gym to gym. null clears it. Only STEP_CHOICES.
+ */
+export function setLiftStep(lifts, id, step, gym = null) {
+  return patchLift(lifts, id, l => {
+    if (step != null && !STEP_CHOICES.includes(num(step))) return l;
+    const v = step == null ? null : num(step);
+    if (gym) {
+      const cur = l.stepByGym && typeof l.stepByGym === 'object' ? l.stepByGym : {};
+      if (v == null) {
+        if (!(gym in cur)) return l;
+        const nx = { ...cur }; delete nx[gym];
+        const o = { ...l };
+        if (Object.keys(nx).length) o.stepByGym = nx; else delete o.stepByGym;
+        return o;
+      }
+      return cur[gym] === v ? l : { ...l, stepByGym: { ...cur, [gym]: v } };
+    }
+    if (v == null) { if (!('step' in l)) return l; const o = { ...l }; delete o.step; return o; }
+    return l.step === v ? l : { ...l, step: v };
+  });
+}
+
+/** The owner's Lifts UI choices (read view, never null). */
+export const liftsPrefs = lifts => (lifts && lifts.prefs && typeof lifts.prefs === 'object' && !Array.isArray(lifts.prefs) ? lifts.prefs : {});
+/** Set one pref (additive: other prefs are kept). Same value → the store itself. */
+export function setLiftsPref(lifts, key, value) {
+  if (typeof key !== 'string' || !key) return lifts;
+  const cur = liftsPrefs(lifts);
+  if (cur[key] === value) return lifts;
+  return { ...lifts, prefs: { ...cur, [key]: value } };
 }
 
 /** A unique id: `lf_` + time + randomness (crypto where there is one). */

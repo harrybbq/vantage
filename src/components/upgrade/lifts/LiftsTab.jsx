@@ -1,77 +1,80 @@
 /**
- * Upgrade → Lifts. A personal-best log for the main lifts (owner, Oct
- * 2026: "a section where I can keep logs of my PBs on main lifts").
+ * Upgrade → Lifts. A workout logger and a personal-best log for the main
+ * lifts (owner, Oct 2026). Redesigned to the Oct 2026 brief (§3).
  *
  * Data: `S.lifts` — a NEW key, written additively (store.js has the
- * rules). The default list (the programme's compound movements) is
- * seeded the first time this tab opens and `S.lifts` is absent — and
- * only once the cloud copy has loaded (`hydrated`), so it can never seed
- * over a store that simply hadn't arrived yet. Until then the defaults
- * are shown, not written.
+ * rules). The default list is seeded the first time this tab opens and
+ * `S.lifts` is absent — and only once the cloud copy has loaded
+ * (`hydrated`), so it can never seed over a store that hadn't arrived.
  *
- * The programme bans back squat, deadlift and barbell RDL. The log does
- * not: it is a record, not a plan. A banned lift gets one quiet line.
+ * Screens (this file only routes; each screen lives in its own file):
+ *   home     Today (WorkoutToday: suggested card, resume banner, the week
+ *            strip) + the lift list (LiftList)
+ *   detail   one lift (LiftDetail — also renders embedded in a Sheet:
+ *            <LiftDetail liftId embedded onClose />, via the Lifts context)
+ *   workout  the live workout (WorkoutLive) while one is open
+ * Sheets: LogSheet (Quick log / edit one set), ManageSheet, FinishSheet.
+ * Delete has a five-second Undo that puts back the identical entry.
  *
- * Shifts: each set is tagged with the rota's shift for its date
- * (shiftOn). Night sessions run at 80% load, so those sets say so — in
- * the list, the chart (hollow points) and the sheet. PBs count raw weight.
+ * The frame: ONE bar — Upgrade's "‹ Upgrade · Lifts" with ⚙ Manage at its
+ * right end (lifts.css places it there); a lift's detail hides that bar
+ * and shows its own single "‹ Lifts" back (A15). On phones the outer panel
+ * border and padding go (no card in a card).
  *
- * Screens: the list (today's workout, then the PB cards) → one lift
- * (LiftDetail); the live workout (WorkoutLive) while one is open.
- * Sheets: LogSheet (Quick Log — log / edit one set), ManageSheet and the
- * Finish summary. Delete has a five-second Undo that puts back the
- * identical entry in its old place.
- *
- * The workout logger (workout.js): a workout in progress lives in
- * S.lifts.active and survives a reload; coming back to Lifts with one
- * open shows "Workout in progress · 23 min · Resume / Discard" rather
- * than throwing you into it. Finish writes its done sets to the same
- * log the PB tables read, so PBs keep one source of truth.
- *
- * Gyms (S.lifts.gyms, DXC / Greenock by default): every set and workout
- * is tagged with one, defaulting to the last gym used. Machines compare
- * within a gym, free weights across (lib/lifts/lifts.js). Manage lifts
- * edits the gyms and each lift's per-gym switch.
+ * Shifts: each set is tagged with the rota's shift for its date. In the
+ * early hours after a night shift `today` is the shift's day
+ * (trainingDay.js) — plan, 80 % load and the date sets save under.
  */
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import Icon from '../../Icon';
-import LiftCard, { agoText } from './LiftCard';
 import LiftDetail from './LiftDetail';
 import LogSheet from './LogSheet';
 import ManageSheet from './ManageSheet';
 import WorkoutToday from './WorkoutToday';
+import LiftList from './LiftList';
 import WorkoutLive from './WorkoutLive';
 import FinishSheet from './FinishSheet';
-import { Toast, Celebrate } from './parts';
-import { useLiftsData, todayIso } from './useLifts';
+import NewWorkoutSheet from './workout/NewWorkoutSheet';
+import { takeLiftsResume, onLiftsResume } from '../../../lib/lifts/liveBus';
+import { Toast } from './parts';
+import { Button, PbToast } from './ui';
+import { LiftsScope, useLiftsScope } from './ui/scope';
+import { useLiftsData, todayIso, LiftsProvider } from './useLifts';
 import {
-  ensureLifts, withLifts, makeEntry, upsertEntry, removeEntry, restoreEntry, addLift, renameLift, setArchived,
+  ensureLifts, withLifts, makeEntry, editEntry, upsertEntry, removeEntry, restoreEntry, addLift, renameLift, setArchived,
   moveLift, deleteLift, recentFirst, newId, defaultGym, setLastGym, setPerGym, addGym, renameGym, setGymArchived, deleteGym,
-  gymName as gymNameOf,
+  setLiftStep, setLiftRest, gymName as gymNameOf,
 } from '../../../lib/lifts/store';
 import { pbMessage, pbKinds, setText, shortLiftName } from '../../../lib/lifts/lifts';
 import { shiftOn } from '../../../lib/rotation/pattern';
+import { trainingDayOf } from '../../../lib/rotation/trainingDay';
 import {
-  activeOf, startWorkout, suggestedStart, discardWorkout, summariseWorkout, finishWorkout, saveTemplate, templateFromSession,
+  activeOf, startWorkout, suggestedStart, discardWorkout, summariseWorkout, finishWorkout, saveTemplate, templateFromSession, deleteTemplate,
 } from '../../../lib/lifts/workout';
 import '../security/security.css';
 import './lifts.css';
 import './workout.css';
+import './lifts-tokens.css';
+import './home.css';
 
 export default function LiftsTab({ S, update, hydrated = true }) {
-  const today = todayIso();
+  const calendarToday = todayIso();
+  const today = trainingDayOf(S, new Date());
+  const nightOf = today !== calendarToday ? today : null;
   const { lifts, bwOf, summaries, totals, gyms, exists } = useLiftsData(S, today);
   const activeGymList = useMemo(() => gyms.filter(g => !g.archived), [gyms]);
+  const gymOrder = useMemo(() => gyms.map(g => g.id), [gyms]);
   const curGym = defaultGym(lifts);
   const gymName = useCallback(id => gymNameOf(lifts, id), [lifts]);
   const [open, setOpen] = useState(null);          // lift id in detail
-  const [sheet, setSheet] = useState(null);        // { kind: 'log', liftId?, entry? } | { kind: 'manage' }
+  const [sheet, setSheet] = useState(null);        // { kind: 'log', liftId?, entry? } | { kind: 'manage', focus? }
   const [toast, setToast] = useState(null);
   const [pb, setPb] = useState(null);
-  const [showArchived, setShowArchived] = useState(false);
   const [view, setView] = useState('list');        // 'list' | 'workout'
   const [finish, setFinish] = useState(null);      // { summary, saved, templateSaved }
+  const [newSheet, setNewSheet] = useState(null);  // { tab } — the New workout sheet (nothing starts until its Start)
+  const [pickOnOpen, setPickOnOpen] = useState(false);
   const active = activeOf(S);
+  const scope = useLiftsScope();
   // The resume line's minutes: a slow tick, only while a workout is open.
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
@@ -80,8 +83,14 @@ export default function LiftsTab({ S, update, hydrated = true }) {
     const t = setInterval(() => setNow(Date.now()), 30_000);
     return () => clearInterval(t);
   }, [active ? active.id : null]); // eslint-disable-line react-hooks/exhaustive-deps
-  // Finished or discarded elsewhere (another device, the summary): back to the list.
   useEffect(() => { if (view === 'workout' && !active && !finish) setView('list'); }, [view, active, finish]);
+  // The mini-bar's Resume (liveBus): open the workout — no state write, navigation only.
+  const hasActive = !!active;
+  useEffect(() => {
+    const go = () => { if (takeLiftsResume() && hasActive) { setOpen(null); setView('workout'); window.scrollTo({ top: 0 }); } };
+    go();
+    return onLiftsResume(go);
+  }, [hasActive]);
 
   // Seed the defaults once, only when the store is absent and the cloud copy is in.
   useEffect(() => {
@@ -92,7 +101,6 @@ export default function LiftsTab({ S, update, hydrated = true }) {
   const shiftOf = useCallback(iso => { const d = shiftOn(S, iso); return d ? d.shift : null; }, [S]);
 
   const inUse = lifts.list.filter(l => !l.archived);
-  const archived = lifts.list.filter(l => l.archived);
   const pickList = useMemo(() => recentFirst(lifts), [lifts]);
   const counts = useMemo(() => {
     const m = new Map();
@@ -105,30 +113,30 @@ export default function LiftsTab({ S, update, hydrated = true }) {
     return m;
   }, [lifts.log]);
   const recentIds = useMemo(() => pickList.filter(l => counts.has(l.id)).map(l => l.id), [pickList, counts]);
-  const cur = open ? summaries.get(open) : null;
-  useEffect(() => { if (open && !cur) setOpen(null); }, [open, cur]);
+  useEffect(() => { if (open && !summaries.get(open)) setOpen(null); }, [open, summaries]);
 
   const save = (f, res) => {
     const editing = sheet && sheet.entry;
-    const entry = makeEntry({ ...(editing || {}), ...f, id: editing ? editing.id : undefined, createdAt: editing ? editing.createdAt : undefined },
-      { id: newId('ls'), now: Date.now(), shift: shiftOf(f.date) || null });
+    const opts = { id: newId('ls'), now: Date.now(), shift: shiftOf(f.date) || null };
+    // An edit keeps the set's id, createdAt, workout link and any key a newer build added.
+    const entry = editing ? editEntry(editing, f, opts) : makeEntry(f, opts);
     write(l => (entry.gym && !editing ? setLastGym(upsertEntry(l, entry), entry.gym) : upsertEntry(l, entry)));
     setSheet(null);
     const lift = lifts.list.find(l => l.id === entry.liftId);
-    if (res && res.any && !res.first) {
+    if (res && res.any && !res.first && entry.type !== 'W') {
       setPb({ text: pbMessage(entry, lift), kinds: pbKinds(res), n: Date.now() });
     } else {
       setToast({ text: `${editing ? 'Saved' : 'Logged'} · ${shortLiftName(lift && lift.name)} ${setText(entry, lift)}`, n: Date.now() });
     }
   };
 
-  const del = entry => {
+  const del = useCallback(entry => {
     let removed = null;
     write(l => { const out = removeEntry(l, entry.id); removed = out.removed; return out.lifts; });
     setSheet(null);
     const lift = lifts.list.find(l => l.id === entry.liftId);
     setToast({ text: `Deleted ${shortLiftName(lift && lift.name)} ${setText(entry, lift)} · ${entry.date}`, undo: () => removed, n: Date.now() });
-  };
+  }, [write, lifts.list]);
   const undo = t => {
     const removed = t.undo && t.undo();
     if (removed) write(l => restoreEntry(l, removed));
@@ -137,59 +145,51 @@ export default function LiftsTab({ S, update, hydrated = true }) {
   const doneToast = useCallback(() => setToast(null), []);
   const donePb = useCallback(() => setPb(null), []);
 
+  // Writers checked against the current store first, so a sheet can show the error.
+  const checked = (fn, ...a) => { const out = fn(lifts, ...a); if (out.ok) write(l => fn(l, ...a).lifts); return out; };
   const manage = {
-    onAdd: ({ name, load, muscles }) => {
-      const out = addLift(lifts, { name, load, muscles }, { id: newId('lift'), now: Date.now() });
-      if (out.ok) write(l => addLift(l, { name, load, muscles }, { id: out.id, now: Date.now() }).lifts);
+    onAdd: ({ name, load, muscles, perGym }) => {
+      const spec = { name, load, muscles, ...(typeof perGym === 'boolean' ? { perGym } : {}) };
+      const out = addLift(lifts, spec, { id: newId('lift'), now: Date.now() });
+      if (out.ok) write(l => addLift(l, spec, { id: out.id, now: Date.now() }).lifts);
       return out;
     },
-    onRename: (id, name) => {
-      const out = renameLift(lifts, id, name);
-      if (out.ok) write(l => renameLift(l, id, name).lifts);
-      return out;
-    },
-    onMove: (id, dir) => write(l => moveLift(l, id, dir)),
+    onRename: (id, name) => checked(renameLift, id, name),
+    onMove: (id, dir, steps = 1) => write(l => { let x = l; for (let i = 0; i < steps; i++) x = moveLift(x, id, dir); return x; }),
     onArchive: (id, on) => write(l => setArchived(l, id, on)),
     onDelete: id => {
-      const out = deleteLift(lifts, id);
-      if (out.ok) write(l => deleteLift(l, id).lifts);
-      else setToast({ text: out.error, n: Date.now() });
+      const out = checked(deleteLift, id);
+      if (!out.ok) setToast({ text: out.error, n: Date.now() });
       return out;
     },
     onPerGym: (id, on) => write(l => setPerGym(l, id, on)),
-    // Gyms: checked against the current store first so the sheet can show the error.
+    onStep: (id, step, gym = null) => write(l => setLiftStep(l, id, step, gym)),
+    onRest: (id, sec) => write(l => setLiftRest(l, id, sec)),
     onAddGym: name => {
       const out = addGym(lifts, name);
       if (out.ok) write(l => addGym(l, name, { id: out.id }).lifts);
       return out;
     },
-    onRenameGym: (id, name) => {
-      const out = renameGym(lifts, id, name);
-      if (out.ok) write(l => renameGym(l, id, name).lifts);
-      return out;
-    },
-    onArchiveGym: (id, on) => {
-      const out = setGymArchived(lifts, id, on);
-      if (out.ok) write(l => setGymArchived(l, id, on).lifts);
-      return out;
-    },
-    onDeleteGym: id => {
-      const out = deleteGym(lifts, id);
-      if (out.ok) write(l => deleteGym(l, id).lifts);
-      return out;
-    },
+    onRenameGym: (id, name) => checked(renameGym, id, name),
+    onArchiveGym: (id, on) => checked(setGymArchived, id, on),
+    onDeleteGym: id => checked(deleteGym, id),
   };
   const pickGym = id => write(l => setLastGym(l, id));
 
   // ── Workout ──
   const goWorkout = () => { setOpen(null); setView('workout'); window.scrollTo({ top: 0 }); };
+  // Rows start EMPTY: the live table shows Previous as placeholders and ✓ commits them.
   const startSuggested = sug => {
-    update(prev => startWorkout(prev, { ...suggestedStart(sug), now: Date.now(), today }));
+    update(prev => startWorkout(prev, { ...suggestedStart(sug, { prefill: false }), now: Date.now(), today }));
     goWorkout();
   };
-  const buildOwn = () => {
-    const sh = shiftOf(today);
-    update(prev => startWorkout(prev, { source: 'blank', name: 'Workout', shift: sh, gym: curGym, now: Date.now(), today }));
+  // "Build my own" / Blank / Recent / Library → the New workout sheet; the clock starts on its Start.
+  const buildOwn = tab => setNewSheet({ tab: typeof tab === 'string' ? tab : 'blank' });
+  const startNew = args => {
+    const { openPicker, ...startArgs } = args;
+    update(prev => startWorkout(prev, { ...startArgs, now: Date.now(), today }));
+    setNewSheet(null);
+    setPickOnOpen(!!openPicker);
     goWorkout();
   };
   const discard = () => { update(prev => discardWorkout(prev)); setToast({ text: 'Workout discarded — nothing was saved', n: Date.now() }); };
@@ -200,85 +200,75 @@ export default function LiftsTab({ S, update, hydrated = true }) {
   const saveWorkout = () => {
     const { summary } = finish;
     update(prev => finishWorkout(prev, summary.session.finishedAt));
+    // The sheet lists the PBs (and each was toasted when its set was ticked) — no second celebration.
     setFinish(f => ({ ...f, saved: true }));
-    if (summary.pbs.length) {
-      setPb({ text: summary.pbs.length === 1 ? summary.pbs[0].text : `${summary.pbs.length} new bests this workout`,
-        kinds: summary.pbs.length === 1 ? null : summary.pbs.map(x => x.text.replace(/^New best: /, '')), n: Date.now() });
-    }
   };
   const closeFinish = () => { const was = finish && finish.saved; setFinish(null); if (was) setView('list'); };
-  const saveAsTemplate = name => {
-    const tpl = templateFromSession(finish.summary.session, name, newId('tp'));
+  // Save as template; started from a saved one → "Update template" replaces it in place (same id).
+  const saveAsTemplate = (name, { update: replace = false } = {}) => {
+    const from = finish.summary.template;
+    const tpl = replace && from ? templateFromSession(finish.summary.session, from.name, from.id) : templateFromSession(finish.summary.session, name, newId('tp'));
     update(prev => saveTemplate(prev, tpl));
-    setFinish(f => ({ ...f, templateSaved: tpl.name }));
+    setFinish(f => ({ ...f, templateSaved: replace ? `Updated template “${tpl.name}”` : `Saved as template “${tpl.name}” — it’s in Library` }));
   };
-  const showHistory = id => { setOpen(id); window.scrollTo({ top: 0 }); };
+  const openLift = useCallback(id => { setOpen(id); window.scrollTo({ top: 0 }); }, []);
+  // View history over the live workout: the lift's detail embedded in WorkoutLive's sheet,
+  // so the workout stays underneath (it reads everything from the Lifts context).
+  const renderHistory = (id, close) => <LiftDetail liftId={id} embedded onClose={close} />;
 
-  const logSheet = sheet && sheet.kind === 'log' && (
-    <LogSheet entry={sheet.entry} liftId={sheet.liftId} lifts={lifts.list} pickList={pickList} log={lifts.log} bwOf={bwOf}
-              today={today} shiftOf={shiftOf} onClose={() => setSheet(null)} onSave={save} onDelete={del}
-              gyms={activeGymList} gym={active && active.gym ? active.gym : curGym} gymName={gymName} />
-  );
+  const ctx = useMemo(() => ({
+    S, lifts, summaries, bwOf, gyms, activeGyms: activeGymList, curGym, gymName, today, calendarToday, counts, shiftOf,
+    activeGym: active && active.gym ? active.gym : curGym,
+    openLog: ({ liftId, entry } = {}) => setSheet({ kind: 'log', liftId, entry }),
+    deleteEntry: del,
+    openManage: focus => setSheet({ kind: 'manage', focus }),
+    openLift,
+  }), [S, lifts, summaries, bwOf, gyms, activeGymList, curGym, gymName, today, calendarToday, counts, shiftOf, active, del, openLift]);
+
+  const screen = open && summaries.get(open) ? 'detail' : view === 'workout' && active ? 'workout' : 'home';
 
   return (
-    <div className="upg-pane sec lifts">
-      {cur ? (
-        <LiftDetail s={cur} today={today} bwOf={bwOf} gyms={gyms} onPerGym={manage.onPerGym} onBack={() => setOpen(null)}
-                    backLabel={view === 'workout' && active ? 'Back to workout' : 'All lifts'}
-                    onLog={() => setSheet({ kind: 'log', liftId: cur.lift.id })}
-                    onEdit={e => setSheet({ kind: 'log', entry: e })} onDelete={del} />
-      ) : view === 'workout' && active ? (
-        <WorkoutLive S={S} update={update} list={lifts.list} recentIds={recentIds} today={today} gyms={activeGymList} gymName={gymName}
-                     onPerGym={manage.onPerGym}
-                     onMinimise={() => { setView('list'); window.scrollTo({ top: 0 }); }} onFinish={openFinish}
-                     onQuickLog={() => setSheet({ kind: 'log' })} onHistory={showHistory} onCreateLift={manage.onAdd}
+    <LiftsScope value={scope}>
+    <LiftsProvider value={ctx}>
+    <div className={`upg-pane sec lifts lh-root is-${screen}`} style={scope.style} data-screen={screen}>
+      {screen === 'detail' && (
+        <LiftDetail liftId={open} onClose={() => { setOpen(null); window.scrollTo({ top: 0 }); }} backLabel="Lifts" />
+      )}
+      {screen === 'workout' && (
+        <WorkoutLive S={S} update={update} list={lifts.list} recentIds={recentIds} today={today} bwOf={bwOf} gyms={activeGymList} gymName={gymName}
+                     initialPicker={pickOnOpen} renderHistory={renderHistory} onManage={() => setSheet({ kind: 'manage' })}
+                     onMinimise={() => { setPickOnOpen(false); setView('list'); window.scrollTo({ top: 0 }); }} onFinish={openFinish}
+                     onQuickLog={() => setSheet({ kind: 'log' })} onCreateLift={manage.onAdd}
                      onToast={text => setToast({ text, n: Date.now() })} />
-      ) : (
+      )}
+      {screen === 'home' && (
         <>
-          <WorkoutToday S={S} today={today} now={now} active={active} onStart={startSuggested} onBuild={buildOwn}
-                        onResume={goWorkout} onDiscard={discard} gyms={activeGymList} gym={curGym} onGym={pickGym} gymName={gymName} />
-          <div className="lf-bar">
-            <div className="lf-bar-text">
-              <span className="sec-eyebrow">// Personal bests</span>
-              <p className="lf-summary">
-                {totals.sets
-                  ? <>{inUse.length} lifts · {totals.sets} sets · <b>{totals.pbsMonth} {totals.pbsMonth === 1 ? 'PB' : 'PBs'} this month</b> · last logged {agoText(totals.last.date, today)}</>
-                  : 'Log a set and its PBs build themselves from real sets: heaviest, and your 1–12 rep maxes.'}
-              </p>
-            </div>
-            <div className="lf-bar-acts">
-              <button type="button" className="sec-btn is-quiet lf-btn-lg" onClick={() => setSheet({ kind: 'manage' })}>
-                <Icon name="settings" size={14} /> Manage lifts
-              </button>
-              <button type="button" className="sec-btn is-primary lf-btn-lg" onClick={() => setSheet({ kind: 'log' })} disabled={!inUse.length}>
-                <Icon name="zap" size={14} /> Quick log a set
-              </button>
-            </div>
+          <div className="lh-frame">
+            <Button variant="quiet" icon="settings" className="lh-frame-manage" onClick={() => setSheet({ kind: 'manage' })} data-testid="lh-manage">Manage</Button>
           </div>
-          {!inUse.length && <p className="lf-muted">No lifts in use — add one in Manage lifts.</p>}
-          <ul className="lf-cards" aria-label="Lifts">
-            {inUse.map(l => (
-              <LiftCard key={l.id} s={summaries.get(l.id)} today={today} gyms={gyms} onOpen={() => setOpen(l.id)}
-                        onLog={() => setSheet({ kind: 'log', liftId: l.id })} />
-            ))}
-          </ul>
-          {archived.length > 0 && (
-            <div className="lf-archived">
-              <button type="button" className="sec-btn is-quiet lf-btn-lg" aria-expanded={showArchived} onClick={() => setShowArchived(v => !v)}>
-                <Icon name={showArchived ? 'chevron-up' : 'chevron-down'} size={14} /> Archived · {archived.length}
-              </button>
-              {showArchived && (
-                <ul className="lf-cards" aria-label="Archived lifts">
-                  {archived.map(l => <LiftCard key={l.id} s={summaries.get(l.id)} today={today} gyms={gyms} onOpen={() => setOpen(l.id)} />)}
-                </ul>
-              )}
-            </div>
-          )}
+          <WorkoutToday S={S} today={today} nightOf={nightOf} now={now} active={active} list={lifts.list}
+                        onStart={startSuggested} onBuild={buildOwn} onResume={goWorkout} onDiscard={discard}
+                        onQuickLog={() => setSheet({ kind: 'log' })} canQuickLog={inUse.length > 0}
+                        gyms={activeGymList} gym={curGym} onGym={pickGym} gymName={gymName} />
+          <LiftList list={lifts.list} summaries={summaries} counts={counts} today={today} activeGym={active && active.gym ? active.gym : curGym}
+                    gymOrder={gymOrder} gymName={gymName} bwOf={bwOf} pbsMonth={totals.pbsMonth}
+                    onOpen={openLift} onLog={id => setSheet({ kind: 'log', liftId: id })} onQuickLog={() => setSheet({ kind: 'log' })}
+                    onManage={() => setSheet({ kind: 'manage' })} />
         </>
       )}
-      {logSheet}
+      {sheet && sheet.kind === 'log' && (
+        <LogSheet entry={sheet.entry} liftId={sheet.liftId} lifts={lifts.list} pickList={pickList} log={lifts.log} bwOf={bwOf}
+                  today={today} maxDate={calendarToday} shiftOf={shiftOf} onClose={() => setSheet(null)} onSave={save} onDelete={del}
+                  gyms={activeGymList} gym={active && active.gym ? active.gym : curGym} gymName={gymName}
+                  onManage={() => setSheet({ kind: 'manage' })} />
+      )}
       {sheet && sheet.kind === 'manage' && (
-        <ManageSheet lifts={lifts.list} counts={counts} onClose={() => setSheet(null)} gyms={gyms} gymCounts={gymCounts} {...manage} />
+        <ManageSheet lifts={lifts.list} counts={counts} onClose={() => setSheet(null)} gyms={gyms} gymCounts={gymCounts} focus={sheet.focus} {...manage} />
+      )}
+      {newSheet && (
+        <NewWorkoutSheet S={S} today={today} gyms={activeGymList} gym={curGym} gymName={gymName} list={lifts.list} initialTab={newSheet.tab}
+                         onStart={startNew} onClose={() => setNewSheet(null)} onQuickLog={() => { setNewSheet(null); setSheet({ kind: 'log' }); }}
+                         onDeleteTemplate={id => update(prev => deleteTemplate(prev, id))} />
       )}
       {finish && (
         <FinishSheet summary={finish.summary} saved={finish.saved} templateSaved={finish.templateSaved}
@@ -287,7 +277,9 @@ export default function LiftsTab({ S, update, hydrated = true }) {
                      onDiscard={() => { update(prev => discardWorkout(prev)); setFinish(null); setView('list'); setToast({ text: 'Workout discarded — nothing was saved', n: Date.now() }); }} />
       )}
       <Toast toast={toast} onUndo={undo} onDone={doneToast} />
-      <Celebrate pb={pb} onDone={donePb} />
+      <PbToast pb={pb} onDone={donePb} />
     </div>
+    </LiftsProvider>
+    </LiftsScope>
   );
 }

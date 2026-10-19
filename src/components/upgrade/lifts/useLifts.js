@@ -5,7 +5,7 @@
  * ids and PB days for the chart).
  * Reads only — writes go through the store's writers in LiftsTab.
  */
-import { useMemo } from 'react';
+import { createContext, useContext, useMemo } from 'react';
 import { liftsOf, gymList } from '../../../lib/lifts/store';
 import {
   makeBwOf, entriesFor, personalBests, pbTimeline, trend, relativeToBodyweight, chrono, perGymOf, gymsUsed, gymOf,
@@ -70,4 +70,22 @@ export function useLiftsData(S, today) {
     return { pbsMonth, sets, last };
   }, [summaries, today]);
   return { lifts, bwOf, summaries, totals, gyms, exists: !!(raw && typeof raw === 'object') };
+}
+
+/**
+ * The Lifts context: what any Lifts screen needs to read the store and to
+ * ask LiftsTab for a sheet — so <LiftDetail liftId embedded onClose /> works
+ * wherever it is rendered under LiftsTab (a page, or inside the workout's
+ * history Sheet: portals keep React context).
+ *
+ * LiftsTab provides { S, lifts, summaries, bwOf, gyms, activeGyms, curGym,
+ * gymName, today, calendarToday, counts, shiftOf, openLog({ liftId?, entry? }),
+ * deleteEntry(entry), openManage(), openLift(id) }.
+ */
+const LiftsCtx = createContext(null);
+export const LiftsProvider = LiftsCtx.Provider;
+export function useLiftsCtx() {
+  const v = useContext(LiftsCtx);
+  if (!v) throw new Error('useLiftsCtx: render inside LiftsTab');
+  return v;
 }

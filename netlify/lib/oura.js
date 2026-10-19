@@ -157,10 +157,14 @@ function mapOura({ sleeps = [], readiness = [], activity = [], workouts = [] }) 
     const d = w.day || (w.start_datetime || '').slice(0, 10);
     const kcal = Math.round(num(w.calories) || 0);
     if (!d || kcal <= 0) continue;
+    // start_datetime is already local ('2026-10-14T03:30:00+01:00'): its
+    // wall clock lets a night-shift session count for the shift's day.
+    const start = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(w.start_datetime || '') ? w.start_datetime.slice(0, 16) : null;
     (burn[d] = burn[d] || []).push({
       id: `oura-${w.id || d + '-' + (burn[d]?.length || 0)}`,
       label: w.activity ? `Oura · ${w.activity}` : 'Oura workout',
       kcal,
+      ...(start ? { start } : {}),
     });
   }
 

@@ -65,6 +65,8 @@ import TermsAcceptanceSheet from './components/TermsAcceptanceSheet';
 // to null and Rollup never emits their chunks.
 const UpgradeSection = OWNER_SURFACES_IN_BUILD ? lazy(() => import('./components/upgrade/UpgradeSection')) : null;
 const AdminEditModal = OWNER_SURFACES_IN_BUILD ? lazy(() => import('./components/AdminEditModal')) : null;
+// The minimised Lifts workout (owner-only): mounted only while S.lifts.active exists, so it never loads otherwise.
+const LiftsMiniBar = OWNER_SURFACES_IN_BUILD ? lazy(() => import('./components/upgrade/lifts/workout/MiniBar')) : null;
 // /invite/<code> — a friend's invite link. Lazy: almost no page load is one.
 const InviteLanding = lazy(() => import('./components/friends/InviteLanding'));
 const InvitePill = lazy(() => import('./components/friends/InviteLanding').then(m => ({ default: m.InvitePill })));
@@ -993,6 +995,11 @@ function Board({ userId, userEmail, onSignOut }) {
 
       <ConnectToast onCancel={handleCancelConnect} />
       <HubFooter visible={activeSection === 'hub'} onOpenLegal={setLegalPage} />
+      {LiftsMiniBar && isOwner && S.lifts && S.lifts.active && (
+        <Suspense fallback={null}>
+          <LiftsMiniBar S={S} isMobile={isMobile} onOpen={() => navigate('upgrade')} />
+        </Suspense>
+      )}
       <CoinToast message={coinToast.message} type={coinToast.type}
                  visible={coinToast.visible} action={coinToast.action} />
       <CommandPalette
