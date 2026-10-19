@@ -135,6 +135,22 @@ export function makeEntry(f, { id, now, shift, gym } = {}) {
   return out;
 }
 
+/** The keys makeEntry writes; anything else on a set (sessionId, keys added later) belongs to it and survives an edit. */
+const MANAGED_KEYS = new Set(['id', 'liftId', 'date', 'weight', 'reps', 'createdAt', 'notes', 'rpe', 'shift', 'gym', 'type']);
+/**
+ * An edited set: `prev` with the form's fields `f` applied through
+ * makeEntry (so a cleared note / RPE / type is removed), keeping its id,
+ * createdAt and every key makeEntry doesn't manage — an edit must never
+ * drop the workout link (`sessionId`) or anything a newer build added.
+ */
+export function editEntry(prev, f, opts = {}) {
+  const base = prev && typeof prev === 'object' ? prev : {};
+  const made = makeEntry({ ...base, ...f, id: base.id, createdAt: base.createdAt }, { ...opts, id: base.id });
+  const extra = {};
+  for (const [k, v] of Object.entries(base)) if (!MANAGED_KEYS.has(k)) extra[k] = v;
+  return { ...extra, ...made };
+}
+
 /** Add a set, or replace the one with the same id in place. */
 export function upsertEntry(lifts, entry) {
   const log = lifts.log || [];

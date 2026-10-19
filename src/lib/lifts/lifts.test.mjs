@@ -13,9 +13,14 @@ import {
 } from './lifts.js';
 import {
   DEFAULT_LIFTS, seedLifts, ensureLifts, liftsOf, withLifts, validateEntry, makeEntry, upsertEntry, removeEntry,
-  restoreEntry, addLift, renameLift, setArchived, moveLift, deleteLift, recentFirst, newId,
+  restoreEntry, addLift, renameLift, setArchived, moveLift, deleteLift, recentFirst, newId, setLiftStep, setLiftRest, STEP_CHOICES, editEntry,
 } from './store.js';
 import { PROGRAMME } from '../../data/trainingProgramme.js';
+import {
+  weekPlan, dayDetail, blockPips, nextTraining, dayWord, sessionE1rms, trendSegments, splitByGap, median, niceTicks, repMaxRows, predictWeight,
+  perGymBests, orderGyms, sparkPoints, groupLifts, agoShort, resolveLogDate, dateChipLabel, monthGrid, addMonths,
+} from './home.js';
+import { weekStrip, planStrip } from './workout.js';
 
 let n = 0;
 const t = (name, fn) => {
@@ -455,5 +460,210 @@ t('date helpers', () => {
   assert.equal(addDays('2026-10-24', 7), '2026-10-31', 'no DST drift');
   assert.equal(daysBetween('2026-01-01', '2026-01-31'), 30);
 });
+
+// ── Lifts home (Oct 2026 redesign): src/lib/lifts/home.js ──
+{
+  const ANCHOR = { id: 'w-anchor', date: '2026-10-05', startedAt: 1, finishedAt: 2, name: 'Legs', source: 'suggested', rotaSession: 'Legs',
+    exercises: [{ liftId: 'lp', sets: [{ reps: 8, weight: 100, done: true }] }] };
+  const W = (id, date, code, extra = {}) => ({ id, date, startedAt: 5, finishedAt: 6, name: code, source: 'suggested', rotaSession: code,
+    exercises: [{ liftId: 'lp', sets: [{ reps: 8, weight: 100, done: true }] }], ...extra });
+  const HS = sessions => ({ lifts: { list: [PRESS], log: [], sessions: [ANCHOR, ...sessions] } });
+
+  t('weekPlan: ONE Mon–Sun strip — plan session, shift code, trained, today, moved, missed', () => {
+    // Default rota: 2026-10-11 Push … 15 Lower (day block), 19 Push N1 … 23 Lower, 24–26 rest.
+    const wk = weekPlan(HS([W('a', '2026-10-11', 'Push')]), '2026-10-13');
+    assert.equal(wk.length, 7);
+    assert.deepEqual(wk.map(c => c.dow), ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']);
+    assert.deepEqual(wk.map(c => c.iso), ['2026-10-12', '2026-10-13', '2026-10-14', '2026-10-15', '2026-10-16', '2026-10-17', '2026-10-18']);
+    assert.deepEqual(wk.map(c => c.today), [false, true, false, false, false, false, false]);
+    assert.equal(wk[0].missed, true, 'Pull passed untrained: missed');
+    assert.equal(wk[1].session, 'Pull', 'and carries forward onto today (plan.js rule)');
+    assert.equal(wk[1].moved, true);
+    assert.equal(wk[3].short, 'Upr', 'short names fit a 46 px cell');
+    assert.deepEqual(wk.slice(4).map(c => c.short), ['Rest', 'Rest', 'Rest']);
+    assert.ok(wk.every(c => c.short.length <= 4));
+    assert.equal(wk[4].code, 'Off');
+    const nights = weekPlan(HS([W('b', '2026-10-19', 'Push')]), '2026-10-20');
+    assert.deepEqual(nights.map(c => c.code), ['N1', 'N2', 'N3', 'N4', 'Off', 'Off', 'Off'], 'shift codes N1–N4 then Off');
+    assert.deepEqual(nights.map(c => c.night), [true, true, true, true, false, false, false]);
+    assert.equal(nights[0].trained, true, 'a finished workout marks its day trained');
+    assert.equal(nights[0].session, 'Push', 'a done day shows what was done');
+    assert.equal(weekPlan({}, 'nope').length, 0);
+  });
+  t('weekPlan merges the old planStrip + weekStrip: same sessions, nothing invented', () => {
+    const S = HS([W('a', '2026-10-11', 'Push')]);
+    const wk = weekPlan(S, '2026-10-13');
+    const old = weekStrip(S, '2026-10-13');
+    assert.deepEqual(wk.map(c => c.session), old.map(d => d.session), 'the week strip\'s sessions');
+    const next = planStrip(S, '2026-10-13', 5);
+    for (const d of next) {
+      const c = wk.find(x => x.iso === d.iso);
+      if (c) assert.equal(c.session || 'Rest', d.session, `${d.iso}: the 5-day plan's session`);
+    }
+    const dd = dayDetail(S, wk[2]);
+    assert.equal(dd.title, 'Wed 14 Oct');
+    assert.ok(dd.exercises.length > 0 && dd.exercises.every(x => x.name && x.sets));
+    assert.equal(dayDetail(S, wk[5]).exercises.length, 0, 'a rest day lists no exercises');
+  });
+  t('blockPips: done / today (+ carried) / to do, in PPLUL order', () => {
+    const bp = blockPips(HS([W('a', '2026-10-11', 'Push')]), '2026-10-13');
+    assert.deepEqual(bp.pips.map(p => p.letter).join(''), 'PPLUL');
+    assert.deepEqual(bp.pips.map(p => p.state), ['done', 'today', 'todo', 'todo', 'todo']);
+    assert.equal(bp.pips[1].carried, true, 'Pull was missed yesterday and carried onto today');
+    assert.equal(bp.done, 1);
+    assert.equal(bp.total, 5);
+    const later = blockPips(HS([W('a', '2026-10-11', 'Push')]), '2026-10-16');
+    assert.ok(later.pips.some(p => p.state === 'missed' && p.carried), 'a rest day: owed sessions read missed, carried');
+    assert.equal(nextTraining(HS([]), '2026-10-15').session, 'Push');
+    assert.equal(nextTraining(HS([]), '2026-10-15').word, 'Mon');
+    assert.equal(dayWord('2026-10-16', '2026-10-15'), 'tomorrow');
+  });
+
+  // The chart.
+  const CH = (date, weight, reps, extra = {}) => set('lp', date, weight, reps, extra);
+  t('sessionE1rms: warm-ups and > 12 reps make no estimate; 6–12 reps are loose', () => {
+    const pts = sessionE1rms([
+      CH('2026-01-01', 300, 3, { type: 'W' }), CH('2026-01-01', 100, 5),
+      CH('2026-01-08', 90, 15), CH('2026-01-15', 80, 8),
+    ], PRESS);
+    assert.equal(pts.length, 2, 'the 15-rep day has no estimate');
+    near(pts[0].value, e1rm(100, 5), 'the warm-up 300 × 3 is ignored');
+    assert.equal(pts[0].loose, false);
+    assert.equal(pts[1].loose, true);
+  });
+  t('trendSegments: rolling median of DAY sessions — night and warm-ups never join it', () => {
+    const sets = [];
+    ['2026-02-01', '2026-02-04', '2026-02-07', '2026-02-10', '2026-02-13'].forEach((d, i) => sets.push(CH(d, 100 + i * 5, 1)));
+    sets.push(CH('2026-02-15', 60, 1, { shift: 'night' }));
+    sets.push(CH('2026-02-16', 400, 1, { type: 'W' }));
+    const pts = sessionE1rms(sets, PRESS);
+    assert.equal(pts.length, 6, 'the night session is a point; the warm-up is not');
+    const seg = trendSegments(pts);
+    assert.equal(seg.length, 1);
+    assert.equal(seg[0].length, 5, 'night left out of the trend');
+    assert.deepEqual(seg[0].map(p => p.value), [100, 102.5, 105, 107.5, 110], 'trailing medians');
+    assert.equal(median([3, 1, 2]), 2);
+    assert.equal(median([4, 1, 2, 3]), 2.5);
+  });
+  t('trendSegments: a gap over 28 days breaks the line and restarts the median', () => {
+    const pts = sessionE1rms([CH('2026-03-01', 100, 1), CH('2026-03-08', 110, 1), CH('2026-04-10', 50, 1), CH('2026-04-12', 52, 1)], PRESS);
+    const seg = trendSegments(pts);
+    assert.equal(seg.length, 2, '33 days between 8 Mar and 10 Apr');
+    assert.deepEqual(seg[1].map(p => p.value), [50, 51], 'the new run does not average in the old one');
+    assert.equal(splitByGap([{ n: 1 }, { n: 29 }, { n: 58 }]).length, 2, '28 days exactly stays joined');
+    const tk = niceTicks(183, 247);
+    assert.ok(tk.ticks.length >= 3 && tk.ticks.length <= 5 && [10, 20, 25].includes(tk.step), `round ticks ${JSON.stringify(tk)}`);
+    assert.ok(tk.lo <= 183 && tk.hi >= 247);
+  });
+  t('repMaxRows: real sets, their estimate, and muted "(pred.)" values only where none exists', () => {
+    const log = [CH('2026-05-01', 100, 5), CH('2026-05-08', 120, 3), CH('2026-05-15', 90, 8)];
+    const pb = personalBests(log, PRESS);
+    const rows = repMaxRows(pb, PRESS);
+    assert.deepEqual(rows.map(r => r.n), [1, 3, 5, 8, 10, 12]);
+    assert.equal(rows[0].entry.weight, 120);
+    assert.equal(rows[0].heaviest, true);
+    assert.equal(rows[2].entry.weight, 100);
+    assert.equal(rows[3].entry.weight, 90);
+    assert.equal(rows[3].pred, null, 'a real set never shows a prediction');
+    assert.equal(rows[4].entry, null);
+    const best = pb.bestE1rm.value;
+    near(rows[4].pred, best / (1 + 10 / 30), 'predicted 10-rep weight from the best estimate');
+    near(rows[5].pred, best / (1 + 12 / 30));
+    near(predictWeight(150, 1), 150);
+    const dip = repMaxRows(personalBests([set('dp', '2026-05-01', 20, 5)], DIP), DIP, { bwOf: () => ({ kg: 80 }) });
+    assert.equal(dip[5].pred, null, 'no prediction on a total-load estimate');
+  });
+
+  // The lift list.
+  t('perGymBests: a machine\'s bests per gym, the ACTIVE gym first, unassigned last, never combined', () => {
+    const LP = { ...PRESS, perGym: true };
+    const log = [
+      set('lp', '2026-06-01', 200, 8, { gym: 'dxc' }), set('lp', '2026-06-02', 150, 8, { gym: 'greenock' }),
+      set('lp', '2026-06-03', 170, 8), set('lp', '2026-06-04', 210, 5, { gym: 'dxc' }),
+    ];
+    const order = ['dxc', 'greenock'];
+    assert.deepEqual(perGymBests(log, LP, { activeGym: 'greenock', gymOrder: order }).map(g => [g.gym, g.best.entry.weight]),
+      [['greenock', 150], ['dxc', 210], [null, 170]]);
+    assert.deepEqual(perGymBests(log, LP, { activeGym: 'dxc', gymOrder: order }).map(g => g.gym), ['dxc', 'greenock', null]);
+    assert.deepEqual(perGymBests(log, { ...PRESS, perGym: false }, { activeGym: 'dxc' }), [], 'a free weight has one best');
+    assert.deepEqual(orderGyms(['b', null, 'z', 'a'], 'z', ['a']), ['z', 'a', 'b', null]);
+    const sp = sparkPoints(log, LP, { gym: 'dxc', pbIds: new Set([log[3].id]) });
+    assert.deepEqual(sp.map(p => p.y), [200, 210], 'dxc sessions only');
+    assert.equal(sp[1].pb, true);
+    assert.equal(sp[1].last, true);
+  });
+  t('groupLifts: empty lifts grouped into one row; archived left out; order kept', () => {
+    const list = [{ id: 'a' }, { id: 'b' }, { id: 'c', archived: true }, { id: 'd' }];
+    const counts = { a: 3, d: 1 };
+    const g = groupLifts(list, id => counts[id]);
+    assert.deepEqual(g.logged.map(l => l.id), ['a', 'd']);
+    assert.deepEqual(g.empty.map(l => l.id), ['b']);
+    assert.equal(agoShort('2026-10-16', '2026-10-19'), '3d');
+    assert.equal(agoShort('2026-10-19', '2026-10-19'), 'today');
+    assert.equal(agoShort('2026-08-01', '2026-10-19'), '3mo');
+  });
+
+  // Quick log's date chip.
+  t('resolveLogDate: Today / Yesterday / a picked day → ISO, never after maxDate', () => {
+    const o = { today: '2026-10-20', maxDate: '2026-10-21' };   // 3:30am Wed after Tuesday's night: today = the training day
+    assert.equal(resolveLogDate('today', o), '2026-10-20');
+    assert.equal(resolveLogDate('yesterday', o), '2026-10-19');
+    assert.equal(resolveLogDate('2026-10-02', o), '2026-10-02');
+    assert.equal(resolveLogDate('2026-10-21', o), '2026-10-21', 'the calendar day is allowed');
+    assert.equal(resolveLogDate('2026-10-25', o), '2026-10-21', 'the future is clamped to maxDate');
+    assert.equal(resolveLogDate('garbage', o), '2026-10-20');
+    assert.equal(dateChipLabel('2026-10-20', '2026-10-20'), 'Today');
+    assert.equal(dateChipLabel('2026-10-19', '2026-10-20'), 'Yesterday');
+    assert.equal(dateChipLabel('2026-10-12', '2026-10-20'), 'Mon 12 Oct');
+    assert.equal(dateChipLabel('2025-10-12', '2026-10-20'), 'Sun 12 Oct 2025');
+    const g = monthGrid('2026-10', { maxDate: '2026-10-21', today: '2026-10-20' });
+    assert.equal(g.label, 'October 2026');
+    const days = g.weeks.flat();
+    assert.equal(days[0].iso, '2026-09-28', 'Monday-first');
+    assert.equal(days.find(d => d.iso === '2026-10-22').disabled, true);
+    assert.equal(days.find(d => d.iso === '2026-10-21').disabled, false);
+    assert.equal(addMonths('2026-01', -1), '2025-12');
+    assert.equal(addMonths('2026-12', 1), '2027-01');
+  });
+
+  // Manage: step / rest writes.
+  t('setLiftStep / setLiftRest: additive — only that lift changes, every other key and lift kept', () => {
+    const L0 = { list: [{ id: 'a', name: 'A', load: 'weight', perGym: true, muscles: ['Quads'] }, { id: 'b', name: 'B', load: 'per_hand' }], log: [set('a', '2026-01-01', 10, 5)], gyms: [{ id: 'dxc', name: 'DXC' }], extra: { x: 1 } };
+    const L1 = setLiftStep(L0, 'a', 1.25);
+    assert.deepEqual(L1.list[0], { ...L0.list[0], step: 1.25 });
+    assert.equal(L1.list[1], L0.list[1], 'other lifts are the same objects');
+    assert.equal(L1.log, L0.log);
+    assert.equal(L1.gyms, L0.gyms);
+    assert.equal(L1.extra, L0.extra);
+    const L2 = setLiftStep(L1, 'a', 5, 'dxc');
+    assert.deepEqual(L2.list[0].stepByGym, { dxc: 5 });
+    assert.equal(L2.list[0].step, 1.25, 'the gym step sits beside the lift step');
+    assert.equal(setLiftStep(L2, 'a', 3), L2, 'only STEP_CHOICES');
+    assert.equal(setLiftStep(L2, 'a', 5, 'dxc'), L2, 'same value → no write');
+    const L3 = setLiftStep(L2, 'a', null, 'dxc');
+    assert.equal('stepByGym' in L3.list[0], false, 'clearing the last gym step removes the key');
+    const R1 = setLiftRest(L0, 'b', 120);
+    assert.equal(R1.list[1].restSec, 120);
+    assert.equal(R1.list[0], L0.list[0]);
+    assert.equal(setLiftRest(R1, 'b', 120), R1);
+    assert.equal('restSec' in setLiftRest(R1, 'b', null).list[1], false);
+    assert.equal(setLiftRest(L0, 'nope', 90), L0);
+    assert.deepEqual(STEP_CHOICES, [1, 1.25, 2, 2.5, 5]);
+  });
+  t('editEntry keeps sessionId and unknown keys; cleared fields go', () => {
+    const prev = { id: 'x1', liftId: 'lp', date: '2026-05-01', weight: 100, reps: 5, createdAt: 7, sessionId: 'wk1', gym: 'dxc', rpe: 8, notes: 'hi', type: 'W', future: { a: 1 } };
+    const out = editEntry(prev, { liftId: 'lp', date: '2026-05-01', weight: '102.5', reps: '5', rpe: '', notes: '', gym: 'dxc', type: null }, { shift: 'night' });
+    assert.equal(out.id, 'x1');
+    assert.equal(out.createdAt, 7);
+    assert.equal(out.sessionId, 'wk1', 'the workout link survives an edit');
+    assert.deepEqual(out.future, { a: 1 });
+    assert.equal(out.weight, 102.5);
+    assert.equal('rpe' in out, false);
+    assert.equal('notes' in out, false);
+    assert.equal('type' in out, false, 'Normal clears the warm-up flag');
+    assert.equal(out.shift, 'night');
+    assert.equal(editEntry(prev, { ...prev, type: 'D' }).type, 'D');
+  });
+}
 
 console.log(`lifts: ${n} tests passed`);
