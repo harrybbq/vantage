@@ -1,6 +1,7 @@
 /**
  * Small pieces shared by the Lifts screens: the sparkline, the ± stepper,
- * the labelled field, the Undo toast and the PB celebration. The toast
+ * the labelled field, the Undo toast and the PB celebration. (The gym
+ * switch and the Undo toast now live in ./ui and are re-exported here.) The toast
  * and the celebration are portalled to <body> (re-wrapped in the theme
  * classes) because an ancestor of the section can carry a transform,
  * which would pin a fixed element to the page instead of the screen.
@@ -8,6 +9,7 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import Icon from '../../Icon';
+import { UndoToast } from './ui/toasts';
 
 /** Width of an element, kept current. */
 export function useWidth(fallback = 600) {
@@ -55,21 +57,11 @@ export function Spark({ points, from, to }) {
 }
 
 /**
- * The gym switch (DXC | Greenock …) — a segmented control. `value` null
- * shows nothing selected (an unassigned set being edited).
+ * The gym switch — now the shared ui/GymSwitch (one segmented control
+ * everywhere, `allowAll` for free weights). Re-exported under the old
+ * name and props ({ gyms, value, onChange, label, className, testId }).
  */
-export function GymSwitch({ gyms, value, onChange, label = 'Gym', className = '', testId }) {
-  if (!gyms || !gyms.length) return null;
-  return (
-    <div className={`sec-seg lf-seg lf-gymseg${className ? ` ${className}` : ''}`} role="group" aria-label={label} data-testid={testId}>
-      {gyms.map(g => (
-        <button key={g.id} type="button" aria-pressed={value === g.id} className={value === g.id ? 'is-on' : ''} onClick={() => onChange(g.id)}>
-          {g.name}
-        </button>
-      ))}
-    </div>
-  );
-}
+export { default as GymSwitch, ALL_GYMS } from './ui/GymSwitch';
 
 /** − value + with a typed value in the middle. */
 export function Stepper({ id, label, value, onChange, step, min, max, decimal = false, unit, dataField }) {
@@ -111,37 +103,12 @@ export function Field({ label, id, error, hint, children, wide = false, as = 'la
   );
 }
 
-/** Five-second toast; `toast.undo` adds an Undo button. */
+/**
+ * Five-second toast; `toast.undo` adds an Undo button — now the shared
+ * ui/UndoToast, kept under the old name and props ({ toast, onUndo, onDone }).
+ */
 export function Toast({ toast, onUndo, onDone }) {
-  const [left, setLeft] = useState(5);
-  const t = useRef(null);
-  useEffect(() => {
-    if (!toast) return undefined;
-    setLeft(5);
-    const started = Date.now();
-    t.current = setInterval(() => {
-      const l = 5 - Math.floor((Date.now() - started) / 1000);
-      if (l <= 0) { clearInterval(t.current); onDone(); } else setLeft(l);
-    }, 250);
-    return () => clearInterval(t.current);
-  }, [toast, onDone]);
-  if (!toast) return null;
-  return createPortal(
-    <div className="upg-app sec lifts lf-toast-root">
-      <div className="lf-toast" role="status" aria-live="polite">
-        <span className="lf-toast-text">{toast.text}</span>
-        {toast.undo && (
-          <button type="button" className="lf-toast-undo" onClick={() => { clearInterval(t.current); onUndo(toast); }}>
-            Undo <span className="lf-toast-left" aria-hidden="true">{left}s</span>
-          </button>
-        )}
-        <button type="button" className="lf-toast-x" aria-label="Dismiss" onClick={() => { clearInterval(t.current); onDone(); }}>
-          <Icon name="x" size={14} />
-        </button>
-      </div>
-    </div>,
-    document.body,
-  );
+  return <UndoToast toast={toast} onUndo={onUndo} onDone={onDone} />;
 }
 
 /**

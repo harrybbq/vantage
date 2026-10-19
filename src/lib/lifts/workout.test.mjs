@@ -14,6 +14,7 @@ import {
   discardWorkout, volume, volumeText, sessionPBs, summariseWorkout, finishWorkout, PROGRAMME_TEMPLATES, templatesOf,
   templateFromSession, saveTemplate, deleteTemplate, templateStart, recentWorkouts, repeatStart, hasSessionOn,
   elapsedSec, clock, minutesText, MAX_SESSIONS, MUSCLES, PROGRAMME_MUSCLES, DEFAULT_REST_SEC, fillEmptyWorkout,
+  exerciseLift, listWithPending, previousSession, setSetType, restSecFor, liftFromPending, RPE_STEPS,
 } from './workout.js';
 import { pbTimeline, personalBests } from './lifts.js';
 import { proposeAutoLogs, applyAutoLogs } from '../trackers/autoLog.js';
@@ -200,7 +201,7 @@ t('estimateMinutes leaves optional exercises out', () => {
 });
 
 // ── Start ──
-t('start from the suggestion: programme lifts created additively, rows pre-filled', () => {
+t('start from the suggestion: programme lifts are PENDING (list untouched), rows pre-filled', () => {
   idn = 0;
   const S = base();
   const sug = suggestWorkout(noHistory(), LEGS_DAY);
@@ -209,11 +210,19 @@ t('start from the suggestion: programme lifts created additively, rows pre-fille
   assert.equal(next.vitalsLog, S.vitalsLog);
   assert.equal(next.lifts.log, S.lifts.log, 'the log is not touched by a start');
   assert.equal(next.lifts.sessions, S.lifts.sessions);
-  for (const l of S.lifts.list) assert.ok(next.lifts.list.includes(l), `${l.name} kept, same object`);
-  const added = next.lifts.list.slice(S.lifts.list.length);
-  assert.deepEqual(added.map(l => l.id), ['prog-45-hyperextension', 'prog-leg-extension', 'prog-standing-calf-raise', 'prog-walking-dumbbell-lunge', 'prog-ab-crunch-machine']);
-  assert.equal(added.find(l => l.id === 'prog-walking-dumbbell-lunge').load, 'per_hand');
-  assert.deepEqual(added.find(l => l.id === 'prog-leg-extension').muscles, ['Quads']);
+  assert.equal(next.lifts.list, S.lifts.list, 'a start never adds lift records (A9)');
+  const pend = activeOf(next).exercises.filter(x => x.pending);
+  assert.deepEqual(pend.map(x => x.liftId), ['prog-45-hyperextension', 'prog-leg-extension', 'prog-standing-calf-raise', 'prog-walking-dumbbell-lunge', 'prog-ab-crunch-machine']);
+  assert.ok(pend.every(x => x.pending.key === x.liftId && x.pending.name), 'the descriptor carries the fixed id and the name');
+  assert.equal(pend.find(x => x.liftId === 'prog-walking-dumbbell-lunge').pending.load, 'per_hand');
+  assert.deepEqual(pend.find(x => x.liftId === 'prog-leg-extension').pending.muscles, ['Quads']);
+  assert.equal(activeOf(next).exercises.find(x => x.liftId === 'seed-leg-press').pending, undefined, 'a lift already in the list is not pending');
+  // The screens read a pending exercise through a virtual lift.
+  const v = exerciseLift(next.lifts.list, pend[1]);
+  assert.deepEqual([v.id, v.name, v.load, v.pending], ['prog-leg-extension', 'Leg extension', 'weight', true]);
+  const wl = listWithPending(next.lifts.list, activeOf(next));
+  assert.equal(wl.length, S.lifts.list.length + 5);
+  assert.equal(listWithPending(S.lifts.list, null), S.lifts.list);
   const a = activeOf(next);
   assert.equal(a.date, LEGS_DAY);
   assert.equal(a.startedAt, 1000);
@@ -231,7 +240,90 @@ t('start from the suggestion: programme lifts created additively, rows pre-fille
 t('start twice on two devices: programme lifts get the same ids', () => {
   const a = startWorkout(base(), { ...suggestedStart(suggestWorkout(noHistory(), LEGS_DAY)), now: 1, today: LEGS_DAY, ids });
   const b = startWorkout(base(), { ...suggestedStart(suggestWorkout(noHistory(), LEGS_DAY)), now: 2, today: LEGS_DAY, ids });
-  assert.deepEqual(a.lifts.list.map(l => l.id), b.lifts.list.map(l => l.id));
+  assert.deepEqual(activeOf(a).exercises.map(x => x.liftId), activeOf(b).exercises.map(x => x.liftId));
+  const ta = toggleDone(updateSet(a, 1, 0, { weight: 50, reps: 12 }), 1, 0, 5);
+  const tb = toggleDone(updateSet(b, 1, 0, { weight: 40, reps: 10 }), 1, 0, 9);
+  assert.deepEqual(ta.lifts.list.map(l => l.id), tb.lifts.list.map(l => l.id), 'created with the same fixed id on both');
+});
+
+const started = () => startWorkout(base(), { ...suggestedStart(suggestWorkout(noHistory(), LEGS_DAY)), now: 10_000, today: LEGS_DAY, ids });
+const lpIdx = S => activeOf(S).exercises.findIndex(x => x.liftId === 'seed-leg-press');
+
+// ── Lazy lift creation (A9) ──
+t('lazy lifts: start → discard leaves the list untouched (suggested, template, recent, fill)', () => {
+  const S = base();
+  const sug = startWorkout(S, { ...suggestedStart(suggestWorkout(noHistory(), LEGS_DAY)), now: 1, today: LEGS_DAY, ids });
+  assert.equal(discardWorkout(sug).lifts.list, S.lifts.list, 'suggested');
+  const push = PROGRAMME_TEMPLATES.find(x => x.id === 'prog:Push');
+  const tpl = startWorkout(S, { ...templateStart(S, push, LEGS_DAY), now: 1, today: LEGS_DAY, ids });
+  assert.ok(activeOf(tpl).exercises.some(x => x.pending), 'Push has programme lifts the fixture list lacks');
+  assert.equal(tpl.lifts.list, S.lifts.list, 'template start adds nothing');
+  assert.equal(discardWorkout(tpl).lifts.list, S.lifts.list, 'template → discard');
+  const rec = startWorkout(S, { ...repeatStart(S, SESSIONS[0], LEGS_DAY), now: 1, today: LEGS_DAY, ids });
+  assert.equal(rec.lifts.list, S.lifts.list, 'recent');
+  const blank = startWorkout(S, { source: 'blank', now: 1, today: LEGS_DAY, ids });
+  const filled = fillEmptyWorkout(blank, templateStart(blank, push, LEGS_DAY));
+  assert.ok(activeOf(filled).exercises.length > 0);
+  assert.equal(filled.lifts.list, blank.lifts.list, 'Build my own → Library adds nothing');
+  assert.equal(discardWorkout(filled).lifts.list, S.lifts.list);
+  // a JSON round trip keeps the descriptor (the workout persists across reloads)
+  assert.deepEqual(JSON.parse(JSON.stringify(activeOf(tpl))), activeOf(tpl));
+});
+t('lazy lifts: the first tick creates the lift once; more ticks and Finish add nothing more', () => {
+  const S = started();
+  const ei = activeOf(S).exercises.findIndex(x => x.liftId === 'prog-leg-extension');
+  const before = S.lifts.list.length;
+  const T1 = toggleDone(updateSet(S, ei, 0, { weight: 50, reps: 12 }), ei, 0, 77);
+  assert.equal(T1.lifts.list.length, before + 1, 'created on the first ticked set');
+  const made = T1.lifts.list[T1.lifts.list.length - 1];
+  assert.deepEqual([made.id, made.name, made.load, made.muscles, made.createdAt], ['prog-leg-extension', 'Leg extension', 'weight', ['Quads'], 77]);
+  for (let k = 0; k < before; k++) assert.equal(T1.lifts.list[k], S.lifts.list[k], 'existing lifts kept, same objects');
+  assert.equal(activeOf(T1).exercises[ei].pending, undefined, 'no longer pending');
+  assert.equal(activeOf(T1).exercises[ei].liftId, 'prog-leg-extension');
+  const T2 = toggleDone(updateSet(T1, ei, 1, { weight: 50, reps: 11 }), ei, 1, 78);
+  assert.equal(T2.lifts.list, T1.lifts.list, 'a second tick creates nothing');
+  const U = toggleDone(T2, ei, 1, 79);
+  assert.equal(U.lifts.list, T1.lifts.list, 'un-tick leaves the lift (it has a done set left)');
+  const F = finishWorkout(T2, 99);
+  assert.equal(F.lifts.list.filter(l => l.id === 'prog-leg-extension').length, 1, 'finish is idempotent on the list');
+  assert.equal(F.lifts.log.filter(e => e.liftId === 'prog-leg-extension').length, 2);
+  // a refused tick (nothing typed, no history) creates nothing
+  const ri = activeOf(S).exercises.findIndex(x => x.liftId === 'prog-standing-calf-raise');
+  const R = updateSet(S, ri, 0, { weight: null, reps: null });
+  assert.equal(toggleDone(R, ri, 0, 1), R, 'refused → no write, no lift');
+});
+t('lazy lifts: Finish creates pending lifts for done sets only; unticked pending exercises create nothing', () => {
+  const S = started();
+  const ei = activeOf(S).exercises.findIndex(x => x.liftId === 'prog-ab-crunch-machine');
+  // a done set that arrived without toggleDone (e.g. merged from another device)
+  const a = activeOf(S);
+  const ex = { ...a.exercises[ei], sets: a.exercises[ei].sets.map((st, i) => (i === 0 ? { ...st, reps: 15, weight: 30, done: true } : st)) };
+  const exercises = a.exercises.slice(); exercises[ei] = ex;
+  const M = { ...S, lifts: { ...S.lifts, active: { ...a, exercises } } };
+  const F = finishWorkout(M, 500);
+  const ids2 = F.lifts.list.map(l => l.id);
+  assert.ok(ids2.includes('prog-ab-crunch-machine'), 'created at Finish');
+  assert.ok(!ids2.includes('prog-leg-extension') && !ids2.includes('prog-45-hyperextension'), 'unticked programme lifts never created');
+  assert.equal(F.lifts.log.filter(e => e.liftId === 'prog-ab-crunch-machine').length, 1);
+  assert.equal(F.lifts.sessions[F.lifts.sessions.length - 1].exercises.length, 1);
+  // a same-name lift that appeared meanwhile is used, not duplicated
+  const twin = { id: 'mine-crunch', name: 'Ab crunch machine', load: 'weight', unit: 'kg', createdAt: 0 };
+  const M2 = { ...M, lifts: { ...M.lifts, list: [...M.lifts.list, twin] } };
+  const F2 = finishWorkout(M2, 500);
+  assert.equal(F2.lifts.list.length, M2.lifts.list.length, 'no duplicate by name');
+  assert.ok(F2.lifts.log.some(e => e.liftId === 'mine-crunch'));
+  // summarise sees a pending exercise's done sets (virtual lift)
+  const sum = summariseWorkout(M, 500);
+  assert.equal(sum.setsDone, 1);
+  assert.equal(summariseWorkout(M, 500).session.exercises[0].liftId, 'prog-ab-crunch-machine');
+});
+t('lazy lifts: lifts already in the list behave exactly as before', () => {
+  let S = startWorkout(base(), { source: 'blank', now: 0, today: LEGS_DAY, ids });
+  S = addExercises(S, ['seed-leg-press'], { ids });
+  const T = toggleDone(S, 0, 0, 10);
+  assert.equal(T.lifts.list, S.lifts.list, 'no list write for a known lift');
+  assert.equal(activeOf(T).exercises[0].pending, undefined);
+  assert.equal(finishWorkout(T, 20).lifts.list, S.lifts.list);
 });
 t('blank start + add exercises: empty rows (Previous shows what to beat), no duplicates', () => {
   const S = startWorkout(base(), { source: 'blank', name: 'Quick workout', now: 0, today: LEGS_DAY, ids });
@@ -248,8 +340,6 @@ t('blank start + add exercises: empty rows (Previous shows what to beat), no dup
 });
 
 // ── Editing the active workout ──
-const started = () => startWorkout(base(), { ...suggestedStart(suggestWorkout(noHistory(), LEGS_DAY)), now: 10_000, today: LEGS_DAY, ids });
-const lpIdx = S => activeOf(S).exercises.findIndex(x => x.liftId === 'seed-leg-press');
 
 t('addSet copies the last row; updateSet cleans numbers; same value → no write', () => {
   let S = started();
@@ -271,7 +361,7 @@ t('toggleDone: fills empties from Previous, refuses a non-set, starts the rest t
   S = addExercises(S, ['seed-leg-press', 'bench', 'seed-dip'], { ids });
   const T = toggleDone(S, 0, 1, 5000);
   const st = activeOf(T).exercises[0].sets[1];
-  assert.deepEqual([st.weight, st.reps, st.done], [145, 8, true], 'set 2 ← Previous set 2');
+  assert.deepEqual([st.weight, st.reps, st.done], [180, 8, true], 'set 2 ← Previous set 2 of the last DAY time (the 145 night is not a day reference)');
   assert.deepEqual(activeOf(T).rest, { endsAt: 5000 + DEFAULT_REST_SEC * 1000, total: DEFAULT_REST_SEC });
   assert.equal(restLeft(activeOf(T), 5000 + 30_000), 60);
   assert.equal(restLeft(activeOf(T), 4000), DEFAULT_REST_SEC, 'a clock read just before the tick never shows more than the total');
@@ -287,7 +377,7 @@ t('toggleDone: fills empties from Previous, refuses a non-set, starts the rest t
   assert.equal(activeOf(toggleDone(updateSet(T, 1, 0, { reps: 5, weight: 60 }), 1, 0, 6000)).exercises[1].sets[0].done, true);
   const U = toggleDone(T, 0, 1, 7000);
   assert.equal(activeOf(U).exercises[0].sets[1].done, false, 'un-tick');
-  assert.equal(activeOf(U).exercises[0].sets[1].weight, 145, 'the values stay');
+  assert.equal(activeOf(U).exercises[0].sets[1].weight, 180, 'the values stay');
 });
 t('rest timer: setRestSec remembers, +15 s, skip', () => {
   let S = started();
@@ -568,6 +658,82 @@ t('fillEmptyWorkout: Recent / Library fill a just-started empty workout, keeping
 t('planFor clamps the set count', () => {
   assert.equal(planFor(base(), LIST[0], { sets: 99 }).rows.length, 20);
   assert.equal(planFor(base(), null, { sets: 0, reps: '8–10' }).rows[0].reps, 8);
+});
+
+// ── Previous by shift, set types, per-lift rest ──
+t('previousSession: day reads day; night reads night, else day × 0.8 rounded to the step', () => {
+  const S = base();
+  const day = previousSession(S, 'seed-leg-press', { gym: 'dxc', night: false });
+  assert.equal(day.source, 'day');
+  assert.deepEqual(day.sets.map(x => x.weight), [170, 180, 180]);
+  const night = previousSession(S, 'seed-leg-press', { gym: 'dxc', night: true });
+  assert.equal(night.source, 'night');
+  assert.deepEqual(night.sets.map(x => x.weight), [145, 145], 'the last NIGHT session as lifted');
+  // dips: day history only → night is ×0.8 rounded to 2.5 (15 → 12, 20 → 16 → 15)
+  const dip = previousSession(S, 'seed-dip', { night: true });
+  assert.equal(dip.source, 'day×0.8');
+  assert.equal(dip.scaled, true);
+  assert.deepEqual(dip.sets.map(x => x.weight), [12.5, 15]);
+  // per dumbbell steps by 1: 31 × 0.8 = 24.8 → 25
+  const S2 = { ...S, lifts: { ...S.lifts, log: [...S.lifts.log, e('seed-incline-db-press', '2026-10-06', 31, 8)] } };
+  assert.deepEqual(previousSession(S2, 'seed-incline-db-press', { night: true }).sets.map(x => x.weight), [25]);
+  // a lift's own step wins: 15 × 0.8 = 12 at step 5 → 10
+  const S3 = { ...S, lifts: { ...S.lifts, list: S.lifts.list.map(l => (l.id === 'seed-dip' ? { ...l, step: 5 } : l)) } };
+  assert.deepEqual(previousSession(S3, 'seed-dip', { night: true }).sets.map(x => x.weight), [15, 20].map(w => Math.round(w * 0.8 / 5) * 5));
+  // night-only history on a day session: shown as lifted, labelled night
+  const lat = previousSession(S, 'seed-lat-pulldown', { gym: 'dxc', night: false });
+  assert.equal(lat.source, 'night');
+  assert.equal(lat.sets[0].weight, 70);
+  assert.equal(previousSession(S, 'bench', { night: true }), null);
+});
+t('night workout: ✓ on an empty row fills from the last NIGHT time', () => {
+  let S = startWorkout(base(), { source: 'blank', now: 0, today: LEGS_NIGHT, shift: 'night', ids });
+  S = addExercises(S, ['seed-leg-press', 'seed-dip'], { ids });
+  const T = toggleDone(S, 0, 0, 1);
+  assert.equal(activeOf(T).exercises[0].sets[0].weight, 145);
+  const D = toggleDone(T, 1, 1, 2);
+  assert.equal(activeOf(D).exercises[1].sets[1].weight, 15, 'dip: day 20 × 0.8 → 15');
+});
+t('set types: W / D / F stored on the set, copied to the session and log; warm-ups never a session PB', () => {
+  let S = startWorkout(base(), { source: 'blank', now: 0, today: LEGS_DAY, ids });
+  S = addExercises(S, ['seed-leg-press'], { ids });
+  S = addSet(addSet(S, 0, { ids }), 0, { ids });
+  S = setSetType(S, 0, 0, 'W');
+  assert.equal(activeOf(S).exercises[0].sets[0].type, 'W');
+  assert.equal(setSetType(S, 0, 0, 'W'), S, 'same type → no write');
+  assert.equal('type' in activeOf(setSetType(S, 0, 0, null)).exercises[0].sets[0], false, 'null → a normal set');
+  assert.equal('type' in activeOf(setSetType(S, 0, 0, 'X')).exercises[0].sets[0], false, 'unknown → a normal set');
+  S = setSetType(S, 0, 2, 'F');
+  assert.equal('type' in activeOf(addSet(setSetType(S, 0, 3, 'D'), 0, { ids })).exercises[0].sets[4], false, 'Add set does not copy the type');
+  // warm-up at 250 × 10 would beat everything — it must not be a PB; set 2 at 185 × 8 is (beats 180 × 8)
+  S = toggleDone(updateSet(S, 0, 0, { weight: 250, reps: 10 }), 0, 0, 1);
+  S = toggleDone(updateSet(S, 0, 1, { weight: 185, reps: 8 }), 0, 1, 2);
+  S = toggleDone(updateSet(S, 0, 2, { weight: 100, reps: 12 }), 0, 2, 3);
+  const sum = summariseWorkout(S, 10);
+  assert.ok(sum.pbs.every(p => p.entry.weight !== 250), 'the warm-up is never a PB');
+  assert.ok(sum.pbs.some(p => p.entry.weight === 185), 'the working set is');
+  assert.equal(sum.volume, 250 * 10 + 185 * 8 + 100 * 12, 'warm-ups still count for volume');
+  const F = finishWorkout(S, 10);
+  const add = F.lifts.log.slice(-3);
+  assert.deepEqual(add.map(x => x.type), ['W', undefined, 'F'], 'type rides onto the log entry');
+  assert.deepEqual(F.lifts.sessions[F.lifts.sessions.length - 1].exercises[0].sets.map(x => x.type), ['W', undefined, 'F']);
+  const pb = personalBests(F.lifts.log, LIST[0]);
+  assert.equal(pb.heaviest.value, 185, 'heaviest ignores the warm-up');
+  assert.ok(!pbTimeline(F.lifts.log, LIST[0]).some(ev => ev.entry.type === 'W'));
+  assert.equal(previousSets(F, 'seed-leg-press').sets[0].type, 'W', 'Previous shows the warm-up row as a warm-up');
+});
+t('per-lift rest: lift.restSec beats the workout rest; RPE steps', () => {
+  assert.equal(restSecFor({ restSec: 90 }, { restSec: 180 }), 180);
+  assert.equal(restSecFor({ restSec: 120 }, {}), 120);
+  assert.equal(restSecFor(null, null), DEFAULT_REST_SEC);
+  assert.equal(restSecFor({}, { restSec: 5 }), 15, 'clamped');
+  const B = base();
+  B.lifts.list = B.lifts.list.map(l => (l.id === 'seed-leg-press' ? { ...l, restSec: 180 } : l));
+  let S = startWorkout(B, { source: 'blank', now: 0, today: LEGS_DAY, ids });
+  S = addExercises(S, ['seed-leg-press'], { ids });
+  assert.equal(activeOf(toggleDone(S, 0, 0, 0)).rest.total, 180);
+  assert.deepEqual(RPE_STEPS, [6, 7, 7.5, 8, 8.5, 9, 9.5, 10]);
+  assert.equal(liftFromPending(null), null);
 });
 
 console.log(`workout: ${n} tests passed`);

@@ -416,3 +416,8 @@ html[data-theme="dark-os"] .wk-nd-chip.is-day { color: #e0a33a; }
   .wk-title-row { flex-wrap: wrap; row-gap: 2px; }
   .wk-gymchip > svg:first-child { display: none; }
 }
+
+/* The narrow row with keyboard entry (phone-width window, fine pointer —
+   A4): inputs fill the narrow cells, no ± steppers. */
+.wk-table.is-touch .wk-deskcell { gap: 0; }
+.lifts .wk-table.is-touch .wk-in { height: 44px; padding: 0 2px; font-size: 16px; }

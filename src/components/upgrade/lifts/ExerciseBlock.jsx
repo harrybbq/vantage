@@ -9,24 +9,31 @@
  *             an empty row ticks with Previous's numbers
  *   delete    swipe a row left on a touch screen; a bin button on desktop
  *
- * Touch screens get tappable cells that drive the docked number pad;
- * desktop gets real inputs (Tab order reps → kg → rpe → ✓, ↑/↓ step)
- * with − / + either side. Narrow columns keep the table inside a 360 px
- * phone with no sideways scroll.
+ * Two independent switches (useInputMode, fixes A4):
+ *   layout (width)   phone → the narrow row (no ± steppers, no bin column);
+ *                    tablet / desktop → the wide row with − / + steppers
+ *   coarse (pointer) → tappable cells that drive the docked number pad and
+ *                    swipe-to-delete; fine → real inputs (Tab order reps →
+ *                    kg → rpe → ✓, ↑/↓ step)
+ * So a narrow window with a mouse gets the phone row with keyboard entry
+ * (and a mouse drag reveals Delete), never the wide table squeezed.
+ * Narrow columns keep the table inside a 360 px phone with no sideways scroll.
  */
 import { useEffect, useRef, useState } from 'react';
 import Icon from '../../Icon';
 import { prevText, musclesOf } from '../../../lib/lifts/workout';
-import { LOAD_LABEL } from '../../../lib/lifts/lifts';
+import { LOAD_LABEL, stepFor } from '../../../lib/lifts/lifts';
 
 const fmt = v => (v == null || v === '' ? '' : String(Math.round(Number(v) * 100) / 100));
 
 export default function ExerciseBlock({
-  ex, ei, lift, prev, coarse, editing, problem, onCell, onChange, onToggle, onRemoveSet, onAddSet, onMenu, onNote, noteOpen, onHistory, gymLabel = null,
+  ex, ei, lift, prev, coarse, layout = null, kgStep: kgStepIn = null, editing, problem, onCell, onChange, onToggle, onRemoveSet, onAddSet, onMenu, onNote, noteOpen, onHistory, gymLabel = null,
 }) {
   const per = lift && lift.load === 'per_hand';
   const bw = lift && lift.load === 'bodyweight_plus';
-  const kgStep = per ? 1 : 2.5;
+  const kgStep = kgStepIn || stepFor(lift);
+  // Narrow row when touch OR a phone-width window; wide row (steppers, bin) otherwise.
+  const narrow = coarse || layout === 'phone';
   const doneN = ex.sets.filter(s => s.done).length;
   return (
     <section className="wk-ex" aria-labelledby={`wk-ex-${ei}`} data-testid="wk-ex">
@@ -43,7 +50,7 @@ export default function ExerciseBlock({
         {[ex.target ? `Target ${ex.sets.length} × ${ex.target}` : null, musclesOf(lift).slice(0, 3).join(' · ') || null, lift && lift.load !== 'weight' ? LOAD_LABEL[lift.load] : null, ex.optional ? 'optional' : null, gymLabel ? `${gymLabel} machine` : null].filter(Boolean).join(' · ')}
       </p>
       {(noteOpen || ex.note) && <Note value={ex.note || ''} autoFocus={noteOpen && !ex.note} onSave={onNote} label={`Note for ${lift ? lift.name : 'exercise'}`} />}
-      <div className={`wk-table${coarse ? ' is-touch' : ' is-desk'}`} role="table" aria-label={`${lift ? lift.name : 'Exercise'} sets`}>
+      <div className={`wk-table${narrow ? ' is-touch' : ' is-desk'}${narrow && !coarse ? ' is-keys' : ''}`} role="table" aria-label={`${lift ? lift.name : 'Exercise'} sets`}>
         <div className="wk-tr wk-th" role="row">
           <span role="columnheader">Set</span>
           <span role="columnheader"><span aria-hidden="true">Prev</span><span className="sr-only">Previous</span></span>
@@ -51,14 +58,14 @@ export default function ExerciseBlock({
           <span role="columnheader" className="is-c">{per ? 'KG/hand' : bw ? '+KG' : 'KG'}</span>
           <span role="columnheader" className="is-c">RPE</span>
           <span role="columnheader" className="is-c"><Icon name="check" size={14} /><span className="sr-only">Done</span></span>
-          {!coarse && <span role="columnheader"><span className="sr-only">Delete</span></span>}
+          {!narrow && <span role="columnheader"><span className="sr-only">Delete</span></span>}
         </div>
         {ex.sets.map((s, si) => {
           const p = prev && prev.sets.length ? prev.sets[Math.min(si, prev.sets.length - 1)] : null;
           const pHere = prev && si < prev.sets.length ? prev.sets[si] : null;
           const ed = editing && editing.ei === ei && editing.si === si ? editing : null;
           return (
-            <SetRow key={s.id} s={s} si={si} coarse={coarse} prevSet={pHere} fill={p} lift={lift} kgStep={kgStep} editing={ed}
+            <SetRow key={s.id} s={s} si={si} coarse={coarse} narrow={narrow} prevSet={pHere} fill={p} lift={lift} kgStep={kgStep} editing={ed}
                     problem={problem && problem.si === si ? problem.text : null}
                     onCell={f => onCell(ei, si, f)} onChange={patch => onChange(ei, si, patch)} onToggle={() => onToggle(ei, si)}
                     onRemove={() => onRemoveSet(ei, si)} name={lift ? lift.name : 'exercise'} />
@@ -70,14 +77,16 @@ export default function ExerciseBlock({
   );
 }
 
-function SetRow({ s, si, coarse, prevSet, fill, lift, kgStep, editing, problem, onCell, onChange, onToggle, onRemove, name }) {
+function SetRow({ s, si, coarse, narrow, prevSet, fill, lift, kgStep, editing, problem, onCell, onChange, onToggle, onRemove, name }) {
   const [dx, setDx] = useState(0);
   const [open, setOpen] = useState(false);
   const g = useRef(null);
   const OPEN = -84;
-  // Swipe left to reveal Delete (touch only; a vertical drag scrolls).
+  // Swipe left to reveal Delete (touch; and a mouse drag in the narrow
+  // row, which has no bin column; a vertical drag scrolls). Not from an input.
   const down = e => {
-    if (e.pointerType !== 'touch' && e.pointerType !== 'pen') return;
+    if (e.pointerType !== 'touch' && e.pointerType !== 'pen' && !(narrow && !coarse)) return;
+    if (e.target && e.target.closest && e.target.closest('input')) return;
     g.current = { x: e.clientX, y: e.clientY, base: open ? OPEN : 0, lock: null };
   };
   const move = e => {
@@ -94,13 +103,13 @@ function SetRow({ s, si, coarse, prevSet, fill, lift, kgStep, editing, problem, 
     if (!st || st.lock !== 'x') return;
     setDx(cur => { const o = cur < OPEN / 2; setOpen(o); return o ? OPEN : 0; });
   };
-  useEffect(() => { if (!coarse) { setDx(0); setOpen(false); } }, [coarse]);
+  useEffect(() => { if (!narrow) { setDx(0); setOpen(false); } }, [narrow]);
   const label = f => `Set ${si + 1} ${f === 'weight' ? 'kilograms' : f}`;
   const pt = prevText(prevSet, lift);
   const copy = () => { if (prevSet) onChange({ reps: prevSet.reps, weight: prevSet.weight }); };
   return (
     <div id={`wk-r-${s.id}`} className={`wk-row-wrap${s.done ? ' is-done' : ''}${problem ? ' has-problem' : ''}`} role="rowgroup">
-      {coarse && (
+      {narrow && (
         <button type="button" className="wk-row-del" onClick={() => { setOpen(false); setDx(0); onRemove(); }} tabIndex={open ? 0 : -1}
                 aria-hidden={!open} aria-label={`Delete set ${si + 1} of ${name}`} data-testid="wk-row-del">
           <Icon name="trash-2" size={18} />
@@ -114,16 +123,16 @@ function SetRow({ s, si, coarse, prevSet, fill, lift, kgStep, editing, problem, 
             {pt}
           </button>
         </span>
-        <Cell f="reps" s={s} coarse={coarse} editing={editing} ph={fill ? fmt(fill.reps) : ''} label={label('reps')} step={1} onCell={onCell} onChange={onChange} />
-        <Cell f="weight" s={s} coarse={coarse} editing={editing} ph={fill ? fmt(fill.weight) : lift && lift.load === 'bodyweight_plus' ? '0' : ''} label={label('weight')} step={kgStep} onCell={onCell} onChange={onChange} decimal />
-        <Cell f="rpe" s={s} coarse={coarse} editing={editing} ph="RPE" label={label('RPE')} step={0.5} onCell={onCell} onChange={onChange} decimal small />
+        <Cell f="reps" s={s} coarse={coarse} narrow={narrow} editing={editing} ph={fill ? fmt(fill.reps) : ''} label={label('reps')} step={1} onCell={onCell} onChange={onChange} />
+        <Cell f="weight" s={s} coarse={coarse} narrow={narrow} editing={editing} ph={fill ? fmt(fill.weight) : lift && lift.load === 'bodyweight_plus' ? '0' : ''} label={label('weight')} step={kgStep} onCell={onCell} onChange={onChange} decimal />
+        <Cell f="rpe" s={s} coarse={coarse} narrow={narrow} editing={editing} ph="RPE" label={label('RPE')} step={0.5} onCell={onCell} onChange={onChange} decimal small />
         <span role="cell" className="is-c">
           <button type="button" className={`wk-check${s.done ? ' is-on' : ''}`} onClick={onToggle} aria-pressed={!!s.done}
                   aria-label={`${s.done ? 'Undo' : 'Mark'} set ${si + 1} done`} data-testid="wk-check">
             <Icon name="check" size={18} strokeWidth={2.6} />
           </button>
         </span>
-        {!coarse && (
+        {!narrow && (
           <span role="cell" className="is-c">
             <button type="button" className="wk-icon wk-del" onClick={onRemove} aria-label={`Delete set ${si + 1} of ${name}`}><Icon name="trash-2" size={15} /></button>
           </span>
@@ -134,7 +143,7 @@ function SetRow({ s, si, coarse, prevSet, fill, lift, kgStep, editing, problem, 
   );
 }
 
-function Cell({ f, s, coarse, editing, ph, label, step, onCell, onChange, decimal = false, small = false }) {
+function Cell({ f, s, coarse, narrow, editing, ph, label, step, onCell, onChange, decimal = false, small = false }) {
   const v = s[f];
   const on = editing && editing.field === f;
   if (coarse) {
@@ -150,9 +159,9 @@ function Cell({ f, s, coarse, editing, ph, label, step, onCell, onChange, decima
   }
   return (
     <span role="cell" className={`is-c wk-deskcell${small ? ' is-small' : ''}`}>
-      {!small && <button type="button" className="wk-pm" tabIndex={-1} aria-label={`${label} down ${step}`} onClick={() => onChange({ [f]: Math.max(0, (Number(v) || 0) - step) })}><Icon name="minus" size={12} /></button>}
+      {!small && !narrow && <button type="button" className="wk-pm" tabIndex={-1} aria-label={`${label} down ${step}`} onClick={() => onChange({ [f]: Math.max(0, (Number(v) || 0) - step) })}><Icon name="minus" size={12} /></button>}
       <DeskInput v={v} ph={ph} label={label} step={step} decimal={decimal} f={f} onChange={onChange} />
-      {!small && <button type="button" className="wk-pm" tabIndex={-1} aria-label={`${label} up ${step}`} onClick={() => onChange({ [f]: (Number(v) || 0) + step })}><Icon name="plus" size={12} /></button>}
+      {!small && !narrow && <button type="button" className="wk-pm" tabIndex={-1} aria-label={`${label} up ${step}`} onClick={() => onChange({ [f]: (Number(v) || 0) + step })}><Icon name="plus" size={12} /></button>}
     </span>
   );
 }

@@ -36,6 +36,12 @@
  * A PB must BEAT something: strictly greater, so a tie is not a PB, and
  * the first set of a lift is a baseline, not a PB.
  *
+ * Warm-up sets (Oct 2026): a set can carry `type` — 'W' warm-up,
+ * 'D' drop set, 'F' to failure (absent = a normal working set). A
+ * WARM-UP never counts for a PB, a rep max, the e1RM or the trend /
+ * chart — it is saved and still counts for volume, it just isn't an
+ * attempt at anything. D and F sets are real working sets and count.
+ *
  * Estimated 1RM (Epley) is kept as a TREND — the chart line, "est. 1RM
  * ~241 kg" — and is never a PB anywhere: not here, not in a badge, not
  * in a celebration, not on the home card.
@@ -110,6 +116,23 @@ export function gymsUsed(log, lift, order = []) {
   const known = order.filter(id => seen.has(id));
   const rest = [...seen].filter(id => id && !order.includes(id)).sort();
   return [...known, ...rest, ...(seen.has(null) ? [null] : [])];
+}
+
+// ── The ± weight step ──────────────────────────────────────────────
+
+/**
+ * The ± step by load type when a lift has none of its own: 2.5 kg on a bar,
+ * a stack or a dip belt; 1 kg per dumbbell (what the logger has always used).
+ */
+export const DEFAULT_STEP = Object.freeze({ weight: 2.5, bodyweight_plus: 2.5, per_hand: 1 });
+/**
+ * The ± step for `lift` at `gymId`: the gym's own step (a machine's stack
+ * differs gym to gym), else the lift's, else DEFAULT_STEP by load type.
+ */
+export function stepFor(lift, gymId = null) {
+  const pos = v => { const n = num(v); return n != null && n > 0 ? n : null; };
+  const byGym = lift && gymId && lift.stepByGym && typeof lift.stepByGym === 'object' ? pos(lift.stepByGym[gymId]) : null;
+  return byGym ?? pos(lift && lift.step) ?? DEFAULT_STEP[(lift && lift.load) || 'weight'] ?? 2.5;
 }
 
 // ── Small readers ──────────────────────────────────────────────────
@@ -225,13 +248,25 @@ export function entryE1rm(entry, lift, bodyweight) {
   return l == null ? null : e1rm(l, entry.reps);
 }
 
+// ── Set types ──────────────────────────────────────────────────────
+
+/** 'W' warm-up · 'D' drop set · 'F' to failure. Absent = a normal working set. */
+export const SET_TYPES = ['W', 'D', 'F'];
+export const SET_TYPE_LABEL = { W: 'Warm-up', D: 'Drop set', F: 'Failure' };
+/** A set's type when it is one of SET_TYPES, else null (a normal set). */
+export const setTypeOf = e => (e && SET_TYPES.includes(e.type) ? e.type : null);
+/** Warm-ups are saved and count for volume, never for PBs, rep maxes, e1RM or the trend. */
+export const isWarmup = e => setTypeOf(e) === 'W';
+
 const valid = e => e && num(e.weight) != null && num(e.reps) != null && num(e.reps) >= 1 && isIso(e.date);
 
-/** One lift's valid sets, oldest first. */
+/** One lift's valid sets, oldest first — warm-ups included (the log, Previous, counts). */
 export function entriesFor(log, lift) {
   if (!lift) return [];
   return (Array.isArray(log) ? log : []).filter(e => valid(e) && e.liftId === lift.id).sort(chrono);
 }
+/** One lift's WORKING sets (warm-ups left out), oldest first — what PBs, rep maxes, e1RM and the trend read. */
+export const workingEntries = (log, lift) => entriesFor(log, lift).filter(e => !isWarmup(e));
 
 // ── Personal bests (real sets only) ─────────────────────────────────
 
@@ -291,7 +326,7 @@ function fold(pb, e, lift, bwOf) {
  * opts.gym (when present, even null): a perGym lift's bests at that gym only.
  */
 export function personalBests(log, lift, opts = {}) {
-  const sets = entriesFor('gym' in opts ? inGym(log, lift, opts.gym) : log, lift);
+  const sets = workingEntries('gym' in opts ? inGym(log, lift, opts.gym) : log, lift);
   const pb = emptyBests(opts.basis || pbBasis(sets, lift, opts.bwOf));
   for (const e of sets) fold(pb, e, lift, opts.bwOf);
   return pb;
@@ -313,8 +348,10 @@ export const isRealPB = res => !!res && (!!res.heaviest || (res.repMaxes || []).
 export function isNewPB(prevLog, entry, lift, opts = {}) {
   // A perGym lift is judged against its own gym only.
   const others = inGym(prevLog, lift, gymOf(entry)).filter(e => e && e.id !== entry.id);
-  const mine = entriesFor(others, lift);
+  const mine = workingEntries(others, lift);
   const basis = pbBasis([...mine, entry], lift, opts.bwOf);
+  // A warm-up is never a PB, never a baseline and carries no estimate.
+  if (isWarmup(entry)) return { first: false, heaviest: false, repMaxes: [], any: false, value: null, basis, warmup: true };
   const pb = personalBests(mine, lift, { ...opts, basis });
   const first = !pb.heaviest;
   const value = entryE1rm(entry, lift, bwKg(opts.bwOf, entry.date));
@@ -342,7 +379,7 @@ export function pbTimeline(log, lift, opts = {}) {
     for (const g of gymsUsed(log, lift)) out.push(...pbTimeline(inGym(log, lift, g), lift, { ...opts, oneGym: true }));
     return out.sort((a, b) => chrono(a.entry, b.entry));
   }
-  const sets = entriesFor(log, lift);
+  const sets = workingEntries(log, lift);
   const pb = emptyBests(pbBasis(sets, lift, opts.bwOf));
   const out = [];
   for (const e of sets) {
@@ -375,7 +412,7 @@ export function pbTimeline(log, lift, opts = {}) {
  */
 export function trend(log, lift, { weeks = null, today, bwOf } = {}) {
   const byDay = new Map();
-  for (const e of entriesFor(log, lift)) {
+  for (const e of workingEntries(log, lift)) {
     const v = entryE1rm(e, lift, bwKg(bwOf, e.date));
     if (v == null) continue;
     const cur = byDay.get(e.date);

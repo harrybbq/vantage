@@ -43,6 +43,7 @@ import WorkoutToday from './WorkoutToday';
 import WorkoutLive from './WorkoutLive';
 import FinishSheet from './FinishSheet';
 import { Toast, Celebrate } from './parts';
+import { LiftsScope, useLiftsScope } from './ui/scope';
 import { useLiftsData, todayIso } from './useLifts';
 import {
   ensureLifts, withLifts, makeEntry, upsertEntry, removeEntry, restoreEntry, addLift, renameLift, setArchived,
@@ -58,6 +59,7 @@ import {
 import '../security/security.css';
 import './lifts.css';
 import './workout.css';
+import './lifts-tokens.css';
 
 export default function LiftsTab({ S, update, hydrated = true }) {
   // The training day, not the calendar day: a 3:30am session after a
@@ -78,6 +80,8 @@ export default function LiftsTab({ S, update, hydrated = true }) {
   const [view, setView] = useState('list');        // 'list' | 'workout'
   const [finish, setFinish] = useState(null);      // { summary, saved, templateSaved }
   const active = activeOf(S);
+  // The user's accent and theme as Lifts tokens (--lf-accent / -ink / --lf-on-accent), live.
+  const scope = useLiftsScope();
   // The resume line's minutes: a slow tick, only while a workout is open.
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
@@ -227,7 +231,8 @@ export default function LiftsTab({ S, update, hydrated = true }) {
   );
 
   return (
-    <div className="upg-pane sec lifts">
+    <LiftsScope value={scope}>
+    <div className="upg-pane sec lifts" style={scope.style}>
       {cur ? (
         <LiftDetail s={cur} today={today} bwOf={bwOf} gyms={gyms} onPerGym={manage.onPerGym} onBack={() => setOpen(null)}
                     backLabel={view === 'workout' && active ? 'Back to workout' : 'All lifts'}
@@ -295,5 +300,6 @@ export default function LiftsTab({ S, update, hydrated = true }) {
       <Toast toast={toast} onUndo={undo} onDone={doneToast} />
       <Celebrate pb={pb} onDone={donePb} />
     </div>
+    </LiftsScope>
   );
 }

@@ -12,7 +12,8 @@
  *             refresh, a sleeping phone or a closed app never loses it.
  *             { id, date, startedAt, name, source, rotaSession?, shift?,
  *               restSec, rest?: { endsAt, total },
- *               exercises: [{ liftId, note?, target?, sets: [{ id, reps, weight, rpe?, done }] }] }
+ *               exercises: [{ liftId, note?, target?, pending?: { key, name, load, muscles },
+ *                             sets: [{ id, reps, weight, rpe?, type?: 'W'|'D'|'F', done }] }] }
  *             Only one at a time: startWorkout is a no-op while one exists.
  *   sessions  finished workouts (same shape, done sets only, plus
  *             finishedAt and durationSec), newest last, at most 400.
@@ -35,9 +36,21 @@
  * (Scaling a night from a night would compound to 64%, so a night base
  * is used as it stands.) Rest day / leave / off-pattern → restDay.
  *
- * Programme exercises not yet in the owner's list are created on first
- * use, with fixed ids (`prog-<slug>`) so two devices merge them by id,
- * a load type guessed from the name and muscle tags from PROGRAMME_MUSCLES.
+ * Programme exercises not yet in the owner's list are created LAZILY
+ * (Oct 2026 — loading a template used to create lift records that
+ * survived Discard). Starting a workout never touches S.lifts.list: such
+ * an exercise carries `pending: { key, name, load, muscles }` and its
+ * liftId is the key. The lift is created — fixed id `prog-<slug>` so two
+ * devices merge it by id, load type guessed from the name, muscle tags
+ * from PROGRAMME_MUSCLES — when its first set is ticked, or at Finish
+ * for done sets. Idempotent; Discard leaves the list exactly as it was.
+ * The screens read a pending exercise's lift through exerciseLift /
+ * listWithPending, a virtual lift that is never written.
+ *
+ * ── Previous by shift ────────────────────────────────────────────────
+ * A day session's Previous is the last DAY time; a night session's is the
+ * last NIGHT time, else the last day time × 0.8 rounded to the lift's step
+ * (previousSession). Night is compared with night, never read as a drop.
  *
  * ── Gyms ─────────────────────────────────────────────────────────────
  * A workout is at one gym (`gym` on active / session / every set it
@@ -55,7 +68,8 @@
 import { PROGRAMME, SESSION_CODES, NIGHT_LOAD_SCALE } from '../../data/trainingProgramme.js';
 import { shiftOn } from '../rotation/pattern.js';
 import {
-  num, isIso, addDays, dayNo, personalBests, pbBasis, pbHeadline, setText, shortLiftName, entriesFor, perGymOf, gymOf,
+  num, isIso, addDays, dayNo, personalBests, pbBasis, pbHeadline, setText, shortLiftName, entriesFor, workingEntries, perGymOf, gymOf,
+  stepFor, isWarmup, SET_TYPES,
 } from './lifts.js';
 import { liftsOf, withLifts, makeEntry, LIMITS, newId, defaultGym, setLastGym, withGyms, gymName, gymList } from './store.js';
 import { PROGRAMME_MUSCLES, musclesOf, norm } from './muscles.js';
@@ -69,6 +83,8 @@ export const REST_LIMITS = [15, 600];
 export const MAX_SESSIONS = 400;
 export const RECENT_N = 10;
 export const RPE_CHIPS = [5, 6, 7, 8, 9, 10];
+/** The pad's RPE chips (Oct 2026): 6–10 in half steps, one hue. */
+export const RPE_STEPS = [6, 7, 7.5, 8, 8.5, 9, 9.5, 10];
 
 /** Load type from a name: a dip carries bodyweight, a dumbbell is per hand, else the number on the stack. */
 export function guessLoad(name) {
@@ -108,12 +124,15 @@ const findByName = (list, name) => {
  * at a time with Quick Log, one date. opts.skipNight: the last DAY-shift
  * time instead. opts.before: only times before this ISO date.
  * opts.gym (when present): a perGym lift's times at that gym only.
+ * opts.onlyNight: the last NIGHT-shift time. opts.lift: the lift (for a
+ * pending exercise, which isn't in the list yet).
+ * Each set carries `type` when it was a warm-up / drop / failure set.
  */
 export function previousSets(S, liftId, opts = {}) {
   const L = liftsOf(S);
   let all = entriesFor(L.log, { id: liftId });
-  if ('gym' in opts && perGymOf(L.list.find(l => l.id === liftId))) all = all.filter(e => gymOf(e) === (opts.gym || null));
-  const pool = all.filter(e => (!opts.skipNight || e.shift !== 'night') && (!opts.before || e.date < opts.before));
+  if ('gym' in opts && perGymOf(opts.lift || L.list.find(l => l.id === liftId))) all = all.filter(e => gymOf(e) === (opts.gym || null));
+  const pool = all.filter(e => (!opts.skipNight || e.shift !== 'night') && (!opts.onlyNight || e.shift === 'night') && (!opts.before || e.date < opts.before));
   if (!pool.length) return null;
   const last = pool[pool.length - 1];
   const key = e => (e.sessionId ? `s:${e.sessionId}` : `d:${e.date}`);
@@ -121,8 +140,99 @@ export function previousSets(S, liftId, opts = {}) {
   const sets = pool.filter(e => key(e) === k);
   return {
     date: last.date, shift: last.shift || null, sessionId: last.sessionId || null,
-    sets: sets.map(e => ({ reps: num(e.reps), weight: num(e.weight), rpe: num(e.rpe) })),
+    sets: sets.map(e => {
+      const o = { reps: num(e.reps), weight: num(e.weight), rpe: num(e.rpe) };
+      if (SET_TYPES.includes(e.type)) o.type = e.type;
+      return o;
+    }),
   };
+}
+
+/**
+ * Previous for a workout, by its shift → { date, shift, sessionId, sets,
+ * source: 'day'|'night'|'day×0.8', scaled } | null. Same shape as
+ * previousSets, so `sets[i]` is "the same set last time".
+ *   day session    the last day-shift time; with only night history, that
+ *                  (source 'night', as lifted)
+ *   night session  the last NIGHT time (source 'night'); else the last day
+ *                  time with weights × scale (0.8) rounded to the lift's
+ *                  step (source 'day×0.8', scaled: true)
+ * opts: { gym, night, scale = NIGHT_LOAD_SCALE, lift }
+ */
+export function previousSession(S, liftId, opts = {}) {
+  const { night = false, scale = NIGHT_LOAD_SCALE } = opts;
+  const lift = opts.lift || liftsOf(S).list.find(l => l.id === liftId) || null;
+  const g = 'gym' in opts ? { gym: opts.gym || null } : {};
+  if (night) {
+    const n = previousSets(S, liftId, { ...g, lift, onlyNight: true });
+    if (n) return { ...n, source: 'night', scaled: false };
+    const d = previousSets(S, liftId, { ...g, lift, skipNight: true });
+    if (!d) return null;
+    const step = stepFor(lift, opts.gym || null);
+    return {
+      ...d, source: 'day×0.8', scaled: true,
+      sets: d.sets.map(st => ({ ...st, weight: st.weight == null ? null : roundTo(st.weight * scale, step) })),
+    };
+  }
+  const d = previousSets(S, liftId, { ...g, lift, skipNight: true });
+  if (d) return { ...d, source: 'day', scaled: false };
+  const n = previousSets(S, liftId, { ...g, lift });
+  return n ? { ...n, source: 'night', scaled: false } : null;
+}
+
+/** The active workout's Previous for one exercise (its gym, its shift). */
+export function previousForExercise(S, active, ex) {
+  if (!active || !ex) return null;
+  return previousSession(S, ex.liftId, { gym: active.gym || null, night: active.shift === 'night', lift: exerciseLift(liftsOf(S).list, ex) });
+}
+
+// ── Pending lifts (created on first tick, never on start) ───────────
+
+/** The lift a pending descriptor stands for — the record it WILL be. Never written by this function. */
+export function liftFromPending(pending, now = 0) {
+  if (!pending || !pending.key || !pending.name) return null;
+  const name = String(pending.name).trim().slice(0, LIMITS.name);
+  const load = ['weight', 'bodyweight_plus', 'per_hand'].includes(pending.load) ? pending.load : guessLoad(name);
+  const lift = { id: pending.key, name, load, unit: 'kg', createdAt: num(now) || 0 };
+  if (Array.isArray(pending.muscles) && pending.muscles.length) lift.muscles = pending.muscles.slice(0, 12);
+  return lift;
+}
+/** An exercise's lift: the list's, else a virtual one from `pending` (not in the list yet, `pending: true`), else null. */
+export function exerciseLift(list, ex) {
+  if (!ex) return null;
+  const l = (list || []).find(x => x.id === ex.liftId);
+  if (l) return l;
+  const v = ex.pending ? liftFromPending(ex.pending) : null;
+  return v ? { ...v, pending: true } : null;
+}
+/** The list plus a virtual lift for each pending exercise of `active` — for READING (names, load types, volume). */
+export function listWithPending(list, active) {
+  const base = Array.isArray(list) ? list : [];
+  if (!active || !Array.isArray(active.exercises)) return base;
+  const extra = [];
+  for (const ex of active.exercises) {
+    if (!ex || !ex.pending || base.some(l => l.id === ex.liftId) || extra.some(l => l.id === ex.liftId)) continue;
+    const v = exerciseLift(base, ex);
+    if (v) extra.push(v);
+  }
+  return extra.length ? [...base, ...extra] : base;
+}
+/**
+ * Create the lift a pending exercise stands for → { lifts, ex }. Idempotent:
+ * an id already in the list is not added twice; a lift of the same name
+ * that appeared meanwhile is used instead (the exercise is re-pointed).
+ * The exercise loses `pending` once its lift exists.
+ */
+function materialise(lifts, ex, now) {
+  if (!ex || !ex.pending) return { lifts, ex };
+  const list = lifts.list || [];
+  const strip = id => { const o = { ...ex, liftId: id }; delete o.pending; return o; };
+  if (list.some(l => l.id === ex.liftId)) return { lifts, ex: strip(ex.liftId) };
+  const same = findByName(list, ex.pending.name);
+  if (same) return { lifts, ex: strip(same.id) };
+  const lift = liftFromPending(ex.pending, now);
+  if (!lift) return { lifts, ex };
+  return { lifts: { ...lifts, list: [...list, lift] }, ex: strip(lift.id) };
 }
 
 /** "180×8", "BW+20×8", "32×8" — the Previous column, tight enough for a 360 px phone. */
@@ -343,7 +453,8 @@ const row = (id, reps = null, weight = null) => ({ id, reps: num(reps), weight: 
  *         rotaSession?, shift?, gym?, exercises: [{ liftId? | liftKey?, name?, sets, reps?, rows? }], ids? }
  * `gym` defaults to the last gym; it is remembered as lastGym.
  * An exercise naming a lift the list doesn't have (a programme exercise
- * on first use) creates it — additively, with a fixed id.
+ * on first use) is added as PENDING — the list is not touched; the lift
+ * is created on its first ticked set (toggleDone) or at Finish.
  */
 export function startWorkout(prev, opts = {}) {
   if (activeOf(prev)) return prev;
@@ -352,21 +463,23 @@ export function startWorkout(prev, opts = {}) {
   return withLifts(prev, l0 => {
     const gym = opts.gym !== undefined ? opts.gym : defaultGym(l0);
     const l = gym ? setLastGym(withGyms(l0), gym) : l0;
-    let list = l.list;
+    const list = l.list;
     const exercises = [];
     for (const x of opts.exercises || []) {
-      let lift = list.find(t => t.id === (x.liftId || x.liftKey)) || (x.name ? findByName(list, x.name) : null);
+      const lift = list.find(t => t.id === (x.liftId || x.liftKey)) || (x.name ? findByName(list, x.name) : null);
+      let pending = null;
       if (!lift && x.name) {
         const nm = String(x.name).trim().slice(0, LIMITS.name);
-        lift = { id: x.liftKey || progId(nm), name: nm, load: guessLoad(nm), unit: 'kg', createdAt: now };
+        if (!nm) continue;
         const ms = PROGRAMME_MUSCLES[nm] || musclesOf({ name: nm });
-        if (ms.length) lift.muscles = ms;
-        list = [...list, lift];
+        pending = { key: x.liftKey || progId(nm), name: nm, load: guessLoad(nm), muscles: ms.length ? ms : [] };
       }
-      if (!lift || exercises.some(e => e.liftId === lift.id)) continue;
+      const id = lift ? lift.id : pending ? pending.key : null;
+      if (!id || exercises.some(e => e.liftId === id)) continue;
       const rows = Array.isArray(x.rows) && x.rows.length ? x.rows
         : Array.from({ length: Math.max(1, Math.round(num(x.sets) || 1)) }, () => ({ reps: null, weight: null }));
-      const ex = { liftId: lift.id, sets: rows.map(r => row(ids('st'), r.reps, r.weight)) };
+      const ex = { liftId: id, sets: rows.map(r => row(ids('st'), r.reps, r.weight)) };
+      if (pending) ex.pending = pending;
       if (x.reps) ex.target = String(x.reps);
       if (x.optional) ex.optional = true;
       exercises.push(ex);
@@ -378,7 +491,7 @@ export function startWorkout(prev, opts = {}) {
     if (rotaSession) active.rotaSession = rotaSession;
     if (shift) active.shift = shift;
     if (gym) active.gym = gym;
-    return { ...l, list, active };
+    return { ...l, active };
   }, now);
 }
 
@@ -463,11 +576,15 @@ export function setProblem(st, lift) {
   return null;
 }
 
+/** Rest after a set of `lift`: the lift's own restSec, else the workout's, else 90 s. */
+export const restSecFor = (active, lift) => clampRest((lift && num(lift.restSec)) || (active && active.restSec) || DEFAULT_REST_SEC);
+
 /**
  * ✓ a set (or un-✓ it). Ticking an empty field fills it from Previous
- * (the same set index of the last time), as the gym app does; a set that
- * still isn't a valid set is refused (prev returned — see setProblem).
- * Ticking starts the rest timer.
+ * (the same set index of the last time — by shift, previousSession), as
+ * the gym app does; a set that still isn't a valid set is refused (prev
+ * returned — see setProblem). Ticking starts the rest timer (the lift's
+ * own rest, else the workout's) and creates a pending exercise's lift.
  */
 export function toggleDone(prev, ei, si, now = 0) {
   const a = activeOf(prev);
@@ -475,8 +592,8 @@ export function toggleDone(prev, ei, si, now = 0) {
   const st = ex && ex.sets[si];
   if (!st) return prev;
   if (st.done) return withActive(prev, x => mapSet(x, ei, si, s => ({ ...s, done: false })));
-  const lift = liftsOf(prev).list.find(l => l.id === ex.liftId);
-  const p = previousSets(prev, ex.liftId, { gym: a.gym || null });
+  const lift = exerciseLift(liftsOf(prev).list, ex);
+  const p = previousForExercise(prev, a, ex);
   const pr = p && p.sets.length ? p.sets[Math.min(si, p.sets.length - 1)] : null;
   const filled = {
     ...st,
@@ -485,11 +602,30 @@ export function toggleDone(prev, ei, si, now = 0) {
   };
   if (setProblem(filled, lift)) return prev;
   if (filled.weight == null) filled.weight = 0;
-  return withActive(prev, x => {
-    const y = mapSet(x, ei, si, () => ({ ...filled, done: true }));
-    const total = clampRest(y.restSec ?? DEFAULT_REST_SEC);
-    return { ...y, rest: { endsAt: num(now) + total * 1000, total } };
+  return withLifts(prev, l => {
+    const y = mapSet(l.active, ei, si, () => ({ ...filled, done: true }));
+    const total = restSecFor(y, lift);
+    let out = { ...l, active: { ...y, rest: { endsAt: num(now) + total * 1000, total } } };
+    if (ex.pending) {
+      // The first ticked set of a programme exercise creates its lift (once).
+      const m = materialise(out, out.active.exercises[ei], now);
+      const exercises = out.active.exercises.slice();
+      exercises[ei] = m.ex;
+      out = { ...m.lifts, active: { ...out.active, exercises } };
+    }
+    return out;
   });
+}
+
+/** Mark a set warm-up 'W' / drop 'D' / failure 'F'; null (or an unknown type) makes it a normal set. */
+export function setSetType(prev, ei, si, type) {
+  const t = SET_TYPES.includes(type) ? type : null;
+  return withActive(prev, a => mapSet(a, ei, si, st => {
+    if ((st.type || null) === t) return st;
+    const o = { ...st };
+    if (t) o.type = t; else delete o.type;
+    return o;
+  }));
 }
 
 export function removeSet(prev, ei, si) {
@@ -512,7 +648,7 @@ export function swapExercise(prev, ei, liftId) {
     if (a.exercises.some((e, i) => i !== ei && e.liftId === liftId)) return a;
     return mapEx(a, ei, ex => {
       if (ex.liftId === liftId) return ex;
-      const p = previousSets(prev, liftId, { gym: a.gym || null });
+      const p = previousSession(prev, liftId, { gym: a.gym || null, night: a.shift === 'night' });
       const sets = ex.sets.map((s, i) => {
         const b = p && p.sets.length ? p.sets[Math.min(i, p.sets.length - 1)] : null;
         return { ...s, weight: b ? b.weight : null, rpe: null, done: false };
@@ -554,7 +690,7 @@ export function setWorkoutGym(prev, gym) {
   if (!gymList(L).some(g => g.id === gym)) return prev;
   const night = a.shift === 'night';
   const exercises = a.exercises.map(ex => {
-    const lift = L.list.find(l => l.id === ex.liftId);
+    const lift = exerciseLift(L.list, ex);
     if (!perGymOf(lift)) return ex;
     const target = ex.target || null;
     const was = planFor(prev, lift, { sets: ex.sets.length, reps: target, night, gym: a.gym || null }).rows;
@@ -650,11 +786,11 @@ export function sessionPBs(prevLog, session, list = [], { bwOf } = {}) {
     const lift = list.find(l => l.id === ex.liftId);
     if (!lift) return;
     const mine = doneSets(ex)
-      .filter(s => num(s.reps) != null && num(s.weight) != null)
+      .filter(s => !isWarmup(s) && num(s.reps) != null && num(s.weight) != null)
       .map((s, j) => ({ id: `__pb-${i}-${j}`, liftId: lift.id, date: session.date, weight: num(s.weight), reps: num(s.reps), createdAt: Number.MAX_SAFE_INTEGER - 1000 + j }));
     if (!mine.length) return;
     // A machine's bests are this gym's only; a free weight's are everywhere's.
-    const prior = entriesFor(before, lift).filter(e => !perGymOf(lift) || gymOf(e) === gymOf(session));
+    const prior = workingEntries(before, lift).filter(e => !perGymOf(lift) || gymOf(e) === gymOf(session));
     if (!prior.length) return;
     const basis = pbBasis([...prior, ...mine], lift, bwOf);
     const b = personalBests(prior, lift, { bwOf, basis });
@@ -691,16 +827,17 @@ export function summariseWorkout(S, now, { bwOf } = {}) {
   const a = activeOf(S);
   if (!a) return null;
   const L = liftsOf(S);
-  const session = sessionOf(a, L.list, now);
+  const list = listWithPending(L.list, a);
+  const session = sessionOf(a, list, now);
   let setsOpen = 0;
   for (const ex of a.exercises) for (const s of ex.sets) if (!s.done) setsOpen++;
   return {
     durationSec: session.durationSec,
-    volume: volume(session, L.list),
+    volume: volume(session, list),
     setsDone: session.exercises.reduce((n, ex) => n + ex.sets.length, 0),
     setsOpen,
     exercises: session.exercises.length,
-    pbs: sessionPBs(L.log, session, L.list, { bwOf }),
+    pbs: sessionPBs(L.log, session, list, { bwOf }),
     session,
   };
 }
@@ -713,6 +850,7 @@ function sessionOf(a, list, now) {
     const sets = ex.sets.filter(s => s.done && !setProblem(s, lift)).map(s => {
       const o = { reps: num(s.reps), weight: num(s.weight) ?? 0, done: true };
       if (num(s.rpe) != null) o.rpe = num(s.rpe);
+      if (SET_TYPES.includes(s.type)) o.type = s.type;
       return o;
     });
     if (!sets.length) continue;
@@ -737,13 +875,27 @@ function sessionOf(a, list, now) {
  * pushed to `sessions` (oldest dropped past 400 — never a log entry),
  * `active` cleared. Nothing ticked → prev (the UI offers Discard).
  * Idempotent: no active → prev; ids already in the log are not re-added.
+ * A pending exercise with a done set gets its lift created here (the same
+ * fixed id toggleDone would have used); one with none creates nothing.
  */
 export function finishWorkout(prev, now) {
-  const a = activeOf(prev);
-  if (!a) return prev;
-  const L = liftsOf(prev);
-  const sessions = Array.isArray(L.sessions) ? L.sessions : [];
-  if (sessions.some(s => s && s.id === a.id)) return withLifts(prev, l => ({ ...l, active: null }));
+  const a0 = activeOf(prev);
+  if (!a0) return prev;
+  const L0 = liftsOf(prev);
+  const sessions = Array.isArray(L0.sessions) ? L0.sessions : [];
+  if (sessions.some(s => s && s.id === a0.id)) return withLifts(prev, l => ({ ...l, active: null }));
+  let L = L0;
+  let a = a0;
+  const hasDone = (ex, list) => ex.sets.some(st => st.done && !setProblem(st, exerciseLift(list, ex)));
+  if (a0.exercises.some(ex => ex.pending && hasDone(ex, L0.list))) {
+    const exercises = a0.exercises.map(ex => {
+      if (!ex.pending || !hasDone(ex, L.list)) return ex;
+      const m = materialise(L, ex, now);
+      L = m.lifts;
+      return m.ex;
+    });
+    a = { ...a0, exercises };
+  }
   const session = sessionOf(a, L.list, now);
   if (!session.exercises.length) return prev;
   const have = new Set(L.log.map(e => e && e.id));
@@ -755,7 +907,7 @@ export function finishWorkout(prev, now) {
       k++;
       if (have.has(id)) return;
       const entry = makeEntry(
-        { liftId: ex.liftId, date: a.date, weight: s.weight, reps: s.reps, rpe: s.rpe, notes: j === 0 ? ex.note : undefined },
+        { liftId: ex.liftId, date: a.date, weight: s.weight, reps: s.reps, rpe: s.rpe, type: s.type, notes: j === 0 ? ex.note : undefined },
         { id, now: (num(now) || 0) + k, shift: a.shift || null, gym: a.gym || null },
       );
       add.push({ ...entry, sessionId: a.id });
@@ -764,6 +916,7 @@ export function finishWorkout(prev, now) {
   const nextSessions = [...sessions, session];
   return withLifts(prev, l => ({
     ...l,
+    list: L.list === L0.list ? l.list : L.list,
     log: add.length ? [...l.log, ...add] : l.log,
     sessions: nextSessions.length > MAX_SESSIONS ? nextSessions.slice(-MAX_SESSIONS) : nextSessions,
     active: null,

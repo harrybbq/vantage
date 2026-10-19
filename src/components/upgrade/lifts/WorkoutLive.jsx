@@ -39,34 +39,30 @@ import { GymSwitch } from './parts';
 import ExerciseBlock from './ExerciseBlock';
 import ExercisePicker from './ExercisePicker';
 import NumPad from './NumPad';
+import useInputMode from './ui/useInputMode';
 import {
-  activeOf, elapsedSec, clock, volume, volumeText, previousSets, addExercises, addSet, updateSet, toggleDone, setProblem,
+  activeOf, elapsedSec, clock, volume, volumeText, previousForExercise, addExercises, addSet, updateSet, toggleDone, setProblem,
   removeSet, removeExercise, swapExercise, setNote, renameWorkout, setRestSec, extendRest, skipRest, restLeft, discardWorkout,
   recentWorkouts, templatesOf, templateStart, repeatStart, fillEmptyWorkout, deleteTemplate, clampRest, setWorkoutGym, doneSetCount,
+  listWithPending, prevText,
 } from '../../../lib/lifts/workout';
-import { shortLiftName, perGymOf } from '../../../lib/lifts/lifts';
+import { shortLiftName, perGymOf, stepFor } from '../../../lib/lifts/lifts';
 
 const fmt = v => (v == null || v === '' ? '' : String(Math.round(Number(v) * 100) / 100));
 const SHORT = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 const dateShort = iso => { const [, m, d] = iso.split('-').map(Number); return `${d} ${SHORT[m - 1]}`; };
 
-/** `(pointer: coarse)` — a touch screen gets the number pad and swipe-to-delete. */
+/** `(pointer: coarse)` — kept for older callers; ui/useInputMode is the source (layout by width, entry by pointer). */
 export function useCoarse() {
-  const q = '(pointer: coarse)';
-  const [m, setM] = useState(() => (typeof window !== 'undefined' && window.matchMedia ? window.matchMedia(q).matches : false));
-  useEffect(() => {
-    if (!window.matchMedia) return undefined;
-    const mq = window.matchMedia(q);
-    const on = () => setM(mq.matches);
-    mq.addEventListener ? mq.addEventListener('change', on) : mq.addListener(on);
-    return () => (mq.removeEventListener ? mq.removeEventListener('change', on) : mq.removeListener(on));
-  }, []);
-  return m;
+  return useInputMode().coarse;
 }
 
-export default function WorkoutLive({ S, update, list, recentIds, today, onMinimise, onFinish, onQuickLog, onHistory, onCreateLift, onToast, gyms = [], gymName = id => id, onPerGym }) {
+export default function WorkoutLive({ S, update, list: listIn, recentIds, today, onMinimise, onFinish, onQuickLog, onHistory, onCreateLift, onToast, gyms = [], gymName = id => id, onPerGym }) {
   const active = activeOf(S);
-  const coarse = useCoarse();
+  // Pending programme exercises (not in the list until their first tick) read through a virtual lift.
+  const list = useMemo(() => listWithPending(listIn, active), [listIn, active]);
+  // Layout follows width, entry follows pointer — independently (A4).
+  const { coarse, layout } = useInputMode();
   const [now, setNow] = useState(() => Date.now());
   const [pad, setPad] = useState(null);            // { ei, si, field, buf, fresh }
   const [picker, setPicker] = useState(null);      // { mode: 'add' } | { mode: 'swap', ei }
@@ -87,11 +83,12 @@ export default function WorkoutLive({ S, update, list, recentIds, today, onMinim
   const gymNow = active ? active.gym || null : null;
   const prevs = useMemo(() => {
     const m = new Map();
-    if (active) for (const ex of active.exercises) m.set(ex.liftId, previousSets(S, ex.liftId, { gym: gymNow }));
+    // By shift (a night session reads the last night, else day × 0.8) and gym — the same Previous ✓ fills from.
+    if (active) for (const ex of active.exercises) m.set(ex.liftId, previousForExercise(S, active, ex));
     return m;
-  // previous sets only change when the log, the gym or a lift's per-gym switch does
+  // previous sets only change when the log, the gym, the shift or a lift's per-gym switch does
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [S && S.lifts && S.lifts.log, S && S.lifts && S.lifts.list, gymNow, active && active.exercises.map(e => e.liftId).join('|')]);
+  }, [S && S.lifts && S.lifts.log, S && S.lifts && S.lifts.list, gymNow, active && active.shift, active && active.exercises.map(e => e.liftId).join('|')]);
 
   // ── Rest timer ──
   const left = active ? restLeft(active, now) : 0;
@@ -115,6 +112,10 @@ export default function WorkoutLive({ S, update, list, recentIds, today, onMinim
     return () => document.removeEventListener('pointerdown', off);
   }, [pad]);
   useEffect(() => { if (!coarse) setPad(null); }, [coarse]);
+  // While the pad is open the page keeps the focused row clear of it.
+  const onPadHeight = useCallback(h => { document.documentElement.style.scrollPaddingBottom = `${h + 16}px`; }, []);
+  useEffect(() => { if (!pad) document.documentElement.style.scrollPaddingBottom = ''; }, [pad]);
+  useEffect(() => () => { document.documentElement.style.scrollPaddingBottom = ''; }, []);
   // Keep the row being typed into above the pad.
   useEffect(() => {
     if (!pad || !active) return;
@@ -134,8 +135,7 @@ export default function WorkoutLive({ S, update, list, recentIds, today, onMinim
   const stepOf = (ei, field) => {
     if (field === 'reps') return 1;
     if (field === 'rpe') return 0.5;
-    const l = liftOf(active.exercises[ei] && active.exercises[ei].liftId);
-    return l && l.load === 'per_hand' ? 1 : 2.5;
+    return stepFor(liftOf(active.exercises[ei] && active.exercises[ei].liftId), gymNow);
   };
   const setAt = (ei, si) => active.exercises[ei] && active.exercises[ei].sets[si];
   const openCell = (ei, si, field) => {
@@ -257,7 +257,8 @@ export default function WorkoutLive({ S, update, list, recentIds, today, onMinim
       ) : (
         <div className="wk-exs">
           {active.exercises.map((ex, ei) => (
-            <ExerciseBlock key={`${ex.liftId}-${ei}`} ex={ex} ei={ei} lift={liftOf(ex.liftId)} prev={prevs.get(ex.liftId)} coarse={coarse}
+            <ExerciseBlock key={`${ex.liftId}-${ei}`} ex={ex} ei={ei} lift={liftOf(ex.liftId)} prev={prevs.get(ex.liftId)} coarse={coarse} layout={layout}
+                           kgStep={stepFor(liftOf(ex.liftId), gymNow)}
                            gymLabel={gymNow && perGymOf(liftOf(ex.liftId)) ? gymName(gymNow) : null}
                            editing={pad && pad.ei === ei ? pad : null} problem={problem && problem.ei === ei ? problem : null}
                            onCell={openCell} onChange={(a, b, patch) => update(prev => updateSet(prev, a, b, patch))}
@@ -296,10 +297,18 @@ export default function WorkoutLive({ S, update, list, recentIds, today, onMinim
             const st = ex && ex.sets[pad.si];
             if (!st) return null;
             const l = liftOf(ex.liftId);
+            const pv = prevs.get(ex.liftId);
+            const ps = pv && pad.si < pv.sets.length ? pv.sets[pad.si] : null;
+            const bwLift = l && l.load === 'bodyweight_plus';
             return (
               <NumPad field={pad.field} title={`${shortLiftName(l ? l.name : '')} · set ${pad.si + 1}`} value={pad.buf}
                       rpe={st.rpe} step={stepOf(pad.ei, pad.field)} onKey={onKey} onStep={onStep} onRpe={onRpe} onNext={onNext} onDone={closePad}
-                      hasNext={!!nextOf(pad)} />
+                      hasNext={!!nextOf(pad)}
+                      fieldLabel={pad.field === 'weight' ? (l && l.load === 'per_hand' ? 'KG/hand' : bwLift ? '+KG' : 'KG') : undefined}
+                      placeholder={pad.field === 'weight' && bwLift ? '+0' : '—'}
+                      prevText={ps ? prevText(ps, l) : null} prevValue={ps ? ps[pad.field] : null} targetReps={ex.target || null}
+                      onSet={v => { const p = pad; setPad({ ...p, buf: fmt(v), fresh: true }); commit(p, fmt(v)); }}
+                      onClose={closePad} onHeight={onPadHeight} />
             );
           })()}
         </div>,
