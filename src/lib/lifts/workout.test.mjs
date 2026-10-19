@@ -15,6 +15,8 @@ import {
   templateFromSession, saveTemplate, deleteTemplate, templateStart, recentWorkouts, repeatStart, hasSessionOn,
   elapsedSec, clock, minutesText, MAX_SESSIONS, MUSCLES, PROGRAMME_MUSCLES, DEFAULT_REST_SEC, fillEmptyWorkout,
   exerciseLift, listWithPending, previousSession, setSetType, restSecFor, liftFromPending, RPE_STEPS,
+  restState, restOver, adjustRest, setRestTotal, setWorkoutShift, markPbToasted, insertSet, insertExercise, nextOpenSet,
+  planProgress, miniBarModel, livePbSets, nightComparison, estimateRise,
 } from './workout.js';
 import { pbTimeline, personalBests } from './lifts.js';
 import { proposeAutoLogs, applyAutoLogs } from '../trackers/autoLog.js';
@@ -362,7 +364,8 @@ t('toggleDone: fills empties from Previous, refuses a non-set, starts the rest t
   const T = toggleDone(S, 0, 1, 5000);
   const st = activeOf(T).exercises[0].sets[1];
   assert.deepEqual([st.weight, st.reps, st.done], [180, 8, true], 'set 2 ← Previous set 2 of the last DAY time (the 145 night is not a day reference)');
-  assert.deepEqual(activeOf(T).rest, { endsAt: 5000 + DEFAULT_REST_SEC * 1000, total: DEFAULT_REST_SEC });
+  assert.deepEqual(activeOf(T).rest, { endsAt: 5000 + DEFAULT_REST_SEC * 1000, total: DEFAULT_REST_SEC, liftId: 'seed-leg-press' },
+    'the rest remembers whose it is (Use for this exercise)');
   assert.equal(restLeft(activeOf(T), 5000 + 30_000), 60);
   assert.equal(restLeft(activeOf(T), 4000), DEFAULT_REST_SEC, 'a clock read just before the tick never shows more than the total');
   assert.equal(toggleDone(T, 1, 0, 1), T, 'bench: never trained, nothing typed → refused');
@@ -734,6 +737,170 @@ t('per-lift rest: lift.restSec beats the workout rest; RPE steps', () => {
   assert.equal(activeOf(toggleDone(S, 0, 0, 0)).rest.total, 180);
   assert.deepEqual(RPE_STEPS, [6, 7, 7.5, 8, 8.5, 9, 9.5, 10]);
   assert.equal(liftFromPending(null), null);
+});
+
+// ── The live-workout redesign (Phase 2A) ──
+t('rest timer from the stored end time: phases, overtime, ±15, presets', () => {
+  let S = startWorkout(base(), { source: 'blank', now: 0, today: LEGS_DAY, ids });
+  S = addExercises(S, ['seed-leg-press'], { ids });
+  assert.deepEqual(restState(activeOf(S), 0), { phase: 'idle', left: 0, over: 0, total: 0, pct: 0, liftId: null });
+  S = toggleDone(S, 0, 0, 10_000);
+  const a = activeOf(S);
+  assert.equal(a.rest.endsAt, 10_000 + 90_000, 'endsAt = tick time + rest');
+  assert.deepEqual(restState(a, 10_000), { phase: 'running', left: 90, over: 0, total: 90, pct: 0, liftId: 'seed-leg-press' });
+  assert.equal(restState(a, 55_000).pct, 0.5);
+  assert.equal(restState(a, 90_500).phase, 'ending', 'the last 10 s tint');
+  assert.equal(restState(a, 90_500).left, 10);
+  assert.equal(restState(a, 100_000).phase, 'over');
+  const o = restState(a, 112_400);
+  assert.deepEqual([o.phase, o.over, o.left, o.pct], ['over', 12, 0, 1], 'overtime counts UP (+0:12), never dismissed');
+  assert.equal(restOver(a, 112_400), 12);
+  assert.equal(restLeft(a, 112_400), 0);
+  // a sleeping phone: a clock read hours later is still exact, nothing ticks
+  assert.equal(restState(a, 10_000 + 3_600_000).over, 3_600 - 90);
+  // −15 / +15
+  const m = activeOf(adjustRest(S, -15, 20_000)).rest;
+  assert.deepEqual([m.endsAt, m.total], [85_000, 75]);
+  const p = activeOf(adjustRest(S, 15, 20_000)).rest;
+  assert.deepEqual([p.endsAt, p.total], [115_000, 105]);
+  assert.equal(activeOf(adjustRest(S, -200, 20_000)).rest.endsAt, 20_000, '−15 never ends the rest in the past');
+  assert.equal(adjustRest(S, -15, 200_000), S, '−15 when over: nothing to take off');
+  const re = activeOf(adjustRest(S, 15, 200_000)).rest;
+  assert.deepEqual([re.endsAt, re.total], [215_000, 15], '+15 when over starts a short rest from now');
+  assert.equal(adjustRest(S, 0, 20_000), S);
+  // presets keep the start
+  const r60 = activeOf(setRestTotal(S, 60, 20_000)).rest;
+  assert.deepEqual([r60.endsAt, r60.total], [70_000, 60]);
+  const r180 = activeOf(setRestTotal(S, 180, 20_000)).rest;
+  assert.deepEqual([r180.endsAt, r180.total], [190_000, 180]);
+  assert.equal(activeOf(setRestTotal(S, 60, 80_000)).rest.endsAt, 80_000, 'a preset already passed lands on "over" now');
+  assert.equal(setRestTotal(S, 90, 20_000), S, 'same preset → no write');
+});
+
+t('✓ commits the placeholders the screen showed (opts.fill); typed values win; nothing to commit → refused', () => {
+  let S = startWorkout(base(), { source: 'blank', now: 0, today: LEGS_DAY, ids });
+  S = addExercises(S, ['seed-leg-press', 'bench'], { ids });
+  const T = toggleDone(S, 0, 0, 1, { fill: { weight: 172.5, reps: 9 } });
+  assert.deepEqual(['weight', 'reps', 'done'].map(k => activeOf(T).exercises[0].sets[0][k]), [172.5, 9, true]);
+  const U = toggleDone(updateSet(S, 0, 0, { reps: 6 }), 0, 0, 1, { fill: { weight: 172.5, reps: 9 } });
+  assert.deepEqual(['weight', 'reps'].map(k => activeOf(U).exercises[0].sets[0][k]), [172.5, 6], 'a typed rep count is kept');
+  assert.equal(toggleDone(S, 1, 0, 1, { fill: { weight: null, reps: null } }), S, 'bench: no previous, nothing typed → refused');
+  assert.equal(toggleDone(S, 1, 0, 1, { fill: { weight: 60, reps: null } }), S, 'half a set is refused');
+});
+
+t('lazy creation holds for the new-workout sheet (empty rows): start → discard leaves the list; first tick creates once', () => {
+  const B = base();
+  const legs = PROGRAMME_TEMPLATES.find(x => x.id === 'prog:Legs');
+  const before = JSON.stringify(B.lifts.list);
+  let S = startWorkout(B, { ...templateStart(B, legs, LEGS_DAY), prefill: false, now: 0, today: LEGS_DAY, ids });
+  assert.equal(JSON.stringify(S.lifts.list), before, 'start writes no lift');
+  assert.ok(activeOf(S).exercises.every(x => x.sets.every(st => st.weight == null && st.reps == null)), 'prefill:false → empty rows');
+  assert.equal(JSON.stringify(discardWorkout(S).lifts.list), before, 'discard leaves the list exactly as it was');
+  const pi = activeOf(S).exercises.findIndex(x => x.pending);
+  const T = toggleDone(updateSet(S, pi, 0, { weight: 40, reps: 10 }), pi, 0, 5);
+  assert.equal(T.lifts.list.length, B.lifts.list.length + 1);
+  const T2 = toggleDone(updateSet(T, pi, 1, { weight: 40, reps: 10 }), pi, 1, 6);
+  assert.equal(T2.lifts.list.length, T.lifts.list.length, 'idempotent');
+});
+
+t('minimise / resume: every read the mini-bar and dock make leaves the workout byte-identical', () => {
+  let S = startWorkout(base(), { source: 'blank', name: 'Push', now: 0, today: LEGS_DAY, ids });
+  S = addExercises(S, ['seed-leg-press', 'seed-dip'], { ids });
+  S = toggleDone(S, 0, 0, 60_000);
+  const snap = JSON.stringify(S);
+  const a = activeOf(S);
+  const mb = miniBarModel(a, 90_000);
+  assert.equal(mb.text, 'PUSH · 1:30 · 1/4 · REST 1:00');
+  assert.equal(miniBarModel(a, 170_000).rest, '+0:20', 'overtime on the bar too');
+  assert.equal(miniBarModel(skipRest(S).lifts.active, 90_000).rest, null, 'no REST segment when not resting');
+  restState(a, 1); planProgress(a); nextOpenSet(a, 1); livePbSets(S); summariseWorkout(S, 100);
+  assert.equal(JSON.stringify(S), snap, 'reads never write');
+  assert.equal(miniBarModel(null, 0), null);
+  assert.deepEqual(planProgress(a), { sets: 4, done: 1, exercises: 2, exercisesDone: 0 });
+  assert.deepEqual(nextOpenSet(a, 0), { ei: 0, si: 1 });
+  assert.deepEqual(nextOpenSet(a, 1), { ei: 1, si: 0 });
+});
+
+t('delete + Undo puts the identical set (and exercise) back; never somewhere it never was', () => {
+  let S = startWorkout(base(), { source: 'blank', now: 0, today: LEGS_DAY, ids });
+  S = addExercises(S, ['seed-leg-press', 'seed-dip'], { ids });
+  S = toggleDone(S, 0, 1, 1);
+  const set = activeOf(S).exercises[0].sets[1];
+  const D = removeSet(S, 0, 1);
+  const R = insertSet(D, 0, 1, set, 'seed-leg-press');
+  assert.deepEqual(activeOf(R).exercises[0], activeOf(S).exercises[0]);
+  assert.equal(insertSet(R, 0, 1, set, 'seed-leg-press'), R, 'twice → no duplicate');
+  assert.equal(insertSet(D, 0, 1, set, 'seed-dip'), D, 'the exercise changed meanwhile → not put back');
+  const ex = activeOf(S).exercises[1];
+  const X = removeExercise(S, 1);
+  assert.deepEqual(activeOf(insertExercise(X, 1, ex)).exercises, activeOf(S).exercises);
+  assert.equal(insertExercise(S, 1, ex), S, 'already there → no-op');
+});
+
+t('live PB marks: real sets only, the gym for a machine, a first session is a baseline; one toast per exercise', () => {
+  let S = startWorkout(base(), { source: 'blank', now: 0, today: LEGS_DAY, gym: 'dxc', ids });
+  S = addExercises(S, ['seed-leg-press', 'bench'], { ids });
+  S = setSetType(updateSet(S, 0, 0, { weight: 300, reps: 10 }), 0, 0, 'W');
+  S = toggleDone(S, 0, 0, 1);
+  S = toggleDone(updateSet(S, 0, 1, { weight: 185, reps: 8 }), 0, 1, 2);
+  S = toggleDone(updateSet(S, 1, 0, { weight: 100, reps: 5 }), 1, 0, 3);
+  const m = livePbSets(S);
+  const a = activeOf(S);
+  assert.equal(m.has(a.exercises[0].sets[0].id), false, 'the warm-up is never a PB');
+  const hit = m.get(a.exercises[0].sets[1].id);
+  assert.ok(hit && hit.heaviest, '185 × 8 beats 180');
+  assert.deepEqual(hit.was, { weight: 180, reps: 8, date: '2026-10-05' }, 'what it beat ("was 180 × 8")');
+  assert.equal(m.has(a.exercises[1].sets[0].id), false, 'bench: first time = baseline');
+  // a machine at another gym compares only there (no history at Greenock → baseline)
+  const B2 = { ...S, lifts: { ...S.lifts, list: S.lifts.list.map(l => (l.id === 'seed-leg-press' ? { ...l, perGym: true } : l)), active: { ...a, gym: 'greenock' } } };
+  assert.equal(livePbSets(B2).size, 0);
+  const K = markPbToasted(S, 'seed-leg-press');
+  assert.deepEqual(activeOf(K).pbToasted, ['seed-leg-press']);
+  assert.equal(markPbToasted(K, 'seed-leg-press'), K, 'once per exercise per session');
+});
+
+t('Finish: PBs say what they beat; night compares with the last NIGHT only; estimates are one muted line', () => {
+  let S = startWorkout(base(), { source: 'blank', now: 0, today: LEGS_NIGHT, shift: 'night', ids });
+  S = addExercises(S, ['seed-leg-press'], { ids });
+  S = toggleDone(updateSet(S, 0, 0, { weight: 147.5, reps: 8 }), 0, 0, 1);
+  const sum = summariseWorkout(S, 100);
+  assert.deepEqual(sum.night.lines.map(x => [x.name, x.text, x.delta]), [['Leg press', '+2.5 kg', 1]], 'vs the 145 × 8 night, not the 180 day');
+  const L = toggleDone(updateSet(S, 0, 0, {}), 0, 0, 1);
+  const lighter = toggleDone(updateSet(L, 0, 0, { weight: 145, reps: 7 }), 0, 0, 2);
+  assert.equal(summariseWorkout(lighter, 100).night.lines[0].text, '−1 rep', 'a drop is plain words, never a red number');
+  let D = startWorkout(base(), { source: 'blank', now: 0, today: LEGS_DAY, ids });
+  D = addExercises(D, ['seed-leg-press'], { ids });
+  D = toggleDone(updateSet(D, 0, 0, { weight: 177.5, reps: 9 }), 0, 0, 1);
+  const ds = summariseWorkout(D, 100);
+  assert.equal(ds.night, null, 'a day session has no night line');
+  assert.equal(ds.pbs.length, 0, '177.5 × 9 is no real-set record …');
+  assert.ok(ds.estimate && ds.estimate.to > ds.estimate.from, '… but its estimate rose — one muted line');
+  assert.equal(estimateRise([], ds.session, LIST), null, 'no history → nothing to compare');
+  assert.equal(nightComparison(D, ds.session, LIST), null);
+  assert.equal(ds.setsPlanned, 2, 'two rows from last time; one ticked');
+});
+
+t('templates: a saved template carries its id (Update template); a built-in never does', () => {
+  const B = saveTemplate(base(), { id: 'tp1', name: 'My push', exercises: [{ liftId: 'bench', sets: 3, reps: '8' }] });
+  const st = templateStart(B, B.lifts.templates[0], LEGS_DAY);
+  assert.equal(st.templateId, 'tp1');
+  assert.equal('templateId' in templateStart(B, PROGRAMME_TEMPLATES[0], LEGS_DAY), false);
+  let S = startWorkout(B, { ...st, now: 0, today: LEGS_DAY, ids });
+  S = toggleDone(updateSet(S, 0, 0, { weight: 60, reps: 8 }), 0, 0, 1);
+  const sum = summariseWorkout(S, 50);
+  assert.deepEqual(sum.template, { id: 'tp1', name: 'My push' });
+  assert.equal(finishWorkout(S, 50).lifts.sessions.slice(-1)[0].templateId, 'tp1');
+});
+
+t('night override: on and off again restores the rota shift; Previous follows', () => {
+  let S = startWorkout(base(), { source: 'blank', now: 0, today: LEGS_DAY, shift: 'early', ids });
+  S = addExercises(S, ['seed-leg-press'], { ids });
+  const N = setWorkoutShift(S, 'night');
+  assert.deepEqual([activeOf(N).shift, activeOf(N).shiftWas], ['night', 'early']);
+  assert.equal(setWorkoutShift(N, 'night'), N);
+  const back = activeOf(setWorkoutShift(N, 'day'));
+  assert.deepEqual([back.shift, 'shiftWas' in back], ['early', false]);
+  assert.equal(activeOf(toggleDone(N, 0, 0, 1)).exercises[0].sets[0].weight, 145, 'night Previous at once');
 });
 
 console.log(`workout: ${n} tests passed`);

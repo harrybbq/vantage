@@ -450,7 +450,12 @@ const row = (id, reps = null, weight = null) => ({ id, reps: num(reps), weight: 
 /**
  * Start a workout → next state. A no-op while one is in progress.
  * opts: { now, today, source: 'suggested'|'blank'|'recent'|'template', name,
- *         rotaSession?, shift?, gym?, exercises: [{ liftId? | liftKey?, name?, sets, reps?, rows? }], ids? }
+ *         rotaSession?, shift?, gym?, exercises: [{ liftId? | liftKey?, name?, sets, reps?, rows? }], ids?,
+ *         prefill?, templateId? }
+ * prefill: false leaves every row EMPTY (the redesigned live table shows
+ * Previous as each cell's placeholder and ✓ commits it — the Stronger
+ * model); the default keeps the pre-filled rows. templateId (a saved
+ * template's id) lets Finish offer "Update template".
  * `gym` defaults to the last gym; it is remembered as lastGym.
  * An exercise naming a lift the list doesn't have (a programme exercise
  * on first use) is added as PENDING — the list is not touched; the lift
@@ -476,7 +481,7 @@ export function startWorkout(prev, opts = {}) {
       }
       const id = lift ? lift.id : pending ? pending.key : null;
       if (!id || exercises.some(e => e.liftId === id)) continue;
-      const rows = Array.isArray(x.rows) && x.rows.length ? x.rows
+      const rows = opts.prefill !== false && Array.isArray(x.rows) && x.rows.length ? x.rows
         : Array.from({ length: Math.max(1, Math.round(num(x.sets) || 1)) }, () => ({ reps: null, weight: null }));
       const ex = { liftId: id, sets: rows.map(r => row(ids('st'), r.reps, r.weight)) };
       if (pending) ex.pending = pending;
@@ -491,6 +496,7 @@ export function startWorkout(prev, opts = {}) {
     if (rotaSession) active.rotaSession = rotaSession;
     if (shift) active.shift = shift;
     if (gym) active.gym = gym;
+    if (opts.templateId) active.templateId = String(opts.templateId);
     return { ...l, active };
   }, now);
 }
@@ -510,9 +516,10 @@ export function fillEmptyWorkout(prev, opts = {}) {
 }
 const keepId = (id, ids) => { let used = false; return p => (p === 'wk' && !used ? (used = true, id) : ids(p)); };
 
-/** The suggestion, ready for startWorkout. */
-export function suggestedStart(sug) {
+/** The suggestion, ready for startWorkout. `prefill: false` → empty rows (placeholders). */
+export function suggestedStart(sug, { prefill = true } = {}) {
   return {
+    ...(prefill === false ? { prefill: false } : {}),
     source: 'suggested', name: sug.name, rotaSession: sug.rotaSession, shift: sug.shift, ...(sug.gym ? { gym: sug.gym } : {}),
     exercises: sug.exercises.map(x => ({ liftId: x.liftId, liftKey: x.liftKey, name: x.name, sets: x.sets, reps: x.reps, optional: x.optional, rows: x.rows })),
   };
@@ -586,26 +593,28 @@ export const restSecFor = (active, lift) => clampRest((lift && num(lift.restSec)
  * returned — see setProblem). Ticking starts the rest timer (the lift's
  * own rest, else the workout's) and creates a pending exercise's lift.
  */
-export function toggleDone(prev, ei, si, now = 0) {
+export function toggleDone(prev, ei, si, now = 0, opts = {}) {
   const a = activeOf(prev);
   const ex = a && a.exercises[ei];
   const st = ex && ex.sets[si];
   if (!st) return prev;
   if (st.done) return withActive(prev, x => mapSet(x, ei, si, s => ({ ...s, done: false })));
   const lift = exerciseLift(liftsOf(prev).list, ex);
-  const p = previousForExercise(prev, a, ex);
-  const pr = p && p.sets.length ? p.sets[Math.min(si, p.sets.length - 1)] : null;
+  // `opts.fill`: the placeholders the screen showed ({ reps, weight }) — what ✓ commits into empty cells.
+  const f = opts.fill && typeof opts.fill === 'object' ? opts.fill : null;
+  const p = f ? null : previousForExercise(prev, a, ex);
+  const pr = f ? { reps: num(f.reps), weight: num(f.weight) } : p && p.sets.length ? p.sets[Math.min(si, p.sets.length - 1)] : null;
   const filled = {
     ...st,
     reps: st.reps ?? (pr ? pr.reps : null),
-    weight: st.weight ?? (pr ? pr.weight : lift && lift.load === 'bodyweight_plus' ? 0 : null),
+    weight: st.weight ?? (pr && pr.weight != null ? pr.weight : lift && lift.load === 'bodyweight_plus' ? 0 : null),
   };
   if (setProblem(filled, lift)) return prev;
   if (filled.weight == null) filled.weight = 0;
   return withLifts(prev, l => {
     const y = mapSet(l.active, ei, si, () => ({ ...filled, done: true }));
     const total = restSecFor(y, lift);
-    let out = { ...l, active: { ...y, rest: { endsAt: num(now) + total * 1000, total } } };
+    let out = { ...l, active: { ...y, rest: { endsAt: num(now) + total * 1000, total, liftId: ex.liftId } } };
     if (ex.pending) {
       // The first ticked set of a programme exercise creates its lift (once).
       const m = materialise(out, out.active.exercises[ei], now);
@@ -740,6 +749,170 @@ export function skipRest(prev) {
 export const restLeft = (active, now) => (active && active.rest
   ? Math.max(0, Math.min(num(active.rest.total) || Infinity, Math.ceil((num(active.rest.endsAt) - num(now)) / 1000))) : 0);
 
+/** Seconds PAST the end of the rest (overtime, counted up as "+0:12"), or 0. */
+export const restOver = (active, now) => (active && active.rest
+  ? Math.max(0, Math.floor((num(now) - num(active.rest.endsAt)) / 1000)) : 0);
+
+/**
+ * The rest timer as the dock draws it, from the stored end time (never a
+ * ticking counter — a sleeping phone or a background tab can't drift it):
+ * → { phase: 'idle'|'running'|'ending'|'over', left, over, total, pct, liftId }
+ *   running  more than 10 s left; ending  the last 10 s (the bar tints);
+ *   over     past the end — counts up, never auto-dismissed.
+ * pct is how much of the rest has gone (0–1), 1 once over.
+ */
+export function restState(active, now) {
+  const r = active && active.rest;
+  if (!r || num(r.endsAt) == null) return { phase: 'idle', left: 0, over: 0, total: 0, pct: 0, liftId: null };
+  const total = Math.max(0, num(r.total) || 0);
+  const ms = num(r.endsAt) - num(now);
+  if (ms <= 0) return { phase: 'over', left: 0, over: Math.floor(-ms / 1000), total, pct: 1, liftId: r.liftId || null };
+  const left = Math.min(total || Infinity, Math.ceil(ms / 1000));
+  const pct = total ? Math.max(0, Math.min(1, 1 - ms / (total * 1000))) : 0;
+  return { phase: left <= 10 ? 'ending' : 'running', left, over: 0, total, pct, liftId: r.liftId || null };
+}
+
+/**
+ * −15 / +15 s (any `sec`) on the rest timer. +sec past the end restarts a
+ * short rest of `sec` from now; −sec never ends before now (it lands on
+ * "rest over"). The total follows so the ring stays honest.
+ */
+export function adjustRest(prev, sec, now) {
+  const d = Math.round(num(sec) || 0);
+  if (!d) return prev;
+  return withActive(prev, a => {
+    if (!a.rest) return a;
+    const end = num(a.rest.endsAt), t = num(now);
+    if (end <= t) {
+      if (d < 0) return a;
+      return { ...a, rest: { ...a.rest, endsAt: t + d * 1000, total: d } };
+    }
+    const nextEnd = Math.max(t, end + d * 1000);
+    const total = Math.max(0, Math.round(num(a.rest.total) + (nextEnd - end) / 1000));
+    return { ...a, rest: { ...a.rest, endsAt: nextEnd, total } };
+  });
+}
+
+/** A preset (60 / 90 / 120 / 180) for the rest that is running: the same start, a new length. */
+export function setRestTotal(prev, sec, now) {
+  const v = clampRest(sec);
+  return withActive(prev, a => {
+    if (!a.rest) return a;
+    const started = num(a.rest.endsAt) - num(a.rest.total) * 1000;
+    const endsAt = Math.max(num(now), started + v * 1000);
+    if (endsAt === num(a.rest.endsAt) && v === num(a.rest.total)) return a;
+    return { ...a, rest: { ...a.rest, endsAt, total: v } };
+  });
+}
+
+/**
+ * Override the workout's shift: 'night' (80 % load, night Previous) or
+ * back to a day session. Previous follows at once. The rota's own shift
+ * ('early', 'off' …) is kept in `shiftWas` while overridden to night, so
+ * turning night off restores it rather than flattening it to 'day'.
+ */
+export function setWorkoutShift(prev, shift) {
+  const night = shift === 'night';
+  return withActive(prev, a => {
+    const isNight = a.shift === 'night';
+    if (night === isNight) return a;
+    const out = { ...a };
+    if (night) {
+      if (a.shift) out.shiftWas = a.shift;
+      out.shift = 'night';
+    } else {
+      out.shift = a.shiftWas && a.shiftWas !== 'night' ? a.shiftWas : 'day';
+      delete out.shiftWas;
+    }
+    return out;
+  });
+}
+
+/** Remember that an exercise's lift has had its PB toast this workout (one per exercise per session). */
+export function markPbToasted(prev, liftId) {
+  if (!liftId) return prev;
+  return withActive(prev, a => {
+    const cur = Array.isArray(a.pbToasted) ? a.pbToasted : [];
+    return cur.includes(liftId) ? a : { ...a, pbToasted: [...cur, liftId] };
+  });
+}
+
+/**
+ * Put a deleted set back at `si` (the Undo of a delete). `liftId` must
+ * still be the exercise's lift — if the exercise moved or was swapped the
+ * set is not put somewhere it never was. A set id already present is a no-op.
+ */
+export function insertSet(prev, ei, si, set, liftId) {
+  if (!set || !set.id) return prev;
+  return withActive(prev, a => mapEx(a, ei, ex => {
+    if (liftId && ex.liftId !== liftId) return ex;
+    if (ex.sets.some(s => s.id === set.id)) return ex;
+    const sets = ex.sets.slice();
+    sets.splice(Math.max(0, Math.min(sets.length, si)), 0, set);
+    return { ...ex, sets };
+  }));
+}
+
+/** Put a removed exercise back at `ei` (Undo). An exercise of the same lift already there is a no-op. */
+export function insertExercise(prev, ei, ex) {
+  if (!ex || !ex.liftId || !Array.isArray(ex.sets)) return prev;
+  return withActive(prev, a => {
+    if (a.exercises.some(e => e.liftId === ex.liftId)) return a;
+    const exercises = a.exercises.slice();
+    exercises.splice(Math.max(0, Math.min(exercises.length, ei)), 0, ex);
+    return { ...a, exercises };
+  });
+}
+
+/**
+ * The next set to do: the first unticked set of exercise `from` (the one
+ * being worked on), else of the first exercise after it with one, else
+ * the first anywhere → { ei, si } | null.
+ */
+export function nextOpenSet(active, from = 0) {
+  if (!active) return null;
+  const xs = active.exercises || [];
+  const n = xs.length;
+  if (!n) return null;
+  const start = Math.max(0, Math.min(n - 1, Math.round(num(from) || 0)));
+  for (let k = 0; k < n; k++) {
+    const ei = (start + k) % n;
+    const si = (xs[ei].sets || []).findIndex(s => !s.done);
+    if (si >= 0) return { ei, si };
+  }
+  return null;
+}
+
+/** → { sets, done, exercises, exercisesDone } — the stats strip's "7/19 sets · 2/6 ex". */
+export function planProgress(active) {
+  const xs = (active && active.exercises) || [];
+  let sets = 0, done = 0, exercisesDone = 0;
+  for (const ex of xs) {
+    const all = ex.sets || [];
+    const d = all.filter(s => s.done).length;
+    sets += all.length; done += d;
+    if (all.length && d === all.length) exercisesDone++;
+  }
+  return { sets, done, exercises: xs.length, exercisesDone };
+}
+
+/**
+ * What the minimised workout's bar says — read-only, from S.lifts.active:
+ * → { name, clock, done, sets, rest: 'm:ss' | '+m:ss' | null, text } | null.
+ * Never writes: minimising and resuming leave the workout byte-identical.
+ */
+export function miniBarModel(active, now) {
+  if (!active) return null;
+  const p = planProgress(active);
+  const r = restState(active, now);
+  const rest = r.phase === 'idle' ? null : r.phase === 'over' ? `+${clock(r.over)}` : clock(r.left);
+  const name = String(active.name || 'Workout');
+  const time = clock(elapsedSec(active, now));
+  const parts = [name.toUpperCase(), time, `${p.done}/${p.sets}`];
+  if (rest) parts.push(`REST ${rest}`);
+  return { name, clock: time, done: p.done, sets: p.sets, rest, text: parts.join(' · ') };
+}
+
 /** Throw the workout away. The log is not touched — nothing was written to it. */
 export function discardWorkout(prev) {
   if (!activeOf(prev)) return prev;
@@ -788,29 +961,10 @@ export function sessionPBs(prevLog, session, list = [], { bwOf } = {}) {
     const mine = doneSets(ex)
       .filter(s => !isWarmup(s) && num(s.reps) != null && num(s.weight) != null)
       .map((s, j) => ({ id: `__pb-${i}-${j}`, liftId: lift.id, date: session.date, weight: num(s.weight), reps: num(s.reps), createdAt: Number.MAX_SAFE_INTEGER - 1000 + j }));
-    if (!mine.length) return;
-    // A machine's bests are this gym's only; a free weight's are everywhere's.
-    const prior = workingEntries(before, lift).filter(e => !perGymOf(lift) || gymOf(e) === gymOf(session));
-    if (!prior.length) return;
-    const basis = pbBasis([...prior, ...mine], lift, bwOf);
-    const b = personalBests(prior, lift, { bwOf, basis });
-    const a = personalBests([...prior, ...mine], lift, { bwOf, basis });
-    const byEntry = new Map();
-    const hit = (entry, k) => {
-      if (!entry || !String(entry.id).startsWith('__pb-')) return;
-      const cur = byEntry.get(entry.id) || { entry, heaviest: false, repMaxes: [] };
-      if (k === 'h') cur.heaviest = true; else cur.repMaxes.push(k);
-      byEntry.set(entry.id, cur);
-    };
-    if (b.heaviest && a.heaviest.value > b.heaviest.value + EPS) hit(a.heaviest.entry, 'h');
-    for (const n of Object.keys(a.repMaxes).map(Number)) {
-      if (b.repMaxes[n] && a.repMaxes[n] && a.repLoads[n] > b.repLoads[n] + EPS) hit(a.repMaxes[n], n);
-    }
-    for (const r of byEntry.values()) {
-      r.repMaxes.sort((x, y) => x - y);
+    for (const r of pbHits(before, mine, lift, gymOf(session), bwOf)) {
       const entry = { liftId: lift.id, date: session.date, weight: r.entry.weight, reps: r.entry.reps };
       out.push({
-        liftId: lift.id, lift, entry, heaviest: r.heaviest, repMaxes: r.repMaxes,
+        liftId: lift.id, lift, entry, heaviest: r.heaviest, repMaxes: r.repMaxes, was: r.was,
         text: `New best: ${shortLiftName(lift.name)} ${setText(entry, lift)} · ${pbHeadline(r)}`,
       });
     }
@@ -819,9 +973,136 @@ export function sessionPBs(prevLog, session, list = [], { bwOf } = {}) {
 }
 
 /**
+ * Which of `mine` (a session's working sets, as entries with ids) hold a
+ * real-set record at the end, against `before` (the log) — a machine's at
+ * `gym` only. → [{ entry, heaviest, repMaxes, was }], `was` being the record
+ * it beat ({ weight, reps, date }; the heaviest's when it beat that).
+ * A lift's first ever session is a baseline (no hits); ties are not PBs.
+ */
+function pbHits(before, mine, lift, gym, bwOf) {
+  if (!mine.length) return [];
+  const prior = workingEntries(before, lift).filter(e => !perGymOf(lift) || gymOf(e) === (gym || null));
+  if (!prior.length) return [];
+  const ids = new Set(mine.map(e => e.id));
+  const basis = pbBasis([...prior, ...mine], lift, bwOf);
+  const b = personalBests(prior, lift, { bwOf, basis });
+  const a = personalBests([...prior, ...mine], lift, { bwOf, basis });
+  const byEntry = new Map();
+  const hit = (entry, k) => {
+    if (!entry || !ids.has(entry.id)) return;
+    const cur = byEntry.get(entry.id) || { entry, heaviest: false, repMaxes: [] };
+    if (k === 'h') cur.heaviest = true; else cur.repMaxes.push(k);
+    byEntry.set(entry.id, cur);
+  };
+  if (b.heaviest && a.heaviest.value > b.heaviest.value + EPS) hit(a.heaviest.entry, 'h');
+  for (const n of Object.keys(a.repMaxes).map(Number)) {
+    if (b.repMaxes[n] && a.repMaxes[n] && a.repLoads[n] > b.repLoads[n] + EPS) hit(a.repMaxes[n], n);
+  }
+  const out = [];
+  for (const r of byEntry.values()) {
+    r.repMaxes.sort((x, y) => x - y);
+    const top = r.repMaxes.length ? r.repMaxes[r.repMaxes.length - 1] : null;
+    const w = r.heaviest ? b.heaviest.entry : top != null ? b.repMaxes[top] : null;
+    out.push({ ...r, was: w ? { weight: num(w.weight), reps: num(w.reps), date: w.date } : null });
+  }
+  return out;
+}
+
+/**
+ * The PB marks for the live set table: which DONE sets of the workout
+ * would hold a real-set record if it ended now → Map(setId → { heaviest,
+ * repMaxes, was }). Warm-ups never; a machine against the workout's gym;
+ * a lift's first session is a baseline. (sessionPBs' rule, keyed by set.)
+ */
+export function livePbSets(S, { bwOf } = {}) {
+  const a = activeOf(S);
+  const out = new Map();
+  if (!a) return out;
+  const L = liftsOf(S);
+  for (const ex of a.exercises) {
+    const lift = exerciseLift(L.list, ex);
+    if (!lift) continue;
+    const mine = ex.sets.filter(s => s.done && !isWarmup(s) && num(s.reps) != null && num(s.weight) != null)
+      .map((s, j) => ({ id: s.id, liftId: lift.id, date: a.date, weight: num(s.weight), reps: num(s.reps), createdAt: Number.MAX_SAFE_INTEGER - 1000 + j }));
+    for (const r of pbHits(L.log, mine, lift, a.gym || null, bwOf)) {
+      out.set(r.entry.id, { heaviest: r.heaviest, repMaxes: r.repMaxes, was: r.was });
+    }
+  }
+  return out;
+}
+
+/** A session's best working set of a lift (heaviest; more reps on a tie) → { weight, reps } | null. */
+const topSet = sets => {
+  let best = null;
+  for (const s of sets || []) {
+    if (isWarmup(s)) continue;
+    const w = num(s.weight), r = num(s.reps);
+    if (w == null || r == null) continue;
+    if (!best || w > best.weight + EPS || (Math.abs(w - best.weight) <= EPS && r > best.reps)) best = { weight: w, reps: r };
+  }
+  return best;
+};
+
+/**
+ * A night session against the last NIGHT time of each lift — like for
+ * like, never against a day — → { lines: [{ liftId, name, text, delta }] }
+ * | null when the session isn't a night or nothing compares. Each line is
+ * the top working set's change: "+2.5 kg" (heavier), "+1 rep" (same
+ * weight), "=" or a plain "−1 rep" (never shown as a red drop).
+ */
+export function nightComparison(S, session, list = []) {
+  if (!session || session.shift !== 'night') return null;
+  const lines = [];
+  for (const ex of session.exercises || []) {
+    const lift = list.find(l => l.id === ex.liftId);
+    if (!lift) continue;
+    const now = topSet(ex.sets);
+    const prevN = previousSets(S, ex.liftId, { onlyNight: true, lift, ...(session.gym ? { gym: session.gym } : {}) });
+    const was = prevN ? topSet(prevN.sets) : null;
+    if (!now || !was) continue;
+    let text, delta;
+    if (Math.abs(now.weight - was.weight) > EPS) {
+      const d = Math.round((now.weight - was.weight) * 100) / 100;
+      text = `${d > 0 ? '+' : '−'}${trim(Math.abs(d))} kg`; delta = d > 0 ? 1 : -1;
+    } else if (now.reps !== was.reps) {
+      const d = now.reps - was.reps;
+      text = `${d > 0 ? '+' : '−'}${Math.abs(d)} ${Math.abs(d) === 1 ? 'rep' : 'reps'}`; delta = d > 0 ? 1 : -1;
+    } else { text = '='; delta = 0; }
+    lines.push({ liftId: lift.id, name: shortLiftName(lift.name), text, delta });
+  }
+  return lines.length ? { lines } : null;
+}
+
+/**
+ * The one muted estimate line Finish may show: the biggest rise in the
+ * e1RM ESTIMATE this session (best working set ≤ 12 reps vs the best
+ * before) → { name, from, to } | null. Never a PB, never gold.
+ */
+export function estimateRise(prevLog, session, list = [], { bwOf } = {}) {
+  let best = null;
+  for (const ex of (session && session.exercises) || []) {
+    const lift = list.find(l => l.id === ex.liftId);
+    if (!lift) continue;
+    const prior = workingEntries(prevLog || [], lift).filter(e => !perGymOf(lift) || gymOf(e) === gymOf(session));
+    if (!prior.length) continue;
+    const b = personalBests(prior, lift, { bwOf });
+    const mine = ex.sets.filter(s => !isWarmup(s)).map((s, j) => ({ id: `__e-${j}`, liftId: lift.id, date: session.date, weight: num(s.weight), reps: num(s.reps), createdAt: j }))
+      .filter(e => e.weight != null && e.reps != null && e.reps <= 12);
+    if (!mine.length || !b.bestE1rm) continue;
+    const a = personalBests(mine, lift, { bwOf });
+    if (!a.bestE1rm) continue;
+    const rise = a.bestE1rm.value - b.bestE1rm.value;
+    if (rise > 0.5 && (!best || rise > best.rise)) best = { name: shortLiftName(lift.name), from: b.bestE1rm.value, to: a.bestE1rm.value, rise };
+  }
+  return best ? { name: best.name, from: best.from, to: best.to } : null;
+}
+
+/**
  * What Finish would save, without saving it → { durationSec, volume,
- * setsDone, setsOpen, exercises, pbs, session } (session = the done
- * sets only, the shape `sessions` stores).
+ * setsDone, setsOpen, setsPlanned, exercises, pbs (each with `was`), night
+ * (nightComparison), estimate (estimateRise — one muted line at most),
+ * template ({ id, name } of the saved template it started from), session }
+ * (session = the done sets only, the shape `sessions` stores).
  */
 export function summariseWorkout(S, now, { bwOf } = {}) {
   const a = activeOf(S);
@@ -829,15 +1110,20 @@ export function summariseWorkout(S, now, { bwOf } = {}) {
   const L = liftsOf(S);
   const list = listWithPending(L.list, a);
   const session = sessionOf(a, list, now);
-  let setsOpen = 0;
-  for (const ex of a.exercises) for (const s of ex.sets) if (!s.done) setsOpen++;
+  let setsOpen = 0, setsPlanned = 0;
+  for (const ex of a.exercises) for (const s of ex.sets) { setsPlanned++; if (!s.done) setsOpen++; }
+  const saved = a.templateId ? (L.templates || []).find(t => t && t.id === a.templateId) : null;
   return {
     durationSec: session.durationSec,
     volume: volume(session, list),
     setsDone: session.exercises.reduce((n, ex) => n + ex.sets.length, 0),
     setsOpen,
+    setsPlanned,
     exercises: session.exercises.length,
     pbs: sessionPBs(L.log, session, list, { bwOf }),
+    night: nightComparison(S, session, list),
+    estimate: estimateRise(L.log, session, list, { bwOf }),
+    template: saved ? { id: saved.id, name: saved.name } : null,
     session,
   };
 }
@@ -866,6 +1152,7 @@ function sessionOf(a, list, now) {
   if (a.rotaSession) s.rotaSession = a.rotaSession;
   if (a.shift) s.shift = a.shift;
   if (a.gym) s.gym = a.gym;
+  if (a.templateId) s.templateId = a.templateId;
   return s;
 }
 
@@ -984,6 +1271,7 @@ export function templateStart(S, tpl, today, opts = {}) {
   const gym = opts.gym !== undefined ? opts.gym : (activeOf(S) && activeOf(S).gym) || defaultGym(L);
   return {
     source: 'template', name: tpl.name, rotaSession: tpl.rotaSession || null, shift: day ? day.shift : null, ...(gym ? { gym } : {}),
+    ...(tpl.builtIn || !tpl.id ? {} : { templateId: tpl.id }),
     exercises: tpl.exercises.map(x => {
       const lift = (x.liftId && list.find(l => l.id === x.liftId)) || (x.name ? findByName(list, x.name) : null);
       const { rows } = planFor(S, lift, { sets: x.sets, reps: x.reps, night, gym });
