@@ -274,3 +274,32 @@ export function applyRead(prev, videoId, recipeId, read) {
   const recipes = (prev.recipes || []).map(r => (r.id === recipeId ? fillFromRead(r, read) : r));
   return { ...prev, mealVideos, recipes };
 }
+
+/* ══ Recipes offered from outside the app ═════════════════════════════ */
+/*
+ * A short list of finished recipes shipped with the app (src/data/
+ * recipeLog.js), offered once in Diet → Recipes. `S.recipeLogAdded`
+ * (new key, additive) remembers which were added, so one that is later
+ * deleted is not offered again. Nothing is written until the tap.
+ */
+
+/** The offered recipes not yet added (by id) and never added before. */
+export function pendingRecipes(S, offered = []) {
+  const have = new Set((S && S.recipes || []).map(r => r && r.id));
+  const seen = new Set((S && S.recipeLogAdded) || []);
+  return offered.filter(r => r && r.id && !have.has(r.id) && !seen.has(r.id));
+}
+
+/** Append the given recipes to S.recipes (skipping ids already there) and remember them. */
+export function addOfferedRecipes(prev, list = [], now = Date.now()) {
+  const have = new Set((prev.recipes || []).map(r => r && r.id));
+  const add = list.filter(r => r && r.id && !have.has(r.id)).map(r => ({ ...EMPTY_RECIPE(), ...r, createdAt: now }));
+  const seen = new Set(prev.recipeLogAdded || []);
+  const marks = list.map(r => r && r.id).filter(id => id && !seen.has(id));
+  if (!add.length && !marks.length) return prev;
+  return {
+    ...prev,
+    recipes: [...(prev.recipes || []), ...add],
+    recipeLogAdded: [...(prev.recipeLogAdded || []), ...marks],
+  };
+}

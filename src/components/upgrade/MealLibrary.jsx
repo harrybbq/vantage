@@ -18,7 +18,9 @@ import {
   EMPTY_RECIPE, MEAL_TYPES, PLATFORM_LABEL, RECIPE_TAGS,
   batchTotals, filterItems, isPortrait, parseVideoUrl, servingToLogRow,
   shareOfTarget, tagCounts, videoThumb, linkedVideos, linkedRecipes, linkVideo, unlinkVideo, applyRead,
+  pendingRecipes, addOfferedRecipes,
 } from '../../lib/diet/meals';
+import { RECIPE_LOG } from '../../data/recipeLog';
 import { readVideoRecipe } from '../../lib/diet/videoRecipe';
 import { parseLine } from '../../lib/diet/ingredients';
 import { deleteRecipeImage, signedUrls, uploadRecipeImage } from '../../lib/diet/recipeImages';
@@ -62,6 +64,9 @@ export function RecipesPanel({ S, update, userId, targets }) {
   const rows = filterItems(recipes, { q, tag });
   const open = recipes.find(r => r.id === openId) || null;
   const loose = videos.filter(v => !linkedRecipes(v, recipes).length);
+  // Recipes written up outside the app, offered once (data/recipeLog.js).
+  const offered = pendingRecipes(S, RECIPE_LOG);
+  const addOffered = () => update(prev => addOfferedRecipes(prev, pendingRecipes(prev, RECIPE_LOG)));
 
   // A new recipe from a video (a saved one, or a pasted link saved now),
   // opened straight away with its ingredients being read in.
@@ -95,6 +100,17 @@ export function RecipesPanel({ S, update, userId, targets }) {
 
   return (
     <>
+      {offered.length > 0 && (
+        <div className="upg-offer" data-testid="recipe-offer">
+          <div className="upg-offer-txt">
+            <b>From your recipe log</b>
+            <span>{offered.map(r => r.title).join(' · ')}</span>
+          </div>
+          <button type="button" className="link-open-btn" onClick={addOffered}>
+            {offered.length === 1 ? 'Add to my recipes' : `Add ${offered.length} recipes`}
+          </button>
+        </div>
+      )}
       <div className="upg-toolbar">
         <input className="upg-search" value={q} onChange={e => setQ(e.target.value)}
                placeholder="Search recipes — name, ingredient or tag" />

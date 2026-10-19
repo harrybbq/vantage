@@ -1,0 +1,105 @@
+/**
+ * Recipes cooked and written up outside the app (the owner's recipe log,
+ * Oct 2026), offered in Diet → Recipes as a one-tap "Add to my recipes".
+ *
+ * Shipped as data rather than written into anyone's saved state: the add
+ * goes through the app's own update(), appends to S.recipes and is
+ * remembered in S.recipeLogAdded, so it can never race a stale client and
+ * a recipe deleted afterwards is not offered again (lib/diet/meals.js).
+ *
+ * Same shape as S.recipes. Figures are per serving and were estimates in
+ * the log, so each takes the middle of its range. Fixed ids make the add
+ * idempotent.
+ */
+export const RECIPE_LOG = [
+  {
+    id: 'rlog-steak-pasta',
+    title: 'Creamy Parmesan Steak Pasta',
+    servings: 1,
+    kcal: 1200, protein: 60, carbs: 100, fat: 70,
+    minutes: 60,
+    tags: ['High protein', 'Training day'],
+    ingredients: [
+      '1 sirloin steak, about 2cm thick',
+      '¾ tsp salt',
+      '½ tsp black pepper',
+      '2 tbsp olive oil',
+      '1 rosemary or thyme sprig',
+      '125g rigatoni',
+      '¼ white or brown onion, finely diced',
+      '2 tsp olive spread',
+      '¼ Knorr beef stock pot',
+      '75ml just-boiled water',
+      '150ml double cream',
+      '1 tsp Dijon mustard',
+      '½ tsp garlic granules',
+      '¼ tsp chilli flakes',
+      '40g Parmesan, finely grated',
+      '40g spinach (optional)',
+      'Parsley, chopped',
+      '1 lemon wedge',
+    ],
+    method: [
+      '1. Pat the steak dry, season both sides with the salt and pepper, and leave it uncovered at room temperature for 30 minutes.',
+      '2. Grate the Parmesan, dice the onion, and stir the stock pot into the just-boiled water. Put a pot of well-salted water on and hold it at a simmer.',
+      '3. Window open and extractor on. Heavy pan on high with half the oil until it shimmers. Stand the steak on its fat edge for about a minute, until golden.',
+      '4. Lay it flat and leave it: 2 minutes for medium-rare, 3 for medium.',
+      '5. Flip, add the rest of the oil and the herb sprig, and baste for 2 minutes (52°C medium-rare, 57°C medium). Don\'t baste with the spread; it burns.',
+      '6. Rest the steak on a board and keep the pan. Boil the rigatoni for 11 minutes (a minute under the packet) and save a mug of pasta water.',
+      '7. Steak pan on medium-low, tip out any burnt oil but keep the browned bits. Soften the onion in the olive spread for 3–4 minutes.',
+      '8. Pour in the stock, scrape up the pan, and reduce by half, about 90 seconds.',
+      '9. Stir in the cream, Dijon, garlic granules and chilli flakes. Simmer gently for about 3 minutes until it coats a spoon. Don\'t hard-boil.',
+      '10. Heat to low. Add the Parmesan a handful at a time, then the spinach. Toss in the pasta and loosen with pasta water until glossy. Taste before salting.',
+      '11. Slice the steak thinly against the grain, pile it on, pour over the resting juices, and finish with parsley and a squeeze of lemon.',
+      '',
+      'Tips: a quarter of a stock pot is plenty (a whole one is for 500ml). Garlic granules go in with the cream, never the dry pan. Keep the sauce off the boil once the Parmesan is in.',
+    ].join('\n'),
+    sourceUrl: '',
+  },
+  {
+    id: 'rlog-shawarma-wrap',
+    title: 'Crispy Garlic Chicken Shawarma Wrap',
+    servings: 1,
+    kcal: 650, protein: 65, carbs: 35, fat: 26,
+    minutes: 35,
+    tags: ['High protein'],
+    ingredients: [
+      '200g chicken breast, sliced 1cm across the grain',
+      '3 tbsp plain 0% skyr (1 for the marinade, 2 for the sauce)',
+      '½ tbsp olive oil',
+      '¾ tsp smoked paprika',
+      '½ tsp ground cumin',
+      '½ tsp ground coriander',
+      '¼ tsp turmeric',
+      '½ tsp garlic granules, plus a pinch for the sauce',
+      '½ tsp salt',
+      '¼ tsp black pepper',
+      '¼ lemon, juiced',
+      '1 tsp oil, for the wok',
+      '25g grated mozzarella',
+      '⅓ red onion, thinly sliced',
+      '1 tomato, deseeded and diced',
+      '¼ tsp sumac',
+      '1 tsp lemon juice',
+      '1 tbsp light mayo',
+      '½ tsp sriracha',
+      '1 Mission Protein wrap',
+      'Parsley, chopped',
+    ],
+    method: [
+      '1. Pat the chicken dry, trim it, and slice into 1cm strips across the grain.',
+      '2. Mix in 1 tbsp skyr, the olive oil, paprika, cumin, coriander, turmeric, ½ tsp garlic granules, salt, pepper and the lemon juice. Cover and chill: 30 minutes minimum, 2–4 hours best, no more than about 12.',
+      '3. Salad: toss the red onion and tomato with the sumac, lemon juice, a pinch of salt and some parsley, and leave it to sit.',
+      '4. Sauce: stir 2 tbsp skyr, the light mayo, sriracha and a pinch (⅛ tsp) of garlic granules smooth; loosen with about 1 tsp water.',
+      '5. Heat the empty wok on medium-high for 1–1.5 minutes, add the oil, and let it shimmer for 20–30 seconds.',
+      '6. Shake the excess marinade off the chicken and spread it in one layer. Leave it alone for 3–4 minutes to crisp.',
+      '7. Break it up and fry another 4–5 minutes until charred in spots and white all through (74°C).',
+      '8. Heat to low, push the chicken together, scatter over the mozzarella and parsley, and cover for 1 minute.',
+      '9. Warm the wrap 10 seconds a side. Half the sauce, the chicken (leave the juices), the salad, the rest of the sauce. Fold the bottom up, sides in, roll tight.',
+      '10. Optional: toast seam-side down in a dry pan for 1–2 minutes, then a minute on the other side, so it stays closed.',
+      '',
+      'Tips: a single layer and hands off for the first few minutes is what makes it crispy. Scoop the tomato seeds out so the wrap doesn\'t go soggy.',
+    ].join('\n'),
+    sourceUrl: '',
+  },
+];
