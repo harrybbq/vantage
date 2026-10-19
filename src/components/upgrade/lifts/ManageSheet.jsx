@@ -1,181 +1,336 @@
 /**
- * Manage lifts: add (name + how it's loaded), rename, reorder,
- * archive / bring back. A lift with sets can only be archived — its
- * history stays; one with no sets can be removed outright.
+ * Manage lifts and gyms (brief §3.11; A8) — a bottom sheet on phones, a
+ * 480 px drawer on desktop.
  *
- * Each lift says whether it is compared per gym (a machine: DXC's leg
- * press isn't Greenock's) or across gyms (a dumbbell is a dumbbell); the
- * default comes from the name and a tap overrides it.
- *
- * Gyms: add, rename, archive / bring back. A gym with sets can only be
- * archived (its sets keep pointing at it); an unused one can be removed.
+ * Lift rows: a drag handle (reorder; ↑ / ↓ also sit in the row's ⋯), the
+ * name as TEXT with ✎ to edit it inline (Save / Cancel — no always-on
+ * input to rename by accident), meta "WEIGHT · 24 sets", and the Compare
+ * switch [Per gym | All gyms] — the ONLY place that setting is edited
+ * (CompareScope elsewhere explains it and links here). The ⋯ holds Move up
+ * / down, Weight step (1 / 1.25 / 2 / 2.5 / 5 → lift.step, or per gym for a
+ * machine → lift.stepByGym), Rest default (→ lift.restSec), Archive, and
+ * Delete for a lift with no sets.
+ * "+ Add lift" expands to name · Loaded as · Machine switch.
+ * Gyms: name (✎), set count, ⋯ (Archive; Delete if no sets), + Add gym.
+ * Archived lifts and gyms sit in a collapsed group with Restore.
+ * Every write is additive and touches only that lift / gym (store.js).
  */
-import { useState } from 'react';
-import { Sheet } from '../security/parts';
+import { useEffect, useRef, useState } from 'react';
 import Icon from '../../Icon';
-import { Field } from './parts';
-import { LOAD_TYPES, LOAD_LABEL, bannedRule, perGymOf, perGymByName } from '../../../lib/lifts/lifts';
+import { Sheet, Button, IconButton, Segmented, Chip } from './ui';
+import { STEP_CHOICES, REST_PRESETS } from '../../../lib/lifts/store';
+import { LOAD_TYPES, LOAD_LABEL, bannedRule, perGymOf, perGymByName, stepFor, DEFAULT_STEP } from '../../../lib/lifts/lifts';
 
-function PerGymToggle({ lift, onPerGym }) {
-  const on = perGymOf(lift);
+const COMPARE = [{ value: 'gym', label: 'Per gym' }, { value: 'all', label: 'All gyms' }];
+const restTxt = s => (s % 60 ? `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}` : `${s / 60} min`);
+const ROW_H = 64;
+
+/** Name as text + ✎ → an inline input with Save / Cancel. */
+function InlineName({ value, label, max = 60, onSave, testId }) {
+  const [edit, setEdit] = useState(false);
+  const [v, setV] = useState(value);
+  const [err, setErr] = useState(null);
+  const input = useRef(null);
+  useEffect(() => { if (edit && input.current) input.current.focus(); }, [edit]);
+  useEffect(() => { if (!edit) setV(value); }, [value, edit]);
+  const save = () => {
+    const out = onSave(v);
+    if (out && out.ok === false) { setErr(out.error); return; }
+    setErr(null); setEdit(false);
+  };
+  if (!edit) {
+    return (
+      <span className="lh-mname">
+        <span className="lh-mname-txt">{value}</span>
+        <IconButton icon="pencil" size={16} label={`Rename ${label}`} onClick={() => setEdit(true)} data-testid={testId} />
+      </span>
+    );
+  }
   return (
-    <button type="button" className={`sec-btn lf-mbtn lf-pergym${on ? ' is-on' : ''}`} aria-pressed={on} onClick={() => onPerGym(lift.id, !on)}
-            aria-label={`${lift.name}: ${on ? 'compared per gym' : 'compared across gyms'} — tap to change`}>
-      <Icon name={on ? 'locate-fixed' : 'link'} size={14} /> {on ? 'Per gym' : 'All gyms'}
-    </button>
+    <span className="lh-medit">
+      <input ref={input} className="lf-cellbox lh-medit-in" value={v} maxLength={max} aria-label={`New name for ${label}`}
+             onChange={e => setV(e.target.value)}
+             onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); save(); } if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); setEdit(false); setErr(null); } }} />
+      <span className="lh-medit-acts">
+        <Button variant="primary" onClick={save}>Save</Button>
+        <Button variant="quiet" onClick={() => { setEdit(false); setErr(null); }}>Cancel</Button>
+      </span>
+      {err && <span className="lh-err" role="alert">{err}</span>}
+    </span>
   );
 }
 
-function Row({ lift, count, first, last, onRename, onMove, onArchive, onDelete, onPerGym }) {
-  const [name, setName] = useState(lift.name);
-  const [err, setErr] = useState(null);
-  const commit = () => {
-    if (name === lift.name) return;
-    const out = onRename(lift.id, name);
-    if (out && out.ok === false) { setErr(out.error); setName(lift.name); } else setErr(null);
-  };
-  const id = `lf-m-${lift.id}`;
+function LiftRow({ lift, count, index, total, gyms, focus, onRename, onPerGym, onMenu, drag }) {
+  const per = perGymOf(lift);
+  const ref = useRef(null);
+  useEffect(() => { if (focus && ref.current) ref.current.scrollIntoView({ block: 'center' }); }, [focus]);
+  const steps = per && lift.stepByGym ? Object.entries(lift.stepByGym).map(([g, s]) => `${(gyms.find(x => x.id === g) || { name: g }).name} ${s}`).join(' · ') : null;
+  const meta = [
+    LOAD_LABEL[lift.load], `${count} ${count === 1 ? 'set' : 'sets'}`,
+    lift.step ? `step ${lift.step}` : null, steps ? `step ${steps}` : null,
+    lift.restSec ? `rest ${restTxt(lift.restSec)}` : null, bannedRule(lift) ? 'not in programme' : null,
+  ].filter(Boolean).join(' · ');
+  const dy = drag && drag.id === lift.id ? drag.dy : 0;
   return (
-    <li className={`lf-mrow${lift.archived ? ' is-archived' : ''}`}>
-      <div className="lf-mrow-main">
-        <label className="sr-only" htmlFor={id}>Name of {lift.name}</label>
-        <input id={id} className="lf-mname" value={name} maxLength={60}
-               onChange={e => setName(e.target.value)} onBlur={commit}
-               onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); e.currentTarget.blur(); } if (e.key === 'Escape') { setName(lift.name); } }} />
-        <span className="lf-mmeta">
-          {LOAD_LABEL[lift.load]} · {count} {count === 1 ? 'set' : 'sets'}{bannedRule(lift) ? ' · not in programme' : ''}
+    <li ref={ref} className={`lh-mrow${focus ? ' is-focus' : ''}${dy ? ' is-drag' : ''}`} style={dy ? { transform: `translateY(${dy}px)` } : undefined} data-testid="lh-mrow">
+      {!lift.archived && (
+        <span className="lh-handle" aria-hidden="true" onPointerDown={e => drag && drag.start(e, lift.id, index, total)}>
+          <Icon name="grip-vertical" size={16} />
         </span>
-        {err && <span className="lf-field-err" role="alert">{err}</span>}
+      )}
+      <div className="lh-mrow-main">
+        <InlineName value={lift.name} label={lift.name} onSave={n => onRename(lift.id, n)} testId="lh-rename" />
       </div>
-      <div className="lf-mrow-acts">
-        {onPerGym && <PerGymToggle lift={lift} onPerGym={onPerGym} />}
+      <IconButton icon="ellipsis" label={`More for ${lift.name}`} onClick={() => onMenu(lift)} data-testid="lh-mmore" />
+      <div className="lh-mrow-sub">
+        <span className="lh-mmeta">{meta}</span>
         {!lift.archived && (
-          <>
-            <button type="button" className="lf-icon-btn" onClick={() => onMove(lift.id, -1)} disabled={first} aria-label={`Move ${lift.name} up`}><Icon name="chevron-up" size={16} /></button>
-            <button type="button" className="lf-icon-btn" onClick={() => onMove(lift.id, 1)} disabled={last} aria-label={`Move ${lift.name} down`}><Icon name="chevron-down" size={16} /></button>
-          </>
-        )}
-        <button type="button" className="sec-btn lf-mbtn" onClick={() => onArchive(lift.id, !lift.archived)}>
-          <Icon name={lift.archived ? 'rotate-ccw' : 'archive'} size={14} /> {lift.archived ? 'Bring back' : 'Archive'}
-        </button>
-        {count === 0 && (
-          <button type="button" className="sec-btn is-bad lf-mbtn" onClick={() => onDelete(lift.id)} aria-label={`Remove ${lift.name}`}>
-            <Icon name="trash-2" size={14} />
-          </button>
+          <Segmented label={`${lift.name}: compare`} size="sm" options={COMPARE} value={per ? 'gym' : 'all'} onChange={v => onPerGym(lift.id, v === 'gym')}
+                     className="lh-mcompare" testId="lh-compare" />
         )}
       </div>
     </li>
+  );
+}
+
+/** The lift's ⋯: move, weight step, rest default, archive / delete. */
+function LiftMenu({ lift, count, gyms, first, last, onClose, onMove, onStep, onRest, onArchive, onDelete }) {
+  const per = perGymOf(lift);
+  const def = DEFAULT_STEP[lift.load] || 2.5;
+  const stepOpts = [{ value: '', label: `Default · ${def}` }, ...STEP_CHOICES.map(s => ({ value: String(s), label: String(s) }))];
+  const restOpts = [{ value: '', label: 'Workout' }, ...REST_PRESETS.map(s => ({ value: String(s), label: restTxt(s) }))];
+  const act = fn => () => { fn(); onClose(); };
+  return (
+    <Sheet title={lift.name} eyebrow="// Manage lift" onClose={onClose} testId="lh-liftmenu">
+      <div className="lh-menu">
+        {!lift.archived && (
+          <div className="lh-menu-row">
+            <Button variant="secondary" icon="arrow-up" onClick={() => onMove(lift.id, -1)} disabled={first}>Move up</Button>
+            <Button variant="secondary" icon="arrow-down" onClick={() => onMove(lift.id, 1)} disabled={last}>Move down</Button>
+          </div>
+        )}
+        <p className="lf-eyebrow">// Weight step (the ± on the pad)</p>
+        {per ? gyms.filter(g => !g.archived).map(g => (
+          <div key={g.id} className="lh-menu-field">
+            <span className="lf-meta">{g.name} · now {stepFor(lift, g.id)} kg</span>
+            <Segmented label={`Weight step at ${g.name}`} size="sm" full options={stepOpts}
+                       value={lift.stepByGym && lift.stepByGym[g.id] != null ? String(lift.stepByGym[g.id]) : ''}
+                       onChange={v => onStep(lift.id, v === '' ? null : Number(v), g.id)} testId={`lh-step-${g.id}`} />
+          </div>
+        )) : (
+          <div className="lh-menu-field">
+            <span className="lf-meta">Now {stepFor(lift)} kg</span>
+            <Segmented label="Weight step" size="sm" full options={stepOpts} value={lift.step != null ? String(lift.step) : ''}
+                       onChange={v => onStep(lift.id, v === '' ? null : Number(v))} testId="lh-step" />
+          </div>
+        )}
+        {per && <p className="lf-meta">A machine&apos;s stack differs gym to gym, so each gym keeps its own step.</p>}
+        <p className="lf-eyebrow">// Rest default</p>
+        <Segmented label="Rest default" size="sm" full options={restOpts} value={lift.restSec ? String(lift.restSec) : ''}
+                   onChange={v => onRest(lift.id, v === '' ? null : Number(v))} testId="lh-rest" />
+        <p className="lf-meta">The rest timer after a set of this lift. “Workout” uses the workout&apos;s default (90 s).</p>
+        <div className="lh-menu-gap" />
+        <Button variant="secondary" size="lg" block icon={lift.archived ? 'rotate-ccw' : 'archive'} onClick={act(() => onArchive(lift.id, !lift.archived))}>
+          {lift.archived ? 'Restore' : 'Archive'}
+        </Button>
+        {count === 0 && (
+          <>
+            <div className="lh-menu-gap" />
+            <Button variant="danger" size="lg" block icon="trash-2" onClick={act(() => onDelete(lift.id))} data-testid="lh-mdelete">Delete lift</Button>
+          </>
+        )}
+        <p className="lf-meta">{count ? 'Archiving keeps every set and PB; the lift just leaves the list and the picker.' : 'No sets yet — it can be deleted.'}</p>
+      </div>
+    </Sheet>
   );
 }
 
 function GymRow({ gym, used, onRename, onArchive, onDelete }) {
-  const [name, setName] = useState(gym.name);
+  const [menu, setMenu] = useState(false);
   const [err, setErr] = useState(null);
-  const commit = () => {
-    if (name === gym.name) return;
-    const out = onRename(gym.id, name);
-    if (out && out.ok === false) { setErr(out.error); setName(gym.name); } else setErr(null);
-  };
-  const act = (fn, ...a) => { const out = fn(...a); setErr(out && out.ok === false ? out.error : null); };
-  const id = `lf-g-${gym.id}`;
+  const act = (fn, ...a) => { const out = fn(...a); setErr(out && out.ok === false ? out.error : null); setMenu(false); };
   return (
-    <li className={`lf-mrow${gym.archived ? ' is-archived' : ''}`} data-testid="lf-gym-row">
-      <div className="lf-mrow-main">
-        <label className="sr-only" htmlFor={id}>Name of the gym {gym.name}</label>
-        <input id={id} className="lf-mname" value={name} maxLength={30}
-               onChange={e => setName(e.target.value)} onBlur={commit}
-               onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); e.currentTarget.blur(); } if (e.key === 'Escape') setName(gym.name); }} />
-        <span className="lf-mmeta">{used} {used === 1 ? 'set' : 'sets'}{gym.archived ? ' · archived' : ''}</span>
-        {err && <span className="lf-field-err" role="alert">{err}</span>}
+    <li className="lh-mrow is-gym" data-testid="lf-gym-row">
+      <div className="lh-mrow-main">
+        <InlineName value={gym.name} label={`the gym ${gym.name}`} max={30} onSave={n => onRename(gym.id, n)} />
+        <span className="lh-mmeta">{used} {used === 1 ? 'set' : 'sets'}{gym.archived ? ' · archived' : ''}</span>
+        {err && <span className="lh-err" role="alert">{err}</span>}
       </div>
-      <div className="lf-mrow-acts">
-        <button type="button" className="sec-btn lf-mbtn" onClick={() => act(onArchive, gym.id, !gym.archived)}>
-          <Icon name={gym.archived ? 'rotate-ccw' : 'archive'} size={14} /> {gym.archived ? 'Bring back' : 'Archive'}
-        </button>
-        {used === 0 && (
-          <button type="button" className="sec-btn is-bad lf-mbtn" onClick={() => act(onDelete, gym.id)} aria-label={`Remove the gym ${gym.name}`}>
-            <Icon name="trash-2" size={14} />
-          </button>
-        )}
-      </div>
+      <IconButton icon="ellipsis" label={`More for the gym ${gym.name}`} onClick={() => setMenu(true)} />
+      {menu && (
+        <Sheet title={gym.name} eyebrow="// Manage gym" onClose={() => setMenu(false)}>
+          <div className="lh-menu">
+            <Button variant="secondary" size="lg" block icon={gym.archived ? 'rotate-ccw' : 'archive'} onClick={() => act(onArchive, gym.id, !gym.archived)}>
+              {gym.archived ? 'Restore' : 'Archive'}
+            </Button>
+            {used === 0 && <><div className="lh-menu-gap" /><Button variant="danger" size="lg" block icon="trash-2" onClick={() => act(onDelete, gym.id)}>Delete gym</Button></>}
+            <p className="lf-meta">A gym with sets can be archived, not removed — its sets keep their gym.</p>
+          </div>
+        </Sheet>
+      )}
     </li>
   );
 }
 
-export default function ManageSheet({
-  lifts, counts, onClose, onAdd, onRename, onMove, onArchive, onDelete, onPerGym,
-  gyms = [], gymCounts = new Map(), onAddGym, onRenameGym, onArchiveGym, onDeleteGym,
-}) {
+function AddLift({ onAdd }) {
+  const [open, setOpen] = useState(false);
   const [name, setName] = useState('');
   const [load, setLoad] = useState('weight');
   const [machine, setMachine] = useState(null);     // null = follow the name
   const [err, setErr] = useState(null);
-  const [gymName, setGymName] = useState('');
-  const [gymErr, setGymErr] = useState(null);
-  const active = lifts.filter(l => !l.archived);
-  const archived = lifts.filter(l => l.archived);
-  const perGymNow = machine == null ? perGymByName(name) : machine;
+  const per = machine == null ? perGymByName(name) : machine;
   const add = e => {
     e.preventDefault();
     const out = onAdd({ name, load, ...(machine == null ? {} : { perGym: machine }) });
     if (out && out.ok === false) { setErr(out.error); return; }
-    setErr(null); setName(''); setLoad('weight'); setMachine(null);
+    setErr(null); setName(''); setLoad('weight'); setMachine(null); setOpen(false);
   };
-  const addGym = e => {
-    e.preventDefault();
-    const out = onAddGym(gymName);
-    if (out && out.ok === false) { setGymErr(out.error); return; }
-    setGymErr(null); setGymName('');
-  };
-  const rows = list => list.map((l, i) => (
-    <Row key={l.id} lift={l} count={counts.get(l.id) || 0} first={i === 0} last={i === list.length - 1}
-         onRename={onRename} onMove={onMove} onArchive={onArchive} onDelete={onDelete} onPerGym={onPerGym} />
-  ));
+  if (!open) {
+    return <button type="button" className="lh-addrow" onClick={() => setOpen(true)} data-testid="lh-addlift"><Icon name="plus" size={16} /> Add lift</button>;
+  }
   return (
-    <Sheet title="Manage lifts" eyebrow="// Lifts" onClose={onClose} className="lifts">
-      <form className="lf-add" onSubmit={add} noValidate>
-        <Field label="Add a lift" id="lf-add-name" error={err} wide>
-          <input id="lf-add-name" value={name} maxLength={60} placeholder="e.g. Bench press" onChange={e => setName(e.target.value)} />
-        </Field>
-        <Field label="Loaded as" id="lf-add-load">
-          <select id="lf-add-load" value={load} onChange={e => setLoad(e.target.value)}>
-            {LOAD_TYPES.map(t => <option key={t} value={t}>{LOAD_LABEL[t]}</option>)}
-          </select>
-        </Field>
-        <label className="lf-check" htmlFor="lf-add-machine">
-          <input id="lf-add-machine" type="checkbox" checked={perGymNow} onChange={e => setMachine(e.target.checked)} />
-          <span>Machine — compare per gym{machine == null && name.trim() ? ' (from the name)' : ''}</span>
-        </label>
-        <button type="submit" className="sec-btn is-primary lf-btn-lg lf-add-btn"><Icon name="plus" size={14} /> Add lift</button>
-      </form>
-      <section>
-        <span className="sec-eyebrow">// In use · {active.length}</span>
-        <p className="lf-muted lf-mnote">“Per gym” compares a machine only with itself — DXC’s stack with DXC’s, Greenock’s with Greenock’s. “All gyms” keeps one record everywhere.</p>
-        <ul className="lf-mlist">{rows(active)}</ul>
+    <form className="lh-addform" onSubmit={add} noValidate>
+      <label className="lf-eyebrow" htmlFor="lh-add-name">Name</label>
+      <input id="lh-add-name" className="lf-cellbox lh-medit-in" value={name} maxLength={60} placeholder="e.g. Bench press" autoFocus onChange={e => setName(e.target.value)} />
+      {err && <span className="lh-err" role="alert">{err}</span>}
+      <span className="lf-eyebrow">Loaded as</span>
+      <Segmented label="Loaded as" size="sm" full options={LOAD_TYPES.map(t => ({ value: t, label: LOAD_LABEL[t] }))} value={load} onChange={setLoad} />
+      <span className="lf-eyebrow">Machine</span>
+      <Segmented label="Machine: compare within each gym" size="sm" full options={[{ value: 'gym', label: 'Machine · per gym' }, { value: 'all', label: 'Free · all gyms' }]}
+                 value={per ? 'gym' : 'all'} onChange={v => setMachine(v === 'gym')} />
+      <p className="lf-meta">{per ? 'Compared within each gym — a machine at one gym isn’t the same machine at another.' : 'One record across every gym.'}{machine == null && name.trim() ? ' (guessed from the name)' : ''}</p>
+      <div className="lh-menu-row">
+        <Button variant="quiet" onClick={() => { setOpen(false); setErr(null); }}>Cancel</Button>
+        <Button type="submit" variant="primary" icon="plus">Add lift</Button>
+      </div>
+    </form>
+  );
+}
+
+function AddGym({ onAddGym }) {
+  const [open, setOpen] = useState(false);
+  const [name, setName] = useState('');
+  const [err, setErr] = useState(null);
+  const add = e => {
+    e.preventDefault();
+    const out = onAddGym(name);
+    if (out && out.ok === false) { setErr(out.error); return; }
+    setErr(null); setName(''); setOpen(false);
+  };
+  if (!open) return <button type="button" className="lh-addrow" onClick={() => setOpen(true)}><Icon name="plus" size={16} /> Add gym</button>;
+  return (
+    <form className="lh-addform" onSubmit={add} noValidate>
+      <label className="lf-eyebrow" htmlFor="lh-add-gym">Gym name</label>
+      <input id="lh-add-gym" className="lf-cellbox lh-medit-in" value={name} maxLength={30} placeholder="e.g. Hotel gym" autoFocus onChange={e => setName(e.target.value)} />
+      {err && <span className="lh-err" role="alert">{err}</span>}
+      <div className="lh-menu-row">
+        <Button variant="quiet" onClick={() => { setOpen(false); setErr(null); }}>Cancel</Button>
+        <Button type="submit" variant="primary" icon="plus">Add gym</Button>
+      </div>
+    </form>
+  );
+}
+
+export default function ManageSheet({
+  lifts, counts, onClose, onAdd, onRename, onMove, onArchive, onDelete, onPerGym, onStep, onRest,
+  gyms = [], gymCounts = new Map(), onAddGym, onRenameGym, onArchiveGym, onDeleteGym, focus = null,
+}) {
+  const [menu, setMenu] = useState(null);
+  const [showArch, setShowArch] = useState(false);
+  const [drag, setDrag] = useState(null);           // { id, dy }
+  const active = lifts.filter(l => !l.archived);
+  const archived = lifts.filter(l => l.archived);
+  const liveGyms = gyms.filter(g => !g.archived);
+  const archGyms = gyms.filter(g => g.archived);
+  const menuLift = menu ? lifts.find(l => l.id === menu) : null;
+  const ai = menuLift ? active.findIndex(l => l.id === menuLift.id) : -1;
+
+  // Drag the handle: rows follow the finger; on release the lift moves by whole rows.
+  const dragApi = {
+    start: (e, id, index, total) => {
+      e.preventDefault();
+      const y0 = e.clientY;
+      const el = e.currentTarget;
+      if (el.setPointerCapture) el.setPointerCapture(e.pointerId);
+      const li = el.closest('li');
+      const h = (li && li.getBoundingClientRect().height + 1) || ROW_H;   // + the hairline
+      const clamp = dy => Math.max(-index * h, Math.min((total - 1 - index) * h, dy));
+      const mv = ev => setDrag({ id, dy: clamp(ev.clientY - y0) });
+      const up = ev => {
+        el.removeEventListener('pointermove', mv);
+        el.removeEventListener('pointerup', up);
+        el.removeEventListener('pointercancel', up);
+        const steps = Math.round(clamp(ev.clientY - y0) / h);
+        setDrag(null);
+        if (steps) onMove(id, steps < 0 ? -1 : 1, Math.abs(steps));
+      };
+      el.addEventListener('pointermove', mv);
+      el.addEventListener('pointerup', up);
+      el.addEventListener('pointercancel', up);
+    },
+  };
+  const dragState = drag ? { ...dragApi, ...drag } : dragApi;
+
+  return (
+    <Sheet title="Manage lifts" eyebrow="// Lifts" onClose={onClose} width={480} className="lh-manage" testId="lh-manage-sheet">
+      <section aria-labelledby="lh-m-h">
+        <p className="lf-eyebrow" id="lh-m-h">// In use · {active.length}</p>
+        <p className="lf-meta lh-mnote"><b>Per gym</b> compares a machine only with itself — DXC&apos;s stack with DXC&apos;s. <b>All gyms</b> keeps one record everywhere.</p>
+        <ul className="lh-mlist">
+          {active.map((l, i) => (
+            <LiftRow key={l.id} lift={l} count={counts.get(l.id) || 0} index={i} total={active.length} gyms={gyms} focus={focus === l.id}
+                     onRename={onRename} onPerGym={onPerGym} onMenu={x => setMenu(x.id)} drag={dragState} />
+          ))}
+        </ul>
+        <AddLift onAdd={onAdd} />
       </section>
-      {archived.length > 0 && (
-        <section>
-          <span className="sec-eyebrow">// Archived · {archived.length}</span>
-          <p className="lf-muted lf-mnote">Archived lifts keep every set and PB; they just leave the list and the picker.</p>
-          <ul className="lf-mlist">{rows(archived)}</ul>
+
+      {onAddGym && (
+        <section className="lh-mgyms" aria-labelledby="lh-g-h">
+          <p className="lf-eyebrow" id="lh-g-h">// Gyms · {liveGyms.length}</p>
+          <p className="lf-meta lh-mnote">A gym with sets can be archived, not removed — its sets keep their gym.</p>
+          <ul className="lh-mlist">
+            {liveGyms.map(g => <GymRow key={g.id} gym={g} used={gymCounts.get(g.id) || 0} onRename={onRenameGym} onArchive={onArchiveGym} onDelete={onDeleteGym} />)}
+          </ul>
+          <AddGym onAddGym={onAddGym} />
         </section>
       )}
-      {onAddGym && (
-        <section className="lf-gyms" aria-labelledby="lf-gyms-h">
-          <span className="sec-eyebrow" id="lf-gyms-h">// Gyms · {gyms.filter(g => !g.archived).length}</span>
-          <p className="lf-muted lf-mnote">A gym with sets can be archived, not removed — its sets keep their gym.</p>
-          <ul className="lf-mlist">
-            {gyms.map(g => (
-              <GymRow key={g.id} gym={g} used={gymCounts.get(g.id) || 0} onRename={onRenameGym} onArchive={onArchiveGym} onDelete={onDeleteGym} />
-            ))}
-          </ul>
-          <form className="lf-add lf-add-gym" onSubmit={addGym} noValidate>
-            <Field label="Add a gym" id="lf-add-gym" error={gymErr} wide>
-              <input id="lf-add-gym" value={gymName} maxLength={30} placeholder="e.g. Hotel gym" onChange={e => setGymName(e.target.value)} />
-            </Field>
-            <button type="submit" className="sec-btn lf-btn-lg lf-add-btn"><Icon name="plus" size={14} /> Add gym</button>
-          </form>
+
+      {(archived.length > 0 || archGyms.length > 0) && (
+        <section className="lh-march">
+          <button type="button" className="lh-addrow" aria-expanded={showArch} onClick={() => setShowArch(v => !v)} data-testid="lh-arch-toggle">
+            <Icon name={showArch ? 'chevron-down' : 'chevron-right'} size={16} /> Archived · {archived.length + archGyms.length}
+          </button>
+          {showArch && (
+            <>
+              {archived.length > 0 && (
+                <ul className="lh-mlist">
+                  {archived.map(l => (
+                    <li key={l.id} className="lh-mrow is-arch">
+                      <div className="lh-mrow-main"><span className="lh-mname-txt">{l.name}</span><span className="lh-mmeta">{LOAD_LABEL[l.load]} · {counts.get(l.id) || 0} sets · archived</span></div>
+                      <Chip onClick={() => onArchive(l.id, false)} icon="rotate-ccw">Restore</Chip>
+                    </li>
+                  ))}
+                </ul>
+              )}
+              {archGyms.length > 0 && (
+                <ul className="lh-mlist">
+                  {archGyms.map(g => (
+                    <li key={g.id} className="lh-mrow is-arch">
+                      <div className="lh-mrow-main"><span className="lh-mname-txt">{g.name}</span><span className="lh-mmeta">gym · {gymCounts.get(g.id) || 0} sets · archived</span></div>
+                      <Chip onClick={() => onArchiveGym(g.id, false)} icon="rotate-ccw">Restore</Chip>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </>
+          )}
         </section>
+      )}
+
+      {menuLift && (
+        <LiftMenu lift={menuLift} count={counts.get(menuLift.id) || 0} gyms={gyms} first={ai <= 0} last={ai < 0 || ai === active.length - 1}
+                  onClose={() => setMenu(null)} onMove={onMove} onStep={onStep} onRest={onRest} onArchive={onArchive} onDelete={onDelete} />
       )}
     </Sheet>
   );

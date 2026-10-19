@@ -26,7 +26,7 @@ html[data-theme="dark-os"] .lifts { --text-muted: #8f8a81; --lf-night-ink: #9db0
 .lifts .sec-eyebrow { letter-spacing: 1.2px; }
 .lifts .sec-btn:focus-visible, .lifts .sec-seg button:focus-visible { outline: 2px solid var(--em); outline-offset: 2px; }
 .lf-btn-lg { min-height: 38px; padding: 0 14px; }
-.lifts .sec-btn.is-primary { color: #fff; }
+.lifts .sec-btn.is-primary { color: var(--lf-on-accent, #fff); }
 
 .lf-tag { display: inline-flex; align-items: center; height: 20px; padding: 0 7px; border-radius: 999px; border: 1px solid var(--border);
   font-family: var(--mono); font-size: var(--lf-fs); line-height: 1; color: var(--text-muted); white-space: nowrap; vertical-align: middle;
