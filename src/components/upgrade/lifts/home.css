@@ -260,7 +260,7 @@
 .lifts .lh-chart { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
 .lifts .lh-chart.is-empty { min-height: 120px; justify-content: center; }
 .lifts .lh-chart-svg { display: block; touch-action: pan-y; cursor: crosshair; -webkit-user-select: none; user-select: none; overflow: visible; }
-.lifts .lh-readout { display: flex; flex-wrap: wrap; align-items: center; gap: 2px 10px; min-height: 32px; font-size: max(13px, var(--lf-fs-floor)); line-height: 18px; color: var(--lf-text); }
+.lifts .lh-readout { display: flex; flex-wrap: wrap; align-items: center; align-content: flex-end; gap: 2px 10px; min-height: 40px; font-size: max(13px, var(--lf-fs-floor)); line-height: 18px; color: var(--lf-text); }
 .lifts .lh-ro-sum { color: var(--lf-mid); }
 .lifts .lh-ro-est { color: var(--lf-muted); font-weight: 500; }
 .lifts .lh-ro-pb { color: var(--lf-pb); font-family: var(--lf-mono); font-size: var(--lf-fs-floor); font-weight: 600; }
