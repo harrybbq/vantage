@@ -432,10 +432,11 @@ html[data-lifts-focus] .lifts .lw-head { top: env(safe-area-inset-top, 0px); }
 .lifts .lw-search { flex: 1; min-width: 0; display: flex; align-items: center; gap: 8px; min-height: 44px; padding: 0 0 0 12px; border: 1px solid var(--lf-line-strong);
   border-radius: var(--lf-r-cell); background: var(--lf-s2); color: var(--lf-muted); }
 .lifts .lw-search:focus-within { outline: 2px solid var(--lf-focus); outline-offset: 0; }
-.lifts .lw-search input { flex: 1; min-width: 0; height: 42px; border: 0; background: transparent; color: var(--lf-text); font: inherit; font-size: 16px; outline: none; }
+.lifts .lw-search input, .lifts .lw-search input[type="search"] { flex: 1; min-width: 0; height: 44px; margin: 0; padding: 0; border: 0; border-radius: 0;
+  background: transparent; box-shadow: none; color: var(--lf-text); font: inherit; font-size: 16px; outline: none; -webkit-appearance: none; appearance: none; }
 .lifts .lw-search input::placeholder { color: var(--lf-muted); opacity: 1; }
 .lifts .lw-search input::-webkit-search-cancel-button { display: none; }
-.lifts .lw-search-x { width: 44px; height: 42px; }
+.lifts .lw-search-x { width: 44px; height: 44px; }
 .lifts .lw-pick-create { flex: none; min-height: 44px; }
 .lifts .lw-chips { display: flex; flex-wrap: wrap; gap: 6px; }
 .lifts .lw-pick-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
