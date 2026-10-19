@@ -1,181 +1,166 @@
 /**
- * Estimated 1RM over time — hand-rolled SVG, drawn at the container's
- * real pixel width so circles stay round and text stays text-sized. The
- * line is an ESTIMATE (a trend); gold points mark days with a real PB
- * set (heaviest or a rep max) — PBs are never the estimate.
+ * est. 1RM over time (brief §3.9) — hand-rolled SVG drawn at the
+ * container's real pixel width (circles stay round, text stays text-sized).
  *
- * To scale on both axes: x is calendar time (a three-week gap looks like
- * three weeks), y is kg on a linear axis with round gridlines. One point
- * per training day (the day's best set). Days with a real PB set are
- * marked larger in gold; night-shift sets (80% load)
- * are HOLLOW and off the line (it joins day-shift sets only), so a
- * lighter night never reads as a regression.
+ *   axis     Y on the RIGHT, 3–4 round ticks, dynamic range, no frame,
+ *            hairline grid; months along the bottom
+ *   lines    one per gym (free weight, "All") or the selected gym only
+ *            (machine / one gym) — the active gym accent 2 px, others mid
+ *            1.5 px, each labelled at its right end ("DXC ~241"), no legend box
+ *   trend    the 5-session rolling median of DAY sessions; night sessions
+ *            never join it; a gap > 28 days breaks it (home.js trendSegments)
+ *   points   raw per-session estimates as 4 px dots; a real PB session is a
+ *            gold diamond 10 px with an s1 outline; night is an 8 px hollow
+ *            indigo circle; a 6–12-rep estimate has a dotted outline; sets of
+ *            > 12 reps and warm-ups make no point at all (sessionE1rms)
+ *   < 3      sessions: points only, and "needs 3 sessions for a trend"
+ *   scrub    the whole plot is the target; a vertical rule snaps to the
+ *            nearest session and the readout ABOVE the plot updates (never
+ *            under the finger); release restores the summary. ← / → keys.
+ * The line is an ESTIMATE; gold marks sets that were actually lifted.
  *
- * Per gym (`groups`, a machine lift's All view): one line per gym, each
- * its own colour AND its own point shape (circle, square, diamond), with
- * a legend naming them — never colour alone. A PB point is gold in its
- * gym's shape, judged against that gym only.
- *
- * Pointer or arrow keys pick a point; its set is read out under the
- * chart (and announced). A summary sits in the svg's aria-label.
+ * Props: groups [{ id, label, points: sessionE1rms(..) }], accentId (the
+ * gym drawn in accent), pbKeys (Set of session keys with a real PB),
+ * lift, from / to (day numbers; null = fit), height, summary (the readout
+ * text at rest), gymLabel(id).
  */
 import { useMemo, useState } from 'react';
 import { useWidth } from './parts';
-import { dayNo, fmtE1rm, setText, pbHeadline, gymOf } from '../../../lib/lifts/lifts';
+import { trendSegments, niceTicks, TREND_WINDOW } from '../../../lib/lifts/home';
+import { roundEstimate } from '../../../lib/lifts/ui';
+import { realSetText } from '../../../lib/lifts/ui';
+import { fmtKg } from '../../../lib/lifts/lifts';
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 const dateLabel = iso => { const [y, m, d] = iso.split('-').map(Number); return `${d} ${MONTHS[m - 1]} ${y}`; };
-const SHAPES = ['circle', 'square', 'diamond'];
+const est = v => `~${fmtKg(roundEstimate(v, 'readout'))}`;
 
-function niceStep(range, target = 4) {
-  const raw = range / target;
-  const mag = 10 ** Math.floor(Math.log10(raw));
-  const f = raw / mag;
-  return (f <= 1 ? 1 : f <= 2 ? 2 : f <= 2.5 ? 2.5 : f <= 5 ? 5 : 10) * mag;
-}
-
-/** One point in its group's shape. r is the circle radius; squares and diamonds match its area-ish. */
-export function Mark({ shape, x, y, r, className }) {
-  if (shape === 'square') { const h = r * 0.9; return <rect className={className} x={x - h} y={y - h} width={h * 2} height={h * 2} />; }
-  if (shape === 'diamond') { const h = r * 1.25; return <path className={className} d={`M${x} ${y - h}L${x + h} ${y}L${x} ${y + h}L${x - h} ${y}Z`} />; }
-  return <circle className={className} cx={x} cy={y} r={r} />;
-}
-
-export default function E1rmChart({ series, groups, lift, pbDays, from, to }) {
-  const [ref, width] = useWidth(640);
+export default function E1rmChart({ groups, accentId = null, pbKeys = null, lift, from = null, to = null, height = 200, summary = '', emptyText = null }) {
+  const [ref, width] = useWidth(358);
   const [pick, setPick] = useState(null);
-  const H = width < 480 ? 200 : 240;
-  const pad = { l: 44, r: 14, t: 24, b: 28 };
-  const multi = Array.isArray(groups) && groups.length > 1;
-  const sets = useMemo(() => (Array.isArray(groups) && groups.length
-    ? groups.map((g, i) => ({ ...g, k: i, shape: SHAPES[i % SHAPES.length] }))
-    : [{ id: null, label: '', series: series || [], k: 0, shape: 'circle' }]), [groups, series]);
+  const W = Math.max(200, width);
+  const H = height;
+  const pad = { l: 6, r: 44, t: 22, b: 24 };   // right: the Y tick labels; top: room for the end labels
 
   const g = useMemo(() => {
-    const all = sets.flatMap(s => s.series);
+    const live = (groups || []).filter(gr => gr.points.length);
+    const all = live.flatMap(gr => gr.points);
     if (!all.length) return null;
-    const firstN = Math.min(...all.map(p => dayNo(p.date))), lastN = Math.max(...all.map(p => dayNo(p.date)));
-    const x0 = from != null ? from : firstN;
-    const x1 = Math.max(to != null ? to : lastN, x0 + 1);
-    const vals = all.map(p => p.value);
-    let lo = Math.min(...vals), hi = Math.max(...vals);
-    if (hi - lo < 4) { lo -= 2; hi += 2; }
-    const step = niceStep(hi - lo);
-    lo = Math.floor(lo / step) * step;
-    hi = Math.ceil(hi / step) * step;
-    const iw = width - pad.l - pad.r, ih = H - pad.t - pad.b;
+    const ns = all.map(p => p.n);
+    const x0 = from != null ? Math.min(from, Math.min(...ns)) : Math.min(...ns);
+    const x1 = Math.max(to != null ? to : Math.max(...ns), x0 + 1);
+    const tk = niceTicks(Math.min(...all.map(p => p.value)), Math.max(...all.map(p => p.value)), 4);
+    const iw = W - pad.l - pad.r, ih = H - pad.t - pad.b;
     const X = n => pad.l + ((n - x0) / (x1 - x0)) * iw;
-    const Y = v => pad.t + ih - ((v - lo) / (hi - lo)) * ih;
-    const ticks = [];
-    for (let v = lo; v <= hi + 1e-9; v += step) ticks.push(v);
-    // Month ticks: every month, thinned to fit ~70px apart.
+    const Y = v => pad.t + ih - ((v - tk.lo) / Math.max(1e-9, tk.hi - tk.lo)) * ih;
+    // Month ticks, thinned to ≥ 56 px apart.
     const months = [];
-    const d0 = new Date(x0 * 86400000), d1 = new Date(x1 * 86400000);
+    const d0 = new Date(x0 * 86400000);
     let y = d0.getUTCFullYear(), m = d0.getUTCMonth() + 1;
     if (m > 11) { m = 0; y++; }
-    while (Date.UTC(y, m, 1) <= d1.getTime()) {
+    while (Math.floor(Date.UTC(y, m, 1) / 86400000) <= x1) {
       months.push({ n: Math.floor(Date.UTC(y, m, 1) / 86400000), m, y });
       m++; if (m > 11) { m = 0; y++; }
     }
-    const every = Math.max(1, Math.ceil(months.length / Math.max(1, Math.floor(iw / 70))));
+    const every = Math.max(1, Math.ceil(months.length / Math.max(1, Math.floor(iw / 56))));
     const mt = months.filter((_, i) => i % every === 0);
-    const lines = sets.map(s => {
-      const pts = s.series.map(p => {
-        const evs = ((pbDays && pbDays.get(p.date)) || []).filter(ev => !multi || gymOf(ev.entry) === s.id);
-        return { ...p, x: X(dayNo(p.date)), y: Y(p.value), pb: evs.length > 0, evs, k: s.k, shape: s.shape, gym: s.id, gymLabel: s.label };
-      });
-      // The line runs through day-shift sets only: a night set (80% load)
-      // sits off the line as a hollow point instead of dragging it down.
-      const day = pts.filter(p => !p.night);
-      const line = (day.length >= 2 ? day : pts).map((p, i) => `${i ? 'L' : 'M'}${p.x.toFixed(1)} ${p.y.toFixed(1)}`).join(' ');
-      return { ...s, pts, line };
+    const daySessions = live.reduce((k, gr) => k + gr.points.filter(p => !p.night).length, 0);
+    const lines = live.map((gr, k) => {
+      const accent = live.length === 1 || gr.id === accentId;
+      const segs = gr.points.filter(p => !p.night).length >= 3 ? trendSegments(gr.points) : [];
+      const paths = segs.filter(s => s.length >= 2).map(s => s.map((p, i) => `${i ? 'L' : 'M'}${X(p.n).toFixed(1)} ${Y(p.value).toFixed(1)}`).join(' '));
+      const flat = segs.flat();
+      const end = flat.length ? flat[flat.length - 1] : null;
+      const pts = gr.points.map(p => ({ ...p, x: X(p.n), y: Y(p.value), pb: !!(pbKeys && pbKeys.has(p.key)), gid: gr.id, glabel: gr.label }));
+      return { ...gr, k, accent, paths, end, pts };
     });
-    const pts = lines.flatMap(l => l.pts).sort((a, b) => a.x - b.x || a.k - b.k);
-    return { X, Y, ticks, mt, pts, lines, lo, hi, iw, ih };
+    // End labels sit just above each line's right end; nudged apart so two gyms never print on top of each other.
+    const ends = lines.filter(l => l.end).map(l => ({ l, y: Y(l.end.value) - 10 })).sort((a, b) => a.y - b.y);
+    for (let i = 1; i < ends.length; i++) if (ends[i].y - ends[i - 1].y < 14) ends[i].y = ends[i - 1].y + 14;
+    for (const e of ends) e.l.endY = Math.min(H - pad.b - 4, Math.max(8, e.y));
+    const pts = lines.flatMap(l => l.pts).sort((a, b) => a.x - b.x);
+    return { X, Y, tk, mt, lines, pts, iw, ih, daySessions };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sets, width, H, from, to, pbDays, multi]);
+  }, [groups, W, H, from, to, pbKeys, accentId]);
 
   if (!g) {
-    return <div ref={ref} className="lf-chart is-empty"><p className="lf-muted">No e1RM to chart in this range{lift.load === 'bodyweight_plus' ? ' — dips need a bodyweight reading within 14 days of the set' : ''}.</p></div>;
+    return (
+      <div ref={ref} className="lh-chart is-empty" data-testid="lh-chart">
+        <p className="lf-meta">{emptyText || `No est. 1RM in this range. Sets of 1–12 reps make an estimate${lift && lift.load === 'bodyweight_plus' ? ' (a dip also needs a bodyweight reading within 14 days)' : ''}; warm-ups don’t.`}</p>
+      </div>
+    );
   }
   const sel = pick != null ? g.pts[Math.min(pick, g.pts.length - 1)] : null;
-  const summary = multi
-    ? `Estimated 1RM per gym: ${g.lines.filter(l => l.pts.length).map(l => `${l.label} from about ${fmtE1rm(l.pts[0].value)} to about ${fmtE1rm(l.pts[l.pts.length - 1].value)} kg over ${l.pts.length} training days`).join('; ')}.`
-    : (() => {
-      const first = g.pts[0], last = g.pts[g.pts.length - 1];
-      return `Estimated 1RM from about ${fmtE1rm(first.value)} kg on ${dateLabel(first.date)} to about ${fmtE1rm(last.value)} kg on ${dateLabel(last.date)}, ${g.pts.length} training days, ${g.pts.filter(p => p.pb).length} with a real PB set.`;
-    })();
+  const multi = g.lines.length > 1;
+  const noTrend = g.lines.every(l => !l.paths.length);
+  const aria = `Estimated 1RM chart, ${g.pts.length} sessions${multi ? ` across ${g.lines.length} gyms` : ''}. `
+    + g.lines.filter(l => l.pts.length).map(l => `${multi ? `${l.label}: ` : ''}from ${est(l.pts[0].value)} kg on ${dateLabel(l.pts[0].date)} to ${est(l.pts[l.pts.length - 1].value)} kg on ${dateLabel(l.pts[l.pts.length - 1].date)}`).join('; ')
+    + `. ${g.pts.filter(p => p.pb).length} sessions with a real PB set${noTrend ? '. Needs 3 day sessions for a trend.' : `. Trend: ${TREND_WINDOW}-session median of day sessions.`}`;
 
   const nearest = ev => {
     const box = ev.currentTarget.getBoundingClientRect();
-    const x = ev.clientX - box.left, y = ev.clientY - box.top;
+    const x = ev.clientX - box.left;
     let best = 0, bd = Infinity;
-    g.pts.forEach((p, i) => { const d = Math.abs(p.x - x) + (multi ? Math.abs(p.y - y) * 0.35 : 0); if (d < bd) { bd = d; best = i; } });
+    g.pts.forEach((p, i) => { const d = Math.abs(p.x - x); if (d < bd) { bd = d; best = i; } });
     setPick(best);
   };
   const onKey = e => {
     if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
       e.preventDefault();
-      setPick(p => {
-        const cur = p == null ? g.pts.length - 1 : p;
-        return Math.max(0, Math.min(g.pts.length - 1, cur + (e.key === 'ArrowLeft' ? -1 : 1)));
-      });
+      setPick(p => { const cur = p == null ? g.pts.length - 1 : p; return Math.max(0, Math.min(g.pts.length - 1, cur + (e.key === 'ArrowLeft' ? -1 : 1))); });
     } else if (e.key === 'Home') { e.preventDefault(); setPick(0); }
     else if (e.key === 'End') { e.preventDefault(); setPick(g.pts.length - 1); }
-    else if (e.key === 'Escape') setPick(null);
+    else if (e.key === 'Escape' && pick != null) { e.stopPropagation(); setPick(null); }
   };
+  const readout = sel
+    ? <>
+        <b className="lf-num">{dateLabel(sel.date)}</b>
+        {multi && <span className="lh-gymtag">{sel.glabel}</span>}
+        <span className="lf-num">{realSetText(sel.entry.weight, sel.entry.reps, lift)}</span>
+        <span className="lh-ro-est lf-num">est. {est(sel.value)}{sel.loose ? ' (6–12 reps)' : ''}</span>
+        {sel.pb && <span className="lh-ro-pb">◆ PB set</span>}
+        {sel.night && <span className="lh-ro-night">☾ night</span>}
+      </>
+    : <span className="lh-ro-sum">{noTrend ? `${summary ? `${summary} · ` : ''}needs 3 sessions for a trend` : summary}</span>;
 
   return (
-    <div ref={ref} className={`lf-chart${multi ? ' is-multi' : ''}`}>
-      <svg width={width} height={H} role="img" aria-label={summary} tabIndex={0} onKeyDown={onKey}
-           onPointerMove={nearest} onPointerDown={nearest} onPointerLeave={e => { if (e.pointerType === 'mouse') setPick(null); }}>
-        <g className="lf-grid">
-          {g.ticks.map(v => (
+    <div ref={ref} className="lh-chart" data-testid="lh-chart">
+      <div className="lh-readout" aria-live="polite" data-testid="lh-readout">{readout}</div>
+      <svg width={W} height={H} role="img" aria-label={aria} tabIndex={0} onKeyDown={onKey} className="lh-chart-svg"
+           onPointerMove={nearest} onPointerDown={nearest}
+           onPointerUp={e => { if (e.pointerType !== 'mouse') setPick(null); }}
+           onPointerLeave={() => setPick(null)} onPointerCancel={() => setPick(null)} onBlur={() => setPick(null)}>
+        <g className="lh-cgrid">
+          {g.tk.ticks.map(v => (
             <g key={v}>
-              <line x1={pad.l} x2={width - pad.r} y1={g.Y(v)} y2={g.Y(v)} />
-              <text x={pad.l - 8} y={g.Y(v)} dy="0.35em" textAnchor="end">{Math.round(v)}</text>
+              <line x1={pad.l} x2={W - pad.r + 4} y1={g.Y(v)} y2={g.Y(v)} />
+              <text className="lh-tick" x={W - pad.r + 8} y={g.Y(v)} dy="0.35em">{fmtKg(v)}</text>
             </g>
           ))}
           {g.mt.map(t => (
-            <text key={t.n} className="lf-xlbl" x={g.X(t.n)} y={H - 8} textAnchor="middle">
-              {t.m === 0 ? String(t.y) : MONTHS[t.m]}
-            </text>
+            <text key={t.n} className="lh-xlbl" x={g.X(t.n)} y={H - 6} textAnchor="middle">{t.m === 0 ? String(t.y) : MONTHS[t.m]}</text>
           ))}
         </g>
-        {g.lines.map(l => <path key={`l${l.k}`} className={`lf-line is-g${l.k}`} d={l.line} />)}
-        {g.lines.map(l => l.pts.map(p => (
-          <Mark key={`${l.k}-${p.date}`} shape={l.shape} x={p.x} y={p.y} r={p.pb ? 4.6 : multi ? 3.2 : 2.8}
-                className={`lf-pt is-g${l.k}${p.night ? ' is-night' : ''}${p.pb ? ' is-pb' : ''}${sel && sel === p ? ' is-sel' : ''}`} />
-        )))}
-        {sel && <line className="lf-cross" x1={sel.x} x2={sel.x} y1={pad.t} y2={H - pad.b} />}
-        <text className="lf-unit" x={pad.l - 8} y={11} textAnchor="end">kg</text>
+        {g.lines.map(l => l.paths.map((d, i) => <path key={`t${l.k}-${i}`} className={`lh-trend${l.accent ? ' is-accent' : ''}`} d={d} />))}
+        {g.lines.map(l => l.pts.map(p => {
+          if (p.night) return <circle key={`${l.k}-${p.key}`} className="lh-pt-night" cx={p.x} cy={p.y} r="4" />;
+          if (p.pb) return <path key={`${l.k}-${p.key}`} className="lh-pt-pb" d={`M${p.x} ${p.y - 5}L${p.x + 5} ${p.y}L${p.x} ${p.y + 5}L${p.x - 5} ${p.y}Z`} />;
+          return <circle key={`${l.k}-${p.key}`} className={`lh-pt${l.accent ? ' is-accent' : ''}${p.loose ? ' is-loose' : ''}`} cx={p.x} cy={p.y} r={p.loose ? 2.5 : 2} />;
+        }))}
+        {g.lines.filter(l => l.end).map(l => (
+          <text key={`e${l.k}`} className={`lh-endlbl${l.accent ? ' is-accent' : ''}`} x={g.X(l.end.n)} y={l.endY} dy="0.35em" textAnchor="end">
+            {multi ? `${l.label} ` : ''}{est(l.end.value)}
+          </text>
+        ))}
+        {sel && <line className="lh-rule" x1={sel.x} x2={sel.x} y1={pad.t} y2={H - pad.b} />}
+        {sel && <circle className="lh-sel" cx={sel.x} cy={sel.y} r="6" />}
       </svg>
-      <div className="lf-chart-read" aria-live="polite">
-        {sel ? (
-          <>
-            <b>{dateLabel(sel.date)}{multi ? ` · ${sel.gymLabel}` : ''}</b>
-            <span>{setText(sel.entry, lift)} · est. 1RM ~{fmtE1rm(sel.value)} kg</span>
-            {sel.pb && sel.evs.map(ev => (
-              <span key={ev.entry.id} className="lf-tag is-pb">PB {setText(ev.entry, lift)} · {pbHeadline(ev)}</span>
-            ))}
-            {sel.night && <span className="lf-tag is-night">night shift · 80% load</span>}
-          </>
-        ) : (
-          <span className="lf-legend">
-            {multi ? g.lines.map(l => (
-              <span key={`k${l.k}`} data-testid="lf-gym-key">
-                <svg className="lf-key-svg" width="22" height="12" aria-hidden="true">
-                  <line className={`lf-line is-g${l.k}`} x1="1" x2="21" y1="6" y2="6" />
-                  <Mark shape={l.shape} x={11} y={6} r={3.4} className={`lf-pt is-g${l.k}`} />
-                </svg>
-                {l.label}
-              </span>
-            )) : <span><i className="lf-key is-line" />Estimated 1RM</span>}
-            <span><i className="lf-key is-pb" />Real PB set that day</span>
-            <span><i className="lf-key is-night" />Night shift · 80% load</span>
-          </span>
-        )}
-      </div>
+      <p className="lh-key" aria-hidden="true">
+        <span><i className="lh-key-pb">◆</i> PB set</span>
+        <span><i className="lh-key-day">●</i> day session</span>
+        <span><i className="lh-key-night">○</i> night 80 %</span>
+        <span><i className="lh-key-trend" /> trend (day)</span>
+      </p>
     </div>
   );
 }

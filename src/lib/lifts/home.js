@@ -213,6 +213,9 @@ export function agoShort(iso, today) {
 export const TREND_WINDOW = 5;
 export const GAP_DAYS = 28;
 
+/** The session a set belongs to: its workout, or (Quick log) its day at its gym. */
+export const sessionKey = e => (e && e.sessionId ? `s:${e.sessionId}` : `d:${e ? e.date : ''}:${gymOf(e) || ''}`);
+
 /**
  * One estimate per session (a workout, or a Quick-log day): the best
  * e1RM among its WORKING sets of 1–12 reps (warm-ups and > 12 reps make
@@ -227,7 +230,7 @@ export function sessionE1rms(sets, lift, { bwOf } = {}) {
     if (r == null || r > LOW_CONFIDENCE_REPS) continue;
     const v = entryE1rm(e, lift, bwKg(e.date));
     if (v == null) continue;
-    const key = e.sessionId ? `s:${e.sessionId}` : `d:${e.date}:${gymOf(e) || ''}`;
+    const key = sessionKey(e);
     const cur = byKey.get(key);
     if (!cur || v > cur.value + 1e-9) {
       byKey.set(key, { key, date: e.date, n: dayNo(e.date), value: v, entry: e, night: e.shift === 'night', gym: gymOf(e), loose: r >= 6 });
@@ -266,6 +269,24 @@ export function trendSegments(points, { k = TREND_WINDOW, gap = GAP_DAYS } = {})
   return splitByGap(day, gap).map(run => run.map((p, i) => ({
     n: p.n, date: p.date, value: median(run.slice(Math.max(0, i - k + 1), i + 1).map(q => q.value)),
   })));
+}
+
+/**
+ * The est. 1RM tile's change over DAY sessions only: the latest trend value
+ * against the trend about `weeks` earlier → { delta, weeks, lastNight }.
+ * `delta` is null with fewer than 3 day sessions. `lastNight`: the most
+ * recent session was a night one (the tile says the trend skips it).
+ */
+export function trendDelta(points, { weeks = 12, k = TREND_WINDOW, gap = GAP_DAYS } = {}) {
+  const pts = points || [];
+  const lastNight = !!(pts.length && pts[pts.length - 1].night);
+  const flat = trendSegments(pts, { k, gap }).flat();
+  if (flat.length < 3) return { delta: null, weeks, lastNight };
+  const last = flat[flat.length - 1];
+  let base = flat[0];
+  for (const p of flat) if (p.n <= last.n - weeks * 7) base = p;
+  if (base === last) return { delta: null, weeks, lastNight };
+  return { delta: Math.round((last.value - base.value) * 10) / 10, weeks: Math.max(1, Math.round((last.n - base.n) / 7)), lastNight };
 }
 
 /** Round, readable Y ticks (3–4) for [lo, hi] → { lo, hi, step, ticks }. */

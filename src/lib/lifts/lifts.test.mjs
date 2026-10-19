@@ -19,6 +19,7 @@ import { PROGRAMME } from '../../data/trainingProgramme.js';
 import {
   weekPlan, dayDetail, blockPips, nextTraining, dayWord, sessionE1rms, trendSegments, splitByGap, median, niceTicks, repMaxRows, predictWeight,
   perGymBests, orderGyms, sparkPoints, groupLifts, agoShort, resolveLogDate, dateChipLabel, monthGrid, addMonths,
+  trendDelta, sessionKey, lastSessionSummary,
 } from './home.js';
 import { weekStrip, planStrip } from './workout.js';
 
@@ -554,6 +555,30 @@ t('date helpers', () => {
     const tk = niceTicks(183, 247);
     assert.ok(tk.ticks.length >= 3 && tk.ticks.length <= 5 && [10, 20, 25].includes(tk.step), `round ticks ${JSON.stringify(tk)}`);
     assert.ok(tk.lo <= 183 && tk.hi >= 247);
+  });
+  t('trendDelta: day sessions only; a night last session is flagged, never a drop', () => {
+    const sets = [];
+    for (let i = 0; i < 16; i++) sets.push(CH(`2026-0${i < 8 ? 6 : 7}-${String((i % 8) * 3 + 1).padStart(2, '0')}`, 100 + i, 1));
+    const pts = sessionE1rms(sets, PRESS);
+    const d = trendDelta(pts, { weeks: 4 });
+    assert.ok(d.delta > 0, `rising trend ${JSON.stringify(d)}`);
+    assert.equal(d.lastNight, false);
+    const withNight = sessionE1rms([...sets, CH('2026-07-30', 60, 1, { shift: 'night' })], PRESS);
+    const dn = trendDelta(withNight, { weeks: 4 });
+    assert.equal(dn.lastNight, true);
+    assert.equal(dn.delta, d.delta, 'the light night session does not move the trend');
+    assert.equal(trendDelta(pts.slice(0, 2)).delta, null, 'fewer than 3 day sessions: no delta');
+    assert.equal(sessionKey({ sessionId: 'w1', date: '2026-01-01' }), 's:w1');
+    assert.equal(sessionKey({ date: '2026-01-01', gym: 'dxc' }), 'd:2026-01-01:dxc');
+  });
+  t('lastSessionSummary: top working set + like-for-like delta (night vs night)', () => {
+    const mk = (id, date, shift, w) => ({ id, date, startedAt: 1, finishedAt: 2, name: 'Push', shift, exercises: [{ liftId: 'lp', sets: [{ weight: w * 2, reps: 10, type: 'W', done: true }, { weight: w, reps: 8, done: true }, { weight: w + 50, reps: 8, done: false }] }] });
+    const S = { lifts: { list: [PRESS], log: [], sessions: [mk('a', '2026-10-01', 'day', 100), mk('b', '2026-10-05', 'night', 80), mk('c', '2026-10-08', 'night', 82.5)] } };
+    const ls = lastSessionSummary(S, { today: '2026-10-19' });
+    assert.equal(ls.session.id, 'c');
+    assert.deepEqual(ls.rows[0].top, { weight: 82.5, reps: 8 }, 'warm-ups and unticked sets never count');
+    assert.equal(ls.rows[0].delta, 2.5, 'compared with the last NIGHT session, not the heavier day one');
+    assert.equal(lastSessionSummary({ lifts: { list: [], log: [], sessions: [] } }, { today: '2026-10-19' }), null);
   });
   t('repMaxRows: real sets, their estimate, and muted "(pred.)" values only where none exists', () => {
     const log = [CH('2026-05-01', 100, 5), CH('2026-05-08', 120, 3), CH('2026-05-15', 90, 8)];
