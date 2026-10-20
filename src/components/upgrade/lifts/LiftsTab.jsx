@@ -33,6 +33,7 @@ import WorkoutToday from './WorkoutToday';
 import LiftList from './LiftList';
 import WorkoutLive from './WorkoutLive';
 import FinishSheet from './FinishSheet';
+import HistoryCard from './HistoryCard';
 import { liftsLinkedTrackers, linkTrackerToLifts } from '../../../lib/trackers/autoLog';
 import NewWorkoutSheet from './workout/NewWorkoutSheet';
 import { takeLiftsResume, onLiftsResume } from '../../../lib/lifts/liveBus';
@@ -251,6 +252,7 @@ export default function LiftsTab({ S, update, hydrated = true }) {
                         onStart={startSuggested} onBuild={buildOwn} onResume={goWorkout} onDiscard={discard}
                         onQuickLog={() => setSheet({ kind: 'log' })} canQuickLog={inUse.length > 0}
                         gyms={activeGymList} gym={curGym} onGym={pickGym} gymName={gymName} />
+          <HistoryCard S={S} update={update} today={calendarToday} />
           <LiftList list={lifts.list} summaries={summaries} counts={counts} today={today} activeGym={active && active.gym ? active.gym : curGym}
                     gymOrder={gymOrder} gymName={gymName} bwOf={bwOf} pbsMonth={totals.pbsMonth}
                     onOpen={openLift} onLog={id => setSheet({ kind: 'log', liftId: id })} onQuickLog={() => setSheet({ kind: 'log' })}
