@@ -58,7 +58,7 @@ html[data-design="console"] .cx-track-board { padding: 10px 8px 6px; }
 }
 html[data-design="console"] .cx-track-bar { display: flex; align-items: center; gap: 4px; margin: 0 0 10px; min-width: 0; }
 html[data-design="console"] .cx-track-title {
-  margin: 0; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  margin: 0; min-width: 0; flex: 0 0 auto; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
   font: 600 var(--cx-fs-17)/var(--cx-lh-17) var(--cx-sans); color: var(--cx-text);
 }
 @media (min-width: 1024px) {
@@ -258,10 +258,12 @@ html[data-design="console"] .cx-track-year .cx-track-legend i { width: 12px; hei
 html[data-design="console"] .cx-track-year .cx-track-legend i.is-trip { background: var(--cx-mid); }
 html[data-design="console"] .cx-track-year .cx-track-legend i.is-span { background: color-mix(in srgb, var(--cx-mid) 45%, var(--cx-s2)); }
 html[data-design="console"] .cx-track-foot {
-  display: flex; align-items: center; gap: 8px; margin: 10px 0 0;
+  display: flex; align-items: center; flex-wrap: wrap; gap: 6px 16px; margin: 10px 0 0;
   font: 400 var(--cx-fs-12)/var(--cx-lh-12) var(--cx-sans); color: var(--cx-muted);
 }
-html[data-design="console"] .cx-track-foot > i { flex: none; width: 16px; height: 3px; border-radius: 2px; background: var(--cx-accent-fill); }
+html[data-design="console"] .cx-track-foot > p { display: flex; align-items: center; gap: 8px; margin: 0; min-width: 0; }
+html[data-design="console"] .cx-track-foot > p > i { flex: none; width: 16px; height: 3px; border-radius: 2px; background: var(--cx-accent-fill); }
+html[data-design="console"] .cx-track-foot > .cx-track-legend.is-inline { margin: 0; }
 
 /* ── Day panel (agenda + trackers) ── */
 html[data-design="console"] .cx-track-day { padding: 4px 16px 6px; }

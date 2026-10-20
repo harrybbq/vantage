@@ -90,13 +90,26 @@ html[data-design="console"] .cx-sweep-scope :is(button, input, select, textarea)
 /* Wrappers round a classic .section stay out of its layout. */
 html[data-design="console"] :is(.cx-sweep-shop, .cx-sweep-achievements) { display: contents; }
 /* Classic page headers inside a bridged screen: the eyebrow goes
-   ("Progress Map", "Break the Cycle"), the Playfair title becomes the
-   console page title. */
+   ("Progress Map", "Break the Cycle"), and so does the Playfair title's
+   text ("Achievement Board", "Shopping List"): the shell's bar already
+   prints the page title, so the page does not say it twice. Only the
+   title's SectionHelp "?" stays, at its own size. */
 html[data-design="console"] .cx-sweep-scope :is(.eyebrow, .m-section-eyebrow) { display: none; }
 html[data-design="console"] .cx-sweep-scope :is(.sec-title, .m-section-title) {
-  font: 600 var(--cx-fs-28)/var(--cx-lh-28) var(--cx-sans);
+  font: 600 0/0 var(--cx-sans);
+  font-size: 0 !important; /* beats classic's phone .sec-title !important (index.css) */
+  line-height: 0 !important;
   color: var(--cx-text);
-  letter-spacing: -0.01em !important;
+  letter-spacing: 0 !important;
+}
+html[data-design="console"] .cx-sweep-scope :is(.sec-title, .m-section-title) .section-help-wrap {
+  font: 400 var(--cx-fs-13)/var(--cx-lh-13) var(--cx-sans);
+}
+/* On a phone a "?" alone would cost a whole row above the toolbar, so the
+   classic title goes entirely there (its help with it; the tour covers the
+   page). Desktop keeps the "?" at the head of the toolbar. */
+@media (max-width: 768px) {
+  html[data-design="console"] .cx-sweep-scope :is(.sec-title, .m-section-title) { display: none !important; }
 }
 /* Classic `//` prefixes drawn by CSS. */
 html[data-design="console"] .cx-sweep-scope :is(.fc-panel-label, .link-island-name, .hub-canvas-panel-label)::before { content: none; display: none; }

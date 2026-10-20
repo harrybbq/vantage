@@ -198,12 +198,6 @@ export default function ConsoleTrack({
                 <Button variant="ghost" iconOnly icon="chevron-right" label={`Next ${unit}`} onClick={() => step(1)} />
                 {wide && <Button className="cx-track-todaybtn" onClick={goToday}>Today</Button>}
                 <span className="cx-track-sp" />
-                {wide && view === 'month' && (
-                  <span className="cx-track-legend is-inline" aria-hidden="true">
-                    {['training', 'social', 'appointment'].map(k => <span key={k}><i style={{ background: kindColour(k) }} />{EVENT_KINDS.find(x => x.id === k).label}</span>)}
-                    <span><i className="is-bill" />Bills</span>
-                  </span>
-                )}
                 {owner && wide && shiftToggle}
                 {wide
                   ? <Segmented label="Calendar view" options={VIEWS} value={view} onChange={setView} className="cx-track-views" />
@@ -225,9 +219,15 @@ export default function ConsoleTrack({
                           onOpenMonth={m => { setView('month'); setAnchor(isoOf(ay, m, 1)); }} />
               )}
               {wide && view !== 'year' && (
-                <p className="cx-track-foot">
-                  <i aria-hidden="true" />The line under a day is how many trackers you ticked. Trips and multi-day events run across the days they cover.
-                </p>
+                <div className="cx-track-foot">
+                  {view === 'month' && (
+                    <span className="cx-track-legend is-inline" aria-hidden="true">
+                      {['training', 'social', 'appointment'].map(k => <span key={k}><i style={{ background: kindColour(k) }} />{EVENT_KINDS.find(x => x.id === k).label}</span>)}
+                      <span><i className="is-bill" />Bills</span>
+                    </span>
+                  )}
+                  <p><i aria-hidden="true" />The line under a day is how many trackers you ticked. Trips and multi-day events run across the days they cover.</p>
+                </div>
               )}
             </Panel>
             {!wide && view !== 'year' && (
