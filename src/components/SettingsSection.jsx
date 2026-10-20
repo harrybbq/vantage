@@ -32,6 +32,13 @@ const WebAccessPanel = OWNER_SURFACES_IN_BUILD
   ? lazy(() => import('./webaccess/WebAccessPanel'))
   : null;
 
+// Owner-only Design switch (Classic / New preview — the console redesign,
+// src/design/console/README.md). Compiled out of native builds the same
+// way; renders nothing unless useIsOwner. Owned by the design foundation.
+const DesignSwitch = OWNER_SURFACES_IN_BUILD
+  ? lazy(() => import('../design/DesignSwitch'))
+  : null;
+
 // Small helper: inline icon + label for the Tools/Data action buttons.
 const IconLabel = ({ name, children, size = 15 }) => (
   <span style={{ display: 'inline-flex', alignItems: 'center', gap: 7 }}><Icon name={name} size={size} />{children}</span>
@@ -834,6 +841,13 @@ export default function SettingsSection({ S, update, active, userId, userEmail, 
             </p>
           )}
         </SettingsGroup>
+
+        {/* Design: Classic / New (preview). Owner-only, absent from native. */}
+        {DesignSwitch && (
+          <Suspense fallback={null}>
+            <DesignSwitch S={S} update={update} userId={userId} />
+          </Suspense>
+        )}
 
         {/* The "Control panel add-ons" group stood here — one checkbox,
             for the hub's cardio calculator, under a heading that promised

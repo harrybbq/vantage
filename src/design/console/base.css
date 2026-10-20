@@ -1,0 +1,381 @@
+/* ════════════════════════════════════════════════════════════════════
+   Console base + the shared cx- component family.
+
+   Every selector starts with html[data-design="console"] (see tokens.css
+   and README.md). This file owns: the page ground (body), removal of the
+   classic body-level decoration, type utilities, and the one family of
+   controls: .cx-btn · .cx-check · .cx-chip · .cx-seg · .cx-input ·
+   .cx-panel · .cx-sheet · .cx-wf (WidgetFrame). The React primitives in
+   ui.jsx render these classes; plain markup may use them directly.
+   ════════════════════════════════════════════════════════════════════ */
+
+/* ── Ground ──
+   Classic paints body with radial accent glows (index.css, hub-dark.css
+   `html[data-hub-os] body`), a CRT scan-line layer (hub-dark.css
+   `body::before`) and a noise layer at z-index 999 (index.css
+   `body::after`). Same specificity as the hub-dark rule; this file is
+   imported after every classic sheet (main.jsx) so it wins — verified on
+   computed styles, not by reading selectors. */
+html[data-design="console"] body {
+  background: var(--cx-bg);
+  background-attachment: scroll;
+  color: var(--cx-text);
+  font-family: var(--cx-sans);
+  font-feature-settings: normal;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+html[data-design="console"] body::before,
+html[data-design="console"] body::after {
+  content: none;
+  display: none;
+  background: none;
+}
+html[data-design="console"] ::selection { background: var(--cx-accent-tint); color: var(--cx-text); }
+
+/* ── Type utilities (sizes from the one scale; no other sizes) ── */
+html[data-design="console"] .cx-t12 { font-size: var(--cx-fs-12); line-height: var(--cx-lh-12); }
+html[data-design="console"] .cx-t13 { font-size: var(--cx-fs-13); line-height: var(--cx-lh-13); }
+html[data-design="console"] .cx-t15 { font-size: var(--cx-fs-15); line-height: var(--cx-lh-15); }
+html[data-design="console"] .cx-t17 { font-size: var(--cx-fs-17); line-height: var(--cx-lh-17); }
+html[data-design="console"] .cx-t22 { font-size: var(--cx-fs-22); line-height: var(--cx-lh-22); }
+html[data-design="console"] .cx-t28 { font-size: var(--cx-fs-28); line-height: var(--cx-lh-28); }
+html[data-design="console"] .cx-t40 { font-size: var(--cx-fs-40); line-height: var(--cx-lh-40); }
+/* Numerals only. Words never go in mono. */
+html[data-design="console"] .cx-num {
+  font-family: var(--cx-mono);
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.01em;
+}
+/* The one mono eyebrow — at most once per screen. */
+html[data-design="console"] .cx-eyebrow {
+  font: 500 var(--cx-fs-12)/var(--cx-lh-12) var(--cx-mono);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--cx-muted);
+}
+html[data-design="console"] .cx-muted { color: var(--cx-muted); }
+html[data-design="console"] .cx-mid { color: var(--cx-mid); }
+html[data-design="console"] .cx-accent { color: var(--cx-accent); }
+html[data-design="console"] .cx-gold { color: var(--cx-gold); }
+html[data-design="console"] .cx-night { color: var(--cx-night); }
+html[data-design="console"] .cx-danger { color: var(--cx-danger); }
+
+/* ── Panel ── */
+html[data-design="console"] .cx-panel {
+  background: var(--cx-s1);
+  border: 1px solid var(--cx-line);
+  border-radius: var(--cx-r-panel);
+  box-shadow: var(--cx-shadow);
+  color: var(--cx-text);
+  min-width: 0;
+}
+
+/* ── Buttons: primary (accent fill) · secondary (line-strong outline) · ghost (text) ── */
+html[data-design="console"] .cx-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--cx-sp-8);
+  height: var(--cx-control-h);
+  min-width: var(--cx-control-h);
+  padding: 0 var(--cx-sp-16);
+  box-sizing: border-box;
+  border-radius: var(--cx-r-cell);
+  border: 1px solid var(--cx-line-strong);
+  background: transparent;
+  color: var(--cx-text);
+  font: 600 var(--cx-fs-15)/1 var(--cx-sans);
+  letter-spacing: normal;
+  text-transform: none;           /* sentence case: write the label that way */
+  white-space: nowrap;
+  cursor: pointer;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+  transition: background-color var(--cx-dur-fast) var(--cx-ease), border-color var(--cx-dur-fast) var(--cx-ease), color var(--cx-dur-fast) var(--cx-ease);
+}
+html[data-design="console"] .cx-btn:hover:not(:disabled) { background: var(--cx-s2); }
+html[data-design="console"] .cx-btn--primary {
+  background: var(--cx-accent-fill);
+  border-color: var(--cx-accent-fill);
+  color: var(--cx-on-accent);
+}
+html[data-design="console"] .cx-btn--primary:hover:not(:disabled) { background: var(--cx-accent-fill); filter: brightness(1.08); }
+html[data-design="console"] .cx-btn--ghost { border-color: transparent; color: var(--cx-mid); }
+html[data-design="console"] .cx-btn--ghost:hover:not(:disabled) { color: var(--cx-text); }
+html[data-design="console"] .cx-btn--danger { border-color: var(--cx-danger); color: var(--cx-danger); }
+html[data-design="console"] .cx-btn--block { display: flex; width: 100%; }
+html[data-design="console"] .cx-btn--icon { padding: 0; width: var(--cx-control-h); }
+html[data-design="console"] .cx-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+@media (pointer: coarse) {
+  html[data-design="console"] .cx-btn { height: 48px; min-width: 48px; }
+  html[data-design="console"] .cx-btn--icon { width: 48px; }
+}
+
+/* Focus: one ring for every cx- control. */
+html[data-design="console"] .cx-btn:focus-visible,
+html[data-design="console"] .cx-check:focus-visible,
+html[data-design="console"] .cx-chip:focus-visible,
+html[data-design="console"] .cx-seg-opt:focus-visible,
+html[data-design="console"] .cx-input:focus-visible,
+html[data-design="console"] .cx-sheet-x:focus-visible {
+  outline: 2px solid var(--cx-accent);
+  outline-offset: 2px;
+}
+
+/* ── Checkbox: one 20 px rounded square, everywhere ──
+   The visual box is 20 px; ::after widens the hit area to 44 px. */
+html[data-design="console"] .cx-check {
+  position: relative;
+  flex: none;
+  display: inline-grid;
+  place-items: center;
+  width: var(--cx-check);
+  height: var(--cx-check);
+  padding: 0;
+  margin: 0;
+  box-sizing: border-box;
+  border-radius: var(--cx-r-chip);
+  border: 1.5px solid var(--cx-line-strong);
+  background: transparent;
+  color: var(--cx-on-accent);
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition: background-color var(--cx-dur-fast) var(--cx-ease), border-color var(--cx-dur-fast) var(--cx-ease);
+}
+html[data-design="console"] .cx-check::after { content: ''; position: absolute; inset: -12px; }
+html[data-design="console"] .cx-check[aria-checked="true"] { background: var(--cx-accent-fill); border-color: var(--cx-accent-fill); }
+html[data-design="console"] .cx-check > svg { opacity: 0; transition: opacity var(--cx-dur-fast) var(--cx-ease); }
+html[data-design="console"] .cx-check[aria-checked="true"] > svg { opacity: 1; }
+html[data-design="console"] .cx-check:disabled { opacity: 0.5; cursor: not-allowed; }
+html[data-design="console"] .cx-check-label {
+  display: inline-flex; align-items: center; gap: var(--cx-sp-12);
+  min-height: 44px; cursor: pointer;
+  font: 400 var(--cx-fs-15)/var(--cx-lh-15) var(--cx-sans); color: var(--cx-text);
+}
+
+/* ── Chip: 28 px, radius 6 ── */
+html[data-design="console"] .cx-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: var(--cx-chip-h);
+  padding: 0 10px;
+  box-sizing: border-box;
+  border-radius: var(--cx-r-chip);
+  border: 1px solid var(--cx-line);
+  background: var(--cx-s1);
+  color: var(--cx-mid);
+  font: 500 var(--cx-fs-13)/1 var(--cx-sans);
+  white-space: nowrap;
+}
+html[data-design="console"] button.cx-chip { cursor: pointer; -webkit-tap-highlight-color: transparent; }
+html[data-design="console"] .cx-chip[aria-pressed="true"],
+html[data-design="console"] .cx-chip.is-on {
+  background: var(--cx-accent-tint);
+  border-color: var(--cx-accent);
+  color: var(--cx-text);
+}
+
+/* ── Segmented control: raised selected segment ── */
+html[data-design="console"] .cx-seg {
+  display: flex;
+  gap: 2px;
+  padding: 3px;
+  box-sizing: border-box;
+  border-radius: var(--cx-r-cell);
+  background: var(--cx-s2);
+  border: 1px solid var(--cx-line);
+  min-width: 0;
+}
+html[data-design="console"] .cx-seg-opt {
+  flex: 1 1 0;
+  min-width: 0;
+  height: 32px;
+  padding: 0 var(--cx-sp-12);
+  border: 0;
+  border-radius: var(--cx-r-chip);
+  background: transparent;
+  color: var(--cx-muted);
+  font: 600 var(--cx-fs-13)/1 var(--cx-sans);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition: background-color var(--cx-dur-fast) var(--cx-ease), color var(--cx-dur-fast) var(--cx-ease);
+}
+html[data-design="console"] .cx-seg-opt[aria-checked="true"] {
+  background: var(--cx-s1);
+  color: var(--cx-text);
+  box-shadow: 0 0 0 1px var(--cx-line);
+}
+html[data-design="console"] .cx-seg-opt:disabled { opacity: 0.5; cursor: not-allowed; }
+@media (pointer: coarse) {
+  html[data-design="console"] .cx-seg-opt { height: 40px; }
+}
+
+/* ── Input: 48 px on s2 with a line-strong border ──
+   `:not(#cx-id)` adds ID-level specificity on purpose: hub-dark.css styles
+   EVERY input/textarea/select under Dark OS with
+   `html[data-theme="dark-os"] input:not(…):not(…):not(…):not(…)` —
+   specificity (0,5,2), which beats a plain scoped class (0,2,1). Measured
+   in the harness (bg/border/colour were classic's) before this was added.
+   It is the only element-type rule in the classic sheets. */
+html[data-design="console"] .cx-input:not(#cx-id) {
+  display: block;
+  width: 100%;
+  height: var(--cx-input-h);
+  padding: 0 14px;
+  box-sizing: border-box;
+  border-radius: var(--cx-r-cell);
+  border: 1px solid var(--cx-line-strong);
+  background: var(--cx-s2);
+  color: var(--cx-text);
+  font: 400 16px/22px var(--cx-sans); /* 16 px, not 15: iOS zooms the page on focus below 16 */
+  transition: border-color var(--cx-dur-fast) var(--cx-ease);
+}
+html[data-design="console"] textarea.cx-input:not(#cx-id) { height: auto; min-height: 96px; padding: 12px 14px; resize: vertical; }
+html[data-design="console"] .cx-input:not(#cx-id)::placeholder { color: var(--cx-muted); opacity: 1; }
+html[data-design="console"] .cx-input:not(#cx-id):focus { border-color: var(--cx-accent); outline: none; }
+html[data-design="console"] .cx-field { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+html[data-design="console"] .cx-field > label,
+html[data-design="console"] .cx-label { font: 600 var(--cx-fs-13)/var(--cx-lh-13) var(--cx-sans); color: var(--cx-mid); }
+
+/* ── WidgetFrame: 16 px icon + 13/600 title + right-aligned 12 px meta ──
+   data-size="small|medium|large" is for the hub grid (1×1 · 2×1 · 2×2);
+   the frame itself only sets the chrome. */
+html[data-design="console"] .cx-wf {
+  display: flex;
+  flex-direction: column;
+  gap: var(--cx-sp-12);
+  padding: 14px var(--cx-sp-16) var(--cx-sp-16);
+  box-sizing: border-box;
+  background: var(--cx-s1);
+  border: 1px solid var(--cx-line);
+  border-radius: var(--cx-r-panel);
+  box-shadow: var(--cx-shadow);
+  color: var(--cx-text);
+  min-width: 0;
+  overflow: hidden;
+}
+html[data-design="console"] .cx-wf-head {
+  display: flex;
+  align-items: center;
+  gap: var(--cx-sp-8);
+  min-height: 20px;
+  color: var(--cx-mid);
+}
+html[data-design="console"] .cx-wf-head > svg { flex: none; }
+html[data-design="console"] .cx-wf-title {
+  margin: 0;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font: 600 var(--cx-fs-13)/var(--cx-lh-13) var(--cx-sans);
+  color: var(--cx-text);
+}
+html[data-design="console"] button.cx-wf-title { background: none; border: 0; padding: 0; cursor: pointer; text-align: left; }
+html[data-design="console"] .cx-wf-meta {
+  margin-left: auto;
+  flex: none;
+  max-width: 50%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font: 400 var(--cx-fs-12)/var(--cx-lh-12) var(--cx-sans);
+  color: var(--cx-muted);
+}
+html[data-design="console"] .cx-wf-body { flex: 1 1 auto; min-width: 0; min-height: 0; display: flex; flex-direction: column; gap: var(--cx-sp-12); }
+
+/* ── Sheet: bottom sheet < 1024 px, right drawer ≥ 1024 px ──
+   Portalled to <body>, which is still under html[data-design]. */
+html[data-design="console"] .cx-sheet-root { position: fixed; inset: 0; z-index: 2000; display: flex; }
+html[data-design="console"] .cx-sheet-root.is-bottom {
+  align-items: flex-end;
+  justify-content: center;
+  box-sizing: border-box;
+  padding-bottom: var(--cx-kb, 0px);  /* rides on the iOS keyboard (useKeyboardInset) */
+}
+html[data-design="console"] .cx-sheet-root.is-right { justify-content: flex-end; }
+html[data-design="console"] .cx-sheet-root.is-nonmodal { pointer-events: none; z-index: 1950; }
+html[data-design="console"] .cx-sheet-scrim {
+  position: absolute; inset: 0;
+  background: var(--cx-scrim);
+  animation: cx-fade var(--cx-dur) var(--cx-ease);
+}
+html[data-design="console"] .cx-sheet {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+  min-height: 0;
+  pointer-events: auto;
+  background: var(--cx-s1);
+  color: var(--cx-text);
+  font-family: var(--cx-sans);
+  outline: none;
+}
+html[data-design="console"] .cx-sheet-root.is-bottom .cx-sheet {
+  width: min(640px, 100%);
+  max-height: min(88vh, calc(100dvh - 24px), calc(var(--cx-vvh, 100dvh) - 24px));
+  border-radius: var(--cx-r-sheet) var(--cx-r-sheet) 0 0;
+  border: 1px solid var(--cx-line);
+  border-bottom: 0;
+  animation: cx-up var(--cx-dur) var(--cx-ease);
+}
+html[data-design="console"] .cx-sheet-root.is-right .cx-sheet {
+  height: 100%;
+  max-width: 100vw;
+  border-left: 1px solid var(--cx-line);
+  animation: cx-in var(--cx-dur) var(--cx-ease);
+}
+html[data-design="console"] .cx-sheet-root.is-nonmodal .cx-sheet { width: min(560px, 100%); }
+html[data-design="console"] .cx-sheet-handle {
+  flex: none; display: grid; place-items: center;
+  height: 48px; margin-bottom: -16px;
+  cursor: grab; touch-action: none;
+}
+html[data-design="console"] .cx-sheet-handle > span { display: block; width: 36px; height: 4px; border-radius: 2px; background: var(--cx-line-strong); }
+html[data-design="console"] .cx-sheet-head {
+  flex: none; display: flex; align-items: center; gap: var(--cx-sp-12);
+  min-height: 52px; box-sizing: border-box; padding: 4px 6px 4px var(--cx-sp-16);
+}
+html[data-design="console"] .cx-sheet-root.is-right .cx-sheet-head { padding-top: var(--cx-sp-12); }
+html[data-design="console"] .cx-sheet-titles { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+html[data-design="console"] .cx-sheet-title {
+  margin: 0;
+  font: 600 var(--cx-fs-17)/var(--cx-lh-17) var(--cx-sans);
+  color: var(--cx-text);
+  overflow-wrap: anywhere;
+}
+html[data-design="console"] .cx-sheet-x {
+  flex: none; display: grid; place-items: center;
+  width: 44px; height: 44px; padding: 0;
+  border: 0; border-radius: var(--cx-r-cell);
+  background: transparent; color: var(--cx-mid); cursor: pointer;
+}
+html[data-design="console"] .cx-sheet-x:hover { background: var(--cx-s2); color: var(--cx-text); }
+html[data-design="console"] .cx-sheet-body {
+  flex: 1 1 auto; min-height: 0;
+  overflow-y: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch;
+  padding: var(--cx-sp-8) var(--cx-sp-16) var(--cx-sp-16);
+}
+html[data-design="console"] .cx-sheet-root.is-bottom .cx-sheet-body:last-child { padding-bottom: calc(16px + env(safe-area-inset-bottom, 0px)); }
+html[data-design="console"] .cx-sheet-foot {
+  flex: none; display: flex; flex-wrap: wrap; gap: var(--cx-sp-8);
+  padding: var(--cx-sp-12) var(--cx-sp-16) calc(12px + env(safe-area-inset-bottom, 0px));
+  border-top: 1px solid var(--cx-line);
+  background: var(--cx-s1);
+}
+html[data-design="console"] .cx-sheet-foot > * { flex: 1 1 auto; }
+@keyframes cx-up { from { transform: translateY(24px); opacity: .4; } }
+@keyframes cx-in { from { transform: translateX(32px); opacity: .4; } }
+@keyframes cx-fade { from { opacity: 0; } }
+
+@media (prefers-reduced-motion: reduce) {
+  html[data-design="console"] .cx-sheet,
+  html[data-design="console"] .cx-sheet-scrim { animation: none; }
+}
