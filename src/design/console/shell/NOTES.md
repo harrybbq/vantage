@@ -25,4 +25,4 @@ changes needed in files this area does not own (see ../README.md §7).
 
 ## After TRACK lands
 
-- Set `CONSOLE_SHOW_HOLIDAY = false` in `shell/nav.js` (and its test) once `ConsoleTrack` shows trips: Holiday then leaves the sidebar and the More sheet. The `holiday` route stays for deep links.
+- Done 2026-10-21: `CONSOLE_SHOW_HOLIDAY = false` (Track shows trips). Holiday has left the sidebar and More; the `holiday` route stays for deep links.

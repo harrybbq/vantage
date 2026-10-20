@@ -7,18 +7,18 @@
  *   TABS      the 5-tab phone bar: Hub · Track · Habits · Shop · More
  *   MORE      the rows in the phone's More sheet
  *
- * Holiday. TRACK is merging trips into Track's calendar; until that lands,
- * Holiday keeps its own entry in the sidebar and in More, so the owner never
- * loses a way to reach trips mid-build. Flip CONSOLE_SHOW_HOLIDAY to false
- * once ConsoleTrack shows trips. The 'holiday' route itself stays either
- * way (deep links, saved tabs), rendered by TRACK's ConsoleHoliday.
+ * Holiday. Trips live in Track's calendar (Calendar › Year has trips, the
+ * next trip and Visited), so Holiday has no entry of its own in the console
+ * sidebar or More. CONSOLE_SHOW_HOLIDAY brings it back if ever needed. The
+ * 'holiday' route itself stays (deep links, saved tabs, the 5 shortcut),
+ * rendered by TRACK's ConsoleHoliday as Track › Calendar › Year.
  *
  * Keyboard hints show the shortcuts that work today (useKeyboardShortcuts:
  * 1 Hub, 2 Achievements, 3 Track, 4 Shop, 5 Holiday). The Direction A mock
  * drew letters; those are not bound, so they are not shown.
  */
 
-export const CONSOLE_SHOW_HOLIDAY = true;
+export const CONSOLE_SHOW_HOLIDAY = false;
 
 const ITEM = {
   hub:          { id: 'hub',          icon: 'house',          label: 'Hub',          key: '1' },

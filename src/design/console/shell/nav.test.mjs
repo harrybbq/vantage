@@ -11,10 +11,12 @@ let n = 0;
 const t = (name, fn) => { try { fn(); n++; } catch (e) { console.error(`✗ ${name}`); throw e; } };
 const ids = list => list.map(i => i.id);
 
-t('Holiday stays reachable until TRACK merges trips into the calendar', () => {
-  assert.equal(CONSOLE_SHOW_HOLIDAY, true, 'flip only after ConsoleTrack shows trips');
-  assert.ok(ids(sidebarItems()).includes('holiday'));
-  assert.ok(ids(moreItems()).includes('holiday'));
+t('Holiday is merged into Track: no entry of its own, but it can come back', () => {
+  assert.equal(CONSOLE_SHOW_HOLIDAY, false, 'trips live in Track › Calendar');
+  assert.ok(!ids(sidebarItems()).includes('holiday'));
+  assert.ok(!ids(moreItems()).includes('holiday'));
+  assert.ok(ids(sidebarItems({ showHoliday: true })).includes('holiday'));
+  assert.ok(ids(moreItems({ showHoliday: true })).includes('holiday'));
   assert.ok(!ids(sidebarItems({ showHoliday: false })).includes('holiday'));
   assert.ok(!ids(moreItems({ showHoliday: false })).includes('holiday'));
 });
@@ -38,7 +40,8 @@ t('phone bar: Hub · Track · Habits · Shop, then More', () => {
 t('every section is reachable on the phone (a tab or a More row)', () => {
   const routed = ['hub', 'achievements', 'track', 'shop', 'holiday', 'habits', 'leaderboard', 'settings', 'friends'];
   const reach = new Set([...ids(TABS), ...ids(moreItems())]);
-  for (const r of routed) assert.ok(reach.has(r), r);
+  // Holiday is reached through Track (Calendar › Year), which its route lights.
+  for (const r of routed) assert.ok(reach.has(r) || (r === 'holiday' && activeTab(r) === 'track'), r);
   assert.ok(ids(moreItems({ isOwner: true })).includes('upgrade'));
   assert.ok(!ids(moreItems()).includes('upgrade'));
 });
