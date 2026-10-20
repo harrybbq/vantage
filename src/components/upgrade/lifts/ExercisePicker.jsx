@@ -12,6 +12,10 @@
  *            add sets in its block). Archived lifts are hidden.
  *   footer   "Add 2 exercises" (disabled: "Pick exercises to add") + the
  *            chosen names in one 12 px mono line.
+ *   library  under your own lifts, "More exercises": the built-in catalogue
+ *            (lib/lifts/catalogue.js) minus names you already have. Picking
+ *            one adds it pending — it joins your list once a set is ticked.
+ *            Shown under All only (Recent / In plan are your history).
  *   empty    "No match for 'trice…'" + [+ Create 'trice…'].
  *   Create   Name · Loaded as [Weight | Per dumbbell | Bodyweight + added] ·
  *            Machine: compare within each gym (switch — ADDED, A8) · Muscle
@@ -33,9 +37,12 @@ import { musclesOf, MUSCLES, PROGRAMME_TEMPLATES } from '../../../lib/lifts/work
 import { perGymOf, dayNo, num } from '../../../lib/lifts/lifts';
 import { realSetText } from '../../../lib/lifts/ui';
 import { norm } from '../../../lib/lifts/muscles';
+import { catalogueFor } from '../../../lib/lifts/catalogue';
 
 const initials = name => String(name || '').split(/[\s,-]+/).filter(w => /^[a-z]/i.test(w)).slice(0, 2).map(w => w[0].toUpperCase()).join('') || '·';
 const PLAN_NAMES = new Set(PROGRAMME_TEMPLATES.flatMap(t => t.exercises.map(x => norm(x.name))));
+// Curly and straight apostrophes match each other ("captain's" finds "Captain’s").
+const fold = t => String(t || '').toLowerCase().replace(/[’‘`]/g, "'");
 const LOADS = [{ value: 'weight', label: 'Weight' }, { value: 'per_hand', label: 'Per dumbbell' }, { value: 'bodyweight_plus', label: 'Bodyweight + added' }];
 
 /** lift id → { date, weight, reps } of its last time's top working set. */
@@ -74,17 +81,22 @@ export default function ExercisePicker({
   const listRef = useRef(null);
 
   const lasts = useMemo(() => lastTimes(log), [log]);
-  const shown = useMemo(() => {
-    const needle = q.trim().toLowerCase();
+  // Pending lifts are left out of the name check, so a library exercise
+  // already in this workout still shows (tagged In workout).
+  const library = useMemo(() => catalogueFor(lifts.filter(l => !l.pending)), [lifts]);
+  const { shown, more } = useMemo(() => {
+    const needle = fold(q.trim());
+    const match = l => (!muscles.length || musclesOf(l).some(m => muscles.includes(m)))
+      && (!needle || fold(l.name).includes(needle) || musclesOf(l).some(m => m.toLowerCase().includes(needle)));
+    const byName = (a, b) => a.name.localeCompare(b.name);
     let out = lifts.filter(l => !l.archived && !l.pending);
     if (chip === 'recent') out = recent.map(id => out.find(l => l.id === id)).filter(Boolean);
     else if (chip === 'plan') out = out.filter(l => PLAN_NAMES.has(norm(l.name)));
-    if (muscles.length) out = out.filter(l => musclesOf(l).some(m => muscles.includes(m)));
-    if (needle) out = out.filter(l => l.name.toLowerCase().includes(needle) || musclesOf(l).some(m => m.toLowerCase().includes(needle)));
-    if (chip !== 'recent') out = [...out].sort((a, b) => a.name.localeCompare(b.name));
-    return out;
-  }, [lifts, recent, chip, muscles, q]);
-  const muscleChoices = MUSCLES.filter(m => m !== 'Other' && lifts.some(l => !l.archived && musclesOf(l).includes(m)));
+    out = out.filter(match);
+    if (chip !== 'recent') out = [...out].sort(byName);
+    return { shown: out, more: chip === 'all' ? library.filter(match).sort(byName) : [] };
+  }, [lifts, library, recent, chip, muscles, q]);
+  const muscleChoices = MUSCLES.filter(m => m !== 'Other' && [...lifts, ...library].some(l => !l.archived && musclesOf(l).includes(m)));
 
   const toggle = l => {
     if (exclude.includes(l.id)) { if (onNotice) onNotice(`${l.name} is already in this workout — add sets in its block`); return; }
@@ -116,7 +128,7 @@ export default function ExercisePicker({
     );
   }
 
-  const names = picked.map(id => { const l = lifts.find(x => x.id === id); return l ? l.name : ''; }).filter(Boolean);
+  const names = picked.map(id => { const l = lifts.find(x => x.id === id) || library.find(x => x.id === id); return l ? l.name : ''; }).filter(Boolean);
   const footer = mode !== 'swap' ? (
     <div className="lw-pick-foot">
       <Button variant="primary" size="lg" block disabled={!picked.length} onClick={() => onPick(picked)} data-testid="lw-pick-add">
@@ -125,6 +137,32 @@ export default function ExercisePicker({
       {names.length > 0 && <p className="lw-pick-names">{names.join(' · ')}</p>}
     </div>
   ) : null;
+
+  const renderRow = l => {
+    const n = picked.indexOf(l.id);
+    const inW = exclude.includes(l.id);
+    const ms = musclesOf(l).slice(0, 2).map(m => m.toUpperCase());
+    const machine = perGymOf(l);
+    const last = lasts.get(l.id);
+    const meta = [...ms, machine && gym ? gymName(gym) : null].filter(Boolean).join(' · ');
+    return (
+      <li key={l.id}>
+        <button type="button" className={`lw-pick-row${n >= 0 ? ' is-on' : ''}${inW ? ' is-in' : ''}`} onClick={() => toggle(l)}
+                aria-pressed={mode === 'swap' || inW ? undefined : n >= 0} data-testid="lw-pick-row">
+          <span className="lw-avatar" aria-hidden="true">{initials(l.name)}</span>
+          <span className="lw-pick-main">
+            <span className="lw-pick-name">{l.name}</span>
+            <span className="lw-pick-meta">{meta || 'NO MUSCLE TAGS'}{inW && <span className="lw-in-tag">In workout</span>}</span>
+            {last && <span className="lw-pick-last">last {agoShort(last.date, today)} · {realSetText(last.weight, last.reps, l)}</span>}
+          </span>
+          {mode !== 'swap' && !inW && (
+            <span className={`lw-tick${n >= 0 ? ' is-on' : ''}`} aria-hidden="true">{n >= 0 ? n + 1 : ''}</span>
+          )}
+          {mode === 'swap' && !inW && <Icon name="chevron-right" size={16} />}
+        </button>
+      </li>
+    );
+  };
 
   const chips = [{ id: 'all', label: 'All' }, { id: 'recent', label: 'Recent' }, { id: 'plan', label: 'In plan' }];
   return (
@@ -148,32 +186,15 @@ export default function ExercisePicker({
         </div>
       </div>
       <ul className="lw-pick-list" aria-label="Exercises" ref={listRef} onKeyDown={onListKey}>
-        {shown.map(l => {
-          const n = picked.indexOf(l.id);
-          const inW = exclude.includes(l.id);
-          const ms = musclesOf(l).slice(0, 2).map(m => m.toUpperCase());
-          const machine = perGymOf(l);
-          const last = lasts.get(l.id);
-          const meta = [...ms, machine && gym ? gymName(gym) : null].filter(Boolean).join(' · ');
-          return (
-            <li key={l.id}>
-              <button type="button" className={`lw-pick-row${n >= 0 ? ' is-on' : ''}${inW ? ' is-in' : ''}`} onClick={() => toggle(l)}
-                      aria-pressed={mode === 'swap' || inW ? undefined : n >= 0} data-testid="lw-pick-row">
-                <span className="lw-avatar" aria-hidden="true">{initials(l.name)}</span>
-                <span className="lw-pick-main">
-                  <span className="lw-pick-name">{l.name}</span>
-                  <span className="lw-pick-meta">{meta || 'NO MUSCLE TAGS'}{inW && <span className="lw-in-tag">In workout</span>}</span>
-                  {last && <span className="lw-pick-last">last {agoShort(last.date, today)} · {realSetText(last.weight, last.reps, l)}</span>}
-                </span>
-                {mode !== 'swap' && !inW && (
-                  <span className={`lw-tick${n >= 0 ? ' is-on' : ''}`} aria-hidden="true">{n >= 0 ? n + 1 : ''}</span>
-                )}
-                {mode === 'swap' && !inW && <Icon name="chevron-right" size={16} />}
-              </button>
-            </li>
-          );
-        })}
-        {!shown.length && (
+        {shown.map(renderRow)}
+        {more.length > 0 && (
+          <li className="lw-pick-sec" data-testid="lw-pick-more">
+            <p className="lf-eyebrow">More exercises</p>
+            <p className="lf-meta">Joins your list once you log a set.</p>
+          </li>
+        )}
+        {more.map(renderRow)}
+        {!shown.length && !more.length && (
           <li className="lw-pick-empty">
             <p className="lf-meta">{q.trim() ? `No match for “${q.trim()}”.` : 'Nothing here with these filters.'}</p>
             <Button variant="secondary" icon="plus" onClick={() => setCreating(true)} data-testid="lw-pick-create-q">Create {q.trim() ? `“${q.trim()}”` : 'an exercise'}</Button>

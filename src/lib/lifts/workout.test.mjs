@@ -19,6 +19,8 @@ import {
   planProgress, miniBarModel, livePbSets, nightComparison, estimateRise,
 } from './workout.js';
 import { pbTimeline, personalBests } from './lifts.js';
+import { CATALOGUE, catId, catalogueFor, catalogueEntry } from './catalogue.js';
+import { LOAD_TYPES } from './lifts.js';
 import { proposeAutoLogs, applyAutoLogs } from '../trackers/autoLog.js';
 import { PROGRAMME, SESSION_CODES } from '../../data/trainingProgramme.js';
 
@@ -901,6 +903,68 @@ t('night override: on and off again restores the rota shift; Previous follows', 
   const back = activeOf(setWorkoutShift(N, 'day'));
   assert.deepEqual([back.shift, 'shiftWas' in back], ['early', false]);
   assert.equal(activeOf(toggleDone(N, 0, 0, 1)).exercises[0].sets[0].weight, 145, 'night Previous at once');
+});
+
+
+// ── The exercise library (catalogue) ──
+t('the catalogue is well formed and never repeats the programme', () => {
+  const idsSeen = new Set();
+  const progNames = new Set(Object.keys(PROGRAMME_MUSCLES).map(x => x.toLowerCase()));
+  for (const c of CATALOGUE) {
+    assert.ok(/^cat-[a-z0-9-]+$/.test(c.id), `${c.name}: id`);
+    assert.ok(!idsSeen.has(c.id), `${c.name}: unique id`); idsSeen.add(c.id);
+    assert.ok(LOAD_TYPES.includes(c.load), `${c.name}: load`);
+    assert.ok(c.muscles.length && c.muscles.every(m => MUSCLES.includes(m)), `${c.name}: muscles`);
+    assert.ok(!progNames.has(c.name.toLowerCase()), `${c.name}: already in the programme`);
+    assert.ok(c.name.length <= 60, `${c.name}: name fits`);
+  }
+  assert.ok(CATALOGUE.filter(c => c.muscles.includes('Abs')).length >= 15, 'a real abs section');
+  assert.equal(catId('Captain’s chair knee raise'), 'cat-captains-chair-knee-raise');
+  assert.equal(catalogueEntry('cat-captains-chair-knee-raise').load, 'bodyweight_plus');
+  const offered = catalogueFor([{ id: 'x', name: 'pull-up' }, { id: 'y', name: 'Hammer Curl', archived: true }]).map(c => c.name);
+  assert.ok(!offered.includes('Pull-up') && !offered.includes('Hammer curl'), 'names you already have are not offered');
+  assert.ok(offered.includes('Chin-up') && offered.every(Boolean));
+});
+t('a library exercise is added pending and only joins the list once a set is logged', () => {
+  const KR = catId('Captain’s chair knee raise');
+  const S = startWorkout(base(), { source: 'blank', name: 'Abs', now: 0, today: LEGS_DAY, ids });
+  const A = addExercises(S, [KR, 'bench', 'cat-nope'], { ids });
+  const ex = activeOf(A).exercises;
+  assert.deepEqual(ex.map(x => x.liftId), [KR, 'bench'], 'unknown ids are ignored');
+  assert.deepEqual(ex[0].pending, { key: KR, name: 'Captain’s chair knee raise', load: 'bodyweight_plus', muscles: ['Abs'] });
+  assert.equal(ex[0].sets.length, 1);
+  assert.equal(A.lifts.list, S.lifts.list, 'picking writes nothing to the list');
+  assert.equal(addExercises(A, [KR], { ids }), A, 'twice → no write');
+  // nothing ticked on it → still not in the list after Finish
+  const benchOnly = toggleDone(updateSet(A, 1, 0, { weight: 60, reps: 8 }), 1, 0, 5);
+  assert.ok(!finishWorkout(benchOnly, 9).lifts.list.some(l => l.id === KR), 'untouched → never created');
+  // a bodyweight set of it → the lift exists, with its muscles, and the log has the set
+  const T = toggleDone(updateSet(A, 0, 0, { weight: 0, reps: 12 }), 0, 0, 7);
+  const F = finishWorkout(T, 10);
+  const lift = F.lifts.list.find(l => l.id === KR);
+  assert.ok(lift && lift.load === 'bodyweight_plus' && lift.muscles[0] === 'Abs', 'created on log');
+  assert.ok(F.lifts.log.some(e2 => e2.liftId === KR && e2.reps === 12), 'set saved');
+  // next time it's an ordinary lift: added by id, not pending, and not offered again
+  const S2 = startWorkout(F, { source: 'blank', name: 'Abs', now: 20, today: '2026-10-14', ids });
+  const ex2 = activeOf(addExercises(S2, [KR], { ids })).exercises[0];
+  assert.equal(ex2.pending, undefined);
+  assert.ok(!catalogueFor(F.lifts.list).some(c => c.id === KR));
+});
+t('a library pick whose name you already have uses your lift', () => {
+  const B = base();
+  const own = { ...B, lifts: { ...B.lifts, list: [...B.lifts.list, { id: 'mine-crunch', name: 'Cable crunch', load: 'weight', unit: 'kg', createdAt: 0 }] } };
+  const S = startWorkout(own, { source: 'blank', name: 'Abs', now: 0, today: LEGS_DAY, ids });
+  const ex = activeOf(addExercises(S, [catId('Cable crunch')], { ids })).exercises[0];
+  assert.equal(ex.liftId, 'mine-crunch');
+  assert.equal(ex.pending, undefined);
+});
+t('swap to a library exercise', () => {
+  const S = addExercises(startWorkout(base(), { source: 'blank', name: 'x', now: 0, today: LEGS_DAY, ids }), ['bench'], { ids });
+  const W = swapExercise(S, 0, catId('Hanging leg raise'));
+  const ex = activeOf(W).exercises[0];
+  assert.equal(ex.liftId, 'cat-hanging-leg-raise');
+  assert.equal(ex.pending.name, 'Hanging leg raise');
+  assert.equal(swapExercise(S, 0, 'cat-nope'), S);
 });
 
 console.log(`workout: ${n} tests passed`);

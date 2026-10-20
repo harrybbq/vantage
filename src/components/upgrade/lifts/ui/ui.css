@@ -109,13 +109,13 @@
 
 /* ── Sheet ── */
 .lf-sheet-root { position: fixed; inset: 0; z-index: 2000; display: flex; }
-.lf-sheet-root.is-bottom { align-items: flex-end; justify-content: center; }
+.lf-sheet-root.is-bottom { align-items: flex-end; justify-content: center; box-sizing: border-box; padding-bottom: var(--lf-kb, 0px); }
 .lf-sheet-root.is-right { justify-content: flex-end; }
 .lf-sheet-root.is-nonmodal { pointer-events: none; z-index: 1950; }
 .lifts .lf-sheet-scrim { position: absolute; inset: 0; background: var(--lf-scrim); animation: lf-fade var(--lf-dur-sheet) var(--lf-ease); }
 .lifts .lf-sheet { position: relative; display: flex; flex-direction: column; box-sizing: border-box; min-height: 0; pointer-events: auto;
   background: var(--lf-s1); color: var(--lf-text); font-family: var(--lf-font); box-shadow: var(--lf-shadow); outline: none; }
-.lf-sheet-root.is-bottom .lf-sheet { width: min(640px, 100%); max-height: min(88vh, calc(100dvh - 24px)); border-radius: var(--lf-r-sheet) var(--lf-r-sheet) 0 0;
+.lf-sheet-root.is-bottom .lf-sheet { width: min(640px, 100%); max-height: min(88vh, calc(100dvh - 24px), calc(var(--lf-vvh, 100dvh) - 24px)); border-radius: var(--lf-r-sheet) var(--lf-r-sheet) 0 0;
   border: 1px solid var(--lf-line-strong); border-bottom: 0; animation: lf-up var(--lf-dur-sheet) var(--lf-ease); }
 .lf-sheet-root.is-right .lf-sheet { height: 100%; max-width: 100vw; border-left: 1px solid var(--lf-line-strong); animation: lf-in var(--lf-dur-sheet) var(--lf-ease); }
 .lifts .lf-sheet-handle { flex: none; display: grid; place-items: center; height: 48px; margin-bottom: -16px; cursor: grab; touch-action: none; }

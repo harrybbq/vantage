@@ -20,9 +20,15 @@
  * Phone: a bottom sheet (≤ 85 vh, internal scroll). Desktop: a centred
  * 560 px dialog (max 80 vh).
  *
+ * After saving, one Track line: the trackers a finished workout ticks
+ * ("Gym — ticked for today"), or, with none linked, a picker to point
+ * one at Lifts (the same 'lifts' auto-fill rule Track offers). The tick
+ * itself is written by useAutomations, never here.
+ *
  * Props: summary (summariseWorkout), saved, templateSaved, gymLabel,
  * gymName(id), onSave, onKeepGoing, onDiscard, onSaveTemplate(name, { update }),
- * onClose.
+ * onClose, trackers, linked (trackers on a lifts/workout rule), dayLog
+ * (S.logs for the workout's day), onLinkTracker(id).
  */
 import { useState } from 'react';
 import Icon from '../../Icon';
@@ -33,8 +39,14 @@ import { perGymOf, fmtKg } from '../../../lib/lifts/lifts';
 
 export default function FinishSheet({
   summary, saved, onSave, onKeepGoing, onDiscard, onSaveTemplate, onClose, templateSaved, gymLabel = null,
+  trackers = [], linked = [], dayLog = {}, onLinkTracker = null,
 }) {
   const [name, setName] = useState(summary ? summary.session.name : '');
+  // The likeliest "gym" tracker first; the owner can pick any other.
+  const [linkId, setLinkId] = useState(() => {
+    const t = trackers.find(x => /\b(gym|lift|lifting|weights|train|training|workout)/i.test(String(x.name || ''))) || trackers[0];
+    return t ? t.id : '';
+  });
   const [asking, setAsking] = useState(false);
   if (!summary) return null;
   const s = summary.session;
@@ -114,6 +126,21 @@ export default function FinishSheet({
         {saved && (
           <div className="lw-fin-saved">
             <p className="lw-fin-ok"><Icon name="check" size={16} /> Saved — {summary.setsDone} {summary.setsDone === 1 ? 'set' : 'sets'} in your log.</p>
+            {linked.length > 0 ? (
+              <p className="lw-fin-ok" data-testid="lw-fin-track">
+                <Icon name="check" size={16} /> {linked.map(t => t.name).join(', ')} {dayLog[linked[0].id] ? '— ticked on Track' : '— ticks on Track from Lifts'}
+              </p>
+            ) : onLinkTracker && trackers.length > 0 && (
+              <div className="lw-fin-link" data-testid="lw-fin-link">
+                <label className="lw-field" htmlFor="lw-link-tracker">
+                  <span className="lf-eyebrow">Tick a tracker when I finish a workout</span>
+                  <select id="lw-link-tracker" className="lf-cellbox lw-input" value={linkId} onChange={e => setLinkId(e.target.value)}>
+                    {trackers.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+                  </select>
+                </label>
+                <Button variant="secondary" icon="check" disabled={!linkId} onClick={() => onLinkTracker(linkId)} data-testid="lw-link-on">Turn on</Button>
+              </div>
+            )}
             {templateSaved ? (
               <p className="lw-fin-ok" data-testid="lw-tpl-saved"><Icon name="check" size={16} /> {templateSaved}</p>
             ) : (

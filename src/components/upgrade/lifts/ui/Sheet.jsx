@@ -8,7 +8,8 @@
  *       handle in a 48 px hit area (drag down past 96 px, or flick, to
  *       close), a 52 px header (eyebrow · title · 44 px close), at most
  *       88vh with the body scrolling inside, `footer` sticky at the bottom
- *       with safe-area padding.
+ *       with safe-area padding. It rides on top of the on-screen keyboard
+ *       (useKeyboardInset) and never grows past what is visible above it.
  *   desktop (≥ 1024 px)  a right drawer `width` px wide (440–560, default 480).
  *   modal (default)  40 % scrim that closes on tap, focus trapped inside,
  *       focus returned to the opener on close, aria-modal.
@@ -27,6 +28,7 @@ import { createPortal } from 'react-dom';
 import Icon from '../../../Icon';
 import { useScopeStyle } from './scope';
 import useInputMode from './useInputMode';
+import useKeyboardInset from './useKeyboardInset';
 import './ui.css';
 
 const stack = [];
@@ -43,6 +45,9 @@ export default function Sheet({
   const style = useScopeStyle();
   const { layout } = useInputMode();
   const side = modal && (placement === 'right' || (placement === 'auto' && layout === 'desktop')) ? 'right' : 'bottom';
+  // A bottom sheet sits on the keyboard, not under it (iOS overlays it).
+  const { kb, vvh } = useKeyboardInset(side === 'bottom');
+  const rootStyle = side === 'bottom' ? { ...style, '--lf-kb': `${kb}px`, ...(vvh ? { '--lf-vvh': `${vvh}px` } : null) } : style;
   const [drag, setDrag] = useState(0);
   const g = useRef(null);
   const close = useCallback(() => { if (onClose) onClose(); }, [onClose]);
@@ -106,7 +111,7 @@ export default function Sheet({
 
   const panelStyle = side === 'right' ? { width: `min(${Math.max(440, Math.min(560, width))}px, 100vw)` } : undefined;
   return createPortal(
-    <div className={`upg-app sec lifts lf-sheet-root is-${side}${modal ? '' : ' is-nonmodal'}${className ? ` ${className}` : ''}`} style={style}>
+    <div className={`upg-app sec lifts lf-sheet-root is-${side}${modal ? '' : ' is-nonmodal'}${className ? ` ${className}` : ''}`} style={rootStyle}>
       {modal && <div className="lf-sheet-scrim" onClick={close} aria-hidden="true" data-testid={testId ? `${testId}-scrim` : undefined} />}
       <section ref={panel} tabIndex={-1} className="lf-sheet" role="dialog" aria-modal={modal ? 'true' : undefined} aria-labelledby={titleId}
                data-testid={testId} onKeyDown={onKeyDown}

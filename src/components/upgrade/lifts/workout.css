@@ -426,6 +426,9 @@ html[data-lifts-focus] .lifts .lw-head { top: env(safe-area-inset-top, 0px); }
 .lifts .lw-new-foot { display: flex; width: 100%; }
 
 /* ── Picker ── */
+/* The picker keeps its height while the list filters, so typing never
+   moves the search box (it used to shrink under the iOS keyboard). */
+.lf-sheet-root.is-bottom.lw-pick .lf-sheet { height: min(88vh, calc(100dvh - 24px), calc(var(--lf-vvh, 100dvh) - 24px)); }
 .lifts .lw-pick-top { position: sticky; top: -1px; z-index: 2; display: flex; flex-direction: column; gap: 8px; margin: -4px -16px 0; padding: 4px 16px 10px;
   background: var(--lf-s1); border-bottom: 1px solid var(--lf-line); }
 .lifts .lw-pick-searchrow { display: flex; gap: 8px; align-items: center; }
@@ -456,6 +459,8 @@ html[data-lifts-focus] .lifts .lw-head { top: env(safe-area-inset-top, 0px); }
 .lifts .lw-tick { flex: none; display: grid; place-items: center; width: 28px; height: 28px; margin: 8px; box-sizing: border-box; border-radius: 50%;
   border: 2px solid var(--lf-line-strong); font-family: var(--lf-mono); font-size: 13px; font-weight: 700; color: var(--lf-on-accent); }
 .lifts .lw-tick.is-on { background: var(--lf-accent); border-color: var(--lf-accent); }
+.lifts .lw-pick-sec { display: flex; flex-direction: column; gap: 2px; padding: 18px 4px 8px; margin-top: 8px; border-top: 1px solid var(--lf-line); }
+.lifts .lw-pick-sec p { margin: 0; }
 .lifts .lw-pick-empty { display: flex; flex-direction: column; align-items: flex-start; gap: 10px; padding: 16px 0; }
 .lifts .lw-pick-foot { display: flex; flex-direction: column; gap: 6px; width: 100%; min-width: 0; }
 .lifts .lw-pick-names { margin: 0; font-family: var(--lf-mono); font-size: var(--lf-fs-floor); line-height: 16px; color: var(--lf-mid); white-space: nowrap;
@@ -489,6 +494,7 @@ html[data-lifts-focus] .lifts .lw-head { top: env(safe-area-inset-top, 0px); }
 .lifts .lw-fin-ok svg { color: var(--lf-accent-ink); }
 .lifts .lw-fin-saved { display: flex; flex-direction: column; gap: 12px; }
 .lifts .lw-tplform { display: flex; flex-direction: column; gap: 8px; }
+.lifts .lw-fin-link { display: flex; flex-direction: column; gap: 8px; }
 .lifts .lw-fin-acts { display: flex; flex-direction: column; gap: 8px; width: 100%; }
 .lifts .lw-fin-row { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; }
 /* Desktop: Finish is a centred 560 px dialog, max 80 vh. */
