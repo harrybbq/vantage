@@ -10,7 +10,8 @@
  * that rewrites saved state on load is the shape of bug that cost us
  * real user data once already (see CLAUDE.md).
  *
- * mood     — removed 2026-08. `S.moodLog` is deliberately left in place.
+ * mood     — removed 2026-08. `S.moodLog` was kept until the owner decided
+ *            (2026-10-20) to delete it — see lib/state/retiredKeys.js.
  * notepad  — removed 2026-08. `S.notepadText` is left in place; the
  *            desktop notepad was never a hubWidgets entry (it hung off
  *            `S.notepadText`/`_showNotepad`) so only the mobile card

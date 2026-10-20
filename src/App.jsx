@@ -26,6 +26,7 @@ import CommandPalette from './components/CommandPalette';
 import ShortcutsModal from './components/ShortcutsModal';
 import PublicPage from './components/PublicPage';
 import { resolvePublicPage, settingsRequest } from './lib/support';
+import { dropRetiredKeys } from './lib/state/retiredKeys';
 import ConsentHost from './components/consent/ConsentHost';
 import CookieBanner from './components/CookieBanner';
 import InstallPrompt from './components/InstallPrompt';
@@ -306,12 +307,23 @@ function Board({ userId, userEmail, onSignOut, initialSettings }) {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loading]);
 
+  // Owner-retired saved-state keys (lib/state/retiredKeys.js — today only
+  // moodLog, deleted by the owner's decision of 2026-10-20). Runs once,
+  // after hydration, removes only the listed keys and returns the same
+  // object when there's nothing to remove, so it never queues a save for
+  // an account that has none of them.
+  const retiredKeysRef = useRef(false);
+  useEffect(() => {
+    if (loading || retiredKeysRef.current) return;
+    retiredKeysRef.current = true;
+    update(prev => dropRetiredKeys(prev));
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loading]);
+
   // One-time cleanup: drop layout pointers to withdrawn widgets, so a
   // Mood card someone had pinned doesn't linger as an empty shell.
   // Deliberately narrow — it filters the two layout arrays and spreads
-  // everything else through untouched. In particular S.moodLog is left
-  // exactly as it is: the entries someone logged are theirs, and if the
-  // widget ever comes back they should still be there.
+  // everything else through untouched.
   const retiredPrunedRef = useRef(false);
   useEffect(() => {
     if (loading || retiredPrunedRef.current) return;

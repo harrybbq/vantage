@@ -491,8 +491,11 @@ else maps onto existing items.
 106. `[ ]` **LAUNCH** Confirm the Netlify functions' region (none set in netlify.toml — likely US) for
     the transfer analysis; written policy for owner/admin access to user data and a log of moderation
     reads; Art. 30 records / LIAs if the solicitor says so. (G5, G18, G25)
-107. `[ ]` **AFTER** Legacy `moodLog` still sits in users' state though Mood was removed — tell users
+107. `[x]` **AFTER** Legacy `moodLog` still sits in users' state though Mood was removed — tell users
     and offer deletion, or remove it additive-first per CLAUDE.md. (G12)
+    *Done 2026-10-20 (owner's decision: delete, never returning): `lib/state/retiredKeys.js` removes
+    `moodLog` once after hydration (only that key; identity otherwise; the merge keeps the deletion).
+    Copies age out of user_data_history (14 days) and backups. Privacy policy to say so (item 100).*
 108. `[ ]` **AFTER** Let a habit be private (kept out of AI and friend surfaces) (G14); self-host the
     fonts so devices don't contact Google Fonts (G16); consider ipwho.is → Netlify's own geo for
     weather so no third party sees the IP.
