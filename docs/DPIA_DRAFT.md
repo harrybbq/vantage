@@ -75,6 +75,10 @@ builds are planned through Capacitor (STARTUP_REQUIREMENTS.md Phase 4).
   secret, or spends money: AI, the leaderboard, wearable sync, account
   deletion, moderation, push. `netlify.toml` sets no function region.
   Netlify's default region is believed to be in the US. **Confirm this.**
+  *(2026-10-20: default for new sites is `cmh`, US East (Ohio); EU/UK
+  regions are self-serve on Pro. Steps and the transfer effect:
+  `docs/ROPA.md` §2. Records of processing: `docs/ROPA.md`; owner access:
+  `docs/ADMIN_ACCESS_POLICY.md`.)*
 - **Most user data sits in one JSON document per user**, `user_data.state`,
   called `S` (`CLAUDE.md`). It is saved on a debounce, re-downloaded when the
   app opens and rewritten on save. The food diary, messages, social graph,
