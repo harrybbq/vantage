@@ -12,7 +12,8 @@
  * scheduled oura-cron so the two paths never drift).
  *
  * Returns { ok, vitals:{date:{sleep,rhr,hrv,recovery,burnKcal}},
- *           burn:{date:[{id,label,kcal}]} }
+ *           burn:{date:[{id,label,kcal}]}, warnings:[string] },
+ * or 502 { error, reconnect } with a cause the user can act on.
  */
 const { pauseGate } = require('../lib/killSwitch');
 const { getFreshToken, fetchOuraData } = require('../lib/oura');
@@ -56,9 +57,21 @@ exports.handler = async (event) => {
   try {
     const accessToken = await getFreshToken(userId, env);
     if (!accessToken) return { statusCode: 404, headers: CORS, body: JSON.stringify({ error: 'not connected' }) };
-    const { vitals, burn } = await fetchOuraData(accessToken, days);
-    return { statusCode: 200, headers: CORS, body: JSON.stringify({ ok: true, days, vitals, burn }) };
+    const { vitals, burn, warnings } = await fetchOuraData(accessToken, days);
+    return { statusCode: 200, headers: CORS, body: JSON.stringify({ ok: true, days, vitals, burn, warnings: warnings || [] }) };
   } catch (e) {
-    return { statusCode: 502, headers: CORS, body: JSON.stringify({ error: e.message || 'oura sync failed' }) };
+    // Item 127 / gap C12: say what went wrong — a revoked grant or a
+    // lapsed membership used to come back as "Synced 0 days". `reconnect`
+    // = only re-authorising helps (a 403 membership lapse does not need
+    // a reconnect, so it is not flagged).
+    console.error('oura-sync failed', e.ouraStatus || '', e.message);
+    return {
+      statusCode: 502,
+      headers: CORS,
+      body: JSON.stringify({
+        error: e.message || 'oura sync failed',
+        reconnect: e.ouraStatus === 400 || e.ouraStatus === 401,
+      }),
+    };
   }
 };

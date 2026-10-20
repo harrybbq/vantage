@@ -42,10 +42,18 @@
  * All of these are best effort and logged; none of them can turn a
  * successful account deletion into a reported failure.
  *
- * WHOOP / Oura: the stored tokens go with the cascade, but the grant is
- * not revoked at the provider. TODO: neither lib/whoop.js nor lib/oura.js
- * documents a revoke endpoint, and guessing one is worse than leaving
- * it — add it here once confirmed from the providers' API docs.
+ * WHOOP / Oura (item 125, 2026-10-20): BEFORE the auth delete — it
+ * needs the stored tokens, which the cascade removes — the grant is
+ * revoked at the provider (WHOOP documents DELETE
+ * /developer/v2/user/access; Oura's endpoint is unverified and not
+ * called). Best effort with a 5 s timeout per provider: a provider
+ * outage never blocks a deletion. AFTER the auth delete succeeds, the
+ * token rows and the user_data / user_data_history rows are deleted
+ * explicitly too. The FK cascade should already have removed them; the
+ * user_data table predates the repo's SQL files, so its FK cannot be
+ * confirmed from here, and a no-op DELETE is cheaper than finding out
+ * the hard way. Never before the auth delete — a failed auth delete must
+ * not leave a live account with its data gone.
  *
  * Env: SUPABASE_URL, the service key via lib/sbKeys (admin delete needs the
  * service role — the anon key cannot remove an auth user). Optional:
@@ -54,6 +62,7 @@
 const sbKeys = require('../lib/sbKeys');
 const { requireUser } = require('../lib/requireUser');
 const { handOverGroup } = require('../lib/leagues');
+const { revokeAll } = require('../lib/wearableRevoke');
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
@@ -135,6 +144,24 @@ async function purgeLeaderboardCache(url, serviceKey) {
   } catch { /* best effort */ }
 }
 
+/* Rows the FK cascade should already have removed — deleted again by
+   user id after the auth delete, so erasure never depends on a FK this
+   repo cannot see. 404/400 = the table does not exist on this project. */
+const AFTER_DELETE_TABLES = [
+  ['whoop_tokens', 'user_id'], ['oura_tokens', 'user_id'],
+  ['user_data', 'id'], ['user_data_history', 'user_id'],
+];
+async function sweepUserRows(userId, url, serviceKey) {
+  for (const [table, col] of AFTER_DELETE_TABLES) {
+    try {
+      const res = await fetch(`${url}/rest/v1/${table}?${col}=eq.${userId}`, {
+        method: 'DELETE', headers: svc(serviceKey, { Prefer: 'return=minimal' }),
+      });
+      if (!res.ok && res.status !== 404 && res.status !== 400) console.error('delete-account: sweep', table, res.status);
+    } catch { /* best effort */ }
+  }
+}
+
 async function deleteRevenueCatSubscriber(userId) {
   const rcKey = process.env.REVENUECAT_SECRET_API_KEY;
   if (!rcKey) return false;
@@ -200,6 +227,9 @@ exports.handler = async (event) => {
     if (!ts.ok && ts.status !== 404 && ts.status !== 400) console.error('delete-account: tracker_streaks delete', ts.status);
   } catch { /* best effort */ }
 
+  // Withdraw WHOOP's grant while the tokens still exist. Never throws.
+  await revokeAll(userId, { ...env, SUPABASE_URL: url });
+
   try {
     const res = await fetch(`${url}/auth/v1/admin/users/${userId}`, {
       method: 'DELETE',
@@ -220,6 +250,7 @@ exports.handler = async (event) => {
 
   // ── After: the account is gone; clean up what the cascade cannot ──
   await Promise.all([
+    sweepUserRows(userId, url, serviceKey),
     removeStorage(userId, url, serviceKey),
     deleteRevenueCatSubscriber(userId),
     purgeLeaderboardCache(url, serviceKey),

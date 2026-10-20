@@ -50,6 +50,7 @@
 // stays runnable under plain node for the parity check in scripts/.
 import { VISIONS_BY_ID } from '../visions/definitions.js';
 import { trackerDone } from '../trackers/done.js';
+import { shareableView } from '../wearables/strip.js';
 
 const DAY_MS = 86_400_000;
 const TIME_SPACING_MS = 7 * DAY_MS;
@@ -463,7 +464,11 @@ function visionPoints(S, category, win = dayWindow(null)) {
  * and day keys are unfloored and uncapped; the server passes it, so the
  * leaderboard number is the capped one either way.
  */
-export function deriveRatings(S, ctx = {}) {
+export function deriveRatings(rawS, ctx = {}) {
+  // Item 124 / D1: WHOOP- and Oura-derived values never move a rating —
+  // the server canonical number (netlify/lib/recompute.js) leaves them
+  // out the same way, and the parity check holds the two together.
+  const S = shareableView(rawS || {});
   const friendCount = ctx.friendCount || 0;
   const win = dayWindow(ctx.createdAt);
 
@@ -515,7 +520,8 @@ export function deriveRatings(S, ctx = {}) {
  * Returns the contribution breakdown for one category. Used by the
  * tap-to-explain modal so users see why their rating is what it is.
  */
-export function categoryBreakdown(S, category, ctx = {}) {
+export function categoryBreakdown(rawS, category, ctx = {}) {
+  const S = shareableView(rawS || {});
   const friendCount = ctx.friendCount || 0;
   const win = dayWindow(ctx.createdAt);
   switch (category) {

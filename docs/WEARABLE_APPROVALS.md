@@ -24,6 +24,15 @@ Before submitting anything, open the WHOOP API Terms, the WHOOP Brand &
 Design Guidelines PDF and the Oura API and MCP Agreement in a browser and
 check the clauses quoted in §0.
 
+**Update 2026-10-20 (later the same day): owner decisions D1 = (a) exclude,
+D2 = allow-list, D4 = keep history + a separate Settings delete, D7 = hide in
+the first native build. Built: C1/C2 (item 124), C3 for WHOOP (item 125; Oura
+still unverified), C9 (the Settings delete), C11/C12 and the §5.1 allow-list
+(item 127). Sections 1 and 4 below describe the code BEFORE those changes;
+STARTUP_REQUIREMENTS items 124–127 carry the current status. For §2.2, pick
+the D1 = (a) wording; for shot 13 (§2.3), screenshot the consent copy saying
+WHOOP/Oura data never counts toward ratings.**
+
 ---
 
 ## 0. What the providers require (confirmed 2026-10-20)

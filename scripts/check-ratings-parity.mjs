@@ -21,6 +21,8 @@
  */
 import { deriveRatings as clientDerive } from '../src/lib/ratings/derive.js';
 import { VISIONS } from '../src/lib/visions/definitions.js';
+import { shareableView } from '../src/lib/wearables/strip.js';
+import { isDeepStrictEqual } from 'node:util';
 import { readFileSync, writeFileSync, unlinkSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { tmpdir } from 'node:os';
@@ -35,19 +37,69 @@ const require = createRequire(import.meta.url);
 const tmpRecompute = join(tmpdir(), `recompute.${process.pid}.cjs`);
 const tmpVisionXp = join(tmpdir(), `visionXp.${process.pid}.cjs`);
 const tmpSbKeys = join(tmpdir(), `sbKeys.${process.pid}.cjs`);
+const tmpShare = join(tmpdir(), `wearableShare.${process.pid}.cjs`);
 writeFileSync(tmpVisionXp, readFileSync(join(root, 'netlify/lib/visionXp.js')));
 writeFileSync(tmpSbKeys, readFileSync(join(root, 'netlify/lib/sbKeys.js')));
+writeFileSync(tmpShare, readFileSync(join(root, 'netlify/lib/wearableShare.js')));
 writeFileSync(
   tmpRecompute,
   readFileSync(join(root, 'netlify/lib/recompute.js'), 'utf8')
     .replace("require('./visionXp')", JSON.stringify(tmpVisionXp).replace(/^/, 'require(').replace(/$/, ')'))
-    .replace("require('./sbKeys')", `require(${JSON.stringify(tmpSbKeys)})`),
+    .replace("require('./sbKeys')", `require(${JSON.stringify(tmpSbKeys)})`)
+    .replace("require('./wearableShare')", `require(${JSON.stringify(tmpShare)})`),
 );
-let serverDerive;
+let serverDerive, serverShareable;
 try {
   ({ deriveRatings: serverDerive } = require(tmpRecompute));
+  ({ shareableState: serverShareable } = require(tmpShare));
 } finally {
-  for (const f of [tmpRecompute, tmpVisionXp, tmpSbKeys]) { try { unlinkSync(f); } catch { /* best effort */ } }
+  for (const f of [tmpRecompute, tmpVisionXp, tmpSbKeys, tmpShare]) { try { unlinkSync(f); } catch { /* best effort */ } }
+}
+
+/* ── WHOOP / Oura data (item 124, D1 = exclude, 2026-10-20) ──────────
+   A band user's state: a WHOOP row every day (sleep/rhr overwritten by
+   the sync, plus band-only keys), a hand weight every third day, a
+   WHOOP workout and an Apple Health step entry in burnLog, and tracker
+   cells auto-ticked from the band next to cells the user ticked. The
+   rating must be exactly what the same state scores with the band data
+   never there — on both sides. */
+const BAND_TRACKERS = [
+  { id: 'bSleep', category: 'fitness', type: 'boolean', auto: { source: 'sleep', threshold: 7 } },
+  { id: 'bSteps', category: 'fitness', type: 'number', auto: { source: 'steps', threshold: null } },
+  { id: 'bStepsB', category: 'fitness', type: 'boolean', auto: { source: 'steps' } },
+  { id: 'bGym', category: 'fitness', type: 'boolean', auto: { source: 'workout' } },
+  { id: 'bRec', category: 'social', type: 'boolean', auto: { source: 'recovery', threshold: 60 } },
+  { id: 'bRead', category: 'brain', type: 'boolean' },
+];
+function bandState(days, { band = true } = {}) {
+  const now = Date.now();
+  const d = i => new Date(now - i * 86_400_000).toISOString().slice(0, 10);
+  const S = { trackers: BAND_TRACKERS, vitalsLog: {}, burnLog: {}, logs: {}, logsAuto: {} };
+  for (let i = 0; i < days; i++) {
+    const k = d(i);
+    const row = {};
+    if (i % 3 === 0) row.weight = 80 + (i % 5) / 10;
+    if (i % 7 === 6) { row.sleep = 6.5; row.rhr = 57; }            // typed on a no-band day
+    if (band && i % 7 !== 6) Object.assign(row, { sleep: 7.5, rhr: 51, hrv: 60, recovery: 66, strain: 11, burnKcal: 2600, stepsWhoop: 11000 });
+    if (Object.keys(row).length) S.vitalsLog[k] = row;
+    const burn = [];
+    if (i % 2 === 0) burn.push({ id: 'ah-' + i, label: '9,500 steps', steps: 9500, kcal: 200 });
+    if (band && i % 3 === 1) burn.push({ id: 'whoop-' + i, label: 'WHOOP workout', kcal: 700, start: k + 'T07:00' });
+    if (burn.length) S.burnLog[k] = burn;
+    const cells = {}, marks = {};
+    if (i % 2 === 1) { cells.bRead = true; marks.bRead = 'manual'; }
+    if (i % 7 === 6) { cells.bSleep = false; marks.bSleep = 'manual'; }
+    if (band && i % 7 !== 6) {
+      cells.bSleep = true; marks.bSleep = 'sleep';
+      cells.bSteps = 11000; marks.bSteps = 'steps';
+      cells.bStepsB = true; marks.bStepsB = 'steps';
+      cells.bRec = true; marks.bRec = 'recovery';
+    }
+    if (band && i % 3 === 1) { cells.bGym = true; marks.bGym = 'workout'; }
+    if (Object.keys(cells).length) S.logs[k] = cells;
+    if (Object.keys(marks).length) S.logsAuto[k] = marks;
+  }
+  return S;
 }
 
 const DAY = 86_400_000;
@@ -178,6 +230,10 @@ function* cases() {
   yield ['every vision, honest two-year-old account', {
     trackers, logs: mkLogs(400), visions: stampAll(now - 10 * DAY),
   }, 5, 100, now - 730 * DAY];
+
+  // ── WHOOP / Oura (item 124) ──
+  yield ['WHOOP user, 120 days', bandState(120), 4, 30, now - 200 * DAY];
+  yield ['WHOOP user, no account age', { ...bandState(60), visions: mkVisions(6) }, 2, 10];
 }
 
 /* What an honest user can stamp on day one — self-checks, savings,
@@ -229,6 +285,14 @@ function* behaviourCases() {
   const dayOne = Object.fromEntries(DAY_ONE_VISIONS.map(id => [id, { unlockedAt: new Date(now).toISOString() }]));
   yield ['honest day-one visions are not capped', { visions: dayOne }, { visions: dayOne },
     { createdAt: now - 60_000 }, {}];
+
+  // WHOOP/Oura data adds nothing to a rating (item 124, D1 = exclude):
+  // a band user's state scores exactly what it scores with the band
+  // never connected — hand weights, typed sleep, Apple Health steps and
+  // manual ticks only.
+  const ctxBand = { createdAt: now - 200 * DAY };
+  yield ['band data adds nothing (120 days)', bandState(120), bandState(120, { band: false }), ctxBand, ctxBand];
+  yield ['band data adds nothing (no account age)', bandState(45), bandState(45, { band: false }), {}, {}];
 }
 
 const TOLERANCE = 1;
@@ -258,6 +322,24 @@ for (const [name, dirty, clean, dirtyCtx, cleanCtx] of behaviourCases()) {
       checked++;
       if (d[k] !== c[k]) failures.push(`${name} · ${side} ${k}: sanitised ${d[k]}, clean ${c[k]}`);
     }
+  }
+}
+
+// The two copies of the band rule must strip exactly the same values.
+for (const [name, S] of [
+  ['band 120', bandState(120)],
+  ['band 10, no trackers list', { ...bandState(10), trackers: undefined }],
+  ['band 30, steps tracker with its own bar', {
+    ...bandState(30),
+    trackers: BAND_TRACKERS.map(t => (t.id === 'bStepsB' ? { ...t, auto: { source: 'steps', threshold: 9000 } } : t)),
+  }],
+  ['no band data', bandState(20, { band: false })],
+]) {
+  const c = shareableView(S);
+  const v = serverShareable(S);
+  for (const key of ['vitalsLog', 'burnLog', 'logs', 'logsAuto']) {
+    checked++;
+    if (!isDeepStrictEqual(c[key], v[key])) failures.push(`band strip · ${name} · ${key}: app and server differ`);
   }
 }
 

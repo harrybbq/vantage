@@ -14,6 +14,7 @@
 const { issueState, issueNativeState, isChallenge } = require('../lib/oauthState');
 const { redirectUriFor } = require('../lib/redirectUri');
 const { requireUser, underLimit, tooMany } = require('../lib/requireUser');
+const { checkWearableAccess, accessGate, accessStatus } = require('../lib/wearableAccess');
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
@@ -44,14 +45,25 @@ exports.handler = async (event) => {
   const userId = auth.userId;
   if (!underLimit('oura-connect', userId, 10)) return tooMany(CORS);
 
+  let req = {};
+  try { req = JSON.parse(event.body || '{}') || {}; } catch { /* no body: web */ }
+  // Item 127: while Oura reviews Vantage only listed accounts may start a
+  // connect (lib/wearableAccess.js; open until the owner flips the
+  // switch). { check: true } asks without starting anything, so the
+  // panel can say so before the button is pressed.
+  if (req.check === true) {
+    const a = await checkWearableAccess({ userId, email: auth.email, provider: 'oura' });
+    return { statusCode: 200, headers: CORS, body: JSON.stringify(accessStatus(a, 'oura')) };
+  }
+  const refused = await accessGate({ userId, email: auth.email, provider: 'oura' }, CORS);
+  if (refused) return refused;
+
   // Constant, registrable value — NOT the request's host. See lib/redirectUri.
   const redirectUri = redirectUriFor(event, 'oura');
   console.info('oura-connect: redirect_uri', redirectUri);
   // Native (the Capacitor app) or web? Only an explicit, well-formed
   // native request leaves the cookie flow; anything else is the web
   // flow exactly as it was.
-  let req = {};
-  try { req = JSON.parse(event.body || '{}') || {}; } catch { /* no body: web */ }
   const native = req.platform === 'native';
   if (native && !isChallenge(req.challenge)) {
     return { statusCode: 400, headers: CORS, body: JSON.stringify({ error: 'Could not start connect — please try again.' }) };

@@ -14,6 +14,7 @@
 
 const { VISION_XP } = require('./visionXp');
 const { serviceKeyHeaders } = require('./sbKeys');
+const { shareableState } = require('./wearableShare');
 
 // ── Constants (mirror derive.js) ─────────────────────────────────────────
 const DAY_MS = 86_400_000;
@@ -361,8 +362,12 @@ function visionPoints(state, category, win) {
  * `createdAt` (ISO string or ms) is when the account was created; null
  * means unknown, which leaves day keys unfloored and uncapped.
  */
-function derivePoints(state, friendCount = 0, macroDays = 0, createdAt = null) {
+function derivePoints(rawState, friendCount = 0, macroDays = 0, createdAt = null) {
   const win = dayWindow(createdAt);
+  // Item 124 / D1: WHOOP- and Oura-derived values never move a number
+  // other people see. Same rule as the client (derive.js) and the AI
+  // coach guard — see ./wearableShare.js.
+  const state = shareableState(rawState || {});
   return {
     brain:
       brainScorePoints(state) +
@@ -426,6 +431,9 @@ const RATING_STATE_KEYS = [
   'achievements', 'trackers', 'logs', 'savings', 'visions',
   'brainScore', 'financeScore', 'fitnessScore', 'socialScore',
   'vitalsLog', 'burnLog',
+  // Read by wearableShare to tell an auto-tick from a band apart from
+  // one the user made. Small: { day: { trackerId: source } }.
+  'logsAuto',
 ];
 const RATING_STATE_SELECT = RATING_STATE_KEYS.map(k => `${k}:state->${k}`).join(',');
 

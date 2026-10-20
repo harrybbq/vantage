@@ -24,13 +24,21 @@
  */
 
 import { VISIONS, VISIONS_BY_ID } from './definitions.js';
+import { shareableView } from '../wearables/strip.js';
 
 const ACH_DRIP_XP = 10; // small per-completion drip from user-created achievements
 
 // ── Pure helpers ──────────────────────────────────────────────────────
 
-/** All vision IDs whose check(S) currently returns true. */
-export function metVisionIds(S) {
+/** All vision IDs whose check(S) currently returns true.
+ *
+ *  Checked against the state WITHOUT WHOOP/Oura-derived values (item
+ *  124, owner decision D1): a vision's xp feeds the ratings and the
+ *  level that friends and handle search see, so a band syncing your
+ *  sleep must not unlock "vitals-7" or carry a logging streak. Stamps
+ *  already in S.visions are never removed. Memoised per S. */
+export function metVisionIds(rawS) {
+  const S = shareableView(rawS);
   const ids = [];
   for (const v of VISIONS) {
     try {

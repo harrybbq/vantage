@@ -5,6 +5,7 @@ import MacroGoalsPanel from './MacroGoalsPanel';
 import NotificationsPanel from './NotificationsPanel';
 import SubscriptionPanel from './SubscriptionPanel';
 import { WearableSync } from './VitalsHistoryCard';
+import { wearableSettingsVisible } from '../lib/native/wearableGate';
 import { OWNER_SURFACES_IN_BUILD } from '../lib/native/ownerSurfaces';
 import AccountPanel from './settings/AccountPanel';
 import DataExportCard from './settings/DataExportCard';
@@ -30,6 +31,11 @@ const AppleHealthImport = OWNER_SURFACES_IN_BUILD
 // 131) — compiled out of native builds the same way.
 const WebAccessPanel = OWNER_SURFACES_IN_BUILD
   ? lazy(() => import('./webaccess/WebAccessPanel'))
+  : null;
+// Owner-only Wearable access panel (who may connect WHOOP/Oura while
+// they review Vantage, item 127) — compiled out of native the same way.
+const WearableAccessPanel = OWNER_SURFACES_IN_BUILD
+  ? lazy(() => import('./wearables/WearableAccessPanel'))
   : null;
 
 // Owner-only Design switch (Classic / New preview — the console redesign,
@@ -997,6 +1003,8 @@ export default function SettingsSection({ S, update, active, userId, userEmail, 
             buttons above the history you came to read. Apple Health was
             already here and stays owner-only; the wearables are open to
             any account, each linking its own device. */}
+        {/* D7: absent in a native build for an account with no WHOOP/Oura link or data. */}
+        {(wearableSettingsVisible(S) || AppleHealthImport) && (
         <SettingsGroup
           title="Health & sync"
           desc="Connect a wearable and its vitals flow into your Vitals & Macros history — sleep, resting HR, HRV, recovery and daily burn. Nothing you've logged by hand is ever replaced."
@@ -1013,6 +1021,7 @@ export default function SettingsSection({ S, update, active, userId, userEmail, 
             </>
           )}
         </SettingsGroup>
+        )}
 
         {/* Notifications — preferences card. The push delivery
             pipeline reads these to gate which kinds of pushes fire.
@@ -1096,6 +1105,9 @@ export default function SettingsSection({ S, update, active, userId, userEmail, 
           <Suspense fallback={null}>
             <WebAccessPanel />
           </Suspense>
+        )}
+        {onOpenSchedule && WearableAccessPanel && (
+          <Suspense fallback={null}><WearableAccessPanel /></Suspense>
         )}
 
         {/* Walkthrough / tour */}

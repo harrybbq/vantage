@@ -18,10 +18,18 @@
  *
  * The synced vitals stay in the user's own state. Disconnecting stops
  * future syncing; it doesn't retract history the user may still want,
- * and deleting it would be a data-loss surprise. Account deletion
- * remains the route for erasing everything.
+ * and deleting it would be a data-loss surprise. Owner decision D4
+ * (2026-10-20): no prompt here — Settings → Tools → Health & sync has a
+ * separate "Delete data synced from WHOOP/Oura" action for that.
+ * Account deletion remains the route for erasing everything.
+ *
+ * Item 125: before the row goes, the grant is revoked at the provider
+ * (WHOOP's DELETE /developer/v2/user/access; Oura unverified) — see
+ * ../lib/wearableRevoke.js. Best effort: the row is deleted whatever the
+ * provider says, so a WHOOP outage never blocks a disconnect.
  */
 const sbKeys = require('../lib/sbKeys');
+const { revokeProvider } = require('../lib/wearableRevoke');
 
 const TABLES = { whoop: 'whoop_tokens', oura: 'oura_tokens' };
 
@@ -59,6 +67,10 @@ exports.handler = async (event) => {
   const userId = (await userRes.json())?.id;
   if (!userId) return { statusCode: 401, headers: CORS, body: JSON.stringify({ error: 'no user id' }) };
 
+  const provider = String(body.provider || '').toLowerCase();
+  // Never throws; logs and carries on.
+  const revoke = await revokeProvider(provider, userId, { ...env, SUPABASE_URL: url });
+
   try {
     const del = await fetch(`${url}/rest/v1/${table}?user_id=eq.${userId}`, {
       method: 'DELETE',
@@ -74,7 +86,7 @@ exports.handler = async (event) => {
       console.error('wearable-disconnect: delete failed', del.status, detail.slice(0, 300));
       return { statusCode: 502, headers: CORS, body: JSON.stringify({ error: 'could not disconnect' }) };
     }
-    return { statusCode: 200, headers: CORS, body: JSON.stringify({ ok: true }) };
+    return { statusCode: 200, headers: CORS, body: JSON.stringify({ ok: true, revoked: !!revoke.revoked }) };
   } catch (e) {
     console.error('wearable-disconnect:', e?.message);
     return { statusCode: 502, headers: CORS, body: JSON.stringify({ error: 'could not disconnect' }) };
