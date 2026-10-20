@@ -24,6 +24,9 @@ global.fetch = async (url, init = {}) => {
   const json = (b, status = 200) => ({ ok: status < 400, status, json: async () => b, text: async () => JSON.stringify(b) });
   if (u.endsWith('/auth/v1/user')) return json({ id: 'user-1', email: world.email });
   if (u.includes('/rest/v1/profiles')) return json([{ tier: world.tier }]);
+  // AI consent (item 98, lib/consentGate): this account said yes.
+  if (u.includes('/rest/v1/user_data')) return json([{ id: 'user-1', consent: { ai: '2026-10-01T00:00:00.000Z' } }]);
+  if (u.includes('/rest/v1/consent_events')) return json([]);
   if (u.includes('/rest/v1/ai_usage')) return json(world.usage ? [{ n: world.usage }] : []);
   if (u.includes('/rest/v1/rpc/ai_usage_bump')) { world.usage++; return json(world.usage <= 40); }
   if (u.startsWith('https://api.anthropic.com/')) {

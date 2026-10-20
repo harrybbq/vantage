@@ -25,6 +25,7 @@ const { requireScheduler } = require('../lib/cronAuth');
 const { mergeStateCAS } = require('../lib/stateWrite');
 
 const { pool } = require('../lib/pool');
+const { consentStatuses, healthSyncAllowed } = require('../lib/consentGate');
 
 const DAYS = 3;                 // enough to catch anything a run or two ago missed
 const CONCURRENCY = 4;
@@ -70,7 +71,16 @@ exports.handler = async (event) => {
     console.error('oura-cron: token list failed', tokRes.status);
     return { statusCode: 502 };
   }
-  const rows = await tokRes.json().catch(() => []);
+  const all = await tokRes.json().catch(() => []);
+
+  // Health consent (item 98) — same rule and failure mode as whoop-cron.
+  const statuses = await consentStatuses(all.map(r => r.user_id), 'health', env);
+  if (!statuses) {
+    console.error('oura-cron: consent read failed — skipping this run');
+    return { statusCode: 502 };
+  }
+  const rows = all.filter(r => healthSyncAllowed(statuses.get(r.user_id)));
+  const noConsent = all.length - rows.length;
 
   // A bounded pool (item 93), like whoop-cron: CONCURRENCY accounts at
   // once, oldest first; stop STARTING at the deadline and let in-flight
@@ -96,6 +106,6 @@ exports.handler = async (event) => {
     }
   }
 
-  console.info(`oura-cron: ${count.synced} synced, ${count.skipped} skipped, ${count.failed} failed, ${count.conflicted} busy (retry next run), ${notReached} not reached (next run), of ${rows.length}`);
+  console.info(`oura-cron: ${count.synced} synced, ${count.skipped} skipped, ${count.failed} failed, ${count.conflicted} busy (retry next run), ${notReached} not reached (next run), of ${rows.length}; ${noConsent} without health consent`);
   return { statusCode: 200 };
 };

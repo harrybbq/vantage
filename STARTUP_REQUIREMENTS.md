@@ -364,18 +364,20 @@ code fails soft until it is run, so order doesn't matter.
     devDependencies (clears item 22's critical/high — none ship).
     *Status 2026-09-30: personal emails replaced with placeholders in SQL; dead SpotifyBar removed (revoke that Last.fm key — it stays in git history); salary comment neutralised; Capacitor CLI/assets moved to devDependencies; PR build workflow added. `TRADING_APP_CLAUDE.md:9` still holds a real email; `dist/` is still committed per the deploy flow.*
 
-83. `[ ]` **LAUNCH** Any signed-in user can still read every column of a
+83. `[~]` **LAUNCH** Any signed-in user can still read every column of a
     searchable profile — `tier` (who pays), `ratings`,
     `prestige_baseline`, `last_active_at` — whatever `leaderboard_optin`
     says. Fix with column-level SELECT grants (the `groups` pattern in
     `group_crest_schema.sql`), after moving own-row reads of `tier` and
     `last_active_at` to a definer RPC. Needs a client audit of every
     `from('profiles').select(...)` first.
-84. `[ ]` **LAUNCH** Name filter and avatar screening bind honest clients
+    *Status 2026-10-20: done in code. Public set = id, handle, display_name, avatar_url, level, ratings_ovr, suspended_at (`src/lib/friends/profileColumns.js`; a build test keeps it equal to the SQL grant and fails if any client select names another column). Own private fields (tier, is_searchable, leaderboard_*) via `my_profile()`, friends' last_active_at via `friend_presence()` (accepted friends only) — both fall back to today's selects until the SQL runs. Category `ratings` stay visible only where the leaderboard/group functions show them (service role; item 103 still open). Owner: deploy, THEN run `supabase/privacy_lockdown_2026_10b.sql` (header has verify queries).*
+84. `[~]` **LAUNCH** Name filter and avatar screening bind honest clients
     only: a user can still PATCH `handle`/`display_name`/`avatar_url` on
     their own row directly. Binding needs those writes moved to a
     service-role function, then
     `revoke update (handle, display_name, avatar_url) on public.profiles from authenticated;`.
+    *Status 2026-10-20: done in code — `netlify/functions/profile-update` (requireUser, `social` kill switch, 10/min brake + 40 changing writes/day durable via ai_usage, server name filter, avatar screening that fails closed) is the client's only writer of the three; the SQL revokes their UPDATE and INSERT grants. Order: deploy first (the new client works under either grant set), then run `supabase/privacy_lockdown_2026_10b.sql`.*
 
 85. `[~]` **LAUNCH** Supabase is retiring the legacy `anon`/`service_role`
     keys by the end of 2026. The new `sb_secret_…` keys go in the `apikey`
@@ -408,8 +410,9 @@ code fails soft until it is run, so order doesn't matter.
 91. `[~]` **AFTER** `get-leaderboard` has no shared cache and pulls ~500
     profiles with avatars per view. Cache 5–10 min; avatars for the top 100 only.
     *Status 2026-10-20: done in code — the global top 100 (per timeframe) is built at most once per 5 min and shared: module scope per instance + one `function_cache` row across instances (lib/sharedCache.js; falls back to module scope until the SQL runs). A cached view is auth + the caller's own profile (+ rank count / colour for a caller outside the top 100) instead of ~10 queries incl. 500 profiles with avatars. Per-caller parts (isSelf, current numbers, opt-out, true rank, pinned row) stay live; friends boards are never cached. Weekly pool reads 500 candidates without avatars and fetches avatars for the 100 shown; friends boards past 100 rows get initials. Others see an opt-out/suspension within ≤ 5 min. Owner: run `supabase/retention_2026_10b.sql` (creates `function_cache`).*
-92. `[ ]` **AFTER** Presence writes a `profiles` UPDATE every 60 s per open
+92. `[~]` **AFTER** Presence writes a `profiles` UPDATE every 60 s per open
     app (`usePublishProfile.js`). Every 5 min is enough.
+    *Status 2026-10-20: done in code — heartbeat every 5 min while visible, plus on sign-in and on return (if the last ping is ≥ 2 min old); the debounced publish writes level/presence only when they change. Online threshold 3 → 11 min (`ONLINE_THRESHOLD_MS`), Settings copy updated. Ships with the deploy; no SQL.*
 93. `[~]` **LAUNCH** `whoop-cron` syncs users one by one inside a 20 s
     budget — only ~10–20 users a night. Batch in parallel or run every 2 h.
     *Status 2026-10-20: done in code — whoop-cron and oura-cron run accounts through a bounded pool (4 at a time, oldest first, stop starting at 20 s, in-flight finish; refresh-token-first and CAS writes unchanged). WHOOP's limit is 100 requests/min and 10,000/day per app, so a run spends ≤ 60 WHOOP calls (~12 accounts) and whoop-cron now runs every 10 min 06:00–08:50 UTC (not :30, when oura-cron runs), skipping accounts already synced that morning — ~180 accounts a morning for <10% of the daily limit. Owner: after the deploy, check one morning's Netlify function log for "not reached" counts; WHOOP also caps an unapproved app at 10 users — apply for production approval / a higher limit in the WHOOP developer dashboard before launch.*
@@ -455,12 +458,14 @@ code fails soft until it is run, so order doesn't matter.
 ### From the DPIA and privacy-label drafts — 2026-10-20
 `docs/DPIA_DRAFT.md` (gaps G1–G26) and `docs/STORE_PRIVACY_LABELS.md`. New findings only; everything
 else maps onto existing items.
-98. `[ ]` **LAUNCH** Consent is enforced in the app only. `whoop-cron`, `oura-cron`, `whoop-sync`,
+98. `[~]` **LAUNCH** Consent is enforced in the app only. `whoop-cron`, `oura-cron`, `whoop-sync`,
     `oura-sync` and `health-sync` keep syncing after a user withdraws health consent (until they also
     press Disconnect), and the AI functions don't check AI consent server-side. Skip/refuse on the server
     (one JSON-path read), or have withdrawal call `wearable-disconnect`. (DPIA G1)
-99. `[ ]` **LAUNCH** No durable consent record — consent lives only in the user-editable state. Add an
+    *Status 2026-10-20: done in code — `netlify/lib/consentGate.js` (pure rule + tests). Health: sync stops when consent is declined/withdrawn; never-asked accounts keep syncing, matching the app. AI: only an explicit yes. Crons filter with one batched `state->consent` read; whoop-sync/oura-sync/health-sync and ai-coach-daily/ai-food-detect (scan)/recipe-from-video refuse with a clear 403. destination-brief left out: no AI call, no user data. Live once deployed; consent_events (item 99) refines it after the SQL.*
+99. `[~]` **LAUNCH** No durable consent record — consent lives only in the user-editable state. Add an
     append-only `consent_events` table (kind, granted/withdrawn, time, copy version, cascade). (G2)
+    *Status 2026-10-20: done in code — table in `supabase/privacy_lockdown_2026_10b.sql` (RLS insert/select own, no update/delete for anyone, server-stamped time, 60/h throttle, cascade); `src/lib/consent/ledger.js` records each consent change after hydration and a just-in-time "Allow" waits for the record + a state save. Fails soft until the owner runs the SQL. Bump `CONSENT_COPY_VERSION` when the consent wording changes.*
 100. `[ ]` **BLOCKS** Privacy policy vs code (labels draft "Mismatches", DPIA G10/G13):
     - says accounts are erased "within 30 days" — deletion is immediate, backups keep 7 days;
     - says "we do not collect purchase history" — RevenueCat keeps it, linked to the user id;

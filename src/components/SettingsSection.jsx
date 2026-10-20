@@ -215,7 +215,7 @@ const SHARE_TOGGLES = [
   { id: 'shareStreak',   label: 'Active habit streak',  desc: 'Days clean + habit name (e.g. "12d Alcohol"). Off unless you turn it on.', defaultOn: false },
   { id: 'shareHeatmap',  label: '91-day activity heatmap', desc: 'Coloured grid of days you logged anything.' },
   { id: 'shareWins',     label: 'Recent achievement wins', desc: 'Last 3 completed achievements with their icons.' },
-  { id: 'sharePresence', label: 'Online status',         desc: 'Green dot when you\'re active in the last 3 minutes.' },
+  { id: 'sharePresence', label: 'Online status',         desc: 'Green dot for friends while you\'re using the app (it fades about 10 minutes after you leave).' },
 ];
 
 function FriendsPrivacyCard({ userId, S, update }) {
@@ -234,9 +234,10 @@ function FriendsPrivacyCard({ userId, S, update }) {
     let cancelled = false;
     (async () => {
       try {
-        // getOwnProfile selects a fixed column set that may not include
-        // leaderboard_optin (added later) — read it directly to avoid
-        // editing the friends query module.
+        // getOwnProfile returns the whole own row (my_profile RPC, item
+        // 83), so leaderboard_optin / leaderboard_color come with it — a
+        // direct select of either would be refused once the column
+        // grants are narrowed. A column that doesn't exist is undefined.
         const p = await getOwnProfile(userId);
         if (cancelled) return;
         // A missing value is shown as OFF: new accounts are created with
@@ -245,14 +246,8 @@ function FriendsPrivacyCard({ userId, S, update }) {
         // without knowing. Real stored values show as they are.
         setSearchable(p?.is_searchable ?? false);
         setHandle(p?.handle || null);
-        const optRes = await supabase.from('profiles')
-          .select('leaderboard_optin').eq('id', userId).maybeSingle();
-        if (!cancelled) setLeaderboardOptin(optRes.data?.leaderboard_optin ?? false);
-        // leaderboard_color is a separate, best-effort read so a missing
-        // column (migration not applied) doesn't break the card.
-        const colRes = await supabase.from('profiles')
-          .select('leaderboard_color').eq('id', userId).maybeSingle();
-        if (!cancelled) setNameColorOn(!!colRes.data?.leaderboard_color);
+        setLeaderboardOptin(p?.leaderboard_optin ?? false);
+        setNameColorOn(!!p?.leaderboard_color);
         setAvailable(true);
       } catch {
         if (!cancelled) setAvailable(false);

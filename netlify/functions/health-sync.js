@@ -82,6 +82,7 @@ function latestWeight(vitalsLog) {
 const { pauseGate } = require('../lib/killSwitch');
 const sbKeys = require('../lib/sbKeys');
 const { mergeStateCAS } = require('../lib/stateWrite');
+const { statusFromState, healthSyncAllowed } = require('../lib/consentGate');
 
 function clientIp(event) {
   const h = event.headers || {};
@@ -128,6 +129,14 @@ exports.handler = async (event) => {
   const row = (await lookup.json())[0];
   if (!row?.id) return reply(403, { error: 'unknown token' });
   const userId = row.id;
+
+  // Health consent (item 98): the state is already in hand, so only the
+  // consent_events read is added. Declined / withdrawn → refused (the
+  // Shortcut shows the message); never asked → accepted, as in the app.
+  const consentState = await statusFromState(row.state?.consent, userId, 'health', env);
+  if (!healthSyncAllowed(consentState)) {
+    return reply(403, { error: 'Health data consent is off in Vantage — turn it on in Settings → Privacy → Consent.', consent: 'health' });
+  }
 
   const date = /^\d{4}-\d{2}-\d{2}$/.test(body.date || '') ? body.date : todayISO();
   const weight = num(body.weight, 20, 400);

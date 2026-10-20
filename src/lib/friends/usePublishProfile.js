@@ -3,11 +3,16 @@ import { upsertOwnPublicStats, updateOwnProfile } from './queries';
 import { habitElapsed } from '../habits/progress.js';
 import { privacyOn } from './privacy.js';
 import { publicNameProblem } from '../moderation/nameFilter.js';
-import { photoHash, requestAvatarScreen } from './avatarScreen.js';
+import { photoHash } from './avatarScreen.js';
+import { writePublicProfile } from './profileWrites.js';
+import { loadOwnProfile } from './profileReads.js';
+import { streakForFriends, planAvatar, planDirectPatch, PRESENCE_INTERVAL_MS, PRESENCE_REPING_MS } from './publishPlan.js';
 
 /**
  * Debounced sync of the user's public-facing data:
- *   - profiles.{display_name, level, last_active_at}
+ *   - profiles.{display_name, avatar_url} — through profile-update, the
+ *     server-side name filter + avatar screening (item 84)
+ *   - profiles.{level, last_active_at} — direct, only when changed
  *   - public_stats.{level, current_streak, streak_habit, heatmap_days,
  *                   recent_wins}
  *
@@ -133,6 +138,12 @@ export function usePublishProfile(userId, S, hasPro, visionState, { hydrated = f
   const updateRef = useRef(update);
   updateRef.current = update;
   const screenRetryRef = useRef({ hash: null, until: 0 });
+  // What the server holds, so only real changes are written (item 92:
+  // fewer profile UPDATEs; item 84: fewer profile-update calls). Seeded
+  // from the own-row read on the first publish of a session.
+  const sentRef = useRef({ userId: null, server: null, level: undefined, presence: undefined, refusedName: undefined, pubBackoffUntil: 0 });
+  // Last presence write (heartbeat or piggy-backed), shared by both effects.
+  const lastPingRef = useRef({ userId: null, at: 0 });
 
   useEffect(() => {
     if (!userId || !S) return;
@@ -147,8 +158,10 @@ export function usePublishProfile(userId, S, hasPro, visionState, { hydrated = f
     // is unchanged; toggling off CLEARS the previous value on the
     // next debounced publish.
     const priv = S.privacy || {};
-    // Streak is opt-IN (see privacy.js) — it publishes the habit name.
-    const streak = privacyOn(priv, 'shareStreak') ? currentStreak(S) : null;
+    // Streak is opt-IN (see privacy.js) — it publishes the habit name,
+    // which friends read, so it goes through the public-text filter.
+    const streak = streakForFriends(privacyOn(priv, 'shareStreak') ? currentStreak(S) : null);
+    const presenceOff = priv.sharePresence === false;
     // A name the public-text filter refuses is published as no name
     // (Settings › Account says why). S.profile.name itself is untouched.
     const ownName = (S.profile?.name || '').trim();
@@ -157,12 +170,9 @@ export function usePublishProfile(userId, S, hasPro, visionState, { hydrated = f
       // 40 chars: the profiles_display_name_len check (audit SQL).
       display_name: ownName && !publicNameProblem(ownName) ? ownName.slice(0, 40) : null,
       level,
-      // last_active_at gates on sharePresence — see also the heartbeat
-      // effect below which won't ping if presence is opted out.
-      last_active_at: priv.sharePresence !== false ? new Date().toISOString() : null,
       // public_stats slice
-      current_streak: streak?.days || 0,
-      streak_habit:   streak?.name || null,
+      current_streak: streak.days,
+      streak_habit:   streak.name,
       heatmap_days:   priv.shareHeatmap !== false ? buildHeatmap(S) : [],
       recent_wins:    priv.shareWins    !== false ? recentWins(S)   : [],
     };
@@ -178,115 +188,153 @@ export function usePublishProfile(userId, S, hasPro, visionState, { hydrated = f
     const lastScreen = S.avatarScreen || null;
 
     // Skip the network round-trip if the meaningful slice hasn't
-    // changed — only `last_active_at` would differ on a no-op tick.
-    // We compare a stable JSON form excluding last_active_at.
+    // changed. Presence is the heartbeat's job, not this one's.
     const sig = JSON.stringify({
       d: payload.display_name, l: payload.level,
       s: payload.current_streak, sh: payload.streak_habit,
       h: payload.heatmap_days.map(x => x.intensity).join(''),
       w: payload.recent_wins.map(x => x.name).join('|'),
-      a: photoSig,
+      a: photoSig, p: presenceOff,
     });
     if (sig === lastPayloadRef.current && triedRef.current) return;
 
     clearTimeout(timerRef.current);
     timerRef.current = setTimeout(async () => {
-      try {
-        // Resize avatar lazily inside the timer so the heavy canvas
-        // work happens after the debounce settles, not on every
-        // render. Null when shareAvatar is off, there's no photo, or
-        // the photo hasn't passed screening.
-        const resized = photoSrc ? await resizeAvatar(photoSrc) : null;
-        const avatarUrl = resized ? await screenedAvatar(photoSrc, resized, lastScreen) : null;
-
-        // Two rows in parallel — they're independent and the
-        // friends rail tolerates either failing without the other.
-        await Promise.all([
-          updateOwnProfile(userId, {
-            display_name: payload.display_name,
-            level: payload.level,
-            last_active_at: payload.last_active_at,
-            avatar_url: avatarUrl,
-          }),
-          // Only publish stats if the user has a handle — without
-          // one they're not visible to anyone, so there's nothing to
-          // publish for. Saves writes for users who haven't claimed.
-          // (Profile row update is still valuable for last_active_at.)
-          // We'll re-publish when the handle is claimed via a
-          // refresh trigger from HandleClaimModal.
-          upsertOwnPublicStats(userId, {
-            level: payload.level,
-            current_streak: payload.current_streak,
-            streak_habit: payload.streak_habit,
-            heatmap_days: payload.heatmap_days,
-            recent_wins: payload.recent_wins,
-          }),
-        ]);
-        lastPayloadRef.current = sig;
-        triedRef.current = true;
-      } catch {
-        // Most likely cause: migrations not applied yet, or the
-        // user is offline. Silently absorb — the rail will surface
-        // its own load error if anything is actually broken.
-        triedRef.current = true;
+      let sent = sentRef.current;
+      if (sent.userId !== userId) {
+        sent = sentRef.current = { userId, server: null, level: undefined, presence: undefined, refusedName: undefined, pubBackoffUntil: 0 };
       }
+      if (!sent.server) {
+        try {
+          const own = await loadOwnProfile(userId);
+          sent.server = { display_name: own?.display_name ?? null, avatar_url: own?.avatar_url ?? null };
+          if (sent.level === undefined && own) sent.level = own.level;
+          if (sent.presence === undefined && own) sent.presence = own.last_active_at ? 'on' : 'off';
+        } catch { /* unknown: send, the server skips no-ops */ }
+      }
+
+      // Three independent writes; the friends rail tolerates any one
+      // failing without the others.
+      const jobs = [publishPublicText(sent), publishDirect(sent), publishStats()];
+      const results = await Promise.allSettled(jobs);
+      if (results.every(r => r.status === 'fulfilled')) lastPayloadRef.current = sig;
+      // Most likely cause of a failure: migrations not applied yet, or
+      // the user is offline. Silently absorb — the rail will surface
+      // its own load error if anything is actually broken.
+      triedRef.current = true;
     }, 4000);
+
+    /** display_name / avatar_url → profile-update (item 84), changes only. */
+    async function publishPublicText(sent) {
+      if (Date.now() < sent.pubBackoffUntil) return;
+      const server = sent.server; // null = unknown
+      const pub = {};
+      if ((!server || payload.display_name !== server.display_name) && payload.display_name !== sent.refusedName) {
+        pub.display_name = payload.display_name;
+      }
+      const hash = photoSrc ? await photoHash(photoSrc) : null;
+      const plan = planAvatar({
+        photoSrc, hash, screen: lastScreen, retry: screenRetryRef.current,
+        serverAvatar: server ? server.avatar_url : undefined,
+      });
+      if (plan.action === 'clear') pub.avatar_url = null;
+      else if (plan.action === 'send') {
+        // The heavy canvas work happens only here, after the debounce.
+        const resized = await resizeAvatar(photoSrc);
+        if (!resized) { if (!server || server.avatar_url !== null) pub.avatar_url = null; }
+        else if (!server || resized !== server.avatar_url) pub.avatar_url = resized;
+      }
+      if (Object.keys(pub).length === 0) return;
+
+      try {
+        const out = await writePublicProfile(userId, pub);
+        if (out?.profile) sent.server = { display_name: out.profile.display_name ?? null, avatar_url: out.profile.avatar_url ?? null };
+        if (hash && 'avatar_url' in pub && pub.avatar_url) recordVerdict(hash, out?.avatar);
+      } catch (e) {
+        if (e?.status === 400 && e.field === 'display_name') sent.refusedName = pub.display_name;
+        else if (e?.status === 400 && e.field === 'avatar_url' && hash) recordVerdict(hash, 'rejected');
+        else if (e?.status === 429 || e?.status === 503) sent.pubBackoffUntil = Date.now() + SCREEN_RETRY_MS;
+        throw e;
+      }
+    }
+
+    /** level / presence-off → a direct UPDATE, only when it changed. */
+    async function publishDirect(sent) {
+      const lp = lastPingRef.current;
+      const patch = planDirectPatch({
+        level: payload.level, sentLevel: sent.level,
+        presenceOff, sentPresence: sent.presence,
+        lastPingAt: lp.userId === userId ? lp.at : 0,
+      });
+      if (Object.keys(patch).length === 0) return;
+      await updateOwnProfile(userId, patch);
+      if ('level' in patch) sent.level = patch.level;
+      if ('last_active_at' in patch) {
+        sent.presence = patch.last_active_at ? 'on' : 'off';
+        if (patch.last_active_at) lastPingRef.current = { userId, at: Date.now() };
+      }
+    }
+
+    /** public_stats — the friend card's streak, heatmap and wins
+     *  (friends-only by RLS). */
+    function publishStats() {
+      return upsertOwnPublicStats(userId, {
+        level: payload.level,
+        current_streak: payload.current_streak,
+        streak_habit: payload.streak_habit,
+        heatmap_days: payload.heatmap_days,
+        recent_wins: payload.recent_wins,
+      });
+    }
+
+    /**
+     * Remember a definitive screening verdict, additively, in
+     * S.avatarScreen ({ hash, ok, at }) — keyed by the SOURCE photo, so the
+     * same photo is not re-sent from this device or another. An undecided
+     * answer (no key, over the cap, timeout) backs off for a while instead.
+     * The server is what decides; this only saves repeat calls.
+     */
+    function recordVerdict(hash, verdict) {
+      if (verdict === 'approved' || verdict === 'unchanged') {
+        if (S?.avatarScreen?.hash === hash && S.avatarScreen.ok === true) return;
+        updateRef.current?.(prev => ({ ...prev, avatarScreen: { hash, ok: true, at: new Date().toISOString() } }));
+      } else if (verdict === 'rejected') {
+        updateRef.current?.(prev => ({ ...prev, avatarScreen: { hash, ok: false, at: new Date().toISOString() } }));
+      } else {
+        screenRetryRef.current = { hash, until: Date.now() + SCREEN_RETRY_MS };
+      }
+    }
 
     return () => clearTimeout(timerRef.current);
   }, [userId, S, hasPro, visionState, hydrated, loadError]);
 
-  /**
-   * The avatar strangers will see, or null. Fails CLOSED: no verdict
-   * (no key, offline, function not deployed) publishes no avatar, and
-   * the photo stays on this device exactly as it was. Only definitive
-   * verdicts are remembered, additively, in S.avatarScreen.
-   */
-  async function screenedAvatar(photoSrc, resized, lastScreen) {
-    const hash = await photoHash(photoSrc);
-    if (!hash) return null;
-    if (lastScreen?.hash === hash) return lastScreen.ok ? resized : null;
-    const retry = screenRetryRef.current;
-    if (retry.hash === hash && Date.now() < retry.until) return null;
-
-    const ok = await requestAvatarScreen(resized);
-    if (ok === null) {
-      screenRetryRef.current = { hash, until: Date.now() + SCREEN_RETRY_MS };
-      return null;
-    }
-    updateRef.current?.(prev => ({ ...prev, avatarScreen: { hash, ok, at: new Date().toISOString() } }));
-    return ok ? resized : null;
-  }
-
-  // ── Presence heartbeat ─────────────────────────────────────────
-  // The debounced publish above only fires when state CHANGES. If
-  // a user opens the app and just looks at it without editing —
-  // their last_active_at goes stale and friends see them as offline.
+  // ── Presence heartbeat (item 92) ───────────────────────────────
+  // The debounced publish above only fires when state CHANGES. If a
+  // user opens the app and just looks at it, last_active_at would go
+  // stale and friends would see them offline.
   //
-  // Fix: a separate 60s interval that pings last_active_at while
-  // the tab is visible. Three tab-visible passes (3 minutes total)
-  // is the offline threshold the friends rail uses, so a real-life
-  // "I left the tab open" friend stays online; an actual close +
-  // walk-away goes offline within 3 minutes.
+  // A ping on sign-in / when the app becomes visible (unless one went
+  // out in the last PRESENCE_REPING_MS), then every PRESENCE_INTERVAL_MS
+  // (5 min — was 60 s, i.e. a profiles UPDATE a minute per open app)
+  // while visible. Nothing while hidden. The friends rail's online
+  // threshold (ONLINE_THRESHOLD_MS, queries.js) is two intervals plus
+  // slack, so one missed ping doesn't flip a friend offline.
   //
-  // We don't ping when the tab is hidden — there's no point pumping
-  // network requests for a backgrounded app, and visibility change
-  // re-fires this immediately on focus return so the gap is
-  // ~unnoticeable.
-  // Note: presence heartbeat below ALSO checks S.privacy.sharePresence
-  // so opting out fully stops the heartbeat (not just the debounced
-  // publish). Without this guard the user's online dot would still
-  // tick every 60s even after they turned presence off.
+  // Opting out of presence (S.privacy.sharePresence) stops the
+  // heartbeat entirely; the publish above clears the stored value once.
   useEffect(() => {
     if (!userId) return;
     if (S?.privacy?.sharePresence === false) return;
     let intervalId = null;
 
-    async function ping() {
-      // Skip if we know the previous publish failed for "schema not
-      // applied" reasons — those errors don't auto-recover and
-      // pinging just spams the console.
+    async function ping(force) {
+      const now = Date.now();
+      const last = lastPingRef.current;
+      if (!force && last.userId === userId && now - last.at < PRESENCE_REPING_MS) return;
+      lastPingRef.current = { userId, at: now };
       try {
-        await updateOwnProfile(userId, { last_active_at: new Date().toISOString() });
+        await updateOwnProfile(userId, { last_active_at: new Date(now).toISOString() });
+        if (sentRef.current.userId === userId) sentRef.current.presence = 'on';
       } catch {
         // silent — same rationale as the debounced publish
       }
@@ -294,8 +342,8 @@ export function usePublishProfile(userId, S, hasPro, visionState, { hydrated = f
 
     function start() {
       if (intervalId) return;
-      ping(); // immediate ping on focus
-      intervalId = setInterval(ping, 60_000);
+      ping(false); // on sign-in / return, unless a ping just went out
+      intervalId = setInterval(() => ping(true), PRESENCE_INTERVAL_MS);
     }
     function stop() {
       if (intervalId) { clearInterval(intervalId); intervalId = null; }
