@@ -348,6 +348,11 @@ code fails soft until it is run, so order doesn't matter.
     *Status 2026-09-30: done except WHOOP/Oura grant revocation (no documented endpoint found); export now includes food log, profile, friendships, messages.*
     *Still open (pack P7, 2026-10-20): export `download()` uses `a.download`, a no-op in a WebView — use
     the share sheet (`navigator.share` with a File, or @capacitor/share + filesystem).*
+    *Status 2026-10-20 (P7): in the app the export is built, then a "Save or share the file" button hands it
+    to `navigator.share` with a File (`src/lib/data/saveExport.js`, 7 tests); the web still downloads. iOS
+    WKWebView supports this (iOS 15+); Android's System WebView has no `navigator.share`, so Android shows
+    "export from the website" until `@capacitor/share` + `@capacitor/filesystem` are added (npm install +
+    `npx cap sync`, a native step) — verify both on a device.*
 68. `[~]` **LAUNCH** Defaults for 13–17s: handle search and leaderboard
     are ON; `shareStreak` publishes habit names (e.g. a quit-drinking
     streak) to friends by default.
@@ -466,7 +471,7 @@ else maps onto existing items.
 99. `[~]` **LAUNCH** No durable consent record — consent lives only in the user-editable state. Add an
     append-only `consent_events` table (kind, granted/withdrawn, time, copy version, cascade). (G2)
     *Status 2026-10-20: done in code — table in `supabase/privacy_lockdown_2026_10b.sql` (RLS insert/select own, no update/delete for anyone, server-stamped time, 60/h throttle, cascade); `src/lib/consent/ledger.js` records each consent change after hydration and a just-in-time "Allow" waits for the record + a state save. Fails soft until the owner runs the SQL. Bump `CONSENT_COPY_VERSION` when the consent wording changes.*
-100. `[ ]` **BLOCKS** Privacy policy vs code (labels draft "Mismatches", DPIA G10/G13):
+100. `[~]` **BLOCKS** Privacy policy vs code (labels draft "Mismatches", DPIA G10/G13):
     - says accounts are erased "within 30 days" — deletion is immediate, backups keep 7 days;
     - says "we do not collect purchase history" — RevenueCat keeps it, linked to the user id;
     - crash reports (`client_errors`: stack, page, UA, user id) not mentioned, never purged;
@@ -481,6 +486,12 @@ else maps onto existing items.
     - "health data is never shown to others" needs a qualifier (the Fitness rating counts logging days);
     - report retention "as long as needed" vs 12 months in ABUSE_HANDLING with nothing deleting them —
       add automatic 12-month deletion of closed reports; fix the stale reporter-cascade line there.
+    *Status 2026-10-20: policy, terms and consent-sheet copy rewritten from the code (`LegalPage.jsx`,
+    `consentCopy.js`; evidence list at the top of PrivacyPolicyContent); section numbers unchanged; Last
+    updated 20 Oct 2026. Still needed outside this change: the 12-month closed-report deletion (batch B's
+    SQL — the policy already states it), a scheduled 30-day `client_errors` purge (item 96 — the policy
+    states 30 days), confirm `REVENUECAT_SECRET_API_KEY` is set in Netlify (the policy says the RevenueCat
+    record goes with the account), the controller identity and inboxes (`src/lib/support.js`).*
 101. `[x]` **BLOCKS** The "Join Waitlist" form (AI Coach — already shipped) stores emails for marketing
     and is reachable in the native build, including the paywall's fallback button. Remove it
     (recommended) or declare marketing use.
@@ -489,9 +500,16 @@ else maps onto existing items.
     table and its rows are untouched — owner to decide whether to delete them (SQL, owner-run).
     Also decided: friend list declared as Apple "Contacts"; wearable data stays out of the AI coach
     at launch (`AI_WEARABLE_DATA_ALLOWED` unset).*
-102. `[ ]` **BLOCKS** Android: the manifest has no `CAMERA` permission (barcode + AI food scan can't
+102. `[~]` **BLOCKS** Android: the manifest has no `CAMERA` permission (barcode + AI food scan can't
     work natively); Firebase Messaging mints a token at startup before notification consent; check the
     merged manifest for the advertising-ID permission.
+    *Status 2026-10-20: done in code — manifest declares CAMERA (camera features `required=false`) and
+    POST_NOTIFICATIONS, `firebase_messaging_auto_init_enabled=false`, and AD_ID `tools:node="remove"`;
+    `useCapacitor` registers (mints the token) only after the user's own opt-in on that device, not
+    merely because Android ≤12 grants notifications at install. On the build machine: `npx cap sync
+    android`, build, then check `app/build/intermediates/merged_manifests/*/AndroidManifest.xml` has
+    CAMERA and no AD_ID; on a device: barcode scan asks for the camera, and no FCM token is created
+    (no `push_tokens` row) until Enable is tapped.*
 103. `[ ]` **LAUNCH** Decide whether category ratings (fitness, finance) are visible to others — the
     fitness rating draws on health data (`netlify/lib/recompute.js`). (G10)
 104. `[ ]` **LAUNCH** Lock-screen-safe push text before push goes live (esp. coach nudges). (G8)
@@ -551,14 +569,21 @@ else maps onto existing items.
     needs the native SIWA flow's authorization code, or the provider token captured at sign-in. (P8)
 118. `[ ]` **BLOCKS** DM text (and the opt-in shared streak habit name) isn't filtered (Apple 1.2 asks
     for a filtering method): reuse `checkPublicText` on send, mirror it server-side. (P9)
-119. `[ ]` **LAUNCH** Copy and widgets for things that don't ship: remove "Recent Mail — coming soon"
+119. `[~]` **LAUNCH** Copy and widgets for things that don't ship: remove "Recent Mail — coming soon"
     from the mobile picker (keep its META for existing stacks); the tutorial still describes Trending
     and Apple Health; Track says "Syncs from WHOOP, Oura or Apple Health"; drop the "Our Apps" preset
     (links to a separate external app, URL carries a personal account name) from the native build.
     (P5, P10, P11)
-120. `[ ]` **LAUNCH** Subscription copy (3.1.2): the More drawer hard-codes "from £3.99/mo" — read it from
+    *Status 2026-10-20: done in code — Recent Mail out of the picker (META/stub kept); tutorial steps rewritten (no
+    Trending, no Apple Health); Track help and auto-fill hints name Apple Health only for the owner;
+    `APP_PRESETS` is empty in native builds (URL absent from the native bundle — checked with a
+    `VITE_NATIVE_BUILD=true` build), old cards show the retired-preset stub.*
+120. `[~]` **LAUNCH** Subscription copy (3.1.2): the More drawer hard-codes "from £3.99/mo" — read it from
     the store product like SubscriptionPanel; soften "Unlimited everything" (AI still has daily caps).
     Rename the hub's rule-based "AI Coach" banner to "Coach" or add a not-medical-advice line. (P6, P12)
+    *Status 2026-10-20: done in code — chip price from `getOfferings()` (none quoted when nothing loads); "No caps on your
+    lists" / "Higher limits" with the AI fair-use cap stated; scan upsell "More with Pro"; the banner is
+    "Coach" with "Tips from your own logs · not medical advice".*
 121. `[ ]` **LAUNCH** Store-form decisions (pack §2–4): Apple "Social Media" = No (Yes → 16+ in
     Australia); alcohol references Infrequent (or change the habit placeholder); export compliance
     "none of the algorithms" + `ITSAppUsesNonExemptEncryption=false` (one line from the solicitor);

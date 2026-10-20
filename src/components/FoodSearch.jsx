@@ -260,7 +260,7 @@ export default function FoodSearch({ onSelectFood, onClose, onOpenModal, savedMe
             </button>
             {quotaLine(quota) && (
               <p className="ai-scan-quota" role="status">
-                {quotaLine(quota)} · <button type="button" className="ai-scan-quota-pro" onClick={() => onOpenModal?.('paywall:aiScans')}>Unlimited with Pro</button>
+                {quotaLine(quota)} · <button type="button" className="ai-scan-quota-pro" onClick={() => onOpenModal?.('paywall:aiScans')}>More with Pro</button>
               </p>
             )}
             {error && (

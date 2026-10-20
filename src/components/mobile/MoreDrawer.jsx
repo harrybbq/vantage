@@ -2,6 +2,8 @@ import { useEffect, useRef, useState } from 'react';
 import { haptic } from '../../hooks/useCapacitor';
 import { useSubscriptionContext } from '../../context/SubscriptionContext';
 import Icon from '../Icon';
+import { getOfferings } from '../../lib/billing/revenuecat';
+import { priceLine } from '../../lib/billing/renewalWording';
 
 const PRO_CHIP_DISMISSED_KEY = 'vb4_more_pro_chip_dismissed';
 
@@ -61,6 +63,23 @@ export default function MoreDrawer({ open, onClose, onNavigate, activeSection, o
     setChipDismissed(true);
     try { localStorage.setItem(PRO_CHIP_DISMISSED_KEY, '1'); } catch { /* quota */ }
   }
+  // The chip's price comes from the store product, never from this file
+  // (App Store 3.1.2, item 120) — it used to say "from £3.99/mo", typed
+  // in, and wrong the day the store price or currency differs. Same
+  // source as SubscriptionPanel. getOfferings() is null on the web and
+  // until the store answers, and then the chip quotes no price at all.
+  const chipVisible = open && !hasPro && !chipDismissed && !!onUpgrade;
+  const [offering, setOffering] = useState(null);
+  useEffect(() => {
+    if (!chipVisible || offering) return undefined;
+    let cancelled = false;
+    getOfferings().then(o => { if (!cancelled) setOffering(o); }).catch(() => {});
+    return () => { cancelled = true; };
+  }, [chipVisible, offering]);
+  const pkgs = offering?.availablePackages || [];
+  const fromPrice = priceLine(pkgs.find(p => p.identifier === '$rc_monthly'))
+    || priceLine(pkgs.find(p => p.identifier === '$rc_annual'));
+
   function handleChipClick() {
     haptic('LIGHT');
     onClose();
@@ -183,7 +202,11 @@ export default function MoreDrawer({ open, onClose, onNavigate, activeSection, o
               <span className="m-drawer-pro-chip-icon" aria-hidden="true"><Icon name="sparkles" size={17} /></span>
               <span className="m-drawer-pro-chip-text">
                 <span className="m-drawer-pro-chip-label">Go Pro</span>
-                <span className="m-drawer-pro-chip-sub">Unlimited everything · from £3.99/mo</span>
+                {/* Not "Unlimited everything": AI features keep a daily
+                    fair-use cap on Pro (netlify/lib/aiQuota.js). */}
+                <span className="m-drawer-pro-chip-sub">
+                  {fromPrice ? `Higher limits · from ${fromPrice}` : 'Higher limits, accents, AI brief'}
+                </span>
               </span>
               <span className="m-drawer-pro-chip-chev" aria-hidden="true"><Icon name="chevron-right" size={15} /></span>
               <span

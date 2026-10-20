@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
 
     <!-- No backups of any kind. App storage holds the Supabase session
          and cached health/state data; allowBackup="true" copied it to
@@ -50,9 +51,45 @@
                 android:name="android.support.FILE_PROVIDER_PATHS"
                 android:resource="@xml/file_paths"></meta-data>
         </provider>
+
+        <!-- Firebase Messaging must not mint an FCM token (or a Firebase
+             installation id) at app start. The token is created only when
+             the user opts in to notifications: requestPushPermission()
+             calls PushNotifications.register(), which turns auto-init on
+             (PushNotificationsPlugin.java setAutoInitEnabled(true)).
+             unregister() turns it back off. Item 102 / labels M16. -->
+        <meta-data
+            android:name="firebase_messaging_auto_init_enabled"
+            android:value="false" />
     </application>
 
     <!-- Permissions -->
 
     <uses-permission android:name="android.permission.INTERNET" />
+
+    <!-- Barcode scanning and the AI food scan open the camera through
+         getUserMedia in the WebView (src/components/CameraScanner.jsx).
+         Capacitor's BridgeWebChromeClient asks for CAMERA at runtime when
+         the page requests it, and Android refuses the ask outright unless
+         the permission is declared here. Asked only when a scan starts. -->
+    <uses-permission android:name="android.permission.CAMERA" />
+    <!-- Not required: phones without a camera can still install the app
+         (food search and manual logging work without one). -->
+    <uses-feature android:name="android.hardware.camera" android:required="false" />
+    <uses-feature android:name="android.hardware.camera.autofocus" android:required="false" />
+
+    <!-- Android 13+ runtime permission for notifications. The push plugin
+         requests it only from requestPushPermission() (our own pre-prompt
+         first); firebase-messaging also declares it, this makes it explicit. -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+
+    <!-- VIBRATE arrives from @capacitor/haptics' own manifest (merged). -->
+
+    <!-- No advertising ID. Vantage has no ads or ad attribution, and the
+         Play Data safety form declares none. Google Play services libraries
+         can merge AD_ID in transitively; this strips it from the merged
+         manifest whatever pulls it in. Check after `npx cap sync android`:
+         app/build/intermediates/merged_manifests/release/AndroidManifest.xml
+         must not contain com.google.android.gms.permission.AD_ID. -->
+    <uses-permission android:name="com.google.android.gms.permission.AD_ID" tools:node="remove" />
 </manifest>

@@ -192,7 +192,10 @@ function AddLinkModal({ openId, onClose, onSwitchModal, onAddApp, onAddHubWidget
 
       {/* Our Apps — one-click presets for our own apps, a Pro bonus.
           Free users see them locked (→ paywall). For Pro users, a preset
-          with no URL yet renders disabled with its deploy hint. */}
+          with no URL yet renders disabled with its deploy hint.
+          Web build only: APP_PRESETS is empty natively (item 119), so
+          the heading goes with it rather than sitting over nothing. */}
+      {visibleAppPresets().length > 0 && <>
       <span className="aw-section-lbl" style={{ marginTop: 16, display: 'flex', alignItems: 'center', gap: 8 }}>
         Our Apps
         <span style={{
@@ -240,6 +243,7 @@ function AddLinkModal({ openId, onClose, onSwitchModal, onAddApp, onAddHubWidget
           );
         })}
       </div>
+      </>}
 
       <div className="modal-actions" style={{ marginTop: '14px' }}>
         <button className="btn btn-ghost" onClick={() => onClose('addLinkModal')}>Cancel</button>

@@ -895,7 +895,11 @@ export default function TrackSection({ S, update, active, onOpenModal, onShowCoi
           rows={[
             { term: 'Trackers', def: 'Tick habits against weekly targets. Select several days to log at once.' },
             { term: 'Nutrition', def: 'Search, scan a barcode, or photograph a plate.' },
-            { term: 'Vitals', def: 'Syncs from WHOOP, Oura or Apple Health.' },
+            // Apple Health import is owner-only and compiled out of the
+            // native build, so only the owner's help names it (item 119).
+            { term: 'Vitals', def: OWNER_SURFACES_IN_BUILD && typeof window !== 'undefined' && window.__vantageOwner
+              ? 'Type them in, or sync from WHOOP, Oura or Apple Health.'
+              : 'Type them in, or sync from WHOOP or Oura.' },
             { term: 'Body', def: 'Your weight trend against a goal.' },
           ]}
         /></div>

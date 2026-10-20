@@ -67,7 +67,7 @@ export default function ConsentCard({ S, update }) {
                   {on
                     ? `Allowed ${when(consent[k])}.`
                     : c.ask}
-                  {k === 'health' && on && ' To stop a connected WHOOP, Oura or Apple Health sync sending more, disconnect it in Settings → Tools too.'}
+                  {k === 'health' && on && ' To stop a connected WHOOP or Oura sending more, disconnect it in Settings → Tools too.'}
                 </div>
               </div>
               <span style={{

@@ -159,7 +159,7 @@ export const AUTO_SOURCES = [
     id: 'sleep',
     label: 'Slept at least',
     short: 'Sleep', chipUnit: 'h',
-    hint: 'Hours asleep, from WHOOP, Oura or Apple Health.',
+    hint: 'Hours asleep, from WHOOP, Oura or entered by hand.',
     needs: 'vitals', unit: 'h', dp: 1, threshold: 7, step: 0.5, max: 24,
     read: vital('sleep'),
   },
@@ -199,7 +199,7 @@ export const AUTO_SOURCES = [
     id: 'steps',
     label: 'Walked at least',
     short: 'Steps',
-    hint: 'Steps from WHOOP, Oura or Apple Health — the highest count wins.',
+    hint: 'Steps from WHOOP or Oura — the highest count wins.',
     needs: 'steps', unit: 'steps', dp: 0, threshold: 10000, step: 500, max: 60000,
     // Today's count keeps climbing after the first sync, so a cell this
     // rule filled itself may RISE as later syncs arrive (never fall, and
