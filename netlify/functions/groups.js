@@ -21,6 +21,7 @@
  * feature the owner has simply not switched on.
  */
 
+const sbKeys = require('../lib/sbKeys');
 const { requireUser, underLimit, tooMany } = require('../lib/requireUser');
 const { screenImage, parseDataUrl } = require('../lib/imageModeration');
 const { withinDailyAiCap, overDailyCap } = require('../lib/aiQuota');
@@ -443,7 +444,7 @@ exports.handler = async (event) => {
 
   const env = {
     supabaseUrl: process.env.SUPABASE_URL,
-    serviceKey: process.env.SUPABASE_SERVICE_ROLE_KEY,
+    serviceKey: sbKeys.serviceKey(process.env),
   };
   if (!env.supabaseUrl || !env.serviceKey) return fail(500, 'not configured');
 

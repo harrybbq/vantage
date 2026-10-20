@@ -17,6 +17,7 @@
  * Intra-day workouts still land via the app's on-open sync; webhooks
  * would be the path to intra-day passive updates.
  */
+const sbKeys = require('../lib/sbKeys');
 const { sb, getFreshToken, fetchWhoopData, mergeWhoopIntoState } = require('../lib/whoop');
 const { requireScheduler } = require('../lib/cronAuth');
 const { mergeStateCAS } = require('../lib/stateWrite');
@@ -30,7 +31,7 @@ exports.handler = async (event) => {
   if (denied) return denied;
 
   const env = process.env;
-  if (!env.WHOOP_CLIENT_ID || !env.WHOOP_CLIENT_SECRET || !env.SUPABASE_URL || !env.SUPABASE_SERVICE_ROLE_KEY) {
+  if (!env.WHOOP_CLIENT_ID || !env.WHOOP_CLIENT_SECRET || !env.SUPABASE_URL || !sbKeys.serviceKey(env)) {
     console.error('whoop-cron: missing env');
     return { statusCode: 500 };
   }

@@ -12,6 +12,7 @@
  * wrapper that exposes recomputeUser() to the JWT-bearing client.
  */
 
+const sbKeys = require('../lib/sbKeys');
 const { recomputeUser } = require('../lib/recompute');
 
 // ── Rate limiting ─────────────────────────────────────────────────────────
@@ -47,7 +48,7 @@ exports.handler = async (event) => {
   }
 
   const supabaseUrl = process.env.SUPABASE_URL;
-  const serviceKey  = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  const serviceKey  = sbKeys.serviceKey(process.env);
   if (!supabaseUrl || !serviceKey) {
     return { statusCode: 500, headers: CORS, body: JSON.stringify({ error: 'not configured' }) };
   }
@@ -58,7 +59,7 @@ exports.handler = async (event) => {
   if (!token) return { statusCode: 401, headers: CORS, body: JSON.stringify({ error: 'missing token' }) };
 
   const userRes = await fetch(`${supabaseUrl}/auth/v1/user`, {
-    headers: { apikey: serviceKey, Authorization: `Bearer ${token}` },
+    headers: sbKeys.userHeaders(process.env, token),
   });
   if (!userRes.ok) return { statusCode: 401, headers: CORS, body: JSON.stringify({ error: 'invalid token' }) };
   const user = await userRes.json();

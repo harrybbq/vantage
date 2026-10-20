@@ -16,6 +16,7 @@
  * few hundred MB.
  */
 
+const sbKeys = require('../lib/sbKeys');
 const { requireScheduler } = require('../lib/cronAuth');
 const { chunk } = require('../lib/pgPage');
 
@@ -31,12 +32,10 @@ const RECENT_SKIP_MS = 6 * 60 * 60 * 1000; // 6h
 function sb(supabaseUrl, serviceKey, path, init = {}) {
   return fetch(`${supabaseUrl}${path}`, {
     ...init,
-    headers: {
-      apikey: serviceKey,
-      Authorization: `Bearer ${serviceKey}`,
+    headers: sbKeys.serviceKeyHeaders(serviceKey, {
       'Content-Type': 'application/json',
       ...(init.headers || {}),
-    },
+    }),
   });
 }
 
@@ -45,7 +44,7 @@ exports.handler = async (event) => {
   if (denied) return denied;
 
   const supabaseUrl = process.env.SUPABASE_URL;
-  const serviceKey  = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  const serviceKey  = sbKeys.serviceKey(process.env);
   if (!supabaseUrl || !serviceKey) {
     return { statusCode: 500, headers: CORS, body: JSON.stringify({ error: 'not configured' }) };
   }

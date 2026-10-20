@@ -7,7 +7,7 @@
  * tokens to the right account without any session storage.
  *
  * Env: WHOOP_CLIENT_ID, WHOOP_CLIENT_SECRET (HMAC key),
- *      SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY.
+ *      SUPABASE_URL and the service key (lib/sbKeys).
  */
 const { issueState } = require('../lib/oauthState');
 const { redirectUriFor } = require('../lib/redirectUri');
@@ -27,7 +27,7 @@ exports.handler = async (event) => {
   if (event.httpMethod === 'OPTIONS') return { statusCode: 204, headers: CORS, body: '' };
   if (event.httpMethod !== 'POST') return { statusCode: 405, headers: CORS, body: JSON.stringify({ error: 'method not allowed' }) };
 
-  const { SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, WHOOP_CLIENT_ID, WHOOP_CLIENT_SECRET } = process.env;
+  const { WHOOP_CLIENT_ID, WHOOP_CLIENT_SECRET } = process.env;
   if (!WHOOP_CLIENT_ID || !WHOOP_CLIENT_SECRET) {
     console.error('whoop-connect: WHOOP_CLIENT_ID / WHOOP_CLIENT_SECRET not set');
     return { statusCode: 500, headers: CORS, body: JSON.stringify({ error: 'WHOOP is not set up on this site yet.' }) };

@@ -365,13 +365,14 @@ code fails soft until it is run, so order doesn't matter.
     service-role function, then
     `revoke update (handle, display_name, avatar_url) on public.profiles from authenticated;`.
 
-85. `[ ]` **LAUNCH** Supabase is retiring the legacy `anon`/`service_role`
+85. `[~]` **LAUNCH** Supabase is retiring the legacy `anon`/`service_role`
     keys by the end of 2026. The new `sb_secret_…` keys go in the `apikey`
     header, are not JWTs, and are refused when the request carries a
     browser User-Agent. Every Netlify function sends the service key as
     both `apikey` and `Authorization: Bearer` — that breaks on the switch.
     Move server calls to supabase-js (handles both) or send `apikey` only,
     and test against a secret key before swapping it in.
+    *Status 2026-10-20: done in code — every function reads keys through `netlify/lib/sbKeys.js` (secret key preferred, legacy fallback), service calls send `apikey` only, user session checks send the public key + the user's JWT; `check:sbkeys` fails the build on a regression; the client prefers `VITE_SUPABASE_PUBLISHABLE_KEY`. Owner switch: (1) Supabase → Project Settings → API Keys → create a secret key and a publishable key; (2) Netlify → env vars: set `SUPABASE_SECRET_KEY` (Functions scope), `SUPABASE_PUBLISHABLE_KEY` and `VITE_SUPABASE_PUBLISHABLE_KEY`; (3) redeploy; (4) open `/.netlify/functions/health` (should say `"db":"ok"`) and the Security console (both use the service key) — and sign in, sync WHOOP once; (5) roll back = delete those three vars and redeploy; (6) only later, once old app builds have updated, deactivate the legacy keys in Supabase.*
 86. `[ ]` **LAUNCH** Netlify Web security center (observed 2026-10-02):
     no WAF, no rate-limiting rules, no firewall traffic rules. Add a
     rate-limit rule on `/.netlify/functions/*` (per-IP) before launch —

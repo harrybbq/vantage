@@ -62,7 +62,7 @@ The real options, fastest first:
    | `REVENUECAT_WEBHOOK_AUTH` | `revenuecat-webhook` (tier changes) | 500 "not configured". RevenueCat retries, so events are not lost. |
    | `TRADING_REPORT_TOKEN` | `trading-summary` | setup hint, no fetch |
    | `OWNER_EMAIL` (and `VITE_OWNER_EMAIL`) | every owner-only function: `moderation`, `security-console`, `admin-set-rating`, `trading-summary`, crest review | 403 for everyone |
-   | `SUPABASE_SERVICE_ROLE_KEY` | nearly every function (anything that writes or reads across users) | 500. The app itself still loads and saves — the client talks to Supabase directly with the anon key. |
+   | `SUPABASE_SECRET_KEY` **and** `SUPABASE_SERVICE_ROLE_KEY` (functions use the secret key when set and fall back to the legacy one — remove both) | nearly every function (anything that writes or reads across users) | 500. The app itself still loads and saves — the client talks to Supabase directly with the anon key. |
 
    ⚠️ Netlify applies env var changes **only on the next deploy.** After changing one: Deploys → **Trigger deploy → Deploy site** (redeploys the current commit, ~15 credits, a few minutes).
    Remember to put the value back afterwards.
@@ -96,8 +96,8 @@ After rotating any of these: set the new value in Netlify, **then redeploy** (en
 | Secret (env var) | Protects | Rotate at | What breaks while rotating |
 |---|---|---|---|
 | Supabase **JWT secret / signing key** | Every user session. Anyone with it can mint a token as any user. | Supabase → Project Settings → JWT Keys (or API → JWT settings on older projects). | **Signs everyone out.** This is the "kill all sessions" lever. With legacy keys it also invalidates the old `anon` and `service_role` keys — update `VITE_SUPABASE_ANON_KEY`, `SUPABASE_ANON_KEY` and `SUPABASE_SERVICE_ROLE_KEY` in the same sitting, then redeploy. |
-| `SUPABASE_SERVICE_ROLE_KEY` | Full database access, bypasses RLS. Used by almost every function. | Supabase → Project Settings → API Keys. With the new-style keys, create a new secret key, deploy it, then delete the old one. With legacy keys, it only changes by rotating the JWT secret (row above). | Functions fail until the redeploy lands. Users stay signed in (new-style keys). |
-| `VITE_SUPABASE_ANON_KEY` / `SUPABASE_ANON_KEY` | Nothing secret — it is public and RLS-gated. Rotate only if forced by the JWT rotation. | As above. | App can't reach Supabase until the new build is live. Old clients (cached builds, native app) break until they update. |
+| `SUPABASE_SECRET_KEY` (new, `sb_secret_…`) / `SUPABASE_SERVICE_ROLE_KEY` (legacy) | Full database access, bypasses RLS. Used by almost every function. | Supabase → Project Settings → API Keys. With the new-style keys, create a new secret key, deploy it, then delete the old one. With legacy keys, it only changes by rotating the JWT secret (row above). | Functions fail until the redeploy lands. Users stay signed in (new-style keys). |
+| `VITE_SUPABASE_PUBLISHABLE_KEY` / `SUPABASE_PUBLISHABLE_KEY` (new) and `VITE_SUPABASE_ANON_KEY` / `SUPABASE_ANON_KEY` (legacy) | Nothing secret — it is public and RLS-gated. Rotate only if forced by the JWT rotation. | As above. | App can't reach Supabase until the new build is live. Old clients (cached builds, native app) break until they update. |
 | `ANTHROPIC_API_KEY` | AI spend. | Anthropic console → API keys. Create new, deploy, then disable the old one. | AI features answer 503 during the gap. Also check the spend limit is still set. |
 | `WHOOP_CLIENT_SECRET` (+ `WHOOP_CLIENT_ID`) | Exchanging and refreshing users' WHOOP tokens. | WHOOP developer dashboard → the app. | Sync and connect fail until redeployed. **Does not revoke users' existing grants** — tokens in `whoop_tokens` stay valid at WHOOP. Also the fallback OAuth-state key (see `OAUTH_STATE_SECRET`). |
 | `OURA_CLIENT_SECRET` (+ `OURA_CLIENT_ID`) | Same for Oura (`oura_tokens`). | Oura developer portal → the application. | Same as WHOOP. |

@@ -22,13 +22,14 @@ const {
   shapeDeploy, shapeSite, shapeFunctions, summariseVitals, netlifyLinks,
   supabaseLinks, groupClientErrors,
 } = require('./securityShape');
+const { serviceKey, serviceKeyHeaders } = require('./sbKeys');
 
 const TIMEOUT_MS = 8000;
 
 function supabaseEnv() {
   return {
     supabaseUrl: process.env.SUPABASE_URL,
-    serviceKey: process.env.SUPABASE_SERVICE_ROLE_KEY,
+    serviceKey: serviceKey(process.env),
   };
 }
 
@@ -69,12 +70,10 @@ const HINTS = {
 function rest(env, path, init = {}, ms = TIMEOUT_MS) {
   return timed(`${env.supabaseUrl}/rest/v1/${path}`, {
     ...init,
-    headers: {
-      apikey: env.serviceKey,
-      Authorization: `Bearer ${env.serviceKey}`,
+    headers: serviceKeyHeaders(env.serviceKey, {
       'Content-Type': 'application/json',
       ...(init.headers || {}),
-    },
+    }),
   }, ms);
 }
 
@@ -121,7 +120,7 @@ const HEALTH_TTL = 30_000;
  *      (Bearer SUPABASE_ACCESS_TOKEN, scoped permission analytics_logs_read) — preferred:
  *      keeps the service key out of the monitoring path;
  *   2. privileged endpoint  {SUPABASE_URL}/customer/v1/privileged/metrics
- *      (HTTP Basic service_role:<SUPABASE_SERVICE_ROLE_KEY>).
+ *      (HTTP Basic service_role:<the service key — lib/sbKeys.serviceKey>).
  * → { ok, health, via: 'management-api'|'privileged' } or a fail().
  */
 async function scrapeText(env) {
@@ -139,7 +138,7 @@ async function scrapeText(env) {
     headers: { Authorization: `Basic ${auth}`, Accept: 'text/plain' },
   });
   // 401/403 here: the endpoint wants a new-style secret key (sb_secret_…)
-  // and SUPABASE_SERVICE_ROLE_KEY holds a legacy JWT, or vice versa.
+  // and the service key is a legacy JWT, or vice versa (lib/sbKeys).
   if (!res.ok) return { status: res.status };
   return { text: await res.text(), via: 'privileged' };
 }

@@ -28,6 +28,8 @@
  * right default for a function that writes leaderboard inputs.
  */
 
+const sbKeys = require('../lib/sbKeys');
+
 const CORS = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'Content-Type, Authorization',
@@ -49,7 +51,7 @@ exports.handler = async (event) => {
   }
 
   const supabaseUrl = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
-  const serviceKey  = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  const serviceKey  = sbKeys.serviceKey(process.env);
   if (!supabaseUrl || !serviceKey) {
     return { statusCode: 500, headers: CORS, body: JSON.stringify({ error: 'not configured' }) };
   }
@@ -60,7 +62,7 @@ exports.handler = async (event) => {
   if (!jwt) return { statusCode: 401, headers: CORS, body: JSON.stringify({ error: 'sign in' }) };
 
   const who = await fetch(`${supabaseUrl}/auth/v1/user`, {
-    headers: { apikey: serviceKey, Authorization: `Bearer ${jwt}` },
+    headers: sbKeys.userHeaders(process.env, jwt),
   });
   if (!who.ok) return { statusCode: 401, headers: CORS, body: JSON.stringify({ error: 'invalid token' }) };
   const me = await who.json();
@@ -99,12 +101,10 @@ exports.handler = async (event) => {
     `${supabaseUrl}/rest/v1/profiles?id=eq.${encodeURIComponent(userId)}`,
     {
       method: 'PATCH',
-      headers: {
-        apikey: serviceKey,
-        Authorization: `Bearer ${serviceKey}`,
+      headers: sbKeys.serviceKeyHeaders(serviceKey, {
         'Content-Type': 'application/json',
         Prefer: 'return=minimal',
-      },
+      }),
       body: JSON.stringify({
         prestige,
         ratings,

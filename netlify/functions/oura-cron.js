@@ -18,6 +18,7 @@
  * vitals/burn, never removes user data — and we skip the write entirely
  * when there's nothing new, keeping DB writes minimal (Micro-friendly).
  */
+const sbKeys = require('../lib/sbKeys');
 const { sb, getFreshToken, fetchOuraData, mergeOuraIntoState } = require('../lib/oura');
 const { requireScheduler } = require('../lib/cronAuth');
 const { mergeStateCAS } = require('../lib/stateWrite');
@@ -29,7 +30,7 @@ exports.handler = async (event) => {
   if (denied) return denied;
 
   const env = process.env;
-  if (!env.OURA_CLIENT_ID || !env.OURA_CLIENT_SECRET || !env.SUPABASE_URL || !env.SUPABASE_SERVICE_ROLE_KEY) {
+  if (!env.OURA_CLIENT_ID || !env.OURA_CLIENT_SECRET || !env.SUPABASE_URL || !sbKeys.serviceKey(env)) {
     // Not an error worth alerting on: the integration is simply not
     // configured on this site yet.
     console.info('oura-cron: not configured, nothing to do');

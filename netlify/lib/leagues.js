@@ -30,6 +30,7 @@
  */
 
 const { inChunks } = require('./pgPage');
+const { serviceKeyHeaders } = require('./sbKeys');
 
 const DIVISIONS = [
   { num: 1,  name: 'Obsidian' },
@@ -95,12 +96,10 @@ const weekStartDate = (now = new Date()) => weekStart(now).toISOString().slice(0
 function sb(supabaseUrl, serviceKey, path, init = {}) {
   return fetch(`${supabaseUrl}${path}`, {
     ...init,
-    headers: {
-      apikey: serviceKey,
-      Authorization: `Bearer ${serviceKey}`,
+    headers: serviceKeyHeaders(serviceKey, {
       'Content-Type': 'application/json',
       ...(init.headers || {}),
-    },
+    }),
   });
 }
 

@@ -21,6 +21,8 @@
  * and deleting it would be a data-loss surprise. Account deletion
  * remains the route for erasing everything.
  */
+const sbKeys = require('../lib/sbKeys');
+
 const TABLES = { whoop: 'whoop_tokens', oura: 'oura_tokens' };
 
 const CORS = {
@@ -38,7 +40,7 @@ exports.handler = async (event) => {
 
   const env = process.env;
   const url = env.SUPABASE_URL || env.VITE_SUPABASE_URL;
-  const serviceKey = env.SUPABASE_SERVICE_ROLE_KEY;
+  const serviceKey = sbKeys.serviceKey(env);
   if (!url || !serviceKey) {
     return { statusCode: 500, headers: CORS, body: JSON.stringify({ error: 'not configured' }) };
   }
@@ -52,7 +54,7 @@ exports.handler = async (event) => {
 
   const jwt = (event.headers.authorization || '').replace(/^Bearer\s+/i, '');
   if (!jwt) return { statusCode: 401, headers: CORS, body: JSON.stringify({ error: 'missing token' }) };
-  const userRes = await fetch(`${url}/auth/v1/user`, { headers: { apikey: serviceKey, Authorization: `Bearer ${jwt}` } });
+  const userRes = await fetch(`${url}/auth/v1/user`, { headers: sbKeys.userHeaders(process.env, jwt) });
   if (!userRes.ok) return { statusCode: 401, headers: CORS, body: JSON.stringify({ error: 'invalid token' }) };
   const userId = (await userRes.json())?.id;
   if (!userId) return { statusCode: 401, headers: CORS, body: JSON.stringify({ error: 'no user id' }) };
@@ -60,11 +62,9 @@ exports.handler = async (event) => {
   try {
     const del = await fetch(`${url}/rest/v1/${table}?user_id=eq.${userId}`, {
       method: 'DELETE',
-      headers: {
-        apikey: serviceKey,
-        Authorization: `Bearer ${serviceKey}`,
+      headers: sbKeys.serviceKeyHeaders(serviceKey, {
         Prefer: 'return=minimal',
-      },
+      }),
     });
     // 404 = the table doesn't exist yet (schema SQL not run). Nothing is
     // stored, so the user is disconnected either way — say so rather

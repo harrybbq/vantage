@@ -36,6 +36,7 @@
  * paid for once.
  */
 
+const sbKeys = require('../lib/sbKeys');
 const { requireScheduler } = require('../lib/cronAuth');
 const {
   sb, fetchBaselines, memberScore, groupScore, rankGroups, weekStart, COIN_AWARD, DIVISIONS,
@@ -51,7 +52,7 @@ exports.handler = async (event) => {
 
   const env = {
     supabaseUrl: process.env.SUPABASE_URL,
-    serviceKey: process.env.SUPABASE_SERVICE_ROLE_KEY,
+    serviceKey: sbKeys.serviceKey(process.env),
   };
   if (!env.supabaseUrl || !env.serviceKey) {
     return { statusCode: 500, headers: CORS, body: JSON.stringify({ error: 'not configured' }) };

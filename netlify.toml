@@ -13,7 +13,7 @@
   # table). Whitelist the keys whose presence in dist/ is intentional.
   #
   # Add any new VITE_* var here when you introduce one. NEVER add
-  # server-side secrets (SUPABASE_SERVICE_ROLE_KEY, FCM_*, etc.) —
+  # server-side secrets (SUPABASE_SECRET_KEY, SUPABASE_SERVICE_ROLE_KEY, FCM_*, etc.) —
   # those should never appear in the bundle in the first place.
   #
   # VITE_OWNER_EMAIL used to be the client-side UI gate (useIsOwner);
@@ -26,15 +26,21 @@
   # (put there legitimately by the VITE_ twin) and attributes it to the
   # SUPABASE_URL key, so that key must be omitted too. The URL is a
   # public endpoint, NOT a secret — the real secret is
-  # SUPABASE_SERVICE_ROLE_KEY, which never enters the bundle and stays
-  # scanned.
+  # service key (SUPABASE_SECRET_KEY / legacy service-role), which never
+  # enters the bundle and stays scanned.
+  #
+  # VITE_SUPABASE_PUBLISHABLE_KEY / SUPABASE_PUBLISHABLE_KEY (item 85):
+  # the new-style public key that replaces the anon key — bundled by the
+  # VITE_ twin on purpose, and the server twin holds the same value, so
+  # both are omitted for the same reason as SUPABASE_URL. NEVER add
+  # SUPABASE_SECRET_KEY here.
   #
   # VITE_API_BASE (native build's function origin, the public site URL —
   # also hard-coded as DEFAULT_API_BASE in src/lib/native/apiUrl.js) and
   # VITE_NATIVE_BUILD (a "true"/"false" build flag) came in with the
   # native work; both are public by design and would otherwise trip the
   # value scan the moment they are set in the dashboard.
-  SECRETS_SCAN_OMIT_KEYS = "VITE_SUPABASE_URL,VITE_SUPABASE_ANON_KEY,VITE_REVENUECAT_API_KEY_IOS,VITE_REVENUECAT_API_KEY_ANDROID,VITE_OWNER_EMAIL,VITE_API_BASE,VITE_NATIVE_BUILD,VITE_AI_WEARABLE_DATA_ALLOWED,SUPABASE_URL"
+  SECRETS_SCAN_OMIT_KEYS = "VITE_SUPABASE_URL,VITE_SUPABASE_ANON_KEY,VITE_SUPABASE_PUBLISHABLE_KEY,SUPABASE_PUBLISHABLE_KEY,VITE_REVENUECAT_API_KEY_IOS,VITE_REVENUECAT_API_KEY_ANDROID,VITE_OWNER_EMAIL,VITE_API_BASE,VITE_NATIVE_BUILD,VITE_AI_WEARABLE_DATA_ALLOWED,SUPABASE_URL"
 
   # Smart detection scans for things that LOOK like secrets by
   # pattern (long base64 strings, JWT shapes, keys with known

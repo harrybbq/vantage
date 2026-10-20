@@ -59,10 +59,11 @@
  * no full-table reads; the RevenueCat answer is cached 10 min per instance.
  * Never logs a figure, a description or a key.
  *
- * Env (names only): SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, OWNER_EMAIL;
+ * Env (names only): SUPABASE_URL, the service key (lib/sbKeys), OWNER_EMAIL;
  * optional REVENUECAT_PROJECT_ID + REVENUECAT_METRICS_API_KEY (falls back
  * to REVENUECAT_SECRET_API_KEY).
  */
+const sbKeys = require('../lib/sbKeys');
 const { requireUser, underLimit, tooMany } = require('../lib/requireUser');
 const { isOwnerEmail } = require('../lib/owner');
 const { pageAll, chunk } = require('../lib/pgPage');
@@ -79,7 +80,7 @@ const reply = (statusCode, body) => ({ statusCode, headers: CORS, body: JSON.str
 const denied = () => reply(401, { error: 'session expired — sign in again' });
 
 const HINT_SQL = 'Run supabase/books_2026_10.sql in the Supabase SQL editor — it creates the three Books tables (service-role only, additive).';
-const HINT_ENV = 'SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY must be set for functions.';
+const HINT_ENV = 'SUPABASE_URL and a Supabase service key (SUPABASE_SECRET_KEY, or the legacy service-role key) must be set for functions.';
 const notConfigured = (hint = HINT_SQL) => reply(200, { ok: false, reason: 'not_configured', hint });
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -98,7 +99,7 @@ const BILL_EDITABLE = ['name', 'kind', 'category', 'amount_pence', 'currency', '
 class NotConfigured extends Error {}
 
 function env() {
-  return { url: process.env.SUPABASE_URL, key: process.env.SUPABASE_SERVICE_ROLE_KEY };
+  return { url: process.env.SUPABASE_URL, key: sbKeys.serviceKey(process.env) };
 }
 
 async function timed(url, init = {}, ms = TIMEOUT_MS) {
@@ -110,12 +111,10 @@ async function timed(url, init = {}, ms = TIMEOUT_MS) {
 function rest(e, path, init = {}) {
   return timed(`${e.url}/rest/v1/${path}`, {
     ...init,
-    headers: {
-      apikey: e.key,
-      Authorization: `Bearer ${e.key}`,
+    headers: sbKeys.serviceKeyHeaders(e.key, {
       'Content-Type': 'application/json',
       ...(init.headers || {}),
-    },
+    }),
   });
 }
 
@@ -246,9 +245,9 @@ const RC_TTL = 10 * 60_000;
 const rcCache = { at: 0, value: null };
 
 async function readRevenueCatOverview() {
-  const key = process.env.REVENUECAT_METRICS_API_KEY || process.env.REVENUECAT_SECRET_API_KEY;
+  const rcKey = process.env.REVENUECAT_METRICS_API_KEY || process.env.REVENUECAT_SECRET_API_KEY;
   const project = process.env.REVENUECAT_PROJECT_ID;
-  if (!key || !project) {
+  if (!rcKey || !project) {
     return { ok: false, reason: 'not_configured', hint: 'Set REVENUECAT_PROJECT_ID and REVENUECAT_METRICS_API_KEY (a v2 secret key with charts_metrics:overview:read) in Netlify, Functions scope.' };
   }
   if (!/^[A-Za-z0-9_-]{1,64}$/.test(project)) return { ok: false, reason: 'not_configured', hint: 'REVENUECAT_PROJECT_ID does not look like a project id.' };
@@ -256,7 +255,7 @@ async function readRevenueCatOverview() {
   let value;
   try {
     const url = `${REVENUECAT_OVERVIEW_URL.replace('{project_id}', enc(project))}?currency=GBP`;
-    const res = await timed(url, { headers: { Authorization: `Bearer ${key}`, Accept: 'application/json' } });
+    const res = await timed(url, { headers: { Authorization: `Bearer ${rcKey}`, Accept: 'application/json' } });
     if (res.status === 401 || res.status === 403) {
       value = { ok: false, reason: 'unavailable', hint: 'RevenueCat refused the key — it needs to be a v2 secret key with the charts_metrics:overview:read permission.' };
     } else if (!res.ok) {

@@ -14,6 +14,7 @@
  * built. Keeps the user's own row honest no matter how stale they were.
  */
 
+const sbKeys = require('../lib/sbKeys');
 const { recomputeUser } = require('../lib/recompute');
 const { suspendedIds } = require('../lib/suspended');
 const { inChunks } = require('../lib/pgPage');
@@ -65,12 +66,10 @@ function checkRateLimit(ip) {
 function sb(supabaseUrl, serviceKey, path, init = {}) {
   return fetch(`${supabaseUrl}${path}`, {
     ...init,
-    headers: {
-      apikey: serviceKey,
-      Authorization: `Bearer ${serviceKey}`,
+    headers: sbKeys.serviceKeyHeaders(serviceKey, {
       'Content-Type': 'application/json',
       ...(init.headers || {}),
-    },
+    }),
   });
 }
 
@@ -296,7 +295,7 @@ exports.handler = async (event) => {
   }
 
   const supabaseUrl = process.env.SUPABASE_URL;
-  const serviceKey  = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  const serviceKey  = sbKeys.serviceKey(process.env);
   if (!supabaseUrl || !serviceKey) {
     return { statusCode: 500, headers: CORS, body: JSON.stringify({ error: 'not configured' }) };
   }
@@ -306,7 +305,7 @@ exports.handler = async (event) => {
   const token = auth.replace(/^Bearer\s+/i, '');
   if (!token) return { statusCode: 401, headers: CORS, body: JSON.stringify({ error: 'missing token' }) };
   const userRes = await fetch(`${supabaseUrl}/auth/v1/user`, {
-    headers: { apikey: serviceKey, Authorization: `Bearer ${token}` },
+    headers: sbKeys.userHeaders(process.env, token),
   });
   if (!userRes.ok) return { statusCode: 401, headers: CORS, body: JSON.stringify({ error: 'invalid token' }) };
   const caller = await userRes.json();

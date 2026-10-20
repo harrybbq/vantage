@@ -41,6 +41,7 @@ function checkRateLimit(ip) {
   return entry.count <= RATE_LIMIT;
 }
 
+const sbKeys = require('../lib/sbKeys');
 const { requireUser, underLimit, tooMany } = require('../lib/requireUser');
 const { withinDailyAiCap, overDailyCap } = require('../lib/aiQuota');
 const { isOwnerEmail } = require('../lib/owner');
@@ -176,11 +177,11 @@ function fitSnapshot(snapshot) {
 /** Pro/lifetime from the server-owned profiles.tier — never the client. */
 async function isPaid(userId) {
   const url = process.env.SUPABASE_URL;
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  const key = sbKeys.serviceKey(process.env);
   if (!url || !key) return false;
   try {
     const res = await fetch(`${url}/rest/v1/profiles?id=eq.${userId}&select=tier`, {
-      headers: { apikey: key, Authorization: `Bearer ${key}` },
+      headers: sbKeys.serviceKeyHeaders(key),
     });
     if (!res.ok) return false;
     const tier = (await res.json())[0]?.tier;

@@ -31,6 +31,7 @@
  *      stay untouched.
  */
 
+const sbKeys = require('../lib/sbKeys');
 const { derivePoints, deriveRatings, loadRatingInputs, writeRatings } = require('../lib/recompute');
 
 const CORS = {
@@ -74,7 +75,7 @@ exports.handler = async (event) => {
   if (event.httpMethod !== 'POST') return reply(405, { error: 'method not allowed' });
 
   const supabaseUrl = process.env.SUPABASE_URL;
-  const serviceKey  = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  const serviceKey  = sbKeys.serviceKey(process.env);
   if (!supabaseUrl || !serviceKey) return reply(500, { error: 'not configured' });
   const env = { supabaseUrl, serviceKey };
 
@@ -83,7 +84,7 @@ exports.handler = async (event) => {
   const token = auth.replace(/^Bearer\s+/i, '');
   if (!token) return reply(401, { error: 'missing token' });
   const userRes = await fetch(`${supabaseUrl}/auth/v1/user`, {
-    headers: { apikey: serviceKey, Authorization: `Bearer ${token}` },
+    headers: sbKeys.userHeaders(process.env, token),
   });
   if (!userRes.ok) return reply(401, { error: 'invalid token' });
   const user = await userRes.json();
@@ -92,7 +93,7 @@ exports.handler = async (event) => {
 
   if (debounced(userId)) return reply(429, { error: 'try again in a moment' });
 
-  const sbHeaders = { apikey: serviceKey, Authorization: `Bearer ${serviceKey}` };
+  const sbHeaders = sbKeys.serviceKeyHeaders(serviceKey);
 
   try {
     // ── Cooldown (fail soft until the column exists) ──

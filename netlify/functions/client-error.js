@@ -18,6 +18,8 @@
  * Always 204, including when the table does not exist yet: an error
  * reporter that can itself throw errors at the app is worse than none.
  */
+const sbKeys = require('../lib/sbKeys');
+
 const CORS = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'Content-Type, Authorization',
@@ -63,10 +65,10 @@ function stripUrl(v) {
 async function userIdFrom(event, url) {
   const raw = event.headers?.authorization || event.headers?.Authorization || '';
   const jwt = raw.replace(/^Bearer\s+/i, '').trim();
-  const apikey = process.env.VITE_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY;
+  const apikey = sbKeys.userApiKey(process.env);
   if (!jwt || !apikey) return null;
   try {
-    const res = await fetch(`${url}/auth/v1/user`, { headers: { apikey, Authorization: `Bearer ${jwt}` } });
+    const res = await fetch(`${url}/auth/v1/user`, { headers: sbKeys.userHeaders(process.env, jwt) });
     if (!res.ok) return null;
     return (await res.json())?.id || null;
   } catch {
@@ -81,7 +83,7 @@ exports.handler = async (event) => {
   if (!allowed(clientIp(event))) return { statusCode: 429, headers: CORS, body: '' };
 
   const url = process.env.SUPABASE_URL;
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  const key = sbKeys.serviceKey(process.env);
   if (!url || !key) return done();
 
   let b;
@@ -102,7 +104,7 @@ exports.handler = async (event) => {
   try {
     const res = await fetch(`${url}/rest/v1/client_errors`, {
       method: 'POST',
-      headers: { apikey: key, Authorization: `Bearer ${key}`, 'Content-Type': 'application/json', Prefer: 'return=minimal' },
+      headers: sbKeys.serviceKeyHeaders(key, { 'Content-Type': 'application/json', Prefer: 'return=minimal' }),
       body: JSON.stringify(row),
     });
     // 404/400 = table not installed yet; nothing to do but carry on.
