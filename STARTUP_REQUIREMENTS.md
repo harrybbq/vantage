@@ -51,16 +51,20 @@ action outside the repo.
 
 ## Phase 3 — Legal and data protection
 
-8. `[ ]` **Get a DPIA done for the health data.** Weight, sleep, resting
+8. `[~]` **Get a DPIA done for the health data.** Weight, sleep, resting
    HR and recovery are *special category* data under UK GDPR — a higher
    bar than ordinary personal data, and a DPIA is likely mandatory
    (Art. 35). Worth an hour with a solicitor; this is the one area where
    guessing is expensive.
+   *Status 2026-10-20: draft for the solicitor in `docs/DPIA_DRAFT.md` (ICO 7-step structure, data-flow
+   inventory, risks, measures, 18 solicitor questions, gaps G1–G26 → items 98–108).*
 9. `[x]` **Privacy policy and terms**, deep-linkable before sign-in —
    `/privacy` and `/terms` already do this.
-10. `[ ]` **Fill in App Store privacy labels** — declare health,
+10. `[~]` **Fill in App Store privacy labels** — declare health,
     financial and contact data collection. Must match what the app
     actually does.
+    *Status 2026-10-20: drafted from code in `docs/STORE_PRIVACY_LABELS.md` (Apple + Play Data safety +
+    health declarations); fix items 100–102 first, then the labels can be entered as drafted.*
 
 ## Phase 4 — Make it build natively
 
@@ -429,6 +433,50 @@ code fails soft until it is run, so order doesn't matter.
 75. `[ ]` **DPAs** with Anthropic, RevenueCat, Netlify, Supabase; WHOOP
     production approval for other people's data; trademark check on
     "Vantage".
+
+### From the DPIA and privacy-label drafts — 2026-10-20
+`docs/DPIA_DRAFT.md` (gaps G1–G26) and `docs/STORE_PRIVACY_LABELS.md`. New findings only; everything
+else maps onto existing items.
+98. `[ ]` **LAUNCH** Consent is enforced in the app only. `whoop-cron`, `oura-cron`, `whoop-sync`,
+    `oura-sync` and `health-sync` keep syncing after a user withdraws health consent (until they also
+    press Disconnect), and the AI functions don't check AI consent server-side. Skip/refuse on the server
+    (one JSON-path read), or have withdrawal call `wearable-disconnect`. (DPIA G1)
+99. `[ ]` **LAUNCH** No durable consent record — consent lives only in the user-editable state. Add an
+    append-only `consent_events` table (kind, granted/withdrawn, time, copy version, cascade). (G2)
+100. `[ ]` **BLOCKS** Privacy policy vs code (labels draft "Mismatches", DPIA G10/G13):
+    - says accounts are erased "within 30 days" — deletion is immediate, backups keep 7 days;
+    - says "we do not collect purchase history" — RevenueCat keeps it, linked to the user id;
+    - crash reports (`client_errors`: stack, page, UA, user id) not mentioned, never purged;
+    - Apple Health and recipe-from-video described as user features — both owner-only, compiled out
+      of native (and the native build's tutorial/Track help/auto-fill/consent strings still say Apple
+      Health);
+    - the coach is said to send vitals and macros — it sends first name, habit names + relapse counts,
+      trackers, holiday destinations and wish-list counts;
+    - Anthropic's API retention not mentioned; money data, body measurements/age/sex/height, relapses,
+      old mood entries and community foods (`food_contributions`) not named;
+    - invite links show the inviter's name, handle, picture, level and rating before sign-in;
+    - "health data is never shown to others" needs a qualifier (the Fitness rating counts logging days);
+    - report retention "as long as needed" vs 12 months in ABUSE_HANDLING with nothing deleting them —
+      add automatic 12-month deletion of closed reports; fix the stale reporter-cascade line there.
+101. `[ ]` **BLOCKS** The "Join Waitlist" form (AI Coach — already shipped) stores emails for marketing
+    and is reachable in the native build, including the paywall's fallback button. Remove it
+    (recommended) or declare marketing use.
+102. `[ ]` **BLOCKS** Android: the manifest has no `CAMERA` permission (barcode + AI food scan can't
+    work natively); Firebase Messaging mints a token at startup before notification consent; check the
+    merged manifest for the advertising-ID permission.
+103. `[ ]` **LAUNCH** Decide whether category ratings (fitness, finance) are visible to others — the
+    fitness rating draws on health data (`netlify/lib/recompute.js`). (G10)
+104. `[ ]` **LAUNCH** Lock-screen-safe push text before push goes live (esp. coach nudges). (G8)
+105. `[ ]` **LAUNCH** Test the AI coach with eating-disorder, self-harm and relapse style inputs and
+    record the results. (G15)
+106. `[ ]` **LAUNCH** Confirm the Netlify functions' region (none set in netlify.toml — likely US) for
+    the transfer analysis; written policy for owner/admin access to user data and a log of moderation
+    reads; Art. 30 records / LIAs if the solicitor says so. (G5, G18, G25)
+107. `[ ]` **AFTER** Legacy `moodLog` still sits in users' state though Mood was removed — tell users
+    and offer deletion, or remove it additive-first per CLAUDE.md. (G12)
+108. `[ ]` **AFTER** Let a habit be private (kept out of AI and friend surfaces) (G14); self-host the
+    fonts so devices don't contact Google Fonts (G16); consider ipwho.is → Netlify's own geo for
+    weather so no third party sees the IP.
 
 ## Phase 7 — Running it safely once it's public
 
