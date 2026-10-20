@@ -205,7 +205,7 @@ export default function MoreDrawer({ open, onClose, onNavigate, activeSection, o
                 {/* Not "Unlimited everything": AI features keep a daily
                     fair-use cap on Pro (netlify/lib/aiQuota.js). */}
                 <span className="m-drawer-pro-chip-sub">
-                  {fromPrice ? `Higher limits, AI brief · from ${fromPrice}` : 'Higher limits, accents and the AI brief'}
+                  {fromPrice ? `Higher limits · from ${fromPrice}` : 'Higher limits, accents, AI brief'}
                 </span>
               </span>
               <span className="m-drawer-pro-chip-chev" aria-hidden="true"><Icon name="chevron-right" size={15} /></span>
