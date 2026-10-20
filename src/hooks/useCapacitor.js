@@ -7,7 +7,9 @@
  *
  * Push permission policy:
  *   The OS push permission prompt is NOT triggered automatically here.
- *   We only attach push listeners if permission is already 'granted'.
+ *   We only attach push listeners (and register(), which mints the FCM
+ *   token) if the user opted in on this device AND permission is still
+ *   'granted' — see hasPushOptIn below.
  *   The first-time prompt is gated behind our own pre-prompt modal so
  *   the user understands what they're opting into BEFORE the iOS
  *   one-shot dialog fires (denied permission can't be re-asked
@@ -18,6 +20,24 @@
  *   right (e.g. after first vision unlock, after first habit log).
  */
 import { useEffect, useRef } from 'react';
+
+// ── The user's own opt-in, per device ───────────────────────────────────
+// OS permission alone is not consent: Android 12 and below grant
+// notifications at install, so "permission is granted" would register
+// the device and mint an FCM token on first launch for someone who never
+// asked for push. The token (and the Firebase installation id behind it)
+// is created only once the user has said yes in our pre-prompt —
+// requestPushPermission() records that here. The manifest keeps
+// Firebase's own auto-init off for the same reason (item 102).
+// Device-local on purpose: it describes this device's registration and
+// is not account data (nothing in S is read or written).
+const PUSH_OPT_IN_KEY = 'vb4_push_opted_in';
+export function hasPushOptIn() {
+  try { return localStorage.getItem(PUSH_OPT_IN_KEY) === '1'; } catch { return false; }
+}
+function recordPushOptIn() {
+  try { localStorage.setItem(PUSH_OPT_IN_KEY, '1'); } catch { /* private storage: asks again next launch */ }
+}
 
 // Lazy-load Capacitor so Vite can still bundle a pure-web build if needed.
 let capCore = null;
@@ -87,14 +107,17 @@ export function useCapacitor({ onPushToken, onPushMessage } = {}) {
         console.warn('SplashScreen:', e.message);
       }
 
-      // ── Push Notifications (passive — only attach if already granted) ───
+      // ── Push Notifications (passive — only if the user opted in) ────────
       // Do NOT call requestPermissions() here. That's gated behind our own
       // pre-prompt UI to protect first-time conversion. We only wire
-      // listeners + register if the user has previously granted.
+      // listeners + register() when the user opted in on this device AND
+      // the OS permission is still granted. register() is what mints the
+      // FCM token, so it must never run for someone who didn't ask.
       try {
+        const optedIn = hasPushOptIn();
         const { PushNotifications } = await import('@capacitor/push-notifications');
-        const { receive } = await PushNotifications.checkPermissions();
-        if (receive === 'granted') {
+        const { receive } = optedIn ? await PushNotifications.checkPermissions() : { receive: 'not-opted-in' };
+        if (optedIn && receive === 'granted') {
           await attachPushListeners({
             onPushToken: v => callbacksRef.current.onPushToken?.(v),
             onPushMessage: v => callbacksRef.current.onPushMessage?.(v),
@@ -171,6 +194,9 @@ export async function requestPushPermission({ onPushToken, onPushMessage } = {})
 
     if (receive !== 'granted') return 'denied';
 
+    // The user tapped Enable in our pre-prompt and the OS agreed: from
+    // here on this device may register at launch (see hasPushOptIn).
+    recordPushOptIn();
     await PushNotifications.register();
     if (onPushToken) {
       await PushNotifications.addListener('registration', token => onPushToken(token.value));
@@ -198,6 +224,10 @@ export async function getPushPermissionState() {
     if (!Capacitor.isNativePlatform()) return 'unsupported';
     const { PushNotifications } = await import('@capacitor/push-notifications');
     const { receive } = await PushNotifications.checkPermissions();
+    // Granted by the OS but never opted in (Android 12 and below grant at
+    // install): report it as not enabled, so the panel offers Enable and
+    // the opt-in — not the install — is what turns push on.
+    if (receive === 'granted' && !hasPushOptIn()) return 'prompt';
     return receive;
   } catch {
     return 'error';
