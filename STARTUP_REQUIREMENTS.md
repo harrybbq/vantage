@@ -513,9 +513,27 @@ else maps onto existing items.
     (no `push_tokens` row) until Enable is tapped.*
 103. `[ ]` **LAUNCH** Decide whether category ratings (fitness, finance) are visible to others — the
     fitness rating draws on health data (`netlify/lib/recompute.js`). (G10)
-104. `[ ]` **LAUNCH** Lock-screen-safe push text before push goes live (esp. coach nudges). (G8)
-105. `[ ]` **LAUNCH** Test the AI coach with eating-disorder, self-harm and relapse style inputs and
+104. `[~]` **LAUNCH** Lock-screen-safe push text before push goes live (esp. coach nudges). (G8)
+    *Status 2026-10-20: done in code — every push goes through `netlify/lib/lockScreenSafe.js` in
+    `push-dispatch.js`: fixed generic title/body per kind (friend request/accepted, coach nudge,
+    streak warning, daily reminder, honour, and the not-yet-written DM, group message and safety
+    notice kinds; anything unknown gets "Vantage / You have a new notification."), nothing from the
+    queued payload shown, `data` = kind + id-shaped references only, Android visibility PRIVATE; client
+    toasts show the title, never a body. No preview setting exists, so safe by default. Tested in the
+    build (`check:lockscreen`). Outside the repo: optionally run
+    `supabase/notifications_lockscreen_2026_10.sql` (triggers stop queueing names/handles); check on a
+    real locked phone when push goes live (item 15).*
+105. `[~]` **LAUNCH** Test the AI coach with eating-disorder, self-harm and relapse style inputs and
     record the results. (G15)
+    *Status 2026-10-20: done in code — safe mode (`netlify/lib/coachSafety.js`, client twin
+    `src/lib/coach/safety.js`): self-harm signals → fixed brief with Samaritans 116 123 / 999 and no
+    model call; eating-disorder, relapse, over-training and under-18 signals → gentle mode (reduced
+    snapshot, no food/weight/body/exercise data or day counts, fixed helpline line); every model brief
+    checked against an output policy and replaced if it breaks it; local brief, tips and nudges follow.
+    System prompt gained a Safety block. 36 invented red-team cases run through the production path in
+    the build (`check:coachsafety`). Results: `docs/COACH_REDTEAM_RESULTS.md`. Outside the repo: run the
+    live-model pass (`ANTHROPIC_API_KEY=… npm run coach:redteam:live -- --repeat 3`) and commit the
+    updated results; verify the helpline numbers on each service's site.*
 106. `[~]` **LAUNCH** Confirm the Netlify functions' region (none set in netlify.toml — likely US) for
     the transfer analysis; written policy for owner/admin access to user data and a log of moderation
     reads; Art. 30 records / LIAs if the solicitor says so. (G5, G18, G25)

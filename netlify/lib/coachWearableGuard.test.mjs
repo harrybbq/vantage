@@ -102,11 +102,17 @@ console.log("server guard — env 'true' passes");
 
 console.log('ai-coach-daily wiring');
 {
+  // The prompt pipeline moved to lib/coachPrompt.js (item 105) so the
+  // red-team eval can run it; the handler hands it the raw snapshot.
   const src = fs.readFileSync(path.join(here, '../functions/ai-coach-daily.js'), 'utf8');
-  ok(/require\('\.\.\/lib\/coachWearableGuard'\)/.test(src), 'function requires the guard');
-  ok(/fitSnapshot\(guardWearableData\(body\.snapshot\)\)/.test(src), 'guard runs before the snapshot is sized and sent');
-  ok(!/VisionBoard|vision-board/i.test(src), 'no stale VisionBoard naming');
-  ok(/personal life app called Vantage/.test(src), 'SYSTEM_PROMPT names Vantage');
+  const lib = fs.readFileSync(path.join(here, 'coachPrompt.js'), 'utf8');
+  ok(/prepareBrief\(body\.snapshot\)/.test(src), 'function hands the raw snapshot to prepareBrief');
+  ok(/require\('\.\/coachWearableGuard'\)/.test(lib), 'pipeline requires the guard');
+  const prep = lib.slice(lib.indexOf('function prepareBrief'));
+  const iGuard = prep.indexOf('guardWearableData(rawSnapshot');
+  ok(iGuard > 0 && iGuard < prep.indexOf('assessSnapshot(guarded)') && iGuard < prep.indexOf('fitSnapshot('), 'guard runs before the snapshot is assessed, sized and sent');
+  ok(!/VisionBoard|vision-board/i.test(src + lib), 'no stale VisionBoard naming');
+  ok(/personal life app called Vantage/.test(lib), 'SYSTEM_PROMPT names Vantage');
 }
 
 // ── Client snapshot ──────────────────────────────────────────────────

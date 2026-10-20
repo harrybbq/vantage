@@ -62,10 +62,12 @@ export async function registerPushToken(userId, token, platform = 'unknown') {
  * an "always-allowed" system push and bypasses the prefs check.
  */
 const KIND_TO_PREF = {
-  'vision-unlock':  'visionUnlock',
-  'friend-request': 'friendRequest',
-  'streak-warning': 'streakWarning',
-  'coach-nudge':    'coachNudge',
+  'vision-unlock':   'visionUnlock',
+  'friend-request':  'friendRequest',
+  'friend-accepted': 'friendRequest',
+  'streak-warning':  'streakWarning',
+  'coach-nudge':     'coachNudge',
+  'daily-reminder':  'streakWarning', // shares the streak-warning toggle (as push-dispatch.js)
 };
 
 /**
@@ -115,8 +117,9 @@ function shouldSurfacePush(msg, prefs) {
  * Supported payloads (declared in the `data` field of the push):
  *   - kind: 'vision-unlock'    → toast + (eventually) confetti
  *   - kind: 'friend-request'   → toast + navigate to Friends rail
- *   - kind: 'streak-warning'   → toast urging the user to log
- *   - kind: 'coach-nudge'      → toast with the nudge body
+ *   - kind: 'streak-warning'   → toast with the (generic) title
+ *   - kind: 'coach-nudge'      → toast with the (generic) title; the
+ *                                nudge itself is read in the app
  *
  * `msg` shape (from useCapacitor):
  *   { title, body, data: { kind, ... }, foreground?, tapped? }
@@ -146,17 +149,22 @@ export function handleIncomingPush(msg, actions = {}) {
       if (showToast) showToast(`✦ ${msg.title || 'Honour earned'}`, true);
       break;
     case 'friend-request':
+    case 'friend-accepted':
       if (showToast) showToast(`◌ ${msg.title || 'New friend request'}`, true);
       // If tapped, navigate to where the rail lives (hub for now;
       // dedicated friends route later).
       if (msg?.tapped && navigate) navigate('hub');
       break;
+    // Lock-screen safe (item 104): the server sends fixed, generic text
+    // (netlify/lib/lockScreenSafe.js), so the toast shows the title —
+    // the body is only ever "Open Vantage to …". Detail lives in the app.
     case 'streak-warning':
-      if (showToast) showToast(`⏰ ${msg.body || 'Streak at risk'}`);
+    case 'daily-reminder':
+      if (showToast) showToast(`⏰ ${msg.title || 'A quick check-in'}`);
       if (msg?.tapped && navigate) navigate('track');
       break;
     case 'coach-nudge':
-      if (showToast) showToast(`✦ ${msg.body || 'Coach has a nudge'}`, true);
+      if (showToast) showToast(`✦ ${msg.title || 'Your coach has a note for you'}`, true);
       if (msg?.tapped && navigate) navigate('hub');
       break;
     default:

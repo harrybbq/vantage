@@ -9,6 +9,8 @@
  */
 import { habitElapsed } from '../habits/progress.js';
 import { isCut } from '../habits/cutdown.js';
+import { coachSafetyModes } from './snapshot.js';
+import { safeBrief } from './safety.js';
 
 const DAY = 86_400_000;
 const todayStr = () => new Date().toISOString().slice(0, 10);
@@ -72,6 +74,16 @@ function closestSaving(S) {
 }
 
 export function heuristicBrief(S) {
+  // Safe mode (item 105): when the state shows eating-disorder, self-harm,
+  // relapse, over-training or under-18 signals, the local brief is the
+  // same fixed, reviewed text the server uses — no streaks, no "log your
+  // weight", and a helpline where one is due. `safe_mode` is the only
+  // marker; which mode applied is never stored.
+  const modes = coachSafetyModes(S);
+  if (modes.length) {
+    return { ...safeBrief({ modes }, { name: firstName(S) === 'there' ? '' : firstName(S), isSunday: false }), source: 'heuristic' };
+  }
+
   const name = firstName(S);
   const hab = topHabit(S);
   const risk = riskyHabit(S);
