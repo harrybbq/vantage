@@ -1,5 +1,6 @@
 import { trainingAdherence } from '../body/goal.js';
 import { habitElapsed } from '../habits/progress.js';
+import { coachSafetyModes } from './snapshot.js';
 /**
  * Pattern snapshot — extended user state for proactive nudge detection.
  *
@@ -270,6 +271,11 @@ export function buildPatternSnapshot(S, opts = {}) {
     // Lifetime totals for ambient context
     coins_balance: S.coins || 0,
     visions_unlocked: Object.keys(S.visions || {}).length,
+    // Safe mode (item 105): true when the coach should go gentle. No
+    // mode names. detectPatternsHeuristic emits nothing then — streak
+    // breaks, body-goal shortfalls and milestone countdowns are exactly
+    // the pressure gentle mode removes.
+    gentle: coachSafetyModes(S).length > 0,
   };
 }
 
@@ -289,6 +295,7 @@ export function buildPatternSnapshot(S, opts = {}) {
  */
 export function detectPatternsHeuristic(snapshot) {
   const out = [];
+  if (snapshot && snapshot.gentle) return out;
 
   // 1. Weekday outliers — flag any tracker where one weekday is
   //    materially weaker than the rest.

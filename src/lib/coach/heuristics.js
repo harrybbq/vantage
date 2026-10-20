@@ -21,6 +21,8 @@
  *   verb?         optional { label, action, args } — wired in App.jsx
  */
 import { habitElapsed } from '../habits/progress.js';
+import { coachSafetyModes } from './snapshot.js';
+import { safeBrief } from './safety.js';
 
 const DAY_MS = 86_400_000;
 
@@ -481,6 +483,24 @@ function isOnCooldown(memEntry, ruleCooldownDays) {
   return false;
 }
 
+// ── Safe mode (item 105) ──────────────────────────────────────────────────
+// When the state shows eating-disorder, self-harm, relapse, over-training
+// or under-18 signals, the tips drop everything about trackers, habits,
+// streaks, coins and weekday pushes. What is left: a trip countdown, and
+// one gentle card carrying the same fixed text as the brief (with the
+// helpline where one is due).
+
+function candidatesFor(S) {
+  const all = buildInsights(S);
+  const modes = coachSafetyModes(S);
+  if (!modes.length) return all;
+  const b = safeBrief({ modes }, {});
+  return [
+    { id: 'safe:gentle', priority: 90, cooldownDays: 0, title: 'Go gently today', body: `${b.focus} ${b.watch}` },
+    ...all.filter(c => c.id.startsWith('holiday:')),
+  ];
+}
+
 // ── Public API ────────────────────────────────────────────────────────────
 
 /**
@@ -492,7 +512,7 @@ function isOnCooldown(memEntry, ruleCooldownDays) {
  * Returns a single insight, or null if nothing fits.
  */
 export function pickInsight(S, memory) {
-  const candidates = buildInsights(S);
+  const candidates = candidatesFor(S);
   const mem = memory || {};
   const fresh = candidates.filter(c => !isOnCooldown(mem[c.id], c.cooldownDays));
   // If everything is on cooldown, fall back to the highest-priority
@@ -506,7 +526,7 @@ export function pickInsight(S, memory) {
  * Return all candidate insights (for debugging / coach panel).
  */
 export function allInsights(S) {
-  return buildInsights(S).sort((a, b) => b.priority - a.priority);
+  return candidatesFor(S).sort((a, b) => b.priority - a.priority);
 }
 
 // ── Memory helpers (used by the widget) ───────────────────────────────────

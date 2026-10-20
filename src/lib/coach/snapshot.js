@@ -10,6 +10,7 @@
  */
 import { habitElapsed } from '../habits/progress.js';
 import { cellFromBand, trackerUsesBandData } from './wearableProvenance.js';
+import { assessState } from './safety.js';
 
 const DAY_MS = 86_400_000;
 
@@ -184,7 +185,7 @@ export function buildSnapshot(S, opts = {}) {
     .filter((v, i, arr) => arr.indexOf(v) === i)
     .slice(0, 8);
 
-  return {
+  const snap = {
     name: (S.profile?.name || '').split(' ')[0] || 'You',
     today_ymd: ymd(today),
     weekday: today.toLocaleDateString('en-GB', { weekday: 'long' }),
@@ -199,4 +200,23 @@ export function buildSnapshot(S, opts = {}) {
     recent_briefs,
     recent_dismissed_topics: recent_dismissed,
   };
+
+  // Safe mode (item 105): the device can see things the snapshot never
+  // carries (food diary totals, weight readings), so it tells the server
+  // which safe modes apply. Mode names only — no values, no text. The
+  // server treats this as ratchet-up only and never forwards it to the
+  // model (netlify/lib/coachSafety.js). Absent in the normal case.
+  const { modes } = assessState(S, snap);
+  if (modes.length) snap.safety = { modes };
+  return snap;
+}
+
+/**
+ * Safe modes for this state (empty array = normal coaching). Used by the
+ * local brief, tips and nudges so they go gentle exactly when the AI
+ * coach does.
+ */
+export function coachSafetyModes(S) {
+  if (!S || typeof S !== 'object') return [];
+  return buildSnapshot(S).safety?.modes || [];
 }
