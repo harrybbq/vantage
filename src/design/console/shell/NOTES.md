@@ -26,3 +26,9 @@ changes needed in files this area does not own (see ../README.md §7).
 ## After TRACK lands
 
 - Done 2026-10-21: `CONSOLE_SHOW_HOLIDAY = false` (Track shows trips). Holiday has left the sidebar and More; the `holiday` route stays for deep links.
+
+## Integration (2026-10-21)
+
+- `data-cx-nav="<id>"` on sidebar items, phone tabs, More rows; `data-cx-nav="more"` on the More tab (SWEEP's tour).
+- `navSection()` in nav.js: the holiday route reads as Track (title and sidebar highlight) while Holiday has no entry. Pinned in nav.test.mjs.
+- Pages no longer draw their own title (PageHead, Track); the bars are the page h1 everywhere.

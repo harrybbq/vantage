@@ -26,3 +26,10 @@ changes needed in files this area does not own (see ../README.md §7).
 - Habits keep the word "relapse" (the shared relapse modal says it); tone is softened around it ("since your last relapse", "Log a relapse").
 - Paywall sells AI scans as "Fair daily limit", not "Unlimited" (aiQuota still caps Pro). Plans are chosen then confirmed ("Continue with yearly"); classic bought on tap.
 - Copy inside classic components mounted whole (Settings tabs, shop, goal board, friends rail, leaderboard panels) keeps classic strings, em-dashes and the "🔒 Pro" chip; only rebuilding those components would change it.
+
+## Integration (2026-10-21)
+
+- Leaderboard › Division draws HUB's DivisionTable through `DivisionBoard.jsx` (classic DivisionBoard props); the placeholder is deleted.
+- Tour targets exist: `data-cx-nav` on sidebar items, phone tabs, More (`more`) and More rows; `data-cx-tour="hub"` on the player strip. The tutorial slot now gets `S`.
+- The paywall slot now gets `count`; `headline()` says "5 of 5" exactly at the cap and keeps "all 5" over it.
+- PageHead no longer prints a title (the shell bar is the page h1); `title` stays as the header's accessible name. Settings dropped its empty PageHead. Classic `.sec-title` text inside `.cx-sweep-scope` is hidden (desktop keeps its "?" help; phones drop the row).

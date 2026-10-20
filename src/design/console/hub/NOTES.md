@@ -11,3 +11,10 @@ changes needed in files this area does not own (see ../README.md §7).
 - **SHELL:** `HubFooter` (the year countdown) still renders under the console hub — Direction A drops it; it is App.jsx's call.
 - **SHELL:** phone drag auto-scroll measures the bars with `.m-appbar` / `.m-tabs`, falling back to `.cx-shell-appbar` / `.cx-shell-tabs`. If the console bars use other class names, tell HUB (HubGrid.jsx `getBounds`).
 - **Layout state:** `S.hubGrid = { v: 1, items: [{ id, type, size, picks?, count?, blocks?, title? }] }`, written only by `useHubGrid.commit`, created on the first user change (never on view). Seeding rules and the size table are in `hub/grid.js`; `PRO_SIZES_GATED` is the one switch for "larger sizes are Pro".
+
+## Integration (2026-10-21)
+
+- DivisionTable is now also drawn by SWEEP's leaderboard (sweep/DivisionBoard.jsx adapts groups standings). Added, all defaulting to today's behaviour: `nameLabel` ('Player'), `valueBand` (true), `formatValue` (null), and `rows[].avatarColor`; the `sub` line now shows on link rows too. Rails verified with zoned group data (top 3 / bottom 3).
+- Player strip carries `data-cx-tour="hub"` (the tour's hub stop rings it).
+- HubFooter: gone under console (App.jsx gates it); resolved.
+- Phone drag auto-scroll: the console bars are `.cx-shell-appbar` / `.cx-shell-tabs`, which the fallback already matches (classic `.m-*` bars are not mounted under console). Verified: holding a dragged cell over the tab bar scrolls the page.

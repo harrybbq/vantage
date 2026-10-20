@@ -22,3 +22,9 @@ changes needed in files this area does not own (see ../README.md §7).
 ## For the foundation
 
 - Classic pixel diff noise: the size of ANY console stylesheet perturbs Chromium's antialiasing at the rounded corners of the classic mobile app bar (Track, Dark OS, 390) by ≤2/255 on 14 pixels. Reproduced with a comment-only track.css of the same size (no rules at all), so it is not a selector leak. Other agents will see the same 14 pixels; compare against a same-size comment-only control before chasing it.
+
+## Integration (2026-10-21)
+
+- The page h1 is gone (the shell bar prints "Track"); on narrow screens the Calendar · Diet · Vitals switch shares the row with Add.
+- The event-kind legend moved from the month bar into the footer line under the grid, because at 1440 (owner, with Shifts) it squeezed the month name to "Octo…".
+- The holiday route now titles the bars "Track" and lights Track in the sidebar (shell/nav.js `navSection`).
