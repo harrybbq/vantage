@@ -487,3 +487,8 @@ html[data-theme="dark-os"] .sn-ok { background: var(--os-surface2); border-color
 .sn-list .sn-body { flex-basis: 100%; margin-top: 2px; color: var(--text-mid); }
 .sn-list-title { font-family: var(--body); font-size: 13px; font-weight: 600; color: var(--text); }
 @media (hover: none) { .sn-ok { min-height: 44px; } .sn-more { min-height: 44px; } }
+
+/* A request row now carries ✓ ✗ ⚑ — a long handle must wrap inside its
+   own column rather than run under the buttons. */
+.fc-request-row .fc-row-status { overflow-wrap: anywhere; }
+.fc-request-actions { align-items: center; }

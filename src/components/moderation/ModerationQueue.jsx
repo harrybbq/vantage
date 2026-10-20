@@ -336,7 +336,7 @@ export default function ModerationQueue({ className = '', onChanged, oldestFirst
                     ))}
                   </div>
                   <input
-                    type="text" maxLength={500} value={rAsk.note} placeholder="What was wrong (kept in the audit trail)"
+                    type="text" maxLength={500} value={rAsk.note} placeholder="What was wrong (audit note)"
                     aria-label="Reset note"
                     onChange={e => setResetAsk({ ...rAsk, note: e.target.value })}
                     onKeyDown={e => { if (e.key === 'Escape') setResetAsk(null); }}

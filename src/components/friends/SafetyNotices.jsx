@@ -76,7 +76,7 @@ export default function SafetyNotices({ userId }) {
       })}
       {unread.length > MAX_UNREAD && (
         <button type="button" className="sn-more" onClick={() => markRead(shown.map(n => n.id))}>
-          {unread.length - MAX_UNREAD} more — mark these read to see them
+          Mark these {shown.length} read · {unread.length - MAX_UNREAD} more waiting
         </button>
       )}
 

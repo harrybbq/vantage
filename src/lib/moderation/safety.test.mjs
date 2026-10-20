@@ -133,7 +133,8 @@ ok(!/nigg/i.test(MESSAGE_FILTERED_TEXT), 'the message never repeats the word');
   ok(/Report a problem/.test(noticeText({ kind: 'account_suspended' }).body), 'suspension says how to appeal');
   ok(noticeText({ kind: 'account_suspended' }).persistent === true, 'suspension notice is persistent');
   eq(noticeText({ kind: 'content_reset', meta: { fields: ['display_name', 'handle', 'avatar'] } }).body.split('.')[0],
-    'Your display name, handle and profile picture broke our rules for things other people see, so we removed it', 'field list reads naturally');
+    'Your display name, handle and profile picture broke our rules for things other people see, so we removed them', 'field list reads naturally');
+  ok(/removed it\. You can choose a new one/.test(noticeText({ kind: 'content_reset', meta: { fields: ['handle'] } }).body), 'singular wording');
   eq(noticeText({ kind: 'content_reset', meta: { fields: ['avatar'] } }).body.split(' broke')[0], 'Your profile picture', 'one field');
   eq(noticeText({ kind: 'content_reset', meta: {} }).body.split(' broke')[0], 'Part of your profile', 'no fields');
   eq(noticeText({ kind: 'something_new' }), null, 'unknown kind → null (skipped)');

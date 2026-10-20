@@ -84,12 +84,14 @@ export function noticeText(notice) {
         title: 'Your suspension has been lifted',
         body: 'You can message friends, send requests and appear on boards again.',
       };
-    case 'content_reset':
+    case 'content_reset': {
+      const many = new Set((Array.isArray(meta.fields) ? meta.fields : []).filter(f => FIELD_WORDS[f])).size > 1;
       return {
         tone: 'warn',
         title: 'We reset part of your profile',
-        body: `${capital(listWords(meta.fields))} broke our rules for things other people see, so we removed it. You can choose a new one — the same one won't be accepted again. ${APPEAL_LINE}`,
+        body: `${capital(listWords(meta.fields))} broke our rules for things other people see, so we removed ${many ? 'them' : 'it'}. You can choose ${many ? 'new ones' : 'a new one'} — the same ${many ? 'ones' : 'one'} won't be accepted again. ${APPEAL_LINE}`,
       };
+    }
     default:
       return null;
   }
