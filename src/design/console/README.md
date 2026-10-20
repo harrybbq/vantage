@@ -154,7 +154,7 @@ The **overlay** slots get the classic component's own props:
 - `ConsoleTutorial`: `{ visible, theme, onNavigate, onClose }`
 - `ConsoleAuth`: `{ onOpenLegal, webInviteOnly }`
 
-If you need a new key, ask SHELL to add it to `sectionProps` in App.jsx. Until
+If you need a new key, write it in your `NOTES.md` for SHELL to add to `sectionProps`. Until
 then, read it from your own hook. Do not edit App.jsx.
 
 ### Page container
@@ -225,7 +225,8 @@ Colour every rating number: OVR and the four categories, yours and friends'.
 ## 7. File ownership
 
 Only the owner of a file edits it. To use something you don't own, import it
-read-only. If you need a change to it, note it for the owner (below).
+read-only. If you need a change to it, write it in your area's `NOTES.md`
+(below).
 
 ### Foundation (this commit). Others treat these as read-only
 
@@ -281,14 +282,16 @@ files, §8), `index.html` (the font link), `src/main.jsx`, `vite.config.js`,
 
 Every classic component in `src/components/**` is a read-only reference.
 
+Also read-only: `src/lib/lifts/**` (its colour maths moved to
+`lib/design/contrast.js` and is re-exported there) and this README.
+
 **A new token or primitive?** Put it in your own area file, prefixed for the
-area (`--cx-hub-…`, `.cx-track-…`, `HubThing.jsx`), and add a line here under
-"Consolidation notes" (append-only, one line each). The foundation folds them
-into tokens.css and ui.jsx afterwards.
-
-### Consolidation notes (append-only)
-
-- (none yet)
+area (`--cx-hub-…`, `.cx-track-…`, `HubThing.jsx`). Record it in your
+area's own notes file, `src/design/console/<area>/NOTES.md` (shell, hub,
+track or sweep), one line each. Don't write notes in this README: four agents
+appending to one file is the conflict this table exists to prevent. The
+foundation folds the notes into tokens.css and ui.jsx afterwards. Anything
+else the owner of a file should change for you goes in the same NOTES.md.
 
 ## 8. Tests and verification
 
