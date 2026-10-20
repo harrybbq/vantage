@@ -37,6 +37,7 @@ const { requireUser, underLimit, tooMany } = require('../lib/requireUser');
 const { withinDailyAiCap, overDailyCap } = require('../lib/aiQuota');
 const { FREE_WEEKLY, decide, usedThisWeek, noteLocalUse, isPaidUser, resetsOnIso } = require('../lib/freeAllowance');
 const { isOwnerEmail } = require('../lib/owner');
+const { consentGate } = require('../lib/consentGate');
 
 // Free accounts get a small weekly allowance of AI scans; Pro and
 // lifetime are limited only by the daily cap (aiQuota). Barcode and text
@@ -110,6 +111,10 @@ exports.handler = async (event) => {
   const auth = await requireUser(event, CORS);
   if (auth.error) return auth.error;
   if (!underLimit('ai-food', auth.userId, 8)) return tooMany(CORS);
+  // The photo goes to Anthropic: AI consent first, on the server too
+  // (item 98). The free-scan quota read above needs no consent.
+  const noConsent = await consentGate(auth.userId, 'ai', CORS);
+  if (noConsent) return noConsent;
 
   const ip = event.headers['x-forwarded-for'] || 'unknown';
   if (!checkRateLimit(ip)) {

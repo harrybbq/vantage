@@ -46,6 +46,7 @@ const sbKeys = require('../lib/sbKeys');
 const { requireUser, underLimit, tooMany } = require('../lib/requireUser');
 const { withinDailyAiCap, overDailyCap } = require('../lib/aiQuota');
 const { isOwnerEmail } = require('../lib/owner');
+const { consentGate } = require('../lib/consentGate');
 const { guardWearableData } = require('../lib/coachWearableGuard');
 
 const CORS = {
@@ -217,6 +218,10 @@ exports.handler = async (event) => {
   const auth = await requireUser(event, CORS);
   if (auth.error) return auth.error;
   if (!underLimit('ai-coach', auth.userId, 6)) return tooMany(CORS);
+  // AI consent, on the server (item 98): the brief sends health-adjacent
+  // data to Anthropic, so it needs the explicit yes the app asks for.
+  const noConsent = await consentGate(auth.userId, 'ai', CORS);
+  if (noConsent) return noConsent;
 
   // The coach is a Pro feature. The client hides it from free users,
   // but the endpoint spends money for whoever calls it, so the tier is

@@ -49,6 +49,7 @@ const { sb, getFreshToken, fetchWhoopData, mergeWhoopIntoState } = require('../l
 const { requireScheduler } = require('../lib/cronAuth');
 const { mergeStateCAS } = require('../lib/stateWrite');
 const { pool } = require('../lib/pool');
+const { consentStatuses, healthSyncAllowed } = require('../lib/consentGate');
 
 const DAYS = 3;                 // enough to catch anything a run or two ago missed
 const CONCURRENCY = 4;
@@ -102,7 +103,20 @@ exports.handler = async (event) => {
     console.error('whoop-cron: token list failed', tokRes.status);
     return { statusCode: 502 };
   }
-  const rows = await tokRes.json().catch(() => []);
+  const due = await tokRes.json().catch(() => []);
+
+  // Health consent, enforced here too (item 98): an account whose owner
+  // declined or withdrew it is skipped, even while the WHOOP grant still
+  // stands. One JSON-path read per 100 accounts. If consent can't be
+  // read, nobody is synced this run — the next run (and its 3-day
+  // window) catches up; syncing on a guess is the wrong way to fail.
+  const statuses = await consentStatuses(due.map(r => r.user_id), 'health', env);
+  if (!statuses) {
+    console.error('whoop-cron: consent read failed — skipping this run');
+    return { statusCode: 502 };
+  }
+  const rows = due.filter(r => healthSyncAllowed(statuses.get(r.user_id)));
+  const noConsent = due.length - rows.length;
 
   // Budget: reserve an account's full cost when it starts, then give
   // back what it did not use (a dead token fails after one call), so
@@ -128,7 +142,7 @@ exports.handler = async (event) => {
     }
   }
 
-  console.info(`whoop-cron: ${count.synced} synced, ${count.skipped} skipped, ${count.failed} failed, ${count.conflicted} busy (retry next run), ${notReached} not reached (next run), of ${rows.length} due; ~${reserved} WHOOP calls`);
+  console.info(`whoop-cron: ${count.synced} synced, ${count.skipped} skipped, ${count.failed} failed, ${count.conflicted} busy (retry next run), ${notReached} not reached (next run), of ${rows.length} due; ${noConsent} without health consent; ~${reserved} WHOOP calls`);
   return { statusCode: 200 };
 };
 
