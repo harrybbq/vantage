@@ -426,6 +426,9 @@ html[data-lifts-focus] .lifts .lw-head { top: env(safe-area-inset-top, 0px); }
 .lifts .lw-new-foot { display: flex; width: 100%; }
 
 /* ── Picker ── */
+/* The picker keeps its height while the list filters, so typing never
+   moves the search box (it used to shrink under the iOS keyboard). */
+.lf-sheet-root.is-bottom.lw-pick .lf-sheet { height: min(88vh, calc(100dvh - 24px), calc(var(--lf-vvh, 100dvh) - 24px)); }
 .lifts .lw-pick-top { position: sticky; top: -1px; z-index: 2; display: flex; flex-direction: column; gap: 8px; margin: -4px -16px 0; padding: 4px 16px 10px;
   background: var(--lf-s1); border-bottom: 1px solid var(--lf-line); }
 .lifts .lw-pick-searchrow { display: flex; gap: 8px; align-items: center; }
