@@ -26,6 +26,7 @@ import { OWNER_SURFACES_IN_BUILD } from '../../../lib/native/ownerSurfaces';
 import Icon from '../../../components/Icon';
 import { Segmented } from '../ui';
 import PageHead from './PageHead';
+import HonoursCase from './HonoursCase';
 
 // Owner-only Design switch — the same gating SettingsSection uses
 // (compiled out of native builds; renders nothing unless useIsOwner).
@@ -163,9 +164,11 @@ function Appearance({ S, update, userId, hasPro }) {
 }
 
 export default function ConsoleSettings({
-  S, update, userId, userEmail, isOwner, navigate, onSignOut, onOpenLegal, onOpenPalette, onOpenShortcuts, onOpenVisions,
+  S, update, userId, userEmail, isOwner, navigate, onSignOut, onOpenLegal, onOpenPalette, onOpenShortcuts,
   requestedSettingsTab,
 }) {
+  // Tools → Honours opens the console trophy case, not the classic list.
+  const [honours, setHonours] = useState(false);
   const { hasPro } = useSubscriptionContext();
   const [tab, setTab] = useState(() => firstTab(requestedSettingsTab));
   // What the classic section is asked to show: a fresh object per change,
@@ -207,11 +210,12 @@ export default function ConsoleSettings({
             onOpenLegal={onOpenLegal}
             onOpenPalette={onOpenPalette}
             onOpenShortcuts={onOpenShortcuts}
-            onOpenVisions={onOpenVisions}
+            onOpenVisions={() => setHonours(true)}
             onOpenSchedule={onOpenSchedule}
           />
         </div>
       )}
+      {honours && <HonoursCase S={S} onClose={() => setHonours(false)} />}
     </section>
   );
 }

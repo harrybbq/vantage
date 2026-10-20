@@ -96,7 +96,7 @@ export default function ConsoleHabits({ S, update, isMobile, onOpenModal, onShow
             {stats.map(s => (
               <div key={s.k} className={s.bad ? 'is-bad' : ''}>
                 <dt>{s.k}</dt>
-                <dd className="cx-num">{s.v}</dd>
+                <dd>{s.v}</dd>
                 <span>{s.sub}</span>
               </div>
             ))}
