@@ -41,7 +41,7 @@ const sbKeys = require('../lib/sbKeys');
 const { screenImage } = require('../lib/imageModeration');
 const { withinDailyAiCap } = require('../lib/aiQuota');
 const { withinDailyCap } = require('../lib/dailyCap');
-const { planProfileUpdate, diffAgainst, writeError } = require('../lib/profileUpdate');
+const { planProfileUpdate, diffAgainst, writeError, resetChecks, RESET_MESSAGE } = require('../lib/profileUpdate');
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
@@ -111,6 +111,25 @@ exports.handler = async (event) => {
   }
 
   const changes = diffAgainst(plan.fields, current);
+
+  // An owner reset sticks (item 112): refuse a value the moderation trail
+  // says was removed. Fail soft — before safety_2026_10b.sql is run the
+  // table doesn't exist and nothing is refused.
+  const checks = resetChecks(changes);
+  if (checks.length) {
+    try {
+      const kinds = checks.map(c => c.kind).join(',');
+      const hashes = checks.map(c => c.hash).join(',');
+      const res = await fetch(`${url}/rest/v1/moderation_actions?target_id=eq.${encodeURIComponent(userId)}`
+        + `&action=in.(${kinds})&value_hash=in.(${hashes})&select=action,value_hash`, { headers: sbKeys.serviceHeaders(env) });
+      if (res.ok) {
+        const rows = await res.json().catch(() => []);
+        const hit = checks.find(c => (rows || []).some(r => r.action === c.kind && r.value_hash === c.hash));
+        if (hit) return json(400, { error: RESET_MESSAGE[hit.field], field: hit.field === 'avatar' ? 'avatar' : hit.field });
+      }
+    } catch { /* fail soft: the reset trail is unreadable — let the write through as before */ }
+  }
+
   const patch = {};
   if ('handle' in changes) patch.handle = changes.handle;
   if ('display_name' in changes) patch.display_name = changes.display_name;

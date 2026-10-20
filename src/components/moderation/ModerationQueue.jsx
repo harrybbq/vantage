@@ -11,11 +11,23 @@
  * Decisions, each confirmed inline (press, then confirm — with an
  * optional note kept with the report):
  *   Dismiss  — nothing wrong; the report closes.
+ *   Resolve  — the report was right and you've dealt with it (e.g. reset
+ *              their name) without suspending; the report closes.
  *   Suspend  — the report was right; the account is hidden from the
- *              leaderboard, search, trending and group boards
- *              server-side. Reversible from the suspended list.
+ *              leaderboard, search, trending and group boards, and can't
+ *              send messages, reactions or friend requests (RLS,
+ *              safety_2026_10b.sql). Reversible from the suspended list.
  *   Ban      — suspend AND an auth-level ban (they cannot sign in).
  *              Goes through security-console's user.ban; reversible.
+ *   Reset    — clear their published display name / handle / picture
+ *              (the Terms promise this). Audited and sticky: the app
+ *              can't publish the same value again. Doesn't close the
+ *              report — Resolve or Suspend after.
+ *
+ * Closing a report tells the reporter the outcome in-app; suspension and
+ * resets tell the reported user — never who reported, and never for a
+ * child-safety report (no tip-off). Urgent reasons (a child's safety,
+ * threats, self-harm) sort to the top and carry a Priority tag.
  *
  * Until the function is deployed (or its SQL run) the endpoint answers
  * 501/404, and the panel says "not installed" rather than looking empty
@@ -34,10 +46,18 @@ const WHERE_LABEL = {
   group: 'Group board',
   messages: 'Messages',
   'friend-card': 'Friend card',
+  'friend-request': 'Friend request',
 };
+
+const RESET_FIELDS = [
+  { id: 'display_name', label: 'Display name', has: r => r.hasName },
+  { id: 'handle', label: 'Handle', has: r => r.hasHandle },
+  { id: 'avatar', label: 'Picture', has: r => !!r.avatar },
+];
 
 const VERB = {
   dismiss: { label: 'Dismiss', confirm: 'Confirm dismiss', note: 'Why (optional)' },
+  resolve: { label: 'Resolve', confirm: 'Confirm resolve', note: 'What you did (kept with the report)' },
   suspend: { label: 'Suspend', confirm: 'Confirm suspend', note: 'What was wrong (kept with the report)' },
   ban: {
     label: 'Ban sign-in', confirm: 'Confirm ban', note: 'Why (kept with the report)',
@@ -87,6 +107,7 @@ export default function ModerationQueue({ className = '', onChanged, oldestFirst
   const [showClosed, setShowClosed] = useState(false);
   const [open, setOpen] = useState(() => new Set()); // expanded contexts
   const [pending, setPending] = useState(null);      // { id, verb, note }
+  const [resetAsk, setResetAsk] = useState(null);    // { id, fields: string[], note }
 
   const load = useCallback(async (p = 0) => {
     setError(null);
@@ -116,7 +137,11 @@ export default function ModerationQueue({ className = '', onChanged, oldestFirst
     const clean = (note || '').trim();
     try {
       if (verb === 'ban') {
-        const ban = await postAction({ action: 'user.ban', userId: r.reportedId, on: true, note: clean || undefined });
+        // A child-safety report never tells the reported person (no tip-off).
+        const ban = await postAction({
+          action: 'user.ban', userId: r.reportedId, on: true, note: clean || undefined,
+          ...(r.reasonId === 'child' ? { notify: false } : {}),
+        });
         if (!ban.ok) throw new Error(ban.error);
       }
       const out = await postModeration(verb === 'dismiss'
@@ -126,8 +151,9 @@ export default function ModerationQueue({ className = '', onChanged, oldestFirst
       if (out.state !== 'ok') throw new Error(out.error || 'Could not record that.');
       const status = verb === 'dismiss' ? 'dismissed' : 'actioned';
       const hits = verb === 'suspend' || verb === 'ban';
+      const told = out.body && out.body.reporterTold ? 'Reporter told the outcome in-app.' : null;
       setReports(list => list.map(x => {
-        if (x.id === r.id) return { ...x, status, note: clean || x.note };
+        if (x.id === r.id) return { ...x, status, note: clean || x.note, told: told || x.told };
         if (hits && x.reportedId && x.reportedId === r.reportedId) return { ...x, suspended: true, banned: x.banned || verb === 'ban' };
         return x;
       }));
@@ -135,6 +161,36 @@ export default function ModerationQueue({ className = '', onChanged, oldestFirst
       if (onChanged) onChanged();
     } catch (e) {
       setError(e?.message || 'Could not record that.');
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  async function reset(r, ask) {
+    if (!ask.fields.length) return;
+    setBusyId(r.id);
+    setError(null);
+    try {
+      const out = await postModeration({
+        action: 'reset', userId: r.reportedId, fields: ask.fields, reportId: r.id,
+        note: ask.note.trim() || undefined,
+      });
+      if (out.state !== 'ok') throw new Error(out.error || 'Could not reset that.');
+      const done = (out.body && out.body.reset) || [];
+      const words = done.map(f => (RESET_FIELDS.find(x => x.id === f) || {}).label || f).join(', ');
+      const line = done.length ? `Reset: ${words}${out.body.told ? ' · they were told' : ''}.` : (out.body.message || 'Nothing to reset.');
+      setReports(list => list.map(x => (x.reportedId && x.reportedId === r.reportedId ? {
+        ...x,
+        hasName: done.includes('display_name') ? false : x.hasName,
+        hasHandle: done.includes('handle') ? false : x.hasHandle,
+        avatar: done.includes('avatar') ? null : x.avatar,
+        resetNote: line,
+        resetWarn: out.body.warning || null,
+      } : x)));
+      setResetAsk(null);
+      if (onChanged) onChanged();
+    } catch (e) {
+      setError(e?.message || 'Could not reset that.');
     } finally {
       setBusyId(null);
     }
@@ -175,9 +231,11 @@ export default function ModerationQueue({ className = '', onChanged, oldestFirst
             Reports{state === 'ok' ? ` · ${openTotal} open` : ''}
           </div>
           <p className="upg-review-sub">
-            What people reported from friend cards, messages, the leaderboard and group boards.
-            Aim to decide within 24 hours. Suspending hides the account everywhere public; banning
-            also stops it signing in. Both can be lifted.
+            What people reported from friend cards, messages, requests, the leaderboard and group
+            boards. Aim to decide within 24 hours — Priority ones (a child&apos;s safety, threats,
+            self-harm) first. Suspending hides the account everywhere public and pauses its
+            messages; banning also stops it signing in. Both can be lifted. The reporter is told
+            the outcome; the reported person is told about a suspension or reset, never by whom.
           </p>
         </div>
         <div className="mod-head-acts">
@@ -203,6 +261,8 @@ export default function ModerationQueue({ className = '', onChanged, oldestFirst
         const msgs = r.messages || [];
         const long = (r.context || '').length > 160 || msgs.length > 0;
         const ask = pending && pending.id === r.id ? pending : null;
+        const rAsk = resetAsk && resetAsk.id === r.id ? resetAsk : null;
+        const resettable = RESET_FIELDS.filter(f => f.has(r));
         const stale = staleHours ? isStale(r, staleHours, now) : false;
         const firstStale = stale && !staleMarked;
         if (firstStale) staleMarked = true;
@@ -217,6 +277,7 @@ export default function ModerationQueue({ className = '', onChanged, oldestFirst
                 {r.deleted && <span className="mod-tag is-muted">Account deleted</span>}
                 {r.banned && <span className="mod-tag is-bad">Banned</span>}
                 {r.suspended && !r.banned && <span className="mod-tag is-bad">Suspended</span>}
+                {r.urgent && r.status === 'open' && <span className="mod-tag is-bad">Priority</span>}
                 {repeat > 1 && <span className="mod-tag is-warn">{repeat} open reports</span>}
                 {r.status !== 'open' && <span className="mod-tag is-muted">{r.status}</span>}
                 {stale && <span className="mod-tag is-warn">Waiting {waitH < 48 ? `${waitH} h` : `${Math.floor(waitH / 24)} days`}</span>}
@@ -249,6 +310,46 @@ export default function ModerationQueue({ className = '', onChanged, oldestFirst
                 })}>{expanded ? 'Show less' : msgs.length ? `Show evidence · ${msgs.length} message${msgs.length === 1 ? '' : 's'}` : 'Show all'}</button>
               )}
               {r.note && r.status !== 'open' && <div className="mod-note">Note: {r.note}</div>}
+              {r.told && <div className="mod-note">{r.told}</div>}
+              {r.resetNote && <div className="mod-note">{r.resetNote}</div>}
+              {r.resetWarn && <div className="mod-note is-warn">{r.resetWarn}</div>}
+              {r.reasonId === 'child' && r.status === 'open' && (
+                <div className="mod-note is-warn">
+                  Child safety: don&apos;t open, save or forward any image. The reported person won&apos;t be
+                  told about action on this report. Follow the NCA / CEOP steps in docs/ABUSE_HANDLING.md.
+                </div>
+              )}
+              {rAsk && (
+                <div className="mod-ask is-reset">
+                  <div className="mod-reset-fields" role="group" aria-label="What to reset">
+                    {resettable.map(f => (
+                      <label key={f.id} className="mod-reset-field">
+                        <input
+                          type="checkbox" checked={rAsk.fields.includes(f.id)}
+                          onChange={() => setResetAsk({
+                            ...rAsk,
+                            fields: rAsk.fields.includes(f.id) ? rAsk.fields.filter(x => x !== f.id) : [...rAsk.fields, f.id],
+                          })}
+                        />
+                        {f.label}
+                      </label>
+                    ))}
+                  </div>
+                  <input
+                    type="text" maxLength={500} value={rAsk.note} placeholder="What was wrong (audit note)"
+                    aria-label="Reset note"
+                    onChange={e => setResetAsk({ ...rAsk, note: e.target.value })}
+                    onKeyDown={e => { if (e.key === 'Escape') setResetAsk(null); }}
+                  />
+                  <button type="button" className="btn btn-sm mod-confirm is-reset"
+                          disabled={busyId === r.id || !rAsk.fields.length}
+                          onClick={() => reset(r, rAsk)}>
+                    {busyId === r.id ? 'Working…' : 'Confirm reset'}
+                  </button>
+                  <button type="button" className="btn btn-sm mod-cancel" onClick={() => setResetAsk(null)}>Cancel</button>
+                  <span className="mod-ask-sub">Clears what others see; their own copy in the app is untouched.</span>
+                </div>
+              )}
               {ask && (
                 <div className={`mod-ask is-${ask.verb}`}>
                   <input
@@ -266,12 +367,22 @@ export default function ModerationQueue({ className = '', onChanged, oldestFirst
                 </div>
               )}
             </div>
-            {r.status === 'open' && !ask && (
+            {r.status === 'open' && !ask && !rAsk && (
               <div className="mod-acts">
                 <button type="button" className="btn btn-sm" disabled={busyId === r.id}
                         onClick={() => setPending({ id: r.id, verb: 'dismiss', note: '' })}>
                   Dismiss
                 </button>
+                <button type="button" className="btn btn-sm" disabled={busyId === r.id}
+                        onClick={() => setPending({ id: r.id, verb: 'resolve', note: '' })}>
+                  Resolve
+                </button>
+                {!r.deleted && resettable.length > 0 && (
+                  <button type="button" className="btn btn-sm" disabled={busyId === r.id}
+                          onClick={() => { setPending(null); setResetAsk({ id: r.id, fields: [], note: '' }); }}>
+                    Reset…
+                  </button>
+                )}
                 {!r.deleted && !r.suspended && (
                   <button type="button" className="btn btn-sm mod-act" disabled={busyId === r.id}
                           onClick={() => setPending({ id: r.id, verb: 'suspend', note: '' })}>

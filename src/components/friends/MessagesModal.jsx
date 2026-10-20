@@ -15,6 +15,10 @@ import {
 import { COUNTER_FROM, dayKey, dayLabel, timeLabel, endsCluster } from '../../lib/friends/dmView';
 import { reportUser, blockUser, reportSnapshot } from '../../lib/friends/queries';
 import { invalidatePartnerFacts } from '../../lib/friends/inboxPeople';
+import { useSafety } from '../../lib/friends/useSafety';
+import { noteSuspended } from '../../lib/friends/safety';
+import { messageTextProblem } from '../../lib/moderation/messageFilter';
+import { SUSPENDED_SHORT } from '../../lib/moderation/notices';
 import ReportFriendModal from './ReportFriendModal';
 import { ClanInviteMenuItem, ClanInviteBubble } from './ClanInvite';
 import { parseInvite } from '../../lib/friends/clanInvite';
@@ -72,9 +76,14 @@ export default function MessagesModal(props) {
 
 function Conversation({
   userId, friend, onClose, onBlocked, inline = false, onBack = null,
-  readOnlyNote = null, onActivity, onRead,
+  readOnlyNote: readOnlyNoteProp = null, onActivity, onRead,
 }) {
   const friendId = friend.id;
+  // A suspended account reads its conversations but can't send (item
+  // 111) — the same read-only state as a former friend, with its own
+  // calm line, instead of every send failing.
+  const safety = useSafety(userId);
+  const readOnlyNote = readOnlyNoteProp || (safety.suspended ? SUSPENDED_SHORT : null);
   const name = friend.name || (friend.handle ? `@${friend.handle}` : 'Friend');
   const first = name.replace(/^@/, '').split(' ')[0];
 
@@ -87,6 +96,7 @@ function Conversation({
   const [hasMore, setHasMore] = useState(false);
   const [loadingEarlier, setLoadingEarlier] = useState(false);
   const [draft, setDraft] = useState('');
+  const [composeErr, setComposeErr] = useState('');   // the DM filter's inline reason
   const [replyTo, setReplyTo] = useState(null);
   const [menu, setMenu] = useState(null);        // { id, below }
   const [newCount, setNewCount] = useState(0);
@@ -342,6 +352,19 @@ function Conversation({
       setMessages(list => confirmSent(list, temp.id, saved));
       if (saved) onActivity?.(saved);
     } catch (e) {
+      if (e?.code === 'filtered' || e?.code === 'suspended') {
+        // Not a delivery failure, so no "Not sent · Retry" bubble: take
+        // it back out and say why where they're typing.
+        setMessages(list => list.filter(x => x.id !== temp.id));
+        if (e.code === 'filtered') {
+          setDraft(d => d || text);
+          if (target) setReplyTo(r => r || target);
+          setComposeErr(e.message);
+        } else {
+          noteSuspended(userId);
+        }
+        return;
+      }
       setMessages(list => markFailed(list, temp.id, e.message || 'Not sent'));
     }
   }
@@ -349,6 +372,8 @@ function Conversation({
   function handleSend() {
     const text = draft.trim();
     if (!text || readOnlyNote) return;
+    const problem = messageTextProblem(text);
+    if (problem) { setComposeErr(problem); return; }
     const target = replyTo;
     setDraft('');
     setReplyTo(null);
@@ -365,6 +390,7 @@ function Conversation({
   function onDraftChange(e) {
     const v = e.target.value.slice(0, MAX_BODY);
     setDraft(v);
+    if (composeErr) setComposeErr('');
     const el = e.target;
     el.style.height = 'auto';
     el.style.height = `${Math.min(el.scrollHeight, 120)}px`;
@@ -747,11 +773,16 @@ function Conversation({
                 onChange={onDraftChange}
                 onKeyDown={onComposerKey}
                 maxLength={MAX_BODY}
+                aria-invalid={composeErr ? true : undefined}
+                aria-describedby={composeErr ? `dm-err-${friendId}` : undefined}
               />
               <button type="button" className="msg-send dm-send" onClick={handleSend} disabled={!draft.trim()} aria-label="Send">
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M22 2 11 13" /><path d="M22 2 15 22l-4-9-9-4Z" /></svg>
               </button>
             </div>
+            {composeErr && (
+              <div className="dm-compose-err" id={`dm-err-${friendId}`} role="alert">{composeErr}</div>
+            )}
             {draft.length >= COUNTER_FROM && (
               <div className={`dm-counter${left <= 0 ? ' is-max' : ''}`} aria-live="polite">{draft.length}/{MAX_BODY}</div>
             )}

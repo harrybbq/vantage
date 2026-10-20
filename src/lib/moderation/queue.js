@@ -11,6 +11,7 @@
  *
  * Pure: moderation/queue.test.mjs pins it.
  */
+import { reasonInfo } from './reasons.js';
 
 /**
  * @returns {{ state: 'ok'|'not-installed'|'forbidden'|'error', reports: object[], error?: string }}
@@ -30,6 +31,8 @@ export function readQueueResponse(status, raw) {
   const list = Array.isArray(body) ? body : (body?.items || body?.reports || body?.queue || []);
   const out = { state: 'ok', reports: (Array.isArray(list) ? list : []).map(normaliseReport).filter(Boolean) };
   if (body && Number.isFinite(body.total)) out.total = body.total;
+  // POST answers (a decision, a reset) carry their own fields — keep them.
+  if (body && typeof body === 'object' && !Array.isArray(body)) out.body = body;
   return out;
 }
 
@@ -45,10 +48,14 @@ export function normaliseReport(r) {
   const snap = (rawSnap && typeof rawSnap === 'object') ? rawSnap : {};
   const who = (r.reported && typeof r.reported === 'object' ? r.reported : null) || r.reported_profile || {};
   const reportedId = r.reported_id ?? r.reportedId ?? who.id ?? null;
+  const info = reasonInfo(r.reason);
   return {
     id: r.id,
     at: r.created_at || r.createdAt || null,
     reason: r.reason || null,
+    reasonId: info.id,
+    // A child's safety, threats, self-harm: top of the queue.
+    urgent: typeof r.urgent === 'boolean' ? r.urgent : info.priority === 0,
     context: r.context || null,
     status: r.status || 'open',
     note: r.note || null,
@@ -58,6 +65,8 @@ export function normaliseReport(r) {
     name: who.display_name || who.name || snap.display_name || null,
     handle: who.handle || snap.handle || null,
     avatar: who.avatar_url || who.avatarUrl || null,
+    hasName: !!(who.display_name || who.name),
+    hasHandle: !!who.handle,
     suspended: !!(who.suspended_at || who.suspendedAt || r.reported_suspended_at),
     banned: !!(who.banned_at || who.bannedAt || who.banned),
     where: snap.where || r.where || null,
@@ -84,13 +93,18 @@ export function openCounts(reports) {
 }
 
 /**
- * Open first, then newest first — or, with `oldestFirst` (the Security
- * console's "stale reports" link), longest-waiting first.
+ * Open first; among open reports the urgent ones (a child's safety,
+ * threats, self-harm) first; then newest first — or, with `oldestFirst`
+ * (the Security console's "stale reports" link), longest-waiting first.
  */
 export function sortQueue(reports, { oldestFirst = false } = {}) {
   return [...(reports || [])].sort((a, b) => {
     const ao = a.status === 'open' ? 0 : 1, bo = b.status === 'open' ? 0 : 1;
     if (ao !== bo) return ao - bo;
+    if (ao === 0) {
+      const au = a.urgent ? 0 : 1, bu = b.urgent ? 0 : 1;
+      if (au !== bu) return au - bu;
+    }
     const byTime = String(b.at || '').localeCompare(String(a.at || ''));
     return oldestFirst ? -byTime : byTime;
   });

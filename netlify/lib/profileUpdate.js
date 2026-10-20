@@ -105,4 +105,37 @@ function writeError(status, body) {
   return { status: 502, field: null, error: 'Could not save your profile — try again.' };
 }
 
-module.exports = { planProfileUpdate, diffAgainst, writeError, HANDLE_RE, NAME_MAX };
+/**
+ * The same hash `public.vb_reset_hash` (supabase/safety_2026_10b.sql)
+ * stores for an owner reset, so this function can honour a reset the way
+ * the `profiles_reset_guard` trigger does for client writes. The trigger
+ * lets the service role through — and this function writes as the service
+ * role — so without this check a user could re-publish a name, handle or
+ * picture the owner removed. Normalisation matches the SQL exactly:
+ * display name → whitespace runs to one space, trimmed, lower-cased;
+ * handle → lower-cased; avatar → the raw data URL. sha256, hex.
+ */
+function resetHash(kind, value) {
+  if (value == null) return null;
+  let v = String(value);
+  if (kind === 'reset_display_name') v = v.replace(/\s+/g, ' ').trim().toLowerCase();
+  else if (kind === 'reset_handle') v = v.toLowerCase();
+  return require('crypto').createHash('sha256').update(v, 'utf8').digest('hex');
+}
+
+/** The (kind, hash) pairs to look up for the fields about to change. */
+function resetChecks(changes) {
+  const out = [];
+  if (changes.display_name) out.push({ field: 'display_name', kind: 'reset_display_name', hash: resetHash('reset_display_name', changes.display_name) });
+  if (changes.handle) out.push({ field: 'handle', kind: 'reset_handle', hash: resetHash('reset_handle', changes.handle) });
+  if (changes.avatar && !changes.avatar.clear && changes.avatar.dataUrl) out.push({ field: 'avatar', kind: 'reset_avatar', hash: resetHash('reset_avatar', changes.avatar.dataUrl) });
+  return out;
+}
+
+const RESET_MESSAGE = {
+  display_name: 'A moderator removed that display name — choose a different one.',
+  handle: 'A moderator removed that handle — choose a different one.',
+  avatar: 'A moderator removed that picture — choose a different one.',
+};
+
+module.exports = { planProfileUpdate, diffAgainst, writeError, resetHash, resetChecks, RESET_MESSAGE, HANDLE_RE, NAME_MAX };

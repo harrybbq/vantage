@@ -1,4 +1,5 @@
 import { supabase } from '../supabase';
+import { webOrigin } from '../native/platform';
 import { inviteUrl, isValidInviteCode, isNotConfigured, parseInvitePath } from './dmModel.js';
 
 /**
@@ -22,8 +23,11 @@ import { inviteUrl, isValidInviteCode, isNotConfigured, parseInvitePath } from '
 
 const PENDING_KEY = 'vantage.pendingInvite';
 
+// The site an invite link must point at. Inside the native app the page
+// origin is capacitor://localhost, which means nothing on anyone else's
+// phone — webOrigin() gives the deployed site there (item 129).
 function origin() {
-  try { return window.location.origin; } catch { return ''; }
+  try { return webOrigin() || ''; } catch { return ''; }
 }
 
 function fail(error, fallback) {

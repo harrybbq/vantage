@@ -531,22 +531,41 @@ else maps onto existing items.
 109. `[ ]` **LAUNCH** Governance the Codes expect: a named accountable person with written
     responsibilities; written content policies, queue prioritisation and moderator guidance; a written
     appeals process; a complaints route that works without an account (pairs with item 72).
-110. `[ ]` **LAUNCH** Reporting loop: acknowledge reports to the reporter and tell them the outcome;
+110. `[~]` **LAUNCH** Reporting loop: acknowledge reports to the reporter and tell them the outcome;
     tell the reported user about action taken; more report reasons (child safety, threats, self-harm,
     sexual content, scams); report + block from an incoming friend request.
-111. `[ ]` **LAUNCH** Suspension doesn't stop DMs — a suspended user can still message friends. Block
+    *Status 2026-10-20: done in code — in-app `safety_notices` (report received by DB trigger; outcome on
+    dismiss/resolve/suspend; suspension, reset and lift told to the reported user, never who reported and
+    never for a child-safety report); reasons child safety, threats or violence, hate, sexual content,
+    self-harm, scam or fraud added (old stored labels unchanged), urgent ones first in the queue with crisis
+    signposting on the sheet; Report/Block on incoming requests. Owner: run `supabase/safety_2026_10b.sql`.*
+111. `[~]` **LAUNCH** Suspension doesn't stop DMs — a suspended user can still message friends. Block
     sends (and probably receipt) for suspended accounts in RLS.
-112. `[ ]` **LAUNCH** Owner tools the Terms already promise: reset a user's display name / handle /
+    *Status 2026-10-20: done in code — RLS refuses a suspended account's messages, reactions, friend
+    requests/accepts and unsends; its earlier messages/reactions are hidden from the other person while
+    suspended (never deleted; the report snapshot and the queue keep them); the app shows a calm suspended
+    banner and read-only conversations. Policy-tested on Postgres 16. Owner: run `supabase/safety_2026_10b.sql`.*
+112. `[~]` **LAUNCH** Owner tools the Terms already promise: reset a user's display name / handle /
     avatar from the moderation queue; re-screen avatars published before screening existed.
+    *Status 2026-10-20: done in code — queue "Reset…" (service role, audited in `moderation_actions`, the
+    same value refused if the app re-publishes it, user told) and "Resolve"; "Re-screen profile pictures"
+    in Security → Moderation (4 per press, owner daily AI cap 200, flags only — keep or remove). Owner: run
+    `supabase/safety_2026_10b.sql`, then press re-screen until the backlog is 0 (needs ANTHROPIC_API_KEY).*
 113. `[ ]` **LAUNCH** NCA child-sexual-abuse reporting duty (in force for user-to-user services since
     7 Apr 2026): register and write the procedure (how evidence is preserved, who files, within what
     time). Add a mute option (Codes user control); supportive information for child users.
+    *Status 2026-10-20 (part): procedure skeleton in `docs/ABUSE_HANDLING.md` (in force since 7 Apr 2026;
+    register, who files, preserve-don't-spread, file within the SI 2026/268 time, record) — the owner fills
+    the blanks and the solicitor confirms. Registration, mute and child supportive information still open.*
 114. `[ ]` **LAUNCH** Teen defaults only apply to NEW accounts: older accounts kept handle search and
     leaderboard on; online status and the heatmap default on. There is no age signal at all — decide
     (with the solicitor) on collecting a birth year and age-specific defaults. Fix the stale lines in
     `docs/ABUSE_HANDLING.md` (reports now survive reporter deletion; the 10-message evidence copy; the
     NCA duty is in force). Confirm `audit_schema_2026_10.sql` and `dm_upgrade_2026_10.sql` are run in
     production (the DM one is confirmed 2026-10-18).
+    *Status 2026-10-20 (part): `docs/ABUSE_HANDLING.md` stale lines fixed (reports survive reporter
+    deletion; the 10-message snapshot at report time; NCA duty in force). The age signal and old-account
+    defaults are still open.*
 
 ### From the store submission pack — 2026-10-20 (`docs/STORE_SUBMISSION_PACK.md` §8, P1–P12)
 115. `[~]` **BLOCKS** WHOOP/Oura connect fails inside the native app: the panel navigates the WebView to
@@ -567,8 +586,13 @@ else maps onto existing items.
     only, then off. And `config.pro_live` must be `'true'` before submission. (P2, P3)
 117. `[ ]` **BLOCKS** Sign in with Apple tokens aren't revoked on account deletion (Apple expects it):
     needs the native SIWA flow's authorization code, or the provider token captured at sign-in. (P8)
-118. `[ ]` **BLOCKS** DM text (and the opt-in shared streak habit name) isn't filtered (Apple 1.2 asks
+118. `[~]` **BLOCKS** DM text (and the opt-in shared streak habit name) isn't filtered (Apple 1.2 asks
     for a filtering method): reuse `checkPublicText` on send, mirror it server-side. (P9)
+    *Status 2026-10-20 (DMs): done in code — the composer refuses slurs and unambiguous explicit terms
+    with an inline reason (draft kept), and a BEFORE INSERT trigger refuses the same list in the database
+    (`vb_message_text_blocked`; list parity checked in the build, JS↔SQL verdicts compared on Postgres 16).
+    Same normalisation as `checkPublicText`, deliberately narrower list: no general swearing, links or
+    help-seeking words ("rape", "paedo", "nudes"). The shared-streak habit name is batch C's half.*
 119. `[~]` **LAUNCH** Copy and widgets for things that don't ship: remove "Recent Mail — coming soon"
     from the mobile picker (keep its META for existing stacks); the tutorial still describes Trending
     and Apple Health; Track says "Syncs from WHOOP, Oura or Apple Health"; drop the "Our Apps" preset
@@ -624,9 +648,10 @@ for Oura effectively permanently).
     register Oura + send the questions email (§3), after 124–127; file both replies with the DPIA (G7).
 
 ### From the domain-day pack — 2026-10-20 (`docs/domain-day/`)
-129. `[ ]` **LAUNCH** Invite links made inside the native app point at `localhost`:
+129. `[~]` **LAUNCH** Invite links made inside the native app point at `localhost`:
     `src/lib/friends/invites.js` builds the URL from the current page address — use `webOrigin()`
     (as deepLinks does). Unverified on a device; fix after the safety batch merges (it owns src/lib/friends).
+    *Status 2026-10-20: fixed in code — invites.js uses webOrigin(); verify a shared invite from the native app opens on another phone.*
 130. `[ ]` **LAUNCH** Domain day (when bought): follow `docs/domain-day/CHECKLIST.md` in order — every
     allow-list first, keep `vantagevision.netlify.app` live (native builds, webhooks and the Health Shortcut
     call it by name; no day-one redirect), sign in to a heavy real account on the new origin before

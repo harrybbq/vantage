@@ -8,7 +8,8 @@ import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
 
 const require = createRequire(import.meta.url);
-const { planProfileUpdate, diffAgainst, writeError } = require('./profileUpdate.js');
+const { planProfileUpdate, diffAgainst, writeError, resetHash, resetChecks, RESET_MESSAGE } = require('./profileUpdate.js');
+const { createHash } = require('node:crypto');
 
 let n = 0;
 const eq = (a, b, m) => { assert.deepEqual(a, b, m); n++; };
@@ -184,6 +185,23 @@ const parse = r => JSON.parse(r.body);
   ok(!direct, 'queries.js no longer PATCHes handle directly');
   const w = readFileSync(new URL('../../src/lib/friends/profileWrites.js', import.meta.url), 'utf8');
   ok(w.includes('/.netlify/functions/profile-update'), 'profileWrites posts to profile-update');
+}
+
+// Owner resets stick through this function too (item 112): same hash as vb_reset_hash.
+{
+  const sha = v => createHash('sha256').update(v, 'utf8').digest('hex');
+  eq(resetHash('reset_display_name', '  Bad   Name '), sha('bad name'), 'display name: whitespace collapsed, trimmed, lower-cased');
+  eq(resetHash('reset_display_name', 'BAD NAME'), resetHash('reset_display_name', 'bad\tname'), 'case and spacing variants hash the same');
+  eq(resetHash('reset_handle', 'Bad_Handle'), sha('bad_handle'), 'handle: lower-cased');
+  eq(resetHash('reset_avatar', IMG), sha(IMG), 'avatar: raw data URL');
+  eq(resetHash('reset_handle', null), null, 'null → null');
+  const checks = resetChecks({ display_name: 'X', handle: 'y_z', avatar: { dataUrl: IMG } });
+  eq(checks.map(c => c.field), ['display_name', 'handle', 'avatar'], 'every changing field is checked');
+  eq(resetChecks({ avatar: { clear: true } }), [], 'clearing a picture is never refused');
+  eq(resetChecks({}), [], 'no changes → no lookup');
+  ok(RESET_MESSAGE.handle && RESET_MESSAGE.display_name && RESET_MESSAGE.avatar, 'each refusal has a message');
+  const fn = (await import('node:fs')).readFileSync(new URL('../functions/profile-update.js', import.meta.url), 'utf8');
+  ok(fn.includes('moderation_actions?target_id=eq.') && fn.indexOf('resetChecks(changes)') < fn.indexOf('withinDailyCap('), 'the function checks resets before spending a write');
 }
 
 console.log(`profileUpdate: ${n} checks passed`);

@@ -19,7 +19,8 @@ const ok = (c, m) => { assert.ok(c, m); n++; };
   const e = readQueueResponse(500, '{"error":"boom"}');
   eq([e.state, e.error], ['error', 'boom'], '500 carries the message');
   eq(readQueueResponse(502, 'garbage').error, "The queue didn't load (HTTP 502).", 'unparseable error body');
-  eq(readQueueResponse(200, '{"reports":[]}'), { state: 'ok', reports: [] }, 'empty queue is ok');
+  { const e0 = readQueueResponse(200, '{"reports":[]}'); eq([e0.state, e0.reports], ['ok', []], 'empty queue is ok'); }
+  eq(readQueueResponse(200, '{"ok":true,"reporterTold":true}').body.reporterTold, true, 'a POST answer keeps its fields');
   eq(readQueueResponse(200, '[{"id":1}]').reports.length, 1, 'bare array accepted');
   eq(readQueueResponse(200, '{"queue":[{"id":1},{"nope":true}]}').reports.length, 1, 'rows without id dropped');
 }
@@ -74,6 +75,19 @@ const ok = (c, m) => { assert.ok(c, m); n++; };
   ok(!c.has(null), 'deleted accounts are not grouped under null');
   eq(sortQueue(rows).map(r => r.id), [2, 1, 4, 3], 'open newest first, then the rest');
   eq(sortQueue(rows, { oldestFirst: true }).map(r => r.id), [4, 1, 2, 3], 'stale view: open oldest first, then the rest');
+  // Urgent (a child's safety, threats, self-harm) first among open ones.
+  const mixed = [
+    { id: 'a', status: 'open', at: '2026-09-30', urgent: false },
+    { id: 'b', status: 'open', at: '2026-09-20', urgent: true },
+    { id: 'c', status: 'actioned', at: '2026-10-01', urgent: true },
+    { id: 'd', status: 'open', at: '2026-09-25', urgent: true },
+  ];
+  eq(sortQueue(mixed).map(r => r.id), ['d', 'b', 'a', 'c'], 'urgent open first (newest), then other open, then closed');
+  eq(sortQueue(mixed, { oldestFirst: true }).map(r => r.id), ['b', 'd', 'a', 'c'], 'stale view keeps urgent first');
+  eq(normaliseReport({ id: 'x', reason: 'Child safety' }).urgent, true, 'urgency read from the stored reason');
+  eq(normaliseReport({ id: 'x', reason: 'Harassment or bullying' }).urgent, false, 'old reasons are not urgent');
+  eq(normaliseReport({ id: 'x', reason: 'Spam', urgent: true }).urgent, true, 'server flag wins');
+  eq(normaliseReport({ id: 'x', reason: 'Self-harm or suicide risk' }).reasonId, 'selfharm', 'reason id');
   const now = Date.parse('2026-09-30T12:00:00Z');
   eq([isStale(rows[0], 24, now), isStale(rows[1], 24, now), isStale(rows[2], 24, now)], [true, false, false], 'stale = open and over a day old');
 }

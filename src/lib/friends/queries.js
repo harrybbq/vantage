@@ -3,6 +3,7 @@ import { publicNameProblem } from '../moderation/nameFilter.js';
 import { PUBLIC_PROFILE_SELECT, OWN_WRITE_RETURNING } from './profileColumns.js';
 import { loadOwnProfile, loadFriendPresence, patchOwnProfileCache } from './profileReads.js';
 import { writePublicProfile } from './profileWrites.js';
+import { safetyErrorKind } from '../moderation/notices.js';
 
 /**
  * Friends data layer — every Supabase call from the social feature
@@ -70,6 +71,10 @@ export function validateHandle(handle) {
  *  silently swallowed. */
 function friendlyError(err, fallback = 'Something went wrong.') {
   const msg = err?.message || '';
+  // Suspension guards (supabase/safety_2026_10b.sql) — say it plainly.
+  const safety = safetyErrorKind(err);
+  if (safety === 'suspended') return 'Your account is suspended, so friend requests are paused.';
+  if (safety === 'peer-suspended') return 'This account is suspended, so the request can\'t be accepted right now.';
   if (/Friend limit reached/i.test(msg)) {
     return 'Friend limit reached — upgrade to Pro for unlimited friends.';
   }
