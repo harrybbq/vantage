@@ -385,10 +385,12 @@ code fails soft until it is run, so order doesn't matter.
 87. `[ ]` **AFTER** `push-dispatch` runs every minute — ~44k invocations a
     month on credit-based pricing, mostly finding nothing. Consider
     every 5 minutes, or trigger it from the queue insert instead.
-88. `[ ]` **AFTER** Supabase compute is **Small**, not Micro — about $5/month
+88. `[x]` **AFTER** Supabase compute is **Small**, not Micro — about $5/month
     over the Pro plan's $10 compute credit. Micro covers today's load; Small
     gives the whole-state saves headroom. Owner's call; switching restarts
     the database for a few minutes (do it while traffic is near zero).
+    *Decided 2026-10-20: stays on Small (owner confirmed). Revisit after items
+    25/26 shrink the state — that is what would make Micro comfortable.*
 89. `[ ]` **AFTER** The Netlify Pro team also hosts `gammonbeastshundred` and
     `vantagetrader` — about a third of builds are Vantage's. Production
     deploys cost 15 credits each (~970 used 27 Sep–5 Oct), so batch
