@@ -20,9 +20,11 @@
  * Overlays (receive the SAME props as the classic component they replace):
  *   ConsolePaywall       PaywallModal's props: { openId, onClose, onManage, onShowToast, onOpenLegal }
  *   ConsoleTutorial      TutorialOverlay's props: { visible, theme, onNavigate, onClose }
+ *   ConsoleAuth          AuthScreen's props: { onOpenLegal, webInviteOnly }
  *
- * The sign-in screen renders before there is any state, so it is always the
- * no-session design (classic until the launch flip) — see README "Gotchas".
+ * ConsoleAuth renders before there is any state, so it only shows once the
+ * no-session design is console, i.e. after the launch flip. Verify it in a
+ * harness (README "Gotchas"), not by signing out.
  */
 export const ConsoleHabits = null;
 export const ConsoleSettings = null;
@@ -32,3 +34,4 @@ export const ConsoleLeaderboard = null;
 export const ConsoleFriends = null;
 export const ConsolePaywall = null;
 export const ConsoleTutorial = null;
+export const ConsoleAuth = null;

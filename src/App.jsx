@@ -23,7 +23,7 @@ import { ConsoleHub } from './design/console/hub';
 import { ConsoleTrack, ConsoleHoliday } from './design/console/track';
 import {
   ConsoleHabits, ConsoleSettings, ConsoleAchievements, ConsoleShop, ConsoleLeaderboard, ConsoleFriends,
-  ConsolePaywall, ConsoleTutorial,
+  ConsolePaywall, ConsoleTutorial, ConsoleAuth,
 } from './design/console/sweep';
 import { useSubscriptionContext } from './context/SubscriptionContext';
 import Modals from './components/Modals';
@@ -1332,7 +1332,11 @@ export default function App() {
     return (
       <>
         {inviteCode && <Suspense fallback={null}><InvitePill onCancel={closeInvite} /></Suspense>}
+        {/* Pre-auth: no provider, so this is the no-session design —
+            classic until the launch flip (src/design/console/README.md). */}
+        <DesignSlot use={ConsoleAuth} props={{ onOpenLegal: setLegalPage, webInviteOnly: access.decision === 'invite-only' }}>
         <AuthScreen onOpenLegal={setLegalPage} webInviteOnly={access.decision === 'invite-only'} />
+        </DesignSlot>
       </>
     );
   }
