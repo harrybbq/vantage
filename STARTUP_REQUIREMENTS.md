@@ -560,6 +560,31 @@ else maps onto existing items.
     exist yet — but set it when the store products are created: RevenueCat → Project settings → API keys →
     Secret API key (`sk_…`, v1) → Netlify env `REVENUECAT_SECRET_API_KEY`, Functions scope → redeploy.
 
+### From the wearable approvals pack — 2026-10-20 (`docs/WEARABLE_APPROVALS.md`, C1–C17, D1–D10)
+Confirmed (official pages, via search excerpts — read the full terms in a browser before submitting):
+WHOOP caps an unapproved app at **10 members**; Oura's API also caps at **10 users** without approval;
+WHOOP 100 req/min + 10,000/day; Oura can't read Gen3/Ring 4 users without an active Oura Membership;
+both providers' terms bar using their data to train/feed AI (keep `AI_WEARABLE_DATA_ALLOWED` unset —
+for Oura effectively permanently).
+124. `[ ]` **BLOCKS (WHOOP approval)** Wearable-derived values reach ratings and the friends heatmap that
+    others see, with no opt-in (`recompute.js` sleep/RHR days, workout burn, auto-ticked trackers, active
+    days; `usePublishProfile.js`). WHOOP's terms count "derivatives" as WHOOP Data and require the user's
+    explicit opt-in before showing it to others. Owner decision D1: exclude wearable-sourced data from
+    shared ratings/heatmap (recommended) or add an opt-in. Fix the "never shown to others" copy to match.
+125. `[ ]` **LAUNCH** Revoke provider grants: WHOOP documents `DELETE /developer/v2/user/access` and asks
+    apps to call it on disconnect — call it on disconnect AND account deletion (corrects item 67's "no
+    documented endpoint"); Oura: check whether an endpoint exists.
+126. `[ ]` **LAUNCH** Branding/labels per WHOOP's guidelines: no home-made WHOOP/Oura logos, don't rename
+    provider metrics (WHOOP Recovery shown under "Readiness"; Oura Readiness stored as "Recovery"), WHOOP's
+    recovery colours, name the provider instead of "wearable"; drop the unused `read:profile` scope.
+127. `[ ]` **LAUNCH** While approval is pending: a server-side allow-list for connect (≤10 incl. one slot for
+    WHOOP's reviewer) with a clear message instead of "connect failed (denied)"; surface Oura errors
+    (today "Synced 0 days"); budget sync-on-open against WHOOP's daily limit (~400–600 DAU would exhaust it)
+    and request an increase in the approval. Decide D4 (delete device history on disconnect option) and
+    D7 (first native build with WHOOP/Oura hidden or held).
+128. `[ ]` **LAUNCH** Submit WHOOP's production approval (draft answers + 13-shot list in the pack §2) and
+    register Oura + send the questions email (§3), after 124–127; file both replies with the DPIA (G7).
+
 ## Phase 7 — Running it safely once it's public
 
 The point is that when something goes wrong, you find out first, you
