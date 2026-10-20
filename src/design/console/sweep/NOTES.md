@@ -20,3 +20,9 @@ changes needed in files this area does not own (see ../README.md §7).
 ## Classic issues found (not fixed: classic is frozen)
 - `paywall:` (bare, 3 call sites) and `paywall:friends` (2) aren't FREE_CAPS keys, so classic PaywallModal renders nothing for them. Console falls back to the generic sheet.
 - "Long streaks breed complacency…" is in `lib/coach/heuristicBrief.js` (hub brief, shared with classic). Gentler wording needs an owner decision because changing it changes classic text.
+
+## Decisions for the owner
+- Sign-in: the email field no longer autofocuses (Google/Apple now lead, and focus would pop the phone keyboard over them). Footer links read "Privacy" / "Terms" (classic: "Privacy Policy" / "Terms of Service"); the paywall keeps the full names. Store-copy call.
+- Habits keep the word "relapse" (the shared relapse modal says it); tone is softened around it ("since your last relapse", "Log a relapse").
+- Paywall sells AI scans as "Fair daily limit", not "Unlimited" (aiQuota still caps Pro). Plans are chosen then confirmed ("Continue with yearly"); classic bought on tap.
+- Copy inside classic components mounted whole (Settings tabs, shop, goal board, friends rail, leaderboard panels) keeps classic strings, em-dashes and the "🔒 Pro" chip; only rebuilding those components would change it.

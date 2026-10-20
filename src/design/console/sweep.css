@@ -446,6 +446,7 @@ html[data-design="console"] .cx-sweep-auth-banner.is-error { color: var(--cx-dan
 html[data-design="console"] .cx-sweep-auth-banner.is-info { color: var(--cx-accent); border-color: var(--cx-accent); background: var(--cx-accent-tint); }
 html[data-design="console"] .cx-sweep-auth-terms { display: flex; align-items: flex-start; gap: var(--cx-sp-12); }
 html[data-design="console"] .cx-sweep-auth-terms .cx-check { margin-top: 0; }
+html[data-design="console"] .cx-sweep-auth-termtext { cursor: pointer; }
 html[data-design="console"] .cx-sweep-auth-oauth { display: flex; flex-direction: column; gap: var(--cx-sp-12); }
 html[data-design="console"] .cx-sweep-auth-oauth p { margin: 0; text-align: center; }
 html[data-design="console"] .cx-sweep-auth-provider {

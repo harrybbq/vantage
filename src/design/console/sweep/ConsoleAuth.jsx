@@ -158,7 +158,8 @@ export default function ConsoleAuth({ onOpenLegal, webInviteOnly = false }) {
             {mode === 'signup' && (
               <div className="cx-sweep-auth-terms">
                 <Checkbox checked={ageConfirmed} onChange={setAgeConfirmed} label="I am 13 or older and agree to the Terms of Service and Privacy Policy" />
-                <span className="cx-t13 cx-mid">
+                {/* Tapping the sentence ticks the box, as classic's <label> did; the links inside still open. */}
+                <span className="cx-t13 cx-mid cx-sweep-auth-termtext" onClick={e => { if (!e.target.closest('button')) setAgeConfirmed(v => !v); }}>
                   I am 13 or older and agree to the{' '}
                   <button type="button" className="cx-sweep-auth-link" onClick={() => onOpenLegal?.('terms')}>Terms of Service</button>
                   {' '}and{' '}
