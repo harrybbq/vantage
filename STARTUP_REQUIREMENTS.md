@@ -346,6 +346,7 @@ code fails soft until it is run, so order doesn't matter.
     grants. Export omits `nutrition_log`, messages and profile, and
     `a.download` does nothing in a WebView.
     *Status 2026-09-30: done except WHOOP/Oura grant revocation (no documented endpoint found); export now includes food log, profile, friendships, messages.*
+    *Status 2026-10-20: WHOOP grant revocation done (item 125 — WHOOP does document an endpoint); Oura's still unverified.*
     *Still open (pack P7, 2026-10-20): export `download()` uses `a.download`, a no-op in a WebView — use
     the share sheet (`navigator.share` with a File, or @capacitor/share + filesystem).*
     *Status 2026-10-20 (P7): in the app the export is built, then a "Save or share the file" button hands it
@@ -628,22 +629,46 @@ WHOOP caps an unapproved app at **10 members**; Oura's API also caps at **10 use
 WHOOP 100 req/min + 10,000/day; Oura can't read Gen3/Ring 4 users without an active Oura Membership;
 both providers' terms bar using their data to train/feed AI (keep `AI_WEARABLE_DATA_ALLOWED` unset —
 for Oura effectively permanently).
-124. `[ ]` **BLOCKS (WHOOP approval)** Wearable-derived values reach ratings and the friends heatmap that
+124. `[x]` **BLOCKS (WHOOP approval)** Wearable-derived values reach ratings and the friends heatmap that
     others see, with no opt-in (`recompute.js` sleep/RHR days, workout burn, auto-ticked trackers, active
     days; `usePublishProfile.js`). WHOOP's terms count "derivatives" as WHOOP Data and require the user's
     explicit opt-in before showing it to others. Owner decision D1: exclude wearable-sourced data from
     shared ratings/heatmap (recommended) or add an opt-in. Fix the "never shown to others" copy to match.
-125. `[ ]` **LAUNCH** Revoke provider grants: WHOOP documents `DELETE /developer/v2/user/access` and asks
+    *Status 2026-10-20: D1 = exclude, done. `src/lib/wearables/strip.js` (`shareableView`, reusing the
+    coach's `wearableProvenance.js` rule) feeds the client ratings, vision unlocks (so the level friends
+    see) and the friends heatmap; `netlify/lib/wearableShare.js` mirrors it in `recompute.js` (state
+    projection gains `logsAuto`), and `check:parity` proves both sides agree and that band data adds
+    nothing. Band users' public ratings drop on their next recompute — expected; say so in the release
+    note. Vision stamps already earned are kept (never removed); prestige baselines snapshotted before
+    this may sit above the new totals until the user climbs past them. Consent + privacy copy updated.*
+125. `[~]` **LAUNCH** Revoke provider grants: WHOOP documents `DELETE /developer/v2/user/access` and asks
     apps to call it on disconnect — call it on disconnect AND account deletion (corrects item 67's "no
     documented endpoint"); Oura: check whether an endpoint exists.
+    *Status 2026-10-20: WHOOP done — `netlify/lib/wearableRevoke.js` (refresh first, 5 s timeout, fail
+    soft) runs before the token row is deleted in `wearable-disconnect` and before the auth delete in
+    `delete-account`, which now also sweeps `whoop_tokens`/`oura_tokens`/`user_data`/`user_data_history`
+    by user id after the auth delete (the `user_data` FK isn't in the repo's SQL to confirm). Oura:
+    UNVERIFIED — its docs weren't reachable from the build machine; a community client points at
+    `GET https://api.ouraring.com/oauth/revoke?access_token=…`. Owner: confirm on
+    cloud.ouraring.com/docs/authentication (or in the §3.2 email), then set `PROVIDERS.oura.revoke`.*
 126. `[ ]` **LAUNCH** Branding/labels per WHOOP's guidelines: no home-made WHOOP/Oura logos, don't rename
     provider metrics (WHOOP Recovery shown under "Readiness"; Oura Readiness stored as "Recovery"), WHOOP's
     recovery colours, name the provider instead of "wearable"; drop the unused `read:profile` scope.
-127. `[ ]` **LAUNCH** While approval is pending: a server-side allow-list for connect (≤10 incl. one slot for
+127. `[~]` **LAUNCH** While approval is pending: a server-side allow-list for connect (≤10 incl. one slot for
     WHOOP's reviewer) with a clear message instead of "connect failed (denied)"; surface Oura errors
     (today "Synced 0 days"); budget sync-on-open against WHOOP's daily limit (~400–600 DAU would exhaust it)
     and request an increase in the approval. Decide D4 (delete device history on disconnect option) and
     D7 (first native build with WHOOP/Oura hidden or held).
+    *Status 2026-10-20 (decided D4, D7): allow-list done in code — `supabase/wearable_access_2026_10.sql`
+    (ships `open`; config switch + list by handle + owner RPCs, 9 slots + the owner), gate in
+    `whoop-connect`/`oura-connect` (`netlify/lib/wearableAccess.js`; already-connected accounts can
+    always reconnect; fails OPEN before the SQL runs), owner panel Settings → Tools → Wearable access,
+    a "you're on the list / not yet" note and plain-language connect results. Oura errors surface
+    (401 → reconnect, 403 → membership; `ouraLastError`). D4: no prompt on disconnect; Settings → Tools →
+    Health & sync → "Delete data synced from WHOOP/Oura" (`stripWearableData`, user-confirmed, manual
+    data kept). D7: `WEARABLES_IN_NATIVE = false` in `src/lib/native/wearableGate.js` hides Connect in
+    native builds; linked accounts keep Disconnect + delete. Owner: run the SQL, add handles (keep one
+    for WHOOP's reviewer), flip to Invite-only. Still open here: the sync-on-open budget (C13).*
 128. `[ ]` **LAUNCH** Submit WHOOP's production approval (draft answers + 13-shot list in the pack §2) and
     register Oura + send the questions email (§3), after 124–127; file both replies with the DPIA (G7).
 
