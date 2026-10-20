@@ -3,7 +3,9 @@
 Everything standing between Vantage as it is today and Vantage on the
 App Store and Google Play. Ordered — later steps depend on earlier ones.
 
-Owners: Harry (harrym3002@outlook.com) · Aidan (anotherone650@gmail.com)
+Owner: Harry (harrym3002@outlook.com) — sole director and shareholder at
+launch (decided 2026-10-20). Aidan (anotherone650@gmail.com) may join
+later; see item 2.
 
 Status key: `[ ]` to do · `[x]` done · `[~]` done in code, needs an
 action outside the repo.
@@ -13,11 +15,21 @@ action outside the repo.
 ## Phase 1 — Company (start immediately; everything queues behind it)
 
 1. `[ ]` **Register a UK limited company** at Companies House (~£50,
-   usually same-day). Two co-owners means limited liability and a clean
-   ownership split; a sole trader can't hold shares between two people.
-2. `[ ]` **Sign a shareholders' agreement.** Who owns what %, what
-   happens if one of you leaves, who decides what. The step people skip
-   and regret. Cheap now, expensive later.
+   usually same-day), Harry as sole director and sole shareholder.
+   Still a company rather than a sole trader: Apple's organisation
+   enrolment and the D-U-N-S number need a legal entity, and a personal
+   Play account means the 12-testers-for-14-days rule (item 6).
+2. `[ ]` **Aidan, in writing, before it matters.** No shareholders'
+   agreement is needed while there is one shareholder. But if Aidan is
+   to get a stake later, write the intent down now (a short dated note:
+   what he'd get and on what terms, e.g. shares that vest over time), so
+   it can't become a "you said…" later. When he joins, the company
+   issues him shares or options, and THAT is when the shareholders'
+   agreement is signed (who owns what %, leaving, who decides).
+2b. `[ ]` **Assign the app's IP to the company** once it exists: a
+   one-page assignment from Harry, and from Aidan for anything he has
+   contributed, so the company cleanly owns the code, name and assets.
+   Stores rarely ask; investors and acquirers always do.
 3. `[ ]` **Open a business bank account.** Apple and Google pay out to
    an account matching the legal entity name exactly.
 4. `[ ]` **Apply for a D-U-N-S number** from Dun & Bradstreet. Free, up
