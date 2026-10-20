@@ -47,3 +47,21 @@ if (!SUPABASE_URL || !SUPABASE_PUBLIC_KEY) {
 }
 
 export const supabase = createClient(SUPABASE_URL, SUPABASE_PUBLIC_KEY);
+
+// Sign in with Apple token capture (STARTUP_REQUIREMENTS item 117).
+// auth-js puts `provider_refresh_token` on the session only once, right
+// after an OAuth sign-in, so the listener has to exist before the
+// client finishes reading the redirect — i.e. here, straight after
+// createClient. It only defers: no supabase call is awaited inside the
+// callback (auth-js holds its lock while notifying), and the dynamic
+// import keeps authFetch → supabase out of an import cycle. Everything
+// past the cheap check is in lib/auth/appleTokenCapture.js; native
+// sign-ins arrive through lib/native/deepLinks.js instead.
+supabase.auth.onAuthStateChange((_event, session) => {
+  if (!session?.provider_refresh_token) return;
+  setTimeout(() => {
+    import('./auth/appleTokenCapture')
+      .then(m => m.captureAppleToken(session))
+      .catch(() => { /* best effort — see the module */ });
+  }, 0);
+});
