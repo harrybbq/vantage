@@ -69,5 +69,6 @@ echo "· assertions"
 # exceed the kernel's per-argument limit.
 psql_ -d copy -v dir="$WORK" -f "$WORK/04_assert_copy.sql"
 psql_ -d prod -v dir="$WORK" -f "$WORK/05_assert_prod.sql"
+( cd "$WORK" && cp alice.json bundle.json && psql_ -d prod -f "$WORK/06_readme_path.sql" )
 
 echo "OK — recovery SQL dry-run passed"
