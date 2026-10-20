@@ -585,6 +585,17 @@ for Oura effectively permanently).
 128. `[ ]` **LAUNCH** Submit WHOOP's production approval (draft answers + 13-shot list in the pack §2) and
     register Oura + send the questions email (§3), after 124–127; file both replies with the DPIA (G7).
 
+### From the domain-day pack — 2026-10-20 (`docs/domain-day/`)
+129. `[ ]` **LAUNCH** Invite links made inside the native app point at `localhost`:
+    `src/lib/friends/invites.js` builds the URL from the current page address — use `webOrigin()`
+    (as deepLinks does). Unverified on a device; fix after the safety batch merges (it owns src/lib/friends).
+130. `[ ]` **LAUNCH** Domain day (when bought): follow `docs/domain-day/CHECKLIST.md` in order — every
+    allow-list first, keep `vantagevision.netlify.app` live (native builds, webhooks and the Health Shortcut
+    call it by name; no day-one redirect), sign in to a heavy real account on the new origin before
+    switching the Supabase Site URL (local stashes are per-origin), change `DEFAULT_API_BASE` before the
+    first store build. Email: Resend (EU region) for Auth SMTP — free tier caps at 100/day, upgrade before
+    any launch push; Zoho mailbox + aliases (`EMAIL.md`). Links/Universal links wait for the native apps.
+
 ## Phase 7 — Running it safely once it's public
 
 The point is that when something goes wrong, you find out first, you
