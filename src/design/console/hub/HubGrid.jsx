@@ -224,7 +224,7 @@ export default function HubGrid({
     const maxRow = Math.max(0, ...Object.keys(rows).map(Number));
     const rowTops = [];
     for (let r = 1; r <= maxRow; r++) rowTops.push(rows[r] ?? (rowTops.length ? rowTops[rowTops.length - 1] : 0));
-    dragRef.current = { id, from, to: from, el, r0: rectOf(el), sx, sy, px: sx, py: sy, gap, rowTops, gridH: g.height, kind, moved: false };
+    dragRef.current = { id, from, to: from, el, r0: rectOf(el), sx, sy, px: sx, py: sy, gap, rowTops, gridH: g.height, kind, moved: false, unswallow: swallowNextClick() };
     el.classList.add('is-lifted');
     document.documentElement.classList.add('cx-hub-dragging');
     setDrag({ id, to: from });
@@ -232,14 +232,20 @@ export default function HubGrid({
     return true;
   }
 
-  const swallowClick = useRef(false);
+  /* A pick-up must never also count as a click on whatever is under the
+     pointer: a held tracker checkbox would tick itself, a held title would
+     navigate. Armed when the drag BEGINS and ended after the drop, because
+     the click that follows a touchend is not guaranteed to land before a
+     zero timeout. */
+  function swallowNextClick() {
+    const eat = e => { e.preventDefault(); e.stopPropagation(); };
+    document.addEventListener('click', eat, { capture: true, once: true });
+    return () => setTimeout(() => document.removeEventListener('click', eat, { capture: true }), 400);
+  }
   function finish(cancel = false) {
     const d = dragRef.current;
     dragRef.current = null;
-    if (d && d.kind === 'mouse') {
-      swallowClick.current = true;
-      setTimeout(() => { swallowClick.current = false; }, 0);
-    }
+    d?.unswallow?.();
     document.documentElement.classList.remove('cx-hub-dragging');
     if (!d) return;
     d.scroller?.stop();
@@ -429,7 +435,6 @@ export default function HubGrid({
               data-type={item.type}
               style={{ gridColumn: `${c.col} / span ${c.w}`, gridRow: `${c.row} / span ${c.h}` }}
               onPointerDown={e => onPointerDown(e, item.id)}
-              onClickCapture={e => { if (swallowClick.current) { e.preventDefault(); e.stopPropagation(); } }}
               onTouchStart={isMobile ? e => onTouchStart(e, item.id) : undefined}
               onContextMenu={isMobile ? e => e.preventDefault() : undefined}
             >
