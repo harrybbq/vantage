@@ -16,7 +16,7 @@ export default function VisitedPanel({ S, year, onOpenMap }) {
     <section className="cx-panel cx-track-visited" aria-label="Visited">
       <header className="cx-track-visited-h">
         <h2>Visited</h2>
-        <span className="cx-muted cx-num">{v.countries} {v.countries === 1 ? 'country' : 'countries'}</span>
+        <span className="cx-muted">{v.rows.filter(r => r.planned).length ? `${v.rows.filter(r => r.planned).length} planned` : ''}</span>
       </header>
       <div className="cx-track-kpis">
         <div><span className="cx-num">{v.countries}</span><span>countries</span></div>

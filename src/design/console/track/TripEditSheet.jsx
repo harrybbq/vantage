@@ -5,8 +5,9 @@
  * (every optional extra included, because the save spreads the form
  * over the record and a field missing here would be written back
  * empty), and saved through trips.js editTrip — classic's
- * handleEditHoliday. Itinerary and Budget are the classic field groups
- * themselves (components/holiday/HolidayFormTabs.jsx).
+ * handleEditHoliday. Itinerary is the classic field group itself
+ * (components/holiday/HolidayFormTabs.jsx); Basics and Budget are drawn
+ * in console controls over the same form (TripFields.jsx).
  */
 import { useState } from 'react';
 import { Sheet, Button, Segmented } from '../ui';
@@ -65,7 +66,12 @@ export default function TripEditSheet({ trip, S, update, tab: initialTab = 'basi
                  options={TABS.map(t => ({ ...t, label: t.value === 'itinerary' && count ? `Itinerary · ${count}` : t.label }))} />
       <div className="cx-track-tabbody">
         {tab === 'basics' && <BasicsFields form={form} setForm={setForm} idPrefix="trip-edit" />}
-        {tab === 'itinerary' && <div className="cx-track-classic"><ItineraryFields form={form} setForm={setForm} /></div>}
+        {tab === 'itinerary' && (
+          <div className="cx-track-classic cx-track-form">
+            <p className="cx-track-hint is-lead">Optional. Each item shows on its day in the calendar.</p>
+            <ItineraryFields form={form} setForm={setForm} />
+          </div>
+        )}
         {tab === 'budget' && (
           <div className="cx-track-form">
             <div className="cx-field">

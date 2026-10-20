@@ -253,7 +253,7 @@ export default function ConsoleTrack({
       )}
 
       {tab === 'diet' && (
-        <div className="cx-track-classic cx-track-diet">
+        <div className="cx-track-classic cx-track-reskin cx-track-diet">
           {userId
             ? <NutritionSection userId={userId} S={S} update={update} selectedDate={selected === today ? null : selected}
                                 calYear={ay} calMonth={am} onShowCoinToast={onShowCoinToast} onMonthDataReady={noop} onOpenModal={onOpenModal} />
@@ -261,7 +261,7 @@ export default function ConsoleTrack({
         </div>
       )}
       {tab === 'vitals' && (
-        <div className="cx-track-classic cx-track-vitals">
+        <div className="cx-track-classic cx-track-reskin cx-track-vitals">
           <VitalsPanel S={S} update={update} />
         </div>
       )}
@@ -288,7 +288,7 @@ export default function ConsoleTrack({
       )}
       {sheet?.type === 'map' && (
         <Sheet title="Visited" eyebrow="Map" onClose={() => setSheet(null)} width={560} className="cx-track-mapsheet" testId="track-map">
-          <div className="cx-track-classic"><VisitedTab S={S} update={update} /></div>
+          <div className="cx-track-classic cx-track-reskin"><VisitedTab S={S} update={update} /></div>
         </Sheet>
       )}
       {autoFor && (

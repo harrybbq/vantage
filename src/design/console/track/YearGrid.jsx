@@ -5,7 +5,8 @@
  * opens it in the Month view; a month's name opens that month.
  */
 import { useMemo } from 'react';
-import { monthMatrix, yearMarks, tripsInMonth, tripHue, MONTHS } from './model';
+import { COUNTRY_BY_ISO, countryForTrip } from '../../../lib/holiday/destinations';
+import { monthMatrix, yearMarks, tripsInMonth, tripHue, cityOf, MONTHS } from './model';
 
 export default function YearGrid({ S, year, today, onOpenDay, onOpenMonth }) {
   const marks = useMemo(() => yearMarks(S, year), [S, year]);
@@ -22,7 +23,7 @@ export default function YearGrid({ S, year, today, onOpenDay, onOpenMonth }) {
                 {trips.length > 0 && (
                   <span className="cx-track-mini-trips">
                     {trips.slice(0, 2).map(t => (
-                      <span key={t.id} style={{ '--k': tripHue(t) }}>{String(t.dest || 'Trip').split(',')[0]}</span>
+                      <span key={t.id} style={{ '--k': tripHue(t) }}>{cityOf(t.dest, COUNTRY_BY_ISO[countryForTrip(t)]?.name) || 'Trip'}</span>
                     ))}
                   </span>
                 )}

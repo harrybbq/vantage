@@ -193,6 +193,7 @@ html[data-design="console"] .cx-track-wday-h {
   display: flex; align-items: center; gap: 8px; width: 100%; min-height: 40px; padding: 0 6px;
   border: 0; background: transparent; color: var(--cx-text); font: inherit; text-align: left; cursor: pointer;
 }
+html[data-design="console"] .cx-track-wday-h .cx-track-d { align-self: center; }
 html[data-design="console"] .cx-track-wday-dow { font: 600 var(--cx-fs-12)/var(--cx-lh-12) var(--cx-sans); color: var(--cx-muted); width: 32px; }
 html[data-design="console"] .cx-track-wday-b { display: flex; flex-direction: column; gap: 4px; padding: 0 6px; min-width: 0; }
 html[data-design="console"] .cx-track-wi {
@@ -578,13 +579,13 @@ html[data-design="console"] .cx-track-vname { font: 600 var(--cx-fs-13)/var(--cx
 html[data-design="console"] .cx-track-vmeta { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font: 400 var(--cx-fs-12)/var(--cx-lh-12) var(--cx-sans); color: var(--cx-muted); }
 html[data-design="console"] .cx-track-pad { padding: 16px; }
 
-/* ── Diet and Vitals: the classic panels, re-skinned from outside ──
+/* ── Diet, Vitals and the Visited map: classic panels, re-skinned from outside ──
    Their own stylesheets read classic tokens; re-point those tokens at
-   the console's, inside these two containers only, then square off the
-   classic chrome (glass blur, 18px radii, spaced-out uppercase labels).
-   Nothing in NutritionSection / VitalsPanel is edited. */
-html[data-design="console"] .cx-track-diet,
-html[data-design="console"] .cx-track-vitals {
+   the console's inside these containers only (.cx-track-reskin), then
+   square off the classic chrome (glass blur, 18px radii, spaced-out
+   uppercase labels). NutritionSection, VitalsPanel and VisitedTab are
+   not edited. */
+html[data-design="console"] .cx-track-reskin {
   --surface: var(--cx-s1);
   --os-surface: var(--cx-s1);
   --os-surface2: var(--cx-s2);
@@ -603,15 +604,12 @@ html[data-design="console"] .cx-track-vitals {
   font-family: var(--cx-sans);
   color: var(--cx-text);
 }
-html[data-design="console"] .cx-track-classic.cx-track-diet *,
-html[data-design="console"] .cx-track-classic.cx-track-vitals * {
+html[data-design="console"] .cx-track-classic.cx-track-reskin * {
   letter-spacing: normal;
   text-transform: none;
 }
-html[data-design="console"] .cx-track-classic.cx-track-diet .card,
-html[data-design="console"] .cx-track-classic.cx-track-diet .tv-card,
-html[data-design="console"] .cx-track-classic.cx-track-vitals .card,
-html[data-design="console"] .cx-track-classic.cx-track-vitals .tv-card {
+html[data-design="console"] .cx-track-classic.cx-track-reskin .card,
+html[data-design="console"] .cx-track-classic.cx-track-reskin .tv-card {
   border: 1px solid var(--cx-line);
   border-radius: var(--cx-r-panel);
   background: var(--cx-s1);
@@ -619,12 +617,13 @@ html[data-design="console"] .cx-track-classic.cx-track-vitals .tv-card {
   backdrop-filter: none;
   -webkit-backdrop-filter: none;
 }
-html[data-design="console"] .cx-track-classic.cx-track-diet .tv-rule > span,
-html[data-design="console"] .cx-track-classic.cx-track-diet .tv-rule > em,
-html[data-design="console"] .cx-track-classic.cx-track-vitals .tv-rule > span,
-html[data-design="console"] .cx-track-classic.cx-track-vitals .tv-rule > em {
+html[data-design="console"] .cx-track-classic.cx-track-reskin .tv-rule > span,
+html[data-design="console"] .cx-track-classic.cx-track-reskin .tv-rule > em {
   font: 600 var(--cx-fs-13)/var(--cx-lh-13) var(--cx-sans);
   color: var(--cx-mid);
 }
-html[data-design="console"] .cx-track-classic.cx-track-diet .tv-rule > i,
-html[data-design="console"] .cx-track-classic.cx-track-vitals .tv-rule > i { background: var(--cx-line); }
+html[data-design="console"] .cx-track-classic.cx-track-reskin .tv-rule > i { background: var(--cx-line); }
+
+/* The classic itinerary intro repeats what the sheet already says. */
+html[data-design="console"] .cx-track-classic .hol-itin-intro { display: none; }
+html[data-design="console"] .cx-track-hint.is-lead { margin: 0; }

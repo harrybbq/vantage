@@ -3,8 +3,9 @@
  * (emptyHolidayForm in components/holiday/HolidayFormTabs.jsx) and the
  * same save path (trips.js), drawn in console controls. Basics is
  * re-drawn here because the classic Basics group carries emoji status
- * options and its own image field; Itinerary and Budget reuse the
- * classic field groups as they are (re-skinned by track.css).
+ * options and its own image field, and Budget because its pot picker
+ * prefixes emoji. Itinerary reuses the classic field group as it is
+ * (re-skinned by track.css).
  */
 import { useRef, useState } from 'react';
 import { Segmented, Button } from '../ui';
