@@ -613,9 +613,17 @@ can stop the bleeding in minutes, and you meet the legal clock.
     Measured state is ~967 kB per user; `holidays` + `backgrounds` are
     ~539 kB of that, all base64 data URIs. It is re-downloaded on every
     app open and rewritten on every save. Roughly halves state size.
+    *Status 2026-10-20: planned — `docs/STATE_SIZE_PLAN.md` + `supabase/state_size_DRAFT_not_run.sql`
+    (DRAFT, do not run). Images → private `media` bucket, references in state, server-side swap with a
+    90-day originals ledger; Phase 0 first (build census, update gate, flags, restore drill, PITR).
+    Owner decisions listed in the plan. Estimate ~967 kB → ~430 kB.*
 26. `[ ]` **Move the per-day logs (`vitalsLog`, `burnLog`, `moodLog`)
     into tables**, the way `nutrition_log` already is. Together with 25
     this takes state from ~967 kB to ~90 kB.
+    *Status 2026-10-20: planned in the same docs — one `daily_log(user_id, kind, day, data)` table,
+    function-only writes (no client delete), journal 90 days, dual-write → backfill → 14 days of zero
+    mismatches → read switch → owner-run per-user cleanup. The first native binary must be built from the
+    read-switch build or later.*
 27. `[ ]` **Decide on Supabase PITR.** Pro gives 7-day daily backups;
     PITR is a paid add-on. Given data safety is the project's stated #1
     rule and there has already been one wipe incident, decide
