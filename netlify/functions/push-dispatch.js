@@ -46,6 +46,7 @@ const { pausedCron } = require('../lib/killSwitch');
 const sbKeys = require('../lib/sbKeys');
 const crypto = require('node:crypto');
 const { requireScheduler } = require('../lib/cronAuth');
+const { lockScreenSafe } = require('../lib/lockScreenSafe');
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
@@ -182,17 +183,16 @@ exports.handler = async (event, context) => {
       // Send to each registered device for the user. We tolerate per-
       // token failures without failing the whole row — only when ALL
       // tokens fail terminally do we mark error.
+      //
+      // Lock-screen safe (item 104): the title and body are fixed text
+      // for the kind, never the queued payload's — a push is read on a
+      // locked phone — and `data` carries only the kind and reference
+      // ids. See lib/lockScreenSafe.js.
+      const message = lockScreenSafe(row.kind, row.payload);
       let anyDelivered = false;
       const deadTokens = [];
       for (const tk of tokens) {
-        const result = await sendFcm(accessToken, tk.token, {
-          title: row.payload?.title || 'Vantage',
-          body:  row.payload?.body  || '',
-          data: {
-            kind: row.kind,
-            ...stringifyValues(row.payload || {}),
-          },
-        });
+        const result = await sendFcm(accessToken, tk.token, message);
         if (result.ok) {
           anyDelivered = true;
         } else if (result.unregistered) {
@@ -288,7 +288,9 @@ async function sendFcm(accessToken, deviceToken, { title, body, data }) {
     },
     android: {
       priority: 'high',
-      notification: { sound: 'default' },
+      // PRIVATE: on a secure lock screen Android shows only the app name
+      // when the user has chosen to hide sensitive content.
+      notification: { sound: 'default', visibility: 'PRIVATE' },
     },
   };
   try {
@@ -355,15 +357,6 @@ function nextAfterQuietHours(prefs, now = new Date()) {
   next.setHours(eh, em, 0, 0);
   if (next <= now) next.setDate(next.getDate() + 1);
   return next;
-}
-
-function stringifyValues(obj) {
-  const out = {};
-  for (const [k, v] of Object.entries(obj || {})) {
-    if (v == null) continue;
-    out[k] = typeof v === 'string' ? v : JSON.stringify(v);
-  }
-  return out;
 }
 
 // ── Tiny Supabase REST client ──────────────────────────────────────────────
