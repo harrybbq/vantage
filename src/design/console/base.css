@@ -216,8 +216,14 @@ html[data-design="console"] .cx-seg-opt:disabled { opacity: 0.5; cursor: not-all
   html[data-design="console"] .cx-seg-opt { height: 40px; }
 }
 
-/* ── Input: 48 px on s2 with a line-strong border ── */
-html[data-design="console"] .cx-input {
+/* ── Input: 48 px on s2 with a line-strong border ──
+   `:not(#cx-id)` adds ID-level specificity on purpose: hub-dark.css styles
+   EVERY input/textarea/select under Dark OS with
+   `html[data-theme="dark-os"] input:not(…):not(…):not(…):not(…)` —
+   specificity (0,5,2), which beats a plain scoped class (0,2,1). Measured
+   in the harness (bg/border/colour were classic's) before this was added.
+   It is the only element-type rule in the classic sheets. */
+html[data-design="console"] .cx-input:not(#cx-id) {
   display: block;
   width: 100%;
   height: var(--cx-input-h);
@@ -230,9 +236,9 @@ html[data-design="console"] .cx-input {
   font: 400 16px/22px var(--cx-sans); /* 16 px, not 15: iOS zooms the page on focus below 16 */
   transition: border-color var(--cx-dur-fast) var(--cx-ease);
 }
-html[data-design="console"] textarea.cx-input { height: auto; min-height: 96px; padding: 12px 14px; resize: vertical; }
-html[data-design="console"] .cx-input::placeholder { color: var(--cx-muted); opacity: 1; }
-html[data-design="console"] .cx-input:focus { border-color: var(--cx-accent); outline: none; }
+html[data-design="console"] textarea.cx-input:not(#cx-id) { height: auto; min-height: 96px; padding: 12px 14px; resize: vertical; }
+html[data-design="console"] .cx-input:not(#cx-id)::placeholder { color: var(--cx-muted); opacity: 1; }
+html[data-design="console"] .cx-input:not(#cx-id):focus { border-color: var(--cx-accent); outline: none; }
 html[data-design="console"] .cx-field { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
 html[data-design="console"] .cx-field > label,
 html[data-design="console"] .cx-label { font: 600 var(--cx-fs-13)/var(--cx-lh-13) var(--cx-sans); color: var(--cx-mid); }
