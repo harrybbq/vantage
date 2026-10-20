@@ -14,6 +14,7 @@
  * built. Keeps the user's own row honest no matter how stale they were.
  */
 
+const { pauseGate } = require('../lib/killSwitch');
 const sbKeys = require('../lib/sbKeys');
 const { recomputeUser } = require('../lib/recompute');
 const { suspendedIds } = require('../lib/suspended');
@@ -285,6 +286,8 @@ async function buildGlobalBoard({ supabaseUrl, serviceKey, callerId, timeframe }
 // ── Handler ──────────────────────────────────────────────────────────────
 exports.handler = async (event) => {
   if (event.httpMethod === 'OPTIONS') return { statusCode: 204, headers: CORS, body: '' };
+  const pausedRes = pauseGate('social', CORS);
+  if (pausedRes) return pausedRes;
   if (event.httpMethod !== 'POST') {
     return { statusCode: 405, headers: CORS, body: JSON.stringify({ error: 'method not allowed' }) };
   }

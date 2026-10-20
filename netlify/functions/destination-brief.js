@@ -26,6 +26,7 @@
  * Returns { place, lat, lon, climate: { tempC, tempMinC, rainDays }, fx: { from, to, rate } }
  * Any part that fails is simply omitted — the client renders what it gets.
  */
+const { pauseGate } = require('../lib/killSwitch');
 const { requireUser, underLimit, tooMany } = require('../lib/requireUser');
 
 const CORS = {
@@ -136,6 +137,8 @@ const CUR_RE = /^[A-Z]{3}$/;
 
 exports.handler = async (event) => {
   if (event.httpMethod === 'OPTIONS') return { statusCode: 204, headers: CORS, body: '' };
+  const pausedRes = pauseGate('ai', CORS);
+  if (pausedRes) return pausedRes;
   if (event.httpMethod !== 'GET') {
 
     return { statusCode: 405, headers: CORS, body: JSON.stringify({ error: 'method not allowed' }) };

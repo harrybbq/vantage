@@ -41,6 +41,7 @@
  *     filtered out by the partial index in notifications_pending.
  */
 
+const { pausedCron } = require('../lib/killSwitch');
 const sbKeys = require('../lib/sbKeys');
 const crypto = require('node:crypto');
 const { requireScheduler } = require('../lib/cronAuth');
@@ -68,6 +69,7 @@ exports.handler = async (event, context) => {
   // everything else now needs PUSH_DISPATCH_SECRET.
   const denied = requireScheduler(event, CORS, 'PUSH_DISPATCH_SECRET');
   if (denied) return denied;
+  if (pausedCron('push', 'push-dispatch')) return { statusCode: 200, body: JSON.stringify({ paused: true, area: 'push' }) };
 
   const supabaseUrl = process.env.SUPABASE_URL;
   const serviceKey  = sbKeys.serviceKey(process.env);

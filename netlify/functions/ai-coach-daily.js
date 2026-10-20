@@ -41,6 +41,7 @@ function checkRateLimit(ip) {
   return entry.count <= RATE_LIMIT;
 }
 
+const { pauseGate } = require('../lib/killSwitch');
 const sbKeys = require('../lib/sbKeys');
 const { requireUser, underLimit, tooMany } = require('../lib/requireUser');
 const { withinDailyAiCap, overDailyCap } = require('../lib/aiQuota');
@@ -205,6 +206,8 @@ exports.handler = async (event) => {
   if (event.httpMethod === 'OPTIONS') {
     return { statusCode: 204, headers: CORS, body: '' };
   }
+  const pausedRes = pauseGate('ai', CORS);
+  if (pausedRes) return pausedRes;
   if (event.httpMethod !== 'POST') {
 
     return { statusCode: 405, headers: CORS, body: JSON.stringify({ error: 'Method not allowed' }) };

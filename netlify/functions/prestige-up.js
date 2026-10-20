@@ -31,6 +31,7 @@
  *      stay untouched.
  */
 
+const { pauseGate } = require('../lib/killSwitch');
 const sbKeys = require('../lib/sbKeys');
 const { derivePoints, deriveRatings, loadRatingInputs, writeRatings } = require('../lib/recompute');
 
@@ -72,6 +73,8 @@ async function readPrestigedAt(supabaseUrl, sbHeaders, userId) {
 
 exports.handler = async (event) => {
   if (event.httpMethod === 'OPTIONS') return { statusCode: 204, headers: CORS, body: '' };
+  const pausedRes = pauseGate('social', CORS);
+  if (pausedRes) return pausedRes;
   if (event.httpMethod !== 'POST') return reply(405, { error: 'method not allowed' });
 
   const supabaseUrl = process.env.SUPABASE_URL;

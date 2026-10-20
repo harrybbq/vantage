@@ -26,6 +26,7 @@
  * AI feature — so no AI-consent gate, but the privacy policy has to say
  * that profile photos are sent to Anthropic for screening.
  */
+const { pauseGate } = require('../lib/killSwitch');
 const crypto = require('crypto');
 const { requireUser, underLimit, tooMany } = require('../lib/requireUser');
 const { screenImage, parseDataUrl } = require('../lib/imageModeration');
@@ -48,6 +49,8 @@ const VERDICT_CAP = 2000;
 
 exports.handler = async (event) => {
   if (event.httpMethod === 'OPTIONS') return { statusCode: 204, headers: CORS, body: '' };
+  const pausedRes = pauseGate('social', CORS);
+  if (pausedRes) return pausedRes;
   if (event.httpMethod !== 'POST') return json(405, { error: 'Method not allowed' });
 
   const auth = await requireUser(event, CORS);

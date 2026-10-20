@@ -21,6 +21,7 @@
  * feature the owner has simply not switched on.
  */
 
+const { pauseGate } = require('../lib/killSwitch');
 const sbKeys = require('../lib/sbKeys');
 const { requireUser, underLimit, tooMany } = require('../lib/requireUser');
 const { screenImage, parseDataUrl } = require('../lib/imageModeration');
@@ -435,6 +436,8 @@ async function moderationAction(auth, action, body, env) {
 // ── Handler ──────────────────────────────────────────────────────────
 exports.handler = async (event) => {
   if (event.httpMethod === 'OPTIONS') return { statusCode: 204, headers: CORS, body: '' };
+  const pausedRes = pauseGate('social', CORS);
+  if (pausedRes) return pausedRes;
   if (event.httpMethod !== 'POST') return fail(405, 'method not allowed');
 
   const auth = await requireUser(event, CORS);

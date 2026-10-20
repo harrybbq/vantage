@@ -47,10 +47,40 @@ Netlify → the site → **Deploys** → pick the last good deploy → **Publish
 - Environment variables are **not** rolled back. They are whatever is set now.
 - If the bad change was a service worker (`public/sw.js`), clients may keep the bad build until a new `CACHE_VERSION` ships. Rolling back the deploy is still the first step.
 
+### Pause an area: `VANTAGE_PAUSE` (the kill switch)
+
+One env var switches whole areas off with no code change (`netlify/lib/killSwitch.js`, item 78).
+
+| Value | What stops |
+|---|---|
+| `ai` | `ai-food-detect`, `ai-coach-daily`, `recipe-from-video`, `destination-brief` |
+| `social` | `get-leaderboard`, `groups`, `prestige-up`, `avatar-check`, and the weekly `settle-leagues` run |
+| `sync` | `whoop-sync`, `oura-sync`, `health-sync` (Apple Health Shortcut), `whoop-callback`, `oura-callback`, and the nightly `whoop-cron` / `oura-cron` |
+| `push` | `push-dispatch` (queued notifications wait in the queue) |
+| `all` | every area above |
+
+Comma-separate to combine (`ai,sync`); case and spaces don't matter; anything else is ignored.
+
+**Never paused, by design:** `delete-account`, `health`, `moderation`, `security-console`, `security-sweep`, `security-agent` (the owner's tool — it is deliberately not in `ai`), `support-ticket`, `client-error`, `csp-report`. You need these during an incident, and users must always be able to delete their account.
+
+Steps:
+
+1. Netlify → the site → **Site configuration → Environment variables → Add a variable**: key `VANTAGE_PAUSE`, value e.g. `ai`, scope **Functions** (or all scopes), same value for every deploy context.
+2. **Deploys → Trigger deploy → Deploy site.** Netlify's docs: *"Environment variable changes require a build and deploy to take effect"* — functions keep the values from the deploy they were built in. So this is **no code change, but not instant**: a build (a few minutes, ~15 credits). If the build itself is the problem, use the rollback above instead.
+3. Check it took: call one paused endpoint (e.g. open the app's leaderboard for `social`) — it should say **"Paused for maintenance — back soon."** HTTP callers get `503 {"error":"paused","area":…}` with `Retry-After: 600`. Scheduled runs log `…: paused by VANTAGE_PAUSE (<area>) — skipping this run` in Netlify → Logs → Functions. WHOOP/Oura connect lands back on the app with "Paused for maintenance".
+4. To resume: delete the variable (or empty it) and **Trigger deploy** again.
+
+After a pause:
+
+- `settle-leagues` only settles the week that just ended, at Mon 00:05 UTC. If `social` is paused across that run, that week is not settled. The code accepts `?week=YYYY-MM-DD` to re-settle a week, but Netlify does not expose scheduled functions by URL in production, so re-running it means running the function locally with the production env (`netlify dev`, then `netlify functions:invoke settle-leagues --querystring "week=YYYY-MM-DD"`) — or accepting the missed week. Prefer lifting a `social` pause before Monday 00:05 UTC.
+- `push-dispatch`: notifications queued during the pause are sent on the first run after it — they may be stale.
+- WHOOP/Oura nightly runs simply catch up the next night (oldest first); users can tap Sync.
+
+**What VANTAGE_PAUSE cannot stop:** anything the app does **directly against Supabase** with the user's session — saving state, DMs (`messages`), friends (`friendships`), blocks, reports, profile edits. Those never touch a Netlify function. To stop one of them, use option 3 below (revoke a grant or drop a policy in the SQL editor), e.g. `revoke insert on public.messages from authenticated;` — write it to a file first so the fix is recorded, and re-grant when done.
+
 ### Switch one function off
 
-**There is no kill-switch env var today.** Item 78 asks for one; it isn't built.
-The real options, fastest first:
+When `VANTAGE_PAUSE` doesn't cover it, the other options, fastest first:
 
 1. **Remove the env var the function needs, then redeploy.** Every one of these fails closed without its key (checked in code):
 
@@ -78,7 +108,7 @@ A redirect in `netlify.toml` over `/.netlify/functions/<name>` is **not** a docu
 ### Scheduled functions
 
 `push-dispatch` (every minute), `security-sweep` (hourly at :23), `snapshot-ratings` (03:00), `whoop-cron` (06:00), `oura-cron` (06:30), `settle-leagues` (Mon 00:05) — all UTC, in `netlify.toml`. `security-sweep` only writes tickets; it never touches user data.
-To stop a cron that is damaging data: remove its env var as above (whoop/oura), or roll back the deploy. Removing the `schedule` line from `netlify.toml` also works but needs a merge and a build.
+To stop a cron that is damaging data: `VANTAGE_PAUSE=sync` (whoop/oura crons), `push` (push-dispatch) or `social` (settle-leagues) and redeploy; or remove its env var as above (whoop/oura); or roll back the deploy. Removing the `schedule` line from `netlify.toml` also works but needs a merge and a build.
 
 ### One user's account
 

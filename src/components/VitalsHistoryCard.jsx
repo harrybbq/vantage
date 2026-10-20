@@ -17,6 +17,7 @@ import { parseHealthExport, applyHealthImport } from '../lib/appleHealth';
 import { syncWhoop } from '../lib/whoopClient';
 import { syncOura, disconnectWearable } from '../lib/ouraClient';
 import { requestConsent } from '../lib/consent/request';
+import { PAUSED_MESSAGE } from '../lib/native/paused';
 
 // Health data is special-category (UK GDPR Art. 9): every route that
 // starts a new source of it asks for explicit consent first. Data that
@@ -263,6 +264,8 @@ function WhoopPanel({ S, update }) {
       setLastRedirect(null);
       update(prev => (prev.whoopConnected ? prev : { ...prev, whoopConnected: true }));
       syncNow(7);
+    } else if (r === 'paused') {
+      setMsg(PAUSED_MESSAGE);
     } else {
       setMsg(`WHOOP connect failed (${r}).`);
     }
@@ -424,6 +427,8 @@ function OuraPanel({ S, update }) {
     if (r === 'connected') {
       update(prev => (prev.ouraConnected ? prev : { ...prev, ouraConnected: true }));
       syncNow(7);
+    } else if (r === 'paused') {
+      setMsg(PAUSED_MESSAGE);
     } else {
       setMsg(`Oura connect failed (${r}).`);
     }

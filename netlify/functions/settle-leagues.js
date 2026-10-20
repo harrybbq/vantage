@@ -36,6 +36,7 @@
  * paid for once.
  */
 
+const { pausedCron } = require('../lib/killSwitch');
 const sbKeys = require('../lib/sbKeys');
 const { requireScheduler } = require('../lib/cronAuth');
 const {
@@ -49,6 +50,7 @@ const DAY_MS = 86_400_000;
 exports.handler = async (event) => {
   const denied = requireScheduler(event, CORS, 'CRON_SECRET');
   if (denied) return denied;
+  if (pausedCron('social', 'settle-leagues')) return { statusCode: 200, body: JSON.stringify({ paused: true, area: 'social' }) };
 
   const env = {
     supabaseUrl: process.env.SUPABASE_URL,

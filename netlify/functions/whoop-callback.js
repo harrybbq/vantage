@@ -6,6 +6,7 @@
  * exchange the code for access+refresh tokens, store them in
  * whoop_tokens (service-role only), and bounce back into the app.
  */
+const { paused } = require('../lib/killSwitch');
 const sbKeys = require('../lib/sbKeys');
 const { verifyState, clearCookie } = require('../lib/oauthState');
 const { redirectUriFor, appUrl } = require('../lib/redirectUri');
@@ -30,6 +31,9 @@ exports.handler = async (event) => {
   const { SUPABASE_URL, WHOOP_CLIENT_ID, WHOOP_CLIENT_SECRET } = process.env;
   const serviceKey = sbKeys.serviceKey(process.env);
   const q = event.queryStringParameters || {};
+  // Kill switch (lib/killSwitch): a browser redirect, so say it with the
+  // same ?provider=<result> the app already reads rather than a 503 page.
+  if (paused('sync')) return redirect(event, 'paused');
 
   if (q.error) return redirect(event, 'denied');
   // Authentic, unexpired, for this provider, AND accompanied by

@@ -18,6 +18,7 @@
  * vitals/burn, never removes user data — and we skip the write entirely
  * when there's nothing new, keeping DB writes minimal (Micro-friendly).
  */
+const { pausedCron } = require('../lib/killSwitch');
 const sbKeys = require('../lib/sbKeys');
 const { sb, getFreshToken, fetchOuraData, mergeOuraIntoState } = require('../lib/oura');
 const { requireScheduler } = require('../lib/cronAuth');
@@ -28,6 +29,7 @@ const DAYS = 3; // enough to catch anything a run or two ago missed
 exports.handler = async (event) => {
   const denied = requireScheduler(event, { 'Content-Type': 'application/json' }, 'CRON_SECRET');
   if (denied) return denied;
+  if (pausedCron('sync', 'oura-cron')) return { statusCode: 200, body: JSON.stringify({ paused: true, area: 'sync' }) };
 
   const env = process.env;
   if (!env.OURA_CLIENT_ID || !env.OURA_CLIENT_SECRET || !env.SUPABASE_URL || !sbKeys.serviceKey(env)) {

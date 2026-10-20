@@ -79,6 +79,7 @@ function latestWeight(vitalsLog) {
   return null;
 }
 
+const { pauseGate } = require('../lib/killSwitch');
 const sbKeys = require('../lib/sbKeys');
 const { mergeStateCAS } = require('../lib/stateWrite');
 
@@ -93,6 +94,8 @@ const reply = (statusCode, body) => ({ statusCode, headers: CORS, body: JSON.str
 
 exports.handler = async (event) => {
   if (event.httpMethod === 'OPTIONS') return { statusCode: 204, headers: CORS, body: '' };
+  const pausedRes = pauseGate('sync', CORS);
+  if (pausedRes) return pausedRes;
   if (event.httpMethod !== 'POST') return reply(405, { error: 'method not allowed' });
 
   const env = process.env;

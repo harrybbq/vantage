@@ -24,6 +24,7 @@
  * app on text fetched from any public video. 10 reads a minute, and the
  * durable daily cap in lib/aiQuota.js on top.
  */
+const { pauseGate } = require('../lib/killSwitch');
 const { requireUser, underLimit, tooMany } = require('../lib/requireUser');
 const { withinDailyAiCap, overDailyCap } = require('../lib/aiQuota');
 const { isOwnerEmail } = require('../lib/owner');
@@ -158,6 +159,8 @@ async function extract(meta) {
 
 exports.handler = async (event) => {
   if (event.httpMethod === 'OPTIONS') return { statusCode: 204, headers: CORS, body: '' };
+  const pausedRes = pauseGate('ai', CORS);
+  if (pausedRes) return pausedRes;
   if (event.httpMethod !== 'POST') return reply(405, { error: 'Method not allowed' });
 
   const auth = await requireUser(event, CORS);

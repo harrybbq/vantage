@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { supabase } from './supabase';
 import { consentStatus } from './consent/consent';
-import { apiUrl } from './authFetch';
+import { apiUrl, apiFetch } from './authFetch';
 
 /**
  * Client-side Oura sync, mirroring whoopClient. Calls the oura-sync
@@ -12,7 +12,7 @@ import { apiUrl } from './authFetch';
  */
 export async function syncOura(update, days = 7) {
   const { data: { session } } = await supabase.auth.getSession();
-  const res = await fetch(apiUrl('/.netlify/functions/oura-sync'), {
+  const res = await apiFetch('/.netlify/functions/oura-sync', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session?.access_token}` },
     body: JSON.stringify({ days }),

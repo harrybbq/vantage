@@ -10,7 +10,7 @@
  * and it can only do that if there is one cache rather than two.
  */
 import { supabase } from '../supabase';
-import { apiUrl } from '../authFetch';
+import { apiFetch } from '../authFetch';
 
 export const CACHE_TTL_MS = 45_000;
 
@@ -23,7 +23,7 @@ export async function callGroups(payload) {
   const session = (await supabase.auth.getSession()).data?.session;
   const token = session?.access_token;
   if (!token) throw new Error('Not signed in.');
-  const res = await fetch(apiUrl('/.netlify/functions/groups'), {
+  const res = await apiFetch('/.netlify/functions/groups', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
     body: JSON.stringify(payload),

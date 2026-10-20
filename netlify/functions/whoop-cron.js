@@ -17,6 +17,7 @@
  * Intra-day workouts still land via the app's on-open sync; webhooks
  * would be the path to intra-day passive updates.
  */
+const { pausedCron } = require('../lib/killSwitch');
 const sbKeys = require('../lib/sbKeys');
 const { sb, getFreshToken, fetchWhoopData, mergeWhoopIntoState } = require('../lib/whoop');
 const { requireScheduler } = require('../lib/cronAuth');
@@ -29,6 +30,7 @@ exports.handler = async (event) => {
   // web request should be able to start.
   const denied = requireScheduler(event, { 'Content-Type': 'application/json' }, 'CRON_SECRET');
   if (denied) return denied;
+  if (pausedCron('sync', 'whoop-cron')) return { statusCode: 200, body: JSON.stringify({ paused: true, area: 'sync' }) };
 
   const env = process.env;
   if (!env.WHOOP_CLIENT_ID || !env.WHOOP_CLIENT_SECRET || !env.SUPABASE_URL || !sbKeys.serviceKey(env)) {

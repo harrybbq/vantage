@@ -460,6 +460,7 @@ can stop the bleeding in minutes, and you meet the legal clock.
     - *Review:* write-up, fix, and a test or check so it can't recur
       (the pattern already used after the 2026-05-03 wipe).
     *Status 2026-09-30: docs/INCIDENT_RUNBOOK.md (contain, secrets inventory, ICO 72 h, breach log, post-mortem). No kill-switch env var exists yet — the runbook documents today's options.*
+    *Status 2026-10-20: kill switch built — `VANTAGE_PAUSE=ai|social|sync|push|all` (comma list) makes those functions answer 503 "Paused for maintenance — back soon" (crons skip their run); moderation, deletion, health and the security tools never pause. Needs a Netlify redeploy to take effect (env changes apply on deploy), no code change. Direct-to-Supabase traffic (DMs, friends) still needs a grant revoke. Owner: read runbook §3 "Pause an area" once, and try it on a quiet evening (`VANTAGE_PAUSE=ai`, redeploy, check, remove, redeploy).*
 79. `[~]` **Abuse handling with a clock on it.** Reports reach an owner
     within hours (push or email), a target of acting within 24 h (what
     Apple expects), a suspend flag that hides a user everywhere, and
