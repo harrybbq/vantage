@@ -32,6 +32,9 @@ function noun(label) {
 // daily limit on Pro (netlify/lib/aiQuota) — never claim "Unlimited".
 const PRO_SIDE = { aiScans: 'Fair daily limit' };
 
+// Row labels where the cap's own label reads wrong in a table.
+const ROW_LABEL = { holidays: 'Holidays', aiScans: 'AI food scans a week' };
+
 // Table order: the caps people hit most, first.
 const ORDER = ['trackers', 'habits', 'achievements', 'shopItems', 'links', 'holidays', 'aiScans'];
 
@@ -51,7 +54,7 @@ export function compareRows(caps, hitKey = null) {
     })
     .map(([key, c]) => ({
       key,
-      label: cap1(c.label),
+      label: ROW_LABEL[key] || cap1(c.label),
       free: String(c.limit),
       pro: PRO_SIDE[key] || 'Unlimited',
       hit: key === hitKey,
