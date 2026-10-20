@@ -369,20 +369,20 @@ code fails soft until it is run, so order doesn't matter.
     devDependencies (clears item 22's critical/high — none ship).
     *Status 2026-09-30: personal emails replaced with placeholders in SQL; dead SpotifyBar removed (revoke that Last.fm key — it stays in git history); salary comment neutralised; Capacitor CLI/assets moved to devDependencies; PR build workflow added. `TRADING_APP_CLAUDE.md:9` still holds a real email; `dist/` is still committed per the deploy flow.*
 
-83. `[~]` **LAUNCH** Any signed-in user can still read every column of a
+83. `[x]` **LAUNCH** Any signed-in user can still read every column of a
     searchable profile — `tier` (who pays), `ratings`,
     `prestige_baseline`, `last_active_at` — whatever `leaderboard_optin`
     says. Fix with column-level SELECT grants (the `groups` pattern in
     `group_crest_schema.sql`), after moving own-row reads of `tier` and
     `last_active_at` to a definer RPC. Needs a client audit of every
     `from('profiles').select(...)` first.
-    *Status 2026-10-20: done in code. Public set = id, handle, display_name, avatar_url, level, ratings_ovr, suspended_at (`src/lib/friends/profileColumns.js`; a build test keeps it equal to the SQL grant and fails if any client select names another column). Own private fields (tier, is_searchable, leaderboard_*) via `my_profile()`, friends' last_active_at via `friend_presence()` (accepted friends only) — both fall back to today's selects until the SQL runs. Category `ratings` stay visible only where the leaderboard/group functions show them (service role; item 103 still open). Owner: deploy, THEN run `supabase/privacy_lockdown_2026_10b.sql` (header has verify queries).*
-84. `[~]` **LAUNCH** Name filter and avatar screening bind honest clients
+    *Status 2026-10-20: done in code. Public set = id, handle, display_name, avatar_url, level, ratings_ovr, suspended_at (`src/lib/friends/profileColumns.js`; a build test keeps it equal to the SQL grant and fails if any client select names another column). Own private fields (tier, is_searchable, leaderboard_*) via `my_profile()`, friends' last_active_at via `friend_presence()` (accepted friends only) — both fall back to today's selects until the SQL runs. Category `ratings` stay visible only where the leaderboard/group functions show them (service role; item 103 still open). Owner: deploy, THEN run `supabase/privacy_lockdown_2026_10b.sql` (header has verify queries). SQL applied 2026-10-20; verified: the seven public columns are the only SELECT grant, and UPDATE is is_searchable, last_active_at, leaderboard_color, leaderboard_optin, level.*
+84. `[x]` **LAUNCH** Name filter and avatar screening bind honest clients
     only: a user can still PATCH `handle`/`display_name`/`avatar_url` on
     their own row directly. Binding needs those writes moved to a
     service-role function, then
     `revoke update (handle, display_name, avatar_url) on public.profiles from authenticated;`.
-    *Status 2026-10-20: done in code — `netlify/functions/profile-update` (requireUser, `social` kill switch, 10/min brake + 40 changing writes/day durable via ai_usage, server name filter, avatar screening that fails closed) is the client's only writer of the three; the SQL revokes their UPDATE and INSERT grants. Order: deploy first (the new client works under either grant set), then run `supabase/privacy_lockdown_2026_10b.sql`.*
+    *Status 2026-10-20: done in code — `netlify/functions/profile-update` (requireUser, `social` kill switch, 10/min brake + 40 changing writes/day durable via ai_usage, server name filter, avatar screening that fails closed) is the client's only writer of the three; the SQL revokes their UPDATE and INSERT grants. Order: deploy first (the new client works under either grant set), then run `supabase/privacy_lockdown_2026_10b.sql`. SQL applied 2026-10-20; verified: handle/display_name/avatar_url have no UPDATE grant.*
 
 85. `[~]` **LAUNCH** Supabase is retiring the legacy `anon`/`service_role`
     keys by the end of 2026. The new `sb_secret_…` keys go in the `apikey`
@@ -412,9 +412,9 @@ code fails soft until it is run, so order doesn't matter.
     releases; Personal's 1,000 credits would not cover the current pace.
 90. `[x]` **AFTER** `global-trending` read every user's state on each refresh
     — the first thing to saturate the DB. *Done 2026-10-05 (#225): Trending removed.*
-91. `[~]` **AFTER** `get-leaderboard` has no shared cache and pulls ~500
+91. `[x]` **AFTER** `get-leaderboard` has no shared cache and pulls ~500
     profiles with avatars per view. Cache 5–10 min; avatars for the top 100 only.
-    *Status 2026-10-20: done in code — the global top 100 (per timeframe) is built at most once per 5 min and shared: module scope per instance + one `function_cache` row across instances (lib/sharedCache.js; falls back to module scope until the SQL runs). A cached view is auth + the caller's own profile (+ rank count / colour for a caller outside the top 100) instead of ~10 queries incl. 500 profiles with avatars. Per-caller parts (isSelf, current numbers, opt-out, true rank, pinned row) stay live; friends boards are never cached. Weekly pool reads 500 candidates without avatars and fetches avatars for the 100 shown; friends boards past 100 rows get initials. Others see an opt-out/suspension within ≤ 5 min. Owner: run `supabase/retention_2026_10b.sql` (creates `function_cache`).*
+    *Status 2026-10-20: done in code — the global top 100 (per timeframe) is built at most once per 5 min and shared: module scope per instance + one `function_cache` row across instances (lib/sharedCache.js; falls back to module scope until the SQL runs). A cached view is auth + the caller's own profile (+ rank count / colour for a caller outside the top 100) instead of ~10 queries incl. 500 profiles with avatars. Per-caller parts (isSelf, current numbers, opt-out, true rank, pinned row) stay live; friends boards are never cached. Weekly pool reads 500 candidates without avatars and fetches avatars for the 100 shown; friends boards past 100 rows get initials. Others see an opt-out/suspension within ≤ 5 min. Owner: run `supabase/retention_2026_10b.sql` (creates `function_cache`). SQL applied 2026-10-20; `function_cache` exists.*
 92. `[~]` **AFTER** Presence writes a `profiles` UPDATE every 60 s per open
     app (`usePublishProfile.js`). Every 5 min is enough.
     *Status 2026-10-20: done in code — heartbeat every 5 min while visible, plus on sign-in and on return (if the last ping is ≥ 2 min old); the debounced publish writes level/presence only when they change. Online threshold 3 → 11 min (`ONLINE_THRESHOLD_MS`), Settings copy updated. Ships with the deploy; no SQL.*
@@ -426,10 +426,10 @@ code fails soft until it is run, so order doesn't matter.
 95. `[~]` **AFTER** `weather` has no auth and calls ipwho.is per request;
     `client-error` and `vitals-beacon` are open writes. Require auth / cache
     by IP / rate-limit (pairs with item 86).
-    *Status 2026-10-20: done in code — weather reads Netlify's own `x-nf-geo` header (lat/lon, or the city name → Open-Meteo geocoder); **ipwho.is is no longer called at all**, so no third party receives the IP (closes STORE_PRIVACY_LABELS Q3 — the privacy policy / labels can drop ipwho.is once this is live). No geo header → chip hidden (logged once per instance). Per IP: 12 calls/h anonymous, up to 60/h with a valid session (verified only past the allowance, verdict cached), 10/min burst; weather cached 30 min per ~11 km cell; `useWeather` sends the session. client-error / vitals-beacon: per-IP minute+hour limits, identical-report dedupe, empty/non-object/no-UA input dropped, and a durable cross-instance cap (1,000 errors / 3,000 vitals an hour, trigger in `retention_2026_10b.sql`). Owner: after deploy, confirm the weather chip still shows (if not, the function log says "no usable x-nf-geo" — tell the next session); still add the Netlify rate-limit rule (item 86).*
-96. `[~]` **AFTER** Retention: nothing prunes `client_errors`,
+    *Status 2026-10-20: done in code — weather reads Netlify's own `x-nf-geo` header (lat/lon, or the city name → Open-Meteo geocoder); **ipwho.is is no longer called at all**, so no third party receives the IP (closes STORE_PRIVACY_LABELS Q3 — the privacy policy / labels can drop ipwho.is once this is live). No geo header → chip hidden (logged once per instance). Per IP: 12 calls/h anonymous, up to 60/h with a valid session (verified only past the allowance, verdict cached), 10/min burst; weather cached 30 min per ~11 km cell; `useWeather` sends the session. client-error / vitals-beacon: per-IP minute+hour limits, identical-report dedupe, empty/non-object/no-UA input dropped, and a durable cross-instance cap (1,000 errors / 3,000 vitals an hour, trigger in `retention_2026_10b.sql`). Owner: after deploy, confirm the weather chip still shows (if not, the function log says "no usable x-nf-geo" — tell the next session); still add the Netlify rate-limit rule (item 86). SQL applied 2026-10-20 (`ingest_caps` exists); weather chip check and item 86 still open.*
+96. `[x]` **AFTER** Retention: nothing prunes `client_errors`,
     `rating_snapshots` or `web_vitals` — schedule a monthly delete of old rows.
-    *Status 2026-10-20: done in code (also DPIA G11, G13) — `retention-prune` scheduled function, weekly Sun 04:47 UTC, calls `public.retention_prune` in batches of ≤ 500 (250 ms apart, ≤ 20 batches per table, 20 s budget): client_errors 30 d, web_vitals 90 d, rating_snapshots 90 d (readers need ≤ 21), sent/dead notifications 30 d, coach_nudges 60 d, CLOSED reports 12 months after closing (with their evidence snapshot; never open ones, never `retention_hold = true`), expired caches. User content (user_data, nutrition_log, messages, friendships, profiles, …) is refused by the JS and by the SQL, and asserted in `check:efficiency`. Stops for `VANTAGE_PAUSE=all|retention` (incident evidence). No pg_cron in the project, so Netlify cron. Owner: run `supabase/retention_2026_10b.sql`, then the dry-run query in its header; set `retention_hold` on any report referred to police/IWF. Privacy policy should state the windows (batch A).*
+    *Status 2026-10-20: done in code (also DPIA G11, G13) — `retention-prune` scheduled function, weekly Sun 04:47 UTC, calls `public.retention_prune` in batches of ≤ 500 (250 ms apart, ≤ 20 batches per table, 20 s budget): client_errors 30 d, web_vitals 90 d, rating_snapshots 90 d (readers need ≤ 21), sent/dead notifications 30 d, coach_nudges 60 d, CLOSED reports 12 months after closing (with their evidence snapshot; never open ones, never `retention_hold = true`), expired caches. User content (user_data, nutrition_log, messages, friendships, profiles, …) is refused by the JS and by the SQL, and asserted in `check:efficiency`. Stops for `VANTAGE_PAUSE=all|retention` (incident evidence). No pg_cron in the project, so Netlify cron. Owner: run `supabase/retention_2026_10b.sql`, then the dry-run query in its header; set `retention_hold` on any report referred to police/IWF. Privacy policy should state the windows (batch A). SQL applied 2026-10-20; verified `retention_prune` exists and is not callable by app users.*
 97. `[x]` **LAUNCH** AI food scans had no server-side tier check.
     *Done 2026-10-05 (#225): 3 free a week, unlimited on Pro, enforced in ai-food-detect.*
 
@@ -468,9 +468,9 @@ else maps onto existing items.
     press Disconnect), and the AI functions don't check AI consent server-side. Skip/refuse on the server
     (one JSON-path read), or have withdrawal call `wearable-disconnect`. (DPIA G1)
     *Status 2026-10-20: done in code — `netlify/lib/consentGate.js` (pure rule + tests). Health: sync stops when consent is declined/withdrawn; never-asked accounts keep syncing, matching the app. AI: only an explicit yes. Crons filter with one batched `state->consent` read; whoop-sync/oura-sync/health-sync and ai-coach-daily/ai-food-detect (scan)/recipe-from-video refuse with a clear 403. destination-brief left out: no AI call, no user data. Live once deployed; consent_events (item 99) refines it after the SQL.*
-99. `[~]` **LAUNCH** No durable consent record — consent lives only in the user-editable state. Add an
+99. `[x]` **LAUNCH** No durable consent record — consent lives only in the user-editable state. Add an
     append-only `consent_events` table (kind, granted/withdrawn, time, copy version, cascade). (G2)
-    *Status 2026-10-20: done in code — table in `supabase/privacy_lockdown_2026_10b.sql` (RLS insert/select own, no update/delete for anyone, server-stamped time, 60/h throttle, cascade); `src/lib/consent/ledger.js` records each consent change after hydration and a just-in-time "Allow" waits for the record + a state save. Fails soft until the owner runs the SQL. Bump `CONSENT_COPY_VERSION` when the consent wording changes.*
+    *Status 2026-10-20: done in code — table in `supabase/privacy_lockdown_2026_10b.sql` (RLS insert/select own, no update/delete for anyone, server-stamped time, 60/h throttle, cascade); `src/lib/consent/ledger.js` records each consent change after hydration and a just-in-time "Allow" waits for the record + a state save. Fails soft until the owner runs the SQL. Bump `CONSENT_COPY_VERSION` when the consent wording changes. SQL applied 2026-10-20; verified `consent_events` has no UPDATE/DELETE for anyone.*
 100. `[~]` **BLOCKS** Privacy policy vs code (labels draft "Mismatches", DPIA G10/G13):
     - says accounts are erased "within 30 days" — deletion is immediate, backups keep 7 days;
     - says "we do not collect purchase history" — RevenueCat keeps it, linked to the user id;
@@ -531,26 +531,26 @@ else maps onto existing items.
 109. `[ ]` **LAUNCH** Governance the Codes expect: a named accountable person with written
     responsibilities; written content policies, queue prioritisation and moderator guidance; a written
     appeals process; a complaints route that works without an account (pairs with item 72).
-110. `[~]` **LAUNCH** Reporting loop: acknowledge reports to the reporter and tell them the outcome;
+110. `[x]` **LAUNCH** Reporting loop: acknowledge reports to the reporter and tell them the outcome;
     tell the reported user about action taken; more report reasons (child safety, threats, self-harm,
     sexual content, scams); report + block from an incoming friend request.
     *Status 2026-10-20: done in code — in-app `safety_notices` (report received by DB trigger; outcome on
     dismiss/resolve/suspend; suspension, reset and lift told to the reported user, never who reported and
     never for a child-safety report); reasons child safety, threats or violence, hate, sexual content,
     self-harm, scam or fraud added (old stored labels unchanged), urgent ones first in the queue with crisis
-    signposting on the sheet; Report/Block on incoming requests. Owner: run `supabase/safety_2026_10b.sql`.*
-111. `[~]` **LAUNCH** Suspension doesn't stop DMs — a suspended user can still message friends. Block
+    signposting on the sheet; Report/Block on incoming requests. Owner: run `supabase/safety_2026_10b.sql`. SQL applied 2026-10-20 (`moderation_actions` exists).*
+111. `[x]` **LAUNCH** Suspension doesn't stop DMs — a suspended user can still message friends. Block
     sends (and probably receipt) for suspended accounts in RLS.
     *Status 2026-10-20: done in code — RLS refuses a suspended account's messages, reactions, friend
     requests/accepts and unsends; its earlier messages/reactions are hidden from the other person while
     suspended (never deleted; the report snapshot and the queue keep them); the app shows a calm suspended
-    banner and read-only conversations. Policy-tested on Postgres 16. Owner: run `supabase/safety_2026_10b.sql`.*
+    banner and read-only conversations. Policy-tested on Postgres 16. Owner: run `supabase/safety_2026_10b.sql`. SQL applied 2026-10-20 (`messages_safety_guard` trigger live).*
 112. `[~]` **LAUNCH** Owner tools the Terms already promise: reset a user's display name / handle /
     avatar from the moderation queue; re-screen avatars published before screening existed.
     *Status 2026-10-20: done in code — queue "Reset…" (service role, audited in `moderation_actions`, the
     same value refused if the app re-publishes it, user told) and "Resolve"; "Re-screen profile pictures"
     in Security → Moderation (4 per press, owner daily AI cap 200, flags only — keep or remove). Owner: run
-    `supabase/safety_2026_10b.sql`, then press re-screen until the backlog is 0 (needs ANTHROPIC_API_KEY).*
+    `supabase/safety_2026_10b.sql`, then press re-screen until the backlog is 0 (needs ANTHROPIC_API_KEY). SQL applied 2026-10-20; the avatar re-screen backlog is still to clear.*
 113. `[ ]` **LAUNCH** NCA child-sexual-abuse reporting duty (in force for user-to-user services since
     7 Apr 2026): register and write the procedure (how evidence is preserved, who files, within what
     time). Add a mute option (Codes user control); supportive information for child users.
@@ -737,7 +737,7 @@ can stop the bleeding in minutes, and you meet the legal clock.
     restore a `user_data_history` snapshot to a test account and time
     it. A backup that has never been restored is a hope, not a backup.
     *Status 2026-09-30: docs/RESTORE_RUNBOOK.md (restore from user_data_history, drill checklist, PITR notes). Run the first drill.*
-    *Status 2026-10-20: runbook rewritten as a decision tree (history restore → copy + one-user recovery → whole-project restore as last resort) with a quarterly drill that uses a free daily backup + one-user recovery on a test account, and a results log. The SQL is dry-run tested on Postgres 16 (`scripts/recovery/test-recovery-sql.sh`). First drill still to run by the owner, after `recovery_2026_10b.sql` is applied.*
+    *Status 2026-10-20: runbook rewritten as a decision tree (history restore → copy + one-user recovery → whole-project restore as last resort) with a quarterly drill that uses a free daily backup + one-user recovery on a test account, and a results log. The SQL is dry-run tested on Postgres 16 (`scripts/recovery/test-recovery-sql.sh`). First drill still to run by the owner, after `recovery_2026_10b.sql` is applied. `recovery_2026_10b.sql` applied 2026-10-20 (ops_log shows "done"); first drill still to run.*
 
 ## Phase 6 — Scale readiness (before real user numbers)
 
@@ -760,7 +760,7 @@ can stop the bleeding in minutes, and you meet the legal clock.
     PITR is a paid add-on. Given data safety is the project's stated #1
     rule and there has already been one wipe incident, decide
     deliberately rather than during an incident.
-    *Status 2026-10-20: decided — PITR ON for the state-size migration window (enable before the image migration I4, off 30 days after the last L7 cleanup) and recommended permanently from public launch; 7 days ≈ $100/month ($0.137/h, outside the spend cap, stops daily backups, needs Small — we're on Small). Foundations built so it's useful the day it's bought and daily backups are useful today: `supabase/recovery_2026_10b.sql` (append-only `ops_log` restore markers + `ops_mark()`, and one-user recovery `export_user_bundle` in a restored copy → `import_user_bundle` dry_run/restore_missing in production, insert-only, never overwrites state), `netlify/lib/opsMark.js`, `docs/RESTORE_RUNBOOK.md` (decision tree, whole-project checklist, "Buying PITR" checklist), `scripts/recovery/README.md`. Owner: run `recovery_2026_10b.sql`; buy PITR before I4 using the runbook checklist (and update DPIA row 23 + running costs).*
+    *Status 2026-10-20: decided — PITR ON for the state-size migration window (enable before the image migration I4, off 30 days after the last L7 cleanup) and recommended permanently from public launch; 7 days ≈ $100/month ($0.137/h, outside the spend cap, stops daily backups, needs Small — we're on Small). Foundations built so it's useful the day it's bought and daily backups are useful today: `supabase/recovery_2026_10b.sql` (append-only `ops_log` restore markers + `ops_mark()`, and one-user recovery `export_user_bundle` in a restored copy → `import_user_bundle` dry_run/restore_missing in production, insert-only, never overwrites state), `netlify/lib/opsMark.js`, `docs/RESTORE_RUNBOOK.md` (decision tree, whole-project checklist, "Buying PITR" checklist), `scripts/recovery/README.md`. Owner: run `recovery_2026_10b.sql`; buy PITR before I4 using the runbook checklist (and update DPIA row 23 + running costs). `recovery_2026_10b.sql` applied 2026-10-20.*
 
 ---
 
