@@ -39,11 +39,34 @@ Two other queues, same page:
 It reads through `/.netlify/functions/moderation`, which checks the
 session and the owner email on the server (`OWNER_EMAIL`).
 
-**Nothing pushes or emails an owner when a report arrives. Today the
-24-hour target depends on an owner opening the queue every day.**
+**The alert:** the hourly security sweep (`security-sweep`, at :23 past
+every hour, `netlify/lib/securitySweep.js`) counts reports filed in the
+last 65 minutes. If there are any, it raises a ticket and pings the
+owner's phone through the existing alert pipeline
+(`netlify/lib/alertNotify.js`): ntfy when `ALERT_NTFY_TOPIC` is set, the
+`ALERT_WEBHOOK_URL` webhook otherwise (both if both are set). The ping
+reads **"N new report(s) — open the moderation queue"** and tapping it
+opens Upgrade → Security → Moderation. It always goes out, whatever
+`ALERT_MIN_SEVERITY` says.
 
-- [ ] Put a daily reminder in both owners' calendars until an alert exists.
-- [ ] Follow-up to build: a notification on insert into `reports` (e.g. a row in `notifications_queue` for each owner, which `push-dispatch` already sends, or an email from a function). Not built yet.
+- **Latency:** a report reaches a phone **within about an hour** (worst
+  case ~65 minutes: filed just after a sweep, picked up by the next).
+  That leaves ~23 hours of the 24-hour target to decide it.
+- **No repeats:** the ticket is keyed by the newest report it saw, so the
+  same reports never ping twice; a newer report always pings again.
+  Resolve the ticket once the queue is clear.
+- **Lock-screen safe:** the ping carries a count and a link — never the
+  reason, the reporter's words, a handle or a user id.
+- **Needs:** `ALERT_NTFY_TOPIC` (or `ALERT_WEBHOOK_URL`) set on Netlify,
+  and `supabase/security_console_2026_10.sql` run (tickets are what
+  stop the repeats — without the ticket table, nothing pings). Check
+  with "Send test alert" in Upgrade → Security → Tickets.
+- **Not covered:** if the sweep itself is not running (a failed deploy,
+  Netlify outage), nothing pings. The stale-reports ticket (open > 24 h)
+  is the backstop, and a weekly look at the queue costs nothing.
+
+If neither alert channel is set up, the target still depends on an
+owner opening the queue every day — set one up.
 
 **Before any of this works:** `supabase/audit_schema_2026_10.sql` must
 have been run. Until then the queue shows "not installed" (the function

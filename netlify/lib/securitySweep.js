@@ -20,7 +20,7 @@ const D = require('./securityData');
 const { evaluateConditions, repeatCapHits, THRESHOLDS } = require('./sweepRules');
 const { percentile } = require('./securityShape');
 const { DAILY_CAPS } = require('./aiQuota');
-const { alertConfig, atOrAbove, createNotifier } = require('./alertNotify');
+const { alertConfig, atOrAbove, createNotifier, queueLink } = require('./alertNotify');
 const { headlineFor } = require('./alertText');
 
 const MAX_PINGS_PER_RUN = 6;
@@ -85,6 +85,20 @@ async function gather(env) {
       else skipped.push({ check: 'reports', reason: 'not_configured' });
     })(),
 
+    // Reports filed since the last sweep (item 79). No status filter, so
+    // it works before the audit SQL adds `status`; ids only, no content.
+    (async () => {
+      if (!up) return;
+      const since = iso(THRESHOLDS.newReportWindowMin * 60_000);
+      const [count, newest] = await Promise.all([
+        D.countRows(env, `reports?created_at=gte.${enc(since)}`),
+        D.rest(env, `reports?created_at=gte.${enc(since)}&select=id&order=created_at.desc&limit=1`)
+          .then(res => (res.ok ? res.json() : null)).catch(() => null),
+      ]);
+      if (count != null && Array.isArray(newest)) r.newReports = { count, newestId: newest[0]?.id || null };
+      else skipped.push({ check: 'new reports', reason: 'unavailable' });
+    })(),
+
     // LCP p75 over the last day
     (async () => {
       if (!up) return;
@@ -139,15 +153,25 @@ async function gather(env) {
  *     never on every hourly repeat of a condition already known.
  *   · Database unreachable is the exception: its ticket cannot be stored
  *     (the database is what is down), so it pings anyway, once per run.
+ *   · A `notify` condition (new reports, item 79) pings whatever the
+ *     minimum severity, but only when NEW: its ticket is one batch of
+ *     reports, and an owner resolving it while the reports are still in
+ *     the look-back window must not get the same push again.
+ *     Tapping it opens the moderation queue.
  * Pure. → { alert, why } | null
  */
-function alertFor(c, { result, row }, priorStatus, minSeverity) {
-  if (!atOrAbove(c.severity, minSeverity)) return null;
+function alertFor(c, { result, row }, priorStatus, minSeverity, env = process.env) {
+  if (!atOrAbove(c.severity, minSeverity) && !c.notify) return null;
   const headline = headlineFor(c.kind, c.detail, { title: c.title });
   const base = { severity: c.severity, title: c.title, headline, kind: c.kind };
+  if (c.notify) {
+    base.force = true;
+    const url = c.kind === 'reports_new' ? queueLink(env) : '';
+    if (url) base.url = url;
+  }
   if (result === 'ok') {
     const isNew = row && row.count === 1;
-    const reopened = priorStatus === 'resolved';
+    const reopened = priorStatus === 'resolved' && !c.notify;
     if (isNew || reopened) return { alert: { ...base, ticketId: row && row.id }, why: isNew ? 'new' : 'reopened' };
     return null;
   }
@@ -175,7 +199,7 @@ async function runSweep(env, { budgetMs = DEFAULT_BUDGET_MS, gather: gatherImpl,
 
     const cfg = alertConfig(alertEnv);
     const notifier = createNotifier({ max: MAX_PINGS_PER_RUN, env: alertEnv, ...(fetchImpl ? { fetchImpl } : {}) });
-    const hot = cfg.configured ? candidates.filter(c => atOrAbove(c.severity, cfg.minSeverity)) : [];
+    const hot = cfg.configured ? candidates.filter(c => c.notify || atOrAbove(c.severity, cfg.minSeverity)) : [];
     const prior = hot.length && readings.db && readings.db.reachable !== false
       ? await D.ticketStatuses(env, hot.map(c => c.fingerprint))
       : new Map();
@@ -192,7 +216,7 @@ async function runSweep(env, { budgetMs = DEFAULT_BUDGET_MS, gather: gatherImpl,
         ...(out.row ? { ticketId: out.row.id, count: out.row.count } : {}),
       });
       if (!cfg.configured) continue;
-      const a = alertFor(c, out, prior.get(c.fingerprint), cfg.minSeverity);
+      const a = alertFor(c, out, prior.get(c.fingerprint), cfg.minSeverity, alertEnv);
       if (!a) continue;
       if (a.why === 'unstored') { if (unstoredPinged) continue; unstoredPinged = true; }
       notifier.add(a.alert);

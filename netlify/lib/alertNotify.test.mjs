@@ -204,6 +204,25 @@ async function main() {
     } finally { globalThis.fetch = saved; }
   }
 
+  // ── new reports (item 79): always notify, once per batch, to the queue ──
+  {
+    const RID = 'aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee';
+    const reports = async () => ({ readings: { db: { reachable: true, ms: 40 }, newReports: { count: 2, newestId: RID } }, skipped: [] });
+    const fresh = await sweepWith({ gather: reports, rpc: () => json({ id: ID, status: 'open', count: 1 }) });
+    expect('report: pings at the DEFAULT (critical) threshold', fresh.ntfyCalls.length, 1);
+    const h = fresh.ntfyCalls[0] && fresh.ntfyCalls[0].init.headers;
+    expect('report: opens the moderation queue', h && h.Click, 'https://app.example/?upgrade=security&sec=moderation');
+    expect('report: title', h && h.Title, N.headerSafe('Vantage: 2 new reports — open the moderation queue'));
+    expect('report: body', fresh.ntfyCalls[0] && fresh.ntfyCalls[0].init.body, '2 new user reports in the last hour — aim to decide within 24 h');
+    expect('report: no report id on the lock screen', JSON.stringify(fresh.ntfyCalls[0].init).includes(RID), false);
+    const again = await sweepWith({ gather: reports, rpc: () => json({ id: ID, status: 'open', count: 2 }), prior: [{ fingerprint: `moderation:new-reports:${RID}`, status: 'open' }] });
+    expect('report: the same batch next hour → no ping', again.ntfyCalls.length, 0);
+    const resolved = await sweepWith({ gather: reports, rpc: () => json({ id: ID, status: 'open', count: 2 }), prior: [{ fingerprint: `moderation:new-reports:${RID}`, status: 'resolved' }] });
+    expect('report: resolved then seen again → still no ping', resolved.ntfyCalls.length, 0);
+  }
+  expect('queueLink', N.queueLink(ENV), 'https://app.example/?upgrade=security&sec=moderation');
+  expect('queueLink unset', N.queueLink({}), '');
+
   if (failures.length) {
     console.error(`check:alerts (notify) — ${failures.length} of ${checked} failed:\n  ${failures.join('\n  ')}`);
     process.exit(1);

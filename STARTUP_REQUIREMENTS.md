@@ -466,6 +466,7 @@ can stop the bleeding in minutes, and you meet the legal clock.
     Apple expects), a suspend flag that hides a user everywhere, and
     evidence kept when an account is deleted.
     *Status 2026-09-30: docs/ABUSE_HANDLING.md; moderation queue built. Nothing alerts an owner when a report arrives yet — check the queue daily until it does.*
+    *Status 2026-10-20: the hourly security sweep now pings the owner within ~1 h of a new report ("N new report(s) — open the moderation queue", tap opens Moderation; no report content or ids), once per batch, regardless of ALERT_MIN_SEVERITY. Owner: make sure `ALERT_NTFY_TOPIC` (or `ALERT_WEBHOOK_URL`) is set on Netlify and press "Send test alert"; then file a test report from a second account and time the ping.*
 80. `[ ]` **Accounts that can't be taken over.** 2FA (authenticator
     app, not SMS) on GitHub, Supabase, Netlify, Apple, Google Play,
     RevenueCat, Anthropic, the domain registrar and the owner email;

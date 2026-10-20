@@ -247,6 +247,21 @@ export function explain(t, { links = null, now = Date.now() } = {}) {
       });
     }
 
+    case 'reports_new': {
+      const c = num(d.count) ?? 0;
+      return out({
+        headline: `${plural(c, 'new user report')} in the last hour — aim to decide within 24 h`,
+        why: 'Someone flagged another user. The reported account stays visible until you decide.',
+        steps: [
+          'Open Moderation and read the report, the snapshot and any messages it carries.',
+          'Dismiss, suspend or ban; a short note helps if a decision is challenged.',
+          'Resolve this ticket once the queue is clear — newer reports raise their own ticket.',
+        ],
+        source: { label: 'Moderation queue', tab: 'moderation', focus: null },
+        facts: [fact('New reports', fmtInt(c)), ...genericFacts(d, ['count'])],
+      });
+    }
+
     case 'deploy_failed': {
       const w = when(d.createdAt);
       return out({
