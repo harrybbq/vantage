@@ -458,9 +458,14 @@ else maps onto existing items.
     - "health data is never shown to others" needs a qualifier (the Fitness rating counts logging days);
     - report retention "as long as needed" vs 12 months in ABUSE_HANDLING with nothing deleting them —
       add automatic 12-month deletion of closed reports; fix the stale reporter-cascade line there.
-101. `[ ]` **BLOCKS** The "Join Waitlist" form (AI Coach — already shipped) stores emails for marketing
+101. `[x]` **BLOCKS** The "Join Waitlist" form (AI Coach — already shipped) stores emails for marketing
     and is reachable in the native build, including the paywall's fallback button. Remove it
     (recommended) or declare marketing use.
+    *Done 2026-10-20 (owner's decision: remove). The form is gone; the coach teaser opens the paywall
+    ("See Pro"); the paywall with no store product shows OK + where Pro is bought. The `waitlist`
+    table and its rows are untouched — owner to decide whether to delete them (SQL, owner-run).
+    Also decided: friend list declared as Apple "Contacts"; wearable data stays out of the AI coach
+    at launch (`AI_WEARABLE_DATA_ALLOWED` unset).*
 102. `[ ]` **BLOCKS** Android: the manifest has no `CAMERA` permission (barcode + AI food scan can't
     work natively); Firebase Messaging mints a token at startup before notification consent; check the
     merged manifest for the advertising-ID permission.

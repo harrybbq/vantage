@@ -861,7 +861,7 @@ function Board({ userId, userEmail, onSignOut }) {
                 userId={userId}
               />
             ) : (
-              <HubSection S={S} update={update} active onOpenModal={handleOpenModal} onOpenWaitlist={() => handleOpenModal('waitlistModal')} onNavigateSettings={() => navigate('settings')} onNavigateTrack={() => navigate('track')} onShowCoinToast={showCoinToast} onCoachAct={handleCoachAct} visionState={visionState} userId={userId} onUpgrade={() => handleOpenModal('paywall:friends')} onNavigate={navigate} />
+              <HubSection S={S} update={update} active onOpenModal={handleOpenModal} onOpenPaywall={() => handleOpenModal('paywall:generic')} onNavigateSettings={() => navigate('settings')} onNavigateTrack={() => navigate('track')} onShowCoinToast={showCoinToast} onCoachAct={handleCoachAct} visionState={visionState} userId={userId} onUpgrade={() => handleOpenModal('paywall:friends')} onNavigate={navigate} />
             )}
             </WidgetBoundary>
           </motion.div>
@@ -988,7 +988,7 @@ function Board({ userId, userEmail, onSignOut }) {
       <PaywallModal
         openId={openModal}
         onClose={handleCloseModal}
-        onUpgrade={() => { handleCloseModal(); handleOpenModal('waitlistModal'); }}
+        onManage={() => { handleCloseModal(); navigate('settings'); }}
         onShowToast={showCoinToast}
         onOpenLegal={setLegalPage}
       />

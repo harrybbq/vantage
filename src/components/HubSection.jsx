@@ -629,7 +629,7 @@ function ProfileCard({ profile, S, update, handle, onSaveName, onSaveTagline, on
 }
 
 // ── Widget Canvas (imperative DOM approach) ──
-export default function HubSection({ S, update, active, onOpenModal, onOpenWaitlist, onNavigateSettings, onNavigateTrack, onShowCoinToast, onCoachAct, visionState, userId, onUpgrade, onNavigate }) {
+export default function HubSection({ S, update, active, onOpenModal, onOpenPaywall, onNavigateSettings, onNavigateTrack, onShowCoinToast, onCoachAct, visionState, userId, onUpgrade, onNavigate }) {
   const canvasRef = useRef(null);
   // Snap toggle lives in the Actions module; the drag engine reads the
   // live value through a ref so mid-drag state is never stale.
@@ -1747,7 +1747,7 @@ export default function HubSection({ S, update, active, onOpenModal, onOpenWaitl
           onNavigateSettings={onNavigateSettings}
           onNavigateTrack={onNavigateTrack}
           onShowCoinToast={onShowCoinToast}
-          onOpenWaitlist={onOpenWaitlist}
+          onOpenPaywall={onOpenPaywall}
           onCoachAct={onCoachAct}
           onUploadPhoto={handleUploadPhoto}
           onToggleSnap={handleToggleSnap}
@@ -1810,7 +1810,7 @@ export default function HubSection({ S, update, active, onOpenModal, onOpenWaitl
           <FriendsRail userId={userId} onUpgrade={onUpgrade} />
         </aside>
       </div>
-      <AiCoachWidget S={S} update={update} onOpenWaitlist={onOpenWaitlist} onCoachAct={onCoachAct} />
+      <AiCoachWidget S={S} update={update} onOpenPaywall={onOpenPaywall} onCoachAct={onCoachAct} />
       <CoachBriefPanel S={S} update={update} onCoachAct={onCoachAct} userId={userId} />
       {moduleMenu.menuNode}
       {primeEditorNode}

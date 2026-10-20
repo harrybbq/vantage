@@ -8,13 +8,16 @@
  *      mode that drives revenue.
  *
  *   2. RC unavailable (web, no plugin, no API key set, offerings
- *      empty) → fall back to the legacy waitlist CTA. The web build
- *      can't actually sell you a sub anyway — App Store / Play Store
- *      are the only payment surfaces — so pointing to a waitlist
- *      keeps the surface honest.
+ *      empty) → no purchase button at all: the web build can't sell a
+ *      sub (App Store / Play Store are the only payment surfaces), so
+ *      the sheet says where Pro is bought and offers only "OK".
  *
- *   3. Pro isn't live yet (config.pro_live === false) → also fall
- *      back to the waitlist path, regardless of platform.
+ *   3. Pro isn't live yet (config.pro_live === false) → the same, with
+ *      "Pro isn't on sale yet".
+ *
+ * There used to be a waitlist behind modes 2 and 3. It was removed
+ * (2026-10-20): it collected emails for marketing, which the privacy
+ * policy says Vantage doesn't do.
  *
  * The cap context (FREE_CAPS[capKey]) is preserved so the headline
  * still reads "You've reached your free limit of N habits".
@@ -63,7 +66,7 @@ function packageWeight(p) {
   return idx === -1 ? 99 : idx;
 }
 
-export default function PaywallModal({ openId, onClose, onUpgrade, onShowToast, onOpenLegal }) {
+export default function PaywallModal({ openId, onClose, onManage, onShowToast, onOpenLegal }) {
   const { proIsLive, hasPro } = useSubscriptionContext();
   const isOpen = typeof openId === 'string' && openId.startsWith('paywall:');
   const capKey = isOpen ? openId.split(':')[1] : null;
@@ -291,23 +294,19 @@ export default function PaywallModal({ openId, onClose, onUpgrade, onShowToast, 
               </div>
             ) : (
               <div className="paywall-actions">
-                <button className="btn btn-ghost" onClick={onClose}>Maybe later</button>
-                <button
-                  className="btn btn-primary paywall-cta"
-                  onClick={onUpgrade}
-                  disabled={offeringsLoading}
-                >
-                  {hasPro
-                    ? 'Manage in Settings'
-                    : offeringsLoading
-                      ? 'Loading…'
-                      : proIsLive
-                        // No product loaded (web, or the store didn't
-                        // answer) → no price. The only price quoted is
-                        // the one the store is about to charge.
-                        ? 'Upgrade to Pro'
-                        : 'Join the waitlist'}
-                </button>
+                {hasPro ? (
+                  <>
+                    <button className="btn btn-ghost" onClick={onClose}>Close</button>
+                    <button className="btn btn-primary paywall-cta" onClick={onManage}>Manage in Settings</button>
+                  </>
+                ) : (
+                  // No product loaded (web, or the store didn't answer) →
+                  // nothing to buy here and no price quoted; the fine print
+                  // says where Pro is bought.
+                  <button className="btn btn-primary paywall-cta" onClick={onClose} disabled={offeringsLoading}>
+                    {offeringsLoading ? 'Loading…' : 'OK'}
+                  </button>
+                )}
               </div>
             )}
 
@@ -325,7 +324,7 @@ export default function PaywallModal({ openId, onClose, onUpgrade, onShowToast, 
                   + `Subscriptions auto-renew at the price shown until cancelled; cancel at least 24 hours before the period ends in ${storeName(plat)} subscription settings.`
                 : proIsLive && !hasPro
                   ? 'Pro is bought in the iOS and Android apps. The price and renewal terms are shown there before you pay, and a subscription can be cancelled any time in the store.'
-                  : 'Your data stays yours.'}
+                  : hasPro ? 'Your data stays yours.' : 'Pro isn’t on sale yet. Everything free stays free.'}
             </p>
 
             <div className="paywall-legal">

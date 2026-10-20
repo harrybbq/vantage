@@ -532,10 +532,12 @@ existing "reports may be kept" line.
 
 ## 5. Open questions for the owner
 
-1. **Waitlist (M2):** remove it (recommended), or keep it and declare marketing
-   use of email on both forms?
-2. **Apple "Contacts":** declare the in-app friend list as Contacts
-   (recommended — Apple's definition says "social graph"), or leave it out?
+1. ~~**Waitlist (M2)**~~ — **decided 2026-10-20: removed.** The form is gone from the app; the
+   coach teaser and the paywall's no-product fallback no longer point at it. So email is App
+   Functionality only — drop the marketing/developer-communications purposes from both forms.
+   Rows already in the `waitlist` table are kept untouched (owner to decide whether to delete).
+2. ~~**Apple "Contacts"**~~ — **decided 2026-10-20: declare it** (the in-app friend list, linked,
+   App Functionality).
 3. **Weather location:** keep ipwho.is and declare Coarse Location "Not
    linked" (current draft)? Or switch the `weather` function to Netlify's own
    geo data, so no third party sees the IP? Either way the policy line must
@@ -552,9 +554,10 @@ existing "reports may be kept" line.
    only? This decides how much of the Children's Code and teen policy applies.
 7. **Anthropic zero data retention:** worth asking for? It would let the
    policy say AI inputs are never kept by anyone.
-8. **Wearable data to the AI coach:** keep `AI_WEARABLE_DATA_ALLOWED` off for
-   launch, until WHOOP and Oura confirm in writing? Turning it on changes the
-   policy, the consent copy and the review note.
+8. ~~**Wearable data to the AI coach**~~ — **decided 2026-10-20: kept out for launch.**
+   `AI_WEARABLE_DATA_ALLOWED` / `VITE_AI_WEARABLE_DATA_ALLOWED` stay unset (the coach guard strips
+   WHOOP/Oura-sourced data by default). Revisit only after WHOOP and Oura confirm in writing; turning
+   it on changes the policy, the consent copy and the review note.
 
 ---
 

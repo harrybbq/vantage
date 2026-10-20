@@ -458,11 +458,11 @@ export function OsQuickLogPanel({ S, update, onNavigateTrack, onShowCoinToast })
 }
 
 // ── Panel: AI Coach wrapper ───────────────────────────────────────────────
-export function OsCoachPanel({ S, update, onOpenWaitlist, onCoachAct, userId }) {
+export function OsCoachPanel({ S, update, onOpenPaywall, onCoachAct, userId }) {
   return (
     <OsPanel label="AI Coach" right="Brief" innerPadding={false}>
       <div className="os-panel-body os-coach-body">
-        <AiCoachWidget S={S} update={update} onOpenWaitlist={onOpenWaitlist} onCoachAct={onCoachAct} />
+        <AiCoachWidget S={S} update={update} onOpenPaywall={onOpenPaywall} onCoachAct={onCoachAct} />
         <CoachBriefPanel S={S} update={update} onCoachAct={onCoachAct} userId={userId} />
       </div>
     </OsPanel>
@@ -616,7 +616,7 @@ export function OsCardioPanel({ profile = {}, onSaveWeight, onLogBurn }) {
 export default function HubOsLayout({
   S, update, canvasRef,
   onAddWidget, onSnapFill, onNavigateSettings, onNavigateTrack,
-  onShowCoinToast, onOpenWaitlist, onCoachAct,
+  onShowCoinToast, onOpenPaywall, onCoachAct,
   onUploadPhoto, onToggleSnap,
   userId, onUpgrade,
 }) {
@@ -701,7 +701,7 @@ export default function HubOsLayout({
               />
             )}
             <OsCoachPanel S={S} update={update}
-              onOpenWaitlist={onOpenWaitlist}
+              onOpenPaywall={onOpenPaywall}
               onCoachAct={onCoachAct}
               userId={userId} />
           </div>
