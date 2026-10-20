@@ -29,6 +29,9 @@ const DAILY_CAPS = {
   recipe: 15,
   crest: 10,
   avatar: 10,
+  // Owner-only: re-screening old profile pictures (lib/avatarRescreen.js),
+  // a few per press. The ceiling on what one day of pressing can cost.
+  'avatar-rescreen': 200,
 };
 
 const MISSING_RETRY_MS = 10 * 60_000;

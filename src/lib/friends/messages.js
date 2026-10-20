@@ -3,6 +3,8 @@ import {
   MAX_BODY, PAGE_SIZE, groupConversations, mapConversationRows, groupReactions,
   normalizeEmoji, isNotConfigured,
 } from './dmModel.js';
+import { messageTextProblem, MESSAGE_FILTERED_TEXT } from '../moderation/messageFilter.js';
+import { safetyErrorKind, SUSPENDED_SHORT } from '../moderation/notices.js';
 
 /**
  * Direct-message data layer. 1:1 messaging between accepted friends;
@@ -27,6 +29,10 @@ const cols = () => (replyCol ? `${BASE}, reply_to` : BASE);
 
 function mapError(err, fallback = 'Something went wrong.') {
   const m = err?.message || '';
+  // The safety guards (safety_2026_10b.sql) say exactly what's wrong.
+  const kind = safetyErrorKind(err);
+  if (kind === 'suspended') return SUSPENDED_SHORT;
+  if (kind === 'filtered') return MESSAGE_FILTERED_TEXT;
   // The friend-only INSERT policy rejects non-friends with an RLS
   // violation — translate it into something actionable.
   if (/row-level security/i.test(m)) return 'You can only message friends.';
@@ -175,6 +181,11 @@ export async function listConversations(userId) {
 export async function sendMessage(fromId, toId, body, { replyTo = null } = {}) {
   const text = (body || '').trim();
   if (!text) return null;
+  // The DM filter (item 118). The database refuses the same words
+  // (messages_safety_guard), so this only saves the round trip and lets
+  // the composer keep the draft with a clear reason.
+  const problem = messageTextProblem(text);
+  if (problem) throw safetyError(problem, 'filtered');
   const row = { sender_id: fromId, recipient_id: toId, body: text.slice(0, MAX_BODY) };
   const withReply = replyCol && replyTo != null ? { ...row, reply_to: replyTo } : row;
   let { data, error } = await supabase.from('messages').insert(withReply).select(cols()).single();
@@ -182,8 +193,20 @@ export async function sendMessage(fromId, toId, body, { replyTo = null } = {}) {
     replyCol = false;
     ({ data, error } = await supabase.from('messages').insert(row).select(cols()).single());
   }
-  if (error) throw new Error(mapError(error, 'Could not send.'));
+  if (error) {
+    const kind = safetyErrorKind(error);
+    if (kind) throw safetyError(mapError(error), kind);
+    throw new Error(mapError(error, 'Could not send.'));
+  }
   return data;
+}
+
+/** An Error the composer can tell apart: `code` is 'filtered' (keep the
+ *  draft, say why) or 'suspended' (show the suspended state). */
+function safetyError(message, code) {
+  const e = new Error(message);
+  e.code = code;
+  return e;
 }
 
 /** Mark every message this friend sent me as read. Cheap no-op when

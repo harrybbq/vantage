@@ -282,6 +282,12 @@ html[data-theme="dark-os"] .dm-replying { color: var(--em-light); }
   font-family: var(--body); font-size: 13px; line-height: 1.45; color: var(--text-mid); text-align: center;
 }
 .dm-toast { font-size: 12px; color: var(--dm-danger); }
+/* The DM filter's reason (item 118): under the box being typed in,
+   the draft kept, nothing sent. */
+.dm-compose-err {
+  padding: 0 14px 10px; margin-top: -2px;
+  font-family: var(--body); font-size: 13px; line-height: 1.4; color: var(--dm-danger);
+}
 
 /* ── Phone: the conversation owns the screen ── */
 .dm-screen {
