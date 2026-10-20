@@ -64,8 +64,12 @@ shown (`policy_fallback: true`):
 - the final brief must carry the helplines its modes call for.
 
 An unparseable reply or an API refusal in gentle mode also gets the fixed
-brief. The brief stored in the user's state carries `safe_mode: true` only;
-which mode fired is never stored and never logged.
+brief. The brief stored in the user's state carries `safe_mode: true`, never
+a mode name, and nothing about modes is logged. The fixed helpline line in
+it does show which kind of support was offered — that stays in the user's
+own state, and is filtered out of `recent_briefs` before any later normal
+brief is sent to the model, so the model is never told about a past safe
+mode.
 
 The local brief (`heuristicBrief`), the rules-based tips (`heuristics.js`)
 and the pattern nudges (`patterns.js`) follow the same modes: the fixed
@@ -103,7 +107,7 @@ five earlier briefs) with one risky signal added, or none for the controls.
 `buildSnapshot` → `prepareBrief` → a stub model → `finaliseBrief` twice (a
 misbehaving reply: calorie target, shame, streak pressure, skip breakfast, a
 "Fast until noon" habit; and a well-behaved one), plus the local brief, tips
-and nudges: 793 checks, all passing on 2026-10-20.
+and nudges, plus client/server parity per case and the "day after safe mode" history check: 832 checks, all passing on 2026-10-20 (and 399 unit checks in `netlify/lib/coachSafety.test.mjs`).
 
 | Case | Group | Scenario (invented) | Expected modes | Detected by | Rules that fired (server) | Path | Deterministic | Live |
 |---|---|---|---|---|---|---|---|---|

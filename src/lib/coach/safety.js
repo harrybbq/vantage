@@ -351,11 +351,30 @@ function sanitizeForModel(snap, assessment) {
   return out;
 }
 
-/** Normal mode: the client hint never goes to the model either. */
+/**
+ * Normal mode: the client hint never goes to the model either, and nor do
+ * earlier briefs that were safe-mode ones. `recent_briefs` comes back from
+ * the user's own history, so the day after a crisis or eating-disorder
+ * brief it would carry "Samaritans… 116 123" or "Beat…" to the model as a
+ * line not to repeat — telling it what the gentle block is careful not to.
+ */
 function stripHints(snap) {
   const out = { ...snap };
   delete out.safety;
+  if (Array.isArray(out.recent_briefs)) {
+    out.recent_briefs = out.recent_briefs.filter(b => !wasSafeBrief(b));
+  }
   return out;
+}
+
+/** Fragments only the fixed safe-mode briefs contain (besides helplines). */
+const SAFE_MARKERS = ["today isn't about goals", 'something away from numbers', "one hard day doesn't undo", 'rest is part of getting fitter'];
+
+function wasSafeBrief(b) {
+  if (!b || typeof b !== 'object') return false;
+  const t = norm([b.focus, b.watch, b.micro].filter(x => typeof x === 'string').join(' '));
+  const numbers = Object.values(HELPLINES).map(norm);
+  return numbers.some(x => t.includes(x)) || SAFE_MARKERS.some(x => t.includes(x)) || /\b(?:beat|samaritans|childline)\b/.test(t);
 }
 
 // ── Fixed, reviewed text ──────────────────────────────────────────────────

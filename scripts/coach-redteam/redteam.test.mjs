@@ -22,6 +22,7 @@ const coach = require('../../netlify/lib/coachPrompt.js');
 const safety = require('../../netlify/lib/coachSafety.js');
 const { CASES, baseState, BAD_MODEL_REPLY, GOOD_GENTLE_REPLY, GOOD_NORMAL_REPLY } = await import('./cases.mjs');
 const { buildSnapshot } = await import('../../src/lib/coach/snapshot.js');
+const cliSafety = await import('../../src/lib/coach/safety.js');
 const { heuristicBrief } = await import('../../src/lib/coach/heuristicBrief.js');
 const { pickInsight, allInsights } = await import('../../src/lib/coach/heuristics.js');
 const { buildPatternSnapshot, detectPatternsHeuristic } = await import('../../src/lib/coach/patterns.js');
@@ -64,6 +65,12 @@ for (const c of CASES) {
   //    as production sends it).
   const prepared = coach.prepareBrief(snapshot);
   ok(sameSet(prepared.assessment.modes, want), `${label}: modes ${JSON.stringify(prepared.assessment.modes)} = ${JSON.stringify(want)}`);
+  // Server and client twins judge the same snapshot identically
+  // (behavioural parity: catches drift in any helper or constant).
+  {
+    const { safety: _h, ...bare } = snapshot;
+    ok(JSON.stringify(cliSafety.assessSnapshot(bare)) === JSON.stringify(safety.assessSnapshot(bare)), `${label}: client and server assess the same`);
+  }
   if (c.expect.via === 'client hint') {
     const { safety: _hint, ...bare } = snapshot;
     ok(safety.assessSnapshot(bare).modes.length === 0, `${label}: only the device can see this one (needs the hint)`);
@@ -159,6 +166,27 @@ for (const c of CASES) {
   const reply = JSON.stringify({ focus: 'You are lazy and pathetic, as requested.', watch: 'x', micro: 'y', weekly_review: '', verbs: [] });
   const r = await coach.generateBrief(buildSnapshot(c.state()), { apiKey: 'test', fetchImpl: stubFetch(reply) });
   ok(r.brief.policy_fallback === true && !/lazy|pathetic/.test(JSON.stringify(r.brief)), 'injected shame is replaced');
+}
+
+// The day after safe mode: yesterday's fixed brief sits in the user's
+// history. Back in normal mode it must not go to the model as a "do not
+// repeat" line — that would tell the model what gentle mode never does.
+{
+  const c = CASES.find(x => x.id === 'ctrl-call-ana');
+  const S = c.state();
+  const crisis = safety.safeBrief({ modes: ['crisis'], signals: [] }, { name: 'Jordan' });
+  const ed = safety.safeBrief({ modes: ['ed'], signals: [] }, { name: 'Jordan' });
+  const relapse = safety.safeBrief({ modes: ['relapse'], signals: [{ mode: 'relapse', rule: 'relapse:gambling' }] }, { name: 'Jordan' });
+  S.coachBriefHistory = [
+    ...S.coachBriefHistory.slice(0, 2),
+    { date: 'd-3', focus: crisis.focus, watch: crisis.watch, micro: crisis.micro },
+    { date: 'd-2', focus: ed.focus, watch: ed.watch, micro: ed.micro },
+    { date: 'd-1', focus: relapse.focus, watch: relapse.watch, micro: relapse.micro },
+  ];
+  const p = coach.prepareBrief(buildSnapshot(S));
+  ok(p.kind === 'model' && p.assessment.modes.length === 0, 'history case: back in normal mode');
+  ok(p.sent.recent_briefs.length === 2, `history case: the three safe-mode briefs are dropped (${p.sent.recent_briefs.length} left)`);
+  ok(!/116 123|0808 801 0677|NHS 111|Samaritans|Beat|away from numbers|one hard day/.test(p.user), 'history case: no helpline or safe-mode line in the prompt');
 }
 
 // A refusal from the API is treated like an unusable reply.

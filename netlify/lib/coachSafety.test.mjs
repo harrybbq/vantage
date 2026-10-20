@@ -35,7 +35,7 @@ console.log('parity: server module vs client twin');
   eq(cli.GENTLE_MODE_INSTRUCTIONS, srv.GENTLE_MODE_INSTRUCTIONS, 'gentle instructions');
   eq(cli.allSignposts(), srv.allSignposts(), 'signposts');
   // Function bodies above the client-only section must match exactly.
-  for (const fn of ['assessSnapshot', 'sanitizeForModel', 'safeBrief', 'checkBriefPolicy', 'classifyTracker', 'signpostFor', 'requiredSignposts']) {
+  for (const fn of ['assessSnapshot', 'sanitizeForModel', 'stripHints', 'safeBrief', 'checkBriefPolicy', 'classifyTracker', 'signpostFor', 'requiredSignposts', 'veryLowIntake', 'rapidWeightDrop', 'relapseCategory', 'norm']) {
     eq(String(cli[fn]), String(srv[fn]), `${fn} source`);
   }
 }
