@@ -81,7 +81,9 @@ async function findUsers(emails) {
       const e = String(u.email || '').toLowerCase();
       if (want.has(e)) found.set(e, { id: u.id, confirmed: !!u.email_confirmed_at, created: u.created_at });
     }
-    if (users.length < 1000) break;
+    // Stop on an empty page, not a short one: the server may cap
+    // per_page below what was asked for.
+    if (users.length === 0) break;
   }
   return found;
 }

@@ -57,12 +57,21 @@ in the account but does not lift the rating card.
    - The state write is compare-and-set. Food log, friendships, messages
      and the group are added only where none exist. It never deletes
      anything and never sets `tier`.
-   - `--create` makes confirmed accounts that all share
-     `DEMO_ACCOUNT_PASSWORD`. Without `--create`, the accounts must already
-     exist (sign up in the app first).
-   - Seed **before** signing in to an account in a browser, or clear that
-     browser's site data afterwards. A browser holding an older local copy
-     of the account goes through the app's merge on its next save.
+   - The weekly-goal coin flags are seeded to match the history, so
+     ticking a past day doesn't pay out a week that was already met.
+   - **Use `--create`.** It makes confirmed accounts that all share
+     `DEMO_ACCOUNT_PASSWORD`, so the seeder is the first thing to write
+     their data. Without `--create` the accounts must already exist. But an
+     account that has already been signed into in the app has usually saved
+     its own first state (a name, consent answers, widgets), and the seeder
+     will then **refuse it**, by design: it can't tell a demo account from
+     a real one by its data. If that happens with a demo account you made
+     minutes ago, delete it in Supabase → Authentication → Users and run
+     again with `--create`. Never do this to an account you didn't just
+     create.
+   - Sign in to the accounts only **after** seeding. If a browser had
+     signed in before, clear its site data first: a browser holding an older
+     local copy of the account goes through the app's merge on its next save.
 3. **Give access** (SQL editor):
 
    ```sql

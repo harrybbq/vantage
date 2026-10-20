@@ -30,6 +30,7 @@
  * that lets a re-run overwrite a row that already holds data.
  */
 import { hasMeaningfulData, meaningfulEvidence } from '../../src/lib/state/meaningful.js';
+import { getWeekKey, countWeekLogs } from '../../src/utils/helpers.js';
 
 export const DEMO_TAG = 'reviewer-demo';
 export const ROLES = ['pro', 'free', 'friend'];
@@ -173,6 +174,26 @@ function trackerLogs(trackers, days, now, r) {
   return logs;
 }
 
+/**
+ * The `awarded_<tracker>_<week>` flags for every week the seeded logs
+ * already meet a tracker's weekly target — what the app would have
+ * stamped had the days been ticked live (TrackSection/QuickLog). Without
+ * them, a reviewer ticking any past day would be paid that week's coins
+ * as if it had just been reached.
+ */
+export function weeklyAwardFlags(trackers, logs) {
+  const out = {};
+  for (const t of trackers) {
+    if (!t.weeklyTarget || !t.weeklyCoins) continue;
+    const weeks = new Map();
+    for (const day of Object.keys(logs)) if (!weeks.has(getWeekKey(day))) weeks.set(getWeekKey(day), day);
+    for (const [week, day] of weeks) {
+      if (countWeekLogs(logs, t.id, day, t) >= t.weeklyTarget) out[`awarded_${t.id}_${week}`] = true;
+    }
+  }
+  return out;
+}
+
 function vitals(days, now, r, startKg, drift) {
   const out = {};
   let w = startKg;
@@ -301,6 +322,7 @@ export function buildProState(now = Date.now(), seed = 1220) {
     theme: 'dark-os', colorScheme: 'green', tutorialCompleted: true,
     termsAcceptedAt: new Date(now - 56 * DAY).toISOString(),
     links: [], achievements, connections, trackers, logs, logsAuto: {},
+    ...weeklyAwardFlags(trackers, logs),
     habits, coins, coinHistory, visions: {}, visionsBackfilled: false,
     vitalsLog, burnProfile: { heightCm: p.heightCm, age: p.age, sex: p.sex, weightKg: p.startKg },
     bodyGoal: { type: 'cut', targetKg: p.goalKg, startKg: p.startKg, startedAt: ymd(now - 56 * DAY), useMacros: true, weeklyWeights: 3, weeklyCardio: 2, gymTrackerId: 't1' },
@@ -318,6 +340,7 @@ export function buildLightState(role, now = Date.now(), friendIndex = 0) {
   const p = personaFor(role, friendIndex);
   const picked = role === 'free' ? TRACKERS.slice(0, 3) : TRACKERS.slice(0, 4);
   const trackers = picked.map(({ p: _p, ...t }) => t);
+  const logs = trackerLogs(picked, 42, now, r);
   const habits = role === 'free'
     // Five active habits: the free cap (src/hooks/useTierLimits.js), so
     // adding a sixth opens the paywall — what the reviewer tests.
@@ -333,7 +356,7 @@ export function buildLightState(role, now = Date.now(), friendIndex = 0) {
     profile: { name: p.name, tagline: p.tagline, photo: null },
     theme: 'cream-pro', colorScheme: 'green', tutorialCompleted: true,
     termsAcceptedAt: new Date(now - 42 * DAY).toISOString(),
-    links: [], trackers, logs: trackerLogs(picked, 42, now, r), logsAuto: {},
+    links: [], trackers, logs, logsAuto: {}, ...weeklyAwardFlags(trackers, logs),
     habits, coins: 0, coinHistory: [], visions: {}, visionsBackfilled: false,
     vitalsLog: vitals(42, now, r, p.startKg, 0.03),
     burnProfile: { heightCm: p.heightCm, age: p.age, sex: p.sex, weightKg: p.startKg },
@@ -403,4 +426,5 @@ export function inviteCode(randomBytes) {
   }
   return out;
 }
+export const weekOf = (day) => getWeekKey(day);
 export const DEMO_GROUP = { name: 'Sunday Runners', crest_color: '#1a7a4a' };

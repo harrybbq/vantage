@@ -81,6 +81,19 @@ for (const [day, row] of Object.entries(S.logs)) {
 const vitalKeys = new Set(Object.values(S.vitalsLog).flatMap(Object.keys));
 eq([...vitalKeys].sort(), ['rhr', 'sleep', 'weight'], 'hand-entered vitals only — no band keys');
 ok(Object.keys(S.vitalsLog).length >= 40, '6+ weeks of vitals');
+{
+  const { countWeekLogs } = await import('../../src/utils/helpers.js');
+  const flags = Object.keys(S).filter(k => k.startsWith('awarded_'));
+  ok(flags.length > 10, `weekly award flags seeded (${flags.length})`);
+  for (const k of flags) {
+    const [, tid, week] = /^awarded_(t\d+)_(\d{4}-W\d{2})$/.exec(k) || [];
+    ok(tid && week, `flag key ${k}`);
+    const t = S.trackers.find(x => x.id === tid);
+    const day = Object.keys(S.logs).find(d => P.weekOf(d) === week);
+    ok(t && countWeekLogs(S.logs, tid, day, t) >= t.weeklyTarget, `${k}: that week really met its target`);
+  }
+  ok(!flags.some(k => k.startsWith('awarded_t4_')), 'no flag for a tracker without a weekly target');
+}
 eq(S.habits.length, 4, 'four habits');
 ok(S.habits.filter(isCut).length === 1 && periods(S.habits.find(isCut), NOW).length > 0, 'cut-down habit reads through lib/habits/cutdown');
 for (const h of S.habits) ok(Number.isFinite(h.startTime) && h.startTime < NOW && Array.isArray(h.milestones), `habit ${h.id}`);
