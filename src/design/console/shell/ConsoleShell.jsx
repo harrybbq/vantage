@@ -21,7 +21,7 @@ import { useUnreadTotal } from '../../../lib/friends/useUnreadTotal';
 import { coinsToday } from '../../../lib/coins/daily';
 import { barRef } from './TopBarActions';
 import {
-  sidebarItems, TABS, moreItems, activeTab, canonicalSection, sectionTitle,
+  sidebarItems, TABS, moreItems, activeTab, canonicalSection, navSection, sectionTitle,
   longDate, shortDate, greeting, initials, paletteHint,
 } from './nav';
 
@@ -85,16 +85,17 @@ function SocialChips({ userId, onOpen }) {
 
 function Sidebar({ section, isOwner, navigate, onSignOut }) {
   const items = sidebarItems({ isOwner });
+  const lit = navSection(section);
   return (
     <div className="cx-shell-side" role="navigation" aria-label="Main" data-shell-nav="side">
       <div className="cx-shell-brand"><span className="cx-shell-logo" aria-hidden="true">V</span>Vantage</div>
       <ul className="cx-shell-side-list">
         {items.map(it => {
-          const on = section === it.id;
+          const on = lit === it.id;
           return (
             <li key={it.id}>
               <button type="button" className={cx('cx-shell-ni', on && 'is-on')} aria-current={on ? 'page' : undefined}
-                      onClick={() => navigate(it.id)} title={it.label}>
+                      onClick={() => navigate(it.id)} title={it.label} data-cx-nav={it.id}>
                 <Icon name={it.icon} size={18} strokeWidth={1.75} />
                 <span className="cx-shell-ni-label">{it.label}</span>
                 {it.key && <kbd className="cx-shell-kbd" aria-label={`Shortcut ${it.key}`}>{it.key}</kbd>}
@@ -162,14 +163,14 @@ function TabBar({ section, moreOpen, navigate, onOpenMore }) {
     <div className="cx-shell-tabs" role="navigation" aria-label="Main" data-shell-nav="tabs">
       {TABS.map(t => (
         <button key={t.id} type="button" className={cx('cx-shell-tab', on === t.id && 'is-on')}
-                aria-current={on === t.id ? 'page' : undefined}
+                aria-current={on === t.id ? 'page' : undefined} data-cx-nav={t.id}
                 onClick={() => { haptic('LIGHT'); navigate(t.id); }}>
           <Icon name={t.icon} size={22} strokeWidth={1.75} />
           <span className="cx-shell-tab-label">{t.label}</span>
         </button>
       ))}
       <button type="button" className={cx('cx-shell-tab', on === 'more' && 'is-on')}
-              aria-haspopup="dialog" aria-expanded={moreOpen}
+              aria-haspopup="dialog" aria-expanded={moreOpen} data-cx-nav="more"
               onClick={() => { haptic('LIGHT'); onOpenMore(); }}>
         <Icon name="menu" size={22} strokeWidth={1.75} />
         <span className="cx-shell-tab-label">More</span>
@@ -187,7 +188,7 @@ function MoreSheet({ section, isOwner, hasPro, navigate, onOpenPaywall, onClose 
           const on = canonicalSection(section) === it.id;
           return (
             <li key={it.id}>
-              <button type="button" className={cx('cx-shell-mi', on && 'is-on')} aria-current={on ? 'page' : undefined} onClick={() => go(it.id)}>
+              <button type="button" className={cx('cx-shell-mi', on && 'is-on')} aria-current={on ? 'page' : undefined} onClick={() => go(it.id)} data-cx-nav={it.id}>
                 <Icon name={it.icon} size={18} strokeWidth={1.75} />
                 <span className="cx-shell-mi-text">
                   <span className="cx-shell-mi-label">{it.label}</span>

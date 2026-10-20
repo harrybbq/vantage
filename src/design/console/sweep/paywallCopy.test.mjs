@@ -68,6 +68,13 @@ t('headline: names the cap that was hit, honestly, without a count it does not h
   assert.equal(headline('trackers', CAPS, { hasPro: true }).title, "You're already on Pro");
 });
 
+t('headline: a count exactly at the cap reads "N of N"; over it, or unknown, stays "all N"', () => {
+  assert.equal(headline('habits', CAPS, { count: 5 }).tag, "You've used 5 of 5 free active habits");
+  assert.equal(headline('habits', CAPS, { count: 7 }).tag, "You've used all 5 free active habits");
+  assert.equal(headline('habits', CAPS, { count: null }).tag, "You've used all 5 free active habits");
+  assert.equal(headline('holidays', CAPS, { count: 1 }).tag, "You've used your free holiday");
+});
+
 t('copy carries no em-dash and no // label', () => {
   const all = [
     ...compareRows(CAPS).flatMap(r => [r.label, r.free, r.pro]),

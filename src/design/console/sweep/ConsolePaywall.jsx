@@ -34,15 +34,15 @@ const UNSELLABLE = new Set(['$rc_lifetime']);
 const PACKAGE_LABEL = { $rc_annual: 'Yearly', $rc_monthly: 'Monthly', $rc_lifetime: 'Lifetime' };
 const weight = p => { const i = PACKAGE_ORDER.indexOf(p.identifier); return i === -1 ? 99 : i; };
 
-export default function ConsolePaywall({ openId, onClose, onManage, onShowToast, onOpenLegal }) {
+export default function ConsolePaywall({ openId, onClose, onManage, onShowToast, onOpenLegal, count = null }) {
   const open = isPaywallId(openId);
-  return open ? <PaywallSheet openId={openId} onClose={onClose} onManage={onManage} onShowToast={onShowToast} onOpenLegal={onOpenLegal} /> : null;
+  return open ? <PaywallSheet openId={openId} onClose={onClose} onManage={onManage} onShowToast={onShowToast} onOpenLegal={onOpenLegal} count={count} /> : null;
 }
 
-function PaywallSheet({ openId, onClose, onManage, onShowToast, onOpenLegal }) {
+function PaywallSheet({ openId, onClose, onManage, onShowToast, onOpenLegal, count }) {
   const { proIsLive, hasPro } = useSubscriptionContext();
   const capKey = resolveCapKey(openId, FREE_CAPS);
-  const head = headline(capKey, FREE_CAPS, { hasPro });
+  const head = headline(capKey, FREE_CAPS, { hasPro, count });
   const rows = useMemo(() => compareRows(FREE_CAPS, capKey), [capKey]);
 
   const [offerings, setOfferings] = useState(null);

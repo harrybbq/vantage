@@ -68,6 +68,16 @@ export function canonicalSection(id) {
   return id || 'hub';
 }
 
+/**
+ * The nav entry a section belongs to. While Holiday has no entry of its
+ * own, its route renders Track (Calendar › Year), so it is Track: the
+ * sidebar highlights Track and the bars title the page "Track".
+ */
+export function navSection(id, { showHoliday = CONSOLE_SHOW_HOLIDAY } = {}) {
+  const s = canonicalSection(id);
+  return s === 'holiday' && !showHoliday ? 'track' : s;
+}
+
 /** Which phone tab lights up for a section: one of TABS' ids, 'more', or null. */
 export function activeTab(section, { moreOpen = false } = {}) {
   if (moreOpen) return 'more';
@@ -85,8 +95,8 @@ const TITLES = {
 };
 
 /** Page title for the top bar and the phone app bar. Never empty. */
-export function sectionTitle(section) {
-  return TITLES[canonicalSection(section)] || 'Vantage';
+export function sectionTitle(section, opts) {
+  return TITLES[navSection(section, opts)] || 'Vantage';
 }
 
 const DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];

@@ -25,7 +25,6 @@ import { VISIONS_BY_ID } from '../../../lib/visions/definitions';
 import { OWNER_SURFACES_IN_BUILD } from '../../../lib/native/ownerSurfaces';
 import Icon from '../../../components/Icon';
 import { Segmented } from '../ui';
-import PageHead from './PageHead';
 import HonoursCase from './HonoursCase';
 
 // Owner-only Design switch — the same gating SettingsSection uses
@@ -193,7 +192,6 @@ export default function ConsoleSettings({
 
   return (
     <section className="section active cx-page cx-sweep-page cx-sweep-settings">
-      <PageHead title="Settings" />
       <Segmented label="Settings" options={TABS} value={tab} onChange={choose} className="cx-sweep-tabs is-scroll" />
       {tab === 'appearance' ? (
         <Appearance S={S} update={update} userId={userId} hasPro={hasPro} />

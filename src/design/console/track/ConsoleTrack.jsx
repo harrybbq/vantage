@@ -180,7 +180,6 @@ export default function ConsoleTrack({
   return (
     <section className="section active cx-page cx-track-page" aria-label="Track">
       <header className="cx-track-head">
-        <h1 className="cx-track-h1">Track</h1>
         <Segmented label="Track sections" options={TABS} value={tab} onChange={setTab} className="cx-track-tabs" />
         {tab === 'calendar' && (
           wide

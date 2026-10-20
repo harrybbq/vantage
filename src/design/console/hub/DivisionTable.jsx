@@ -25,6 +25,11 @@
  *   label      accessible name of the table
  *   valueLabel header of the right-most column (default 'Ovr')
  *   weeklyLabel header of the weekly column (default 'Wk'); false hides it
+ *   nameLabel  header of the name column (default 'Player'; 'Group' for divisions)
+ *   valueBand  colour the right-most value by its tier band (default true).
+ *              false for a value that is not a rating (a group's weekly score)
+ *   formatValue (v) => node for the right-most value (default: the number)
+ *   rows[].avatarColor  optional ground for the initials avatar (a group crest)
  *
  * Every rating number (category cells, OVR) is coloured by its tier band
  * (lib/ratings/bands.js). Styles: hub.css, `.cx-dt*`.
@@ -49,9 +54,10 @@ export function Diamonds({ n }) {
   );
 }
 
-export function Avatar({ name, url, size = 24, self = false, online = false }) {
+export function Avatar({ name, url, size = 24, self = false, online = false, color = null }) {
+  const ground = color && !url ? { background: color, color: '#FFFFFF' } : null;
   return (
-    <span className={`cx-av${self ? ' is-self' : ''}`} style={{ width: size, height: size, fontSize: Math.max(11, Math.round(size * 0.38)) }} aria-hidden="true">
+    <span className={`cx-av${self ? ' is-self' : ''}`} style={{ width: size, height: size, fontSize: Math.max(11, Math.round(size * 0.38)), ...ground }} aria-hidden="true">
       {url ? <img src={url} alt="" /> : initialsOf(name)}
       {online && <i className="cx-av-on" />}
     </span>
@@ -70,7 +76,7 @@ const num = v => (v == null || v === '' || !Number.isFinite(Number(v)) ? null : 
 
 export default function DivisionTable({
   rows = [], showCats = false, limit = 0, legend = null, note = null, onRow = null,
-  label = 'League table', valueLabel = 'Ovr', weeklyLabel = 'Wk',
+  label = 'League table', valueLabel = 'Ovr', weeklyLabel = 'Wk', valueBand = true, formatValue = null, nameLabel = 'Player',
 }) {
   let shown = rows;
   if (limit > 0 && rows.length > limit) {
@@ -85,7 +91,7 @@ export default function DivisionTable({
         <thead>
           <tr>
             <th scope="col" className="cx-dt-pos"><span className="cx-sr">Position</span></th>
-            <th scope="col" className="cx-dt-l">Player</th>
+            <th scope="col" className="cx-dt-l">{nameLabel}</th>
             {showCats && CATS.map(([k, ab, full]) => <th key={k} scope="col" title={full}><abbr title={full}>{ab}</abbr></th>)}
             {weeklyLabel !== false && <th scope="col" title="This week">{weeklyLabel}</th>}
             <th scope="col">{valueLabel}</th>
@@ -102,13 +108,13 @@ export default function DivisionTable({
                 <td className="cx-dt-name">
                   {onRow ? (
                     <button type="button" className="cx-dt-who" onClick={e => { e.stopPropagation(); onRow(r); }}>
-                      <Avatar name={r.name} url={r.avatarUrl} self={r.isSelf} />
-                      <span className="cx-dt-nm">{r.name}</span>
+                      <Avatar name={r.name} url={r.avatarUrl} self={r.isSelf} color={r.avatarColor} />
+                      <span className="cx-dt-nm">{r.name}{r.sub && <small className="cx-dt-sub">{r.sub}</small>}</span>
                       <Diamonds n={r.prestige} />
                     </button>
                   ) : (
                     <span className="cx-dt-who">
-                      <Avatar name={r.name} url={r.avatarUrl} self={r.isSelf} />
+                      <Avatar name={r.name} url={r.avatarUrl} self={r.isSelf} color={r.avatarColor} />
                       <span className="cx-dt-nm">{r.name}{r.sub && <small className="cx-dt-sub">{r.sub}</small>}</span>
                       <Diamonds n={r.prestige} />
                     </span>
@@ -119,7 +125,7 @@ export default function DivisionTable({
                   return <td key={k} className={`cx-dt-att cx-num ${bandClass(v)}`}>{v == null ? '–' : v}</td>;
                 })}
                 {weeklyLabel !== false && <td className="cx-dt-wk cx-num"><Weekly v={r.weekly} /></td>}
-                <td className={`cx-dt-ovr cx-num ${bandClass(ovr)}`}>{ovr == null ? '–' : ovr}</td>
+                <td className={`cx-dt-ovr cx-num ${valueBand ? bandClass(ovr) : ''}`}>{ovr == null ? '–' : formatValue ? formatValue(ovr) : ovr}</td>
               </tr>
             );
           })}

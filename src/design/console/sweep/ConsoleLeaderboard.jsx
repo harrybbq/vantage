@@ -7,7 +7,7 @@
  *               crest, kick), so it is mounted whole, never forked.
  *   Division    the division table with promotion and relegation rails,
  *               fed by the same useGroups read the classic tab uses.
- *               Drawn by DivisionTable (see the import below).
+ *               Drawn by HUB's DivisionTable, through DivisionBoard.
  *   Individual  classic LeaderboardPanel (friends / global, all-time /
  *               weekly climb, add friend, the friend ratings sheet),
  *               restyled from outside.
@@ -19,10 +19,9 @@ import { useEffect, useState } from 'react';
 import GroupsTab from '../../../components/groups/GroupsTab';
 import LeaderboardPanel from '../../../components/LeaderboardPanel';
 import { useGroups } from '../../../hooks/useGroups';
-// SWAP POINT: HUB's shared table. Replace with
-//   import DivisionTable from '../hub/DivisionTable';
-// once hub/DivisionTable.jsx exists (same props: data, division, onPickDivision).
-import DivisionTable from './DivisionTablePlaceholder';
+// The division rail + HUB's shared DivisionTable (hub/DivisionTable.jsx),
+// behind classic DivisionBoard's props (data, division, onPickDivision).
+import DivisionBoard from './DivisionBoard';
 import { Segmented } from '../ui';
 import PageHead from './PageHead';
 
@@ -60,7 +59,7 @@ function DivisionView() {
   }
   if (error) return <p className="cx-sweep-quiet cx-danger" role="alert">{error}</p>;
   if (!data) return null;
-  return <DivisionTable data={data} division={division ?? data.group?.division ?? 10} onPickDivision={setDivision} />;
+  return <DivisionBoard data={data} division={division ?? data.group?.division ?? 10} onPickDivision={setDivision} />;
 }
 
 export default function ConsoleLeaderboard({ userId, isMobile, navigate }) {

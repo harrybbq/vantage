@@ -3,13 +3,22 @@
  */
 import assert from 'node:assert/strict';
 import {
-  CONSOLE_SHOW_HOLIDAY, sidebarItems, TABS, moreItems, activeTab, canonicalSection,
+  CONSOLE_SHOW_HOLIDAY, sidebarItems, TABS, moreItems, activeTab, canonicalSection, navSection,
   sectionTitle, longDate, shortDate, greeting, initials, paletteHint,
 } from './nav.js';
 
 let n = 0;
 const t = (name, fn) => { try { fn(); n++; } catch (e) { console.error(`✗ ${name}`); throw e; } };
 const ids = list => list.map(i => i.id);
+
+t('the holiday route reads as Track while Holiday has no entry', () => {
+  assert.equal(navSection('holiday'), 'track');
+  assert.equal(sectionTitle('holiday'), 'Track');
+  assert.equal(navSection('holiday', { showHoliday: true }), 'holiday');
+  assert.equal(sectionTitle('holiday', { showHoliday: true }), 'Holiday');
+  assert.equal(navSection('schedule'), 'upgrade');
+  assert.equal(sectionTitle('settings'), 'Settings');
+});
 
 t('Holiday is merged into Track: no entry of its own, but it can come back', () => {
   assert.equal(CONSOLE_SHOW_HOLIDAY, false, 'trips live in Track › Calendar');

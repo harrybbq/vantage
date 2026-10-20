@@ -72,10 +72,11 @@ export function compareRows(caps, hitKey = null) {
  * The top of the sheet for the cap that opened it:
  *   { tag, title, sub }
  * `tag` is the line beside the Pro mark ("You've used all 5 free habits").
- * The count is not known here (the slot gets only the id), so it says
- * "all N", which is true whether someone is at the cap or over it.
+ * `count` (App passes it alongside the id) is how many exist now. Exactly
+ * at the cap it says "5 of 5"; without a count, or over the cap (a lapsed
+ * Pro account keeps what it made), it says "all N", which is true either way.
  */
-export function headline(capKey, caps, { hasPro = false } = {}) {
+export function headline(capKey, caps, { hasPro = false, count = null } = {}) {
   const cap = (caps && caps[capKey]) || null;
   if (hasPro) {
     return { tag: 'Pro is active', title: "You're already on Pro", sub: 'Manage your subscription in Settings.' };
@@ -93,7 +94,9 @@ export function headline(capKey, caps, { hasPro = false } = {}) {
   const one = noun(cap.label);
   const title = n === 1 ? `Plan more than one ${one}` : `Add more than ${numberWord(n)} ${cap.label}`;
   return {
-    tag: n === 1 ? `You've used your free ${one}` : `You've used all ${n} free ${cap.label}`,
+    tag: n === 1 ? `You've used your free ${one}`
+      : count === n ? `You've used ${n} of ${n} free ${cap.label}`
+      : `You've used all ${n} free ${cap.label}`,
     title: capKey === 'trackers' ? `Track more than ${numberWord(n)} things` : title,
     sub: 'Both themes and every core feature stay free. Pro raises the limits and opens customisation.',
   };

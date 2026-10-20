@@ -180,6 +180,14 @@ const MODAL_CAPS = {
   addHabitModal:       { key: 'habits',       count: S => (S.habits || []).length },
 };
 
+/** For `paywall:<capKey>`, how many of that thing the account has now (console paywall copy). */
+function paywallCount(openId, S) {
+  if (typeof openId !== 'string' || !openId.startsWith('paywall:')) return null;
+  const key = openId.slice('paywall:'.length);
+  const cap = Object.values(MODAL_CAPS).find(c => c.key === key);
+  return cap ? cap.count(S) : null;
+}
+
 function Board({ userId, userEmail, onSignOut, initialSettings }) {
   const {
     S, update, loading, hydrated, justMigrated, dismissMigrationBanner,
@@ -1108,6 +1116,9 @@ function Board({ userId, userEmail, onSignOut, initialSettings }) {
 
       <DesignSlot use={ConsolePaywall} props={{
         openId: openModal,
+        // How many of the capped thing exist now, so the console sheet can
+        // say "5 of 5". Read-only; null for ids that are not a counted cap.
+        count: paywallCount(openModal, S),
         onClose: handleCloseModal,
         onManage: () => { handleCloseModal(); navigate('settings'); },
         onShowToast: showCoinToast,
@@ -1204,6 +1215,7 @@ function Board({ userId, userEmail, onSignOut, initialSettings }) {
       {/* Onboarding tutorial — shows once for new users, replayable
           from Settings. Dark OS users get the terser voice variant. */}
       <DesignSlot use={ConsoleTutorial} props={{
+        S,
         visible: !S.tutorialCompleted,
         theme: resolveEffectiveTheme(S.theme || 'cream-pro') === 'dark-os' ? 'dark' : 'cream',
         onNavigate: navigate,

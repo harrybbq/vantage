@@ -111,7 +111,7 @@ export function PlayerStrip({ S, visionState, hub, navigate, onOpenVisions, onOp
   const name = (S.profile?.name || '').trim() || 'You';
   const handle = hub?.friends?.ownProfile?.handle;
   return (
-    <section className="cx-panel cx-hub-player" aria-label="Your level and ratings">
+    <section className="cx-panel cx-hub-player" aria-label="Your level and ratings" data-cx-tour="hub">
       <div className="cx-hub-pl-id">
         <button type="button" className="cx-hub-pl-who" onClick={() => navigate?.('settings')} aria-label="Your profile, in Settings">
           <Avatar name={name} url={S.profile?.photo || null} size={44} self />
