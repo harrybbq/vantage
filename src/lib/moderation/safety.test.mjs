@@ -291,6 +291,11 @@ ok(!/nigg/i.test(MESSAGE_FILTERED_TEXT), 'the message never repeats the word');
   const goodPic = `data:image/jpeg;base64,${'A'.repeat(200)}`;
   const calls = [];
   const realFetch = globalThis.fetch;
+  // Hermetic: the build runs on Netlify with real Supabase env set; this
+  // test must not depend on whether it is.
+  const ENV_KEYS = ['SUPABASE_URL', 'VITE_SUPABASE_URL', 'SUPABASE_SERVICE_ROLE_KEY', 'SUPABASE_SECRET_KEY'];
+  const savedEnv = Object.fromEntries(ENV_KEYS.map(k => [k, process.env[k]]));
+  for (const k of ENV_KEYS) delete process.env[k];
   globalThis.fetch = async (url, init = {}) => {
     const u = String(url);
     const body = init.body ? JSON.parse(init.body) : null;
@@ -304,6 +309,10 @@ ok(!/nigg/i.test(MESSAGE_FILTERED_TEXT), 'the message never repeats the word');
         { user_id: B, avatar_url: 'data:image/gif;base64,R0lG', avatar_hash: 'b'.repeat(64) },
       ]), { status: 200 });
     }
+    // The durable daily cap (aiQuota → ai_usage_bump) only runs when the
+    // process has Supabase env — as it does on Netlify. Answer it "under
+    // the cap" so the test means the same thing everywhere.
+    if (u.includes('rpc/ai_usage_bump')) return new Response('true', { status: 200 });
     if (u.includes('rpc/avatar_screen_status')) return new Response('{"withAvatar":2,"unscreened":0,"flagged":2}', { status: 200 });
     if (u.includes('rpc/avatar_screen_flagged')) return new Response('[]', { status: 200 });
     return new Response('[]', { status: 200 });
@@ -319,6 +328,7 @@ ok(!/nigg/i.test(MESSAGE_FILTERED_TEXT), 'the message never repeats the word');
     eq(calls.filter(c => c.u.startsWith('https://api.anthropic.com')).length, 1, 'only the readable picture is sent to the model');
   } finally {
     globalThis.fetch = realFetch;
+    for (const k of ENV_KEYS) { if (savedEnv[k] === undefined) delete process.env[k]; else process.env[k] = savedEnv[k]; }
   }
 }
 
