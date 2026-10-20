@@ -26,11 +26,10 @@ import {
 } from '../../lib/trackers/autoLog';
 
 const NEEDS = {
-  vitals: 'a weight, sleep or heart-rate source — WHOOP, Oura, Apple Health, or entered by hand',
+  vitals: 'a weight, sleep or heart-rate reading — from WHOOP, Oura, or entered by hand',
   wearable: 'WHOOP or Oura connected, or a workout finished in Vantage',
   whoop: 'WHOOP connected',
-  health: 'an Apple Health import',
-  steps: 'WHOOP, Oura or an Apple Health import',
+  steps: 'WHOOP or Oura connected',
 };
 
 export default function AutoFillModal({ tracker, S, update, onClose }) {

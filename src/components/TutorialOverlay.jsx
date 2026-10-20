@@ -43,7 +43,7 @@ const STEPS_CREAM = [
   {
     id: 'hub', label: 'Hub',
     title: 'Your hub',
-    body: 'Home base. Your profile card, overall rating, friends rail (add by @handle, message, see streaks) and an AI daily brief. Below that, a canvas you build yourself — drag widgets anywhere, right-click a module to make it transparent.',
+    body: 'Home base. Your profile card, overall rating, friends rail (add by @handle, message, see streaks) and, on Pro, an AI daily brief. Below that, a canvas you build yourself — drag widgets anywhere, right-click a module to make it transparent.',
     target: 'hub', placement: 'bottom', arrowDir: 'up',
     navTo: 'hub',
   },
@@ -63,13 +63,13 @@ const STEPS_CREAM = [
   {
     id: 'track', label: 'Track',
     title: 'Track & log',
-    body: 'Daily trackers with streaks and weekly coin goals. Nutrition logging — search foods, scan barcodes, or identify a plate with AI (Pro); liquids log in ml automatically. Vitals (sleep, heart rate, recovery) sync from a WHOOP band, an Oura ring, or Apple Health. New: Body (weight trend + goal) lives here too.',
+    body: 'Daily trackers with streaks and weekly coin goals — point one at a reading the app already gets and it ticks itself. Nutrition logging — search foods, scan barcodes, or identify a plate with AI (3 free scans a week, more on Pro); liquids log in ml automatically. Vitals (weight, sleep, heart rate, recovery) — type them in, or sync a WHOOP band or an Oura ring.',
     target: 'nav-tab-track', placement: 'right', arrowDir: 'left',
   },
   {
     id: 'shop', label: 'Shop',
     title: 'Reward yourself',
-    body: 'A wishlist with a point. Paste a link to autofill an item, set a ⬡ coin cost, and unlock it when you\'ve earned enough — or turn the coin requirement off in Settings → Goals and use it as a plain wishlist. The Trending board shows what your friends are saving for and what\'s popular across Vantage — always anonymous, opt-out in Settings.',
+    body: 'A wishlist with a point. Paste a link to autofill an item, set a ⬡ coin cost, and unlock it when you\'ve earned enough — or turn the coin requirement off in Settings → Goals and use it as a plain wishlist.',
     target: 'nav-tab-shop', placement: 'right', arrowDir: 'left',
   },
   {
@@ -87,13 +87,13 @@ const STEPS_CREAM = [
   {
     id: 'leaderboard', label: 'Leaderboard',
     title: 'Compete + climb',
-    body: 'Your OVR rating (Brain / Finance / Fitness / Social, each 0–99) ranks you against friends or globally, all-time or weekly climb. Add people straight from the board, message friends, and at OVR 99 Prestige up for a colour-band badge (GREEN I → CRIMSON X). Hide yourself from the global board any time in Settings.',
+    body: 'Your OVR rating (Brain / Finance / Fitness / Social, each 0–99) ranks you against friends or globally, all-time or weekly climb. Add people straight from the board, message friends, and at OVR 99 Prestige up for a colour-band badge (GREEN I → CRIMSON X). You choose whether you appear on the global board, in Settings → Privacy.',
     target: 'nav-tab-leaderboard', placement: 'right', arrowDir: 'left',
   },
   {
     id: 'settings', label: 'Settings',
     title: 'Make it yours',
-    body: 'Colour schemes — some free, some unlocked by earning Honours, more with Pro (plus a coloured leaderboard name). Connect a WHOOP band or Oura ring, or import Apple Health. Decide whether coins are required to buy shop items. Set macro goals, manage every privacy toggle (search, leaderboard, trending, what friends see), browse the Honours catalogue, export your data, and replay this tour.',
+    body: 'Colour schemes — some free, some unlocked by earning Honours, more with Pro (plus a coloured leaderboard name). Connect a WHOOP band or Oura ring. Decide whether coins are required to buy shop items. Set macro goals, manage every privacy toggle (search, leaderboard, what friends see), browse the Honours catalogue, export your data, and replay this tour.',
     target: 'nav-tab-settings', placement: 'right', arrowDir: 'left',
   },
   {
@@ -115,7 +115,7 @@ const STEPS_DARK = [
   {
     id: 'hub', label: 'hub',
     title: 'the hub',
-    body: 'Home base. Profile, ratings ledger, friends rail (@handles, DMs, presence), AI daily brief, draggable widget canvas. Right-click any module to toggle transparency.',
+    body: 'Home base. Profile, ratings ledger, friends rail (@handles, DMs, presence), AI daily brief (Pro), draggable widget canvas. Right-click any module to toggle transparency.',
     target: 'hub', placement: 'bottom', arrowDir: 'up',
     navTo: 'hub',
   },
@@ -135,13 +135,13 @@ const STEPS_DARK = [
   {
     id: 'track', label: 'track',
     title: 'track and log',
-    body: 'Daily trackers + nutrition (search / barcode / AI identify on Pro; liquids auto-ml). Vitals sync from WHOOP, Oura, or Apple Health. Body: weight trend, weekly rate, goal. Coin scams blocked: post-bonus untoggles reverse the award.',
+    body: 'Daily trackers, auto-filled from readings you already have if you want. Nutrition (search / barcode / AI identify — 3 free a week, more on Pro; liquids auto-ml). Vitals: manual, WHOOP or Oura. Coin scams blocked: post-bonus untoggles reverse the award.',
     target: 'nav-tab-track', placement: 'right', arrowDir: 'left',
   },
   {
     id: 'shop', label: 'shop',
     title: 'shop',
-    body: 'Wishlist items. Paste a URL → autofill. Spend ⬡ coins to unlock — personal incentive layer, and the coin gate itself is optional (settings → goals). Trending board: friends-scope + global-scope aggregates, fully anonymous, opt-out in settings.',
+    body: 'Wishlist items. Paste a URL → autofill. Spend ⬡ coins to unlock — personal incentive layer, and the coin gate itself is optional (settings → goals).',
     target: 'nav-tab-shop', placement: 'right', arrowDir: 'left',
   },
   {
@@ -159,13 +159,13 @@ const STEPS_DARK = [
   {
     id: 'leaderboard', label: 'leaderboard',
     title: 'leaderboard',
-    body: 'Server-canonical ratings. Friends / Global × all-time / weekly-climb. Add friends straight from the board. At OVR 99: prestige — colour-band badge (forest → crimson), climb restarts, nothing else wiped. Global visibility is opt-out.',
+    body: 'Server-canonical ratings. Friends / Global × all-time / weekly-climb. Add friends straight from the board. At OVR 99: prestige — colour-band badge (forest → crimson), climb restarts, nothing else wiped. Global visibility: your call, settings → privacy.',
     target: 'nav-tab-leaderboard', placement: 'right', arrowDir: 'left',
   },
   {
     id: 'settings', label: 'settings',
     title: 'settings',
-    body: 'Colour schemes: free tier + honour-unlocked + Pro (incl. coloured leaderboard name). WHOOP / Oura / Apple Health connections. Shop coin gate on/off. Macros, privacy toggles (search / leaderboard / trending / profile shares), Honours catalogue, data export, replay this tour.',
+    body: 'Colour schemes: free tier + honour-unlocked + Pro (incl. coloured leaderboard name). WHOOP / Oura connections. Shop coin gate on/off. Macros, privacy toggles (search / leaderboard / profile shares), Honours catalogue, data export, replay this tour.',
     target: 'nav-tab-settings', placement: 'right', arrowDir: 'left',
   },
   {
