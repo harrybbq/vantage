@@ -1,0 +1,18 @@
+{
+  "applinks": {
+    "details": [
+      {
+        "appIDs": ["[APPLE_TEAM_ID].com.vantage.app"],
+        "components": [
+          {
+            "/": "/invite/*",
+            "comment": "Friend invite links (src/lib/friends/dmModel.js inviteUrl). Opens the app when installed, the website otherwise."
+          }
+        ]
+      }
+    ]
+  },
+  "webcredentials": {
+    "apps": ["[APPLE_TEAM_ID].com.vantage.app"]
+  }
+}
