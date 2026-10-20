@@ -515,6 +515,18 @@ to `mergeWhoopIntoState` and `mergeOuraIntoState`. A unit test asserts
 that applying the ops to a view equals running the existing merge on a
 state (§7).
 
+**Write-order rule for every dual-writer (client and server): state
+first, then the table, and only after the state write succeeded.** If the
+state CAS conflicts and the run skips the user, the table write is skipped
+too. This keeps the table from ever being newer than state while both are
+written, which is what makes "state wins" safe in the backfill and the
+forward-fill.
+
+Testing the draft SQL showed why this matters. A cron that wrote the table
+but lost its state CAS would leave `whoop-9` in the table and `whoop-1` in
+state. A state-wins reconcile would then put `whoop-1` back next to
+`whoop-9`, double-counting that day's burn until the next cron run.
+
 ### 3.5 Readers and query patterns
 
 - **Client readers (about 30 files, Appendix A):** unchanged. They read
@@ -532,8 +544,9 @@ state (§7).
   projection where only one metric is needed, e.g.
   `select=day,w:data->weight`.
 - **Server ranking:** `daily_log_rating_days(p_user)` returns one small row
-  per day (kind, day, has-core-vital, burn kcal, created_at,
-  server-sourced) instead of moving the logs.
+  per day instead of moving the logs: kind, day, whether it has a core
+  vital, the sources of those core vitals (per key), total burn kcal, the
+  kcal from server-sourced entries, and created_at.
 
 ### 3.6 Ranking, leaderboard and anti-forgery (items 44/26)
 
@@ -682,14 +695,14 @@ The gate must ship **now**, because a gate only binds builds that contain it.
 | L2 | state | state | state **+ table** | state (complete) | state | No: state remains the source |
 | L3 | state + table (shadow) | state | state + table | state (complete) | state; the backfill/reconciler copies them to the table | No: state remains the source |
 | L4 | as L3 | state | as L3 | state | as L3 | No: backfill only adds to the table (state wins key by key, table-only keys kept) |
-| L5 | state + table | **table** (+ state forward-fill, state wins) | state + table | state (**still complete**, because everyone dual-writes) | state; forward-filled by new clients and the reconciler | No. A burn entry an *old* build deletes may reappear, which is the merge rule's deliberate "resurrect rather than lose". |
+| L5 | state + table | **table** (+ state forward-fill, state wins) | state + table | state (**still complete**, because everyone dual-writes) | state; forward-filled by new clients and the reconciler | No. A value or burn entry that an *old* build deletes may reappear, because removals only travel as explicit ops, which old builds never send. This is the merge rule's deliberate "resurrect rather than lose" (`merge.js:31-38`). Its size is visible in verify's `extra_in_table` count. |
 | L6 | as L5 | as L5 | as L5 | as L5 | as L5 | No. This phase is only waiting. |
 | L7 (per user) | **table only** (marker strips the keys) | table | table only | state without logs → **empty vitals and burn display** (cosmetic; the server-side OVR is unaffected) | Regrown key in state → shown as a union (table wins) → absorbed by the server | Only one narrow case: an old build's *edit to an existing value* made after cleanup is set-if-absent, so the table value stays. New days from an old build are kept. Bounded by `min_build` (L6). |
 
 | Phase | What ships | Verified by | Rollback |
 |---|---|---|---|
 | **L1 Expand** | SQL: `daily_log`, triggers, `daily_log_history`, validation helpers, `daily_log_apply` / `_service`, `daily_log_rating_days`, `daily_log_backfill_runs`, backfill and verify functions (draft §2–§3). No code reads or writes the table. | Advisors; RLS tests (A cannot read B; `authenticated` cannot insert, update or delete directly; `anon` nothing); RPC validation tests on a scratch project | Drop the empty objects |
-| **L2 Server shadow-write** (flag `logs_server_shadow`) | `whoop-cron`, `oura-cron`, `health-sync`, `whoop-sync`, `oura-sync` also call the service RPC. The state CAS path is unchanged, and an RPC failure is logged and never fails the run. | Row counts grow for connected users; the RPC error rate in function logs is 0 | Flag off; the rows are harmless |
+| **L2 Server shadow-write** (flag `logs_server_shadow`) | `whoop-cron`, `oura-cron`, `health-sync`, `whoop-sync`, `oura-sync` also call the service RPC, **only after their state CAS returned `written`** (write-order rule, §3.4). The state CAS path is unchanged, and an RPC failure is logged and never fails the run. | Row counts grow for connected users; the RPC error rate in function logs is 0 | Flag off; the rows are harmless |
 | **L3 Client shadow-write** (flag `logs_client_shadow`) | `lib/logs/store.js` diff + outbox + RPC **after** each successful state save. It never blocks a save. A **shadow compare** on load (table view vs `state` view; counts and hashes only, no values) goes to `client_errors` as `log-shadow-diff`. CACHE_VERSION bump. | Shadow diffs trend to zero for users who have been backfilled | Flag off |
 | **L4 Backfill + verify** | The owner runs `daily_log_backfill_user` for everyone in batches (draft §3). It is idempotent: it locks the `user_data` row so it serialises with CAS writers, copies with state winning per key, never removes table keys, and reports invalid keys. `daily_log_verify_user` gives per-user, per-kind counts: days in state, rows present, days missing, values that differ, invalid keys. A **nightly reconciler** re-runs the backfill for users whose `user_data.updated_at` moved since their last run, which catches old-build writes, until L7. | **Gate to L5:** every user shows 0 missing and 0 differing for 14 consecutive days, and invalid keys are reviewed. Restore drill done first (§7). | Nothing to undo: the table only gained rows. Truncating is possible but unnecessary. |
 | **L5 Switch reads** (flags `logs_read_from_table` for the client, `ratings_from_table` for the server) | Client: view from table rows + forward-fill (state wins). Keeps dual-writing state. The marker-following `stripForSave` logic is **included but dormant** (no marker exists yet). Export adds `daily_log`. Server: recompute from `daily_log_rating_days`, after the parity run. CACHE_VERSION bump. **The first native store binary should be cut from this build or later.** | Playwright with heavy data; parity report; shadow-diff telemetry stays at 0; owner account for a week first | Flag off: the client reads state again, which is complete because of dual-write |
@@ -762,8 +775,45 @@ plus cascade plus explicit grants, `security definer` with
 | 4 | L7 | `state_archive`, `daily_log_cleanup_user`, `daily_log_absorb_user`. **Entirely inside a block comment.** Not to be created until the owner approves L7. |
 | 5 | all | Verification queries (privileges, policies, per-user verify, sizes) |
 
-The SQL has not been run anywhere, including against a scratch project. It
-must be run end to end on a scratch project (§7) before any phase.
+**What has been checked, and what has not.** The draft has **never been
+run against the Supabase project**. On 2026-10-20 it was checked on a
+throwaway local PostgreSQL 16 with stub `auth` and `storage` schemas,
+Supabase-style default grants and synthetic data only. The database was
+deleted afterwards.
+
+What passed:
+- §0–§3 apply cleanly and re-run idempotently, and §4 creates when
+  uncommented.
+- The backfill copies vitals, body, mood and burn. Duplicate and missing
+  burn ids become `#n` and `legacy-n`. Invalid day keys
+  (`2026-02-30`, `junk`) are counted and left in place.
+- A second backfill writes 0 rows, and `updated_at` does not move.
+- An old-build state edit shows up in verify and is healed by the next
+  backfill, and the overwrite is journaled.
+- Client writes:
+  - set and unset work, and `src` becomes `manual`;
+  - out-of-range values, `mood` writes, future days, a prefix removal
+    from a client and an empty op are each refused per op;
+  - direct `INSERT`/`UPDATE`/`DELETE` are denied;
+  - a 41-day bulk removal is refused;
+  - a user cannot see another user's rows;
+  - a client removal is journaled and visible to its owner.
+- The service write replaces only `whoop-*` burn entries.
+- The picture swap is hash-guarded. A re-run returns `already`, and
+  `media_restore_user` puts the original back.
+- Cleanup refuses on mismatches and on invalid keys (unless allowed),
+  archives every key, and leaves a state that `vb_state_meaningful` still
+  calls meaningful.
+- Absorb keeps the table's value and adds new days.
+- Deleting the auth user cascades every new table.
+- Only `daily_log_apply` and `note_client_build` are executable by
+  `authenticated`.
+
+The test scripts are in the session scratchpad (`sqlcheck/`), not the repo.
+
+**Still required before any phase:** a run against a real Supabase scratch
+project or branch (real `storage` schema, real `auth.uid()`, Advisors), as
+§7 describes.
 
 ---
 
