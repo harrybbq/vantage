@@ -152,7 +152,7 @@ const TEXT_RULES = [
   { id: 'vomit', mode: 'ed', re: /\bvomit(?:ing|ed)?\b|\bthrow(?:ing)?\s+up\b|\bmake\s+my\s*self\s+(?:sick|throw\s+up)\b/ },
   { id: 'laxative', mode: 'ed', re: /\b(?:laxatives?|diuretics?|diet\s+pills?|slimming\s+pills?)\b/ },
   { id: 'binge-eating', mode: 'ed', re: /\bbing(?:e|eing|ing|ed)\s*(?:eat(?:ing)?|food|and\s+purg)/ },
-  { id: 'binge-habit', mode: 'ed', habitOnly: true, re: /^(?:no\s+|stop\s+|quit\s+)?bing(?:e|eing|ing)$/ },
+  { id: 'binge-alone', mode: 'ed', re: /^(?:no\s+|stop\s+|quit\s+)?bing(?:e|eing|ing)$/ },
   { id: 'starve', mode: 'ed', re: /\bstarv(?:e|es|ed|ing|ation)\b/ },
   { id: 'pro-ana', mode: 'ed', re: /\bpro[\s-]?(?:ana|mia)\b|\b(?:thin|bone|mean)spo\b|\bthinspiration\b/ },
   { id: 'chew-spit', mode: 'ed', re: /\bchew\s*(?:and|&|n)\s*spit\b/ },
@@ -209,7 +209,7 @@ function classifyTracker(t) {
     return 'weight';
   }
   if (/\b(?:run|runs|running|jog\w*|gym|workouts?|work\s*outs?|training|exercis\w*|cardio|steps|cycl\w*|bike|swim\w*|hiit|lifting|walk\w*|spin|yoga|pilates|sport|rowing|miles|km)\b/.test(name)
-    || /^(?:steps|sessions|workouts)$/.test(unit)) {
+    || /^(?:steps|workouts)$/.test(unit)) {
     return 'exercise';
   }
   return null;
@@ -339,17 +339,18 @@ function assessSnapshot(snap, extra = {}) {
 
 // ── What the model may see in gentle mode ─────────────────────────────────
 
-const BODY_TERMS = /\b(?:weigh\w*|kg|kgs|kilos?|lbs?|pounds|stone|bmi|body\s*fat|calor\w*|kcal|cals?|diet\w*|slim\w*|thin\w*|skinny|abs|six[\s-]?pack|lose|losing|lost|shed|bikini|beach\s+body|waist|thighs?|toned?|fast\w*|macros?|protein|carbs?|food|meals?|eat\w*|snack\w*|sugar|size\s+\d+)\b/;
+const BODY_TERMS = /\b(?:weigh\w*|kg|kgs|kilos?|lbs?|pounds|stone|bmi|body\s*fat|calor\w*|kcal|cals?|diet\w*|slim\w*|thin\w*|skinny|abs|six[\s-]?pack|lose|losing|lost|shed|bikini|beach\s+body|waist|thighs?|toned?|fast\w*|macros?|protein|carbs?|food|meals?|eat\w*|snack\w*|sugar|size\s+\d+|recipes?|cook\w*)\b/;
+const EXERCISE_TERMS = /\b(?:run|runs|running|marathon|half\s+marathon|[0-9]+k|jog\w*|gym|workouts?|training|exercis\w*|cardio|steps|cycl\w*|swim\w*|hiit|lifting|triathlon|ironman|pull[\s-]?ups?|push[\s-]?ups?|squats?|bench|deadlift)\b/;
 
 /**
  * The snapshot the model gets in gentle mode: nothing about food, weight,
- * body or exercise volume, no day counts or relapse counts, nothing a
+ * body or exercise (goals included), no day counts or relapse counts, nothing a
  * rule flagged, and no previous briefs (their lines could be exactly the
  * kind of thing gentle mode exists to stop).
  */
 function sanitizeForModel(snap, assessment) {
   const flagged = new Set((assessment && assessment.signals || []).map(x => x.where));
-  const keep = (k, i, name) => !flagged.has(`${k}.${i}`) && !BODY_TERMS.test(norm(name));
+  const keep = (k, i, name) => !flagged.has(`${k}.${i}`) && !BODY_TERMS.test(norm(name)) && !EXERCISE_TERMS.test(norm(name));
   const out = { ...snap };
   delete out.safety;
   delete out.notes;
@@ -422,7 +423,7 @@ function signpostFor(assessment) {
 
 function safeName(name) {
   const n = String(name || '').trim();
-  return /^[\p{L}][\p{L}' -]{0,19}$/u.test(n) && n !== 'You' ? n : '';
+  return /^[\p{L}][\p{L}'-]{0,19}$/u.test(n) && n !== 'You' ? n : '';
 }
 const lead = (name, rest) => (name ? `${name}, ${rest}` : rest.charAt(0).toUpperCase() + rest.slice(1));
 
