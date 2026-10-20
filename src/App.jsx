@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, lazy, Suspense } from 'react';
-import { AnimatePresence, motion } from 'framer-motion';
+import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import { supabase } from './lib/supabase';
 import { useVisionBoardState, hasLocalStorageData, clearLocalStorageData } from './hooks/useVisionBoardState';
 import { SubscriptionProvider } from './context/SubscriptionContext';
@@ -25,6 +25,9 @@ import {
   ConsoleHabits, ConsoleSettings, ConsoleAchievements, ConsoleShop, ConsoleLeaderboard, ConsoleFriends,
   ConsolePaywall, ConsoleTutorial, ConsoleAuth,
 } from './design/console/sweep';
+// Console chrome (SHELL): sidebar, top bar, phone app bar, tab bar, More.
+// Lazy, so classic never downloads it.
+const ConsoleShell = lazy(() => import('./design/console/shell/ConsoleShell'));
 import { useSubscriptionContext } from './context/SubscriptionContext';
 import Modals from './components/Modals';
 import PaywallModal from './components/PaywallModal';
@@ -143,6 +146,15 @@ const pageMotion = {
   exit: { opacity: 0, y: -10 },
   transition: { duration: 0.35, ease: [0.22, 1, 0.36, 1] },
 };
+// Console pages fade only (Direction A: 200 ms, the Lifts ease), and stand
+// still under prefers-reduced-motion. Classic keeps pageMotion as it was.
+const consoleMotion = {
+  initial: { opacity: 0 },
+  animate: { opacity: 1 },
+  exit: { opacity: 0 },
+  transition: { duration: 0.2, ease: [0.2, 0.7, 0.2, 1] },
+};
+const consoleMotionStill = { initial: false, animate: { opacity: 1 }, exit: { opacity: 1 }, transition: { duration: 0 } };
 
 // ── Background helpers ────────────────────────────────────────────────────
 // Backgrounds used to live in localStorage (device-local), which meant they
@@ -201,6 +213,9 @@ function Board({ userId, userEmail, onSignOut, initialSettings }) {
     theme: resolveEffectiveTheme(S.theme || 'cream-pro'),
   });
   // ── end design switch ──
+  const isConsole = design === 'console';
+  const reduceMotion = useReducedMotion();
+  const pm = !isConsole ? pageMotion : (reduceMotion ? consoleMotionStill : consoleMotion);
   // Passive WHOOP sync — refreshes vitals/burn whenever the app opens or
   // regains focus (throttled), so data stays fresh without visiting Track.
   useWhoopAutoSync(S, update);
@@ -643,7 +658,9 @@ function Board({ userId, userEmail, onSignOut, initialSettings }) {
   // text that sits straight on the page (headers, tab rows, Settings)
   // can take a reading plate — see "Text over a photo" in index.css.
   // Presentation only: reads S.backgrounds, writes nothing to state.
-  const photoBehind = !!backgrounds[activeSection];
+  // The console design draws no per-section photo (S.backgrounds is kept,
+  // untouched, for classic), so it never asks for a reading plate.
+  const photoBehind = !isConsole && !!backgrounds[activeSection];
   useEffect(() => {
     const r = document.documentElement;
     if (photoBehind) r.setAttribute('data-bg-photo', '1');
@@ -834,6 +851,14 @@ function Board({ userId, userEmail, onSignOut, initialSettings }) {
           Dim is a separate flat layer over the top rather than an
           opacity on this one, so it works over the theme's own backdrop
           when no image has been chosen. */}
+      {/* Console design: its own shell replaces everything from here to
+          PageHeader (backdrop, boot sequence, overlays, Nav, mobile chrome,
+          PageHeader). Classic renders exactly what it always did. */}
+      {isConsole ? (
+        <Suspense fallback={null}>
+          <ConsoleShell {...sectionProps} />
+        </Suspense>
+      ) : (<>
       {currentBg && (
         <div style={{
           position: 'fixed',
@@ -920,12 +945,13 @@ function Board({ userId, userEmail, onSignOut, initialSettings }) {
         bgFx={bgFx}
         onBgFx={setBgFx}
       />
+      </>)}
 
       {/* Main sections — each in its own boundary, so one page throwing
           leaves the nav and the other pages working (item 58). */}
       <AnimatePresence mode="wait">
         {activeSection === 'hub' && (
-          <motion.div key="hub" {...pageMotion}>
+          <motion.div key="hub" {...pm}>
             <WidgetBoundary variant="section" name="hub">
             <DesignSlot use={ConsoleHub} props={sectionProps}>
             {isMobile ? (
@@ -946,7 +972,7 @@ function Board({ userId, userEmail, onSignOut, initialSettings }) {
           </motion.div>
         )}
         {activeSection === 'achievements' && (
-          <motion.div key="achievements" {...pageMotion}>
+          <motion.div key="achievements" {...pm}>
             <WidgetBoundary variant="section" name="achievements">
             <DesignSlot use={ConsoleAchievements} props={sectionProps}>
             <Suspense fallback={null}>
@@ -957,7 +983,7 @@ function Board({ userId, userEmail, onSignOut, initialSettings }) {
           </motion.div>
         )}
         {activeSection === 'track' && (
-          <motion.div key="track" {...pageMotion}>
+          <motion.div key="track" {...pm}>
             <WidgetBoundary variant="section" name="track">
             <DesignSlot use={ConsoleTrack} props={sectionProps}>
             <Suspense fallback={null}>
@@ -968,7 +994,7 @@ function Board({ userId, userEmail, onSignOut, initialSettings }) {
           </motion.div>
         )}
         {activeSection === 'shop' && (
-          <motion.div key="shop" {...pageMotion}>
+          <motion.div key="shop" {...pm}>
             <WidgetBoundary variant="section" name="shop">
             <DesignSlot use={ConsoleShop} props={sectionProps}>
             <Suspense fallback={null}>
@@ -979,7 +1005,7 @@ function Board({ userId, userEmail, onSignOut, initialSettings }) {
           </motion.div>
         )}
         {activeSection === 'holiday' && (
-          <motion.div key="holiday" {...pageMotion}>
+          <motion.div key="holiday" {...pm}>
             <WidgetBoundary variant="section" name="holiday">
             <DesignSlot use={ConsoleHoliday} props={sectionProps}>
             <Suspense fallback={null}>
@@ -990,7 +1016,7 @@ function Board({ userId, userEmail, onSignOut, initialSettings }) {
           </motion.div>
         )}
         {activeSection === 'habits' && (
-          <motion.div key="habits" {...pageMotion}>
+          <motion.div key="habits" {...pm}>
             <WidgetBoundary variant="section" name="habits">
             <DesignSlot use={ConsoleHabits} props={sectionProps}>
             <Suspense fallback={null}>
@@ -1005,7 +1031,7 @@ function Board({ userId, userEmail, onSignOut, initialSettings }) {
           </motion.div>
         )}
         {activeSection === 'leaderboard' && (
-          <motion.div key="leaderboard" {...pageMotion}>
+          <motion.div key="leaderboard" {...pm}>
             <WidgetBoundary variant="section" name="leaderboard">
             <DesignSlot use={ConsoleLeaderboard} props={sectionProps}>
             <Suspense fallback={null}>
@@ -1022,7 +1048,7 @@ function Board({ userId, userEmail, onSignOut, initialSettings }) {
           </motion.div>
         )}
         {activeSection === 'settings' && (
-          <motion.div key="settings" {...pageMotion}>
+          <motion.div key="settings" {...pm}>
             <WidgetBoundary variant="section" name="settings">
             <DesignSlot use={ConsoleSettings} props={sectionProps}>
             <SettingsSection S={S} update={update} active userId={userId} userEmail={userEmail} onSignOut={handleExplicitSignOut} requestedTab={settingsTab} onOpenLegal={setLegalPage} onOpenPalette={() => setPaletteOpen(true)} onOpenShortcuts={() => setShortcutsOpen(true)} onOpenVisions={() => setVisionsOpen(true)} onOpenSchedule={isOwner ? () => navigate('upgrade') : null} />
@@ -1037,7 +1063,7 @@ function Board({ userId, userEmail, onSignOut, initialSettings }) {
             'schedule' is the id this lived under before it grew tabs —
             still accepted so an old link or a stale tab doesn't 404. */}
         {UpgradeSection && (activeSection === 'upgrade' || activeSection === 'schedule') && (
-          <motion.div key="upgrade" {...pageMotion}>
+          <motion.div key="upgrade" {...pm}>
             <WidgetBoundary variant="section" name="upgrade">
             <Suspense fallback={null}>
               <UpgradeSection S={S} update={update} active isOwner={isOwner} userId={userId} hydrated={hydrated} />
@@ -1050,7 +1076,7 @@ function Board({ userId, userEmail, onSignOut, initialSettings }) {
             MoreDrawer. Render on desktop too so deep-linking works,
             but in practice the bottom-tab/drawer surface is mobile. */}
         {activeSection === 'friends' && (
-          <motion.div key="friends" {...pageMotion}>
+          <motion.div key="friends" {...pm}>
             <WidgetBoundary variant="section" name="friends">
             <DesignSlot use={ConsoleFriends} props={sectionProps}>
             <Suspense fallback={null}>
@@ -1097,7 +1123,8 @@ function Board({ userId, userEmail, onSignOut, initialSettings }) {
       </DesignSlot>
 
       <ConnectToast onCancel={handleCancelConnect} />
-      <HubFooter visible={activeSection === 'hub'} onOpenLegal={setLegalPage} />
+      {/* Year countdown + seconds clock: classic only (Direction A drops it). */}
+      {!isConsole && <HubFooter visible={activeSection === 'hub'} onOpenLegal={setLegalPage} />}
       {LiftsMiniBar && isOwner && S.lifts && S.lifts.active && (
         <Suspense fallback={null}>
           <LiftsMiniBar S={S} isMobile={isMobile} onOpen={() => navigate('upgrade')} />
