@@ -429,3 +429,36 @@
 @media (max-width: 380px) { .lifts .lh-wide { display: none; } }
 /* The sheet panel takes focus on open (so Tab starts inside it); the panel itself needs no ring. */
 .lifts .lf-sheet:focus-visible { outline: none; }
+
+/* ── Workout history (HistoryCard) ── */
+.lifts .lh-hist { display: flex; flex-direction: column; gap: 12px; }
+.lifts .lh-hist-top { display: flex; align-items: baseline; justify-content: space-between; flex-wrap: wrap; gap: 4px 12px; }
+.lifts .lh-hist-top .lf-meta { margin: 0; }
+.lifts .lh-hm-year { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.lifts .lh-hm-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+.lifts .lh-hm-y { margin: 0; font-family: var(--lf-font); font-size: 24px; line-height: 28px; font-weight: 700; color: var(--lf-text); }
+.lifts .lh-hm-total { font-size: max(13px, var(--lf-fs-floor)); color: var(--lf-muted); font-variant-numeric: tabular-nums; }
+.lifts .lh-hm { --lh-hm-dow: 16px; display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.lifts .lh-hm-months { position: relative; height: 14px; margin-left: calc(var(--lh-hm-dow) + 4px); }
+.lifts .lh-hm-months span { position: absolute; top: 0; font-size: 11px; line-height: 14px; color: var(--lf-muted); white-space: nowrap; }
+.lifts .lh-hm-body { display: flex; gap: 4px; align-items: stretch; }
+.lifts .lh-hm-dow { flex: none; width: var(--lh-hm-dow); display: grid; grid-template-rows: repeat(7, 1fr); font-size: 10px; line-height: 1; color: var(--lf-muted); }
+.lifts .lh-hm-dow span { display: flex; align-items: center; }
+.lifts .lh-hm-svg { flex: 1; min-width: 0; width: 100%; height: auto; display: block; }
+.lifts .lh-hm-c { fill: var(--lf-s3); }
+.lifts .lh-hm-c.is-1, .lifts .lh-hm-legend .is-1 { fill: color-mix(in srgb, var(--lf-accent) 40%, var(--lf-s3)); background: color-mix(in srgb, var(--lf-accent) 40%, var(--lf-s3)); }
+.lifts .lh-hm-c.is-2, .lifts .lh-hm-legend .is-2 { fill: color-mix(in srgb, var(--lf-accent) 70%, var(--lf-s3)); background: color-mix(in srgb, var(--lf-accent) 70%, var(--lf-s3)); }
+.lifts .lh-hm-c.is-3, .lifts .lh-hm-legend .is-3 { fill: var(--lf-accent); background: var(--lf-accent); }
+.lifts .lh-hm-c.is-future { fill: var(--lf-s2); }
+.lifts .lh-hm-c.is-today { stroke: var(--lf-text); stroke-width: 1.5; }
+.lifts .lh-hm-legend { display: flex; align-items: center; justify-content: flex-end; gap: 4px; margin: 0; font-size: 12px; color: var(--lf-muted); }
+.lifts .lh-hm-legend i { width: 12px; height: 12px; border-radius: 3px; background: var(--lf-s3); }
+.lifts .lh-hm-legend i:first-of-type { margin-left: 4px; }
+.lifts .lh-hm-legend i:last-of-type { margin-right: 4px; }
+.lifts .lh-hist-acts { display: flex; flex-wrap: wrap; gap: 8px; }
+.lifts .lh-hist-years { display: flex; flex-direction: column; gap: 28px; padding-bottom: 8px; }
+.lifts .lh-imp { display: flex; flex-direction: column; gap: 12px; }
+.lifts .lh-imp p { margin: 0; }
+.lifts .lh-imp-text { width: 100%; box-sizing: border-box; min-height: 140px; padding: 10px 12px; resize: vertical; font-family: var(--lf-mono); font-size: 16px; line-height: 22px; color: var(--lf-text); }
+.lifts .lh-imp-sum, .lifts .lh-imp-ok { font-size: var(--lf-fs-body); color: var(--lf-text); font-weight: 600; }
+.lifts .lh-imp-bad { font-size: max(13px, var(--lf-fs-floor)); color: var(--lf-danger); }
