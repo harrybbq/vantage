@@ -346,6 +346,8 @@ code fails soft until it is run, so order doesn't matter.
     grants. Export omits `nutrition_log`, messages and profile, and
     `a.download` does nothing in a WebView.
     *Status 2026-09-30: done except WHOOP/Oura grant revocation (no documented endpoint found); export now includes food log, profile, friendships, messages.*
+    *Still open (pack P7, 2026-10-20): export `download()` uses `a.download`, a no-op in a WebView — use
+    the share sheet (`navigator.share` with a File, or @capacitor/share + filesystem).*
 68. `[~]` **LAUNCH** Defaults for 13–17s: handle search and leaderboard
     are ON; `shareStreak` publishes habit names (e.g. a quit-drinking
     streak) to friends by default.
@@ -433,11 +435,14 @@ code fails soft until it is run, so order doesn't matter.
 72. `[ ]` **Support URL + support email** (both stores require one; the
     policy already promises it) and a written **subject-access** process.
     *Status 2026-10-04: in-app channel live — Settings → Report a problem files a ticket into Upgrade → Security (security_console_2026_10.sql run). A public support URL + email are still needed.*
-73. `[ ]` **Reviewer kit** — demo account with Pro, sandbox testers,
+73. `[~]` **Reviewer kit** — demo account with Pro, sandbox testers,
     review notes (WHOOP/Oura need hardware).
-74. `[ ]` **Store forms** — Apple age-rating questionnaire, Play IARC,
+74. `[~]` **Store forms** — Apple age-rating questionnaire, Play IARC,
     Data safety, Health apps declaration, Financial features (none),
     account-deletion web URL, export-compliance/encryption declaration.
+    *Status 2026-10-20: drafted — `docs/STORE_SUBMISSION_PACK.md` (reviewer kit, Apple age rating → 13+,
+    Play IARC/audience, declarations, listing copy, shot list, rejection risks) and
+    `docs/STORE_PRIVACY_LABELS.md` (labels + Data safety). Decisions: item 121. Gaps: items 115–122.*
 75. `[ ]` **DPAs** with Anthropic, RevenueCat, Netlify, Supabase; WHOOP
     production approval for other people's data; trademark check on
     "Vantage".
@@ -511,6 +516,34 @@ else maps onto existing items.
     `docs/ABUSE_HANDLING.md` (reports now survive reporter deletion; the 10-message evidence copy; the
     NCA duty is in force). Confirm `audit_schema_2026_10.sql` and `dm_upgrade_2026_10.sql` are run in
     production (the DM one is confirmed 2026-10-18).
+
+### From the store submission pack — 2026-10-20 (`docs/STORE_SUBMISSION_PACK.md` §8, P1–P12)
+115. `[ ]` **BLOCKS** WHOOP/Oura connect fails inside the native app: the panel navigates the WebView to
+    the provider, the callback returns to the website root, and the OAuth `state` is bound to an
+    HttpOnly cookie the system browser doesn't have. Open the authorize URL with `Browser.open`, bind
+    state without a cookie for native starts, redirect native callbacks to `com.vantage.app://…`;
+    verify on a device. (P1)
+116. `[ ]` **BLOCKS** Review purchases: sandbox events are dropped unless `REVENUECAT_ALLOW_SANDBOX=true`,
+    so a reviewer who buys Pro gets a 403 from the coach. Recommended: set it for the review window
+    only, then off. And `config.pro_live` must be `'true'` before submission. (P2, P3)
+117. `[ ]` **BLOCKS** Sign in with Apple tokens aren't revoked on account deletion (Apple expects it):
+    needs the native SIWA flow's authorization code, or the provider token captured at sign-in. (P8)
+118. `[ ]` **BLOCKS** DM text (and the opt-in shared streak habit name) isn't filtered (Apple 1.2 asks
+    for a filtering method): reuse `checkPublicText` on send, mirror it server-side. (P9)
+119. `[ ]` **LAUNCH** Copy and widgets for things that don't ship: remove "Recent Mail — coming soon"
+    from the mobile picker (keep its META for existing stacks); the tutorial still describes Trending
+    and Apple Health; Track says "Syncs from WHOOP, Oura or Apple Health"; drop the "Our Apps" preset
+    (links to a separate external app, URL carries a personal account name) from the native build.
+    (P5, P10, P11)
+120. `[ ]` **LAUNCH** Subscription copy (3.1.2): the More drawer hard-codes "from £3.99/mo" — read it from
+    the store product like SubscriptionPanel; soften "Unlimited everything" (AI still has daily caps).
+    Rename the hub's rule-based "AI Coach" banner to "Coach" or add a not-medical-advice line. (P6, P12)
+121. `[ ]` **LAUNCH** Store-form decisions (pack §2–4): Apple "Social Media" = No (Yes → 16+ in
+    Australia); alcohol references Infrequent (or change the habit placeholder); export compliance
+    "none of the algorithms" + `ITSAppUsesNonExemptEncryption=false` (one line from the solicitor);
+    iPad support or not; Play audience 13+ bands or 18+.
+122. `[ ]` **LAUNCH** Create the reviewer demo accounts 4–6 weeks before submitting — ratings cap
+    history at account age, so a fresh account looks empty. (Pack §1.)
 
 ## Phase 7 — Running it safely once it's public
 
