@@ -418,10 +418,16 @@ code fails soft until it is run, so order doesn't matter.
     *Done 2026-10-05 (#225): 3 free a week, unlimited on Pro, enforced in ai-food-detect.*
 
 ### Non-code tasks missing until now
-71. `[ ]` **Online Safety Act 2023** — DMs, groups and the leaderboard
+71. `[~]` **Online Safety Act 2023** — DMs, groups and the leaderboard
     make Vantage a user-to-user service: Ofcom illegal-content risk
     assessment + children's access assessment, and Terms describing
     moderation.
+    *Status 2026-10-20: drafts in `docs/ONLINE_SAFETY_ACT_DRAFT.md` (scope, illegal-content risk
+    assessment, children's access + risk assessment, Codes measures checklist, proposed Terms text,
+    record-keeping, 14 solicitor questions). Ofcom's site was blocked from the drafting environment —
+    measure numbers are from memory; check against the current Codes. Likely conclusion: in scope
+    NOW (social features are live on the web), small, "multi-risk" (grooming + harassment rated
+    medium), children's duties apply. New gaps → items 109–114.*
 72. `[ ]` **Support URL + support email** (both stores require one; the
     policy already promises it) and a written **subject-access** process.
     *Status 2026-10-04: in-app channel live — Settings → Report a problem files a ticket into Upgrade → Security (security_console_2026_10.sql run). A public support URL + email are still needed.*
@@ -482,6 +488,27 @@ else maps onto existing items.
 108. `[ ]` **AFTER** Let a habit be private (kept out of AI and friend surfaces) (G14); self-host the
     fonts so devices don't contact Google Fonts (G16); consider ipwho.is → Netlify's own geo for
     weather so no third party sees the IP.
+
+### From the Online Safety Act draft — 2026-10-20 (`docs/ONLINE_SAFETY_ACT_DRAFT.md`)
+109. `[ ]` **LAUNCH** Governance the Codes expect: a named accountable person with written
+    responsibilities; written content policies, queue prioritisation and moderator guidance; a written
+    appeals process; a complaints route that works without an account (pairs with item 72).
+110. `[ ]` **LAUNCH** Reporting loop: acknowledge reports to the reporter and tell them the outcome;
+    tell the reported user about action taken; more report reasons (child safety, threats, self-harm,
+    sexual content, scams); report + block from an incoming friend request.
+111. `[ ]` **LAUNCH** Suspension doesn't stop DMs — a suspended user can still message friends. Block
+    sends (and probably receipt) for suspended accounts in RLS.
+112. `[ ]` **LAUNCH** Owner tools the Terms already promise: reset a user's display name / handle /
+    avatar from the moderation queue; re-screen avatars published before screening existed.
+113. `[ ]` **LAUNCH** NCA child-sexual-abuse reporting duty (in force for user-to-user services since
+    7 Apr 2026): register and write the procedure (how evidence is preserved, who files, within what
+    time). Add a mute option (Codes user control); supportive information for child users.
+114. `[ ]` **LAUNCH** Teen defaults only apply to NEW accounts: older accounts kept handle search and
+    leaderboard on; online status and the heatmap default on. There is no age signal at all — decide
+    (with the solicitor) on collecting a birth year and age-specific defaults. Fix the stale lines in
+    `docs/ABUSE_HANDLING.md` (reports now survive reporter deletion; the 10-message evidence copy; the
+    NCA duty is in force). Confirm `audit_schema_2026_10.sql` and `dm_upgrade_2026_10.sql` are run in
+    production (the DM one is confirmed 2026-10-18).
 
 ## Phase 7 — Running it safely once it's public
 
