@@ -1,15 +1,13 @@
 /**
  * SWEEP area entry — owned by the SWEEP agent (src/design/console/README.md).
  *
- * App.jsx mounts these through <DesignSlot>. While null, the classic
- * screen renders, in console mode too. Replace with lazy components:
- *
- *   import { lazy } from 'react';
- *   export const ConsoleHabits = lazy(() => import('./ConsoleHabits'));
+ * App.jsx mounts these through <DesignSlot>. Each is lazy, so classic
+ * users never download console code; a slot set back to null shows the
+ * classic screen again, in console mode too.
  *
  * Section routes (receive the SectionProps bag, README.md "Section props"):
  *   ConsoleHabits        'habits' (desktop + mobile; `isMobile` is in the bag)
- *   ConsoleSettings      'settings' — MUST render the owner Design switch
+ *   ConsoleSettings      'settings' — renders the owner Design switch
  *                        (src/design/DesignSwitch.jsx) in Appearance, with the
  *                        same OWNER_SURFACES_IN_BUILD lazy gating SettingsSection uses
  *   ConsoleAchievements  'achievements'
@@ -26,12 +24,14 @@
  * no-session design is console, i.e. after the launch flip. Verify it in a
  * harness (README "Gotchas"), not by signing out.
  */
-export const ConsoleHabits = null;
-export const ConsoleSettings = null;
-export const ConsoleAchievements = null;
-export const ConsoleShop = null;
-export const ConsoleLeaderboard = null;
-export const ConsoleFriends = null;
-export const ConsolePaywall = null;
-export const ConsoleTutorial = null;
-export const ConsoleAuth = null;
+import { lazy } from 'react';
+
+export const ConsoleHabits = lazy(() => import('./ConsoleHabits'));
+export const ConsoleSettings = lazy(() => import('./ConsoleSettings'));
+export const ConsoleAchievements = lazy(() => import('./ConsoleAchievements'));
+export const ConsoleShop = lazy(() => import('./ConsoleShop'));
+export const ConsoleLeaderboard = lazy(() => import('./ConsoleLeaderboard'));
+export const ConsoleFriends = lazy(() => import('./ConsoleFriends'));
+export const ConsolePaywall = lazy(() => import('./ConsolePaywall'));
+export const ConsoleTutorial = lazy(() => import('./ConsoleTutorial'));
+export const ConsoleAuth = lazy(() => import('./ConsoleAuth'));
