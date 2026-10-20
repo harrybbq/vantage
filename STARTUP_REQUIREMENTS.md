@@ -130,8 +130,9 @@ action outside the repo.
       re-opens the hole.
     - ⚠️ Locking the COLUMNS was not enough: the server recomputes ratings
       from `user_data.state`, which the user writes. See item 44.
-    - `[ ]` **Set `OWNER_EMAIL`** on Netlify (comma-separated). The
+    - `[x]` **Set `OWNER_EMAIL`** on Netlify (comma-separated). The
       function fails closed without it.
+      *Set by the owner, confirmed 2026-10-20.*
     - `level` is deliberately still client-writable: cosmetic on the
       friend card, published on a debounce by `usePublishProfile`, and
       not a leaderboard input. Moving it needs that write server-side
