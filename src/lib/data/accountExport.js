@@ -15,6 +15,7 @@
  */
 import { supabase } from '../supabase';
 import { fetchAllPages } from './paginate';
+import { loadOwnProfile } from '../friends/profileReads';
 
 export async function collectAccountData(userId) {
   const tables = {};
@@ -31,9 +32,9 @@ export async function collectAccountData(userId) {
     .range(from, to)));
 
   await grab('profile', async () => {
-    const { data, error } = await supabase.from('profiles').select('*').eq('id', userId).maybeSingle();
-    if (error) throw error;
-    return data || null;
+    // The whole own row via the my_profile RPC (item 83): a direct
+    // select('*') is refused once the profiles column grants are narrowed.
+    return (await loadOwnProfile(userId, { fresh: true })) || null;
   });
 
   await grab('friendships', () => fetchAllPages((from, to) => supabase

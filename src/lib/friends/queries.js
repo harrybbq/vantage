@@ -1,5 +1,7 @@
 import { supabase } from '../supabase';
 import { publicNameProblem } from '../moderation/nameFilter.js';
+import { PUBLIC_PROFILE_SELECT, OWN_WRITE_RETURNING } from './profileColumns.js';
+import { loadOwnProfile, loadFriendPresence, patchOwnProfileCache } from './profileReads.js';
 
 /**
  * Friends data layer — every Supabase call from the social feature
@@ -89,13 +91,13 @@ function friendlyError(err, fallback = 'Something went wrong.') {
  *  (paywall_schema usually creates it on first login, but this is a
  *  defensive check for older accounts or fresh test users). */
 export async function getOwnProfile(userId) {
-  const { data, error } = await supabase
-    .from('profiles')
-    .select('id, handle, display_name, avatar_url, level, is_searchable, last_active_at, tier')
-    .eq('id', userId)
-    .maybeSingle();
-  if (error) throw new Error(friendlyError(error, 'Could not load profile.'));
-  return data;
+  // Private own-row fields (tier, is_searchable, last_active_at, …) come
+  // through the my_profile RPC — profileReads.js (item 83).
+  try {
+    return await loadOwnProfile(userId);
+  } catch (error) {
+    throw new Error(friendlyError(error, 'Could not load profile.'));
+  }
 }
 
 /** Claim or update your handle. Validates locally first, then writes
@@ -108,9 +110,10 @@ export async function setHandle(userId, handle) {
     .from('profiles')
     .update({ handle })
     .eq('id', userId)
-    .select()
+    .select(OWN_WRITE_RETURNING)
     .single();
   if (error) throw new Error(friendlyError(error, 'Could not save handle.'));
+  patchOwnProfileCache(userId, data);
   return data;
 }
 
@@ -135,9 +138,10 @@ export async function updateOwnProfile(userId, patch) {
     .from('profiles')
     .update(clean)
     .eq('id', userId)
-    .select()
+    .select(OWN_WRITE_RETURNING)
     .maybeSingle();
   if (error) throw new Error(friendlyError(error, 'Could not save profile.'));
+  patchOwnProfileCache(userId, clean);
   return data;
 }
 
@@ -192,18 +196,21 @@ export async function listAcceptedFriends(userId) {
     e.requester_id === userId ? e.addressee_id : e.requester_id
   );
   if (otherIds.length === 0) return [];
-  const { data: profiles, error: pErr } = await supabase
-    .from('profiles')
-    // last_active_at drives the online-bubble heuristic in the rail.
-    // Pulled here (rather than per-friend on selection) so the list
-    // can sort online-first without an N+1 round-trip. ratings_ovr is
-    // the server-canonical overall rating (written by the recompute
-    // function) — it replaced `level` on the friend card.
-    .select('id, handle, display_name, avatar_url, level, ratings_ovr, last_active_at')
-    .in('id', otherIds);
+  // ratings_ovr is the server-canonical overall rating (written by the
+  // recompute function) — it replaced `level` on the friend card.
+  // last_active_at drives the online bubble; it is friends-only now
+  // (item 83), so it comes from the friend_presence RPC alongside.
+  const [{ data: profiles, error: pErr }, presence] = await Promise.all([
+    supabase
+      .from('profiles')
+      .select(PUBLIC_PROFILE_SELECT)
+      .in('id', otherIds),
+    loadFriendPresence(otherIds),
+  ]);
   if (pErr) throw new Error(friendlyError(pErr, 'Could not load friend profiles.'));
   return (profiles || []).map(p => ({
     ...p,
+    last_active_at: presence.get(p.id) ?? null,
     accepted_at: edges.find(e =>
       e.requester_id === p.id || e.addressee_id === p.id
     )?.accepted_at,
@@ -250,7 +257,7 @@ export async function listPendingRequests(userId) {
   if (ids.length === 0) return [];
   const { data: profiles, error: pErr } = await supabase
     .from('profiles')
-    .select('id, handle, display_name, avatar_url, level, ratings_ovr')
+    .select(PUBLIC_PROFILE_SELECT)
     .in('id', ids);
   if (pErr) throw new Error(friendlyError(pErr, 'Could not load requesters.'));
   return (profiles || []).map(p => {
