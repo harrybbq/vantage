@@ -24,7 +24,8 @@ import CoinToast from './components/CoinToast';
 import ConnectToast from './components/ConnectToast';
 import CommandPalette from './components/CommandPalette';
 import ShortcutsModal from './components/ShortcutsModal';
-import LegalPage from './components/LegalPage';
+import PublicPage from './components/PublicPage';
+import { resolvePublicPage, settingsRequest } from './lib/support';
 import ConsentHost from './components/consent/ConsentHost';
 import CookieBanner from './components/CookieBanner';
 import InstallPrompt from './components/InstallPrompt';
@@ -144,7 +145,7 @@ const MODAL_CAPS = {
   addHabitModal:       { key: 'habits',       count: S => (S.habits || []).length },
 };
 
-function Board({ userId, userEmail, onSignOut }) {
+function Board({ userId, userEmail, onSignOut, initialSettings }) {
   const {
     S, update, loading, hydrated, justMigrated, dismissMigrationBanner,
     loadError, retryLoad, startFresh, restoreFromBackup, hasBackup,
@@ -231,6 +232,8 @@ function Board({ userId, userEmail, onSignOut }) {
   // the rest and re-checks the owner before showing anything.
   const [activeSection, setActiveSection] = useState(() => {
     if (typeof window === 'undefined') return 'hub';
+    // Arrived from /support or /delete-account's "take me there" button.
+    if (initialSettings) return 'settings';
     if (/[?&](whoop|oura)=/.test(window.location.search)) return 'settings';
     if (OWNER_SURFACES_IN_BUILD && parseSecurityLink(window.location.search)) return 'upgrade';
     return 'hub';
@@ -408,7 +411,7 @@ function Board({ userId, userEmail, onSignOut }) {
   // nonce means two consecutive requests for the same tab both land —
   // tap your avatar, wander to Appearance, tap it again, go back to
   // Account.
-  const [settingsTab, setSettingsTab] = useState(null);
+  const [settingsTab, setSettingsTab] = useState(initialSettings || null);
   const [trackTab, setTrackTab] = useState(null);
 
   function navigate(id) {
@@ -1057,7 +1060,19 @@ function Board({ userId, userEmail, onSignOut }) {
       {/* Health/AI consent sheet — one-time ask + requestConsent() host. */}
       <ConsentHost S={S} update={update} hydrated={hydrated} onOpenLegal={setLegalPage} />
       <TermsAcceptanceSheet S={S} update={update} hydrated={hydrated} onOpenLegal={setLegalPage} onSignOut={onSignOut} />
-      {legalPage && <LegalPage page={legalPage} onClose={() => setLegalPage(null)} />}
+      {legalPage && (
+        <PublicPage
+          page={legalPage}
+          signedIn
+          onClose={() => setLegalPage(null)}
+          onNavigate={setLegalPage}
+          onOpenSettings={focus => {
+            setLegalPage(null);
+            setSettingsTab(settingsRequest(focus));
+            setActiveSection('settings');
+          }}
+        />
+      )}
 
       {/* Onboarding tutorial — shows once for new users, replayable
           from Settings. Dark OS users get the terser voice variant. */}
@@ -1073,16 +1088,19 @@ function Board({ userId, userEmail, onSignOut }) {
 
 export default function App() {
   const [session, setSession] = useState(undefined);
-  // Deep-linkable legal pages: /privacy and /terms (or #privacy/#terms)
-  // open the doc directly, pre-auth. App-store listings require a public
-  // privacy-policy URL that works without signing in — this is it.
+  // Deep-linkable public pages: /privacy, /terms, /support and
+  // /delete-account (or the same as #hash) open directly, pre-auth.
+  // App-store listings require a privacy-policy URL and a support URL
+  // that work without signing in, and Google Play an account-deletion
+  // URL for people who no longer have the app — these are they.
   const [legalPage, setLegalPage] = useState(() => {
-    const path = window.location.pathname.replace(/\/+$/, '');
-    const hash = window.location.hash.replace('#', '');
-    if (path === '/privacy' || hash === 'privacy') return 'privacy';
-    if (path === '/terms' || hash === 'terms') return 'terms';
-    return null;
+    try { return resolvePublicPage(window.location.pathname, window.location.hash); } catch { return null; }
   });
+  // Where a public page's "take me there" button sends the visitor once
+  // the app boots: Settings → Account, at Report a problem or Delete
+  // account. Signed out, it waits through sign-in. Board reads it once,
+  // on mount.
+  const [pendingSettings, setPendingSettings] = useState(null);
 
   // Invite links deep-link pre-auth the same way. A code parked by the
   // landing's button (sessionStorage) brings the visitor back to it after
@@ -1100,9 +1118,21 @@ export default function App() {
 
   function closeLegal() {
     setLegalPage(null);
-    // Drop the /privacy or /terms path so the app boots normally.
+    // Drop the /privacy, /terms, /support or /delete-account path so the
+    // app boots normally.
     try { window.history.replaceState(null, '', '/'); } catch { /* no-op */ }
   }
+
+  function leaveLegalFor(focus) {
+    setPendingSettings(settingsRequest(focus));
+    closeLegal();
+  }
+
+  // Board has taken the pending request into its initial state by the
+  // time this runs; clear it so a later sign-in starts on the hub.
+  useEffect(() => {
+    if (session && pendingSettings) setPendingSettings(null);
+  }, [session, pendingSettings]);
 
   // Native only: the Google/Apple sign-in return (com.vantage.app://…).
   // Registered here, above AuthScreen, so a callback that cold-starts
@@ -1150,9 +1180,18 @@ export default function App() {
     await supabase.auth.signOut();
   }
 
-  // Legal page overlay — accessible before login
+  // Public page overlay — accessible before login
   if (legalPage) {
-    return <LegalPage page={legalPage} onClose={closeLegal} />;
+    return (
+      <PublicPage
+        page={legalPage}
+        signedIn={session === undefined ? undefined : !!session}
+        onClose={closeLegal}
+        onNavigate={setLegalPage}
+        onOpenSettings={leaveLegalFor}
+        onSignIn={leaveLegalFor}
+      />
+    );
   }
 
   if (session === undefined) {
@@ -1186,7 +1225,7 @@ export default function App() {
   }
   return (
     <SubscriptionProvider userId={session.user.id}>
-      <Board userId={session.user.id} userEmail={session.user.email} onSignOut={handleSignOut} />
+      <Board userId={session.user.id} userEmail={session.user.email} onSignOut={handleSignOut} initialSettings={pendingSettings} />
     </SubscriptionProvider>
   );
 }

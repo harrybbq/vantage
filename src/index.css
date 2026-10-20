@@ -194,7 +194,10 @@ body{
   color:var(--em-text);
   text-decoration:underline;
 }
-.auth-legal-link{ padding:0; }
+.auth-legal-link{ padding:0; min-height:44px; }
+/* Settings groups a public page scrolls to (lib/support.js SETTINGS_FOCUS):
+   land clear of the fixed header/app bar. */
+#settings-support, #settings-delete-account{ scroll-margin-top:96px; }
 @media (max-width:380px){
   /* Card padding feels tight at very small widths — pull the side
      padding in so form fields don't crowd the border. */

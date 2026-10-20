@@ -1,10 +1,16 @@
 import { useEffect, useState } from 'react';
 
 // ── Shared prose wrapper ─────────────────────────────────────────────────
-function Section({ title, children }) {
+// Exported for the /support and /delete-account pages (support/
+// SupportPages.jsx) so every public page reads the same.
+//
+// Colours are fixed, not theme tokens: the overlay is always dark, and
+// pre-auth (or in Cream) var(--text) is the cream theme's near-black —
+// which made every section heading invisible on the dark overlay.
+export function Section({ title, children }) {
   return (
     <div style={{ marginBottom: '28px' }}>
-      <h2 style={{ fontFamily: 'var(--serif, Playfair Display, serif)', fontSize: '16px', fontWeight: 700, color: 'var(--text, #e8eaf0)', margin: '0 0 10px', borderBottom: '1px solid rgba(255,255,255,.1)', paddingBottom: '8px' }}>
+      <h2 style={{ fontFamily: 'var(--serif, Playfair Display, serif)', fontSize: '16px', fontWeight: 700, color: '#e8eaf0', margin: '0 0 10px', borderBottom: '1px solid rgba(255,255,255,.1)', paddingBottom: '8px' }}>
         {title}
       </h2>
       <div style={{ fontSize: '13px', lineHeight: 1.75, color: 'rgba(232,234,240,.8)', fontFamily: 'var(--sans, DM Sans, sans-serif)' }}>
@@ -14,11 +20,11 @@ function Section({ title, children }) {
   );
 }
 
-function P({ children }) {
+export function P({ children }) {
   return <p style={{ margin: '0 0 10px' }}>{children}</p>;
 }
 
-function Ul({ items }) {
+export function Ul({ items }) {
   return (
     <ul style={{ margin: '6px 0 10px 18px', padding: 0 }}>
       {items.map((item, i) => <li key={i} style={{ marginBottom: '5px' }}>{item}</li>)}
@@ -41,7 +47,7 @@ function Updated() {
 // Placeholders still to be filled in before launch. Styled so nobody can
 // mistake one for finished text — a policy that quietly says "[Company
 // name]" in body type reads as an oversight; this reads as a TODO.
-function Todo({ children }) {
+export function Todo({ children }) {
   return (
     <span style={{
       fontFamily: 'var(--mono)', fontSize: '12px', padding: '1px 5px', borderRadius: '4px',
@@ -54,6 +60,22 @@ function Mono({ children }) {
   return <span style={{ fontFamily: 'var(--mono)', color: 'var(--em-light, #4dc485)' }}>{children}</span>;
 }
 
+// Link to another public page (/support, /delete-account, /privacy,
+// /terms). A real href, so it works opened in a new tab or with
+// JavaScript off; `go` swaps the page in place when the overlay can.
+export const LINK_COLOR = '#5fd39a';
+export function PageLink({ to, go, children }) {
+  return (
+    <a
+      href={`/${to}`}
+      onClick={e => { if (!go) return; e.preventDefault(); go(to); }}
+      style={{ color: LINK_COLOR, textDecoration: 'underline', textUnderlineOffset: '2px' }}
+    >
+      {children}
+    </a>
+  );
+}
+
 // ── Privacy Policy ───────────────────────────────────────────────────────
 // Section 8 is written from the code, not from memory: every host listed
 // is one the app or its Netlify functions actually contact (grep
@@ -61,12 +83,12 @@ function Mono({ children }) {
 // in the same change). It separates what your DEVICE contacts directly —
 // which hands that provider your IP address — from what our functions
 // contact on your behalf, which does not.
-function PrivacyPolicyContent() {
+function PrivacyPolicyContent({ go }) {
   return (
     <>
       <Section title="1. Who We Are">
         <P>Vantage ("the App", "we", "us") is a personal productivity, goal-tracking and wellness application, available on the web and as a mobile app. The data controller for personal data processed through the App is <Todo>[Company name, registered address — to be completed on incorporation]</Todo>.</P>
-        <P>For any privacy question or request, contact us at the support email shown on the App's store listing, or via Settings inside the App. To report a security vulnerability, email <Todo>security@[domain — to be confirmed]</Todo>. This policy is written for users in the United Kingdom and European Economic Area, but it applies to everyone who uses the App.</P>
+        <P>For any privacy question or request, contact us at the support email shown on the App's store listing, or via Settings inside the App (see <PageLink to="support" go={go}>Support</PageLink>). To report a security vulnerability, email <Todo>security@[domain — to be confirmed]</Todo>. This policy is written for users in the United Kingdom and European Economic Area, but it applies to everyone who uses the App.</P>
       </Section>
 
       <Section title="2. Data We Collect">
@@ -193,7 +215,7 @@ function PrivacyPolicyContent() {
 
       <Section title="11. Data Retention & Deletion">
         <Ul items={[
-          'Account & content — retained while your account is active. Delete your account at any time via Settings → Account → Delete account; your login and all associated data are permanently erased within 30 days.',
+          <>Account &amp; content — retained while your account is active. Delete your account at any time via Settings → Account → Delete account (see <PageLink to="delete-account" go={go}>Delete your account</PageLink>); your login and all associated data are permanently erased within 30 days.</>,
           'History snapshots — to recover from accidental loss, we automatically keep up to 14 daily copies of your app data (without images). Older copies are replaced as new ones are made, and all of them are deleted with your account.',
           'WHOOP and Oura tokens — deleted immediately when you disconnect that device.',
           'Direct messages — retained until you delete them or your account.',
@@ -246,7 +268,7 @@ function PrivacyPolicyContent() {
 }
 
 // ── Terms of Service ─────────────────────────────────────────────────────
-function TermsContent() {
+function TermsContent({ go }) {
   return (
     <>
       <Section title="1. The Service">
@@ -310,7 +332,7 @@ function TermsContent() {
           'Review — every report is reviewed by a person. We aim to act within 24 hours. Group pictures and profile pictures are also screened automatically before others see them, and held back if the screen is unsure.',
           'Action — depending on what we find we may remove or reset content (for example a display name, handle or group picture), hide an account from the leaderboard, search and group boards, suspend it, or close it. Serious or repeated breaches lead to permanent closure. Content that may be illegal can be reported to the police or other authorities.',
           'Evidence — a report, with a copy of the reported handle and display name and any messages attached to it, may be kept after the account involved is deleted, so that repeat abuse can be recognised.',
-          'Disagree with a decision? Contact us via the support address on the store listing and we will look at it again.',
+          <>Disagree with a decision? Contact us via the support address on the store listing (see <PageLink to="support" go={go}>Support</PageLink>) and we will look at it again.</>,
         ]} />
       </Section>
 
@@ -351,7 +373,7 @@ function TermsContent() {
       </Section>
 
       <Section title="15. Termination">
-        <P>You may close your account at any time in Settings (Settings → Account → Delete account), which deletes your data as described in the Privacy Policy. We may suspend or terminate accounts that violate these terms, with notice where reasonably possible. Sections that by their nature should survive termination (your content licence for anonymised aggregates, disclaimers, liability limits, governing law) survive.</P>
+        <P>You may close your account at any time in Settings (Settings → Account → Delete account; see <PageLink to="delete-account" go={go}>Delete your account</PageLink>), which deletes your data as described in the Privacy Policy. We may suspend or terminate accounts that violate these terms, with notice where reasonably possible. Sections that by their nature should survive termination (your content licence for anonymised aggregates, disclaimers, liability limits, governing law) survive.</P>
       </Section>
 
       <Section title="16. Changes to These Terms">
@@ -369,7 +391,7 @@ function TermsContent() {
 // ── Main LegalPage overlay ───────────────────────────────────────────────
 // Publicly reachable pre-auth: App.jsx opens this for /privacy, /terms
 // (and #privacy / #terms) so app-store listings can link straight to it.
-export default function LegalPage({ page, onClose }) {
+export default function LegalPage({ page, onClose, onNavigate }) {
   // Internal doc switcher — seeded from the prop, but self-managed so the
   // Privacy ↔ Terms toggle actually swaps content (the old version only
   // set location.hash, which never re-rendered anything).
@@ -394,6 +416,8 @@ export default function LegalPage({ page, onClose }) {
     setActive(key);
     // Keep the URL shareable/bookmarkable without a reload.
     try { window.history.replaceState(null, '', `/${key}`); } catch { /* no-op */ }
+    // Tell the host (PublicPage) so the tab title follows.
+    onNavigate?.(key);
   }
 
   return (
@@ -448,7 +472,7 @@ export default function LegalPage({ page, onClose }) {
         </div>
 
         {/* Content */}
-        {isPrivacy ? <PrivacyPolicyContent /> : <TermsContent />}
+        {isPrivacy ? <PrivacyPolicyContent go={onNavigate} /> : <TermsContent go={onNavigate} />}
       </div>
     </div>
   );
