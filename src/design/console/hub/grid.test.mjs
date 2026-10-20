@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import {
   PRO_SIZES_GATED, WIDGET_SIZES, SIZES, sizesFor, isProSize, validateSize, effectiveSize,
   seedHubGrid, readHubGrid, withHubGrid, moveItem, nudgeItem, setItemSize, patchItem, removeItem, addItem,
-  packGrid, dropIndex, spanOf,
+  packGrid, dropIndex, spanOf, moveVisible,
 } from './grid.js';
 
 let n = 0;
@@ -83,13 +83,13 @@ t('seed: retired, stubs, unknown and malformed entries are skipped; nothing thro
   assert.deepEqual(types(seedHubGrid({ mobileWidgets: [{ id: 'm', type: 'mail' }, { id: 'n', type: 'notepad' }] })), ['today', 'league', 'friends', 'upnext']);
 });
 
-t('seed: primes are instanceable; exact duplicates collapse; trackers prime replaces Today', () => {
+t('seed: primes are instanceable; exact duplicates collapse; Today always leads', () => {
   const S = {
     hubWidgets: [{ id: 'a', type: 'prime:savings', blocks: ['total'] }, { id: 'b', type: 'prime:savings', blocks: ['pots'] }],
     mobileWidgets: [{ id: 'c', type: 'prime:savings', blocks: ['total'] }, { id: 'd', type: 'prime:trackers' }],
   };
   const g = seedHubGrid(S);
-  assert.deepEqual(types(g), ['league', 'friends', 'upnext', 'prime:savings', 'prime:savings', 'prime:trackers']);
+  assert.deepEqual(types(g), ['today', 'league', 'friends', 'upnext', 'prime:savings', 'prime:savings', 'prime:trackers']);
   assert.deepEqual(g.items.filter(i => i.type === 'prime:savings').map(i => i.blocks), [['total'], ['pots']]);
 });
 
@@ -140,6 +140,13 @@ t('move / nudge / size / patch / remove / add', () => {
   const added = addItem(g, { type: 'prime:habits', blocks: ['timers'] }, { makeId: () => (k++ ? 'n2' : 'a') });
   assert.deepEqual(added.items[4], { id: 'n2', type: 'prime:habits', size: 'medium', blocks: ['timers'] });
   assert.equal(addItem(g, 'zzz', { makeId: () => 'q' }), g);
+});
+
+t('moveVisible keeps hidden items in their slots', () => {
+  const g = { v: 1, items: ['a', 'H', 'b', 'c'].map(id => ({ id, type: 'vitals', size: 'small' })) };
+  const vis = it => it.id !== 'H';
+  assert.deepEqual(moveVisible(g, vis, 2, 0).items.map(i => i.id), ['c', 'H', 'a', 'b']);
+  assert.equal(moveVisible(g, vis, 1, 1), g);
 });
 
 t('pack: first fit, no overlaps, large is 2×2, small fills the hole', () => {

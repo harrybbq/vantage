@@ -106,7 +106,7 @@ export function sizesFor(type, { presetIds = null } = {}) {
 export function isProSize(type, size, opts) {
   if (!PRO_SIZES_GATED) return false;
   const t = sizesFor(type, opts);
-  if (!t || !RANK.hasOwnProperty(size)) return false;
+  if (!t || !Object.prototype.hasOwnProperty.call(RANK, size)) return false;
   return RANK[size] > RANK[t.free];
 }
 
@@ -169,9 +169,10 @@ function carry(w) {
  * The first-use grid, derived from both classic lists.
  *
  *   1. Console widgets lead, in the mockup's hierarchy: Today, League,
- *      Friends, Up next. Today is skipped when a Trackers prime is
- *      already in either list (it would show the same ticks twice), and
- *      Up next when there is nothing upcoming to show (`hasUpcoming`).
+ *      Friends, Up next. Today stands in for the classic desktop hub's
+ *      fixed tracker module (QuickLog), which was never a hubWidgets
+ *      entry, so it is always seeded. Up next is skipped when there is
+ *      nothing upcoming to show (`hasUpcoming`).
  *   2. Then every desktop widget (S.hubWidgets) in its order, then every
  *      phone widget (S.mobileWidgets) not already placed — so a widget
  *      present in only one list still appears.
@@ -206,8 +207,7 @@ export function seedHubGrid(S, opts = {}) {
     items.push({ id: uid(idBase), type, size, ...own });
   };
 
-  const hasTrackersPrime = [...desk, ...phone].some(w => w.type === 'prime:trackers');
-  if (!hasTrackersPrime) push('today', WIDGET_SIZES.today.def, {}, 'cx-today');
+  push('today', WIDGET_SIZES.today.def, {}, 'cx-today');
   push('league', WIDGET_SIZES.league.def, {}, 'cx-league');
   push('friends', WIDGET_SIZES.friends.def, {}, 'cx-friends');
   if (hasUpcoming) push('upnext', WIDGET_SIZES.upnext.def, {}, 'cx-upnext');
@@ -253,6 +253,19 @@ export function moveItem(grid, from, to) {
   const [it] = items.splice(from, 1);
   items.splice(t, 0, it);
   return { ...grid, items };
+}
+
+/**
+ * Move within the VISIBLE items only (a filtered view — owner-only or
+ * build-gated widgets are kept but not drawn). Hidden items keep their
+ * slots in the stored order; the visible ones are re-dealt into theirs.
+ */
+export function moveVisible(grid, isVisible, from, to) {
+  const vis = grid.items.filter(isVisible);
+  const moved = moveItem({ items: vis }, from, to).items;
+  if (moved === vis) return grid;
+  let k = 0;
+  return { ...grid, items: grid.items.map(it => (isVisible(it) ? moved[k++] : it)) };
 }
 
 /** Move by id, `delta` places (keyboard: −1 earlier, +1 later). */
