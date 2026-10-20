@@ -241,5 +241,17 @@ export function stripWearableData(prev, opts = {}) {
     next.streaks = recalcStreaks(r.logs, prev.trackers || [], prev.streaks || {});
   }
   for (const k of markers) delete next[k];
+  if (r.vitalsLog || r.burnLog || r.logs || r.logsAuto) {
+    // A record of the deletion (new key, additive). It also keeps the
+    // state from reading as the factory seed when the band was all an
+    // account held: the anti-wipe guard (lib/state/meaningful.js) refuses
+    // to save a seed-looking state over a cloud row with data, which
+    // would have undone the deletion on the next load.
+    next.wearableDeleted = {
+      at: new Date().toISOString(),
+      days: r.counts.days.size,
+      sharedVitals: opts.sharedVitals !== false,
+    };
+  }
   return next;
 }

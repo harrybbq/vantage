@@ -50,7 +50,7 @@ export const MEANINGFUL_IGNORE = [
   'notifications', 'privacy', 'lastfm',
   // Derived or server caches, rewritten on load.
   'ratings', 'prestige', 'streaks', 'coachMemory', 'coachBriefHistory',
-  'coachBrief', 'whoopLastError', 'ouraLastError',
+  'coachBrief', 'whoopLastError',
   // Auto-stamped: plan posting writes { from } the first time it looks.
   // Posted months are counted below.
   'planLedger',

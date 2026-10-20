@@ -10,6 +10,7 @@
  */
 import assert from 'node:assert/strict';
 import { stripWearableData, shareableView, wearableDataSummary, providerLabel } from './strip.js';
+import { looksLikeFactoryDefault, hasMeaningfulData } from '../state/meaningful.js';
 
 let n = 0;
 const ok = (c, m) => { assert.ok(c, m); n++; };
@@ -148,6 +149,24 @@ function fixture() {
   ok(stripWearableData(clean) === clean, 'state with no band data is returned unchanged');
   ok(stripWearableData(null) === null, 'null tolerated');
   ok(stripWearableData({}) !== undefined, 'empty tolerated');
+}
+
+// ── the anti-wipe guard must let the deletion save ──
+{
+  // An account whose only content was the band: seed trackers, nothing typed.
+  const bandOnly = {
+    trackers: [{ id: 't1' }, { id: 't2' }, { id: 't3' }],
+    achievements: [{ id: 'a1' }],
+    whoopConnected: true,
+    vitalsLog: { '2026-10-01': { sleep: 7, rhr: 50, hrv: 60, recovery: 70 } },
+    burnLog: { '2026-10-01': [{ id: 'whoop-1', kcal: 300 }] },
+  };
+  ok(hasMeaningfulData(bandOnly), 'before: the cloud row counts as real data');
+  const after = stripWearableData(bandOnly);
+  ok(!looksLikeFactoryDefault(after), 'after: not mistaken for a wipe (the save is not refused)');
+  ok(after.wearableDeleted && after.wearableDeleted.days === 1, 'deletion recorded');
+  ok(!looksLikeFactoryDefault(stripWearableData(fixture())), 'mixed account: saves as normal');
+  eq(stripWearableData({ whoopLastError: { at: 1 } }).wearableDeleted, undefined, 'markers-only clear writes no record');
 }
 
 // ── shareableView ──
