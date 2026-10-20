@@ -7,7 +7,7 @@
  * can bind the tokens to the right account without any session storage.
  *
  * Env: OURA_CLIENT_ID, OURA_CLIENT_SECRET (also the HMAC key),
- *      SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY.
+ *      SUPABASE_URL and the service key (lib/sbKeys).
  */
 const { issueState } = require('../lib/oauthState');
 const { redirectUriFor } = require('../lib/redirectUri');
@@ -31,7 +31,7 @@ exports.handler = async (event) => {
   if (event.httpMethod === 'OPTIONS') return { statusCode: 204, headers: CORS, body: '' };
   if (event.httpMethod !== 'POST') return { statusCode: 405, headers: CORS, body: JSON.stringify({ error: 'method not allowed' }) };
 
-  const { SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, OURA_CLIENT_ID, OURA_CLIENT_SECRET } = process.env;
+  const { OURA_CLIENT_ID, OURA_CLIENT_SECRET } = process.env;
   if (!OURA_CLIENT_ID || !OURA_CLIENT_SECRET) {
     console.error('oura-connect: OURA_CLIENT_ID / OURA_CLIENT_SECRET not set');
     return { statusCode: 500, headers: CORS, body: JSON.stringify({ error: 'Oura is not set up on this site yet.' }) };

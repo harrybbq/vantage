@@ -6,6 +6,8 @@
  * Keeping the token refresh + mapping in one place means the passive
  * sync and the on-demand sync can never drift apart.
  */
+const { serviceHeaders } = require('./sbKeys');
+
 const API = 'https://api.prod.whoop.com/developer';
 const TOKEN_URL = 'https://api.prod.whoop.com/oauth/oauth2/token';
 const KJ_TO_KCAL = 1 / 4.184;
@@ -24,11 +26,7 @@ function localStart(iso, offset) {
 function sb(path, opts, env) {
   return fetch(`${env.SUPABASE_URL}/rest/v1/${path}`, {
     ...opts,
-    headers: {
-      apikey: env.SUPABASE_SERVICE_ROLE_KEY,
-      Authorization: `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`,
-      ...(opts?.headers || {}),
-    },
+    headers: serviceHeaders(env, opts?.headers || {}),
   });
 }
 

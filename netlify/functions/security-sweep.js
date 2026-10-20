@@ -39,7 +39,7 @@ exports.handler = async (event) => {
 
   const env = supabaseEnv();
   if (!env.supabaseUrl || !env.serviceKey) {
-    console.warn('security-sweep: SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY not set');
+    console.warn('security-sweep: SUPABASE_URL / service key not set');
     return { statusCode: 500, headers: CORS, body: JSON.stringify({ error: 'not configured' }) };
   }
 

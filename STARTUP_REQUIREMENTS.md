@@ -3,7 +3,9 @@
 Everything standing between Vantage as it is today and Vantage on the
 App Store and Google Play. Ordered — later steps depend on earlier ones.
 
-Owners: Harry (harrym3002@outlook.com) · Aidan (anotherone650@gmail.com)
+Owner: Harry (harrym3002@outlook.com) — sole director and shareholder at
+launch (decided 2026-10-20). Aidan (anotherone650@gmail.com) may join
+later; see item 2.
 
 Status key: `[ ]` to do · `[x]` done · `[~]` done in code, needs an
 action outside the repo.
@@ -13,11 +15,21 @@ action outside the repo.
 ## Phase 1 — Company (start immediately; everything queues behind it)
 
 1. `[ ]` **Register a UK limited company** at Companies House (~£50,
-   usually same-day). Two co-owners means limited liability and a clean
-   ownership split; a sole trader can't hold shares between two people.
-2. `[ ]` **Sign a shareholders' agreement.** Who owns what %, what
-   happens if one of you leaves, who decides what. The step people skip
-   and regret. Cheap now, expensive later.
+   usually same-day), Harry as sole director and sole shareholder.
+   Still a company rather than a sole trader: Apple's organisation
+   enrolment and the D-U-N-S number need a legal entity, and a personal
+   Play account means the 12-testers-for-14-days rule (item 6).
+2. `[ ]` **Aidan, in writing, before it matters.** No shareholders'
+   agreement is needed while there is one shareholder. But if Aidan is
+   to get a stake later, write the intent down now (a short dated note:
+   what he'd get and on what terms, e.g. shares that vest over time), so
+   it can't become a "you said…" later. When he joins, the company
+   issues him shares or options, and THAT is when the shareholders'
+   agreement is signed (who owns what %, leaving, who decides).
+2b. `[ ]` **Assign the app's IP to the company** once it exists: a
+   one-page assignment from Harry, and from Aidan for anything he has
+   contributed, so the company cleanly owns the code, name and assets.
+   Stores rarely ask; investors and acquirers always do.
 3. `[ ]` **Open a business bank account.** Apple and Google pay out to
    an account matching the legal entity name exactly.
 4. `[ ]` **Apply for a D-U-N-S number** from Dun & Bradstreet. Free, up
@@ -39,16 +51,20 @@ action outside the repo.
 
 ## Phase 3 — Legal and data protection
 
-8. `[ ]` **Get a DPIA done for the health data.** Weight, sleep, resting
+8. `[~]` **Get a DPIA done for the health data.** Weight, sleep, resting
    HR and recovery are *special category* data under UK GDPR — a higher
    bar than ordinary personal data, and a DPIA is likely mandatory
    (Art. 35). Worth an hour with a solicitor; this is the one area where
    guessing is expensive.
+   *Status 2026-10-20: draft for the solicitor in `docs/DPIA_DRAFT.md` (ICO 7-step structure, data-flow
+   inventory, risks, measures, 18 solicitor questions, gaps G1–G26 → items 98–108).*
 9. `[x]` **Privacy policy and terms**, deep-linkable before sign-in —
    `/privacy` and `/terms` already do this.
-10. `[ ]` **Fill in App Store privacy labels** — declare health,
+10. `[~]` **Fill in App Store privacy labels** — declare health,
     financial and contact data collection. Must match what the app
     actually does.
+    *Status 2026-10-20: drafted from code in `docs/STORE_PRIVACY_LABELS.md` (Apple + Play Data safety +
+    health declarations); fix items 100–102 first, then the labels can be entered as drafted.*
 
 ## Phase 4 — Make it build natively
 
@@ -98,8 +114,13 @@ action outside the repo.
       deletion and quietly become a GDPR problem.
 21. `[x]` **Security headers added.** CSP is deliberately **Report-Only**
     — promote it to enforcing once the violation reports are quiet.
-22. `[ ]` **Triage the dependency vulnerabilities** — 1 critical, 12 high
+22. `[x]` **Triage the dependency vulnerabilities** — 1 critical, 12 high
     in production deps, mostly the Capacitor toolchain.
+    *Status 2026-10-20: `npm audit --omit=dev` → 0. Capacitor core/android/cli 8.3.1 → 8.5.3 together (the
+    critical: remote content could load at the app origin through the native HTTP proxy path, GHSA-rvm3-566m-v7fv);
+    `ws` 8.20.0 → 8.22.0 under supabase-js (two highs). What remains is dev/build tooling that never ships
+    (babel, vitest, brace-expansion, xmldom via the assets generator) — re-check monthly. Run `npx cap sync` after
+    pulling, on the build machine.*
 23. `[~]` **`prestige` and `ratings*` writes moved server-side.**
     The leaderboard ranks by `prestige * 100 + ratings_ovr` and both
     were granted to `authenticated`, so any signed-in user could PATCH
@@ -113,8 +134,9 @@ action outside the repo.
       re-opens the hole.
     - ⚠️ Locking the COLUMNS was not enough: the server recomputes ratings
       from `user_data.state`, which the user writes. See item 44.
-    - `[ ]` **Set `OWNER_EMAIL`** on Netlify (comma-separated). The
+    - `[x]` **Set `OWNER_EMAIL`** on Netlify (comma-separated). The
       function fails closed without it.
+      *Set by the owner, confirmed 2026-10-20.*
     - `level` is deliberately still client-writable: cosmetic on the
       friend card, published on a debounce by `usePublishProfile`, and
       not a leaderboard input. Moving it needs that write server-side
@@ -324,6 +346,8 @@ code fails soft until it is run, so order doesn't matter.
     grants. Export omits `nutrition_log`, messages and profile, and
     `a.download` does nothing in a WebView.
     *Status 2026-09-30: done except WHOOP/Oura grant revocation (no documented endpoint found); export now includes food log, profile, friendships, messages.*
+    *Still open (pack P7, 2026-10-20): export `download()` uses `a.download`, a no-op in a WebView — use
+    the share sheet (`navigator.share` with a File, or @capacitor/share + filesystem).*
 68. `[~]` **LAUNCH** Defaults for 13–17s: handle search and leaderboard
     are ON; `shareStreak` publishes habit names (e.g. a quit-drinking
     streak) to friends by default.
@@ -353,13 +377,14 @@ code fails soft until it is run, so order doesn't matter.
     service-role function, then
     `revoke update (handle, display_name, avatar_url) on public.profiles from authenticated;`.
 
-85. `[ ]` **LAUNCH** Supabase is retiring the legacy `anon`/`service_role`
+85. `[~]` **LAUNCH** Supabase is retiring the legacy `anon`/`service_role`
     keys by the end of 2026. The new `sb_secret_…` keys go in the `apikey`
     header, are not JWTs, and are refused when the request carries a
     browser User-Agent. Every Netlify function sends the service key as
     both `apikey` and `Authorization: Bearer` — that breaks on the switch.
     Move server calls to supabase-js (handles both) or send `apikey` only,
     and test against a secret key before swapping it in.
+    *Status 2026-10-20: done in code — every function reads keys through `netlify/lib/sbKeys.js` (secret key preferred, legacy fallback), service calls send a NEW key on `apikey` only (Supabase's rule) while a LEGACY key keeps apikey + Bearer exactly as before (the apikey-only form couldn't be tested live from the build sandbox — supabase.co is blocked there — so today's behaviour is unchanged until the switch), user session checks send the public key + the user's JWT; `check:sbkeys` fails the build on a regression; the client prefers `VITE_SUPABASE_PUBLISHABLE_KEY`. Owner switch: (1) Supabase → Project Settings → API Keys → create a secret key and a publishable key; (2) Netlify → env vars: set `SUPABASE_SECRET_KEY` (Functions scope), `SUPABASE_PUBLISHABLE_KEY` and `VITE_SUPABASE_PUBLISHABLE_KEY`; (3) redeploy; (4) open `/.netlify/functions/health` (should say `"db":"ok"`) and the Security console (both use the service key) — and sign in, sync WHOOP once, and delete a throwaway test account (account deletion uses the Auth admin API — the one path to prove on the new key); (5) roll back = delete those three vars and redeploy; (6) only later, once old app builds have updated, deactivate the legacy keys in Supabase.*
 86. `[ ]` **LAUNCH** Netlify Web security center (observed 2026-10-02):
     no WAF, no rate-limiting rules, no firewall traffic rules. Add a
     rate-limit rule on `/.netlify/functions/*` (per-IP) before launch —
@@ -367,10 +392,12 @@ code fails soft until it is run, so order doesn't matter.
 87. `[ ]` **AFTER** `push-dispatch` runs every minute — ~44k invocations a
     month on credit-based pricing, mostly finding nothing. Consider
     every 5 minutes, or trigger it from the queue insert instead.
-88. `[ ]` **AFTER** Supabase compute is **Small**, not Micro — about $5/month
+88. `[x]` **AFTER** Supabase compute is **Small**, not Micro — about $5/month
     over the Pro plan's $10 compute credit. Micro covers today's load; Small
     gives the whole-state saves headroom. Owner's call; switching restarts
     the database for a few minutes (do it while traffic is near zero).
+    *Decided 2026-10-20: stays on Small (owner confirmed). Revisit after items
+    25/26 shrink the state — that is what would make Micro comfortable.*
 89. `[ ]` **AFTER** The Netlify Pro team also hosts `gammonbeastshundred` and
     `vantagetrader` — about a third of builds are Vantage's. Production
     deploys cost 15 credits each (~970 used 27 Sep–5 Oct), so batch
@@ -381,8 +408,9 @@ code fails soft until it is run, so order doesn't matter.
     profiles with avatars per view. Cache 5–10 min; avatars for the top 100 only.
 92. `[ ]` **AFTER** Presence writes a `profiles` UPDATE every 60 s per open
     app (`usePublishProfile.js`). Every 5 min is enough.
-93. `[ ]` **LAUNCH** `whoop-cron` syncs users one by one inside a 20 s
+93. `[~]` **LAUNCH** `whoop-cron` syncs users one by one inside a 20 s
     budget — only ~10–20 users a night. Batch in parallel or run every 2 h.
+    *Status 2026-10-20: done in code — whoop-cron and oura-cron run accounts through a bounded pool (4 at a time, oldest first, stop starting at 20 s, in-flight finish; refresh-token-first and CAS writes unchanged). WHOOP's limit is 100 requests/min and 10,000/day per app, so a run spends ≤ 60 WHOOP calls (~12 accounts) and whoop-cron now runs every 10 min 06:00–08:50 UTC (not :30, when oura-cron runs), skipping accounts already synced that morning — ~180 accounts a morning for <10% of the daily limit. Owner: after the deploy, check one morning's Netlify function log for "not reached" counts; WHOOP also caps an unapproved app at 10 users — apply for production approval / a higher limit in the WHOOP developer dashboard before launch.*
 94. `[ ]` **LAUNCH** Custom SMTP for Supabase Auth. The built-in mailer
     allows a few emails an hour; signups and resets fail at ~50 users.
 95. `[ ]` **AFTER** `weather` has no auth and calls ipwho.is per request;
@@ -394,21 +422,132 @@ code fails soft until it is run, so order doesn't matter.
     *Done 2026-10-05 (#225): 3 free a week, unlimited on Pro, enforced in ai-food-detect.*
 
 ### Non-code tasks missing until now
-71. `[ ]` **Online Safety Act 2023** — DMs, groups and the leaderboard
+71. `[~]` **Online Safety Act 2023** — DMs, groups and the leaderboard
     make Vantage a user-to-user service: Ofcom illegal-content risk
     assessment + children's access assessment, and Terms describing
     moderation.
-72. `[ ]` **Support URL + support email** (both stores require one; the
+    *Status 2026-10-20: drafts in `docs/ONLINE_SAFETY_ACT_DRAFT.md` (scope, illegal-content risk
+    assessment, children's access + risk assessment, Codes measures checklist, proposed Terms text,
+    record-keeping, 14 solicitor questions). Ofcom's site was blocked from the drafting environment —
+    measure numbers are from memory; check against the current Codes. Likely conclusion: in scope
+    NOW (social features are live on the web), small, "multi-risk" (grooming + harassment rated
+    medium), children's duties apply. New gaps → items 109–114.*
+72. `[~]` **Support URL + support email** (both stores require one; the
     policy already promises it) and a written **subject-access** process.
     *Status 2026-10-04: in-app channel live — Settings → Report a problem files a ticket into Upgrade → Security (security_console_2026_10.sql run). A public support URL + email are still needed.*
-73. `[ ]` **Reviewer kit** — demo account with Pro, sandbox testers,
+    *Status 2026-10-20: public `/support` and `/delete-account` pages built (pre-auth, like /privacy; linked from the sign-in footer, the policy and the terms). `/delete-account` is the Play Console account-deletion URL (item 74). Owner: fill `SUPPORT_EMAIL` (and `SECURITY_EMAIL`, with SECURITY.md + security.txt) in `src/lib/support.js` once the domain and inbox exist — until then both pages show a marked placeholder. Subject-access process still to write.*
+73. `[~]` **Reviewer kit** — demo account with Pro, sandbox testers,
     review notes (WHOOP/Oura need hardware).
-74. `[ ]` **Store forms** — Apple age-rating questionnaire, Play IARC,
+74. `[~]` **Store forms** — Apple age-rating questionnaire, Play IARC,
     Data safety, Health apps declaration, Financial features (none),
     account-deletion web URL, export-compliance/encryption declaration.
+    *Status 2026-10-20: drafted — `docs/STORE_SUBMISSION_PACK.md` (reviewer kit, Apple age rating → 13+,
+    Play IARC/audience, declarations, listing copy, shot list, rejection risks) and
+    `docs/STORE_PRIVACY_LABELS.md` (labels + Data safety). Decisions: item 121. Gaps: items 115–122.*
 75. `[ ]` **DPAs** with Anthropic, RevenueCat, Netlify, Supabase; WHOOP
     production approval for other people's data; trademark check on
     "Vantage".
+
+### From the DPIA and privacy-label drafts — 2026-10-20
+`docs/DPIA_DRAFT.md` (gaps G1–G26) and `docs/STORE_PRIVACY_LABELS.md`. New findings only; everything
+else maps onto existing items.
+98. `[ ]` **LAUNCH** Consent is enforced in the app only. `whoop-cron`, `oura-cron`, `whoop-sync`,
+    `oura-sync` and `health-sync` keep syncing after a user withdraws health consent (until they also
+    press Disconnect), and the AI functions don't check AI consent server-side. Skip/refuse on the server
+    (one JSON-path read), or have withdrawal call `wearable-disconnect`. (DPIA G1)
+99. `[ ]` **LAUNCH** No durable consent record — consent lives only in the user-editable state. Add an
+    append-only `consent_events` table (kind, granted/withdrawn, time, copy version, cascade). (G2)
+100. `[ ]` **BLOCKS** Privacy policy vs code (labels draft "Mismatches", DPIA G10/G13):
+    - says accounts are erased "within 30 days" — deletion is immediate, backups keep 7 days;
+    - says "we do not collect purchase history" — RevenueCat keeps it, linked to the user id;
+    - crash reports (`client_errors`: stack, page, UA, user id) not mentioned, never purged;
+    - Apple Health and recipe-from-video described as user features — both owner-only, compiled out
+      of native (and the native build's tutorial/Track help/auto-fill/consent strings still say Apple
+      Health);
+    - the coach is said to send vitals and macros — it sends first name, habit names + relapse counts,
+      trackers, holiday destinations and wish-list counts;
+    - Anthropic's API retention not mentioned; money data, body measurements/age/sex/height, relapses,
+      old mood entries and community foods (`food_contributions`) not named;
+    - invite links show the inviter's name, handle, picture, level and rating before sign-in;
+    - "health data is never shown to others" needs a qualifier (the Fitness rating counts logging days);
+    - report retention "as long as needed" vs 12 months in ABUSE_HANDLING with nothing deleting them —
+      add automatic 12-month deletion of closed reports; fix the stale reporter-cascade line there.
+101. `[x]` **BLOCKS** The "Join Waitlist" form (AI Coach — already shipped) stores emails for marketing
+    and is reachable in the native build, including the paywall's fallback button. Remove it
+    (recommended) or declare marketing use.
+    *Done 2026-10-20 (owner's decision: remove). The form is gone; the coach teaser opens the paywall
+    ("See Pro"); the paywall with no store product shows OK + where Pro is bought. The `waitlist`
+    table and its rows are untouched — owner to decide whether to delete them (SQL, owner-run).
+    Also decided: friend list declared as Apple "Contacts"; wearable data stays out of the AI coach
+    at launch (`AI_WEARABLE_DATA_ALLOWED` unset).*
+102. `[ ]` **BLOCKS** Android: the manifest has no `CAMERA` permission (barcode + AI food scan can't
+    work natively); Firebase Messaging mints a token at startup before notification consent; check the
+    merged manifest for the advertising-ID permission.
+103. `[ ]` **LAUNCH** Decide whether category ratings (fitness, finance) are visible to others — the
+    fitness rating draws on health data (`netlify/lib/recompute.js`). (G10)
+104. `[ ]` **LAUNCH** Lock-screen-safe push text before push goes live (esp. coach nudges). (G8)
+105. `[ ]` **LAUNCH** Test the AI coach with eating-disorder, self-harm and relapse style inputs and
+    record the results. (G15)
+106. `[ ]` **LAUNCH** Confirm the Netlify functions' region (none set in netlify.toml — likely US) for
+    the transfer analysis; written policy for owner/admin access to user data and a log of moderation
+    reads; Art. 30 records / LIAs if the solicitor says so. (G5, G18, G25)
+107. `[x]` **AFTER** Legacy `moodLog` still sits in users' state though Mood was removed — tell users
+    and offer deletion, or remove it additive-first per CLAUDE.md. (G12)
+    *Done 2026-10-20 (owner's decision: delete, never returning): `lib/state/retiredKeys.js` removes
+    `moodLog` once after hydration (only that key; identity otherwise; the merge keeps the deletion).
+    Copies age out of user_data_history (14 days) and backups. Privacy policy to say so (item 100).*
+108. `[ ]` **AFTER** Let a habit be private (kept out of AI and friend surfaces) (G14); self-host the
+    fonts so devices don't contact Google Fonts (G16); consider ipwho.is → Netlify's own geo for
+    weather so no third party sees the IP.
+
+### From the Online Safety Act draft — 2026-10-20 (`docs/ONLINE_SAFETY_ACT_DRAFT.md`)
+109. `[ ]` **LAUNCH** Governance the Codes expect: a named accountable person with written
+    responsibilities; written content policies, queue prioritisation and moderator guidance; a written
+    appeals process; a complaints route that works without an account (pairs with item 72).
+110. `[ ]` **LAUNCH** Reporting loop: acknowledge reports to the reporter and tell them the outcome;
+    tell the reported user about action taken; more report reasons (child safety, threats, self-harm,
+    sexual content, scams); report + block from an incoming friend request.
+111. `[ ]` **LAUNCH** Suspension doesn't stop DMs — a suspended user can still message friends. Block
+    sends (and probably receipt) for suspended accounts in RLS.
+112. `[ ]` **LAUNCH** Owner tools the Terms already promise: reset a user's display name / handle /
+    avatar from the moderation queue; re-screen avatars published before screening existed.
+113. `[ ]` **LAUNCH** NCA child-sexual-abuse reporting duty (in force for user-to-user services since
+    7 Apr 2026): register and write the procedure (how evidence is preserved, who files, within what
+    time). Add a mute option (Codes user control); supportive information for child users.
+114. `[ ]` **LAUNCH** Teen defaults only apply to NEW accounts: older accounts kept handle search and
+    leaderboard on; online status and the heatmap default on. There is no age signal at all — decide
+    (with the solicitor) on collecting a birth year and age-specific defaults. Fix the stale lines in
+    `docs/ABUSE_HANDLING.md` (reports now survive reporter deletion; the 10-message evidence copy; the
+    NCA duty is in force). Confirm `audit_schema_2026_10.sql` and `dm_upgrade_2026_10.sql` are run in
+    production (the DM one is confirmed 2026-10-18).
+
+### From the store submission pack — 2026-10-20 (`docs/STORE_SUBMISSION_PACK.md` §8, P1–P12)
+115. `[ ]` **BLOCKS** WHOOP/Oura connect fails inside the native app: the panel navigates the WebView to
+    the provider, the callback returns to the website root, and the OAuth `state` is bound to an
+    HttpOnly cookie the system browser doesn't have. Open the authorize URL with `Browser.open`, bind
+    state without a cookie for native starts, redirect native callbacks to `com.vantage.app://…`;
+    verify on a device. (P1)
+116. `[ ]` **BLOCKS** Review purchases: sandbox events are dropped unless `REVENUECAT_ALLOW_SANDBOX=true`,
+    so a reviewer who buys Pro gets a 403 from the coach. Recommended: set it for the review window
+    only, then off. And `config.pro_live` must be `'true'` before submission. (P2, P3)
+117. `[ ]` **BLOCKS** Sign in with Apple tokens aren't revoked on account deletion (Apple expects it):
+    needs the native SIWA flow's authorization code, or the provider token captured at sign-in. (P8)
+118. `[ ]` **BLOCKS** DM text (and the opt-in shared streak habit name) isn't filtered (Apple 1.2 asks
+    for a filtering method): reuse `checkPublicText` on send, mirror it server-side. (P9)
+119. `[ ]` **LAUNCH** Copy and widgets for things that don't ship: remove "Recent Mail — coming soon"
+    from the mobile picker (keep its META for existing stacks); the tutorial still describes Trending
+    and Apple Health; Track says "Syncs from WHOOP, Oura or Apple Health"; drop the "Our Apps" preset
+    (links to a separate external app, URL carries a personal account name) from the native build.
+    (P5, P10, P11)
+120. `[ ]` **LAUNCH** Subscription copy (3.1.2): the More drawer hard-codes "from £3.99/mo" — read it from
+    the store product like SubscriptionPanel; soften "Unlimited everything" (AI still has daily caps).
+    Rename the hub's rule-based "AI Coach" banner to "Coach" or add a not-medical-advice line. (P6, P12)
+121. `[ ]` **LAUNCH** Store-form decisions (pack §2–4): Apple "Social Media" = No (Yes → 16+ in
+    Australia); alcohol references Infrequent (or change the habit placeholder); export compliance
+    "none of the algorithms" + `ITSAppUsesNonExemptEncryption=false` (one line from the solicitor);
+    iPad support or not; Play audience 13+ bands or 18+.
+122. `[ ]` **LAUNCH** Create the reviewer demo accounts 4–6 weeks before submitting — ratings cap
+    history at account age, so a fresh account looks empty. (Pack §1.)
 
 ## Phase 7 — Running it safely once it's public
 
@@ -447,11 +586,13 @@ can stop the bleeding in minutes, and you meet the legal clock.
     - *Review:* write-up, fix, and a test or check so it can't recur
       (the pattern already used after the 2026-05-03 wipe).
     *Status 2026-09-30: docs/INCIDENT_RUNBOOK.md (contain, secrets inventory, ICO 72 h, breach log, post-mortem). No kill-switch env var exists yet — the runbook documents today's options.*
+    *Status 2026-10-20: kill switch built — `VANTAGE_PAUSE=ai|social|sync|push|all` (comma list) makes those functions answer 503 "Paused for maintenance — back soon" (crons skip their run); moderation, deletion, health and the security tools never pause. Needs a Netlify redeploy to take effect (env changes apply on deploy), no code change. Direct-to-Supabase traffic (DMs, friends) still needs a grant revoke. Owner: read runbook §3 "Pause an area" once, and try it on a quiet evening (`VANTAGE_PAUSE=ai`, redeploy, check, remove, redeploy).*
 79. `[~]` **Abuse handling with a clock on it.** Reports reach an owner
     within hours (push or email), a target of acting within 24 h (what
     Apple expects), a suspend flag that hides a user everywhere, and
     evidence kept when an account is deleted.
     *Status 2026-09-30: docs/ABUSE_HANDLING.md; moderation queue built. Nothing alerts an owner when a report arrives yet — check the queue daily until it does.*
+    *Status 2026-10-20: the hourly security sweep now pings the owner within ~1 h of a new report ("N new report(s) — open the moderation queue", tap opens Moderation; no report content or ids), once per batch, regardless of ALERT_MIN_SEVERITY. Owner: make sure `ALERT_NTFY_TOPIC` (or `ALERT_WEBHOOK_URL`) is set on Netlify and press "Send test alert"; then file a test report from a second account and time the ping.*
 80. `[ ]` **Accounts that can't be taken over.** 2FA (authenticator
     app, not SMS) on GitHub, Supabase, Netlify, Apple, Google Play,
     RevenueCat, Anthropic, the domain registrar and the owner email;
@@ -475,9 +616,17 @@ can stop the bleeding in minutes, and you meet the legal clock.
     Measured state is ~967 kB per user; `holidays` + `backgrounds` are
     ~539 kB of that, all base64 data URIs. It is re-downloaded on every
     app open and rewritten on every save. Roughly halves state size.
+    *Status 2026-10-20: planned — `docs/STATE_SIZE_PLAN.md` + `supabase/state_size_DRAFT_not_run.sql`
+    (DRAFT, do not run). Images → private `media` bucket, references in state, server-side swap with a
+    90-day originals ledger; Phase 0 first (build census, update gate, flags, restore drill, PITR).
+    Owner decisions listed in the plan. Estimate ~967 kB → ~430 kB.*
 26. `[ ]` **Move the per-day logs (`vitalsLog`, `burnLog`, `moodLog`)
     into tables**, the way `nutrition_log` already is. Together with 25
     this takes state from ~967 kB to ~90 kB.
+    *Status 2026-10-20: planned in the same docs — one `daily_log(user_id, kind, day, data)` table,
+    function-only writes (no client delete), journal 90 days, dual-write → backfill → 14 days of zero
+    mismatches → read switch → owner-run per-user cleanup. The first native binary must be built from the
+    read-switch build or later.*
 27. `[ ]` **Decide on Supabase PITR.** Pro gives 7-day daily backups;
     PITR is a paid add-on. Given data safety is the project's stated #1
     rule and there has already been one wipe incident, decide

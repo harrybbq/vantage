@@ -12,6 +12,7 @@
  * `env` is { supabaseUrl, serviceKey }.
  */
 const { invalidateSuspended } = require('./suspended');
+const { serviceKeyHeaders } = require('./sbKeys');
 
 const PAGE_SIZE = 25;
 const CONTEXT_MESSAGES = 10;
@@ -21,12 +22,10 @@ const NOT_INSTALLED = [501, { error: 'moderation schema not installed' }];
 function sb(env, path, init = {}) {
   return fetch(`${env.supabaseUrl}/rest/v1/${path}`, {
     ...init,
-    headers: {
-      apikey: env.serviceKey,
-      Authorization: `Bearer ${env.serviceKey}`,
+    headers: serviceKeyHeaders(env.serviceKey, {
       'Content-Type': 'application/json',
       ...(init.headers || {}),
-    },
+    }),
   });
 }
 

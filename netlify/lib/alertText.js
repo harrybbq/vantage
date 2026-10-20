@@ -73,6 +73,8 @@ function headlineFor(kind, detail, { title = '', now = Date.now() } = {}) {
       const wait = Number.isFinite(oldest) ? fmtWait(now - oldest) : null;
       return `${plural(c, 'user report')} waiting over a day${wait ? ` — the oldest for ${wait}` : ''}`;
     }
+    case 'reports_new':
+      return `${plural(n(d.count) ?? 0, 'new user report')} in the last hour — aim to decide within 24 h`;
     case 'deploy_failed':
       return 'The latest production deploy failed — the site is still serving the previous build';
     case 'vitals_lcp_poor':

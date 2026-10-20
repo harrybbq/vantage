@@ -28,8 +28,10 @@ function flattenForLegacy(insight) {
   return `${insight.title}. ${insight.body}`;
 }
 
-// ── Compact teaser banner (pre-launch) ───────────────────────────────────
-function AiCoachBanner({ insight, onJoinWaitlist }) {
+// ── Compact teaser banner (Pro not on sale yet) ──────────────────────────
+// The waitlist this used to point at was removed (2026-10-20): it collected
+// emails for marketing, which the privacy policy says Vantage doesn't do.
+function AiCoachBanner({ insight, onOpenPaywall }) {
   const text = flattenForLegacy(insight);
   const words = text.split(' ');
   const hook = words.slice(0, 5).join(' ');
@@ -45,15 +47,17 @@ function AiCoachBanner({ insight, onJoinWaitlist }) {
           {rest && <span className="ai-coach-banner-blurred"> {rest}</span>}
         </span>
       </div>
-      <button className="btn btn-primary ai-coach-banner-btn" onClick={onJoinWaitlist}>
-        Join Waitlist
-      </button>
+      {onOpenPaywall && (
+        <button className="btn btn-primary ai-coach-banner-btn" onClick={onOpenPaywall}>
+          See Pro
+        </button>
+      )}
     </div>
   );
 }
 
 // ── Compact upgrade CTA (post-launch) ────────────────────────────────────
-function AiCoachUpgradeBanner({ insight }) {
+function AiCoachUpgradeBanner({ insight, onOpenPaywall }) {
   const text = flattenForLegacy(insight);
   const words = text.split(' ');
   const hook = words.slice(0, 5).join(' ');
@@ -69,7 +73,7 @@ function AiCoachUpgradeBanner({ insight }) {
           {rest && <span className="ai-coach-banner-blurred"> {rest}</span>}
         </span>
       </div>
-      <button className="btn btn-primary ai-coach-banner-btn">
+      <button className="btn btn-primary ai-coach-banner-btn" onClick={onOpenPaywall} disabled={!onOpenPaywall}>
         Upgrade to Pro
       </button>
     </div>
@@ -113,7 +117,7 @@ function AiCoachFull({ insight, onAct, onDismiss }) {
 }
 
 // ── Main export ───────────────────────────────────────────────────────────
-export default function AiCoachWidget({ S, update, onOpenWaitlist, onCoachAct }) {
+export default function AiCoachWidget({ S, update, onOpenPaywall, onCoachAct }) {
   const insight = useCurrentInsight(S);
   // Track which id we've already auto-stamped as "shown" today so we
   // don't write to coachMemory on every render. Resets per insight id.
@@ -153,8 +157,8 @@ export default function AiCoachWidget({ S, update, onOpenWaitlist, onCoachAct })
 
   return (
     <ProGate
-      teaser={<AiCoachBanner insight={insight} onJoinWaitlist={onOpenWaitlist} />}
-      upgradeCta={<AiCoachUpgradeBanner insight={insight} />}
+      teaser={<AiCoachBanner insight={insight} onOpenPaywall={onOpenPaywall} />}
+      upgradeCta={<AiCoachUpgradeBanner insight={insight} onOpenPaywall={onOpenPaywall} />}
     >
       <AiCoachFull insight={insight} onAct={handleAct} onDismiss={handleDismiss} />
     </ProGate>

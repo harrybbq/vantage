@@ -20,12 +20,10 @@
  * of overwriting what we just wrote.
  */
 
+const { serviceHeaders } = require('./sbKeys');
+
 function headers(env, extra = {}) {
-  return {
-    apikey: env.SUPABASE_SERVICE_ROLE_KEY,
-    Authorization: `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`,
-    ...extra,
-  };
+  return serviceHeaders(env, extra);
 }
 
 /** → { state, updatedAt } | null (no row) ; throws on a failed read. */

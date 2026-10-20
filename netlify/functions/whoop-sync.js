@@ -14,6 +14,7 @@
  * Returns { ok, vitals:{date:{sleep,rhr,hrv,recovery,strain}},
  *           burn:{date:[{id,label,kcal}]} }
  */
+const { pauseGate } = require('../lib/killSwitch');
 const { getFreshToken, fetchWhoopData } = require('../lib/whoop');
 const { requireUser, underLimit, tooMany } = require('../lib/requireUser');
 
@@ -25,6 +26,8 @@ const CORS = {
 
 exports.handler = async (event) => {
   if (event.httpMethod === 'OPTIONS') return { statusCode: 204, headers: CORS, body: '' };
+  const pausedRes = pauseGate('sync', CORS);
+  if (pausedRes) return pausedRes;
   if (event.httpMethod !== 'POST') return { statusCode: 405, headers: CORS, body: JSON.stringify({ error: 'method not allowed' }) };
 
   const env = process.env;

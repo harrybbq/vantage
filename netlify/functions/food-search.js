@@ -30,6 +30,7 @@ const OFF_SEARCH = 'https://search.openfoodfacts.org';
 // lib/foodSources.js at that. Same string in both places now.
 const UA = 'Vantage/1.0 (https://vantagevision.netlify.app)';
 
+const sbKeys = require('../lib/sbKeys');
 const { requireUser, underLimit, tooMany } = require('../lib/requireUser');
 const { searchUSDA, searchFatSecret } = require('../lib/foodSources');
 
@@ -62,7 +63,7 @@ async function searchCommunity(q, env) {
     '&select=id,name,brand,serving_g,serving_unit,calories,protein_g,carbs_g,fat_g,fibre_g,sugar_g,sodium_mg' +
     '&order=created_at.desc&limit=12';
   const res = await fetch(url, {
-    headers: { apikey: env.serviceKey, Authorization: `Bearer ${env.serviceKey}` },
+    headers: sbKeys.serviceKeyHeaders(env.serviceKey),
   });
   // The table may simply not exist yet — that is "no community results",
   // not a failed search.
@@ -363,7 +364,7 @@ async function searchByName(q, page = 1, opts = {}) {
      panel for a food the big databases carry as a bare name, theirs is
      the one worth showing. */
   const community = opts.community
-    ? searchCommunity(q, { supabaseUrl: env.SUPABASE_URL, serviceKey: env.SUPABASE_SERVICE_ROLE_KEY }).catch(() => [])
+    ? searchCommunity(q, { supabaseUrl: env.SUPABASE_URL, serviceKey: sbKeys.serviceKey(env) }).catch(() => [])
     : Promise.resolve([]);
 
   const tracked = [community, relevance, popularity, usda, fatsecret].map(settle);

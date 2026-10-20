@@ -28,17 +28,15 @@
  * For overlapping vitals fields the later sync wins — see
  * mergeOuraIntoState.
  */
+const { serviceHeaders } = require('./sbKeys');
+
 const API = 'https://api.ouraring.com/v2/usercollection';
 const TOKEN_URL = 'https://api.ouraring.com/oauth/token';
 
 function sb(path, opts, env) {
   return fetch(`${env.SUPABASE_URL}/rest/v1/${path}`, {
     ...opts,
-    headers: {
-      apikey: env.SUPABASE_SERVICE_ROLE_KEY,
-      Authorization: `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`,
-      ...(opts?.headers || {}),
-    },
+    headers: serviceHeaders(env, opts?.headers || {}),
   });
 }
 

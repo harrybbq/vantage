@@ -1853,118 +1853,8 @@ function RelapseModal({ openId, onClose, habits, onRelapse }) {
   );
 }
 
-// ── Waitlist ──
-function WaitlistModal({ openId, onClose, userId, userEmail }) {
-  const [email, setEmail] = useState(userEmail || '');
-  const [status, setStatus] = useState('idle'); // idle | submitting | success | already
-  const [count, setCount] = useState(null);
-
-  // Prefill email if it arrives after mount
-  useEffect(() => {
-    if (userEmail && !email) setEmail(userEmail);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [userEmail]);
-
-  // Fetch count + check existing whenever modal opens
-  useEffect(() => {
-    if (openId !== 'waitlistModal') return;
-    setStatus('idle');
-
-    async function loadCount() {
-      const { data } = await supabase.from('waitlist_count').select('total').single();
-      if (data?.total != null) setCount(Number(data.total));
-    }
-
-    async function checkExisting() {
-      if (!userId) return;
-      const { data } = await supabase
-        .from('waitlist')
-        .select('id')
-        .eq('user_id', userId)
-        .maybeSingle();
-      if (data) setStatus('already');
-    }
-
-    loadCount();
-    checkExisting();
-  }, [openId, userId]);
-
-  async function handleSubmit() {
-    if (!email.trim()) return;
-    setStatus('submitting');
-    const { error } = await supabase.from('waitlist').insert({
-      user_id: userId || null,
-      email: email.trim(),
-    });
-    if (error?.code === '23505') {
-      // Unique constraint — already on list
-      setStatus('already');
-    } else if (error) {
-      setStatus('idle');
-    } else {
-      setStatus('success');
-      setCount(c => (c != null ? c + 1 : null));
-      setTimeout(() => onClose('waitlistModal'), 2000);
-    }
-  }
-
-  const isDone = status === 'success' || status === 'already';
-
-  return (
-    <Modal id="waitlistModal" openId={openId} onClose={onClose} style={{ maxWidth: '380px' }}>
-      <div style={{ textAlign: 'center', paddingTop: '8px' }}>
-        <div style={{ fontSize: '28px', marginBottom: '8px' }}>✦</div>
-        <h3 style={{ margin: '0 0 6px', fontSize: '17px' }}>AI Coach — Early Access</h3>
-        <p style={{ fontSize: '12px', color: 'var(--text-muted)', margin: '0 0 20px', lineHeight: 1.6 }}>
-          Be the first to know when AI Coach launches.
-        </p>
-      </div>
-
-      {isDone ? (
-        <div style={{ textAlign: 'center', padding: '16px 0 20px', fontFamily: 'var(--mono)', fontSize: '14px', color: 'var(--em-text)' }}>
-          {status === 'already' ? "You're already on the list ✓" : "You're on the list ✓"}
-        </div>
-      ) : (
-        <>
-          <div className="fg">
-            <label>Email</label>
-            <input
-              type="email"
-              placeholder="you@example.com"
-              value={email}
-              onChange={e => setEmail(e.target.value)}
-              onKeyDown={e => e.key === 'Enter' && handleSubmit()}
-              disabled={status === 'submitting'}
-            />
-          </div>
-          <div className="modal-actions">
-            <button className="btn btn-ghost" onClick={() => onClose('waitlistModal')}>Cancel</button>
-            <button className="btn btn-primary" onClick={handleSubmit} disabled={status === 'submitting'}>
-              {status === 'submitting' ? 'Sending…' : 'Notify me'}
-            </button>
-          </div>
-        </>
-      )}
-
-      {count != null && (
-        <div style={{ textAlign: 'center', fontFamily: 'var(--mono)', fontSize: 'var(--fs-floor)', color: 'var(--text-muted)', marginTop: '12px', letterSpacing: '0.5px' }}>
-          {count} {count === 1 ? 'person' : 'people'} already waiting
-        </div>
-      )}
-
-      {/* Subscription transparency */}
-      <div style={{ marginTop: '16px', padding: '12px', background: 'rgba(255,255,255,.04)', borderRadius: '10px', border: '1px solid rgba(255,255,255,.07)' }}>
-        <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-floor)', color: 'var(--text-muted)', lineHeight: 1.7, letterSpacing: '0.3px' }}>
-          <strong style={{ color: 'var(--text)', display: 'block', marginBottom: '4px' }}>Subscription transparency</strong>
-          Joining the waitlist is free — no payment details required. If AI Coach launches as a paid feature, you will be told the price and what is included before any charge. You can cancel at any time. Free features remain free.
-        </div>
-      </div>
-    </Modal>
-  );
-}
-
 // ── Main Modals container ──
-export default function Modals({ openModal, S, update, onClose, onOpen, onShowCoinToast, userId, userEmail, onNavigate }) {
+export default function Modals({ openModal, S, update, onClose, onOpen, userId, onNavigate }) {
   const { hasPro } = useSubscriptionContext();
   function handleAddLink(link) {
     update(prev => ({ ...prev, links: [...prev.links, link] }));
@@ -2172,7 +2062,6 @@ export default function Modals({ openModal, S, update, onClose, onOpen, onShowCo
       <AddHabitModal openId={effectiveOpen} onClose={onClose} onAdd={handleAddHabit} />
       <EditHabitModal openId={effectiveOpen} onClose={onClose} habits={S.habits} onEdit={handleEditHabit} onDelete={handleDeleteHabit} />
       <RelapseModal openId={effectiveOpen} onClose={onClose} habits={S.habits} onRelapse={handleRelapseHabit} />
-      <WaitlistModal openId={effectiveOpen} onClose={onClose} userId={userId} userEmail={userEmail} />
     </>
   );
 }

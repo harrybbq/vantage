@@ -1593,3 +1593,11 @@ html[data-theme="dark-os"] .upg-mark.is-done { color: #4cc765; }
   .upg-cell .upg-mark { font-size: 10px; bottom: 2px; right: 2px; }
   .upg-cell .upg-sess { max-width: calc(100% - 7px); }
 }
+
+/* Recipes offered from outside the app (data/recipeLog.js) — one line, one tap. */
+.upg-offer { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; padding: 12px 14px; margin-bottom: 12px;
+  border: 1px solid rgba(var(--em-rgb), .45); border-radius: 12px; background: var(--card); }
+.upg-offer-txt { flex: 1 1 220px; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.upg-offer-txt b { font-size: 14px; color: var(--text); }
+.upg-offer-txt span { font-size: max(12.5px, var(--fs-floor)); color: var(--text-muted); overflow-wrap: anywhere; }
+.upg-offer .link-open-btn { min-height: 44px; }

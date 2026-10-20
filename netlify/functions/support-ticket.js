@@ -22,6 +22,7 @@
  * (`release`, the hashed bundle name) they sent. Nothing from their app
  * state.
  */
+const sbKeys = require('../lib/sbKeys');
 const { requireUser, underLimit, tooMany } = require('../lib/requireUser');
 const { alertConfig, atOrAbove, notifyOwner } = require('../lib/alertNotify');
 const { headlineFor } = require('../lib/alertText');
@@ -73,9 +74,9 @@ exports.handler = async (event) => {
   const category = CATEGORIES.has(b?.category) ? b.category : 'other';
 
   const url = process.env.SUPABASE_URL;
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  const key = sbKeys.serviceKey(process.env);
   if (!url || !key) return reply(503, { error: 'Could not send right now — try again later.' });
-  const headers = { apikey: key, Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' };
+  const headers = sbKeys.serviceKeyHeaders(key, { 'Content-Type': 'application/json' });
 
   try {
     // Durable daily cap: this account's tickets since UTC midnight.

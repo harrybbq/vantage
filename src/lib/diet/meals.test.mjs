@@ -1,6 +1,8 @@
 /** Links between recipes and saved videos. Invented data only. */
 import assert from 'node:assert/strict';
-import { linkedVideos, linkedRecipes, linkVideo, unlinkVideo, fillFromRead, applyRead } from './meals.js';
+import { linkedVideos, linkedRecipes, linkVideo, unlinkVideo, fillFromRead, applyRead, pendingRecipes, addOfferedRecipes } from './meals.js';
+import { parseLine } from './ingredients.js';
+import { RECIPE_LOG } from '../../data/recipeLog.js';
 
 let n = 0;
 const t = (name, fn) => { fn(); n++; };
@@ -67,6 +69,37 @@ t('applyRead stores the read on the video and fills the recipe', () => {
   assert.equal(a.mealVideos[0].read, READ);
   assert.equal(a.recipes[0].servings, 6);
   assert.equal(a.recipes[1], s.recipes[1]);
+});
+
+t('offered recipes: pending until added, then never again', () => {
+  const s = base();
+  const offer = [{ id: 'o1', title: 'Steak pasta', kcal: 1200 }, { id: 'o2', title: 'Wrap', kcal: 650 }];
+  assert.deepEqual(pendingRecipes(s, offer).map(r => r.id), ['o1', 'o2']);
+  const a = addOfferedRecipes(s, offer, 42);
+  assert.equal(a.recipes.length, 4, 'appended, nothing replaced');
+  assert.equal(a.recipes[0], s.recipes[0]);
+  assert.equal(a.recipes[1], s.recipes[1]);
+  assert.equal(a.recipes[2].createdAt, 42);
+  assert.equal(a.recipes[2].servings, 1, 'missing fields come from EMPTY_RECIPE');
+  assert.deepEqual(a.recipeLogAdded, ['o1', 'o2']);
+  assert.equal(a.mealVideos, s.mealVideos, 'other keys untouched');
+  assert.equal(addOfferedRecipes(a, offer, 99), a, 'adding again is a no-op');
+  assert.equal(pendingRecipes(a, offer).length, 0);
+  const deleted = { ...a, recipes: a.recipes.filter(r => r.id !== 'o1') };
+  assert.equal(pendingRecipes(deleted, offer).length, 0, 'a deleted one is not offered again');
+  const one = addOfferedRecipes(s, [offer[1]], 1);
+  assert.deepEqual(pendingRecipes(one, offer).map(r => r.id), ['o1'], 'adding one leaves the other offered');
+});
+
+t('the shipped recipe log is well-formed and its ingredient lines parse', () => {
+  assert.equal(RECIPE_LOG.length, 2);
+  for (const r of RECIPE_LOG) {
+    assert.ok(r.id.startsWith('rlog-') && r.title && r.servings === 1);
+    for (const k of ['kcal', 'protein', 'carbs', 'fat', 'minutes']) assert.ok(r[k] > 0, `${r.id} ${k}`);
+    assert.ok(r.ingredients.length >= 15 && r.method.includes('1. '));
+    const numbered = r.ingredients.filter(l => /^[\d½¼¾⅓⅔⅛]/.test(l));
+    for (const l of numbered) { const p = parseLine(l); assert.ok(p && p.qty > 0, `parses: ${l}`); }
+  }
 });
 
 console.log(`meal links: ${n} passed`);

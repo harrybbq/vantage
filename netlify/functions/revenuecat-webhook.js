@@ -20,7 +20,7 @@
  *
  * Required Netlify env vars:
  *   SUPABASE_URL
- *   SUPABASE_SERVICE_ROLE_KEY     (NOT the anon key — needs to write profiles.tier)
+ *   SUPABASE_SECRET_KEY or legacy service-role key, via lib/sbKeys (NOT the anon key — needs to write profiles.tier)
  *   REVENUECAT_WEBHOOK_AUTH       (random string ≥ 32 chars; share with RC dashboard)
  *
  * Event types we handle:
@@ -56,6 +56,7 @@
  *     else in the app writes it.
  */
 
+const sbKeys = require('../lib/sbKeys');
 const { safeEqual } = require('../lib/cronAuth');
 
 const CORS = {
@@ -90,11 +91,11 @@ function deriveTier(entitlementIdsActive = []) {
  * (lifetime / non-expiring) or in the future.
  */
 async function tierFromSubscriberApi(appUserId) {
-  const key = process.env.REVENUECAT_SECRET_API_KEY;
-  if (!key) return null;
+  const rcKey = process.env.REVENUECAT_SECRET_API_KEY;
+  if (!rcKey) return null;
   try {
     const res = await fetch(`https://api.revenuecat.com/v1/subscribers/${encodeURIComponent(appUserId)}`, {
-      headers: { Authorization: `Bearer ${key}`, Accept: 'application/json' },
+      headers: { Authorization: `Bearer ${rcKey}`, Accept: 'application/json' },
     });
     if (!res.ok) {
       console.error('revenuecat-webhook: subscriber read failed', res.status);
@@ -153,7 +154,7 @@ exports.handler = async (event) => {
   }
 
   const supabaseUrl = process.env.SUPABASE_URL;
-  const serviceKey  = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  const serviceKey  = sbKeys.serviceKey(process.env);
   if (!supabaseUrl || !serviceKey) {
     return {
       statusCode: 500, headers: CORS,
@@ -242,12 +243,10 @@ exports.handler = async (event) => {
   const url = `${supabaseUrl}/rest/v1/profiles?id=eq.${encodeURIComponent(userId)}&${filters.join('&')}&select=id`;
   const res = await fetch(url, {
     method: 'PATCH',
-    headers: {
-      apikey: serviceKey,
-      Authorization: `Bearer ${serviceKey}`,
+    headers: sbKeys.serviceKeyHeaders(serviceKey, {
       'Content-Type': 'application/json',
       Prefer: 'return=representation',
-    },
+    }),
     body: JSON.stringify({
       tier: nextTier,
       tier_updated_at: stamp,

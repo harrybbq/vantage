@@ -48,6 +48,7 @@ const SAMPLES = {
   advisor_error: { name: 'rls_disabled_in_public', detail: 'Table `public.x` is public, but RLS has not been enabled.', remediation: 'https://supabase.com/docs/guides/database/database-linter?lint=0013_rls_disabled_in_public' },
   client_errors_spike: { lastHour: 42, trailingHourlyAvg: 3 },
   reports_stale: { count: 12, oldestAt: '2026-10-01T12:00:00Z' },
+  reports_new: { count: 2, windowMin: 65 },
   deploy_failed: { deployId: '66ff0a1b2c3d4e5f60718293', branch: 'master', error: 'Build script returned non-zero exit code: 2', createdAt: '2026-10-04T11:40:00Z' },
   vitals_lcp_poor: { lcpP75Ms: 4600, samples: 380, thresholdMs: 4000 },
   ai_cap_repeat: { userId: '99999999-8888-4777-8666-555555555555', bucket: 'food_detect', days: 3, cap: 20 },
@@ -73,6 +74,8 @@ expect('spike', H('client_errors_spike', SAMPLES.client_errors_spike), '42 app e
 expect('spike from zero', H('client_errors_spike', { lastHour: 12, trailingHourlyAvg: 0 }), '12 app errors in the last hour — usually there are none');
 expect('stale', H('reports_stale', SAMPLES.reports_stale), '12 user reports waiting over a day — the oldest for 3 days');
 expect('stale one', H('reports_stale', { count: 1, oldestAt: '2026-10-03T06:00:00Z' }), '1 user report waiting over a day — the oldest for 30 h');
+expect('new reports', H('reports_new', SAMPLES.reports_new), '2 new user reports in the last hour — aim to decide within 24 h');
+expect('new report one', H('reports_new', { count: 1 }), '1 new user report in the last hour — aim to decide within 24 h');
 expect('lcp', H('vitals_lcp_poor', SAMPLES.vitals_lcp_poor), '1 in 4 page loads takes 4.6 s or longer to show its main content — good is under 2.5 s');
 expect('ai cap', H('ai_cap_repeat', SAMPLES.ai_cap_repeat), 'One account hit the daily food detect cap on 3 of the last 3 days');
 expect('advisor', H('advisor_error', SAMPLES.advisor_error), 'Supabase’s security advisor flags an error: rls disabled in public');

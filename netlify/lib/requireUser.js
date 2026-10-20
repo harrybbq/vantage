@@ -18,6 +18,7 @@
  * Keying on the user id is what makes that upgrade a one-line change
  * later, and it makes abuse attributable in the meantime.
  */
+const { userApiKey, userHeaders } = require('./sbKeys');
 
 /**
  * → { userId } on success, or { error } holding a ready-to-return
@@ -27,9 +28,10 @@
 async function requireUser(event, CORS) {
   const env = process.env;
   const url = env.SUPABASE_URL || env.VITE_SUPABASE_URL;
-  // The anon key is the right credential for reading /auth/v1/user; the
-  // service key is only a fallback for sites that don't expose it.
-  const apikey = env.VITE_SUPABASE_ANON_KEY || env.SUPABASE_ANON_KEY || env.SUPABASE_SERVICE_ROLE_KEY;
+  // The public key is the right credential for reading /auth/v1/user;
+  // the service key is only a fallback for sites that don't expose it
+  // (lib/sbKeys.userApiKey).
+  const apikey = userApiKey(env);
 
   const fail = (code, msg) => ({
     error: { statusCode: code, headers: CORS, body: JSON.stringify({ error: msg }) },
@@ -43,7 +45,7 @@ async function requireUser(event, CORS) {
 
   try {
     const res = await fetch(`${url}/auth/v1/user`, {
-      headers: { apikey, Authorization: `Bearer ${jwt}` },
+      headers: userHeaders(env, jwt),
     });
     if (!res.ok) return fail(401, 'session expired — sign in again');
     const me = await res.json();

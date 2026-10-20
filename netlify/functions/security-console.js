@@ -138,6 +138,7 @@
  *
  * A non-owner gets exactly the 401 a bad token gets.
  */
+const sbKeys = require('../lib/sbKeys');
 const { requireUser, underLimit, tooMany } = require('../lib/requireUser');
 const { isOwnerEmail } = require('../lib/owner');
 const D = require('../lib/securityData');
@@ -293,7 +294,7 @@ async function banStates(env, ids) {
   for (const id of ids.slice(0, 25)) {
     try {
       const res = await D.timed(`${env.supabaseUrl}/auth/v1/admin/users/${id}`, {
-        headers: { apikey: env.serviceKey, Authorization: `Bearer ${env.serviceKey}` },
+        headers: sbKeys.serviceKeyHeaders(env.serviceKey),
       }, 4000);
       if (res.ok) {
         const u = await res.json();
@@ -460,12 +461,10 @@ async function ticketCreate(env, b) {
 async function adminUser(env, id, init = {}) {
   return D.timed(`${env.supabaseUrl}/auth/v1/admin/users/${id}`, {
     ...init,
-    headers: {
-      apikey: env.serviceKey,
-      Authorization: `Bearer ${env.serviceKey}`,
+    headers: sbKeys.serviceKeyHeaders(env.serviceKey, {
       'Content-Type': 'application/json',
       ...(init.headers || {}),
-    },
+    }),
   });
 }
 
