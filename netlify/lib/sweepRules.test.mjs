@@ -68,6 +68,24 @@ expect('exactly 3× is not a spike', fps({ errors: { lastHour: 30, prev24h: 240 
 expect('stale reports', fps({ staleReports: { count: 3, oldestAt: '2026-09-29T10:00:00Z' } }), ['moderation:stale-reports']);
 expect('stale title singular', evaluateConditions({ staleReports: { count: 1 } })[0].title, '1 report open longer than 24 h');
 
+// ── new reports (item 79): one alert per batch, keyed by the newest report ──
+const RID = 'aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee';
+expect('new reports', fps({ newReports: { count: 2, newestId: RID } }), [`moderation:new-reports:${RID}`]);
+expect('new reports high', sev({ newReports: { count: 2, newestId: RID } }), ['high']);
+expect('new reports always notify', evaluateConditions({ newReports: { count: 1, newestId: RID } })[0].notify, true);
+expect('new reports title', evaluateConditions({ newReports: { count: 2, newestId: RID } })[0].title, '2 new reports — open the moderation queue');
+expect('new report title singular', evaluateConditions({ newReports: { count: 1, newestId: RID } })[0].title, '1 new report — open the moderation queue');
+expect('same newest report → same fingerprint (dedupe)', fps({ newReports: { count: 1, newestId: RID } }), fps({ newReports: { count: 3, newestId: RID } }));
+expect('newer report → new fingerprint', fps({ newReports: { count: 1, newestId: 'ffffffff-bbbb-4ccc-8ddd-eeeeeeeeeeee' } })[0] !== fps({ newReports: { count: 1, newestId: RID } })[0], true);
+expect('no new reports', fps({ newReports: { count: 0, newestId: null } }), []);
+expect('count without an id raises nothing', fps({ newReports: { count: 2, newestId: null } }), []);
+expect('unknown count raises nothing', fps({ newReports: { count: null, newestId: RID } }), []);
+{
+  const c = evaluateConditions({ newReports: { count: 4, newestId: RID } })[0];
+  expect('new reports detail carries no ids or content', c.detail, { count: 4, windowMin: 65 });
+  expect('title carries no ids', c.title.includes(RID), false);
+}
+
 // ── deploy: fingerprint per deploy, so the next failure is a new ticket ──
 expect('deploy failed', fps({ latestDeploy: { id: 'abc123', state: 'error', title: 'Merge #221' } }), ['deploy:failed:abc123']);
 expect('deploy building', fps({ latestDeploy: { id: 'abc123', state: 'building' } }), []);
@@ -104,8 +122,9 @@ const all = evaluateConditions({
   db: { reachable: true, ms: 2000 }, diskUsedPct: 91, connections: { used: 59, max: 60 },
   advisorErrors: [{ name: 'a', title: 'A' }], errors: { lastHour: 50, prev24h: 10 }, staleReports: { count: 2 },
   latestDeploy: { id: 'd', state: 'error' }, vitals: { lcpP75: 6000, samples: 99 }, aiCaps: hits,
+  newReports: { count: 1, newestId: RID },
 });
-expect('all conditions', all.length, 9);
+expect('all conditions', all.length, 10);
 expect('well-formed', all.every(c => c.fingerprint && c.kind && ['critical', 'high', 'medium', 'low'].includes(c.severity)
   && c.title && c.title.length <= 200 && c.detail && typeof c.detail === 'object'), true);
 expect('unique fingerprints', new Set(all.map(c => c.fingerprint)).size, all.length);

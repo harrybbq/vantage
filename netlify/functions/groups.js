@@ -21,6 +21,8 @@
  * feature the owner has simply not switched on.
  */
 
+const { pauseGate } = require('../lib/killSwitch');
+const sbKeys = require('../lib/sbKeys');
 const { requireUser, underLimit, tooMany } = require('../lib/requireUser');
 const { screenImage, parseDataUrl } = require('../lib/imageModeration');
 const { withinDailyAiCap, overDailyCap } = require('../lib/aiQuota');
@@ -434,6 +436,8 @@ async function moderationAction(auth, action, body, env) {
 // ── Handler ──────────────────────────────────────────────────────────
 exports.handler = async (event) => {
   if (event.httpMethod === 'OPTIONS') return { statusCode: 204, headers: CORS, body: '' };
+  const pausedRes = pauseGate('social', CORS);
+  if (pausedRes) return pausedRes;
   if (event.httpMethod !== 'POST') return fail(405, 'method not allowed');
 
   const auth = await requireUser(event, CORS);
@@ -443,7 +447,7 @@ exports.handler = async (event) => {
 
   const env = {
     supabaseUrl: process.env.SUPABASE_URL,
-    serviceKey: process.env.SUPABASE_SERVICE_ROLE_KEY,
+    serviceKey: sbKeys.serviceKey(process.env),
   };
   if (!env.supabaseUrl || !env.serviceKey) return fail(500, 'not configured');
 

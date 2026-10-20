@@ -30,21 +30,24 @@ const root = new URL('..', import.meta.url).pathname;
 const require = createRequire(import.meta.url);
 
 /* The functions are CommonJS inside a "type": "module" package, so they
-   are copied to .cjs to be required. visionXp comes along because
-   recompute requires it by relative path. */
+   are copied to .cjs to be required. visionXp and sbKeys come along
+   because recompute requires them by relative path. */
 const tmpRecompute = join(tmpdir(), `recompute.${process.pid}.cjs`);
 const tmpVisionXp = join(tmpdir(), `visionXp.${process.pid}.cjs`);
+const tmpSbKeys = join(tmpdir(), `sbKeys.${process.pid}.cjs`);
 writeFileSync(tmpVisionXp, readFileSync(join(root, 'netlify/lib/visionXp.js')));
+writeFileSync(tmpSbKeys, readFileSync(join(root, 'netlify/lib/sbKeys.js')));
 writeFileSync(
   tmpRecompute,
   readFileSync(join(root, 'netlify/lib/recompute.js'), 'utf8')
-    .replace("require('./visionXp')", JSON.stringify(tmpVisionXp).replace(/^/, 'require(').replace(/$/, ')')),
+    .replace("require('./visionXp')", JSON.stringify(tmpVisionXp).replace(/^/, 'require(').replace(/$/, ')'))
+    .replace("require('./sbKeys')", `require(${JSON.stringify(tmpSbKeys)})`),
 );
 let serverDerive;
 try {
   ({ deriveRatings: serverDerive } = require(tmpRecompute));
 } finally {
-  for (const f of [tmpRecompute, tmpVisionXp]) { try { unlinkSync(f); } catch { /* best effort */ } }
+  for (const f of [tmpRecompute, tmpVisionXp, tmpSbKeys]) { try { unlinkSync(f); } catch { /* best effort */ } }
 }
 
 const DAY = 86_400_000;

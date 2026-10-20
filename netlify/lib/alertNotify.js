@@ -38,7 +38,9 @@
  * The ticket title and a plain headline (lib/alertText.js), e.g.
  * "Database unreachable" / "The database isn’t answering — the app
  * can’t load or save". NO user data, no ids beyond the ticket's own,
- * no secrets. Click opens /?upgrade=security&ticket=<id>.
+ * no secrets. Click opens /?upgrade=security&ticket=<id> (a new-report ping:
+ * "2 new reports — open the moderation queue", opening
+ * /?upgrade=security&sec=moderation, sent whatever ALERT_MIN_SEVERITY is).
  *
  * notifyOwner never throws: a failed ping is logged and the caller
  * carries on. createNotifier caps pings per run (the sweep uses 6).
@@ -102,6 +104,12 @@ function ticketLink(ticketId, env = process.env) {
   return UUID.test(String(ticketId || ''))
     ? `${base}/?upgrade=security&ticket=${ticketId}`
     : `${base}/?upgrade=security&sec=overview`;
+}
+
+/** Where a new-report ping lands: Upgrade → Security → Moderation (item 79). */
+function queueLink(env = process.env) {
+  const base = appBase(env);
+  return base ? `${base}/?upgrade=security&sec=moderation` : '';
 }
 
 /** RFC 2047 for any header value that is not plain printable ASCII. */
@@ -218,7 +226,9 @@ function createNotifier({ max = 6, env = process.env, fetchImpl = globalThis.fet
     },
     get size() { return queue.length; },
     async flush() {
-      const results = await Promise.all(queue.map(a => notifyOwner(a, { env, fetchImpl })));
+      // `force` is set by the sweep for conditions that always notify (new
+      // reports) — they skip the ALERT_MIN_SEVERITY threshold.
+      const results = await Promise.all(queue.map(a => notifyOwner(a, { env, fetchImpl, force: !!a.force })));
       const sent = results.filter(r => r.sent.length).length;
       if (dropped) console.warn(`alertNotify: ${dropped} alert(s) over the per-run cap of ${max} not sent`);
       return { queued: queue.length, sent, dropped };
@@ -227,6 +237,6 @@ function createNotifier({ max = 6, env = process.env, fetchImpl = globalThis.fet
 }
 
 module.exports = {
-  SEVERITIES, atOrAbove, alertConfig, appBase, ticketLink, headerSafe,
+  SEVERITIES, atOrAbove, alertConfig, appBase, ticketLink, queueLink, headerSafe,
   buildNtfyRequest, buildWebhookRequest, notifyOwner, createNotifier,
 };

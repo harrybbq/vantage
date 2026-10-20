@@ -13,7 +13,7 @@
  *
  * Required Netlify env vars (all set in dashboard):
  *   SUPABASE_URL                  — same as the client uses
- *   SUPABASE_SERVICE_ROLE_KEY     — service role key (NOT the anon key)
+ *   SUPABASE_SECRET_KEY (or legacy service-role key, via lib/sbKeys) — NOT the anon key
  *   FCM_SERVICE_ACCOUNT_JSON      — JSON string of the FCM service
  *                                   account key. Generate in Firebase
  *                                   Console → Project settings → Service
@@ -41,6 +41,8 @@
  *     filtered out by the partial index in notifications_pending.
  */
 
+const { pausedCron } = require('../lib/killSwitch');
+const sbKeys = require('../lib/sbKeys');
 const crypto = require('node:crypto');
 const { requireScheduler } = require('../lib/cronAuth');
 
@@ -67,9 +69,10 @@ exports.handler = async (event, context) => {
   // everything else now needs PUSH_DISPATCH_SECRET.
   const denied = requireScheduler(event, CORS, 'PUSH_DISPATCH_SECRET');
   if (denied) return denied;
+  if (pausedCron('push', 'push-dispatch')) return { statusCode: 200, body: JSON.stringify({ paused: true, area: 'push' }) };
 
   const supabaseUrl = process.env.SUPABASE_URL;
-  const serviceKey  = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  const serviceKey  = sbKeys.serviceKey(process.env);
   if (!supabaseUrl || !serviceKey) {
     return {
       statusCode: 500, headers: CORS,
@@ -367,12 +370,10 @@ function stringifyValues(obj) {
 // PostgREST is straightforward for the few calls we need.
 function createSupabaseAdmin(url, serviceKey) {
   const base = `${url}/rest/v1`;
-  const headers = {
-    apikey: serviceKey,
-    Authorization: `Bearer ${serviceKey}`,
+  const headers = sbKeys.serviceKeyHeaders(serviceKey, {
     'Content-Type': 'application/json',
     Prefer: 'return=representation',
-  };
+  });
 
   async function select(table, opts = {}) {
     // Two call shapes for backward compat:

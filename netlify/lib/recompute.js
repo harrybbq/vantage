@@ -13,6 +13,7 @@
  */
 
 const { VISION_XP } = require('./visionXp');
+const { serviceKeyHeaders } = require('./sbKeys');
 
 // ── Constants (mirror derive.js) ─────────────────────────────────────────
 const DAY_MS = 86_400_000;
@@ -286,7 +287,7 @@ function macroPoints(macroDays = 0) {
  * the canonical one.
  */
 async function fetchMacroDays(userId, { supabaseUrl, serviceKey }) {
-  const headers = { apikey: serviceKey, Authorization: `Bearer ${serviceKey}` };
+  const headers = serviceKeyHeaders(serviceKey);
   try {
     const goalRes = await fetch(
       `${supabaseUrl}/rest/v1/nutrition_macros?user_id=eq.${userId}&name=eq.Calories&select=daily_goal`,
@@ -438,7 +439,7 @@ const RATING_STATE_SELECT = RATING_STATE_KEYS.map(k => `${k}:state->${k}`).join(
 async function fetchCreatedAt(userId, { supabaseUrl, serviceKey }) {
   try {
     const res = await fetch(`${supabaseUrl}/auth/v1/admin/users/${userId}`, {
-      headers: { apikey: serviceKey, Authorization: `Bearer ${serviceKey}` },
+      headers: serviceKeyHeaders(serviceKey),
     });
     if (!res.ok) return null;
     return (await res.json())?.created_at || null;
@@ -455,7 +456,7 @@ async function fetchCreatedAt(userId, { supabaseUrl, serviceKey }) {
  * let a state be emptied in between.
  */
 async function loadRatingInputs(userId, { supabaseUrl, serviceKey }, { createdAt } = {}) {
-  const headers = { apikey: serviceKey, Authorization: `Bearer ${serviceKey}` };
+  const headers = serviceKeyHeaders(serviceKey);
 
   const stateRes = await fetch(
     `${supabaseUrl}/rest/v1/user_data?id=eq.${userId}&select=${RATING_STATE_SELECT}`,
@@ -504,12 +505,10 @@ async function writeRatings(userId, ratings, { supabaseUrl, serviceKey }) {
     `${supabaseUrl}/rest/v1/profiles?id=eq.${userId}`,
     {
       method: 'PATCH',
-      headers: {
-        apikey: serviceKey,
-        Authorization: `Bearer ${serviceKey}`,
+      headers: serviceKeyHeaders(serviceKey, {
         'Content-Type': 'application/json',
         Prefer: 'return=minimal',
-      },
+      }),
       body: JSON.stringify({
         ratings,
         ratings_ovr: ratings.ovr,

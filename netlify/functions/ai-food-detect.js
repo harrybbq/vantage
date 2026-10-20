@@ -32,6 +32,7 @@ function checkRateLimit(ip) {
   return entry.count <= RATE_LIMIT;
 }
 
+const { pauseGate } = require('../lib/killSwitch');
 const { requireUser, underLimit, tooMany } = require('../lib/requireUser');
 const { withinDailyAiCap, overDailyCap } = require('../lib/aiQuota');
 const { FREE_WEEKLY, decide, usedThisWeek, noteLocalUse, isPaidUser, resetsOnIso } = require('../lib/freeAllowance');
@@ -89,6 +90,8 @@ exports.handler = async (event) => {
   if (event.httpMethod === 'OPTIONS') {
     return { statusCode: 204, headers: CORS, body: '' };
   }
+  const pausedRes = pauseGate('ai', CORS);
+  if (pausedRes) return pausedRes;
   // GET → the caller's allowance, so the scanner can say "2 of 3 free
   // scans left this week" before anyone spends one.
   if (event.httpMethod === 'GET') {

@@ -47,10 +47,40 @@ Netlify → the site → **Deploys** → pick the last good deploy → **Publish
 - Environment variables are **not** rolled back. They are whatever is set now.
 - If the bad change was a service worker (`public/sw.js`), clients may keep the bad build until a new `CACHE_VERSION` ships. Rolling back the deploy is still the first step.
 
+### Pause an area: `VANTAGE_PAUSE` (the kill switch)
+
+One env var switches whole areas off with no code change (`netlify/lib/killSwitch.js`, item 78).
+
+| Value | What stops |
+|---|---|
+| `ai` | `ai-food-detect`, `ai-coach-daily`, `recipe-from-video`, `destination-brief` |
+| `social` | `get-leaderboard`, `groups`, `prestige-up`, `avatar-check`, and the weekly `settle-leagues` run |
+| `sync` | `whoop-sync`, `oura-sync`, `health-sync` (Apple Health Shortcut), `whoop-callback`, `oura-callback`, and the nightly `whoop-cron` / `oura-cron` |
+| `push` | `push-dispatch` (queued notifications wait in the queue) |
+| `all` | every area above |
+
+Comma-separate to combine (`ai,sync`); case and spaces don't matter; anything else is ignored.
+
+**Never paused, by design:** `delete-account`, `health`, `moderation`, `security-console`, `security-sweep`, `security-agent` (the owner's tool — it is deliberately not in `ai`), `support-ticket`, `client-error`, `csp-report`. You need these during an incident, and users must always be able to delete their account.
+
+Steps:
+
+1. Netlify → the site → **Site configuration → Environment variables → Add a variable**: key `VANTAGE_PAUSE`, value e.g. `ai`, scope **Functions** (or all scopes), same value for every deploy context.
+2. **Deploys → Trigger deploy → Deploy site.** Netlify's docs: *"Environment variable changes require a build and deploy to take effect"* — functions keep the values from the deploy they were built in. So this is **no code change, but not instant**: a build (a few minutes, ~15 credits). If the build itself is the problem, use the rollback above instead.
+3. Check it took: call one paused endpoint (e.g. open the app's leaderboard for `social`) — it should say **"Paused for maintenance — back soon."** HTTP callers get `503 {"error":"paused","area":…}` with `Retry-After: 600`. Scheduled runs log `…: paused by VANTAGE_PAUSE (<area>) — skipping this run` in Netlify → Logs → Functions. WHOOP/Oura connect lands back on the app with "Paused for maintenance".
+4. To resume: delete the variable (or empty it) and **Trigger deploy** again.
+
+After a pause:
+
+- `settle-leagues` only settles the week that just ended, at Mon 00:05 UTC. If `social` is paused across that run, that week is not settled. The code accepts `?week=YYYY-MM-DD` to re-settle a week, but Netlify does not expose scheduled functions by URL in production, so re-running it means running the function locally with the production env (`netlify dev`, then `netlify functions:invoke settle-leagues --querystring "week=YYYY-MM-DD"`) — or accepting the missed week. Prefer lifting a `social` pause before Monday 00:05 UTC.
+- `push-dispatch`: notifications queued during the pause are sent on the first run after it — they may be stale.
+- WHOOP/Oura nightly runs simply catch up the next night (oldest first); users can tap Sync.
+
+**What VANTAGE_PAUSE cannot stop:** anything the app does **directly against Supabase** with the user's session — saving state, DMs (`messages`), friends (`friendships`), blocks, reports, profile edits. Those never touch a Netlify function. To stop one of them, use option 3 below (revoke a grant or drop a policy in the SQL editor), e.g. `revoke insert on public.messages from authenticated;` — write it to a file first so the fix is recorded, and re-grant when done.
+
 ### Switch one function off
 
-**There is no kill-switch env var today.** Item 78 asks for one; it isn't built.
-The real options, fastest first:
+When `VANTAGE_PAUSE` doesn't cover it, the other options, fastest first:
 
 1. **Remove the env var the function needs, then redeploy.** Every one of these fails closed without its key (checked in code):
 
@@ -62,7 +92,7 @@ The real options, fastest first:
    | `REVENUECAT_WEBHOOK_AUTH` | `revenuecat-webhook` (tier changes) | 500 "not configured". RevenueCat retries, so events are not lost. |
    | `TRADING_REPORT_TOKEN` | `trading-summary` | setup hint, no fetch |
    | `OWNER_EMAIL` (and `VITE_OWNER_EMAIL`) | every owner-only function: `moderation`, `security-console`, `admin-set-rating`, `trading-summary`, crest review | 403 for everyone |
-   | `SUPABASE_SERVICE_ROLE_KEY` | nearly every function (anything that writes or reads across users) | 500. The app itself still loads and saves — the client talks to Supabase directly with the anon key. |
+   | `SUPABASE_SECRET_KEY` **and** `SUPABASE_SERVICE_ROLE_KEY` (functions use the secret key when set and fall back to the legacy one — remove both) | nearly every function (anything that writes or reads across users) | 500. The app itself still loads and saves — the client talks to Supabase directly with the anon key. |
 
    ⚠️ Netlify applies env var changes **only on the next deploy.** After changing one: Deploys → **Trigger deploy → Deploy site** (redeploys the current commit, ~15 credits, a few minutes).
    Remember to put the value back afterwards.
@@ -77,8 +107,8 @@ A redirect in `netlify.toml` over `/.netlify/functions/<name>` is **not** a docu
 
 ### Scheduled functions
 
-`push-dispatch` (every minute), `security-sweep` (hourly at :23), `snapshot-ratings` (03:00), `whoop-cron` (06:00), `oura-cron` (06:30), `settle-leagues` (Mon 00:05) — all UTC, in `netlify.toml`. `security-sweep` only writes tickets; it never touches user data.
-To stop a cron that is damaging data: remove its env var as above (whoop/oura), or roll back the deploy. Removing the `schedule` line from `netlify.toml` also works but needs a merge and a build.
+`push-dispatch` (every minute), `security-sweep` (hourly at :23), `snapshot-ratings` (03:00), `whoop-cron` (every 10 min 06:00–08:50, not :30), `oura-cron` (06:30), `settle-leagues` (Mon 00:05) — all UTC, in `netlify.toml`. `security-sweep` only writes tickets; it never touches user data.
+To stop a cron that is damaging data: `VANTAGE_PAUSE=sync` (whoop/oura crons), `push` (push-dispatch) or `social` (settle-leagues) and redeploy; or remove its env var as above (whoop/oura); or roll back the deploy. Removing the `schedule` line from `netlify.toml` also works but needs a merge and a build.
 
 ### One user's account
 
@@ -96,8 +126,8 @@ After rotating any of these: set the new value in Netlify, **then redeploy** (en
 | Secret (env var) | Protects | Rotate at | What breaks while rotating |
 |---|---|---|---|
 | Supabase **JWT secret / signing key** | Every user session. Anyone with it can mint a token as any user. | Supabase → Project Settings → JWT Keys (or API → JWT settings on older projects). | **Signs everyone out.** This is the "kill all sessions" lever. With legacy keys it also invalidates the old `anon` and `service_role` keys — update `VITE_SUPABASE_ANON_KEY`, `SUPABASE_ANON_KEY` and `SUPABASE_SERVICE_ROLE_KEY` in the same sitting, then redeploy. |
-| `SUPABASE_SERVICE_ROLE_KEY` | Full database access, bypasses RLS. Used by almost every function. | Supabase → Project Settings → API Keys. With the new-style keys, create a new secret key, deploy it, then delete the old one. With legacy keys, it only changes by rotating the JWT secret (row above). | Functions fail until the redeploy lands. Users stay signed in (new-style keys). |
-| `VITE_SUPABASE_ANON_KEY` / `SUPABASE_ANON_KEY` | Nothing secret — it is public and RLS-gated. Rotate only if forced by the JWT rotation. | As above. | App can't reach Supabase until the new build is live. Old clients (cached builds, native app) break until they update. |
+| `SUPABASE_SECRET_KEY` (new, `sb_secret_…`) / `SUPABASE_SERVICE_ROLE_KEY` (legacy) | Full database access, bypasses RLS. Used by almost every function. | Supabase → Project Settings → API Keys. With the new-style keys, create a new secret key, deploy it, then delete the old one. With legacy keys, it only changes by rotating the JWT secret (row above). | Functions fail until the redeploy lands. Users stay signed in (new-style keys). |
+| `VITE_SUPABASE_PUBLISHABLE_KEY` / `SUPABASE_PUBLISHABLE_KEY` (new) and `VITE_SUPABASE_ANON_KEY` / `SUPABASE_ANON_KEY` (legacy) | Nothing secret — it is public and RLS-gated. Rotate only if forced by the JWT rotation. | As above. | App can't reach Supabase until the new build is live. Old clients (cached builds, native app) break until they update. |
 | `ANTHROPIC_API_KEY` | AI spend. | Anthropic console → API keys. Create new, deploy, then disable the old one. | AI features answer 503 during the gap. Also check the spend limit is still set. |
 | `WHOOP_CLIENT_SECRET` (+ `WHOOP_CLIENT_ID`) | Exchanging and refreshing users' WHOOP tokens. | WHOOP developer dashboard → the app. | Sync and connect fail until redeployed. **Does not revoke users' existing grants** — tokens in `whoop_tokens` stay valid at WHOOP. Also the fallback OAuth-state key (see `OAUTH_STATE_SECRET`). |
 | `OURA_CLIENT_SECRET` (+ `OURA_CLIENT_ID`) | Same for Oura (`oura_tokens`). | Oura developer portal → the application. | Same as WHOOP. |
@@ -167,7 +197,7 @@ Upgrade → **Security** (owner only; `netlify/functions/security-console.js`, c
 - **Netlify** — published deploy, last 10 deploys (need `NETLIFY_AUTH_TOKEN`); real-user web vitals p75 from `public.web_vitals`; DB ping. Netlify has **no API** for Observability (requests, status codes), function invocations or bandwidth — the panel links to those dashboard pages instead.
 - **Advisors** — a finding you have looked at and accept (e.g. RLS on with no policies, on purpose) can be **accepted**: it stops counting on the Overview and the sweep stops raising it (`public.security_accepted_findings`, keyed by the advisor's `cache_key`). Un-accept to bring it back. Advisor endpoints are experimental upstream.
 - **Moderation** — the report queue (same logic as `moderation.js`), suspended accounts, crest queue. **Suspend** hides a user from public boards; **Ban** also sets an Auth-level ban (`ban_duration`), so they cannot sign in or refresh a session. An access token they already hold stays valid until it expires (about an hour by default) — for an active SEV1, also rotate as in section 4. Both are reversible from the same screen. Owner accounts cannot be banned there.
-- **Tickets** — `public.security_tickets`: raised hourly by `security-sweep` (DB down/slow, disk/connections > 80 %, advisor ERRORs, client-error spike, reports open > 24 h, failed production deploy, LCP p75 > 4 s, repeated AI-cap hits), by users from Settings → Report a problem (5 a day each), or by hand. A repeating condition bumps its ticket's count; a resolved one re-opens if it returns. **A critical ticket is a reason to open this runbook at section 2.**
+- **Tickets** — `public.security_tickets`: raised hourly by `security-sweep` (DB down/slow, disk/connections > 80 %, advisor ERRORs, client-error spike, reports open > 24 h, new reports in the last hour (always pings the owner — item 79), failed production deploy, LCP p75 > 4 s, repeated AI-cap hits), by users from Settings → Report a problem (5 a day each), or by hand. A repeating condition bumps its ticket's count; a resolved one re-opens if it returns. **A critical ticket is a reason to open this runbook at section 2.**
 
 Setup: run `supabase/security_console_2026_10.sql`; set `SUPABASE_ACCESS_TOKEN` and `NETLIFY_AUTH_TOKEN` (both optional, both top-tier — see section 4); redeploy. Every panel shows a setup card until its piece is there.
 

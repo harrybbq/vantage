@@ -37,7 +37,7 @@
  * to the server's today:
  *   { "date":"2026-07-08", "steps":8234, "weight":72.4, "sleep":7.3, "rhr":57 }
  *
- * Env: SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY.
+ * Env: SUPABASE_URL, the service key (lib/sbKeys).
  */
 
 const CORS = {
@@ -79,6 +79,8 @@ function latestWeight(vitalsLog) {
   return null;
 }
 
+const { pauseGate } = require('../lib/killSwitch');
+const sbKeys = require('../lib/sbKeys');
 const { mergeStateCAS } = require('../lib/stateWrite');
 
 function clientIp(event) {
@@ -92,11 +94,13 @@ const reply = (statusCode, body) => ({ statusCode, headers: CORS, body: JSON.str
 
 exports.handler = async (event) => {
   if (event.httpMethod === 'OPTIONS') return { statusCode: 204, headers: CORS, body: '' };
+  const pausedRes = pauseGate('sync', CORS);
+  if (pausedRes) return pausedRes;
   if (event.httpMethod !== 'POST') return reply(405, { error: 'method not allowed' });
 
   const env = process.env;
   const supabaseUrl = env.SUPABASE_URL;
-  const serviceKey = env.SUPABASE_SERVICE_ROLE_KEY;
+  const serviceKey = sbKeys.serviceKey(env);
   if (!supabaseUrl || !serviceKey) return reply(500, { error: 'not configured' });
 
   // Per IP first: this is checked before anything touches the database,
@@ -116,7 +120,7 @@ exports.handler = async (event) => {
 
   const lookup = await fetch(
     `${supabaseUrl}/rest/v1/user_data?state->>healthToken=eq.${token}&select=id,state,updated_at`,
-    { headers: { apikey: serviceKey, Authorization: `Bearer ${serviceKey}` } });
+    { headers: sbKeys.serviceKeyHeaders(serviceKey) });
   if (!lookup.ok) {
     console.error('health-sync: lookup failed', lookup.status);
     return reply(500, { error: 'sync failed' });

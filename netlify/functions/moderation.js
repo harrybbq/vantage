@@ -33,6 +33,7 @@
  * owner's Security console (functions/security-console.js), so the two
  * can never disagree about how a report is closed.
  */
+const sbKeys = require('../lib/sbKeys');
 const { requireUser, underLimit, tooMany } = require('../lib/requireUser');
 const { isOwnerEmail } = require('../lib/owner');
 const { listOpenReports, decideReport } = require('../lib/moderationCore');
@@ -56,7 +57,7 @@ exports.handler = async (event) => {
   if (!isOwnerEmail(auth.email)) return reply(403, { error: 'forbidden' });
   if (!underLimit('moderation', auth.userId, 60)) return tooMany(CORS);
 
-  const env = { supabaseUrl: process.env.SUPABASE_URL, serviceKey: process.env.SUPABASE_SERVICE_ROLE_KEY };
+  const env = { supabaseUrl: process.env.SUPABASE_URL, serviceKey: sbKeys.serviceKey(process.env) };
   if (!env.supabaseUrl || !env.serviceKey) return reply(500, { error: 'not configured' });
 
   try {

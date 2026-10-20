@@ -19,6 +19,7 @@
  * env all refuse rather than guess.
  */
 
+const sbKeys = require('../lib/sbKeys');
 const { requireUser } = require('../lib/requireUser');
 
 const CORS = {
@@ -45,15 +46,13 @@ exports.handler = async (event) => {
   // requireUser gives us the id; we need the email for the owner check,
   // so re-read the verified user rather than trusting anything client-sent.
   const url = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
-  const apikey = process.env.VITE_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY
-    || process.env.SUPABASE_SERVICE_ROLE_KEY;
   const jwt = (event.headers?.authorization || event.headers?.Authorization || '')
     .replace(/^Bearer\s+/i, '').trim();
 
   let email = '';
   try {
     const who = await fetch(`${url}/auth/v1/user`, {
-      headers: { apikey, Authorization: `Bearer ${jwt}` },
+      headers: sbKeys.userHeaders(process.env, jwt),
     });
     if (who.ok) email = ((await who.json())?.email || '').toLowerCase();
   } catch { /* falls through to the owner check below */ }

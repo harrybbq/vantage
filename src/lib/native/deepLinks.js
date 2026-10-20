@@ -1,5 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
-import { supabase } from '../supabase';
+import { supabase, SUPABASE_URL, SUPABASE_PUBLIC_KEY } from '../supabase';
 import { isNativeApp } from './platform';
 import { parseAuthCallback, AUTH_CALLBACK_URL } from './authCallback';
 
@@ -36,8 +36,8 @@ let oauthClient = null;
 function nativeOAuthClient() {
   if (oauthClient) return oauthClient;
   oauthClient = createClient(
-    import.meta.env.VITE_SUPABASE_URL,
-    import.meta.env.VITE_SUPABASE_ANON_KEY,
+    SUPABASE_URL,
+    SUPABASE_PUBLIC_KEY,
     {
       auth: {
         flowType: 'pkce',

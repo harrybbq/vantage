@@ -6,6 +6,8 @@
  * Vantage user), exchange the code for access+refresh tokens, store them
  * in oura_tokens (service-role only), and bounce back into the app.
  */
+const { paused } = require('../lib/killSwitch');
+const sbKeys = require('../lib/sbKeys');
 const { verifyState, clearCookie } = require('../lib/oauthState');
 const { redirectUriFor, appUrl } = require('../lib/redirectUri');
 
@@ -24,8 +26,12 @@ function redirect(event, result) {
 }
 
 exports.handler = async (event) => {
-  const { SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, OURA_CLIENT_ID, OURA_CLIENT_SECRET } = process.env;
+  const { SUPABASE_URL, OURA_CLIENT_ID, OURA_CLIENT_SECRET } = process.env;
+  const serviceKey = sbKeys.serviceKey(process.env);
   const q = event.queryStringParameters || {};
+  // Kill switch (lib/killSwitch): a browser redirect, so say it with the
+  // same ?provider=<result> the app already reads rather than a 503 page.
+  if (paused('sync')) return redirect(event, 'paused');
 
   if (q.error) return redirect(event, 'denied');
   // Authentic, unexpired, for this provider, AND accompanied by
@@ -61,12 +67,10 @@ exports.handler = async (event) => {
 
     const up = await fetch(`${SUPABASE_URL}/rest/v1/oura_tokens`, {
       method: 'POST',
-      headers: {
-        apikey: SUPABASE_SERVICE_ROLE_KEY,
-        Authorization: `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
+      headers: sbKeys.serviceKeyHeaders(serviceKey, {
         'Content-Type': 'application/json',
         Prefer: 'resolution=merge-duplicates,return=minimal',
-      },
+      }),
       body: JSON.stringify({
         user_id: userId,
         access_token: tok.access_token,

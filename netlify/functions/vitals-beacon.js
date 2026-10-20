@@ -18,6 +18,7 @@
  * Always 204: a measurement endpoint must never be the reason a page
  * misbehaves, and it tells a prober nothing.
  */
+const sbKeys = require('../lib/sbKeys');
 const { shapeVitalsRow } = require('../lib/securityShape');
 
 const CORS = {
@@ -60,7 +61,7 @@ exports.handler = async (event) => {
   if (!allowed(clientIp(event))) return { statusCode: 429, headers: CORS, body: '' };
 
   const url = process.env.SUPABASE_URL;
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  const key = sbKeys.serviceKey(process.env);
   if (!url || !key || Date.now() < missingUntil) return done();
 
   // sendBeacon with a string body arrives as text/plain; parse regardless.
@@ -72,7 +73,7 @@ exports.handler = async (event) => {
   try {
     const res = await fetch(`${url}/rest/v1/web_vitals`, {
       method: 'POST',
-      headers: { apikey: key, Authorization: `Bearer ${key}`, 'Content-Type': 'application/json', Prefer: 'return=minimal' },
+      headers: sbKeys.serviceKeyHeaders(key, { 'Content-Type': 'application/json', Prefer: 'return=minimal' }),
       body: JSON.stringify(row),
     });
     if (res.status === 404 || res.status === 400) missingUntil = Date.now() + 10 * 60_000;

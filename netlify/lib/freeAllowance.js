@@ -23,6 +23,8 @@
  * it just has the allowance.
  */
 
+const { serviceKey, serviceKeyHeaders } = require('./sbKeys');
+
 const FREE_WEEKLY = {
   'food-detect': 3,
 };
@@ -77,12 +79,12 @@ function localAdd(bucket, userId, week) {
 async function usedThisWeek(bucket, userId, now = new Date(), fetchImpl = fetch) {
   const week = weekStartIso(now);
   const url = process.env.SUPABASE_URL;
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  const key = serviceKey(process.env);
   if (!url || !key) return { used: localUsed(bucket, userId, week), source: 'local' };
   try {
     const q = `${url}/rest/v1/ai_usage?select=n&user_id=eq.${encodeURIComponent(userId)}`
       + `&bucket=eq.${encodeURIComponent(bucket)}&day=gte.${week}`;
-    const res = await fetchImpl(q, { headers: { apikey: key, Authorization: `Bearer ${key}` } });
+    const res = await fetchImpl(q, { headers: serviceKeyHeaders(key) });
     if (!res.ok) return { used: localUsed(bucket, userId, week), source: 'local' };
     const rows = await res.json();
     const used = Array.isArray(rows) ? rows.reduce((s, r) => s + (Number(r && r.n) || 0), 0) : 0;
@@ -100,11 +102,11 @@ function noteLocalUse(bucket, userId, now = new Date()) {
 /** Pro/lifetime from the server-owned profiles.tier. Fails to "free". */
 async function isPaidUser(userId, fetchImpl = fetch) {
   const url = process.env.SUPABASE_URL;
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  const key = serviceKey(process.env);
   if (!url || !key || !userId) return false;
   try {
     const res = await fetchImpl(`${url}/rest/v1/profiles?id=eq.${encodeURIComponent(userId)}&select=tier`, {
-      headers: { apikey: key, Authorization: `Bearer ${key}` },
+      headers: serviceKeyHeaders(key),
     });
     if (!res.ok) return false;
     const tier = (await res.json())[0]?.tier;

@@ -375,13 +375,14 @@ code fails soft until it is run, so order doesn't matter.
     service-role function, then
     `revoke update (handle, display_name, avatar_url) on public.profiles from authenticated;`.
 
-85. `[ ]` **LAUNCH** Supabase is retiring the legacy `anon`/`service_role`
+85. `[~]` **LAUNCH** Supabase is retiring the legacy `anon`/`service_role`
     keys by the end of 2026. The new `sb_secret_…` keys go in the `apikey`
     header, are not JWTs, and are refused when the request carries a
     browser User-Agent. Every Netlify function sends the service key as
     both `apikey` and `Authorization: Bearer` — that breaks on the switch.
     Move server calls to supabase-js (handles both) or send `apikey` only,
     and test against a secret key before swapping it in.
+    *Status 2026-10-20: done in code — every function reads keys through `netlify/lib/sbKeys.js` (secret key preferred, legacy fallback), service calls send `apikey` only, user session checks send the public key + the user's JWT; `check:sbkeys` fails the build on a regression; the client prefers `VITE_SUPABASE_PUBLISHABLE_KEY`. Owner switch: (1) Supabase → Project Settings → API Keys → create a secret key and a publishable key; (2) Netlify → env vars: set `SUPABASE_SECRET_KEY` (Functions scope), `SUPABASE_PUBLISHABLE_KEY` and `VITE_SUPABASE_PUBLISHABLE_KEY`; (3) redeploy; (4) open `/.netlify/functions/health` (should say `"db":"ok"`) and the Security console (both use the service key) — and sign in, sync WHOOP once; (5) roll back = delete those three vars and redeploy; (6) only later, once old app builds have updated, deactivate the legacy keys in Supabase.*
 86. `[ ]` **LAUNCH** Netlify Web security center (observed 2026-10-02):
     no WAF, no rate-limiting rules, no firewall traffic rules. Add a
     rate-limit rule on `/.netlify/functions/*` (per-IP) before launch —
@@ -405,8 +406,9 @@ code fails soft until it is run, so order doesn't matter.
     profiles with avatars per view. Cache 5–10 min; avatars for the top 100 only.
 92. `[ ]` **AFTER** Presence writes a `profiles` UPDATE every 60 s per open
     app (`usePublishProfile.js`). Every 5 min is enough.
-93. `[ ]` **LAUNCH** `whoop-cron` syncs users one by one inside a 20 s
+93. `[~]` **LAUNCH** `whoop-cron` syncs users one by one inside a 20 s
     budget — only ~10–20 users a night. Batch in parallel or run every 2 h.
+    *Status 2026-10-20: done in code — whoop-cron and oura-cron run accounts through a bounded pool (4 at a time, oldest first, stop starting at 20 s, in-flight finish; refresh-token-first and CAS writes unchanged). WHOOP's limit is 100 requests/min and 10,000/day per app, so a run spends ≤ 60 WHOOP calls (~12 accounts) and whoop-cron now runs every 10 min 06:00–08:50 UTC (not :30, when oura-cron runs), skipping accounts already synced that morning — ~180 accounts a morning for <10% of the daily limit. Owner: after the deploy, check one morning's Netlify function log for "not reached" counts; WHOOP also caps an unapproved app at 10 users — apply for production approval / a higher limit in the WHOOP developer dashboard before launch.*
 94. `[ ]` **LAUNCH** Custom SMTP for Supabase Auth. The built-in mailer
     allows a few emails an hour; signups and resets fail at ~50 users.
 95. `[ ]` **AFTER** `weather` has no auth and calls ipwho.is per request;
@@ -547,11 +549,13 @@ can stop the bleeding in minutes, and you meet the legal clock.
     - *Review:* write-up, fix, and a test or check so it can't recur
       (the pattern already used after the 2026-05-03 wipe).
     *Status 2026-09-30: docs/INCIDENT_RUNBOOK.md (contain, secrets inventory, ICO 72 h, breach log, post-mortem). No kill-switch env var exists yet — the runbook documents today's options.*
+    *Status 2026-10-20: kill switch built — `VANTAGE_PAUSE=ai|social|sync|push|all` (comma list) makes those functions answer 503 "Paused for maintenance — back soon" (crons skip their run); moderation, deletion, health and the security tools never pause. Needs a Netlify redeploy to take effect (env changes apply on deploy), no code change. Direct-to-Supabase traffic (DMs, friends) still needs a grant revoke. Owner: read runbook §3 "Pause an area" once, and try it on a quiet evening (`VANTAGE_PAUSE=ai`, redeploy, check, remove, redeploy).*
 79. `[~]` **Abuse handling with a clock on it.** Reports reach an owner
     within hours (push or email), a target of acting within 24 h (what
     Apple expects), a suspend flag that hides a user everywhere, and
     evidence kept when an account is deleted.
     *Status 2026-09-30: docs/ABUSE_HANDLING.md; moderation queue built. Nothing alerts an owner when a report arrives yet — check the queue daily until it does.*
+    *Status 2026-10-20: the hourly security sweep now pings the owner within ~1 h of a new report ("N new report(s) — open the moderation queue", tap opens Moderation; no report content or ids), once per batch, regardless of ALERT_MIN_SEVERITY. Owner: make sure `ALERT_NTFY_TOPIC` (or `ALERT_WEBHOOK_URL`) is set on Netlify and press "Send test alert"; then file a test report from a second account and time the ping.*
 80. `[ ]` **Accounts that can't be taken over.** 2FA (authenticator
     app, not SMS) on GitHub, Supabase, Netlify, Apple, Google Play,
     RevenueCat, Anthropic, the domain registrar and the owner email;

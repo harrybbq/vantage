@@ -47,10 +47,11 @@
  * documents a revoke endpoint, and guessing one is worse than leaving
  * it — add it here once confirmed from the providers' API docs.
  *
- * Env: SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY (admin delete needs the
+ * Env: SUPABASE_URL, the service key via lib/sbKeys (admin delete needs the
  * service role — the anon key cannot remove an auth user). Optional:
  * REVENUECAT_SECRET_API_KEY.
  */
+const sbKeys = require('../lib/sbKeys');
 const { requireUser } = require('../lib/requireUser');
 const { handOverGroup } = require('../lib/leagues');
 
@@ -63,7 +64,7 @@ const CORS = {
 
 const STORAGE_BUCKETS = ['cv', 'recipes'];
 
-const svc = (serviceKey, extra = {}) => ({ apikey: serviceKey, Authorization: `Bearer ${serviceKey}`, ...extra });
+const svc = (serviceKey, extra = {}) => sbKeys.serviceKeyHeaders(serviceKey, extra);
 
 /** Hand over every group this user owns. Throws if a hand-over fails. */
 async function handOverOwnedGroups(userId, url, serviceKey) {
@@ -122,12 +123,12 @@ async function removeStorage(userId, url, serviceKey) {
 }
 
 async function deleteRevenueCatSubscriber(userId) {
-  const key = process.env.REVENUECAT_SECRET_API_KEY;
-  if (!key) return false;
+  const rcKey = process.env.REVENUECAT_SECRET_API_KEY;
+  if (!rcKey) return false;
   try {
     const res = await fetch(`https://api.revenuecat.com/v1/subscribers/${encodeURIComponent(userId)}`, {
       method: 'DELETE',
-      headers: { Authorization: `Bearer ${key}` },
+      headers: { Authorization: `Bearer ${rcKey}` },
     });
     if (!res.ok && res.status !== 404) console.error('delete-account: RevenueCat delete failed', res.status);
     return res.ok;
@@ -145,7 +146,7 @@ exports.handler = async (event) => {
 
   const env = process.env;
   const url = env.SUPABASE_URL || env.VITE_SUPABASE_URL;
-  const serviceKey = env.SUPABASE_SERVICE_ROLE_KEY;
+  const serviceKey = sbKeys.serviceKey(env);
   if (!url || !serviceKey) {
     // Fail loudly rather than half-deleting: better the user is told it
     // didn't work than believes their account is gone when it isn't.

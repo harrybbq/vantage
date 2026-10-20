@@ -12,6 +12,8 @@
  * means "nobody is suspended". Cached for a few minutes in module scope
  * — the list is tiny and changes rarely, and Micro pays for every read.
  */
+const { serviceKeyHeaders } = require('./sbKeys');
+
 const TTL_MS = 5 * 60_000;
 let cache = { at: 0, ids: new Set() };
 
@@ -21,7 +23,7 @@ async function suspendedIds({ supabaseUrl, serviceKey }) {
   try {
     const res = await fetch(
       `${supabaseUrl}/rest/v1/profiles?suspended_at=not.is.null&select=id&limit=5000`,
-      { headers: { apikey: serviceKey, Authorization: `Bearer ${serviceKey}` } });
+      { headers: serviceKeyHeaders(serviceKey) });
     if (res.ok) ids = new Set((await res.json()).map(r => r.id));
     // 400/404 = column not there yet: nobody is suspended. Anything else
     // is transient — keep serving the last good set rather than none.

@@ -21,6 +21,8 @@
 // Per user, per UTC day. Generous for real use (the coach caches one
 // brief a day; food-detect is a camera scan), tight enough that a
 // scripted account costs pennies rather than pounds.
+const { serviceKey, serviceKeyHeaders } = require('./sbKeys');
+
 const DAILY_CAPS = {
   coach: 20,
   'food-detect': 40,
@@ -55,13 +57,13 @@ async function withinDailyAiCap(bucket, userId) {
   if (!cap || !userId) return false;
 
   const url = process.env.SUPABASE_URL;
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  const key = serviceKey(process.env);
   if (!url || !key || Date.now() < rpcMissingUntil) return localBump(bucket, userId, cap);
 
   try {
     const res = await fetch(`${url}/rest/v1/rpc/ai_usage_bump`, {
       method: 'POST',
-      headers: { apikey: key, Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
+      headers: serviceKeyHeaders(key, { 'Content-Type': 'application/json' }),
       body: JSON.stringify({ p_user: userId, p_bucket: bucket, p_limit: cap }),
     });
     if (res.status === 404 || res.status === 400) {

@@ -19,6 +19,8 @@
  * costs Supabase one tiny query per instance per CACHE_MS rather than
  * one per request, and each IP is also rate-limited.
  */
+const sbKeys = require('../lib/sbKeys');
+
 const HEADERS = {
   'Content-Type': 'application/json',
   'Cache-Control': 'no-store',
@@ -47,7 +49,7 @@ async function pingDb(url, key) {
   const timer = setTimeout(() => ctl.abort(), PING_TIMEOUT_MS);
   try {
     const res = await fetch(`${url}/rest/v1/config?select=key&limit=1`, {
-      headers: { apikey: key, Authorization: `Bearer ${key}` },
+      headers: sbKeys.serviceKeyHeaders(key),
       signal: ctl.signal,
     });
     return res.status < 500 ? 'ok' : 'unreachable';
@@ -77,7 +79,7 @@ exports.handler = async (event) => {
   }
 
   const url = process.env.SUPABASE_URL;
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  const key = sbKeys.serviceKey(process.env);
   // Unconfigured is down: every data function would be failing too.
   if (!url || !key) return reply(503, 'not configured');
 

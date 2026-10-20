@@ -23,6 +23,11 @@ const THRESHOLDS = {
   errorSpikeFactor: 3,
   errorSpikeMin: 10,
   staleReportHours: 24,
+  // New reports: the sweep runs hourly, so look back one hour plus a
+  // small margin for scheduler jitter. A report in the margin is seen by
+  // two sweeps; the fingerprint (the newest report's id) makes the
+  // second sighting a bump, not a second alert.
+  newReportWindowMin: 65,
   lcpPoorMs: 4000,
   lcpMinSamples: 20,
   aiCapDays: 2,          // hit the cap on at least this many of the window's days
@@ -49,6 +54,7 @@ const isNum = v => typeof v === 'number' && Number.isFinite(v);
  *   advisorErrors [{ name, title }]                   (Security advisor ERRORs)
  *   errors        { lastHour:number, prev24h:number }  (client_errors)
  *   staleReports  { count:number, oldestAt:string }
+ *   newReports    { count:number, newestId:string }      (created in the last window)
  *   latestDeploy  { id, state, title, errorMessage, branch, createdAt }
  *   vitals        { lcpP75:number, samples:number }
  *   aiCaps        [{ userId, bucket, days:number, cap:number }]
@@ -127,6 +133,24 @@ function evaluateConditions(r = {}, t = THRESHOLDS) {
       severity: 'medium',
       title: `${r.staleReports.count} report${r.staleReports.count === 1 ? '' : 's'} open longer than ${t.staleReportHours} h`,
       detail: { count: r.staleReports.count, oldestAt: r.staleReports.oldestAt || null },
+    });
+  }
+
+  // Item 79: an owner hears about a report within the hour, not the
+  // next time they open the queue. `notify: true` sends it whatever
+  // ALERT_MIN_SEVERITY says (default critical). The fingerprint names the
+  // NEWEST report seen, so the same reports never alert twice and a newer
+  // one always does. No report content and no user ids anywhere in it —
+  // the title is what lands on a phone lock screen.
+  const nr = r.newReports;
+  if (nr && isNum(nr.count) && nr.count > 0 && nr.newestId) {
+    out.push({
+      fingerprint: fingerprint('moderation', 'new-reports', nr.newestId),
+      kind: 'reports_new',
+      severity: 'high',
+      notify: true,
+      title: `${nr.count} new report${nr.count === 1 ? '' : 's'} — open the moderation queue`,
+      detail: { count: nr.count, windowMin: t.newReportWindowMin },
     });
   }
 
