@@ -212,6 +212,7 @@ html[data-design="console"] .cx-shell-tabs {
   padding: var(--cx-sp-4) max(4px, env(safe-area-inset-right, 0px)) var(--cx-shell-tab-pad) max(4px, env(safe-area-inset-left, 0px));
   box-sizing: border-box;
   display: grid; grid-template-columns: repeat(5, minmax(0, 1fr));
+  background: var(--cx-bg);    /* WebViews without color-mix (Chrome < 111) */
   background: color-mix(in srgb, var(--cx-bg) 94%, transparent);
   -webkit-backdrop-filter: blur(16px); backdrop-filter: blur(16px);
   border-top: 1px solid var(--cx-line);
