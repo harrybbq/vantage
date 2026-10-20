@@ -148,6 +148,18 @@ function walk(S, { sharedVitals = true, keepVantageWorkouts = false } = {}) {
   return { vitalsLog, burnLog, logs, logsAuto, counts };
 }
 
+/** Quick yes/no: does S hold any WHOOP/Oura-synced vitals or workouts? */
+export function hasWearableData(S) {
+  if (!S || typeof S !== 'object') return false;
+  for (const row of Object.values(S.vitalsLog || {})) {
+    if (row && typeof row === 'object' && BAND_VITAL_KEYS.some(k => row[k] != null)) return true;
+  }
+  for (const list of Object.values(S.burnLog || {})) {
+    if (Array.isArray(list) && list.some(isBandEntry)) return true;
+  }
+  return false;
+}
+
 const viewCache = new WeakMap();
 
 /**

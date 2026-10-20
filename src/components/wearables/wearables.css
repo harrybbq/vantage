@@ -1,0 +1,73 @@
+/* WHOOP / Oura settings pieces (items 124–127, D4): the data-delete
+   action, the "limited while WHOOP reviews Vantage" note, and the owner's
+   Wearable access panel. Theme tokens only, so cream-pro and dark-os both
+   hold; nothing wider than the viewport on a phone. */
+
+/* ── Delete data synced from WHOOP/Oura ─────────────────────────────── */
+.wx-delete {
+  margin: 0 0 14px; padding: 10px 12px; border-radius: 10px;
+  border: 1px dashed var(--border, #e2dccf);
+}
+.wx-delete-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.wx-delete .vitals-ah-hint { min-width: 0; flex: 1 1 200px; }
+.wx-confirm {
+  padding: 12px 14px; border-radius: 10px; border: 1px solid var(--border, #e2dccf);
+  background: var(--bg-raised, rgba(255,255,255,.04));
+}
+.wx-delete .wx-confirm { padding: 0; border: 0; background: none; }
+.wx-confirm-text { margin: 0 0 10px; font-size: 13px; line-height: 1.55; color: var(--text); }
+.wx-confirm-note { margin: 0 0 10px; font-size: 12.5px; line-height: 1.5; color: #b45309; }
+html[data-theme="dark-os"] .wx-confirm-note { color: #fbbf24; }
+.wx-check {
+  display: flex; align-items: flex-start; gap: 8px; margin: 0 0 10px;
+  font-size: 12.5px; line-height: 1.5; color: var(--text-mid, var(--text)); cursor: pointer;
+}
+.wx-check input { margin-top: 3px; flex: 0 0 auto; width: 16px; height: 16px; }
+.wx-confirm-actions { display: flex; flex-wrap: wrap; gap: 8px; justify-content: flex-end; }
+.vitals-ah-btn.wx-btn-danger { background: #dc2626; color: #fff; }
+
+/* ── Limited-access note under a provider's panel ───────────────────── */
+.wx-note {
+  margin: -6px 0 14px; padding: 8px 12px; border-radius: 8px;
+  font-size: 12.5px; line-height: 1.5; color: var(--text-mid, var(--text));
+  background: rgba(26,122,74,.06); border: 1px solid rgba(26,122,74,.2);
+}
+.wx-note-limited { background: rgba(217,119,6,.08); border-color: rgba(217,119,6,.3); }
+
+/* ── Owner panel ────────────────────────────────────────────────────── */
+.wx-panel { display: flex; flex-direction: column; gap: 14px; max-width: 640px; }
+.wx-mode-row { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+.wx-pill {
+  font-family: var(--mono); font-size: var(--fs-floor); letter-spacing: 1px; text-transform: uppercase;
+  font-weight: 700; padding: 6px 10px; border-radius: 999px;
+  color: var(--em, #1a7a4a); background: rgba(26,122,74,.10); border: 1px solid rgba(26,122,74,.25);
+}
+html[data-theme="dark-os"] .wx-pill { color: var(--em-light, #4ade80); }
+.wx-pill-locked { color: #b45309; background: rgba(217,119,6,.10); border-color: rgba(217,119,6,.3); }
+html[data-theme="dark-os"] .wx-pill-locked { color: #fbbf24; }
+.wx-counts {
+  margin: -6px 0 0; font-family: var(--mono); font-size: var(--fs-floor); letter-spacing: .3px;
+  color: var(--text-muted);
+}
+.wx-msg { margin: 0; font-size: 13px; line-height: 1.5; color: var(--text-mid, var(--text)); }
+.wx-msg-warn { color: #b45309; }
+html[data-theme="dark-os"] .wx-msg-warn { color: #fbbf24; }
+.wx-label {
+  display: block; margin-bottom: 6px; font-family: var(--mono); font-size: var(--fs-floor);
+  letter-spacing: 1.2px; text-transform: uppercase; color: var(--text-muted);
+}
+.wx-add-row { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr) auto; gap: 8px; }
+@media (max-width: 640px) {
+  .wx-add-row { grid-template-columns: minmax(0, 1fr) auto; }
+  .wx-add-row > input:first-child { grid-column: 1 / -1; }
+}
+.wx-empty { margin: 0; font-size: 13px; color: var(--text-muted); }
+.wx-list { list-style: none; margin: 0; padding: 0; border-top: 1px solid var(--border); }
+.wx-row { display: flex; align-items: center; gap: 10px; padding: 10px 0; border-bottom: 1px solid var(--border); }
+.wx-row-main { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.wx-row-name { font-size: 14px; color: var(--text); overflow-wrap: anywhere; }
+.wx-row-meta {
+  font-family: var(--mono); font-size: var(--fs-floor); letter-spacing: .3px; color: var(--text-muted);
+  overflow-wrap: anywhere;
+}
+.wx-row-actions { display: flex; gap: 6px; flex: 0 0 auto; }

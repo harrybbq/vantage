@@ -61,7 +61,13 @@ async function getFreshToken(userId, env) {
       client_secret: env.OURA_CLIENT_SECRET,
     }),
   });
-  if (!ref.ok) throw new Error('oura token refresh failed — reconnect Oura');
+  if (!ref.ok) {
+    const err = new Error(ref.status === 400 || ref.status === 401
+      ? 'Oura sign-in has expired — reconnect Oura below.'
+      : `Oura refused to refresh the connection (${ref.status}).`);
+    err.ouraStatus = ref.status;
+    throw err;
+  }
   const tok = await ref.json();
   /* Persist the rotated refresh token BEFORE anything else happens —
      the old one is already spent, so losing this write disconnects the
@@ -87,23 +93,48 @@ async function getFreshToken(userId, env) {
 
 const ymd = d => d.toISOString().slice(0, 10);
 
-/** Paginated GET of an Oura v2 collection between start/end (YYYY-MM-DD).
- *  Oura returns { data: [...], next_token }. A non-OK response is
- *  tolerated so one unavailable scope can't fail the whole sync. */
-async function ouraList(path, accessToken, startDate, endDate) {
+/**
+ * Human-readable cause for an Oura HTTP status (item 127 / gap C12).
+ * 403 is the one Oura-specific case: Gen3 and Ring 4 owners without an
+ * active Oura Membership cannot share data with other apps.
+ */
+function ouraReason(status) {
+  if (status === 401) return 'Oura rejected our access — reconnect Oura below.';
+  if (status === 403) return 'Oura needs an active Oura Membership before other apps can read your data (Gen3 and Ring 4). Renew it in the Oura app, then sync again.';
+  if (status === 429) return 'Oura is rate-limiting us — try again in a few minutes.';
+  if (status >= 500) return 'Oura is having problems right now — try again later.';
+  return `Oura returned ${status}.`;
+}
+
+/**
+ * Paginated GET of an Oura v2 collection between start/end (YYYY-MM-DD).
+ * Oura returns { data: [...], next_token }.
+ *
+ * Returns { records, error } — the whoopList pattern. It used to `break`
+ * on any non-OK response and return an empty list, so a lapsed
+ * membership or a revoked grant read as "Synced 0 days" (gap C12).
+ */
+async function ouraList(path, accessToken, startDate, endDate, fetchImpl = fetch) {
   const out = [];
   let nextToken = null;
+  let error = null;
   for (let page = 0; page < 5; page++) {
     const params = new URLSearchParams({ start_date: startDate, end_date: endDate });
     if (nextToken) params.set('next_token', nextToken);
-    const res = await fetch(`${API}${path}?${params}`, { headers: { Authorization: `Bearer ${accessToken}` } });
-    if (!res.ok) break;
+    let res;
+    try {
+      res = await fetchImpl(`${API}${path}?${params}`, { headers: { Authorization: `Bearer ${accessToken}` } });
+    } catch (e) {
+      error = { path, status: 0, reason: `Could not reach Oura (${(e && e.message) || 'network error'}).` };
+      break;
+    }
+    if (!res.ok) { error = { path, status: res.status, reason: ouraReason(res.status) }; break; }
     const json = await res.json().catch(() => ({}));
     out.push(...(json.data || []));
     nextToken = json.next_token || null;
     if (!nextToken) break;
   }
-  return out;
+  return { records: out, error };
 }
 
 const num = v => (typeof v === 'number' && Number.isFinite(v) ? v : null);
@@ -169,23 +200,36 @@ function mapOura({ sleeps = [], readiness = [], activity = [], workouts = [] }) 
   return { vitals, burn };
 }
 
-// Fetch + map the last `days` of Oura data for an access token.
-async function fetchOuraData(accessToken, days = 7) {
-  const end = ymd(new Date());
+/**
+ * Fetch + map the last `days` of Oura data for an access token.
+ * → { vitals, burn, warnings }
+ *
+ * One collection failing is survivable (warnings). ALL of them failing
+ * throws with the most actionable cause (an auth/membership status
+ * first), carrying `ouraStatus` — never a quiet empty result.
+ */
+async function fetchOuraData(accessToken, days = 7, fetchImpl = fetch) {
   // +1 day on the end date: Oura's daily endpoints are inclusive of
   // start_date but a sleep that ends this morning is filed under today,
   // and asking for tomorrow costs nothing while avoiding an off-by-one
   // that silently drops the most recent night.
   const endPlus = ymd(new Date(Date.now() + 86400000));
   const start = ymd(new Date(Date.now() - days * 86400000));
-  const [sleeps, readiness, activity, workouts] = await Promise.all([
-    ouraList('/sleep', accessToken, start, endPlus),
-    ouraList('/daily_readiness', accessToken, start, endPlus),
-    ouraList('/daily_activity', accessToken, start, endPlus),
-    ouraList('/workout', accessToken, start, endPlus),
+  const parts = await Promise.all([
+    ouraList('/sleep', accessToken, start, endPlus, fetchImpl),
+    ouraList('/daily_readiness', accessToken, start, endPlus, fetchImpl),
+    ouraList('/daily_activity', accessToken, start, endPlus, fetchImpl),
+    ouraList('/workout', accessToken, start, endPlus, fetchImpl),
   ]);
-  void end;
-  return mapOura({ sleeps, readiness, activity, workouts });
+  const errors = parts.map(p => p.error).filter(Boolean);
+  if (errors.length === parts.length) {
+    const lead = errors.find(e => e.status === 401 || e.status === 403) || errors[0];
+    const err = new Error(lead.reason);
+    err.ouraStatus = lead.status;
+    throw err;
+  }
+  const [sleeps, readiness, activity, workouts] = parts.map(p => p.records);
+  return { ...mapOura({ sleeps, readiness, activity, workouts }), warnings: [...new Set(errors.map(e => e.reason))] };
 }
 
 // PURE: merge synced Oura data into an app state object — the exact
@@ -206,4 +250,4 @@ function mergeOuraIntoState(state, vitals, burn) {
   return { ...state, vitalsLog, burnLog, ouraConnected: true };
 }
 
-module.exports = { sb, getFreshToken, ouraList, mapOura, fetchOuraData, mergeOuraIntoState };
+module.exports = { sb, getFreshToken, ouraList, ouraReason, mapOura, fetchOuraData, mergeOuraIntoState };

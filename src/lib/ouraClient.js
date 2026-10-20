@@ -18,22 +18,44 @@ export async function syncOura(update, days = 7) {
     body: JSON.stringify({ days }),
   });
   const body = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(body.error || 'sync failed');
+  if (!res.ok) {
+    // Item 127 / gap C12: a revoked grant or a lapsed Oura Membership
+    // used to read as "Synced 0 days". Recorded like whoopLastError so
+    // the panel can report a failure the user never saw (background sync).
+    const err = new Error(body.error || 'Oura sync failed.');
+    err.reconnect = !!body.reconnect;
+    update(prev => ({ ...prev, ouraLastError: { at: Date.now(), message: err.message, reconnect: err.reconnect } }));
+    throw err;
+  }
   update(prev => {
     const vitalsLog = { ...(prev.vitalsLog || {}) };
-    for (const [d, v] of Object.entries(body.vitals || {})) vitalsLog[d] = { ...(vitalsLog[d] || {}), ...v };
+    let changed = false;
+    for (const [d, v] of Object.entries(body.vitals || {})) {
+      const before = prev.vitalsLog?.[d] || {};
+      const merged = { ...before, ...v };
+      if (Object.keys(merged).some(k => before[k] !== merged[k])) { vitalsLog[d] = merged; changed = true; }
+    }
     const burnLog = { ...(prev.burnLog || {}) };
     for (const [d, entries] of Object.entries(body.burn || {})) {
       // Only ever replaces this device's own entries — a user with both
       // an Oura and a WHOOP keeps both sets of workouts.
-      const others = (burnLog[d] || []).filter(a => !String(a.id || '').startsWith('oura-'));
-      burnLog[d] = [...others, ...entries];
+      const others = (prev.burnLog?.[d] || []).filter(a => !String(a.id || '').startsWith('oura-'));
+      const next = [...others, ...entries];
+      const before = prev.burnLog?.[d] || [];
+      if (before.length !== next.length || JSON.stringify(before) !== JSON.stringify(next)) {
+        burnLog[d] = next; changed = true;
+      }
     }
-    return { ...prev, vitalsLog, burnLog, ouraConnected: true };
+    // Nothing new and nothing to clear → prev unchanged (no ~1 MB save).
+    if (!changed && prev.ouraConnected && !prev.ouraLastError) return prev;
+    const next = { ...prev, vitalsLog, burnLog, ouraConnected: true };
+    delete next.ouraLastError;
+    return next;
   });
   return {
     vDays: Object.keys(body.vitals || {}).length,
     bDays: Object.keys(body.burn || {}).length,
+    warnings: body.warnings || [],
   };
 }
 
