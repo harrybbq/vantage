@@ -609,6 +609,7 @@ can stop the bleeding in minutes, and you meet the legal clock.
     restore a `user_data_history` snapshot to a test account and time
     it. A backup that has never been restored is a hope, not a backup.
     *Status 2026-09-30: docs/RESTORE_RUNBOOK.md (restore from user_data_history, drill checklist, PITR notes). Run the first drill.*
+    *Status 2026-10-20: runbook rewritten as a decision tree (history restore → copy + one-user recovery → whole-project restore as last resort) with a quarterly drill that uses a free daily backup + one-user recovery on a test account, and a results log. The SQL is dry-run tested on Postgres 16 (`scripts/recovery/test-recovery-sql.sh`). First drill still to run by the owner, after `recovery_2026_10b.sql` is applied.*
 
 ## Phase 6 — Scale readiness (before real user numbers)
 
@@ -627,10 +628,11 @@ can stop the bleeding in minutes, and you meet the legal clock.
     function-only writes (no client delete), journal 90 days, dual-write → backfill → 14 days of zero
     mismatches → read switch → owner-run per-user cleanup. The first native binary must be built from the
     read-switch build or later.*
-27. `[ ]` **Decide on Supabase PITR.** Pro gives 7-day daily backups;
+27. `[~]` **Decide on Supabase PITR.** Pro gives 7-day daily backups;
     PITR is a paid add-on. Given data safety is the project's stated #1
     rule and there has already been one wipe incident, decide
     deliberately rather than during an incident.
+    *Status 2026-10-20: decided — PITR ON for the state-size migration window (enable before the image migration I4, off 30 days after the last L7 cleanup) and recommended permanently from public launch; 7 days ≈ $100/month ($0.137/h, outside the spend cap, stops daily backups, needs Small — we're on Small). Foundations built so it's useful the day it's bought and daily backups are useful today: `supabase/recovery_2026_10b.sql` (append-only `ops_log` restore markers + `ops_mark()`, and one-user recovery `export_user_bundle` in a restored copy → `import_user_bundle` dry_run/restore_missing in production, insert-only, never overwrites state), `netlify/lib/opsMark.js`, `docs/RESTORE_RUNBOOK.md` (decision tree, whole-project checklist, "Buying PITR" checklist), `scripts/recovery/README.md`. Owner: run `recovery_2026_10b.sql`; buy PITR before I4 using the runbook checklist (and update DPIA row 23 + running costs).*
 
 ---
 
