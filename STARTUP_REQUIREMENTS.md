@@ -389,9 +389,10 @@ code fails soft until it is run, so order doesn't matter.
     no WAF, no rate-limiting rules, no firewall traffic rules. Add a
     rate-limit rule on `/.netlify/functions/*` (per-IP) before launch —
     the in-function limits are per instance.
-87. `[ ]` **AFTER** `push-dispatch` runs every minute — ~44k invocations a
+87. `[x]` **AFTER** `push-dispatch` runs every minute — ~44k invocations a
     month on credit-based pricing, mostly finding nothing. Consider
     every 5 minutes, or trigger it from the queue insert instead.
+    *Status 2026-10-20: every 5 minutes (`*/5 * * * *` in netlify.toml) — ~44.6k → ~8.9k invocations and empty-queue reads a month. Nothing needs 1-minute latency: the only queue producers are the friend-request/accept triggers; DMs don't push; push isn't live until FCM (item 15). Trigger-on-insert rejected: scheduled functions aren't URL-invocable and pg_net would need a secret in the DB. Revisit if DM pushes are added.*
 88. `[x]` **AFTER** Supabase compute is **Small**, not Micro — about $5/month
     over the Pro plan's $10 compute credit. Micro covers today's load; Small
     gives the whole-state saves headroom. Owner's call; switching restarts
@@ -404,8 +405,9 @@ code fails soft until it is run, so order doesn't matter.
     releases; Personal's 1,000 credits would not cover the current pace.
 90. `[x]` **AFTER** `global-trending` read every user's state on each refresh
     — the first thing to saturate the DB. *Done 2026-10-05 (#225): Trending removed.*
-91. `[ ]` **AFTER** `get-leaderboard` has no shared cache and pulls ~500
+91. `[~]` **AFTER** `get-leaderboard` has no shared cache and pulls ~500
     profiles with avatars per view. Cache 5–10 min; avatars for the top 100 only.
+    *Status 2026-10-20: done in code — the global top 100 (per timeframe) is built at most once per 5 min and shared: module scope per instance + one `function_cache` row across instances (lib/sharedCache.js; falls back to module scope until the SQL runs). A cached view is auth + the caller's own profile (+ rank count / colour for a caller outside the top 100) instead of ~10 queries incl. 500 profiles with avatars. Per-caller parts (isSelf, current numbers, opt-out, true rank, pinned row) stay live; friends boards are never cached. Weekly pool reads 500 candidates without avatars and fetches avatars for the 100 shown; friends boards past 100 rows get initials. Others see an opt-out/suspension within ≤ 5 min. Owner: run `supabase/retention_2026_10b.sql` (creates `function_cache`).*
 92. `[ ]` **AFTER** Presence writes a `profiles` UPDATE every 60 s per open
     app (`usePublishProfile.js`). Every 5 min is enough.
 93. `[~]` **LAUNCH** `whoop-cron` syncs users one by one inside a 20 s
@@ -413,11 +415,13 @@ code fails soft until it is run, so order doesn't matter.
     *Status 2026-10-20: done in code — whoop-cron and oura-cron run accounts through a bounded pool (4 at a time, oldest first, stop starting at 20 s, in-flight finish; refresh-token-first and CAS writes unchanged). WHOOP's limit is 100 requests/min and 10,000/day per app, so a run spends ≤ 60 WHOOP calls (~12 accounts) and whoop-cron now runs every 10 min 06:00–08:50 UTC (not :30, when oura-cron runs), skipping accounts already synced that morning — ~180 accounts a morning for <10% of the daily limit. Owner: after the deploy, check one morning's Netlify function log for "not reached" counts; WHOOP also caps an unapproved app at 10 users — apply for production approval / a higher limit in the WHOOP developer dashboard before launch.*
 94. `[ ]` **LAUNCH** Custom SMTP for Supabase Auth. The built-in mailer
     allows a few emails an hour; signups and resets fail at ~50 users.
-95. `[ ]` **AFTER** `weather` has no auth and calls ipwho.is per request;
+95. `[~]` **AFTER** `weather` has no auth and calls ipwho.is per request;
     `client-error` and `vitals-beacon` are open writes. Require auth / cache
     by IP / rate-limit (pairs with item 86).
-96. `[ ]` **AFTER** Retention: nothing prunes `client_errors`,
+    *Status 2026-10-20: done in code — weather reads Netlify's own `x-nf-geo` header (lat/lon, or the city name → Open-Meteo geocoder); **ipwho.is is no longer called at all**, so no third party receives the IP (closes STORE_PRIVACY_LABELS Q3 — the privacy policy / labels can drop ipwho.is once this is live). No geo header → chip hidden (logged once per instance). Per IP: 12 calls/h anonymous, up to 60/h with a valid session (verified only past the allowance, verdict cached), 10/min burst; weather cached 30 min per ~11 km cell; `useWeather` sends the session. client-error / vitals-beacon: per-IP minute+hour limits, identical-report dedupe, empty/non-object/no-UA input dropped, and a durable cross-instance cap (1,000 errors / 3,000 vitals an hour, trigger in `retention_2026_10b.sql`). Owner: after deploy, confirm the weather chip still shows (if not, the function log says "no usable x-nf-geo" — tell the next session); still add the Netlify rate-limit rule (item 86).*
+96. `[~]` **AFTER** Retention: nothing prunes `client_errors`,
     `rating_snapshots` or `web_vitals` — schedule a monthly delete of old rows.
+    *Status 2026-10-20: done in code (also DPIA G11, G13) — `retention-prune` scheduled function, weekly Sun 04:47 UTC, calls `public.retention_prune` in batches of ≤ 500 (250 ms apart, ≤ 20 batches per table, 20 s budget): client_errors 30 d, web_vitals 90 d, rating_snapshots 90 d (readers need ≤ 21), sent/dead notifications 30 d, coach_nudges 60 d, CLOSED reports 12 months after closing (with their evidence snapshot; never open ones, never `retention_hold = true`), expired caches. User content (user_data, nutrition_log, messages, friendships, profiles, …) is refused by the JS and by the SQL, and asserted in `check:efficiency`. Stops for `VANTAGE_PAUSE=all|retention` (incident evidence). No pg_cron in the project, so Netlify cron. Owner: run `supabase/retention_2026_10b.sql`, then the dry-run query in its header; set `retention_hold` on any report referred to police/IWF. Privacy policy should state the windows (batch A).*
 97. `[x]` **LAUNCH** AI food scans had no server-side tier check.
     *Done 2026-10-05 (#225): 3 free a week, unlimited on Pro, enforced in ai-food-detect.*
 
@@ -548,6 +552,13 @@ else maps onto existing items.
     iPad support or not; Play audience 13+ bands or 18+.
 122. `[ ]` **LAUNCH** Create the reviewer demo accounts 4–6 weeks before submitting — ratings cap
     history at account age, so a fresh account looks empty. (Pack §1.)
+
+123. `[ ]` **BLOCKS** `REVENUECAT_SECRET_API_KEY` is not set in Netlify (owner confirmed 2026-10-20). Without
+    it, account deletion can't remove the RevenueCat subscriber (the /delete-account page says it does),
+    and the webhook can't confirm a subscriber's real state from RevenueCat's API (item 46 falls back to
+    trusting event order). Harmless today — RevenueCat only creates records for native purchases, and none
+    exist yet — but set it when the store products are created: RevenueCat → Project settings → API keys →
+    Secret API key (`sk_…`, v1) → Netlify env `REVENUECAT_SECRET_API_KEY`, Functions scope → redeploy.
 
 ## Phase 7 — Running it safely once it's public
 

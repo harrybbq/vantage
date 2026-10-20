@@ -13,13 +13,24 @@
  * which is why this needs no session (a beacon cannot carry one) and
  * why the privacy policy can call it anonymous.
  *
- * Abuse limits: 2 KB body cap, 20 a minute per IP (per instance — a
- * brake), every number range-checked (lib/securityShape.shapeVitalsRow).
+ * Abuse limits (item 95): 2 KB body cap; per IP 20 a minute and 60 an
+ * hour (lib/ipLimit.js, per instance — a brake; one real page load
+ * sends at most one beacon, and only 1 in 5 are sampled); every number
+ * range-checked and a row with no metric dropped
+ * (lib/securityShape.shapeVitalsRow); no User-Agent → dropped (the IP
+ * and UA are only looked at here, never stored). Durable cap across
+ * instances: once retention_2026_10b.sql is run, a trigger refuses
+ * inserts past 3,000 an hour in total, and the 400 backs this instance
+ * off for ten minutes like a missing table.
  * Always 204: a measurement endpoint must never be the reason a page
  * misbehaves, and it tells a prober nothing.
+ *
+ * Retention: rows older than 90 days are deleted by the weekly
+ * retention-prune function (item 96).
  */
 const sbKeys = require('../lib/sbKeys');
 const { shapeVitalsRow } = require('../lib/securityShape');
+const { createIpLimiter, clientIp } = require('../lib/ipLimit');
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
@@ -30,26 +41,10 @@ const CORS = {
 const done = () => ({ statusCode: 204, headers: CORS, body: '' });
 
 const MAX_BODY = 2 * 1024;
-const PER_MINUTE = 20;
+const limiter = createIpLimiter([{ ms: 60_000, max: 20 }, { ms: 60 * 60_000, max: 60 }]);
 
-const hits = new Map();
-function allowed(ip) {
-  const now = Date.now();
-  const e = hits.get(ip) || { n: 0, t: now };
-  if (now - e.t > 60_000) { e.n = 0; e.t = now; }
-  e.n++;
-  hits.set(ip, e);
-  if (hits.size > 5000) for (const [k, v] of hits) if (now - v.t > 60_000) hits.delete(k);
-  return e.n <= PER_MINUTE;
-}
-
-function clientIp(event) {
-  const h = event.headers || {};
-  return h['x-nf-client-connection-ip'] || String(h['x-forwarded-for'] || '').split(',')[0].trim() || 'unknown';
-}
-
-// A missing table is remembered for ten minutes so a beacon flood
-// before the SQL is run costs nothing.
+// A missing table (or the durable hourly cap, also a 400) is remembered
+// for ten minutes so a beacon flood before the SQL is run costs nothing.
 let missingUntil = 0;
 
 exports.handler = async (event) => {
@@ -58,7 +53,9 @@ exports.handler = async (event) => {
 
   const raw = event.isBase64Encoded ? Buffer.from(event.body || '', 'base64').toString('utf8') : (event.body || '');
   if (Buffer.byteLength(raw, 'utf8') > MAX_BODY) return { statusCode: 413, headers: CORS, body: '' };
-  if (!allowed(clientIp(event))) return { statusCode: 429, headers: CORS, body: '' };
+  if (!limiter.hit(clientIp(event)).allowed) return { statusCode: 429, headers: CORS, body: '' };
+  const ua = event.headers?.['user-agent'] || event.headers?.['User-Agent'];
+  if (!ua || !String(ua).trim()) return done();
 
   const url = process.env.SUPABASE_URL;
   const key = sbKeys.serviceKey(process.env);
