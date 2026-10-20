@@ -346,6 +346,7 @@ code fails soft until it is run, so order doesn't matter.
     grants. Export omits `nutrition_log`, messages and profile, and
     `a.download` does nothing in a WebView.
     *Status 2026-09-30: done except WHOOP/Oura grant revocation (no documented endpoint found); export now includes food log, profile, friendships, messages.*
+    *Status 2026-10-20: WHOOP grant revocation done (item 125 — WHOOP does document an endpoint); Oura's still unverified.*
     *Still open (pack P7, 2026-10-20): export `download()` uses `a.download`, a no-op in a WebView — use
     the share sheet (`navigator.share` with a File, or @capacitor/share + filesystem).*
     *Status 2026-10-20 (P7): in the app the export is built, then a "Save or share the file" button hands it
@@ -512,12 +513,41 @@ else maps onto existing items.
     (no `push_tokens` row) until Enable is tapped.*
 103. `[ ]` **LAUNCH** Decide whether category ratings (fitness, finance) are visible to others — the
     fitness rating draws on health data (`netlify/lib/recompute.js`). (G10)
-104. `[ ]` **LAUNCH** Lock-screen-safe push text before push goes live (esp. coach nudges). (G8)
-105. `[ ]` **LAUNCH** Test the AI coach with eating-disorder, self-harm and relapse style inputs and
+104. `[~]` **LAUNCH** Lock-screen-safe push text before push goes live (esp. coach nudges). (G8)
+    *Status 2026-10-20: done in code — every push goes through `netlify/lib/lockScreenSafe.js` in
+    `push-dispatch.js`: fixed generic title/body per kind (friend request/accepted, coach nudge,
+    streak warning, daily reminder, honour, and the not-yet-written DM, group message and safety
+    notice kinds; anything unknown gets "Vantage / You have a new notification."), nothing from the
+    queued payload shown, `data` = kind + id-shaped references only, Android visibility PRIVATE; client
+    toasts show the title, never a body. No preview setting exists, so safe by default. Tested in the
+    build (`check:lockscreen`). Outside the repo: optionally run
+    `supabase/notifications_lockscreen_2026_10.sql` (triggers stop queueing names/handles); check on a
+    real locked phone when push goes live (item 15).*
+105. `[~]` **LAUNCH** Test the AI coach with eating-disorder, self-harm and relapse style inputs and
     record the results. (G15)
-106. `[ ]` **LAUNCH** Confirm the Netlify functions' region (none set in netlify.toml — likely US) for
+    *Status 2026-10-20: done in code — safe mode (`netlify/lib/coachSafety.js`, client twin
+    `src/lib/coach/safety.js`): self-harm signals → fixed brief with Samaritans 116 123 / 999 and no
+    model call; eating-disorder, relapse, over-training and under-18 signals → gentle mode (reduced
+    snapshot, no food/weight/body/exercise data or day counts, fixed helpline line); every model brief
+    checked against an output policy and replaced if it breaks it; local brief, tips and nudges follow.
+    System prompt gained a Safety block. 36 invented red-team cases run through the production path in
+    the build (`check:coachsafety`). Results: `docs/COACH_REDTEAM_RESULTS.md`. Outside the repo: run the
+    live-model pass (`ANTHROPIC_API_KEY=… npm run coach:redteam:live -- --repeat 3`) and commit the
+    updated results; verify the helpline numbers on each service's site.*
+106. `[~]` **LAUNCH** Confirm the Netlify functions' region (none set in netlify.toml — likely US) for
     the transfer analysis; written policy for owner/admin access to user data and a log of moderation
     reads; Art. 30 records / LIAs if the solicitor says so. (G5, G18, G25)
+    *Status 2026-10-20: drafted — region finding + steps in `docs/ROPA.md` §2: all 44 functions are v1
+    with no per-function config, so the site-level region applies; default for sites made after 4 Oct
+    2023 is `cmh` US East (Ohio); `lhr`/`fra`/`dub` are self-serve on Pro (Netlify's
+    context-and-tools repo + docs extracts, checked 2026-10-20). Even in the EU, Netlify Inc. (US) stays
+    a restricted transfer under its DPA (EU SCCs + UK Addendum); DPF status unconfirmed.
+    `docs/ADMIN_ACCESS_POLICY.md` (who, five purposes, what's logged today vs not, `ops_mark('access',…)`
+    habit, record template, specs A1–A4 to log evidence reads and bans). `docs/ROPA.md` (Art. 30 —
+    REQUIRED: the under-250 exemption doesn't cover special category data, ICO; activities A1–A14,
+    recipients, transfers, retention as built, LIAs L1–L7 for the solicitor). Owner: read the Supabase
+    region, set the Netlify Functions region to match, redeploy, record it; check Netlify on the DPF
+    list; adopt the access policy; solicitor: Q-A1–A4, LIAs, R-1–R-4.*
 107. `[x]` **AFTER** Legacy `moodLog` still sits in users' state though Mood was removed — tell users
     and offer deletion, or remove it additive-first per CLAUDE.md. (G12)
     *Done 2026-10-20 (owner's decision: delete, never returning): `lib/state/retiredKeys.js` removes
@@ -528,9 +558,16 @@ else maps onto existing items.
     weather so no third party sees the IP.
 
 ### From the Online Safety Act draft — 2026-10-20 (`docs/ONLINE_SAFETY_ACT_DRAFT.md`)
-109. `[ ]` **LAUNCH** Governance the Codes expect: a named accountable person with written
+109. `[~]` **LAUNCH** Governance the Codes expect: a named accountable person with written
     responsibilities; written content policies, queue prioritisation and moderator guidance; a written
     appeals process; a complaints route that works without an account (pairs with item 72).
+    *Status 2026-10-20: drafted — `docs/OSA_GOVERNANCE.md`: what the Codes expect scaled to a one-person
+    company (ICU A2 named person = all services; A3 written responsibilities = multi-risk, which Vantage
+    is on the draft's ratings), fill-in appointment, responsibilities + cover arrangement, 5-line code of
+    conduct, training record, monthly evidence log (with query), complaints/appeals procedure, yearly
+    review checklist. Cross-refers to the OSA draft rather than repeating it. Owner: fill in and sign
+    §2–§4, do the §5 training, set the monthly/yearly reminders, fill the complaint timings here and in
+    the Terms; support address still item 72.*
 110. `[x]` **LAUNCH** Reporting loop: acknowledge reports to the reporter and tell them the outcome;
     tell the reported user about action taken; more report reasons (child safety, threats, self-harm,
     sexual content, scams); report + block from an incoming friend request.
@@ -551,12 +588,24 @@ else maps onto existing items.
     same value refused if the app re-publishes it, user told) and "Resolve"; "Re-screen profile pictures"
     in Security → Moderation (4 per press, owner daily AI cap 200, flags only — keep or remove). Owner: run
     `supabase/safety_2026_10b.sql`, then press re-screen until the backlog is 0 (needs ANTHROPIC_API_KEY). SQL applied 2026-10-20; the avatar re-screen backlog is still to clear.*
-113. `[ ]` **LAUNCH** NCA child-sexual-abuse reporting duty (in force for user-to-user services since
+113. `[~]` **LAUNCH** NCA child-sexual-abuse reporting duty (in force for user-to-user services since
     7 Apr 2026): register and write the procedure (how evidence is preserved, who files, within what
     time). Add a mute option (Codes user control); supportive information for child users.
     *Status 2026-10-20 (part): procedure skeleton in `docs/ABUSE_HANDLING.md` (in force since 7 Apr 2026;
     register, who files, preserve-don't-spread, file within the SI 2026/268 time, record) — the owner fills
     the blanks and the solicitor confirms. Registration, mute and child supportive information still open.*
+    *Status 2026-10-20 (procedure): `docs/ABUSE_HANDLING.md` NCA section completed from sources checked
+    today — verified: s.66 + s.69 commenced 7 Apr 2026 by SI 2026/262 (Commencement No. 7); SI 2026/268
+    made 9 Mar 2026, in force 7 Apr (the earlier SI 2025/368 was revoked before commencing). Grooming
+    text counts, not only images; the IWF doesn't discharge the duty. Registration via the NCA CSEA-IRP
+    (organisation → Referral Bureau review Mon–Fri → administrator adds filers); 999 first if
+    unregistered and a child is at imminent risk; `retention_hold` on the report at once; URN 5 years,
+    content ≥ 1 year (secondary source — verify). The 2026 urgency time frames weren't readable (sites
+    blocked) — working rule in the doc, solicitor to confirm. Still open: **register on the CSEA-IRP**
+    (and who registers before the company exists), fill the blanks, rehearse once; specs for approval in
+    ABUSE_HANDLING "Open product gaps": G-1 mute, G-2 "Staying safe" supportive info (shown to everyone
+    until item 114 gives an age signal), G-3 a reported user can delete their account and cascade the
+    evidence away (recommend: refuse deletion while a report is on hold).*
 114. `[ ]` **LAUNCH** Teen defaults only apply to NEW accounts: older accounts kept handle search and
     leaderboard on; online status and the heatmap default on. There is no age signal at all — decide
     (with the solicitor) on collecting a birth year and age-specific defaults. Fix the stale lines in
@@ -581,11 +630,33 @@ else maps onto existing items.
     web flow byte-for-byte unchanged; `check:wearableconnect`. Needs: the `wearable-callback` host in the
     Android intent filter, `com.vantage.app` as an iOS URL type once `ios/` exists, then a device test.
     Later hardening: verified App Links / Universal Links instead of the custom scheme.*
-116. `[ ]` **BLOCKS** Review purchases: sandbox events are dropped unless `REVENUECAT_ALLOW_SANDBOX=true`,
+116. `[~]` **BLOCKS** Review purchases: sandbox events are dropped unless `REVENUECAT_ALLOW_SANDBOX=true`,
     so a reviewer who buys Pro gets a 403 from the coach. Recommended: set it for the review window
     only, then off. And `config.pro_live` must be `'true'` before submission. (P2, P3)
-117. `[ ]` **BLOCKS** Sign in with Apple tokens aren't revoked on account deletion (Apple expects it):
+    *Status 2026-10-20: done in code. The global switch is replaced by narrow routes
+    (`netlify/lib/reviewSandbox.js`, tested): sandbox events are honoured for accounts on the owner's
+    reviewer list (`supabase/reviewer_access_2026_10.sql`: email-keyed, RLS locked, SQL-editor-only
+    functions, each row expires within 90 days, confirmed emails only), or for anyone while
+    `REVIEW_WINDOW_UNTIL` is open (≤ 30 days ahead, closes itself). `REVENUECAT_ALLOW_SANDBOX=true` still
+    works as a legacy override and logs a warning. Any failure closes the gate. Subscriber-API reads
+    leave sandbox entitlements out unless sandbox is honoured. `reviewer_access_add(…, grant_pro)` gives
+    demo account A a recorded, revertible lifetime grant that no webhook can demote.
+    `review_preflight()` / `scripts/reviewer-demo/preflight.mjs` checks `pro_live` and the reviewer
+    accounts before submission. Owner: run the SQL, add the accounts, unset `REVENUECAT_ALLOW_SANDBOX`
+    if set (`docs/REVIEWER_KIT.md`).*
+117. `[~]` **BLOCKS** Sign in with Apple tokens aren't revoked on account deletion (Apple expects it):
     needs the native SIWA flow's authorization code, or the provider token captured at sign-in. (P8)
+    *Status 2026-10-20: done in code. Both web and native sign in through Supabase OAuth; there is no
+    native SIWA plugin. The Apple refresh token Supabase hands over once at sign-in is posted by
+    `src/lib/auth/appleTokenCapture.js` (wired in `lib/supabase.js` and `lib/native/deepLinks.js`) to the new
+    `apple-token` function. It stores the token only when the caller's newest identity is a fresh Apple
+    sign-in, in `apple_tokens` (`supabase/apple_revocation_2026_10.sql`: RLS on, no policies; AES-256-GCM
+    with `APPLE_TOKEN_SECRET`). `delete-account` reads it before the auth delete and revokes it at Apple
+    after, with an ES256 client secret. Every failure is logged and none blocks deletion. Owner: Apple key +
+    Netlify env (`APPLE_TEAM_ID`, `APPLE_KEY_ID`, `APPLE_PRIVATE_KEY`, `APPLE_SERVICES_ID`,
+    `APPLE_TOKEN_SECRET`), run the SQL, then the smoke test in `docs/SIGN_IN_WITH_APPLE.md`. That test
+    confirms Supabase returns Apple's refresh token, which could not be checked from here. Tokens are
+    captured from deployment on; earlier Apple sign-ins have none until they sign in again.*
 118. `[~]` **BLOCKS** DM text (and the opt-in shared streak habit name) isn't filtered (Apple 1.2 asks
     for a filtering method): reuse `checkPublicText` on send, mirror it server-side. (P9)
     *Status 2026-10-20 (DMs): done in code — the composer refuses slurs and unambiguous explicit terms
@@ -612,8 +683,17 @@ else maps onto existing items.
     Australia); alcohol references Infrequent (or change the habit placeholder); export compliance
     "none of the algorithms" + `ITSAppUsesNonExemptEncryption=false` (one line from the solicitor);
     iPad support or not; Play audience 13+ bands or 18+.
-122. `[ ]` **LAUNCH** Create the reviewer demo accounts 4–6 weeks before submitting — ratings cap
+122. `[~]` **LAUNCH** Create the reviewer demo accounts 4–6 weeks before submitting — ratings cap
     history at account age, so a fresh account looks empty. (Pack §1.)
+    *Status 2026-10-20: tooling done. `scripts/reviewer-demo/seed.mjs` creates (with `--create`) and seeds
+    A (Pro), B (free, five habits = the cap) and the demo friends with 6–8 weeks of invented history in
+    the app's own state shapes (checked through the app's pure libs in `plan.test.mjs`): trackers,
+    habits, hand-entered vitals, savings, trips, wish list, food log, friendships, DMs and a group. It
+    touches only `--allow` addresses, refuses owner addresses, stops before any write if a row holds
+    data it did not write, uses compare-and-set for the state, never deletes and never sets tier. It
+    is a dry run unless `--write` is given (`seed.test.mjs` proves this end to end). Steps:
+    `docs/REVIEWER_KIT.md`. Still to do (owner): create the accounts on the company domain (item 72)
+    4–6 weeks before submitting, then run the seeder and `reviewer_access_add`.*
 
 123. `[ ]` **BLOCKS** `REVENUECAT_SECRET_API_KEY` is not set in Netlify (owner confirmed 2026-10-20). Without
     it, account deletion can't remove the RevenueCat subscriber (the /delete-account page says it does),
@@ -628,22 +708,46 @@ WHOOP caps an unapproved app at **10 members**; Oura's API also caps at **10 use
 WHOOP 100 req/min + 10,000/day; Oura can't read Gen3/Ring 4 users without an active Oura Membership;
 both providers' terms bar using their data to train/feed AI (keep `AI_WEARABLE_DATA_ALLOWED` unset —
 for Oura effectively permanently).
-124. `[ ]` **BLOCKS (WHOOP approval)** Wearable-derived values reach ratings and the friends heatmap that
+124. `[x]` **BLOCKS (WHOOP approval)** Wearable-derived values reach ratings and the friends heatmap that
     others see, with no opt-in (`recompute.js` sleep/RHR days, workout burn, auto-ticked trackers, active
     days; `usePublishProfile.js`). WHOOP's terms count "derivatives" as WHOOP Data and require the user's
     explicit opt-in before showing it to others. Owner decision D1: exclude wearable-sourced data from
     shared ratings/heatmap (recommended) or add an opt-in. Fix the "never shown to others" copy to match.
-125. `[ ]` **LAUNCH** Revoke provider grants: WHOOP documents `DELETE /developer/v2/user/access` and asks
+    *Status 2026-10-20: D1 = exclude, done. `src/lib/wearables/strip.js` (`shareableView`, reusing the
+    coach's `wearableProvenance.js` rule) feeds the client ratings, vision unlocks (so the level friends
+    see) and the friends heatmap; `netlify/lib/wearableShare.js` mirrors it in `recompute.js` (state
+    projection gains `logsAuto`), and `check:parity` proves both sides agree and that band data adds
+    nothing. Band users' public ratings drop on their next recompute — expected; say so in the release
+    note. Vision stamps already earned are kept (never removed); prestige baselines snapshotted before
+    this may sit above the new totals until the user climbs past them. Consent + privacy copy updated.*
+125. `[~]` **LAUNCH** Revoke provider grants: WHOOP documents `DELETE /developer/v2/user/access` and asks
     apps to call it on disconnect — call it on disconnect AND account deletion (corrects item 67's "no
     documented endpoint"); Oura: check whether an endpoint exists.
+    *Status 2026-10-20: WHOOP done — `netlify/lib/wearableRevoke.js` (refresh first, 5 s timeout, fail
+    soft) runs before the token row is deleted in `wearable-disconnect` and before the auth delete in
+    `delete-account`, which now also sweeps `whoop_tokens`/`oura_tokens`/`user_data`/`user_data_history`
+    by user id after the auth delete (the `user_data` FK isn't in the repo's SQL to confirm). Oura:
+    UNVERIFIED — its docs weren't reachable from the build machine; a community client points at
+    `GET https://api.ouraring.com/oauth/revoke?access_token=…`. Owner: confirm on
+    cloud.ouraring.com/docs/authentication (or in the §3.2 email), then set `PROVIDERS.oura.revoke`.*
 126. `[ ]` **LAUNCH** Branding/labels per WHOOP's guidelines: no home-made WHOOP/Oura logos, don't rename
     provider metrics (WHOOP Recovery shown under "Readiness"; Oura Readiness stored as "Recovery"), WHOOP's
     recovery colours, name the provider instead of "wearable"; drop the unused `read:profile` scope.
-127. `[ ]` **LAUNCH** While approval is pending: a server-side allow-list for connect (≤10 incl. one slot for
+127. `[~]` **LAUNCH** While approval is pending: a server-side allow-list for connect (≤10 incl. one slot for
     WHOOP's reviewer) with a clear message instead of "connect failed (denied)"; surface Oura errors
     (today "Synced 0 days"); budget sync-on-open against WHOOP's daily limit (~400–600 DAU would exhaust it)
     and request an increase in the approval. Decide D4 (delete device history on disconnect option) and
     D7 (first native build with WHOOP/Oura hidden or held).
+    *Status 2026-10-20 (decided D4, D7): allow-list done in code — `supabase/wearable_access_2026_10.sql`
+    (ships `open`; config switch + list by handle + owner RPCs, 9 slots + the owner), gate in
+    `whoop-connect`/`oura-connect` (`netlify/lib/wearableAccess.js`; already-connected accounts can
+    always reconnect; fails OPEN before the SQL runs), owner panel Settings → Tools → Wearable access,
+    a "you're on the list / not yet" note and plain-language connect results. Oura errors surface
+    (401 → reconnect, 403 → membership; `ouraLastError`). D4: no prompt on disconnect; Settings → Tools →
+    Health & sync → "Delete data synced from WHOOP/Oura" (`stripWearableData`, user-confirmed, manual
+    data kept). D7: `WEARABLES_IN_NATIVE = false` in `src/lib/native/wearableGate.js` hides Connect in
+    native builds; linked accounts keep Disconnect + delete. Owner: run the SQL, add handles (keep one
+    for WHOOP's reviewer), flip to Invite-only. Still open here: the sync-on-open budget (C13).*
 128. `[ ]` **LAUNCH** Submit WHOOP's production approval (draft answers + 13-shot list in the pack §2) and
     register Oura + send the questions email (§3), after 124–127; file both replies with the DPIA (G7).
 

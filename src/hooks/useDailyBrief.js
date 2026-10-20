@@ -46,9 +46,11 @@ export function useDailyBrief({ S, update, isPro }) {
   const heuristic = useMemo(
     () => (isPro && S?.profile ? heuristicBrief(S) : null),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [isPro, S?.profile?.name, S?.habits, S?.logs, S?.macroHistory, S?.vitalsLog, S?.savings]
+    [isPro, S?.profile?.name, S?.profile?.tagline, S?.habits, S?.trackers, S?.achievements, S?.logs, S?.macroHistory, S?.vitalsLog, S?.savings]
   );
-  const brief = llmBrief || heuristic;
+  // Safe mode (item 105): a brief cached before the state turned risky
+  // gives way to the local safe brief until the next fetch.
+  const brief = (heuristic?.safe_mode && !llmBrief?.safe_mode ? heuristic : llmBrief) || heuristic;
 
   const aiConsent = isGranted(S?.consent, 'ai');
 

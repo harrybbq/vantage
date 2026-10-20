@@ -55,7 +55,14 @@ async function requireUser(event, CORS) {
     // does not need a second round trip to ask who this is. It is the
     // verified address from the auth server, not anything the client
     // said about itself.
-    return { userId, email: String(me?.email || '').toLowerCase() };
+    // identities: the linked sign-in providers with their
+    // last_sign_in_at, from the same verified call — apple-token uses
+    // them to tell which provider was just used (lib/appleRevoke.js).
+    return {
+      userId,
+      email: String(me?.email || '').toLowerCase(),
+      identities: Array.isArray(me?.identities) ? me.identities : [],
+    };
   } catch {
     return fail(503, 'could not verify session');
   }

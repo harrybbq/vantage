@@ -13,8 +13,8 @@
  * so one delete removes user_data, user_data_history, profiles,
  * nutrition_log / _macros / _daily_summary, messages (both directions),
  * friendships, blocks, reports, push_tokens, whoop_tokens,
- * bank_connections, coach_nudges, rating_snapshots, notifications_queue
- * and waitlist.
+ * bank_connections, coach_nudges, rating_snapshots, notifications_queue,
+ * waitlist and apple_tokens.
  *
  * Enumerating those tables here instead would be worse: the list would
  * silently drift every time a table is added, and a missed one is a
@@ -39,21 +39,39 @@
  *   · Storage objects under `<uid>/` in the `cv` and `recipes` buckets
  *     (storage.objects has no FK to auth.users).
  *   · The RevenueCat subscriber, when REVENUECAT_SECRET_API_KEY is set.
+ *   · Sign in with Apple (item 117, 2026-10-20): the stored Apple refresh
+ *     token is READ before the auth delete (its apple_tokens row
+ *     cascades away with the account) and REVOKED at Apple after it —
+ *     lib/appleRevoke.js. Needs APPLE_TEAM_ID, APPLE_KEY_ID,
+ *     APPLE_PRIVATE_KEY, APPLE_SERVICES_ID (+ APPLE_TOKEN_SECRET if the
+ *     tokens are stored encrypted); without them, or without a stored
+ *     token, it logs and moves on.
  * All of these are best effort and logged; none of them can turn a
  * successful account deletion into a reported failure.
  *
- * WHOOP / Oura: the stored tokens go with the cascade, but the grant is
- * not revoked at the provider. TODO: neither lib/whoop.js nor lib/oura.js
- * documents a revoke endpoint, and guessing one is worse than leaving
- * it — add it here once confirmed from the providers' API docs.
+ * WHOOP / Oura (item 125, 2026-10-20): BEFORE the auth delete — it
+ * needs the stored tokens, which the cascade removes — the grant is
+ * revoked at the provider (WHOOP documents DELETE
+ * /developer/v2/user/access; Oura's endpoint is unverified and not
+ * called). Best effort with a 5 s timeout per provider: a provider
+ * outage never blocks a deletion. AFTER the auth delete succeeds, the
+ * token rows and the user_data / user_data_history rows are deleted
+ * explicitly too. The FK cascade should already have removed them; the
+ * user_data table predates the repo's SQL files, so its FK cannot be
+ * confirmed from here, and a no-op DELETE is cheaper than finding out
+ * the hard way. Never before the auth delete — a failed auth delete must
+ * not leave a live account with its data gone.
  *
  * Env: SUPABASE_URL, the service key via lib/sbKeys (admin delete needs the
  * service role — the anon key cannot remove an auth user). Optional:
- * REVENUECAT_SECRET_API_KEY.
+ * REVENUECAT_SECRET_API_KEY; APPLE_TEAM_ID, APPLE_KEY_ID, APPLE_PRIVATE_KEY,
+ * APPLE_SERVICES_ID, APPLE_TOKEN_SECRET (docs/SIGN_IN_WITH_APPLE.md).
  */
 const sbKeys = require('../lib/sbKeys');
 const { requireUser } = require('../lib/requireUser');
 const { handOverGroup } = require('../lib/leagues');
+const { revokeAll } = require('../lib/wearableRevoke');
+const { revokeStoredToken } = require('../lib/appleRevoke');
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
@@ -135,6 +153,24 @@ async function purgeLeaderboardCache(url, serviceKey) {
   } catch { /* best effort */ }
 }
 
+/* Rows the FK cascade should already have removed — deleted again by
+   user id after the auth delete, so erasure never depends on a FK this
+   repo cannot see. 404/400 = the table does not exist on this project. */
+const AFTER_DELETE_TABLES = [
+  ['whoop_tokens', 'user_id'], ['oura_tokens', 'user_id'],
+  ['user_data', 'id'], ['user_data_history', 'user_id'],
+];
+async function sweepUserRows(userId, url, serviceKey) {
+  for (const [table, col] of AFTER_DELETE_TABLES) {
+    try {
+      const res = await fetch(`${url}/rest/v1/${table}?${col}=eq.${userId}`, {
+        method: 'DELETE', headers: svc(serviceKey, { Prefer: 'return=minimal' }),
+      });
+      if (!res.ok && res.status !== 404 && res.status !== 400) console.error('delete-account: sweep', table, res.status);
+    } catch { /* best effort */ }
+  }
+}
+
 async function deleteRevenueCatSubscriber(userId) {
   const rcKey = process.env.REVENUECAT_SECRET_API_KEY;
   if (!rcKey) return false;
@@ -149,6 +185,37 @@ async function deleteRevenueCatSubscriber(userId) {
     console.error('delete-account: RevenueCat unreachable', e?.message);
     return false;
   }
+}
+
+/**
+ * The stored Sign in with Apple token row, or null. Read BEFORE the auth
+ * delete: the row cascades with the account. Never throws — a missing
+ * table (SQL not run) or any error means "nothing to revoke".
+ */
+async function readAppleToken(userId, url, serviceKey) {
+  try {
+    const res = await fetch(
+      `${url}/rest/v1/apple_tokens?user_id=eq.${encodeURIComponent(userId)}&select=token,enc,client_kind`,
+      { headers: svc(serviceKey) });
+    if (!res.ok) {
+      if (res.status !== 404) console.error('delete-account: apple token read', res.status);
+      return null;
+    }
+    return (await res.json().catch(() => []))[0] || null;
+  } catch (e) {
+    console.error('delete-account: apple token read unreachable', e?.message);
+    return null;
+  }
+}
+
+/** Revoke at Apple. Logs the outcome (never the token); never throws. */
+async function revokeApple(row) {
+  if (!row) return null;
+  const r = await revokeStoredToken(row, process.env);
+  if (!r.ok) {
+    console.error('delete-account: Apple revoke not done', r.reason, r.status || '', (r.missing || []).join(','));
+  }
+  return r;
 }
 
 exports.handler = async (event) => {
@@ -200,6 +267,11 @@ exports.handler = async (event) => {
     if (!ts.ok && ts.status !== 404 && ts.status !== 400) console.error('delete-account: tracker_streaks delete', ts.status);
   } catch { /* best effort */ }
 
+  // Withdraw WHOOP's grant while the tokens still exist. Never throws.
+  await revokeAll(userId, { ...env, SUPABASE_URL: url });
+  // Read now, revoke after the account is gone (see revokeApple).
+  const appleRow = await readAppleToken(userId, url, serviceKey);
+
   try {
     const res = await fetch(`${url}/auth/v1/admin/users/${userId}`, {
       method: 'DELETE',
@@ -220,9 +292,11 @@ exports.handler = async (event) => {
 
   // ── After: the account is gone; clean up what the cascade cannot ──
   await Promise.all([
+    sweepUserRows(userId, url, serviceKey),
     removeStorage(userId, url, serviceKey),
     deleteRevenueCatSubscriber(userId),
     purgeLeaderboardCache(url, serviceKey),
+    revokeApple(appleRow),
   ]).catch(() => null);
 
   return { statusCode: 200, headers: CORS, body: JSON.stringify({ ok: true }) };

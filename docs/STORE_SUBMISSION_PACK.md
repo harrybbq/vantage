@@ -71,6 +71,14 @@ domain, item 72). They must never belong to a real person:
 | **B: Free demo** `[reviewer-free@company-domain]` | Test the purchase with a sandbox Apple ID or a Play licence tester | Free | Five active habits, so adding a sixth opens the paywall (free cap is 5, `src/hooks/useTierLimits.js:16`) |
 | **C, D: demo friends** `[demo-friend-1@…]`, `[demo-friend-2@…]` | Give A friends, messages and a group, so a reviewer can report or block **without touching a real user** | Free | Light seed, plus fictional names and photos |
 
+> **Update 2026-10-20 (items 116, 122):** the steps below are superseded by
+> `docs/REVIEWER_KIT.md`. A gets Pro from the reviewer list
+> (`reviewer_access_add(…, grant_pro => true)` in `supabase/reviewer_access_2026_10.sql`,
+> a recorded, revertible lifetime grant). B's sandbox purchase now reaches
+> `profiles.tier` because B is on that list. The accounts are created and
+> seeded by `scripts/reviewer-demo/seed.mjs`. The text below is kept as the
+> original reasoning.
+
 **Granting Pro to A.** `tier` is server-owned. The only route is
 `supabase/lifetime_grants.sql`, run in the Supabase SQL editor (as service role):
 
@@ -112,8 +120,13 @@ the data has exactly the shape the code expects, and it uses no SQL against
 applies to demo rows too. If a seed script is ever wanted, it must be reviewed
 by the owner before it runs. It must resolve one user id from A's email, refuse
 to run if that row's state is already meaningful (`vb_state_meaningful`), insert
-`nutrition_log` rows only, and never touch any other row. That script is not
-written here.
+`nutrition_log` rows only, and never touch any other row. *(2026-10-20: written as
+`scripts/reviewer-demo/seed.mjs`, item 122. It touches only addresses passed in
+`--allow`, refuses any `user_data` row holding data it did not write itself (same
+rule as `vb_state_meaningful`, via `src/lib/state/meaningful.js`) before writing
+anything, and is a dry run unless `--write` is given. Besides the state and the
+food log it adds the demo friendships, DMs and group, insert-if-absent only. See
+`docs/REVIEWER_KIT.md`.)*
 
 | Screen (how to reach it) | Seed | Why |
 |---|---|---|
@@ -161,7 +174,8 @@ person's health data into a shared account (§1.4).
   `PaywallModal.jsx:164,304-309`). Item 101 removes the waitlist itself.
 - Do a real-device purchase on both platforms (item 17).
 - Decide how a reviewer's **sandbox** purchase unlocks server-checked Pro
-  features (gap P2, §8).
+  features (gap P2, §8). *(2026-10-20: the reviewer list plus an optional
+  self-expiring `REVIEW_WINDOW_UNTIL`, see `docs/REVIEWER_KIT.md`.)*
 
 ### 1.4 Features that need hardware: how to let reviewers see them
 
@@ -854,9 +868,17 @@ Each one blocks a smooth review.
   the server check RevenueCat's subscriber API with sandbox accepted for
   specific allow-listed reviewer user ids. Recommendation: (a), switched off
   after approval.
+  *Done in code 2026-10-20 (item 116), a narrower version of (b): sandbox events
+  are honoured for accounts on the owner's reviewer list
+  (`supabase/reviewer_access_2026_10.sql`), or for anyone while
+  `REVIEW_WINDOW_UNTIL` (≤ 30 days ahead, closes itself) is open.
+  `REVENUECAT_ALLOW_SANDBOX` still works as a legacy override.
+  `netlify/lib/reviewSandbox.js`; `docs/REVIEWER_KIT.md`.*
 - **P3.** `config.pro_live` must be `'true'` before submission
   (`supabase/paywall_schema.sql:46`, `src/hooks/useSubscription.js:73`).
-  Pairs with item 101.
+  Pairs with item 101. *(2026-10-20: `review_preflight()` checks it, along with
+  the reviewer accounts, and prints the `update` to run;
+  `scripts/reviewer-demo/preflight.mjs` runs it from a terminal.)*
 - **P4. Dead button.** *(Fixed 2026-10-20 in e28f549 — the banner opens the paywall; the waitlist it also mentions is removed, item 101.)* `AiCoachUpgradeBanner`'s "Upgrade to Pro" has no
   `onClick` (`src/components/AiCoachWidget.jsx:56-79`). Free users see it once
   `pro_live` is true.
@@ -883,6 +905,11 @@ Each one blocks a smooth review.
   refresh token by default, so this needs either the native SIWA flow
   (which yields an authorization code to exchange and revoke) or capturing the
   provider token at sign-in.
+  *Done in code 2026-10-20 (item 117): the provider refresh token is captured at
+  sign-in (web and native both go through Supabase OAuth), stored server-side in
+  `apple_tokens`, and revoked by `delete-account` after the account is deleted.
+  Revocation never blocks deletion. Owner setup and the smoke test:
+  `docs/SIGN_IN_WITH_APPLE.md`.*
 - **P9. DM text isn't filtered.** `sendMessage` inserts the body as typed
   (`src/lib/friends/messages.js:175-180`). Apple 1.2's first bullet asks for *"a
   method for filtering objectionable material from being posted"*. Reuse

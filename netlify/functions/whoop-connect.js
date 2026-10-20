@@ -17,6 +17,7 @@
 const { issueState, issueNativeState, isChallenge } = require('../lib/oauthState');
 const { redirectUriFor } = require('../lib/redirectUri');
 const { requireUser, underLimit, tooMany } = require('../lib/requireUser');
+const { checkWearableAccess, accessGate, accessStatus } = require('../lib/wearableAccess');
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
@@ -43,6 +44,19 @@ exports.handler = async (event) => {
   const userId = auth.userId;
   if (!underLimit('whoop-connect', userId, 10)) return tooMany(CORS);
 
+  let req = {};
+  try { req = JSON.parse(event.body || '{}') || {}; } catch { /* no body: web */ }
+  // Item 127: while WHOOP reviews Vantage only listed accounts may start a
+  // connect (lib/wearableAccess.js; open until the owner flips the
+  // switch). { check: true } asks without starting anything, so the
+  // panel can say so before the button is pressed.
+  if (req.check === true) {
+    const a = await checkWearableAccess({ userId, email: auth.email, provider: 'whoop' });
+    return { statusCode: 200, headers: CORS, body: JSON.stringify(accessStatus(a, 'whoop')) };
+  }
+  const refused = await accessGate({ userId, email: auth.email, provider: 'whoop' }, CORS);
+  if (refused) return refused;
+
   // Constant, registrable value — NOT the request's host. See lib/redirectUri.
   const redirectUri = redirectUriFor(event, 'whoop');
   // Logged because when WHOOP rejects it the user sees WHOOP's error page,
@@ -51,8 +65,6 @@ exports.handler = async (event) => {
   // Native (the Capacitor app) or web? Only an explicit, well-formed
   // native request leaves the cookie flow; anything else is the web
   // flow exactly as it was.
-  let req = {};
-  try { req = JSON.parse(event.body || '{}') || {}; } catch { /* no body: web */ }
   const native = req.platform === 'native';
   if (native && !isChallenge(req.challenge)) {
     return { statusCode: 400, headers: CORS, body: JSON.stringify({ error: 'Could not start connect — please try again.' }) };

@@ -18,6 +18,10 @@ import { requestConsent } from '../lib/consent/request';
 import { PAUSED_MESSAGE } from '../lib/native/paused';
 import { startWearableConnect } from '../lib/native/deepLinks';
 import { takeWearableResult, onWearableResult, browserHint } from '../lib/native/wearableConnect';
+import { wearableConnectAvailable } from '../lib/native/wearableGate';
+import { connectResultMessage, showWearablePanel } from '../lib/wearables/access';
+import WearableDataDelete from './wearables/WearableDataDelete';
+import WearableAccessNote from './wearables/WearableAccessNote';
 
 // Health data is special-category (UK GDPR Art. 9): every route that
 // starts a new source of it asks for explicit consent first. Data that
@@ -209,7 +213,7 @@ function callbackUrlForThisOrigin() {
   return `${webOrigin()}/.netlify/functions/whoop-callback`;
 }
 
-function WhoopPanel({ S, update }) {
+function WhoopPanel({ S, update, canConnect = true }) {
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState('');
   const connected = !!S.whoopConnected;
@@ -267,7 +271,7 @@ function WhoopPanel({ S, update }) {
     } else if (r === 'paused') {
       setMsg(PAUSED_MESSAGE);
     } else {
-      setMsg(`WHOOP connect failed (${r}).`);
+      setMsg(connectResultMessage('whoop', r));
     }
   }
   const applyRef = useRef(applyResult);
@@ -287,7 +291,7 @@ function WhoopPanel({ S, update }) {
   }, []);
 
   async function disconnect() {
-    if (!window.confirm('Disconnect WHOOP? Vitals already synced stay in your history.')) return;
+    if (!window.confirm('Disconnect WHOOP? Vantage’s access is withdrawn at WHOOP too. Vitals already synced stay in your history — delete them any time below.')) return;
     setBusy(true); setMsg('');
     try {
       await disconnectWearable(update, 'whoop');
@@ -334,7 +338,7 @@ function WhoopPanel({ S, update }) {
                 does the same thing forever. Reconnecting is the only move
                 that helps, so offer it here rather than making the user
                 find Disconnect and guess. */}
-            {lastError?.reconnect && (
+            {lastError?.reconnect && canConnect && (
               <button type="button" className="vitals-ah-btn" disabled={busy} onClick={connect}>Reconnect WHOOP</button>
             )}
             <button type="button" className="vitals-ah-btn vitals-ah-btn-alt" disabled={busy} onClick={disconnect}>Disconnect</button>
@@ -409,17 +413,23 @@ function WhoopPanel({ S, update }) {
  * The panel hides itself entirely when the site has no Oura credentials
  * configured — no point advertising a button that returns "env missing".
  */
-function OuraPanel({ S, update }) {
+function OuraPanel({ S, update, canConnect = true }) {
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState('');
   const connected = !!S.ouraConnected;
+  // A background sync's failure (lapsed membership, revoked grant) —
+  // shown here because the user never saw the request (item 127 / C12).
+  const ouraError = !msg && S.ouraLastError ? S.ouraLastError : null;
 
   async function syncNow(days = 7) {
     setBusy(true);
     setMsg('');
     try {
-      const { vDays, bDays } = await syncOura(update, days);
-      setMsg(`Synced ${vDays} day${vDays === 1 ? '' : 's'} of vitals · ${bDays} workout day${bDays === 1 ? '' : 's'}.`);
+      const { vDays, bDays, warnings } = await syncOura(update, days);
+      const base = vDays === 0 && bDays === 0
+        ? `Oura had nothing for the last ${days} days.`
+        : `Synced ${vDays} day${vDays === 1 ? '' : 's'} of vitals · ${bDays} workout day${bDays === 1 ? '' : 's'}.`;
+      setMsg(warnings?.length ? `${base} ${warnings.join(' ')}` : base);
     } catch (e) {
       setMsg(e.message || 'Oura sync failed.');
     }
@@ -436,7 +446,7 @@ function OuraPanel({ S, update }) {
     } else if (r === 'paused') {
       setMsg(PAUSED_MESSAGE);
     } else {
-      setMsg(`Oura connect failed (${r}).`);
+      setMsg(connectResultMessage('oura', r));
     }
   }
   const applyRef = useRef(applyResult);
@@ -459,7 +469,7 @@ function OuraPanel({ S, update }) {
     // Consent withdrawal: drops the stored tokens. Vitals already synced
     // stay put — removing them would be a data-loss surprise, and
     // account deletion is the route for erasing everything.
-    if (!window.confirm('Disconnect your Oura Ring? Vitals already synced stay in your history.')) return;
+    if (!window.confirm('Disconnect your Oura Ring? Vitals already synced stay in your history — delete them any time below.')) return;
     setBusy(true); setMsg('');
     try {
       await disconnectWearable(update, 'oura');
@@ -495,11 +505,14 @@ function OuraPanel({ S, update }) {
               {busy ? 'Syncing…' : 'Sync Oura'}
             </button>
             <button type="button" className="vitals-ah-btn vitals-ah-btn-alt" disabled={busy} onClick={() => syncNow(30)}>30d</button>
+            {ouraError?.reconnect && canConnect && (
+              <button type="button" className="vitals-ah-btn" disabled={busy} onClick={connect}>Reconnect Oura</button>
+            )}
             <button type="button" className="vitals-ah-btn vitals-ah-btn-alt" disabled={busy} onClick={disconnect}>Disconnect</button>
           </>
         )}
-        <span className="vitals-ah-hint">
-          {msg || (connected
+        <span className={'vitals-ah-hint' + (ouraError ? ' is-error' : '')}>
+          {msg || (ouraError ? `Last sync failed: ${ouraError.message}` : connected
             ? 'Pulls sleep, resting HR, HRV, readiness and daily burn. Auto-syncs when you open the app.'
             : 'Link your Oura Ring — sleep, resting HR, HRV, readiness and daily burn.')}
         </span>
@@ -551,10 +564,24 @@ function OuraBadge({ connected }) {
  * exactly where the question gets asked.
  */
 export function WearableSync({ S, update }) {
+  // D7: native builds hide Connect (lib/native/wearableGate.js). A linked
+  // account keeps its panel — sync, Disconnect — and the delete action.
+  const canConnect = wearableConnectAvailable();
   return (
     <>
-      <WhoopPanel S={S} update={update} />
-      <OuraPanel S={S} update={update} />
+      {showWearablePanel({ connectAvailable: canConnect, connected: S.whoopConnected }) && (
+        <>
+          <WhoopPanel S={S} update={update} canConnect={canConnect} />
+          <WearableAccessNote provider="whoop" connected={!!S.whoopConnected} />
+        </>
+      )}
+      {showWearablePanel({ connectAvailable: canConnect, connected: S.ouraConnected }) && (
+        <>
+          <OuraPanel S={S} update={update} canConnect={canConnect} />
+          <WearableAccessNote provider="oura" connected={!!S.ouraConnected} />
+        </>
+      )}
+      <WearableDataDelete S={S} update={update} />
     </>
   );
 }

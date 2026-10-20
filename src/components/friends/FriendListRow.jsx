@@ -37,7 +37,12 @@ function initials(name) {
 
 function statusLine(friend) {
   if (friend.streak > 0) return `🔥 ${friend.streak}d`;
-  if (friend.lastSeenDays != null) return `${friend.lastSeenDays}d ago`;
+  if (friend.online) return 'Online now';
+  if (friend.lastSeenDays != null) {
+    if (friend.lastSeenDays <= 0) return 'Today';
+    if (friend.lastSeenDays === 1) return 'Yesterday';
+    return `${friend.lastSeenDays}d ago`;
+  }
   return `@${friend.handle}`;
 }
 

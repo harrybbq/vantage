@@ -18,6 +18,9 @@
  *     env var on Netlify. RC sends this in the `Authorization` header
  *     of every event; we reject anything missing or mismatched.
  *
+ * Optional (item 116): REVIEW_WINDOW_UNTIL (ISO date, ≤ 30 days ahead),
+ *   REVENUECAT_ALLOW_SANDBOX (legacy), REVENUECAT_SECRET_API_KEY.
+ *
  * Required Netlify env vars:
  *   SUPABASE_URL
  *   SUPABASE_SECRET_KEY or legacy service-role key, via lib/sbKeys (NOT the anon key — needs to write profiles.tier)
@@ -38,9 +41,11 @@
  * reserved for genuine failures.
  *
  * ── Hardening (2026-09-30, item 46) ─────────────────────────────────
- *   · SANDBOX events are acknowledged and ignored unless
- *     REVENUECAT_ALLOW_SANDBOX is 'true' — a TestFlight purchase must
- *     not grant Pro on the production database.
+ *   · SANDBOX events are acknowledged and ignored — a TestFlight
+ *     purchase must not grant Pro on the production database — except
+ *     for the narrow review routes in lib/reviewSandbox.js (item 116,
+ *     2026-10-20): accounts on the owner's reviewer list, an open
+ *     REVIEW_WINDOW_UNTIL, or the legacy REVENUECAT_ALLOW_SANDBOX=true.
  *   · A lifetime row is never overwritten, on ANY path: every PATCH
  *     carries tier=neq.lifetime (writing lifetime onto lifetime is a
  *     no-op anyway).
@@ -58,6 +63,7 @@
 
 const sbKeys = require('../lib/sbKeys');
 const { safeEqual } = require('../lib/cronAuth');
+const { sandboxDecision, globalSandboxReason, activeEntitlementIds } = require('../lib/reviewSandbox');
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
@@ -90,7 +96,7 @@ function deriveTier(entitlementIdsActive = []) {
  * event). An entitlement is active while its expires_date is null
  * (lifetime / non-expiring) or in the future.
  */
-async function tierFromSubscriberApi(appUserId) {
+async function tierFromSubscriberApi(appUserId, { includeSandbox = false } = {}) {
   const rcKey = process.env.REVENUECAT_SECRET_API_KEY;
   if (!rcKey) return null;
   try {
@@ -101,15 +107,40 @@ async function tierFromSubscriberApi(appUserId) {
       console.error('revenuecat-webhook: subscriber read failed', res.status);
       return null;
     }
-    const ents = (await res.json())?.subscriber?.entitlements || {};
-    const now = Date.now();
-    const active = Object.entries(ents)
-      .filter(([, v]) => v && (v.expires_date == null || new Date(v.expires_date).getTime() > now))
-      .map(([id]) => id);
+    // Sandbox-backed entitlements count only when sandbox is honoured
+    // for this account (lib/reviewSandbox.js) — the API reports both
+    // environments, so a TestFlight purchase would otherwise decide the
+    // tier on a production event.
+    const subscriber = (await res.json())?.subscriber;
+    const active = activeEntitlementIds(subscriber, Date.now(), { includeSandbox });
     return deriveTier(active) || 'free';
   } catch (e) {
     console.error('revenuecat-webhook: subscriber read unreachable', e?.message);
     return null;
+  }
+}
+
+/**
+ * Is this account on the owner's active reviewer list? One service-role
+ * RPC (supabase/reviewer_access_2026_10.sql). Fails CLOSED: SQL not run
+ * yet (404), any error, or no answer → false, i.e. the sandbox event is
+ * skipped exactly as it was before item 116.
+ */
+async function isActiveReviewer(userId, supabaseUrl, serviceKey) {
+  try {
+    const res = await fetch(`${supabaseUrl}/rest/v1/rpc/reviewer_sandbox_allowed`, {
+      method: 'POST',
+      headers: sbKeys.serviceKeyHeaders(serviceKey, { 'Content-Type': 'application/json' }),
+      body: JSON.stringify({ p_user_id: userId }),
+    });
+    if (!res.ok) {
+      if (res.status !== 404) console.error('revenuecat-webhook: reviewer check failed', res.status);
+      return false;
+    }
+    return (await res.json().catch(() => false)) === true;
+  } catch (err) {
+    console.error('revenuecat-webhook: reviewer check unreachable', err?.message);
+    return false;
   }
 }
 
@@ -148,13 +179,37 @@ exports.handler = async (event) => {
     return { statusCode: 400, headers: CORS, body: JSON.stringify({ error: 'no event field' }) };
   }
 
-  // Sandbox purchases are free; they must never reach production tiers.
-  if (String(e.environment || '').toUpperCase() === 'SANDBOX' && process.env.REVENUECAT_ALLOW_SANDBOX !== 'true') {
-    return { statusCode: 200, headers: CORS, body: JSON.stringify({ ok: true, skipped: 'sandbox' }) };
-  }
+  // RC's app_user_id is whatever we passed to Purchases.logIn() —
+  // i.e. the Supabase user id (see useSubscription.js → loginRevenueCat).
+  // If the user is anonymous (anon RC user prefixed with $RCAnonymousID),
+  // we can't sync into profiles — log + 200 so RC stops retrying.
+  const userId = typeof e.app_user_id === 'string' ? e.app_user_id : '';
+  const anonymous = !userId || userId.startsWith('$RCAnonymousID');
 
   const supabaseUrl = process.env.SUPABASE_URL;
   const serviceKey  = sbKeys.serviceKey(process.env);
+
+  // Sandbox purchases are free; they reach production tiers only by the
+  // narrow review routes (lib/reviewSandbox.js, item 116). The reviewer
+  // list is looked up for SANDBOX events only, and only when no global
+  // route already decided.
+  const nowMs = Date.now();
+  let sandbox = sandboxDecision({ environment: e.environment, env: process.env, nowMs });
+  if (sandbox.needsReviewerLookup) {
+    const isReviewer = !anonymous && supabaseUrl && serviceKey
+      ? await isActiveReviewer(userId, supabaseUrl, serviceKey)
+      : false;
+    sandbox = sandboxDecision({ environment: e.environment, env: process.env, nowMs, isReviewer });
+  }
+  if (!sandbox.honour) {
+    return { statusCode: 200, headers: CORS, body: JSON.stringify({ ok: true, skipped: 'sandbox' }) };
+  }
+  if (sandbox.reason === 'legacy_override') {
+    console.warn('revenuecat-webhook: sandbox event honoured by REVENUECAT_ALLOW_SANDBOX=true — prefer the reviewer list or REVIEW_WINDOW_UNTIL (item 116)');
+  } else if (sandbox.reason !== 'production') {
+    console.log('revenuecat-webhook: sandbox event honoured', sandbox.reason, e.type);
+  }
+
   if (!supabaseUrl || !serviceKey) {
     return {
       statusCode: 500, headers: CORS,
@@ -162,13 +217,8 @@ exports.handler = async (event) => {
     };
   }
 
-  // RC's app_user_id is whatever we passed to Purchases.logIn() —
-  // i.e. the Supabase user id (see useSubscription.js → loginRevenueCat).
-  // If the user is anonymous (anon RC user prefixed with $RCAnonymousID),
-  // we can't sync into profiles — log + 200 so RC stops retrying.
-  const userId = e.app_user_id;
-  if (!userId || userId.startsWith('$RCAnonymousID')) {
-    console.log('Skipping anonymous user event:', e.type, userId);
+  if (anonymous) {
+    console.log('Skipping anonymous user event:', e.type);
     return { statusCode: 200, headers: CORS, body: JSON.stringify({ ok: true, skipped: 'anonymous' }) };
   }
 
@@ -218,7 +268,11 @@ exports.handler = async (event) => {
 
   // With the secret key, RevenueCat's CURRENT view of the subscriber
   // decides — the event only tells us to look. Null = could not ask.
-  const fromApi = await tierFromSubscriberApi(userId);
+  // Sandbox entitlements count when this event was honoured as sandbox,
+  // or when sandbox is open for everyone; never for a plain production
+  // event otherwise.
+  const includeSandbox = sandbox.reason !== 'production' || !!globalSandboxReason(process.env, nowMs);
+  const fromApi = await tierFromSubscriberApi(userId, { includeSandbox });
   if (fromApi) nextTier = fromApi;
 
   // Patch profiles.tier.

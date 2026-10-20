@@ -5,6 +5,7 @@ import { parseAuthCallback, AUTH_CALLBACK_URL } from './authCallback';
 import { parseWearableCallback } from './wearableReturn';
 import { requestConnect, openAuthorize, finishConnect, deliverWearableResult } from './wearableConnect';
 import { apiUrl } from '../authFetch';
+import { captureAppleToken } from '../auth/appleTokenCapture';
 
 /**
  * Native sign-in: system browser out, custom scheme back.
@@ -105,6 +106,10 @@ export async function handleUrl(url) {
       const { data, error } = await nativeOAuthClient().auth.exchangeCodeForSession(cb.code);
       if (error) throw error;
       session = data?.session || null;
+      // The PKCE exchange is the one place the native flow sees Apple's
+      // refresh token — setSession below drops provider tokens. Item 117;
+      // fire and forget.
+      if (session) captureAppleToken(session);
     } else if (cb.accessToken && cb.refreshToken) {
       session = { access_token: cb.accessToken, refresh_token: cb.refreshToken };
     }

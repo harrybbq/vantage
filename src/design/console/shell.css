@@ -1,0 +1,306 @@
+/* ════════════════════════════════════════════════════════════════════
+   Console design — SHELL area. Owner: the SHELL agent (see README.md).
+   Covers: desktop sidebar nav, page header / top bar, mobile app bar, bottom tab bar, More drawer.
+
+   Rules (README.md):
+   - EVERY selector starts with html[data-design="console"]. No bare
+     selectors, no :root, no edits to classic CSS files.
+   - Use the tokens in tokens.css (--cx-*, --band-*, --promo/--releg)
+     and the cx- family in base.css; raw hex only for a commented one-off,
+     no font sizes off the scale (12/13/15/17/22/28/40), DM Sans
+     max weight 600.
+   - A new token or primitive goes HERE, prefixed for this area
+     (--cx-shell-*, .cx-shell-*), with a note for later consolidation.
+   - Classic must render exactly as before with data-design="classic".
+   ════════════════════════════════════════════════════════════════════ */
+
+/* ── Shell geometry ───────────────────────────────────────────────────
+   One set of numbers for the bars and the page that sits between them.
+   --m-appbar-h / --m-tabs-h are classic's mobile chrome
+   variables (index.css :root). Classic components that offset from the
+   tab bar (coin toast, install prompt, shop undo, the Lifts mini bar) read
+   them, so redefining them here keeps those clear of the taller console
+   bars. The drawn tab bar is 56 px of targets plus at least 28 px below
+   them, more where the home indicator needs it (84 px with no inset). */
+html[data-design="console"] {
+  --cx-shell-side-w: 216px;
+  --cx-shell-top-h: 60px;
+  --cx-shell-app-h: 52px;
+  --cx-shell-tab-h: 56px;
+  --cx-shell-tab-pad: max(28px, env(safe-area-inset-bottom, 0px));
+  --cx-page-max: 1400px;       /* areas may narrow it on their own page class */
+  --m-appbar-h: var(--cx-shell-app-h);
+  /* classic adds --m-safe-bottom (the raw inset) to this, so subtract it */
+  --m-tabs-h: calc(var(--cx-shell-tab-h) + var(--cx-shell-tab-pad) - env(safe-area-inset-bottom, 0px));
+}
+@media (max-width: 1100px) and (min-width: 769px) {
+  html[data-design="console"] { --cx-shell-side-w: 64px; }
+}
+
+/* Shared bits */
+html[data-design="console"] .cx-shell-sp { flex: 1 1 auto; min-width: 0; }
+html[data-design="console"] .cx-shell-slot { display: flex; align-items: center; gap: var(--cx-sp-8); min-width: 0; }
+html[data-design="console"] .cx-shell-slot:empty { display: none; }
+html[data-design="console"] .cx-shell-kbd {
+  font: 500 var(--cx-fs-12)/1 var(--cx-mono);
+  color: var(--cx-muted);
+  background: none; border: 0; padding: 0; box-shadow: none;
+}
+/* Classic presses every button to scale(.97) (index.css, global). The
+   shell's own controls answer with colour instead. */
+html[data-design="console"] .cx-shell-side button:active,
+html[data-design="console"] .cx-shell-top button:active,
+html[data-design="console"] .cx-shell-appbar button:active,
+html[data-design="console"] .cx-shell-tabs button:active,
+html[data-design="console"] .cx-shell-more button:active { transform: none; }
+
+/* Focus: the cx- ring, on every shell control. */
+html[data-design="console"] .cx-shell-ni:focus-visible,
+html[data-design="console"] .cx-shell-chip:focus-visible,
+html[data-design="console"] .cx-shell-avatar:focus-visible,
+html[data-design="console"] .cx-shell-tab:focus-visible,
+html[data-design="console"] .cx-shell-mi:focus-visible {
+  outline: 2px solid var(--cx-accent);
+  outline-offset: 2px;
+}
+
+/* ── Desktop sidebar (216 px; a 64 px icon rail from 769 to 1100) ──
+   A div with role=navigation, not <nav>: classic styles the bare <nav>
+   element (fixed, 56 px, widening on hover). */
+html[data-design="console"] .cx-shell-side {
+  position: fixed; top: 0; left: 0; bottom: 0; z-index: 200;
+  width: var(--cx-shell-side-w); box-sizing: border-box;
+  display: flex; flex-direction: column; gap: 2px;
+  padding: var(--cx-sp-16) var(--cx-sp-12);
+  background: var(--cx-bg);
+  border-right: 1px solid var(--cx-line);
+  overflow-y: auto; overflow-x: hidden;
+  font-family: var(--cx-sans);
+}
+html[data-design="console"] .cx-shell-brand {
+  display: flex; align-items: center; gap: 10px;
+  padding: 4px 8px 20px;
+  font: 600 var(--cx-fs-17)/1 var(--cx-sans); letter-spacing: -0.01em;
+  color: var(--cx-text);
+}
+html[data-design="console"] .cx-shell-logo {
+  flex: none; width: 26px; height: 26px; border-radius: var(--cx-r-chip);
+  display: grid; place-items: center;
+  background: var(--cx-accent-fill); color: var(--cx-on-accent);
+  font: 600 var(--cx-fs-15)/1 var(--cx-sans);
+}
+html[data-design="console"] .cx-shell-side-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2px; }
+html[data-design="console"] .cx-shell-ni {
+  display: flex; align-items: center; gap: var(--cx-sp-12);
+  width: 100%; min-height: 40px; box-sizing: border-box;
+  padding: 0 10px; margin: 0;
+  border: 0; border-radius: var(--cx-r-cell);
+  background: transparent; color: var(--cx-mid);
+  font: 500 var(--cx-fs-15)/var(--cx-lh-15) var(--cx-sans);
+  text-align: left; cursor: pointer; white-space: nowrap;
+  transition: background-color var(--cx-dur-fast) var(--cx-ease), color var(--cx-dur-fast) var(--cx-ease);
+}
+html[data-design="console"] .cx-shell-ni:hover { background: var(--cx-s2); color: var(--cx-text); }
+html[data-design="console"] .cx-shell-ni.is-on { background: var(--cx-s2); color: var(--cx-text); }
+html[data-design="console"] .cx-shell-ni.is-on svg { color: var(--cx-accent); }
+html[data-design="console"] .cx-shell-ni-label { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+html[data-design="console"] .cx-shell-ni .cx-shell-kbd { margin-left: auto; }
+html[data-design="console"] .cx-shell-signout { margin-top: auto; }
+@media (max-width: 1100px) and (min-width: 769px) {
+  html[data-design="console"] .cx-shell-side { padding: var(--cx-sp-16) var(--cx-sp-8); align-items: center; }
+  html[data-design="console"] .cx-shell-brand { padding: 4px 0 20px; font-size: 0; gap: 0; }
+  html[data-design="console"] .cx-shell-ni { width: 44px; min-height: 44px; padding: 0; justify-content: center; }
+  html[data-design="console"] .cx-shell-ni-label,
+  html[data-design="console"] .cx-shell-ni .cx-shell-kbd { display: none; }
+}
+
+/* ── Desktop top bar (60 px) ── */
+html[data-design="console"] .cx-shell-top {
+  position: fixed; top: 0; right: 0; left: var(--cx-shell-side-w); z-index: 195;
+  height: var(--cx-shell-top-h); box-sizing: border-box;
+  display: flex; align-items: center; gap: var(--cx-sp-12);
+  padding: 0 28px;
+  background: var(--cx-bg);
+  border-bottom: 1px solid var(--cx-line);
+  font-family: var(--cx-sans);
+}
+html[data-design="console"] .cx-shell-title {
+  margin: 0; flex: none;
+  font: 600 var(--cx-fs-17)/var(--cx-lh-17) var(--cx-sans);
+  color: var(--cx-text); letter-spacing: -0.005em;
+}
+html[data-design="console"] .cx-shell-context {
+  font-size: var(--cx-fs-13); line-height: var(--cx-lh-13); color: var(--cx-muted);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0;
+}
+html[data-design="console"] .cx-shell-slot-start { margin-left: var(--cx-sp-4); }
+
+/* Chips in the bars: 32 px on desktop, 36 px on the phone bar; the
+   ::after widens the hit area to 44 px without moving the layout. */
+html[data-design="console"] .cx-shell-chip {
+  position: relative; flex: none;
+  display: inline-flex; align-items: center; gap: 6px;
+  height: 32px; box-sizing: border-box; padding: 0 10px; margin: 0;
+  border: 1px solid var(--cx-line); border-radius: var(--cx-r-cell);
+  background: var(--cx-s1); color: var(--cx-mid);
+  font: 500 var(--cx-fs-13)/1 var(--cx-sans);
+  cursor: pointer; white-space: nowrap;
+  transition: border-color var(--cx-dur-fast) var(--cx-ease), color var(--cx-dur-fast) var(--cx-ease);
+}
+html[data-design="console"] .cx-shell-chip::after { content: ''; position: absolute; inset: -6px -2px; }
+html[data-design="console"] .cx-shell-chip:hover { border-color: var(--cx-line-strong); color: var(--cx-text); }
+html[data-design="console"] .cx-shell-search { width: 240px; color: var(--cx-muted); }
+html[data-design="console"] .cx-shell-search-label { flex: 1 1 auto; text-align: left; overflow: hidden; text-overflow: ellipsis; }
+html[data-design="console"] .cx-shell-coins-n { color: var(--cx-text); font-size: var(--cx-fs-13); }
+html[data-design="console"] .cx-shell-coins-today { color: var(--cx-accent); font-size: var(--cx-fs-12); }
+html[data-design="console"] .cx-shell-coins-today.is-down { color: var(--cx-danger); }
+html[data-design="console"] .cx-shell-ask { color: var(--cx-gold); border-color: var(--cx-gold); background: var(--cx-gold-tint); }
+html[data-design="console"] .cx-shell-ask .cx-num { font-size: var(--cx-fs-12); }
+@media (max-width: 1100px) {
+  html[data-design="console"] .cx-shell-search { width: auto; }
+  html[data-design="console"] .cx-shell-search-label { display: none; }
+}
+
+/* Avatar: 50% radius is reserved for avatars. */
+html[data-design="console"] .cx-shell-avatar {
+  position: relative; flex: none;
+  display: grid; place-items: center;
+  width: var(--cx-shell-av, 32px); height: var(--cx-shell-av, 32px);
+  padding: 0; margin: 0; border: 0; border-radius: 50%;
+  background: none; cursor: pointer;
+}
+html[data-design="console"] .cx-shell-avatar::after { content: ''; position: absolute; inset: -6px; border-radius: 50%; }
+html[data-design="console"] .cx-shell-avatar-face {
+  display: grid; place-items: center; overflow: hidden;
+  width: 100%; height: 100%; border-radius: 50%;
+  background: var(--cx-accent-tint); color: var(--cx-accent);
+  box-shadow: inset 0 0 0 1px var(--cx-line);
+  font: 600 var(--cx-fs-12)/1 var(--cx-sans);
+}
+html[data-design="console"] .cx-shell-avatar-face img { width: 100%; height: 100%; object-fit: cover; display: block; }
+
+/* ── Phone app bar (52 px + top inset) ── */
+html[data-design="console"] .cx-shell-appbar {
+  position: fixed; top: 0; left: 0; right: 0; z-index: 195;
+  height: calc(var(--cx-shell-app-h) + env(safe-area-inset-top, 0px));
+  padding: env(safe-area-inset-top, 0px) var(--cx-sp-16) 0;
+  box-sizing: border-box;
+  display: flex; align-items: center; gap: 10px;
+  background: var(--cx-bg);
+  font-family: var(--cx-sans);
+}
+html[data-design="console"] .cx-shell-appbar-title {
+  margin: 0; min-width: 0;
+  font: 600 var(--cx-fs-22)/var(--cx-lh-22) var(--cx-sans); letter-spacing: -0.01em;
+  color: var(--cx-text);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+html[data-design="console"] .cx-shell-appbar-titles { display: flex; flex-direction: column; min-width: 0; }
+html[data-design="console"] .cx-shell-appbar-date { font-size: var(--cx-fs-12); line-height: var(--cx-lh-12); color: var(--cx-muted); }
+html[data-design="console"] .cx-shell-appbar-greet {
+  margin: 0;
+  font: 600 var(--cx-fs-17)/22px var(--cx-sans); color: var(--cx-text);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+html[data-design="console"] .cx-shell-appbar .cx-shell-chip { height: 36px; }
+html[data-design="console"] .cx-shell-appbar .cx-shell-chip::after { inset: -4px -2px; }
+
+/* ── Phone tab bar: 5 tabs, 12 px labels, ≥ 84 px tall ── */
+html[data-design="console"] .cx-shell-tabs {
+  position: fixed; left: 0; right: 0; bottom: 0; z-index: 195;
+  height: calc(var(--cx-shell-tab-h) + var(--cx-shell-tab-pad));
+  padding: var(--cx-sp-4) max(4px, env(safe-area-inset-right, 0px)) var(--cx-shell-tab-pad) max(4px, env(safe-area-inset-left, 0px));
+  box-sizing: border-box;
+  display: grid; grid-template-columns: repeat(5, minmax(0, 1fr));
+  background: var(--cx-bg);    /* WebViews without color-mix (Chrome < 111) */
+  background: color-mix(in srgb, var(--cx-bg) 94%, transparent);
+  -webkit-backdrop-filter: blur(16px); backdrop-filter: blur(16px);
+  border-top: 1px solid var(--cx-line);
+  font-family: var(--cx-sans);
+}
+html[data-design="console"] .cx-shell-tab {
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: var(--cx-sp-4);
+  min-width: 0; min-height: 48px; padding: 0; margin: 0;
+  border: 0; border-radius: var(--cx-r-cell); background: none;
+  color: var(--cx-muted); cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition: color var(--cx-dur-fast) var(--cx-ease);
+}
+html[data-design="console"] .cx-shell-tab-label { font: 500 var(--cx-fs-12)/var(--cx-lh-12) var(--cx-sans); }
+html[data-design="console"] .cx-shell-tab.is-on { color: var(--cx-text); }
+html[data-design="console"] .cx-shell-tab.is-on svg { color: var(--cx-accent); }
+html[data-design="console"] .cx-shell-tab.is-on .cx-shell-tab-label { font-weight: 600; }
+
+/* ── More sheet ── */
+html[data-design="console"] .cx-shell-more-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
+html[data-design="console"] .cx-shell-more-list li + li { border-top: 1px solid var(--cx-line); }
+html[data-design="console"] .cx-shell-mi {
+  display: flex; align-items: center; gap: var(--cx-sp-12);
+  width: 100%; min-height: 56px; box-sizing: border-box;
+  padding: var(--cx-sp-8) var(--cx-sp-4); margin: 0;
+  border: 0; border-radius: var(--cx-r-cell); background: none;
+  color: var(--cx-mid); text-align: left; cursor: pointer;
+  font-family: var(--cx-sans);
+}
+html[data-design="console"] .cx-shell-mi:hover { color: var(--cx-text); }
+html[data-design="console"] .cx-shell-mi.is-on { color: var(--cx-text); }
+html[data-design="console"] .cx-shell-mi.is-on > svg:first-child { color: var(--cx-accent); }
+html[data-design="console"] .cx-shell-mi > svg:last-child { color: var(--cx-muted); }
+html[data-design="console"] .cx-shell-mi-text { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+html[data-design="console"] .cx-shell-mi-label { font: 600 var(--cx-fs-15)/var(--cx-lh-15) var(--cx-sans); color: var(--cx-text); }
+html[data-design="console"] .cx-shell-mi-desc { font-size: var(--cx-fs-13); line-height: var(--cx-lh-13); color: var(--cx-muted); }
+html[data-design="console"] .cx-shell-pro {
+  margin-top: var(--cx-sp-12); padding: var(--cx-sp-8) var(--cx-sp-12);
+  border: 1px solid var(--cx-line); background: var(--cx-accent-tint);
+}
+html[data-design="console"] .cx-shell-pro > svg:first-child { color: var(--cx-accent); }
+
+/* ── A classic page inside the console shell ──
+   While the areas land, a slot left null shows the classic page in
+   console mode. Move it clear of the wider sidebar and taller top bar.
+   (Phones need nothing: classic's .section offsets read --m-appbar-h and
+   --m-tabs-h, redefined above.) .cx-page below overrides this. */
+@media (min-width: 769px) {
+  html[data-design="console"] .section {
+    margin-left: var(--cx-shell-side-w);
+    padding-top: calc(var(--cx-shell-top-h) + var(--cx-sp-16));
+  }
+}
+
+/* ── Page container: .cx-page ─────────────────────────────────────────
+   A console section renders <section className="section active cx-page
+   cx-<area>-page">. Classic .section gives the 56 px rail offset, and on
+   phones a set of !important paddings (index.css, 768 px media); these
+   rules out-rank both (html[data-design] adds specificity, and the phone
+   values are !important too). Content is centred in the space right of
+   the sidebar up to --cx-page-max; set a smaller --cx-page-max on your
+   area's page class for a narrow page (Settings, say). */
+html[data-design="console"] .cx-page {
+  display: block;
+  min-height: 100vh; box-sizing: border-box;
+  margin-left: var(--cx-shell-side-w);
+  padding-top: calc(var(--cx-shell-top-h) + var(--cx-sp-20));
+  padding-bottom: 40px;
+  /* % here is the body's width, so subtract the sidebar first. */
+  padding-left: max(28px, calc((100% - var(--cx-shell-side-w) - var(--cx-page-max)) / 2));
+  padding-right: max(28px, calc((100% - var(--cx-shell-side-w) - var(--cx-page-max)) / 2));
+  background: none;
+  font-family: var(--cx-sans);
+  color: var(--cx-text);
+}
+@media (max-width: 768px) {
+  html[data-design="console"] .cx-page {
+    margin-left: 0 !important;
+    padding-top: calc(var(--cx-shell-app-h) + env(safe-area-inset-top, 0px) + var(--cx-sp-8)) !important;
+    padding-bottom: calc(var(--cx-shell-tab-h) + var(--cx-shell-tab-pad) + var(--cx-sp-16)) !important;
+    padding-left: max(var(--cx-sp-16), env(safe-area-inset-left, 0px)) !important;
+    padding-right: max(var(--cx-sp-16), env(safe-area-inset-right, 0px)) !important;
+    min-height: 100vh;
+    overflow-x: clip;
+  }
+  /* Classic's "Not saved" pill sits at a fixed 84 px (inline style);
+     lift it clear of the taller bar. */
+  html[data-design="console"] .save-status-pill {
+    bottom: calc(var(--cx-shell-tab-h) + var(--cx-shell-tab-pad) + var(--cx-sp-8)) !important;
+  }
+}

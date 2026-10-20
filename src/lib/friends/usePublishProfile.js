@@ -6,6 +6,7 @@ import { publicNameProblem } from '../moderation/nameFilter.js';
 import { photoHash } from './avatarScreen.js';
 import { writePublicProfile } from './profileWrites.js';
 import { loadOwnProfile } from './profileReads.js';
+import { shareableView } from '../wearables/strip.js';
 import { streakForFriends, planAvatar, planDirectPatch, PRESENCE_INTERVAL_MS, PRESENCE_REPING_MS } from './publishPlan.js';
 
 /**
@@ -77,9 +78,13 @@ async function resizeAvatar(dataUrl) {
 /** Build the heatmap_days array friends will see — last 91 days,
  *  same shape as friendsMock so the renderer doesn't change. We
  *  lean on `S.logs` as the source of truth and assign intensity
- *  by the count of distinct trackers logged on each day. */
+ *  by the count of distinct trackers logged on each day.
+ *
+ *  Ticks an auto-fill rule made from a WHOOP/Oura reading are left out
+ *  (item 124, owner decision D1): friends see what you logged, not what
+ *  your band did. */
 function buildHeatmap(S) {
-  const logs = S.logs || {};
+  const logs = shareableView(S).logs || {};
   const today = new Date();
   today.setHours(0, 0, 0, 0);
   const days = [];
