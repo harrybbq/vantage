@@ -612,11 +612,33 @@ else maps onto existing items.
     web flow byte-for-byte unchanged; `check:wearableconnect`. Needs: the `wearable-callback` host in the
     Android intent filter, `com.vantage.app` as an iOS URL type once `ios/` exists, then a device test.
     Later hardening: verified App Links / Universal Links instead of the custom scheme.*
-116. `[ ]` **BLOCKS** Review purchases: sandbox events are dropped unless `REVENUECAT_ALLOW_SANDBOX=true`,
+116. `[~]` **BLOCKS** Review purchases: sandbox events are dropped unless `REVENUECAT_ALLOW_SANDBOX=true`,
     so a reviewer who buys Pro gets a 403 from the coach. Recommended: set it for the review window
     only, then off. And `config.pro_live` must be `'true'` before submission. (P2, P3)
-117. `[ ]` **BLOCKS** Sign in with Apple tokens aren't revoked on account deletion (Apple expects it):
+    *Status 2026-10-20: done in code. The global switch is replaced by narrow routes
+    (`netlify/lib/reviewSandbox.js`, tested): sandbox events are honoured for accounts on the owner's
+    reviewer list (`supabase/reviewer_access_2026_10.sql`: email-keyed, RLS locked, SQL-editor-only
+    functions, each row expires within 90 days, confirmed emails only), or for anyone while
+    `REVIEW_WINDOW_UNTIL` is open (≤ 30 days ahead, closes itself). `REVENUECAT_ALLOW_SANDBOX=true` still
+    works as a legacy override and logs a warning. Any failure closes the gate. Subscriber-API reads
+    leave sandbox entitlements out unless sandbox is honoured. `reviewer_access_add(…, grant_pro)` gives
+    demo account A a recorded, revertible lifetime grant that no webhook can demote.
+    `review_preflight()` / `scripts/reviewer-demo/preflight.mjs` checks `pro_live` and the reviewer
+    accounts before submission. Owner: run the SQL, add the accounts, unset `REVENUECAT_ALLOW_SANDBOX`
+    if set (`docs/REVIEWER_KIT.md`).*
+117. `[~]` **BLOCKS** Sign in with Apple tokens aren't revoked on account deletion (Apple expects it):
     needs the native SIWA flow's authorization code, or the provider token captured at sign-in. (P8)
+    *Status 2026-10-20: done in code. Both web and native sign in through Supabase OAuth; there is no
+    native SIWA plugin. The Apple refresh token Supabase hands over once at sign-in is posted by
+    `src/lib/auth/appleTokenCapture.js` (wired in `lib/supabase.js` and `lib/native/deepLinks.js`) to the new
+    `apple-token` function. It stores the token only when the caller's newest identity is a fresh Apple
+    sign-in, in `apple_tokens` (`supabase/apple_revocation_2026_10.sql`: RLS on, no policies; AES-256-GCM
+    with `APPLE_TOKEN_SECRET`). `delete-account` reads it before the auth delete and revokes it at Apple
+    after, with an ES256 client secret. Every failure is logged and none blocks deletion. Owner: Apple key +
+    Netlify env (`APPLE_TEAM_ID`, `APPLE_KEY_ID`, `APPLE_PRIVATE_KEY`, `APPLE_SERVICES_ID`,
+    `APPLE_TOKEN_SECRET`), run the SQL, then the smoke test in `docs/SIGN_IN_WITH_APPLE.md`. That test
+    confirms Supabase returns Apple's refresh token, which could not be checked from here. Tokens are
+    captured from deployment on; earlier Apple sign-ins have none until they sign in again.*
 118. `[~]` **BLOCKS** DM text (and the opt-in shared streak habit name) isn't filtered (Apple 1.2 asks
     for a filtering method): reuse `checkPublicText` on send, mirror it server-side. (P9)
     *Status 2026-10-20 (DMs): done in code — the composer refuses slurs and unambiguous explicit terms
@@ -643,8 +665,17 @@ else maps onto existing items.
     Australia); alcohol references Infrequent (or change the habit placeholder); export compliance
     "none of the algorithms" + `ITSAppUsesNonExemptEncryption=false` (one line from the solicitor);
     iPad support or not; Play audience 13+ bands or 18+.
-122. `[ ]` **LAUNCH** Create the reviewer demo accounts 4–6 weeks before submitting — ratings cap
+122. `[~]` **LAUNCH** Create the reviewer demo accounts 4–6 weeks before submitting — ratings cap
     history at account age, so a fresh account looks empty. (Pack §1.)
+    *Status 2026-10-20: tooling done. `scripts/reviewer-demo/seed.mjs` creates (with `--create`) and seeds
+    A (Pro), B (free, five habits = the cap) and the demo friends with 6–8 weeks of invented history in
+    the app's own state shapes (checked through the app's pure libs in `plan.test.mjs`): trackers,
+    habits, hand-entered vitals, savings, trips, wish list, food log, friendships, DMs and a group. It
+    touches only `--allow` addresses, refuses owner addresses, stops before any write if a row holds
+    data it did not write, uses compare-and-set for the state, never deletes and never sets tier. It
+    is a dry run unless `--write` is given (`seed.test.mjs` proves this end to end). Steps:
+    `docs/REVIEWER_KIT.md`. Still to do (owner): create the accounts on the company domain (item 72)
+    4–6 weeks before submitting, then run the seeder and `reviewer_access_add`.*
 
 123. `[ ]` **BLOCKS** `REVENUECAT_SECRET_API_KEY` is not set in Netlify (owner confirmed 2026-10-20). Without
     it, account deletion can't remove the RevenueCat subscriber (the /delete-account page says it does),
