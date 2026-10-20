@@ -36,10 +36,13 @@ const ok = (v, m) => { assert.ok(v, m); n++; };
 
   const h = K.serviceHeaders(both, { Prefer: 'return=minimal' });
   eq(h, { Prefer: 'return=minimal', apikey: 'sb_secret_new' }, 'service headers: apikey + extras');
-  ok(!('Authorization' in h), 'service headers carry NO Authorization');
-  ok(!('Authorization' in K.serviceHeaders({ SUPABASE_SERVICE_ROLE_KEY: 'legacy' })), 'no Authorization with the legacy key either');
-  ok(!('Authorization' in K.serviceKeyHeaders('k', { Authorization: 'Bearer k' })), 'the key cannot be smuggled back onto Authorization');
-  eq(K.serviceKeyHeaders('k', { 'Content-Type': 'application/json' }), { 'Content-Type': 'application/json', apikey: 'k' }, 'serviceKeyHeaders keeps extras');
+  ok(!('Authorization' in h), 'a new secret key: NO Authorization');
+  eq(K.serviceHeaders({ SUPABASE_SERVICE_ROLE_KEY: 'legacy.jwt' }), { apikey: 'legacy.jwt', Authorization: 'Bearer legacy.jwt' }, 'a legacy JWT key keeps both headers, exactly as before');
+  ok(!('Authorization' in K.serviceKeyHeaders('sb_secret_k', { Authorization: 'Bearer sb_secret_k' })), 'a new key cannot be smuggled back onto Authorization');
+  eq(K.serviceKeyHeaders('sb_secret_k', { 'Content-Type': 'application/json' }), { 'Content-Type': 'application/json', apikey: 'sb_secret_k' }, 'serviceKeyHeaders keeps extras');
+  eq(K.serviceKeyHeaders('legacy.jwt', { Authorization: 'Bearer user.jwt' }).Authorization, 'Bearer user.jwt', 'a caller-supplied Authorization is never overwritten');
+  eq(K.serviceKeyHeaders('', {}), { apikey: '' }, 'no key → no Bearer');
+  ok(K.isNewKey('sb_secret_x') && K.isNewKey('sb_publishable_x') && !K.isNewKey('eyJhbGciOi.x.y') && !K.isNewKey(undefined), 'isNewKey');
 
   const u = K.userHeaders({ SUPABASE_PUBLISHABLE_KEY: 'pub', SUPABASE_SECRET_KEY: 'sec' }, 'user.jwt.here', { Accept: 'x' });
   eq(u, { Accept: 'x', apikey: 'pub', Authorization: 'Bearer user.jwt.here' }, 'user headers: public apikey + the user JWT');
@@ -94,6 +97,12 @@ function fresh(rel) {
   return require(p);
 }
 
+// Service calls: a new key → apikey only; a legacy key → apikey + Bearer (unchanged behaviour).
+const svcAuth = (headers, expect, what) => {
+  if (String(expect.service).startsWith('sb_')) ok(!('Authorization' in headers), `${what} sends no Authorization (new key)`);
+  else eq(headers.Authorization, `Bearer ${expect.service}`, `${what} keeps Bearer <legacy key>, as before`);
+};
+
 async function scenario(label, keys, expect) {
   for (const k of KEY_ENV) delete process.env[k];
   Object.assign(process.env, keys);
@@ -107,7 +116,7 @@ async function scenario(label, keys, expect) {
   eq(hr.statusCode, 200, `${label}: health answers`);
   const hc = calls.find(c => c.url.includes('/rest/v1/config'));
   eq(hc.headers.apikey, expect.service, `${label}: health sends the service key on apikey`);
-  ok(!('Authorization' in hc.headers), `${label}: health sends no Authorization`);
+  svcAuth(hc.headers, expect, `${label}: health`);
 
   // wearable-disconnect: verify the user, then a service delete
   calls.length = 0;
@@ -119,7 +128,7 @@ async function scenario(label, keys, expect) {
   eq(who.headers.apikey, expect.user, `${label}: session check uses the public key`);
   const del = calls.find(c => c.method === 'DELETE');
   eq(del.headers.apikey, expect.service, `${label}: delete runs with the service key`);
-  ok(!('Authorization' in del.headers), `${label}: delete sends no Authorization`);
+  svcAuth(del.headers, expect, `${label}: delete`);
 
   // admin-set-rating: owner check as the user, PATCH as service
   calls.length = 0;
@@ -128,7 +137,7 @@ async function scenario(label, keys, expect) {
   eq(ar.statusCode, 200, `${label}: admin-set-rating answers`);
   const patch = calls.find(c => c.method === 'PATCH');
   eq(patch.headers.apikey, expect.service, `${label}: PATCH carries the service key`);
-  ok(!('Authorization' in patch.headers), `${label}: PATCH sends no Authorization`);
+  svcAuth(patch.headers, expect, `${label}: PATCH`);
 
   // requireUser (every AI / social endpoint)
   calls.length = 0;
@@ -144,7 +153,7 @@ async function scenario(label, keys, expect) {
   const tok = calls.find(c => c.url.includes('whoop_tokens'));
   if (tok) {
     eq(tok.headers.apikey, expect.service, `${label}: whoop lib uses the service key`);
-    ok(!('Authorization' in tok.headers), `${label}: whoop lib sends no Authorization`);
+    svcAuth(tok.headers, expect, `${label}: whoop lib`);
   }
 
   // not configured stays a 500

@@ -147,7 +147,7 @@ for (const uid of USERS.slice(6, 16)) {
   const iWrite = idx(l => l.method === 'PATCH' && l.u.includes(`user_data?id=eq.${uid}`));
   ok(iRefresh >= 0 && iPersist > iRefresh && iWrite > iPersist, `whoop-cron: ${uid.slice(-2)} refresh → persist → write`);
 }
-ok(log.every(l => !l.u.includes('supabase.co') || !('Authorization' in l.headers)), 'whoop-cron: Supabase calls carry no Authorization (sbKeys)');
+ok(log.every(l => !l.u.includes('supabase.co') || l.headers.Authorization === 'Bearer legacy.service.TEST'), 'whoop-cron: Supabase calls keep the legacy key shape (apikey + Bearer) via sbKeys');
 const line = out.find(s => s.startsWith('whoop-cron:')) || '';
 ok(/10 synced, 0 skipped, 6 failed, 0 busy .*24 not reached .*of 40 due/.test(line), `whoop-cron: counts logged (${line})`);
 
