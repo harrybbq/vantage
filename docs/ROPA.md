@@ -57,8 +57,9 @@ use `export const config`). So every function, including the scheduled
 ones, runs in **the site-level Functions region**. For a site created after
 4 October 2023 that defaults to **`cmh`, US East (Ohio, AWS us-east-2)**;
 an older site may be on another default (old forum posts say us-east-1).
-The repo's first commit is dated 2026-08-18, but the Netlify site may be
-older — **read the actual value in the dashboard, don't infer it.**
+The project's history goes back at least to May 2026 (the 2026-05-03
+incident) and the Netlify site may be older still — **read the actual
+value in the dashboard, don't infer it.**
 
 **Can it be EU? Yes, on Pro (which the owner has).** Frankfurt (`fra`),
 London (`lhr`) and Dublin (`dub`) are listed as self-serve regions, and
