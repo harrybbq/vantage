@@ -10,14 +10,14 @@
  * (var(--em)); all text wears text tokens.
  */
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { supabase } from '../lib/supabase';
-import { apiUrl } from '../lib/authFetch';
 import { webOrigin } from '../lib/native/platform';
 import { parseHealthExport, applyHealthImport } from '../lib/appleHealth';
 import { syncWhoop } from '../lib/whoopClient';
 import { syncOura, disconnectWearable } from '../lib/ouraClient';
 import { requestConsent } from '../lib/consent/request';
 import { PAUSED_MESSAGE } from '../lib/native/paused';
+import { startWearableConnect } from '../lib/native/deepLinks';
+import { takeWearableResult, onWearableResult, browserHint } from '../lib/native/wearableConnect';
 
 // Health data is special-category (UK GDPR Art. 9): every route that
 // starts a new source of it asks for explicit consent first. Data that
@@ -251,13 +251,13 @@ function WhoopPanel({ S, update }) {
   // Handle the OAuth redirect (?whoop=connected). Routine freshness is
   // now driven by the app-level auto-sync (useWhoopAutoSync) on open/
   // focus, so this only needs to catch the just-connected case.
-  useEffect(() => {
-    const p = new URLSearchParams(window.location.search);
-    const r = p.get('whoop');
-    if (!r) return;
-    p.delete('whoop');
-    const qs = p.toString();
-    window.history.replaceState({}, '', window.location.pathname + (qs ? '?' + qs : ''));
+  //
+  // The native app gets the same words by a different road: the return
+  // comes in as com.vantage.app://wearable-callback, lib/native/deepLinks
+  // finishes it, and the result is parked for whichever panel is (or is
+  // about to be) mounted — taken here on mount, or from the event.
+  function applyResult(r) {
+    setBusy(false);
     if (r === 'connected') {
       // It worked — the redirect URI is not in question, so stop showing it.
       try { sessionStorage.removeItem(REDIRECT_KEY); } catch { /* ignore */ }
@@ -269,7 +269,21 @@ function WhoopPanel({ S, update }) {
     } else {
       setMsg(`WHOOP connect failed (${r}).`);
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }
+  const applyRef = useRef(applyResult);
+  applyRef.current = applyResult;
+  useEffect(() => {
+    const p = new URLSearchParams(window.location.search);
+    const r = p.get('whoop');
+    if (r) {
+      p.delete('whoop');
+      const qs = p.toString();
+      window.history.replaceState({}, '', window.location.pathname + (qs ? '?' + qs : ''));
+      applyRef.current(r);
+    }
+    const parked = takeWearableResult('whoop');
+    if (parked) applyRef.current(parked);
+    return onWearableResult('whoop', res => applyRef.current(res));
   }, []);
 
   async function disconnect() {
@@ -288,19 +302,15 @@ function WhoopPanel({ S, update }) {
     if (!(await requestConsent('health'))) { setMsg(NEEDS_HEALTH_CONSENT); return; }
     setBusy(true); setMsg('');
     try {
-      const { data: { session } } = await supabase.auth.getSession();
-      const res = await fetch(apiUrl('/.netlify/functions/whoop-connect'), {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${session?.access_token}` },
-      });
-      const body = await res.json().catch(() => ({}));
-      if (!res.ok || !body.url) throw new Error(body.error || 'connect failed');
-      if (body.redirectUri) {
+      // Web: navigates this page, as before. Native: opens the system
+      // browser and returns; the result arrives through applyResult.
+      const { native } = await startWearableConnect('whoop', body => {
+        if (!body.redirectUri) return;
         const diag = { redirectUri: body.redirectUri, clientId: body.clientId || '' };
         try { sessionStorage.setItem(REDIRECT_KEY, JSON.stringify(diag)); } catch { /* private mode */ }
         setLastRedirect(diag);
-      }
-      window.location.href = body.url;
+      });
+      if (native) { setBusy(false); setMsg(browserHint('whoop')); }
     } catch (e) {
       setMsg(e.message || 'Could not start WHOOP connect.');
       setBusy(false);
@@ -417,13 +427,9 @@ function OuraPanel({ S, update }) {
   }
 
   // Handle the OAuth redirect (?oura=connected).
-  useEffect(() => {
-    const p = new URLSearchParams(window.location.search);
-    const r = p.get('oura');
-    if (!r) return;
-    p.delete('oura');
-    const qs = p.toString();
-    window.history.replaceState({}, '', window.location.pathname + (qs ? '?' + qs : ''));
+  // Native returns arrive parked or by event — see WhoopPanel.
+  function applyResult(r) {
+    setBusy(false);
     if (r === 'connected') {
       update(prev => (prev.ouraConnected ? prev : { ...prev, ouraConnected: true }));
       syncNow(7);
@@ -432,7 +438,21 @@ function OuraPanel({ S, update }) {
     } else {
       setMsg(`Oura connect failed (${r}).`);
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }
+  const applyRef = useRef(applyResult);
+  applyRef.current = applyResult;
+  useEffect(() => {
+    const p = new URLSearchParams(window.location.search);
+    const r = p.get('oura');
+    if (r) {
+      p.delete('oura');
+      const qs = p.toString();
+      window.history.replaceState({}, '', window.location.pathname + (qs ? '?' + qs : ''));
+      applyRef.current(r);
+    }
+    const parked = takeWearableResult('oura');
+    if (parked) applyRef.current(parked);
+    return onWearableResult('oura', res => applyRef.current(res));
   }, []);
 
   async function disconnect() {
@@ -454,14 +474,8 @@ function OuraPanel({ S, update }) {
     if (!(await requestConsent('health'))) { setMsg(NEEDS_HEALTH_CONSENT); return; }
     setBusy(true); setMsg('');
     try {
-      const { data: { session } } = await supabase.auth.getSession();
-      const res = await fetch(apiUrl('/.netlify/functions/oura-connect'), {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${session?.access_token}` },
-      });
-      const body = await res.json().catch(() => ({}));
-      if (!res.ok || !body.url) throw new Error(body.error || 'connect failed');
-      window.location.href = body.url;
+      const { native } = await startWearableConnect('oura');
+      if (native) { setBusy(false); setMsg(browserHint('oura')); }
     } catch (e) {
       setMsg(e.message || 'Could not start Oura connect.');
       setBusy(false);

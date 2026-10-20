@@ -526,11 +526,19 @@ else maps onto existing items.
     production (the DM one is confirmed 2026-10-18).
 
 ### From the store submission pack — 2026-10-20 (`docs/STORE_SUBMISSION_PACK.md` §8, P1–P12)
-115. `[ ]` **BLOCKS** WHOOP/Oura connect fails inside the native app: the panel navigates the WebView to
+115. `[~]` **BLOCKS** WHOOP/Oura connect fails inside the native app: the panel navigates the WebView to
     the provider, the callback returns to the website root, and the OAuth `state` is bound to an
     HttpOnly cookie the system browser doesn't have. Open the authorize URL with `Browser.open`, bind
     state without a cookie for native starts, redirect native callbacks to `com.vantage.app://…`;
     verify on a device. (P1)
+    *Status 2026-10-20: done in code. Native starts send a PKCE-style challenge (verifier stays on the
+    device); the state is signed + 10-min + provider + challenge, no cookie; the callback hands code+state
+    to `com.vantage.app://wearable-callback` WITHOUT exchanging, and the app's POST finish exchanges only
+    with the verifier and a session for the state's user (lib/oauthState.js "Native starts" says why a
+    cookie-less signed state alone would reopen the cross-account attack). Same registered redirect URI;
+    web flow byte-for-byte unchanged; `check:wearableconnect`. Needs: the `wearable-callback` host in the
+    Android intent filter, `com.vantage.app` as an iOS URL type once `ios/` exists, then a device test.
+    Later hardening: verified App Links / Universal Links instead of the custom scheme.*
 116. `[ ]` **BLOCKS** Review purchases: sandbox events are dropped unless `REVENUECAT_ALLOW_SANDBOX=true`,
     so a reviewer who buys Pro gets a 403 from the coach. Recommended: set it for the review window
     only, then off. And `config.pro_live` must be `'true'` before submission. (P2, P3)
@@ -801,6 +809,11 @@ Standing rules for both wearables, so a third one doesn't relearn them:
   user's tokens under the attacker's id — health data to the wrong
   person. The cookie is `SameSite=Lax` on purpose: the provider's
   redirect is a top-level GET, which Lax allows and Strict would block.
+  Native (app) starts can't use the cookie, so they bind with a
+  verifier the app keeps (PKCE shape) and the callback never exchanges
+  their code itself — the app finishes with verifier + session. A
+  cookie-less state that the callback would exchange on its own is the
+  same hole again (item 115).
 - **Every new user-scoped table needs `on delete cascade`** to
   `auth.users(id)`, or account deletion leaves it behind (see item 20).
 - **Disconnect must delete the tokens**, because the privacy policy says

@@ -3,13 +3,15 @@
  *
  * Step 1 of the Oura OAuth flow, mirroring whoop-connect. The signed-in
  * user POSTs here with their Supabase JWT; we return the Oura authorize
- * URL carrying a tamper-proof `state` (userId + HMAC) so the callback
- * can bind the tokens to the right account without any session storage.
+ * URL carrying a signed, expiring, single-use `state` (lib/oauthState.js).
+ *
+ * Body (optional JSON): { platform: 'native', challenge } from the
+ * Capacitor app — same branching as whoop-connect.
  *
  * Env: OURA_CLIENT_ID, OURA_CLIENT_SECRET (also the HMAC key),
  *      SUPABASE_URL and the service key (lib/sbKeys).
  */
-const { issueState } = require('../lib/oauthState');
+const { issueState, issueNativeState, isChallenge } = require('../lib/oauthState');
 const { redirectUriFor } = require('../lib/redirectUri');
 const { requireUser, underLimit, tooMany } = require('../lib/requireUser');
 
@@ -45,7 +47,18 @@ exports.handler = async (event) => {
   // Constant, registrable value — NOT the request's host. See lib/redirectUri.
   const redirectUri = redirectUriFor(event, 'oura');
   console.info('oura-connect: redirect_uri', redirectUri);
-  const { state, cookie } = issueState(userId, 'oura', process.env);
+  // Native (the Capacitor app) or web? Only an explicit, well-formed
+  // native request leaves the cookie flow; anything else is the web
+  // flow exactly as it was.
+  let req = {};
+  try { req = JSON.parse(event.body || '{}') || {}; } catch { /* no body: web */ }
+  const native = req.platform === 'native';
+  if (native && !isChallenge(req.challenge)) {
+    return { statusCode: 400, headers: CORS, body: JSON.stringify({ error: 'Could not start connect — please try again.' }) };
+  }
+  const { state, cookie } = native
+    ? { state: issueNativeState(userId, 'oura', req.challenge, process.env), cookie: null }
+    : issueState(userId, 'oura', process.env);
   const url = `${AUTH_URL}?` + new URLSearchParams({
     client_id: OURA_CLIENT_ID,
     redirect_uri: redirectUri,
@@ -54,11 +67,12 @@ exports.handler = async (event) => {
     state,
   });
 
-  // The nonce cookie is what makes the state single-use and
-  // browser-bound; the callback refuses a state without it.
+  // Web: the nonce cookie is what makes the state single-use and
+  // browser-bound; the callback refuses a web state without it.
+  // Native: no cookie — the challenge inside the state does that job.
   return {
     statusCode: 200,
-    headers: { ...CORS, 'Set-Cookie': cookie },
+    headers: cookie ? { ...CORS, 'Set-Cookie': cookie } : CORS,
     body: JSON.stringify({ ok: true, url, redirectUri }),
   };
 };

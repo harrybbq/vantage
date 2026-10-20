@@ -60,6 +60,7 @@ import { installGlobalErrorHandlers } from './lib/telemetry/reportError';
 // window.onerror + unhandledrejection → client-error reports (item 77).
 installGlobalErrorHandlers();
 import { initDeepLinks } from './lib/native/deepLinks';
+import { WEARABLE_RETURN_EVENT } from './lib/native/wearableConnect';
 import TermsAcceptanceSheet from './components/TermsAcceptanceSheet';
 
 // Owner-only surfaces, absent from native builds (lib/native/ownerSurfaces.js).
@@ -425,6 +426,16 @@ function Board({ userId, userEmail, onSignOut, initialSettings }) {
   // Account.
   const [settingsTab, setSettingsTab] = useState(initialSettings || null);
   const [trackTab, setTrackTab] = useState(null);
+
+  // Native WHOOP / Oura return (lib/native/deepLinks): the app's version
+  // of landing on `/?whoop=connected`. Go to Settings › Tools, where the
+  // panel takes the parked result — it may not be mounted yet if the app
+  // cold-started behind the browser. Never fires on the web.
+  useEffect(() => {
+    const go = () => { setSettingsTab({ tab: 'tools', n: Date.now() }); setActiveSection('settings'); };
+    window.addEventListener(WEARABLE_RETURN_EVENT, go);
+    return () => window.removeEventListener(WEARABLE_RETURN_EVENT, go);
+  }, []);
 
   function navigate(id) {
     // 'profile' is no longer a section of its own — the photo, name,

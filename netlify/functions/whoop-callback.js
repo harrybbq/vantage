@@ -2,89 +2,28 @@
  * Netlify function: whoop-callback
  *
  * Step 2 of the WHOOP OAuth flow. WHOOP redirects here with
- * ?code&state. We verify the state HMAC (binds to a Vantage user),
- * exchange the code for access+refresh tokens, store them in
- * whoop_tokens (service-role only), and bounce back into the app.
+ * ?code&state.
+ *
+ *   Web start    verify the state (signature, expiry, provider, and the
+ *                HttpOnly nonce cookie), exchange the code, store the
+ *                tokens in whoop_tokens (service-role only), and bounce
+ *                back to the site with ?whoop=<result>.
+ *   Native start hand the code to the app at
+ *                com.vantage.app://wearable-callback; the app POSTs it
+ *                back here with its session and PKCE-style verifier, and
+ *                only then is it exchanged.
+ *
+ * The logic lives in lib/wearableCallback.js so WHOOP and Oura cannot
+ * drift apart; see there and lib/oauthState.js for the why.
  */
-const { paused } = require('../lib/killSwitch');
-const sbKeys = require('../lib/sbKeys');
-const { verifyState, clearCookie } = require('../lib/oauthState');
-const { redirectUriFor, appUrl } = require('../lib/redirectUri');
+const { makeCallback } = require('../lib/wearableCallback');
 
-const TOKEN_URL = 'https://api.prod.whoop.com/oauth/oauth2/token';
-
-
-function redirect(event, result) {
-  // Always burn the nonce, success or failure — a state that
-  // survives one attempt is a state that can be retried.
-  // Back to the site's canonical origin, not the request host: the two
-  // can differ, and the Supabase session lives on the origin the user
-  // actually signed in on.
-  return {
-    statusCode: 302,
-    headers: { Location: appUrl(event, `whoop=${result}`), 'Set-Cookie': clearCookie },
-    body: '',
-  };
-}
-
-exports.handler = async (event) => {
-  const { SUPABASE_URL, WHOOP_CLIENT_ID, WHOOP_CLIENT_SECRET } = process.env;
-  const serviceKey = sbKeys.serviceKey(process.env);
-  const q = event.queryStringParameters || {};
-  // Kill switch (lib/killSwitch): a browser redirect, so say it with the
-  // same ?provider=<result> the app already reads rather than a 503 page.
-  if (paused('sync')) return redirect(event, 'paused');
-
-  if (q.error) return redirect(event, 'denied');
-  // Authentic, unexpired, for this provider, AND accompanied by
-  // the nonce cookie set when this browser began the flow.
-  const checked = verifyState(q.state, 'whoop', event, process.env);
-  if (checked.error) return redirect(event, checked.error);
-  const userId = checked.userId;
-  if (!q.code) return redirect(event, 'nocode');
-
-  try {
-    const tokenRes = await fetch(TOKEN_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      body: new URLSearchParams({
-        grant_type: 'authorization_code',
-        code: q.code,
-        client_id: WHOOP_CLIENT_ID,
-        client_secret: WHOOP_CLIENT_SECRET,
-        // Byte-identical to what whoop-connect sent, or WHOOP rejects the
-        // exchange. Both come from the same helper so they cannot drift.
-        redirect_uri: redirectUriFor(event, 'whoop'),
-      }),
-    });
-    if (!tokenRes.ok) {
-      console.error('whoop token exchange failed:', tokenRes.status, await tokenRes.text().catch(() => ''));
-      return redirect(event, 'tokenfail');
-    }
-    const tok = await tokenRes.json();
-    const expiresAt = new Date(Date.now() + (tok.expires_in || 3600) * 1000).toISOString();
-
-    const up = await fetch(`${SUPABASE_URL}/rest/v1/whoop_tokens`, {
-      method: 'POST',
-      headers: sbKeys.serviceKeyHeaders(serviceKey, {
-        'Content-Type': 'application/json',
-        Prefer: 'resolution=merge-duplicates,return=minimal',
-      }),
-      body: JSON.stringify({
-        user_id: userId,
-        access_token: tok.access_token,
-        refresh_token: tok.refresh_token,
-        expires_at: expiresAt,
-        updated_at: new Date().toISOString(),
-      }),
-    });
-    if (!up.ok) {
-      console.error('whoop token store failed:', up.status, await up.text().catch(() => ''));
-      return redirect(event, 'storefail');
-    }
-    return redirect(event, 'connected');
-  } catch (e) {
-    console.error('whoop callback error:', e?.message);
-    return redirect(event, 'error');
-  }
-};
+exports.handler = makeCallback({
+  provider: 'whoop',
+  tokenUrl: 'https://api.prod.whoop.com/oauth/oauth2/token',
+  table: 'whoop_tokens',
+  clientIdVar: 'WHOOP_CLIENT_ID',
+  clientSecretVar: 'WHOOP_CLIENT_SECRET',
+  defaultExpiresIn: 3600,
+  requireTokens: false,
+});
