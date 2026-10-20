@@ -66,8 +66,8 @@ async function saveVerdict(env, row) {
 }
 
 /**
- * Screen the next batch. → [200, { ok, screened, approved, flagged,
- * pending, capped, status }] or a fail-soft error body.
+ * Screen the next batch. → [200, { ok, screened, approved, newlyFlagged,
+ * pending, capped, status, flagged: [list] }] or a fail-soft error body.
  */
 async function rescreenBatch(env, ownerId, apiKey) {
   if (!apiKey) return [503, { error: 'Screening needs ANTHROPIC_API_KEY on Netlify — nothing was screened.' }];
@@ -103,7 +103,8 @@ async function rescreenBatch(env, ownerId, apiKey) {
 
   const [, after] = await rescreenStatus(env);
   console.info(`moderation: avatar re-screen ${tally.screened} screened, ${tally.flagged} flagged, ${tally.pending} pending${tally.capped ? ', daily cap reached' : ''}`);
-  return [200, { ok: true, ...tally, status: after && after.status, flagged: after && after.flagged }];
+  const { flagged: newlyFlagged, ...rest } = tally;
+  return [200, { ok: true, ...rest, newlyFlagged, status: after && after.status, flagged: after && after.flagged }];
 }
 
 /**

@@ -68,7 +68,7 @@ export default function AvatarRescreen({ className = '', onChanged }) {
       if (code === 501) { setState('not-installed'); return; }
       if (code !== 200) { setError(body.error || `Screening failed (HTTP ${code}).`); return; }
       take(body);
-      const bits = [`${body.screened || 0} screened`, `${body.flagged || 0} flagged`];
+      const bits = [`${body.screened || 0} screened`, `${body.newlyFlagged || 0} flagged`];
       if (body.pending) bits.push(`${body.pending} couldn't be decided — they stay in the backlog`);
       if (body.capped) bits.push("today's screening cap is reached — try again tomorrow");
       setResult(bits.join(' · ') + '.');

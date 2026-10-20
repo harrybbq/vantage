@@ -177,4 +177,148 @@ ok(!/nigg/i.test(MESSAGE_FILTERED_TEXT), 'the message never repeats the word');
   eq(meta, { handle: 'sam', name: 'Sam S' }, 'reporter notice meta: who they reported, nothing else');
 }
 
+// ── Moderation core against a fake PostgREST: who gets told what ──
+{
+  const core = loadCjs('../../../netlify/lib/moderationCore.js');
+  const env = { supabaseUrl: 'https://db.test', serviceKey: 'service-test' };
+  const R = '11111111-1111-4111-8111-111111111111';     // report
+  const REPORTER = '22222222-2222-4222-8222-222222222222';
+  const TARGET = '33333333-3333-4333-8333-333333333333';
+  const OWNER = '44444444-4444-4444-8444-444444444444';
+  let calls = [];
+  let fixtures = {};
+  const realFetch = globalThis.fetch;
+  globalThis.fetch = async (url, init = {}) => {
+    const u = new URL(url);
+    const method = init.method || 'GET';
+    const body = init.body ? JSON.parse(init.body) : null;
+    calls.push({ method, path: u.pathname.replace('/rest/v1/', ''), search: decodeURIComponent(u.search), body });
+    const key = `${method} ${u.pathname.replace('/rest/v1/', '')}`;
+    const data = typeof fixtures[key] === 'function' ? fixtures[key](u, body) : (fixtures[key] ?? []);
+    return new Response(JSON.stringify(data), { status: 200, headers: { 'content-range': '0-0/1' } });
+  };
+  const posts = table => calls.filter(c => c.method === 'POST' && c.path === table).map(c => c.body);
+
+  try {
+    // Dismiss: the reporter hears, nobody else.
+    calls = [];
+    fixtures = { 'GET reports': [{ id: R, reporter_id: REPORTER, reported_id: TARGET, reason: 'Spam', status: 'open', reported_snapshot: { handle: 'sam' } }] };
+    let [code, out] = await core.decideReport(env, OWNER, { id: R, action: 'dismiss' });
+    eq([code, out.status, out.reporterTold], [200, 'dismissed', true], 'dismiss closes and tells the reporter');
+    eq(posts('safety_notices'), [{ user_id: REPORTER, kind: 'report_dismissed', meta: { handle: 'sam' }, report_id: R }], 'one notice, to the reporter, naming who they reported');
+
+    // Suspend on a threats report: reporter told, reported told (no report id, no reporter).
+    calls = [];
+    fixtures = {
+      'GET reports': [{ id: R, reporter_id: REPORTER, reported_id: TARGET, reason: 'Threats or violence', status: 'open', reported_snapshot: { handle: 'sam' } }],
+      'GET profiles': [{ suspended_at: null }],
+      'PATCH profiles': [{ id: TARGET }],
+    };
+    [code, out] = await core.decideReport(env, OWNER, { id: R, action: 'action', suspend: true, note: 'threats in DMs' });
+    eq([code, out.suspended, out.reportedTold], [200, true, true], 'suspended, reported user told');
+    const n2 = posts('safety_notices');
+    eq(n2.map(x => [x.user_id, x.kind]), [[TARGET, 'account_suspended'], [REPORTER, 'report_actioned']], 'suspended user + reporter notices');
+    eq([n2[0].report_id, n2[0].meta], [null, {}], 'the reported user\'s notice carries no report id and no names');
+    eq(posts('moderation_actions').map(a => [a.action, a.target_id, a.actor_id, a.report_id]), [['suspend', TARGET, OWNER, R]], 'suspension audited');
+
+    // Child safety: never tell the reported person.
+    calls = [];
+    fixtures['GET reports'] = [{ id: R, reporter_id: REPORTER, reported_id: TARGET, reason: 'Child safety', status: 'open', reported_snapshot: {} }];
+    [code, out] = await core.decideReport(env, OWNER, { id: R, action: 'action', suspend: true });
+    eq(posts('safety_notices').map(x => [x.user_id, x.kind]), [[REPORTER, 'report_actioned']], 'child-safety suspension: reporter only');
+    eq(out.reportedTold, false, 'reportedTold false on child safety');
+
+    // Already suspended: no second notice, original time kept.
+    calls = [];
+    fixtures['GET reports'] = [{ id: R, reporter_id: null, reported_id: TARGET, reason: 'Spam', status: 'open' }];
+    fixtures['GET profiles'] = [{ suspended_at: '2026-10-01T00:00:00Z' }];
+    await core.decideReport(env, OWNER, { id: R, action: 'action', suspend: true });
+    eq(calls.filter(c => c.method === 'PATCH' && c.path === 'profiles').length, 0, 'no re-suspend PATCH');
+    eq(posts('safety_notices').length, 0, 'no duplicate notice (and no reporter left to tell)');
+
+    // A report closed twice isn't re-announced.
+    calls = [];
+    fixtures['GET reports'] = [{ id: R, reporter_id: REPORTER, reported_id: TARGET, reason: 'Spam', status: 'dismissed' }];
+    await core.decideReport(env, OWNER, { id: R, action: 'dismiss' });
+    eq(posts('safety_notices').length, 0, 'already-closed report: reporter not told again');
+
+    // Reset: audit hash first, then the PATCH, then the notice.
+    calls = [];
+    fixtures = { 'GET profiles': [{ id: TARGET, display_name: 'Bad  Name', handle: 'badhandle', avatar_url: null }] };
+    [code, out] = await core.resetProfile(env, OWNER, { userId: TARGET, fields: ['display_name', 'avatar', 'tier'], reportId: R, note: 'slur' });
+    eq([code, out.reset, out.told, out.warning], [200, ['display_name'], true, undefined], 'only fields with a value are reset; tier ignored');
+    const order = calls.map(c => `${c.method} ${c.path}`);
+    ok(order.indexOf('POST moderation_actions') < order.indexOf('PATCH profiles'), 'audit hash written before the reset');
+    eq(calls.find(c => c.method === 'PATCH' && c.path === 'profiles').body, { display_name: null }, 'PATCH clears only the published name');
+    eq(posts('moderation_actions')[0].value_hash, core.resetHash('reset_display_name', 'Bad  Name'), 'hash of the removed value');
+    eq(posts('safety_notices'), [{ user_id: TARGET, kind: 'content_reset', meta: { fields: ['display_name'] }, report_id: null }], 'user told what was reset, nothing else');
+    eq((await core.resetProfile(env, OWNER, { userId: TARGET, fields: [] }))[0], 400, 'no fields → 400');
+    eq((await core.resetProfile(env, OWNER, { userId: 'nope', fields: ['handle'] }))[0], 400, 'bad id → 400');
+
+    // Notices table missing (SQL not run): the decision still lands.
+    calls = [];
+    fixtures = { 'GET reports': [{ id: R, reporter_id: REPORTER, reported_id: TARGET, reason: 'Spam', status: 'open' }] };
+    const prevFetch = globalThis.fetch;
+    globalThis.fetch = async (url, init = {}) => (String(url).includes('safety_notices')
+      ? new Response('{"code":"PGRST205"}', { status: 404 }) : prevFetch(url, init));
+    [code, out] = await core.decideReport(env, OWNER, { id: R, action: 'dismiss' });
+    eq([code, out.status, out.reporterTold], [200, 'dismissed', false], 'fail soft: closed even without the notices table');
+    globalThis.fetch = prevFetch;
+
+    // Urgent reports join the first page, first.
+    calls = [];
+    fixtures = {
+      'GET reports': (u) => (u.searchParams.get('reason')
+        ? [{ id: 'u1', reason: 'Child safety', created_at: '2026-09-01T00:00:00Z' }]
+        : [{ id: 'n1', reason: 'Spam', created_at: '2026-10-19T00:00:00Z' }, { id: 'u1', reason: 'Child safety', created_at: '2026-09-01T00:00:00Z' }]),
+    };
+    [code, out] = await core.listOpenReports(env, 0);
+    eq(out.items.map(i => [i.id, i.urgent]), [['u1', true], ['n1', false]], 'urgent first, de-duplicated');
+    ok(calls.some(c => c.search.includes('reason=in.("Threats or violence","Child safety","Self-harm or suicide risk")')), 'urgent query names the three labels');
+  } finally {
+    globalThis.fetch = realFetch;
+  }
+}
+
+// ── Avatar re-screen: flags, never removes; no key → nothing screened ──
+{
+  const AR = loadCjs('../../../netlify/lib/avatarRescreen.js');
+  const env = { supabaseUrl: 'https://db.test', serviceKey: 'service-test' };
+  const OWNER = '44444444-4444-4444-8444-444444444444';
+  const A = '55555555-5555-4555-8555-555555555555';
+  const B = '66666666-6666-4666-8666-666666666666';
+  const goodPic = `data:image/jpeg;base64,${'A'.repeat(200)}`;
+  const calls = [];
+  const realFetch = globalThis.fetch;
+  globalThis.fetch = async (url, init = {}) => {
+    const u = String(url);
+    const body = init.body ? JSON.parse(init.body) : null;
+    calls.push({ u, method: init.method || 'GET', body });
+    if (u.startsWith('https://api.anthropic.com')) {
+      return new Response(JSON.stringify({ content: [{ type: 'text', text: '{"decision":"reject","reason":"sexual content"}' }] }), { status: 200 });
+    }
+    if (u.includes('rpc/avatar_screen_candidates')) {
+      return new Response(JSON.stringify([
+        { user_id: A, avatar_url: goodPic, avatar_hash: 'a'.repeat(64) },
+        { user_id: B, avatar_url: 'data:image/gif;base64,R0lG', avatar_hash: 'b'.repeat(64) },
+      ]), { status: 200 });
+    }
+    if (u.includes('rpc/avatar_screen_status')) return new Response('{"withAvatar":2,"unscreened":0,"flagged":2}', { status: 200 });
+    if (u.includes('rpc/avatar_screen_flagged')) return new Response('[]', { status: 200 });
+    return new Response('[]', { status: 200 });
+  };
+  try {
+    eq((await AR.rescreenBatch(env, OWNER, ''))[0], 503, 'no API key → nothing screened, said plainly');
+    eq(calls.length, 0, 'no key → no database or model calls');
+    const [code, out] = await AR.rescreenBatch(env, OWNER, 'test-key');
+    eq([code, out.screened, out.newlyFlagged, out.approved], [200, 2, 2, 0], 'both flagged (one by the screen, one unreadable)');
+    const verdicts = calls.filter(c => c.u.includes('avatar_screenings')).map(c => [c.body.user_id, c.body.decision]);
+    eq(verdicts.sort(), [[A, 'rejected'], [B, 'rejected']].sort(), 'verdicts recorded against the hash');
+    ok(!calls.some(c => c.method === 'PATCH' && c.u.includes('/profiles')), 'a flag never touches the profile');
+    eq(calls.filter(c => c.u.startsWith('https://api.anthropic.com')).length, 1, 'only the readable picture is sent to the model');
+  } finally {
+    globalThis.fetch = realFetch;
+  }
+}
+
 console.log(`✓ safety & moderation — ${n} checks`);
