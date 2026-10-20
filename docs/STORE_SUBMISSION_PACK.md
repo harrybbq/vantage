@@ -101,6 +101,11 @@ invite-only group.
 
 ### 1.2 What to seed in Account A, screen by screen
 
+> **Web gate (STARTUP_REQUIREMENTS item 131).** At launch the full app runs in the store apps; on the web
+> it is invite-only once the owner flips the switch. Reviewers use the native app (the review notes need no
+> web URL beyond the public pages, which stay open). Seed A on the web only while the web is open, or add
+> A–D to the web allow-list first (Settings → Tools → Web access); seeding in the native app works too.
+
 Seed by hand through the app's own UI, signed in to A on the web build. That way
 the data has exactly the shape the code expects, and it uses no SQL against
 `user_data`. CLAUDE.md treats `user_data` rewrites as off-limits, and that rule

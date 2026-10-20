@@ -242,6 +242,12 @@ unless you decide to deliberately, because removal takes months. The
 
 ## 4. Verify the new origin before sending anyone to it
 
+*Web gate (STARTUP_REQUIREMENTS item 131):* if the web is already
+invite-only, the throwaway account in step 3 lands on the "Vantage is on
+iPhone and Android" page after confirming — expected, and the
+confirmation link check still holds. The heavy account in step 6 must be
+on the allow-list (the owner always is). Public pages stay open.
+
 1. Open `https://[your-domain]/privacy`, `/terms`, `/support` and
    `/delete-account` signed out. All four render (pre-auth routes,
    `src/lib/support.js:42`).

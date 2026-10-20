@@ -633,6 +633,20 @@ for Oura effectively permanently).
     switching the Supabase Site URL (local stashes are per-origin), change `DEFAULT_API_BASE` before the
     first store build. Email: Resend (EU region) for Auth SMTP — free tier caps at 100/day, upgrade before
     any launch push; Zoho mailbox + aliases (`EMAIL.md`). Links/Universal links wait for the native apps.
+131. `[~]` **LAUNCH** Mobile-only public launch: web gate (owner decision 2026-10-20). In a web browser the full
+    app is for an owner-kept allow-list (owner + friends); everyone else signed in on the web gets "Vantage is
+    on iPhone and Android" with store links, Sign out and Delete my account (Google's web-deletion rule). Native
+    apps, `/privacy` `/terms` `/support` `/delete-account` are never gated; `/invite/<code>` keeps the preview
+    but its call to action becomes the store apps. A server-side SWITCH (`config.web_access`), shipped OPEN.
+    Launch-day steps (owner): (1) run `supabase/web_access_2026_10b.sql` (needs owner_content.sql; verify block
+    in its header); (2) Settings → Tools → Web access: add friends' sign-in emails (you are always allowed);
+    (3) at launch press "Switch web to invite-only…" → confirm; (4) verify in a private window with a
+    non-listed test account: it gets the app-store page, the public pages still open. Reopen with the same
+    panel. Fill `src/lib/storeLinks.js` when the listings exist (null shows "Coming soon").
+    *Status 2026-10-20: done in code — `src/lib/webAccess.js` (decision, `check:webaccess`, incl. a test that
+    the gated path never mounts the state hook), gate page + owner panel in `src/components/webaccess/`,
+    delete flow shared with Settings (`src/lib/account/deleteAccount.js`); SQL dry-run on Postgres 16
+    (`scripts/webaccess/test-web-access-sql.sh`). Owner: steps 1–4 above.*
 
 ## Phase 7 — Running it safely once it's public
 

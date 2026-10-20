@@ -63,6 +63,16 @@ installGlobalErrorHandlers();
 import { initDeepLinks } from './lib/native/deepLinks';
 import { WEARABLE_RETURN_EVENT } from './lib/native/wearableConnect';
 import TermsAcceptanceSheet from './components/TermsAcceptanceSheet';
+import WebAccessBoundary from './components/webaccess/WebAccessBoundary';
+import { useWebAccess } from './components/webaccess/useWebAccess';
+import { loadWebAccessMode } from './lib/webAccessClient';
+import { isGated, inviteAppOnly } from './lib/webAccess';
+
+// Web gate (item 131): ask for the mode now, alongside getSession, so the
+// answer is usually here before the session is. Native: no request.
+loadWebAccessMode();
+// The app-store page — only a gated web visitor ever loads it.
+const WebAccessGate = lazy(() => import('./components/webaccess/WebAccessGate'));
 
 // Owner-only surfaces, absent from native builds (lib/native/ownerSurfaces.js).
 // Lazy so the flag can drop them: with VITE_NATIVE_BUILD set these fold
@@ -1135,6 +1145,11 @@ export default function App() {
     try { return parseInvitePath(window.location.pathname) || peekPendingInvite(); } catch { return null; }
   });
   const [inviteAuth, setInviteAuth] = useState(false);
+
+  // Web gate (item 131) — ships open; see lib/webAccess.js. Decides
+  // whether Board may mount at all for this visitor (WebAccessBoundary).
+  const access = useWebAccess({ session: session || null, publicRoute: !!legalPage });
+
   function closeInvite() {
     takePendingInvite();
     setInviteCode(null);
@@ -1220,13 +1235,13 @@ export default function App() {
     );
   }
 
-  if (session === undefined) {
-    return (
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', color: 'var(--text-muted)', fontFamily: 'var(--mono)', fontSize: '13px', letterSpacing: '2px' }}>
-        LOADING...
-      </div>
-    );
-  }
+  const loader = (
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', color: 'var(--text-muted)', fontFamily: 'var(--mono)', fontSize: '13px', letterSpacing: '2px' }}>
+      LOADING...
+    </div>
+  );
+
+  if (session === undefined) return loader;
 
   if (inviteCode && !(inviteAuth && !session)) {
     return (
@@ -1234,6 +1249,7 @@ export default function App() {
         <InviteLanding
           code={inviteCode}
           session={session}
+          appOnly={inviteAppOnly(access.decision)}
           onSignIn={() => setInviteAuth(true)}
           onDone={closeInvite}
         />
@@ -1245,13 +1261,33 @@ export default function App() {
     return (
       <>
         {inviteCode && <Suspense fallback={null}><InvitePill onCancel={closeInvite} /></Suspense>}
-        <AuthScreen onOpenLegal={setLegalPage} />
+        <AuthScreen onOpenLegal={setLegalPage} webInviteOnly={access.decision === 'invite-only'} />
       </>
     );
   }
+  // Board — and with it every state load and save — mounts ONLY through
+  // this boundary. A gated web visitor gets the app-store page instead and
+  // Board never runs for them (webAccess.test.mjs pins both).
   return (
-    <SubscriptionProvider userId={session.user.id}>
-      <Board userId={session.user.id} userEmail={session.user.email} onSignOut={handleSignOut} initialSettings={pendingSettings} />
-    </SubscriptionProvider>
+    <WebAccessBoundary
+      decision={access.decision}
+      signedIn
+      fallback={isGated(access.decision) ? (
+        <Suspense fallback={loader}>
+          <WebAccessGate
+            userId={session.user.id}
+            email={session.user.email}
+            unverified={access.decision === 'unverified'}
+            onRetry={access.retry}
+            onSignOut={handleSignOut}
+            onOpenLegal={setLegalPage}
+          />
+        </Suspense>
+      ) : loader}
+    >
+      <SubscriptionProvider userId={session.user.id}>
+        <Board userId={session.user.id} userEmail={session.user.email} onSignOut={handleSignOut} initialSettings={pendingSettings} />
+      </SubscriptionProvider>
+    </WebAccessBoundary>
   );
 }

@@ -1,6 +1,5 @@
 import { useEffect, useState, lazy, Suspense } from 'react';
 import { motion } from 'framer-motion';
-import { supabase } from '../lib/supabase';
 import { adjustColour } from '../utils/helpers';
 import MacroGoalsPanel from './MacroGoalsPanel';
 import NotificationsPanel from './NotificationsPanel';
@@ -17,8 +16,7 @@ import { getOwnProfile, updateOwnProfile } from '../lib/friends/queries';
 import { VISIONS_BY_ID } from '../lib/visions/definitions';
 import Icon from './Icon';
 import TravelPolicyCard from './holiday/TravelPolicyCard';
-import { authFetch } from '../lib/authFetch';
-import { clearLocalUserData } from '../lib/state/clearLocal';
+import { confirmAndDeleteAccount } from '../lib/account/deleteAccount';
 import { privacyOn, privacyToggle } from '../lib/friends/privacy';
 import { SETTINGS_FOCUS } from '../lib/support';
 
@@ -26,6 +24,12 @@ import { SETTINGS_FOCUS } from '../lib/support';
 // (lib/native/ownerSurfaces.js); null there, so the branch below drops.
 const AppleHealthImport = OWNER_SURFACES_IN_BUILD
   ? lazy(() => import('./VitalsHistoryCard').then(m => ({ default: m.AppleHealthImport })))
+  : null;
+
+// Owner-only Web access panel (the web gate's switch + allow-list, item
+// 131) — compiled out of native builds the same way.
+const WebAccessPanel = OWNER_SURFACES_IN_BUILD
+  ? lazy(() => import('./webaccess/WebAccessPanel'))
   : null;
 
 // Small helper: inline icon + label for the Tools/Data action buttons.
@@ -560,30 +564,10 @@ export default function SettingsSection({ S, update, active, userId, userEmail, 
   }
 
   async function handleDeleteAccount() {
-    if (!window.confirm('Delete your Vantage account?\n\nYour login and everything in the account are permanently erased. This cannot be undone.\n\nAn App Store or Google Play subscription is NOT cancelled by this — cancel it in the store.')) return;
-    if (!window.confirm('Are you absolutely sure? Press OK to confirm deletion.')) return;
-    setDeleting(true);
+    // Two confirms, the server call, local cleanup and sign-out live in
+    // lib/account/deleteAccount.js — the web gate page uses the same flow.
     try {
-      // Goes through a server function because deleting the ACCOUNT (not
-      // merely its data) needs the service role. The old flow removed
-      // the user_data row and signed out, which left auth.users,
-      // profiles, friendships and push_tokens behind — the account still
-      // existed, which fails App Store 5.1.1(v) and is an incomplete
-      // erasure under UK GDPR. Deleting the auth user cascades the rest.
-      const res = await authFetch('/.netlify/functions/delete-account', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ confirm: 'DELETE' }),
-      });
-      const out = await res.json().catch(() => ({}));
-      if (!res.ok || !out.ok) throw new Error(out.error || 'Deletion failed.');
-      // The account is gone server-side, so this device's copies of it
-      // go too (item 56) — backup, pictures, pending edit, breadcrumb,
-      // SW caches. Only after the server confirms.
-      await clearLocalUserData(userId, { deleted: true });
-      // Only sign out once the server confirms — otherwise the user is
-      // logged out believing they're deleted when they aren't.
-      await supabase.auth.signOut();
+      await confirmAndDeleteAccount(userId, { onStart: () => setDeleting(true) });
     } catch (e) {
       alert('Error: ' + (e.message || 'Something went wrong.'));
       setDeleting(false);
@@ -1088,6 +1072,16 @@ export default function SettingsSection({ S, update, active, userId, userEmail, 
               <span aria-hidden="true" style={{display:'inline-flex',marginRight:6}}><Icon name="trending-up" size={15} /></span>Open Upgrade
             </button>
           </SettingsGroup>
+        )}
+
+        {/* Web access — owner-only, same gate as the Upgrade card above:
+            the switch that makes the web invite-only at launch, and the
+            list of who is invited (item 131). Each RPC checks
+            is_app_owner() server-side; this is only where the controls live. */}
+        {onOpenSchedule && WebAccessPanel && (
+          <Suspense fallback={null}>
+            <WebAccessPanel />
+          </Suspense>
         )}
 
         {/* Walkthrough / tour */}
