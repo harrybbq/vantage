@@ -206,6 +206,19 @@ export function tripsInMonth(S, year, month) {
 }
 
 /**
+ * The place a trip names, from its free-text destination and its
+ * country: "Lisbon, Portugal" → Lisbon; "Stag do, Porto" → Porto (the
+ * last part, unless that part IS the country); "Edinburgh" → Edinburgh.
+ */
+export function cityOf(dest, countryName) {
+  const parts = String(dest || '').split(',').map(x => x.trim()).filter(Boolean);
+  if (!parts.length) return '';
+  if (parts.length === 1) return parts[0];
+  const last = parts[parts.length - 1];
+  return countryName && last.toLowerCase() === String(countryName).toLowerCase() ? parts[parts.length - 2] : last;
+}
+
+/**
  * Visited, for the Year view panel. `countryFor(trip)` → ISO2 or null
  * and `nameOf(iso2)` are passed in (lib/holiday/destinations), so this
  * stays free of the JSON country table.
@@ -223,10 +236,10 @@ export function visitedSummary(S, year, countryFor, nameOf) {
   const byCountry = new Map();
   const cities = new Set();
   let nights = 0;
-  const cityOf = t => String(t.dest || '').split(',')[0].trim();
+  const cityFor = t => { const c = countryFor(t); return cityOf(t.dest, c ? nameOf(c) : ''); };
   for (const t of done) {
     const c = countryFor(t);
-    const city = cityOf(t);
+    const city = cityFor(t);
     if (city) cities.add(city.toLowerCase());
     if (t.from && t.from.startsWith(String(year))) nights += nightsOf(t);
     if (!c) continue;
@@ -245,7 +258,7 @@ export function visitedSummary(S, year, countryFor, nameOf) {
     if (t.status === 'completed') continue;
     const c = countryFor(t);
     if (!c || byCountry.has(c) || planned.some(p => p.iso2 === c)) continue;
-    planned.push({ iso2: c, name: nameOf(c) || c, trips: 1, cities: [cityOf(t)].filter(Boolean), year: Number((t.from || '').slice(0, 4)) || 0, planned: true });
+    planned.push({ iso2: c, name: nameOf(c) || c, trips: 1, cities: [cityFor(t)].filter(Boolean), year: Number((t.from || '').slice(0, 4)) || 0, planned: true });
   }
   const rows = [...byCountry.values()].sort((a, b) => b.year - a.year || a.name.localeCompare(b.name));
   return { countries: visitedCount, cities: cities.size, nights, rows: [...rows, ...planned] };

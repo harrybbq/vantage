@@ -4,7 +4,7 @@ import { applyTick, tapValue } from './tick.js';
 import { addTrip, editTrip, deleteTrip, cycleTripStatus, nextStatus, tripFromForm, photoOf } from './trips.js';
 import {
   monthMatrix, weekDays, mondayOf, rowBands, eventsForDays, billsInRange, trackerCompletion,
-  itineraryOn, nextTrip, yearMarks, tripHue, visitedSummary, money,
+  itineraryOn, nextTrip, yearMarks, tripHue, visitedSummary, money, cityOf,
 } from './model.js';
 import { getWeekKey } from '../../../utils/helpers.js';
 
@@ -185,6 +185,13 @@ t('visited: completed trips + manual ticks; planned listed after', () => {
   assert.equal(v.cities, 1);
   assert.equal(v.nights, 4);
   assert.deepEqual(v.rows.map(r => [r.name, r.planned]), [['Portugal', false], ['Netherlands', false], ['Japan', true]]);
+});
+
+t('cityOf reads the place out of free text', () => {
+  assert.equal(cityOf('Lisbon, Portugal', 'Portugal'), 'Lisbon');
+  assert.equal(cityOf('Stag do, Porto', 'Portugal'), 'Porto');
+  assert.equal(cityOf('Edinburgh', 'United Kingdom'), 'Edinburgh');
+  assert.equal(cityOf('', 'Spain'), '');
 });
 
 console.log(`track: ${n} tests passed`);
