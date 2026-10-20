@@ -420,7 +420,9 @@ function DeleteAccountContent({ signedIn, go, onOpenSettings, onSignIn }) {
           <>
             <ol style={{ margin: '0 0 10px 20px', padding: 0 }}>
               <li style={{ marginBottom: '4px' }}>Sign in to Vantage — here on the web, or in the app.</li>
-              <li style={{ marginBottom: '4px' }}>Open <Strong>Settings → Account → Delete account</Strong>.</li>
+              <li style={{ marginBottom: '4px' }}>Open <Strong>Settings → Account → Delete account</Strong>. On the web, if
+                you see a page saying Vantage is on iPhone and Android, use its <Strong>Delete my account</Strong> button
+                instead — it does the same thing.</li>
               <li>Confirm twice. You&apos;re signed out once it&apos;s done.</li>
             </ol>
             <Actions>

@@ -672,6 +672,10 @@ for Oura effectively permanently).
     the gated path never mounts the state hook), gate page + owner panel in `src/components/webaccess/`,
     delete flow shared with Settings (`src/lib/account/deleteAccount.js`); SQL dry-run on Postgres 16
     (`scripts/webaccess/test-web-access-sql.sh`). Owner: steps 1–4 above.*
+    *Launch-day copy (from the gate agent): when switching to invite-only, change the privacy policy's
+    opening line "available on the web and as a mobile app" (LegalPage.jsx) to "…as a mobile app; the web
+    version is by invitation"; export and Settings-path lines stay true in the apps. /delete-account already
+    tells gated web visitors to use the gate page's Delete button.*
 
 ## Phase 7 — Running it safely once it's public
 
