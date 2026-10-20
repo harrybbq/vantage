@@ -479,9 +479,18 @@ export default function AuthScreen({ onOpenLegal }) {
 
         {/* Legal footer */}
         <div style={S.legalFooter}>
-          <button type="button" className="auth-legal-link" onClick={() => onOpenLegal?.('privacy')}>Privacy Policy</button>
-          <span style={{ color: 'var(--border)', fontSize: 'var(--fs-floor)' }}>·</span>
-          <button type="button" className="auth-legal-link" onClick={() => onOpenLegal?.('terms')}>Terms of Service</button>
+          {/* Two pairs, so a wrap on a phone breaks between them and never
+              leaves a dot leading the second line. */}
+          <span style={S.legalPair}>
+            <button type="button" className="auth-legal-link" onClick={() => onOpenLegal?.('privacy')}>Privacy Policy</button>
+            <span style={{ color: 'var(--border)', fontSize: 'var(--fs-floor)' }}>·</span>
+            <button type="button" className="auth-legal-link" onClick={() => onOpenLegal?.('terms')}>Terms of Service</button>
+          </span>
+          <span style={S.legalPair}>
+            <button type="button" className="auth-legal-link" onClick={() => onOpenLegal?.('support')}>Support</button>
+            <span style={{ color: 'var(--border)', fontSize: 'var(--fs-floor)' }}>·</span>
+            <button type="button" className="auth-legal-link" onClick={() => onOpenLegal?.('delete-account')}>Delete account</button>
+          </span>
         </div>
       </div>
     </div>
@@ -685,6 +694,12 @@ const S = {
   legalFooter: {
     marginTop: 20, paddingTop: 16,
     borderTop: '1px solid var(--border, #e2dccf)',
-    display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 12,
+    display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '0 18px',
+    // Four links now (Privacy, Terms, Support, Delete account): wrap on
+    // phones rather than overflow the card.
+    flexWrap: 'wrap',
+  },
+  legalPair: {
+    display: 'inline-flex', alignItems: 'center', gap: 12, flexWrap: 'wrap', justifyContent: 'center',
   },
 };

@@ -3,6 +3,7 @@ import Icon from '../Icon';
 import SettingsGroup from './SettingsGroup';
 import { authFetch } from '../../lib/authFetch';
 import { release } from '../../lib/telemetry/reportError';
+import { SETTINGS_FOCUS } from '../../lib/support';
 
 /**
  * Settings → Account → Report a problem.
@@ -72,6 +73,7 @@ export default function SupportCard() {
 
   return (
     <SettingsGroup
+      id={SETTINGS_FOCUS.support}
       title="Report a problem"
       desc="Something broken, confusing or wrong? Tell us here. We read every report."
     >

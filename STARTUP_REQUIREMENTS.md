@@ -432,9 +432,10 @@ code fails soft until it is run, so order doesn't matter.
     measure numbers are from memory; check against the current Codes. Likely conclusion: in scope
     NOW (social features are live on the web), small, "multi-risk" (grooming + harassment rated
     medium), children's duties apply. New gaps → items 109–114.*
-72. `[ ]` **Support URL + support email** (both stores require one; the
+72. `[~]` **Support URL + support email** (both stores require one; the
     policy already promises it) and a written **subject-access** process.
     *Status 2026-10-04: in-app channel live — Settings → Report a problem files a ticket into Upgrade → Security (security_console_2026_10.sql run). A public support URL + email are still needed.*
+    *Status 2026-10-20: public `/support` and `/delete-account` pages built (pre-auth, like /privacy; linked from the sign-in footer, the policy and the terms). `/delete-account` is the Play Console account-deletion URL (item 74). Owner: fill `SUPPORT_EMAIL` (and `SECURITY_EMAIL`, with SECURITY.md + security.txt) in `src/lib/support.js` once the domain and inbox exist — until then both pages show a marked placeholder. Subject-access process still to write.*
 73. `[~]` **Reviewer kit** — demo account with Pro, sandbox testers,
     review notes (WHOOP/Oura need hardware).
 74. `[~]` **Store forms** — Apple age-rating questionnaire, Play IARC,

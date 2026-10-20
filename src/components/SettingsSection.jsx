@@ -20,6 +20,7 @@ import TravelPolicyCard from './holiday/TravelPolicyCard';
 import { authFetch } from '../lib/authFetch';
 import { clearLocalUserData } from '../lib/state/clearLocal';
 import { privacyOn, privacyToggle } from '../lib/friends/privacy';
+import { SETTINGS_FOCUS } from '../lib/support';
 
 // Owner-only Apple Health Shortcut panel — compiled out of native builds
 // (lib/native/ownerSurfaces.js); null there, so the branch below drops.
@@ -523,10 +524,20 @@ export default function SettingsSection({ S, update, active, userId, userEmail, 
   // 'account'. It carries a nonce rather than being a bare tab id so
   // asking for the same tab twice still moves you back to it, and so a
   // request never re-fires when this component happens to re-render.
+  //
+  // `focus` (from /support and /delete-account — lib/support.js) also
+  // scrolls to one group once the tab has rendered: Report a problem or
+  // Delete account. It only scrolls; nothing is pressed for you.
   useEffect(() => {
-    if (!requestedTab?.tab) return;
-    if (!SETTINGS_TABS.some(t => t.id === requestedTab.tab)) return;
+    if (!requestedTab?.tab) return undefined;
+    if (!SETTINGS_TABS.some(t => t.id === requestedTab.tab)) return undefined;
     setActiveTab(requestedTab.tab);
+    const id = SETTINGS_FOCUS[requestedTab.focus];
+    if (!id) return undefined;
+    const t = setTimeout(() => {
+      document.getElementById(id)?.scrollIntoView({ block: 'start', behavior: 'smooth' });
+    }, 350);
+    return () => clearTimeout(t);
   }, [requestedTab]);
   const currentScheme = S.colorScheme || 'green';
   // Resolved, not raw — someone still carrying a retired `cream`/`dark`
@@ -654,6 +665,7 @@ export default function SettingsSection({ S, update, active, userId, userEmail, 
                 us, so deleting here cannot stop it; say where to cancel. */}
             <SettingsGroup
               tone="danger"
+              id={SETTINGS_FOCUS.delete}
               title="Delete account"
               desc="Permanently deletes your Vantage account and everything in it — your login, profile, friends, messages, food log, vitals, boards, trackers and settings. It cannot be undone, and the same email can only come back as a brand-new, empty account."
             >
