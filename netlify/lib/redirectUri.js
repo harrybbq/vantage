@@ -52,4 +52,29 @@ function appUrl(event, query = '') {
   return `${siteBase(event)}/${query ? '?' + query : ''}`;
 }
 
-module.exports = { siteBase, redirectUriFor, appUrl };
+/**
+ * Where a NATIVE start goes after the callback: back into the app, not
+ * to the website. The provider still redirects to the registered https
+ * callback above (providers only accept registered URIs, and a custom
+ * scheme there would be one more value to keep in sync); it is the
+ * callback that forwards to the app.
+ *
+ * A constant, like the redirect URI: the scheme is the bundle id
+ * (capacitor.config.ts) and the host is the one the app's intent filter
+ * and src/lib/native/wearableReturn.js listen for. Never built from the
+ * request, so the callback cannot be made to redirect anywhere else.
+ *
+ * Carries a status and, for the hand-off, the one-time code + state.
+ * Never a token: the code is useless without the client secret (server
+ * only) AND the verifier the app kept AND the user's session — see
+ * lib/oauthState.js "Native starts".
+ */
+const NATIVE_RETURN = 'com.vantage.app://wearable-callback';
+
+function nativeReturnUrl(provider, params = {}) {
+  const q = new URLSearchParams({ provider });
+  for (const [k, v] of Object.entries(params)) if (v != null && v !== '') q.set(k, String(v));
+  return `${NATIVE_RETURN}?${q}`;
+}
+
+module.exports = { siteBase, redirectUriFor, appUrl, nativeReturnUrl, NATIVE_RETURN };

@@ -3,13 +3,18 @@
  *
  * Step 1 of the WHOOP OAuth flow. The signed-in user POSTs here with
  * their Supabase JWT; we return the WHOOP authorize URL carrying a
- * tamper-proof `state` (userId + HMAC) so the callback can bind the
- * tokens to the right account without any session storage.
+ * signed, expiring, single-use `state` (lib/oauthState.js).
+ *
+ * Body (optional JSON): { platform: 'native', challenge } from the
+ * Capacitor app. A native start gets a cookie-less state bound to the
+ * app's PKCE-style challenge instead of the nonce cookie, because the
+ * provider page runs in the system browser, which never sees our
+ * cookie. No body (the web) → the cookie flow, unchanged.
  *
  * Env: WHOOP_CLIENT_ID, WHOOP_CLIENT_SECRET (HMAC key),
  *      SUPABASE_URL and the service key (lib/sbKeys).
  */
-const { issueState } = require('../lib/oauthState');
+const { issueState, issueNativeState, isChallenge } = require('../lib/oauthState');
 const { redirectUriFor } = require('../lib/redirectUri');
 const { requireUser, underLimit, tooMany } = require('../lib/requireUser');
 
@@ -43,7 +48,18 @@ exports.handler = async (event) => {
   // Logged because when WHOOP rejects it the user sees WHOOP's error page,
   // not ours, so this is the only place the actual value is visible.
   console.info('whoop-connect: redirect_uri', redirectUri);
-  const { state, cookie } = issueState(userId, 'whoop', process.env);
+  // Native (the Capacitor app) or web? Only an explicit, well-formed
+  // native request leaves the cookie flow; anything else is the web
+  // flow exactly as it was.
+  let req = {};
+  try { req = JSON.parse(event.body || '{}') || {}; } catch { /* no body: web */ }
+  const native = req.platform === 'native';
+  if (native && !isChallenge(req.challenge)) {
+    return { statusCode: 400, headers: CORS, body: JSON.stringify({ error: 'Could not start connect — please try again.' }) };
+  }
+  const { state, cookie } = native
+    ? { state: issueNativeState(userId, 'whoop', req.challenge, process.env), cookie: null }
+    : issueState(userId, 'whoop', process.env);
   const url = `${AUTH_URL}?` + new URLSearchParams({
     client_id: WHOOP_CLIENT_ID,
     redirect_uri: redirectUri,
@@ -52,8 +68,9 @@ exports.handler = async (event) => {
     state,
   });
 
-  // The nonce cookie is what makes the state single-use and
-  // browser-bound; the callback refuses a state without it.
+  // Web: the nonce cookie is what makes the state single-use and
+  // browser-bound; the callback refuses a web state without it.
+  // Native: no cookie — the challenge inside the state does that job.
   //
   // redirectUri and clientId are echoed back so the two halves of a
   // "redirect_uri does not match" failure are both inspectable. The
@@ -64,7 +81,7 @@ exports.handler = async (event) => {
   // client_id is not a secret — WHOOP puts it in the authorize URL.
   return {
     statusCode: 200,
-    headers: { ...CORS, 'Set-Cookie': cookie },
+    headers: cookie ? { ...CORS, 'Set-Cookie': cookie } : CORS,
     body: JSON.stringify({ ok: true, url, redirectUri, clientId: WHOOP_CLIENT_ID }),
   };
 };
