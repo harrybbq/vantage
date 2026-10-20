@@ -571,4 +571,54 @@ html[data-design="console"] .cx-hub-cell .prime-card {
 html[data-design="console"] .cx-hub-cell .prime-card [class*="-hero"],
 html[data-design="console"] .cx-hub-cell .prime-card [class*="num"],
 html[data-design="console"] .cx-hub-cell .prime-card [class*="-val"] { font-family: var(--cx-mono); font-style: normal; }
-html[data-design="console"] .cx-hub-page.is-desk .cx-hub-cell .prime-fit:not(.is-auto) { margin: -4px -16px -16px; }
+
+/* Prime views (prime.css): mono uppercase eyebrows → 12 px sentence-case
+   sans; serif hero figures → DM Mono; bars on the console track. */
+html[data-design="console"] .cx-hub-cell .pv-eyebrow,
+html[data-design="console"] .cx-hub-cell .pv-card-eyebrow,
+html[data-design="console"] .cx-hub-cell .pv-fact-l,
+html[data-design="console"] .cx-hub-cell .pv-seg-head,
+html[data-design="console"] .cx-hub-cell .pv-list-head,
+html[data-design="console"] .cx-hub-cell .pv-heat-day,
+html[data-design="console"] .cx-hub-cell .pv-tile-t,
+html[data-design="console"] .cx-hub-cell .pv-ring-in small {
+  font-family: var(--cx-sans); font-size: var(--cx-fs-12); line-height: var(--cx-lh-12);
+  letter-spacing: normal; text-transform: none; color: var(--cx-muted);
+}
+html[data-design="console"] .cx-hub-cell .pv-eyebrow::first-letter,
+html[data-design="console"] .cx-hub-cell .pv-card-eyebrow::first-letter,
+html[data-design="console"] .cx-hub-cell .pv-fact-l::first-letter { text-transform: uppercase; }
+html[data-design="console"] .cx-hub-cell .pv-eyebrow,
+html[data-design="console"] .cx-hub-cell .pv-card-eyebrow,
+html[data-design="console"] .cx-hub-cell .pv-fact-l { text-transform: lowercase; }
+html[data-design="console"] .cx-hub-cell .pv-hero-big,
+html[data-design="console"] .cx-hub-cell .pv-heroM-big,
+html[data-design="console"] .cx-hub-cell .pv-vessel-pct,
+html[data-design="console"] .cx-hub-cell .pv-map-n {
+  font-family: var(--cx-mono); font-style: normal; font-weight: 500; letter-spacing: -.01em; font-variant-numeric: tabular-nums;
+}
+html[data-design="console"] .cx-hub-cell .pv-hero-big { font-size: var(--cx-fs-28); line-height: var(--cx-lh-28); }
+html[data-design="console"] .cx-hub-cell .pv-heroM-big { font-size: var(--cx-fs-22); line-height: var(--cx-lh-22); }
+html[data-design="console"] .cx-hub-cell .pv-vessel-pct { font-size: var(--cx-fs-17); line-height: var(--cx-lh-17); }
+html[data-design="console"] .cx-hub-cell .pv-hero-sub,
+html[data-design="console"] .cx-hub-cell .pv-heroM-side,
+html[data-design="console"] .cx-hub-cell .pv-row-n,
+html[data-design="console"] .cx-hub-cell .pv-barL-name,
+html[data-design="console"] .cx-hub-cell .pv-barM-name,
+html[data-design="console"] .cx-hub-cell .pv-vessel-name,
+html[data-design="console"] .cx-hub-cell .pv-dots-t,
+html[data-design="console"] .cx-hub-cell .pv-card-title { font-family: var(--cx-sans); }
+html[data-design="console"] .cx-hub-cell .pv-track { background: var(--cx-track); border-radius: var(--cx-r-bar); }
+html[data-design="console"] .cx-hub-cell .pv-vessel { border-radius: var(--cx-r-cell); }
+
+/* Classic m-* bodies: labels to sentence-case sans, numbers to DM Mono. */
+html[data-design="console"] .cx-hub-cell .m-widget-habit-next,
+html[data-design="console"] .cx-hub-cell .m-macros-goal,
+html[data-design="console"] .cx-hub-cell [class*="-hint"],
+html[data-design="console"] .cx-hub-cell [class*="-eyebrow"] { font-family: var(--cx-sans); letter-spacing: normal; text-transform: none; }
+html[data-design="console"] .cx-hub-cell.is-small .m-vitals-tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+html[data-design="console"] .cx-hub-cell.is-small .m-vitals-tile:nth-child(n + 3) { display: none; }
+html[data-design="console"] .cx-hub-cell .m-vitals-tile { min-width: 0; overflow: hidden; }
+html[data-design="console"] .cx-hub-cell .m-vitals-val { font-size: var(--cx-fs-17); line-height: var(--cx-lh-17); white-space: nowrap; }
+html[data-design="console"] .cx-hub-cell .m-vitals-unit { font-family: var(--cx-mono); font-size: var(--cx-fs-12); color: var(--cx-muted); }
+html[data-design="console"] .cx-hub-cell .m-vitals-delta { position: static; font-family: var(--cx-mono); font-size: var(--cx-fs-12); }

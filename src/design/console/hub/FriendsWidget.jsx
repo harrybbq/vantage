@@ -154,7 +154,7 @@ function Heat({ days = [] }) {
       <div className="cx-hub-heat" role="img" aria-label={`${active} active days in the last 13 weeks`}>
         {cols.map((c, i) => (
           <span key={i} className="cx-hub-heat-col">
-            {c.map(d => <i key={d.ymd} className={`l${Math.max(0, Math.min(3, d.intensity || 0))}`} title={d.ymd} />)}
+            {c.map((d, j) => <i key={j} className={`l${Math.max(0, Math.min(3, d.intensity || 0))}`} title={d.ymd} />)}
           </span>
         ))}
       </div>
@@ -247,7 +247,7 @@ export function FriendTakeover({ hub }) {
   // panel portalled — report modal, message menus), returns to the widgets.
   useEffect(() => {
     if (!f) return undefined;
-    const onKey = e => { if (e.key === 'Escape' && !e.defaultPrevented && !document.querySelector('.modal-overlay, .msg-overlay')) hub.closeFriend(); };
+    const onKey = e => { if (e.key === 'Escape' && !document.querySelector('.modal-overlay.open, .msg-overlay, .cx-sheet-root, .cx-hub-menu')) hub.closeFriend(); };
     const onDown = e => {
       const t = e.target;
       if (!(t instanceof Node) || (ref.current && ref.current.contains(t))) return;
@@ -306,7 +306,7 @@ export function FriendsOverlays({ hub, isMobile, onUpgrade }) {
   return (
     <>
       {isMobile && hub.selected && !hub.thread && (
-        <Sheet title={hub.selected.name} onClose={hub.closeFriend} className="cx-hub-fsheet" testId="cx-hub-friend-sheet">
+        <Sheet title="Friend" onClose={hub.closeFriend} className="cx-hub-fsheet" testId="cx-hub-friend-sheet">
           <FriendCardCx f={hub.selected} hub={hub} inSheet />
         </Sheet>
       )}

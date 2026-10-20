@@ -232,9 +232,14 @@ export default function HubGrid({
     return true;
   }
 
+  const swallowClick = useRef(false);
   function finish(cancel = false) {
     const d = dragRef.current;
     dragRef.current = null;
+    if (d && d.kind === 'mouse') {
+      swallowClick.current = true;
+      setTimeout(() => { swallowClick.current = false; }, 0);
+    }
     document.documentElement.classList.remove('cx-hub-dragging');
     if (!d) return;
     d.scroller?.stop();
@@ -254,7 +259,9 @@ export default function HubGrid({
   // ── Mouse / pen: drag by the header ──
   function onPointerDown(e, id) {
     if (e.pointerType === 'touch' || e.button !== 0) return;
-    if (!e.target.closest('.cx-wf-head') || e.target.closest('button, a, input, select, textarea')) return;
+    // The header is the handle — including its title, which still opens
+    // its page on a plain click (a drag swallows that click below).
+    if (!e.target.closest('.cx-wf-head') || e.target.closest('a, input, select, textarea, button:not(.cx-wf-title)')) return;
     const sx = e.clientX, sy = e.clientY;
     let started = false;
     const move = ev => {
@@ -422,6 +429,7 @@ export default function HubGrid({
               data-type={item.type}
               style={{ gridColumn: `${c.col} / span ${c.w}`, gridRow: `${c.row} / span ${c.h}` }}
               onPointerDown={e => onPointerDown(e, item.id)}
+              onClickCapture={e => { if (swallowClick.current) { e.preventDefault(); e.stopPropagation(); } }}
               onTouchStart={isMobile ? e => onTouchStart(e, item.id) : undefined}
               onContextMenu={isMobile ? e => e.preventDefault() : undefined}
             >
