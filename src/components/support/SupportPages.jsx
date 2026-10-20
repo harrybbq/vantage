@@ -287,14 +287,6 @@ function SupportContent({ signedIn, go, onOpenSettings, onSignIn }) {
           </P>
         </Faq>
 
-        <Faq q="Does Vantage work with Apple Health?">
-          <P>
-            Not for every account yet — Apple Health import is still being tested and isn&apos;t switched on
-            generally. WHOOP and Oura connect today, and you can log weight, sleep and resting heart rate yourself
-            from the Vitals widget on your hub.
-          </P>
-        </Faq>
-
         <Faq q="How do I get a copy of my data?">
           <P>
             <Strong>Settings → Account → Your data.</Strong> Choose a passphrase and download an encrypted file. The
@@ -487,7 +479,7 @@ function DeleteAccountContent({ signedIn, go, onOpenSettings, onSignIn }) {
         <Ul items={[
           <>
             <Strong>Reports.</Strong> A report you made, or one made about you, may be kept after the account is
-            deleted — only as long as needed to deal with it and with repeat abuse. It loses its link to your
+            deleted — for up to 12 months after the report is closed, to deal with it and with repeat abuse. It loses its link to your
             account but keeps a copy of the handle and display name it was about, and any messages attached to it
             (up to five from a reported conversation).
           </>,

@@ -55,6 +55,9 @@ whenever a new Supabase table, state key, Netlify function or SDK ships.
 
 ## 1. Apple — App Privacy
 
+> **Update 2026-10-20:** the `weather` function no longer calls ipwho.is. It reads Netlify's own geo header (`x-nf-geo`) and sends Open-Meteo only a city name or a position rounded to ~11 km — no third party receives the IP (item 95). Coarse Location stays declared "Not linked" (Netlify, our processor, derives it per request; nothing is stored). Open question 3 is resolved by this; the ipwho.is rows below are historical.
+
+
 ### 1.1 Data types that ARE collected
 
 Unless a row says otherwise: **Used for tracking: No.** There is no ad SDK, no
@@ -538,7 +541,7 @@ existing "reports may be kept" line.
    Rows already in the `waitlist` table are kept untouched (owner to decide whether to delete).
 2. ~~**Apple "Contacts"**~~ — **decided 2026-10-20: declare it** (the in-app friend list, linked,
    App Functionality).
-3. **Weather location:** keep ipwho.is and declare Coarse Location "Not
+3. ~~**Weather location**~~ — **resolved 2026-10-20: ipwho.is removed (Netlify geo).** Was: keep ipwho.is and declare Coarse Location "Not
    linked" (current draft)? Or switch the `weather` function to Netlify's own
    geo data, so no third party sees the IP? Either way the policy line must
    match.

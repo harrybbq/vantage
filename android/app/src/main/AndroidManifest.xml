@@ -38,6 +38,7 @@
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />
                 <data android:scheme="com.vantage.app" android:host="auth-callback" />
+                <data android:scheme="com.vantage.app" android:host="wearable-callback" />
             </intent-filter>
 
         </activity>

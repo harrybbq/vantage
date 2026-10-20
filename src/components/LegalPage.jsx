@@ -143,7 +143,7 @@ function PrivacyPolicyContent({ go }) {
           'Payment & subscription data — if you buy Vantage Pro, the purchase is processed by Apple (App Store) or Google (Google Play), and RevenueCat, our subscription provider, keeps the purchase and renewal history of your Pro subscription (which plan, when it started, renewed or ended, and the store) linked to your Vantage account ID. We receive your subscription status. We never receive or store your card number.',
           'Device & notification data — if you turn on push notifications, we store a device push token so notifications can be delivered via Apple/Google push services (Firebase Cloud Messaging). In the app, the token is only created once you agree to notifications.',
           'Camera images (optional) — if you use the AI food scanner (3 free scans a week; more on Pro, within a daily fair-use limit), a single camera frame is sent to Anthropic\'s API to identify the food (section 7). We do not store the image.',
-          'Approximate location — to show local weather, our server looks up the approximate city for your IP address (section 8). We do not store the result against your account, and we never collect precise (GPS) location.',
+          'Approximate location — to show local weather, our hosting provider (Netlify) works out your approximate city from your connection and passes only that to our server, which uses it (or a position rounded to about 11 km) to fetch the forecast (section 8). Your IP address is not sent to any weather or location service, nothing is stored against your account, and we never collect precise (GPS) location.',
           'Third-party sign-in data (optional) — if you sign in with Google or Apple, we receive a minimal profile from that provider (section 9).',
           'Session data — a session token kept by our authentication provider to keep you signed in.',
           'Preferences — colour scheme, background and similar choices, stored in your browser\'s / device\'s localStorage and in your account.',
@@ -229,8 +229,7 @@ function PrivacyPolicyContent({ go }) {
         ]} />
         <P><strong>Services our servers contact on your behalf</strong> (they see the request, not your account):</P>
         <Ul items={[
-          <>ipwho.is — <strong>receives your IP address</strong> so our weather function can find your approximate city. Nothing else is sent.</>,
-          'Open-Meteo — weather forecasts for that approximate location, and historic weather and place lookups for holiday destinations you add.',
+          'Open-Meteo — weather forecasts for your approximate location (a city name or a position rounded to about 11 km — never your IP address), and historic weather and place lookups for holiday destinations you add.',
           'Frankfurter (frankfurter.app) — currency exchange rates for holiday destinations.',
           'Open Food Facts, USDA FoodData Central and FatSecret — food search. Only your search text or a scanned barcode is sent.',
           'GNews — news headlines for the news widget, including any topic you search for.',
