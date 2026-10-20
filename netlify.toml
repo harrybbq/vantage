@@ -220,3 +220,14 @@
 # it clear of the on-the-hour crons above.
 [functions."security-sweep"]
   schedule = "23 * * * *"
+
+# retention-prune deletes OLD OPERATIONAL rows (item 96, DPIA G11/G13):
+# client_errors 30 d, web_vitals 90 d, rating_snapshots 90 d, sent/dead
+# notifications 30 d, coach_nudges 60 d, closed reports 12 months (not
+# on retention_hold), expired caches. Never user content — see
+# netlify/lib/retention.js. Small batches (≤500 rows, 250 ms apart,
+# 20 s budget). Sunday 04:47 UTC: after the 03:00 snapshot, before the
+# 06:00 wearable crons, clear of security-sweep (:23). Does nothing
+# until supabase/retention_2026_10b.sql is run.
+[functions."retention-prune"]
+  schedule = "47 4 * * 0"

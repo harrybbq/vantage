@@ -107,7 +107,7 @@ A redirect in `netlify.toml` over `/.netlify/functions/<name>` is **not** a docu
 
 ### Scheduled functions
 
-`push-dispatch` (every 5 minutes), `security-sweep` (hourly at :23), `snapshot-ratings` (03:00), `whoop-cron` (every 10 min 06:00–08:50, not :30), `oura-cron` (06:30), `settle-leagues` (Mon 00:05) — all UTC, in `netlify.toml`. `security-sweep` only writes tickets; it never touches user data.
+`push-dispatch` (every 5 minutes), `security-sweep` (hourly at :23), `snapshot-ratings` (03:00), `whoop-cron` (every 10 min 06:00–08:50, not :30), `oura-cron` (06:30), `settle-leagues` (Mon 00:05), `retention-prune` (Sun 04:47) — all UTC, in `netlify.toml`. `security-sweep` only writes tickets; it never touches user data. `retention-prune` deletes only old operational rows (crash reports, vitals, snapshots, sent pushes, old nudges, closed reports > 12 months) — **during an incident set `VANTAGE_PAUSE=all` or `retention`** so crash reports you may need as evidence aren't pruned.
 To stop a cron that is damaging data: `VANTAGE_PAUSE=sync` (whoop/oura crons), `push` (push-dispatch) or `social` (settle-leagues) and redeploy; or remove its env var as above (whoop/oura); or roll back the deploy. Removing the `schedule` line from `netlify.toml` also works but needs a merge and a build.
 
 ### One user's account

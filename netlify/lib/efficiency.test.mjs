@@ -470,4 +470,147 @@ function makeSupabase({ cacheTable = true } = {}) {
   eq((await VB.handler({ httpMethod: 'POST', headers: {}, body: 'x'.repeat(3000) })).statusCode, 413, 'oversize → 413');
 }
 
+// ── retention (item 96) ─────────────────────────────────────────────────
+{
+  const { readFileSync } = await import('node:fs');
+  const { fileURLToPath } = await import('node:url');
+  const { join, dirname } = await import('node:path');
+  const here = dirname(fileURLToPath(import.meta.url));
+  const root = join(here, '..', '..');
+  const R = require('./retention.js');
+  const USER_CONTENT = ['user_data', 'user_data_history', 'nutrition_log', 'messages', 'friendships', 'profiles', 'push_tokens', 'blocks', 'groups'];
+
+  // Query builder refuses user content, and anything not on the list.
+  for (const t of USER_CONTENT) {
+    assert.throws(() => R.buildPruneCall(t), /user content|not a retention target/, `${t} refused`); n++;
+    ok(R.NEVER.has(t) || ['groups'].includes(t), `${t} on the NEVER list`);
+    ok(!R.TARGETS.some(x => x.target === t), `${t} is not a target`);
+  }
+  assert.throws(() => R.buildPruneCall('client_errors; drop table user_data'), /not a retention target/); n++;
+  assert.throws(() => R.buildPruneCall(''), /not a retention target/); n++;
+  // Even if someone adds a user-content table to TARGETS, NEVER wins.
+  R.TARGETS.push({ target: 'messages', days: 1 });
+  assert.throws(() => R.buildPruneCall('messages'), /user content/, 'NEVER beats TARGETS'); n++;
+  R.TARGETS.pop();
+  eq(R.buildPruneCall('client_errors', { limit: 99999, dryRun: true }),
+    { path: '/rest/v1/rpc/retention_prune', body: { p_target: 'client_errors', p_limit: 2000, p_dry_run: true } }, 'limit clamped to 2000');
+  eq(R.buildPruneCall('reports').body.p_limit, R.BATCH, 'default batch');
+
+  // SQL ↔ JS: same targets, same windows; SQL touches no user-content table.
+  const sql = readFileSync(join(root, 'supabase', 'retention_2026_10b.sql'), 'utf8');
+  const code = sql.split('\n').filter(l => !l.trim().startsWith('--')).join('\n');
+  const branches = [...code.matchAll(/p_target = '(\w+)'/g)].map(m => m[1]);
+  eq(branches.sort(), R.TARGETS.map(t => t.target).sort(), 'SQL function names exactly the JS targets');
+  const unit = { days: 1, months: 30, hours: 1 / 24 };
+  for (const { target, days } of R.TARGETS) {
+    const start = code.indexOf(`p_target = '${target}'`);
+    const next = code.slice(start + 10).search(/elsif p_target|\belse\b\s*\n\s*raise/);
+    const body = code.slice(start, start + 10 + next);
+    const ivs = [...body.matchAll(/interval '(\d+) (day|days|month|months)'/g)]
+      .map(m => Number(m[1]) * unit[m[2].replace(/s$/, '') + 's']);
+    ok(ivs.length > 0 && ivs.every(d => Math.abs(d - days) <= 5), `${target}: SQL window ${ivs.join('/')}d matches JS ${days}d`);
+  }
+  for (const t of USER_CONTENT) {
+    ok(!new RegExp(`(delete\\s+from|truncate|update)\\s+(public\\.)?${t}\\b`, 'i').test(code), `SQL never deletes/updates ${t}`);
+  }
+  const deletes = [...code.matchAll(/delete\s+from\s+public\.(\w+)/gi)].map(m => m[1]);
+  ok(deletes.length > 0 && deletes.every(t => R.TARGETS.some(x => x.target === t)), `every SQL delete is a target (${[...new Set(deletes)].join(', ')})`);
+  ok(/revoke all on function public\.retention_prune\(text, integer, boolean\) from public, anon, authenticated/.test(code), 'prune function revoked from app roles');
+  ok(/raise exception 'retention_prune: % is not a retention target'/.test(code), 'SQL raises for any other target');
+  ok(/^begin;$/m.test(code) && /^commit;$/m.test(code), 'one transaction');
+  // Header documents the user-content rule (the owner reads it before running).
+  ok(/NEVER USER CONTENT/.test(sql) && USER_CONTENT.slice(0, 6).every(t => sql.includes(t)), 'header names the user-content tables it never touches');
+  // The function and lib source never name a user-content table in a request path.
+  const fnSrc = readFileSync(join(root, 'netlify', 'functions', 'retention-prune.js'), 'utf8');
+  for (const t of USER_CONTENT) ok(!fnSrc.includes(`/rest/v1/${t}`), `retention-prune never calls /rest/v1/${t}`);
+
+  // Runner: batches until a short batch, respects caps, budget and errors.
+  const calls = [];
+  const backlog = { client_errors: 1234, web_vitals: 0, rating_snapshots: 20000 };
+  const rpc = async (path, body) => {
+    calls.push(body.p_target);
+    if (body.p_target === 'coach_nudges') return { ok: false, status: 400 };       // table missing
+    const left = backlog[body.p_target] || 0;
+    const c = Math.min(left, body.p_limit);
+    backlog[body.p_target] = left - c;
+    return { ok: true, status: 200, count: c };
+  };
+  let t = 0;
+  const res = await R.runRetention({ rpc, now: () => t, sleep: async ms => { t += ms; } });
+  eq([res.client_errors.deleted, res.client_errors.batches, res.client_errors.complete], [1234, 3, true], 'client_errors: 500+500+234, complete');
+  eq([res.web_vitals.deleted, res.web_vitals.batches, res.web_vitals.complete], [0, 1, true], 'nothing to do = one cheap call');
+  eq([res.rating_snapshots.deleted, res.rating_snapshots.batches, res.rating_snapshots.complete], [10000, 20, false], 'backlog capped at 20 batches (10k rows) per run');
+  ok(/failed \(400\)/.test(res.coach_nudges.error), 'a missing table fails that target only');
+  ok(res.reports.complete && res.function_cache.complete, 'later targets still ran');
+  ok(!calls.some(c => USER_CONTENT.includes(c)), 'runner never asked for a user-content table');
+  // Time budget: a slow DB stops new work.
+  let t2 = 0;
+  const slow = async (p, body) => { t2 += 6000; return { ok: true, status: 200, count: body.p_limit }; };
+  const res2 = await R.runRetention({ rpc: slow, now: () => t2, sleep: async () => {} });
+  ok(Object.values(res2).some(r => r.skipped === 'time budget'), 'time budget stops new batches');
+  // 404 = SQL not run yet.
+  const res3 = await R.runRetention({ rpc: async () => ({ ok: false, status: 404 }), sleep: async () => {} });
+  ok(Object.values(res3).every(r => r.error === 'retention_prune not installed' && r.deleted === 0), 'before the SQL: nothing happens, every target says so');
+  // Dry run: one call per target, flagged.
+  const dry = [];
+  await R.runRetention({ rpc: async (p, b) => { dry.push(b); return { ok: true, status: 200, count: b.p_limit }; }, dryRun: true, sleep: async () => {} });
+  eq([dry.length, dry.every(b => b.p_dry_run === true)], [R.TARGETS.length, true], 'dry run = one flagged call per target');
+
+  // The handler: scheduler-only, paused by VANTAGE_PAUSE=all|retention, logs counts.
+  const RP = require('../functions/retention-prune.js');
+  eq([RP._test.pausedForRetention('all'), RP._test.pausedForRetention('AI, retention'), RP._test.pausedForRetention('ai,social,sync,push'), RP._test.pausedForRetention('')],
+    [true, true, false, false], 'retention pauses for all|retention only');
+  process.env.SUPABASE_URL = 'https://proj.supabase.co';
+  process.env.SUPABASE_SECRET_KEY = 'sb_secret_test';
+  delete process.env.CRON_SECRET;
+  const seen = [];
+  globalThis.fetch = async (url, init = {}) => {
+    seen.push(String(url));
+    ok(String(url).endsWith('/rest/v1/rpc/retention_prune'), 'handler only calls the prune RPC');
+    return { ok: true, status: 200, json: async () => 0 };
+  };
+  const denied = await RP.handler({ httpMethod: 'GET', headers: {}, body: '' });
+  eq([denied.statusCode, seen.length], [401, 0], 'a plain web request is refused (no CRON_SECRET)');
+  process.env.VANTAGE_PAUSE = 'all';
+  let r = await RP.handler({ body: JSON.stringify({ next_run: 'x' }) });
+  eq([JSON.parse(r.body).paused, seen.length], [true, 0], 'paused → no DB calls');
+  delete process.env.VANTAGE_PAUSE;
+  const logs = [];
+  const info = console.info;
+  console.info = (...a) => logs.push(a.join(' '));
+  r = await RP.handler({ body: JSON.stringify({ next_run: 'x' }) });
+  console.info = info;
+  eq([r.statusCode, seen.length], [200, R.TARGETS.length], 'scheduled run: one call per target when nothing is old');
+  ok(logs.some(l => /^retention-prune: client_errors=0 /.test(l)), 'logs one line of counts');
+}
+
+// ── netlify.toml schedules ──────────────────────────────────────────────
+{
+  const { readFileSync, existsSync } = await import('node:fs');
+  const { fileURLToPath } = await import('node:url');
+  const { join, dirname } = await import('node:path');
+  const root = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
+  const toml = readFileSync(join(root, 'netlify.toml'), 'utf8');
+  const schedules = {};
+  for (const m of toml.matchAll(/^\[functions\."([\w-]+)"\]\s*\n\s*schedule\s*=\s*"([^"]+)"/gm)) schedules[m[1]] = m[2];
+  const FIELD = [[0, 59], [0, 23], [1, 31], [1, 12], [0, 7]];
+  const validField = (f, [lo, hi]) => f.split(',').every(part => {
+    const [range, step] = part.split('/');
+    if (step !== undefined && !/^\d+$/.test(step)) return false;
+    if (range === '*') return true;
+    const [a, b] = range.split('-').map(Number);
+    return Number.isInteger(a) && a >= lo && a <= hi && (b === undefined || (Number.isInteger(b) && b >= a && b <= hi));
+  });
+  const validCron = s => { const f = s.trim().split(/\s+/); return f.length === 5 && f.every((x, i) => validField(x, FIELD[i])); };
+  for (const [fn, cron] of Object.entries(schedules)) {
+    ok(validCron(cron), `${fn}: "${cron}" is a valid 5-field cron`);
+    ok(existsSync(join(root, 'netlify', 'functions', `${fn}.js`)), `${fn}: function file exists`);
+  }
+  eq(schedules['push-dispatch'], '*/5 * * * *', 'push-dispatch every 5 minutes (item 87)');
+  eq(schedules['retention-prune'], '47 4 * * 0', 'retention weekly, Sunday 04:47 UTC');
+  ok(!Object.values(schedules).includes('* * * * *'), 'no every-minute cron left');
+  // Rough monthly invocation count of push-dispatch: 30 days × 24 h × 12.
+  eq(30 * 24 * 60 / 5, 8640, 'push-dispatch ≈ 8.6k runs / 30 days (was 43.2k)');
+}
+
 console.log(`efficiency (items 87/91/95/96): ${n} checks passed`);
