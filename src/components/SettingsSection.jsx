@@ -215,7 +215,7 @@ const SHARE_TOGGLES = [
   { id: 'shareStreak',   label: 'Active habit streak',  desc: 'Days clean + habit name (e.g. "12d Alcohol"). Off unless you turn it on.', defaultOn: false },
   { id: 'shareHeatmap',  label: '91-day activity heatmap', desc: 'Coloured grid of days you logged anything.' },
   { id: 'shareWins',     label: 'Recent achievement wins', desc: 'Last 3 completed achievements with their icons.' },
-  { id: 'sharePresence', label: 'Online status',         desc: 'Green dot when you\'re active in the last 3 minutes.' },
+  { id: 'sharePresence', label: 'Online status',         desc: 'Green dot for friends while you\'re using the app (it fades about 10 minutes after you leave).' },
 ];
 
 function FriendsPrivacyCard({ userId, S, update }) {

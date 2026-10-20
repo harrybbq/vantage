@@ -65,7 +65,7 @@
     "check:weekkey": "node src/utils/helpers.test.mjs",
     "check:renewal": "node src/lib/billing/renewalWording.test.mjs",
     "check:consent": "node src/lib/consent/consent.test.mjs && npm run check:privacy",
-    "check:privacy": "node src/lib/friends/profileColumns.test.mjs",
+    "check:privacy": "node src/lib/friends/profileColumns.test.mjs && node src/lib/friends/publishPlan.test.mjs && node netlify/lib/profileUpdate.test.mjs",
     "check:modqueue": "node src/lib/moderation/queue.test.mjs",
     "check:paginate": "node src/lib/data/paginate.test.mjs",
     "check:apiurl": "node src/lib/native/apiUrl.test.mjs",
