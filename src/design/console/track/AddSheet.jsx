@@ -49,7 +49,10 @@ export default function AddSheet({ S, update, date, kind: initialKind = 'event',
   const [start, setStart] = useState(event?.time || '');
   const [end, setEnd] = useState(event?.end || '');
   const [location, setLocation] = useState(event?.location || '');
-  const [colour, setColour] = useState(event?.colour || (span?.colour) || EVENT_COLOURS[0].hex);
+  // A new event starts blue (as classic). An existing one keeps what it
+  // has — no colour means "the kind's colour", and saving an unrelated
+  // edit must not quietly paint it blue.
+  const [colour, setColour] = useState(editing ? (event.colour || span?.colour || '') : EVENT_COLOURS[0].hex);
   // Trip fields — the classic form shape
   const [trip, setTrip] = useState(() => ({ ...emptyHolidayForm(), from: date || '', to: isRealDate(date) ? addDays(date, 3) : '' }));
 
@@ -264,7 +267,7 @@ export default function AddSheet({ S, update, date, kind: initialKind = 'event',
             </div>
           </div>
           <div className="cx-track-preview" aria-hidden="true">
-            <span className="cx-track-kbar" style={{ '--k': eventColour({ colour }) }} />
+            <span className="cx-track-kbar" style={{ '--k': eventColour({ colour, kind: event?.kind }) }} />
             <span className="cx-track-preview-t">{clean || 'Untitled'}</span>
             {kind === 'span'
               ? datesOk && <span className="cx-muted">{Math.min(spanLength(...(datesBackwards ? [endDate, startDate] : [startDate, endDate])), MAX_SPAN_DAYS)} days</span>
