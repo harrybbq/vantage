@@ -862,6 +862,9 @@ export default function TrackSection({ S, update, active, onOpenModal, onShowCoi
   const [tab, setTab] = useState('trackers');
   // Which tracker's auto-fill rule is being edited, if any.
   const [autoFor, setAutoFor] = useState(null);
+  // Auto-fill offers the Lifts rule to the owner only (Lifts is theirs).
+  const { isOwner } = useIsOwner(OWNER_SURFACES_IN_BUILD ? userId : null);
+  const owner = OWNER_SURFACES_IN_BUILD && isOwner;
 
   // Same right-click transparency the hub modules have, same store
   // (S.moduleTransparency) and same menu component — a second
@@ -1008,6 +1011,7 @@ export default function TrackSection({ S, update, active, onOpenModal, onShowCoi
           tracker={S.trackers.find(t => t.id === autoFor.id) || autoFor}
           S={S}
           update={update}
+          owner={owner}
           onClose={() => setAutoFor(null)}
         />
       )}

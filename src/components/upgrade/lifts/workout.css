@@ -489,6 +489,7 @@ html[data-lifts-focus] .lifts .lw-head { top: env(safe-area-inset-top, 0px); }
 .lifts .lw-fin-ok svg { color: var(--lf-accent-ink); }
 .lifts .lw-fin-saved { display: flex; flex-direction: column; gap: 12px; }
 .lifts .lw-tplform { display: flex; flex-direction: column; gap: 8px; }
+.lifts .lw-fin-link { display: flex; flex-direction: column; gap: 8px; }
 .lifts .lw-fin-acts { display: flex; flex-direction: column; gap: 8px; width: 100%; }
 .lifts .lw-fin-row { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; }
 /* Desktop: Finish is a centred 560 px dialog, max 80 vh. */

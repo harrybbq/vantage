@@ -168,8 +168,20 @@ export const AUTO_SOURCES = [
     label: 'A workout was recorded',
     short: 'Workout',
     hint: 'A workout was recorded — wearable or Vantage: any WHOOP or Oura workout, or a workout finished in Vantage, that day. Step counts do not count.',
-    needs: 'wearable', unit: '', dp: 0, threshold: null,
+    needs: 'wearable', unit: '', dp: 0, threshold: null, flag: true,
     read: (S, day) => (hasWorkout(S, day) ? 1 : null),
+  },
+  {
+    // Lifts is owner-gated, so the option is too (AutoFillModal hides an
+    // ownerOnly source from everyone else). Unlike 'workout', a WHOOP
+    // walk or an Oura bike ride never ticks it: only a workout saved in
+    // Lifts does — what a "Gym" tracker usually means.
+    id: 'lifts',
+    label: 'I finished a workout in Lifts',
+    short: 'Lifts',
+    hint: 'Ticks on any day you save a workout in Upgrade → Lifts. Wearable workouts don’t count.',
+    needs: 'lifts', unit: '', dp: 0, threshold: null, flag: true, ownerOnly: true,
+    read: (S, day) => (hasVantageWorkout(S, day) ? 1 : null),
   },
   {
     id: 'strain',
@@ -210,6 +222,36 @@ export const AUTO_SOURCES = [
 ];
 
 export const sourceById = id => AUTO_SOURCES.find(s => s.id === id) || null;
+
+/** Sources a person can pick: an ownerOnly one only for the owner. */
+export const pickableSources = owner => AUTO_SOURCES.filter(s => !s.ownerOnly || owner);
+
+/** Trackers that a finished Lifts workout ticks (either rule reads it). */
+export function liftsLinkedTrackers(S) {
+  return ((S && S.trackers) || []).filter(t => {
+    const r = ruleFor(t);
+    return r && (r.source.id === 'lifts' || r.source.id === 'workout');
+  });
+}
+
+/**
+ * Point a tracker at finished Lifts workouts. Clears `autoOff` (this is
+ * the user asking for a rule) and replaces any rule it had. `prev`
+ * unchanged for an unknown tracker or one already on the rule.
+ */
+export function linkTrackerToLifts(prev, trackerId) {
+  const trackers = (prev && prev.trackers) || [];
+  const t = trackers.find(x => x && x.id === trackerId);
+  if (!t || (t.auto && t.auto.source === 'lifts')) return prev;
+  return {
+    ...prev,
+    trackers: trackers.map(x => {
+      if (x.id !== trackerId) return x;
+      const { autoOff, ...rest } = x;
+      return { ...rest, auto: { source: 'lifts', threshold: null } };
+    }),
+  };
+}
 
 /** Does any day in the log carry a reading this source could use? */
 export function sourceHasData(S, source, days = 60, now = new Date()) {
@@ -448,7 +490,8 @@ export function autoProvenance(S, day, trackerId) {
   const source = sourceById(src);
   if (!source) return null;
   const reading = source.read(S, day);
-  if (reading == null) return { source, text: source.label };
+  // A yes/no source has no reading worth printing ("…: 1").
+  if (reading == null || source.flag) return { source, reading, text: source.label };
   const shown = source.dp ? reading.toFixed(source.dp) : Math.round(reading).toLocaleString('en-GB');
   return { source, reading, text: `${source.label.replace(/ at least| at or above| reached/, '')}: ${shown}${source.unit ? ' ' + source.unit : ''}` };
 }

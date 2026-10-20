@@ -33,6 +33,7 @@ import WorkoutToday from './WorkoutToday';
 import LiftList from './LiftList';
 import WorkoutLive from './WorkoutLive';
 import FinishSheet from './FinishSheet';
+import { liftsLinkedTrackers, linkTrackerToLifts } from '../../../lib/trackers/autoLog';
 import NewWorkoutSheet from './workout/NewWorkoutSheet';
 import { takeLiftsResume, onLiftsResume } from '../../../lib/lifts/liveBus';
 import { Toast } from './parts';
@@ -273,6 +274,9 @@ export default function LiftsTab({ S, update, hydrated = true }) {
       {finish && (
         <FinishSheet summary={finish.summary} saved={finish.saved} templateSaved={finish.templateSaved}
                      gymLabel={finish.summary.session.gym ? gymName(finish.summary.session.gym) : null}
+                     trackers={S.trackers || []} linked={liftsLinkedTrackers(S)}
+                     dayLog={(S.logs || {})[finish.summary.session.date] || {}}
+                     onLinkTracker={id => update(prev => linkTrackerToLifts(prev, id))}
                      onSave={saveWorkout} onKeepGoing={() => setFinish(null)} onClose={closeFinish} onSaveTemplate={saveAsTemplate}
                      onDiscard={() => { update(prev => discardWorkout(prev)); setFinish(null); setView('list'); setToast({ text: 'Workout discarded — nothing was saved', n: Date.now() }); }} />
       )}

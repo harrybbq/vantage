@@ -13,6 +13,7 @@ import {
   hasDeviceWorkout, stepsOn, ruleFor, ruleLabel, isAutoFilled, autoProvenance,
   sourceHasData, sourceById, recentDays, dayKey, BACKFILL_DAYS,
   isStepTracker, suggestStepRules, applyStepRules, hasVantageWorkout, hasWorkout,
+  pickableSources, liftsLinkedTrackers, linkTrackerToLifts,
 } from './autoLog.js';
 
 let n = 0;
@@ -367,6 +368,44 @@ const numT = (id, auto, extra = {}) => ({ id, name: id, type: 'number', auto, ..
   const filled = base({ ...S, logs: { [D(1)]: { gym: false } } });
   ok(!proposeAutoLogs(filled, { now: NOW }).some(p => p.day === D(1)), 'a cell with a value is never overwritten');
   ok(sourceHasData(S, sourceById('workout'), 14, NOW), 'a Vantage workout makes the rule live without a wearable');
+}
+
+// ── The Lifts-only rule (owner): a saved Lifts workout, never a wearable one ──
+{
+  const sess = (id, date) => ({ id, date, exercises: [{ liftId: 'lp', sets: [{ reps: 8, weight: 100, done: true }] }] });
+  const S = base({
+    trackers: [boolT('gym', undefined, { name: 'Gym' }), numT('sess', undefined, { name: 'Sessions' }), boolT('read', { source: 'sleep' })],
+    burnLog: { [D(2)]: [{ id: 'whoop-w9', label: 'Weightlifting', kcal: 380 }] },
+    lifts: { list: [], log: [], sessions: [sess('wk1', D(1)), sess('wk3', D(3))] },
+  });
+  ok(!pickableSources(false).some(s => s.id === 'lifts'), 'the Lifts rule is not offered to everyone');
+  ok(pickableSources(true).some(s => s.id === 'lifts'), 'the owner gets it');
+  eq(pickableSources(false).length, AUTO_SOURCES.length - 1, 'and nothing else is hidden');
+  eq(liftsLinkedTrackers(S).length, 0, 'nothing linked yet');
+
+  const linked = linkTrackerToLifts({ ...S, trackers: S.trackers.map(t => (t.id === 'gym' ? { ...t, autoOff: true } : t)) }, 'gym');
+  const gym = linked.trackers.find(t => t.id === 'gym');
+  eq(gym.auto, { source: 'lifts', threshold: null }, 'linking sets the rule');
+  ok(!('autoOff' in gym), 'and clears an earlier "off" — this is the user asking');
+  ok(linkTrackerToLifts(linked, 'gym') === linked, 'linking twice writes nothing');
+  ok(linkTrackerToLifts(S, 'nope') === S, 'an unknown tracker writes nothing');
+  eq(liftsLinkedTrackers(linked).map(t => t.id), ['gym'], 'the linked tracker is reported');
+  eq(liftsLinkedTrackers(base({ trackers: [boolT('g', { source: 'workout' })] })).map(t => t.id), ['g'], 'a workout rule counts as linked too');
+
+  const props = proposeAutoLogs(linked, { now: NOW });
+  eq(props.map(p => p.day).sort(), [D(1), D(3)].sort(), 'Lifts days only — the WHOOP workout does not tick it');
+  const next = applyAutoLogs(linked, props, { now: NOW });
+  eq(next.logsAuto[D(1)].gym, 'lifts', 'the tick says it came from Lifts');
+  eq(autoProvenance(next, D(1), 'gym').text, 'I finished a workout in Lifts', 'and the provenance line is the label, not "…: 1"');
+
+  // finishing today's workout ticks today on the next pass
+  const today = { ...next, lifts: { ...next.lifts, sessions: [...next.lifts.sessions, sess('wk9', TODAY)] } };
+  eq(proposeAutoLogs(today, { now: NOW }).map(p => p.day), [TODAY], 'a workout saved today ticks today');
+  const man = { ...today, logs: { ...today.logs, [TODAY]: { gym: false } }, logsAuto: { ...today.logsAuto, [TODAY]: { gym: MANUAL } } };
+  eq(proposeAutoLogs(man, { now: NOW }).length, 0, 'unless the user set today by hand');
+
+  const num = linkTrackerToLifts(S, 'sess');
+  eq(applyAutoLogs(num, proposeAutoLogs(num, { now: NOW }), { now: NOW }).logs[D(1)].sess, 1, 'a number tracker records 1 workout');
 }
 
 console.log(`tracker auto-fill: ${n} assertions passed`);

@@ -22,7 +22,7 @@ import { useState } from 'react';
 import { createPortal } from 'react-dom';
 import { backdropClose } from '../../utils/backdropClose';
 import {
-  AUTO_SOURCES, ruleFor, sourceHasData, proposeAutoLogs, BACKFILL_DAYS,
+  AUTO_SOURCES, pickableSources, ruleFor, sourceHasData, proposeAutoLogs, BACKFILL_DAYS,
 } from '../../lib/trackers/autoLog';
 
 const NEEDS = {
@@ -30,9 +30,10 @@ const NEEDS = {
   wearable: 'WHOOP or Oura connected, or a workout finished in Vantage',
   whoop: 'WHOOP connected',
   steps: 'WHOOP or Oura connected',
+  lifts: 'a workout saved in Upgrade → Lifts',
 };
 
-export default function AutoFillModal({ tracker, S, update, onClose }) {
+export default function AutoFillModal({ tracker, S, update, onClose, owner = false }) {
   const existing = ruleFor(tracker);
   const [sourceId, setSourceId] = useState(existing ? existing.source.id : '');
   const [threshold, setThreshold] = useState(existing && existing.threshold != null ? String(existing.threshold) : '');
@@ -89,7 +90,9 @@ export default function AutoFillModal({ tracker, S, update, onClose }) {
             <span className="af-opt-title">Off — I’ll log it myself</span>
           </button>
 
-          {AUTO_SOURCES.map(s => {
+          {/* A rule already on the tracker stays listed even where its
+              source is not offered (the owner on a native build). */}
+          {pickableSources(owner).concat(existing && existing.source.ownerOnly && !owner ? [existing.source] : []).map(s => {
             const live = sourceHasData(S, s);
             return (
               <button
