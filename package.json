@@ -86,10 +86,10 @@
     "check:lifts": "node src/lib/lifts/lifts.test.mjs && node src/lib/lifts/workout.test.mjs && node src/lib/lifts/gyms.test.mjs && node src/lib/lifts/plan.test.mjs && node src/lib/lifts/ui.test.mjs"
   },
   "dependencies": {
-    "@capacitor/android": "^8.3.1",
+    "@capacitor/android": "^8.5.3",
     "@capacitor/app": "^8.1.0",
     "@capacitor/browser": "^8.0.4",
-    "@capacitor/core": "^8.3.1",
+    "@capacitor/core": "^8.5.3",
     "@capacitor/haptics": "^8.0.2",
     "@capacitor/push-notifications": "^8.0.3",
     "@capacitor/splash-screen": "^8.0.1",
@@ -109,7 +109,7 @@
   },
   "devDependencies": {
     "@capacitor/assets": "^3.0.5",
-    "@capacitor/cli": "^8.3.1",
+    "@capacitor/cli": "^8.5.3",
     "@eslint/js": "^9.39.5",
     "@types/react": "^18.3.1",
     "@types/react-dom": "^18.3.1",

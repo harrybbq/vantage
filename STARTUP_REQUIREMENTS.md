@@ -110,8 +110,13 @@ action outside the repo.
       deletion and quietly become a GDPR problem.
 21. `[x]` **Security headers added.** CSP is deliberately **Report-Only**
     — promote it to enforcing once the violation reports are quiet.
-22. `[ ]` **Triage the dependency vulnerabilities** — 1 critical, 12 high
+22. `[x]` **Triage the dependency vulnerabilities** — 1 critical, 12 high
     in production deps, mostly the Capacitor toolchain.
+    *Status 2026-10-20: `npm audit --omit=dev` → 0. Capacitor core/android/cli 8.3.1 → 8.5.3 together (the
+    critical: remote content could load at the app origin through the native HTTP proxy path, GHSA-rvm3-566m-v7fv);
+    `ws` 8.20.0 → 8.22.0 under supabase-js (two highs). What remains is dev/build tooling that never ships
+    (babel, vitest, brace-expansion, xmldom via the assets generator) — re-check monthly. Run `npx cap sync` after
+    pulling, on the build machine.*
 23. `[~]` **`prestige` and `ratings*` writes moved server-side.**
     The leaderboard ranks by `prestige * 100 + ratings_ovr` and both
     were granted to `authenticated`, so any signed-in user could PATCH
