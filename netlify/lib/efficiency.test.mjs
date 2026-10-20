@@ -284,6 +284,190 @@ function makeSupabase({ cacheTable = true } = {}) {
   ok(!sbx.log.some(l => l.startsWith('UNEXPECTED')), 'no unexpected requests');
 }
 
-// Exposed for the later sections of this file.
-export { eq, ok, jsonRes };
-console.log(`efficiency (leaderboard + cache): ${n} checks passed`);
+// ── ipLimit ─────────────────────────────────────────────────────────────
+{
+  const { createIpLimiter, clientIp } = require('./ipLimit.js');
+  let t = 0;
+  const L = createIpLimiter([{ ms: 60_000, max: 3 }, { ms: 3_600_000, max: 5 }], { now: () => t, maxKeys: 50 });
+  const seq = [];
+  for (let i = 0; i < 4; i++) seq.push(L.hit('1.2.3.4').allowed);
+  eq(seq, [true, true, true, false], 'per-minute window: 3 allowed, 4th refused');
+  eq(L.hit('5.6.7.8').allowed, true, 'other IPs unaffected');
+  t += 61_000;
+  eq(L.hit('1.2.3.4').allowed, true, 'next minute: 5th of the hour allowed (refused hits still counted)');
+  eq(L.hit('1.2.3.4').allowed, false, '6th of the hour refused by the hourly window');
+  t += 3_600_000;
+  eq(L.hit('1.2.3.4').allowed, true, 'after the hour, allowed again');
+  eq(L.peek('1.2.3.4', 1), 1, 'peek reads the hourly count without counting');
+  for (let i = 0; i < 200; i++) L.hit(`10.0.0.${i}`);
+  ok(L.size() <= 51, `memory bounded (size ${L.size()})`);
+  eq(clientIp({ headers: { 'x-nf-client-connection-ip': '9.9.9.9', 'x-forwarded-for': '1.1.1.1, 2.2.2.2' } }), '9.9.9.9', 'Netlify IP header wins');
+  eq(clientIp({ headers: { 'x-forwarded-for': '1.1.1.1, 2.2.2.2' } }), '1.1.1.1', 'XFF first hop fallback');
+  eq(clientIp({}), 'unknown', 'no headers → unknown');
+  assert.throws(() => createIpLimiter([]), /window/); n++;
+}
+
+// ── sessionCache ────────────────────────────────────────────────────────
+{
+  const { sessionUserId, _cache } = require('./sessionCache.js');
+  const env = { SUPABASE_URL: 'https://p.supabase.co', SUPABASE_PUBLISHABLE_KEY: 'sb_publishable_x' };
+  const b64 = o => Buffer.from(JSON.stringify(o)).toString('base64url');
+  const jwt = (exp) => `${b64({ alg: 'HS256' })}.${b64({ sub: 'u1', exp })}.sig`;
+  let t = 1_700_000_000_000;
+  let calls = 0;
+  const fakeAuth = async (url, init) => {
+    calls++;
+    const tok = init.headers.Authorization.replace('Bearer ', '');
+    return tok.endsWith('.bad') ? { ok: false, status: 401, json: async () => ({}) } : { ok: true, status: 200, json: async () => ({ id: 'u1' }) };
+  };
+  const ev = tok => ({ headers: { authorization: `Bearer ${tok}` } });
+  const good = jwt(Math.floor(t / 1000) + 3600);
+  eq(await sessionUserId(ev(good), { env, fetchImpl: fakeAuth, now: () => t }), 'u1', 'valid token → user id');
+  eq(await sessionUserId(ev(good), { env, fetchImpl: fakeAuth, now: () => t + 1000 }), 'u1', 'cached');
+  eq(calls, 1, 'second check served from cache, no Auth call');
+  ok(![..._cache.keys()].some(k => k.includes(good)), 'cache keyed by hash, never the raw token');
+  eq(await sessionUserId(ev(good), { env, fetchImpl: fakeAuth, now: () => t + 6 * 60_000 }), 'u1', 'past 5 min → re-verified');
+  eq(calls, 2, 're-verification made one call');
+  const bad = `${b64({ alg: 'HS256' })}.${b64({ sub: 'x' })}.bad`;
+  eq(await sessionUserId(ev(bad), { env, fetchImpl: fakeAuth, now: () => t }), null, 'rejected token → null');
+  await sessionUserId(ev(bad), { env, fetchImpl: fakeAuth, now: () => t + 1000 });
+  eq(calls, 3, 'rejection cached too');
+  const expired = jwt(Math.floor(t / 1000) - 10);
+  eq(await sessionUserId(ev(expired), { env, fetchImpl: fakeAuth, now: () => t }), null, 'expired token → null without an Auth call');
+  eq(calls, 3, 'no call for an expired token');
+  eq(await sessionUserId({ headers: { authorization: 'Bearer not-a-jwt' } }, { env, fetchImpl: fakeAuth }), null, 'junk → null');
+  eq(await sessionUserId({ headers: {} }, { env, fetchImpl: fakeAuth }), null, 'no header → null');
+}
+
+// ── weather ─────────────────────────────────────────────────────────────
+{
+  const W = require('../functions/weather.js');
+  const geo = o => Buffer.from(JSON.stringify(o)).toString('base64');
+  const LDN = { city: 'London', country: { code: 'GB', name: 'United Kingdom' }, subdivision: { code: 'ENG' }, latitude: 51.5074, longitude: -0.1278, timezone: 'Europe/London' };
+  eq(W._test.geoFromHeaders({ 'x-nf-geo': geo(LDN) }), { city: 'London', country: 'GB', latitude: 51.5074, longitude: -0.1278 }, 'base64 x-nf-geo parsed');
+  eq(W._test.geoFromHeaders({ 'x-nf-geo': JSON.stringify(LDN) }).city, 'London', 'plain-JSON x-nf-geo (dev) parsed');
+  eq(W._test.geoFromHeaders({ 'x-nf-geo': geo({ city: 'Leeds', country: { code: 'GB' } }) }), { city: 'Leeds', country: 'GB' }, 'no lat/lon → city only');
+  eq(W._test.geoFromHeaders({ 'x-nf-geo': geo({ latitude: 0, longitude: 0 }) }), null, '0,0 is "unknown", not the Gulf of Guinea');
+  eq(W._test.geoFromHeaders({ 'x-nf-geo': '%%%' }), null, 'garbage → null');
+  eq(W._test.geoFromHeaders({}), null, 'absent → null');
+
+  const upstream = [];
+  globalThis.fetch = async (url) => {
+    upstream.push(String(url));
+    if (String(url).includes('ipwho')) throw new Error('ipwho.is must never be called');
+    if (String(url).includes('geocoding-api')) return { ok: true, json: async () => ({ results: [{ latitude: 53.8, longitude: -1.55 }] }) };
+    if (String(url).includes('api.open-meteo.com')) return { ok: true, json: async () => ({ current: { temperature_2m: 12.4, weather_code: 3, is_day: 1 } }) };
+    if (String(url).includes('/auth/v1/user')) return { ok: true, status: 200, json: async () => ({ id: 'u-weather' }) };
+    throw new Error('unexpected ' + url);
+  };
+  const get = (headers) => W.handler({ httpMethod: 'GET', headers });
+  let r = await get({ 'x-nf-client-connection-ip': '198.51.100.1', 'x-nf-geo': geo(LDN) });
+  let b = JSON.parse(r.body);
+  eq([r.statusCode, b.tempC, b.tempF, b.code, b.city], [200, 12, 54, 3, 'London'], 'weather from x-nf-geo');
+  eq(r.headers['Cache-Control'], 'private, max-age=900', 'success is private-cacheable only');
+  r = await get({ 'x-nf-client-connection-ip': '198.51.100.2', 'x-nf-geo': geo({ ...LDN, latitude: 51.52, longitude: -0.11 }) });
+  eq(upstream.filter(u => u.includes('api.open-meteo.com')).length, 1, 'same ~11 km cell → served from cache');
+  r = await get({ 'x-nf-client-connection-ip': '198.51.100.3', 'x-nf-geo': geo({ city: 'Leeds', country: { code: 'GB' } }) });
+  b = JSON.parse(r.body);
+  eq([b.city, b.tempC], ['Leeds', 12], 'city-only geo → geocoded by name');
+  ok(upstream.some(u => u.includes('geocoding-api') && u.includes('name=Leeds') && u.includes('countryCode=GB')), 'geocoder got the city name only');
+  ok(!upstream.some(u => /198\.51\.100/.test(u)), 'the caller IP is never sent upstream');
+  r = await get({ 'x-nf-client-connection-ip': '198.51.100.4' });
+  eq(JSON.parse(r.body), { error: 'location unavailable' }, 'no geo → chip hidden, no third-party lookup');
+  ok(!upstream.some(u => u.includes('ipwho')), 'ipwho.is never called');
+
+  // Rate limit: anonymous allowance, then session required, then hard cap.
+  // Date.now is faked so calls can be spaced past the 10-a-minute brake.
+  const realNow = Date.now;
+  let ft = realNow();
+  Date.now = () => ft;
+  try {
+    let authCalls = 0;
+    const baseFetch = globalThis.fetch;
+    globalThis.fetch = async (url, init) => { if (String(url).includes('/auth/v1/user')) authCalls++; return baseFetch(url, init); };
+    const ip = { 'x-nf-client-connection-ip': '203.0.113.50', 'x-nf-geo': geo(LDN) };
+    let statuses = [];
+    for (let i = 0; i < W._test.ANON_PER_HOUR; i++) { statuses.push((await get(ip)).statusCode); ft += 7000; }
+    ok(statuses.every(s => s === 200), `first ${W._test.ANON_PER_HOUR} anonymous calls an hour served`);
+    eq(authCalls, 0, 'no Auth call inside the anonymous allowance');
+    eq((await get(ip)).statusCode, 429, 'past the allowance without a session → 429');
+    const b64 = o => Buffer.from(JSON.stringify(o)).toString('base64url');
+    process.env.SUPABASE_URL = 'https://proj.supabase.co';
+    process.env.SUPABASE_PUBLISHABLE_KEY = 'sb_publishable_test';
+    const tok = `${b64({ alg: 'HS256' })}.${b64({ sub: 'u', exp: Math.floor(ft / 1000) + 7200 })}.s`;
+    const ip2 = { 'x-nf-client-connection-ip': '203.0.113.51', 'x-nf-geo': geo(LDN), authorization: `Bearer ${tok}` };
+    statuses = [];
+    for (let i = 0; i < W._test.SIGNED_IN_PER_HOUR; i++) { statuses.push((await get(ip2)).statusCode); ft += 7000; }
+    ok(statuses.every(s => s === 200), `signed-in caller: ${W._test.SIGNED_IN_PER_HOUR} an hour served`);
+    // 48 verified calls over ~5.6 min: one Auth call, then one more when
+    // the 5-minute verdict cache lapses — never one per call.
+    eq(authCalls, 2, 'session verified once per 5 minutes (cached by token hash), not per call');
+    eq((await get(ip2)).statusCode, 429, 'hourly cap applies even signed in');
+    const ip3 = { 'x-nf-client-connection-ip': '203.0.113.52', 'x-nf-geo': geo(LDN) };
+    statuses = [];
+    for (let i = 0; i < 11; i++) statuses.push((await get(ip3)).statusCode);
+    eq([statuses.slice(0, 10).every(s => s === 200), statuses[10]], [true, 429], 'burst brake: 10 a minute for everyone');
+    globalThis.fetch = baseFetch;
+  } finally { Date.now = realNow; }
+  eq((await W.handler({ httpMethod: 'POST', headers: {} })).statusCode, 405, 'GET only');
+}
+
+// ── client-error ────────────────────────────────────────────────────────
+{
+  process.env.SUPABASE_URL = 'https://proj.supabase.co';
+  process.env.SUPABASE_SECRET_KEY = 'sb_secret_test';
+  const inserts = [];
+  let insertStatus = 201;
+  globalThis.fetch = async (url, init = {}) => {
+    if (String(url).endsWith('/rest/v1/client_errors')) { inserts.push(JSON.parse(init.body)); return { ok: insertStatus < 300, status: insertStatus }; }
+    if (String(url).includes('/auth/v1/user')) return { ok: false, status: 401, json: async () => ({}) };
+    throw new Error('unexpected ' + url);
+  };
+  const CE = require('../functions/client-error.js');
+  const UA = 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X)';
+  const post = (body, headers = {}) => CE.handler({ httpMethod: 'POST', headers: { 'user-agent': UA, 'x-nf-client-connection-ip': '192.0.2.1', ...headers }, body: typeof body === 'string' ? body : JSON.stringify(body) });
+
+  let r = await post({ kind: 'window.onerror', message: 'TypeError: x is undefined', stack: 'at a (b.js:1:2)', url: 'https://vantagevision.netlify.app/hub?token=abc#x', release: 'index-Abc123.js' });
+  eq(r.statusCode, 204, '204');
+  eq(inserts.length, 1, 'stored');
+  eq([inserts[0].kind, inserts[0].url, inserts[0].release, inserts[0].user_id], ['window.onerror', 'https://vantagevision.netlify.app/hub', 'index-Abc123.js', null], 'shaped: real kind kept, query stripped, no user');
+  await post({ kind: 'window.onerror', message: 'TypeError: x is undefined', stack: 'at a (b.js:1:2)' });
+  eq(inserts.length, 1, 'same report from same IP inside a minute → deduped');
+  await post({ message: '   ' });
+  await post({ stack: '' });
+  await post([1, 2]);
+  await post('not json');
+  await post({ message: 'no ua' }, { 'user-agent': '' });
+  eq(inserts.length, 1, 'whitespace / empty / array / non-JSON / no-UA dropped');
+  await post({ message: 'odd release', release: '<script>' });
+  eq(inserts[1].release, null, 'non-build-id release nulled');
+  eq((await post('x'.repeat(9000))).statusCode, 413, 'oversize → 413');
+  insertStatus = 400;
+  await post({ message: 'capped A' });
+  await post({ message: 'capped B' });
+  eq(inserts.length, 3, 'a 400 (durable cap / no table) backs the instance off');
+  CE._test.reset(); insertStatus = 201;
+  let codes = [];
+  for (let i = 0; i < 31; i++) codes.push((await post({ message: `burst ${i}` }, { 'x-nf-client-connection-ip': '192.0.2.99' })).statusCode);
+  eq([codes.slice(0, 30).every(c => c === 204), codes[30]], [true, 429], '30 a minute per IP, then 429');
+}
+
+// ── vitals-beacon ───────────────────────────────────────────────────────
+{
+  const rows = [];
+  globalThis.fetch = async (url, init = {}) => {
+    if (String(url).endsWith('/rest/v1/web_vitals')) { rows.push(JSON.parse(init.body)); return { ok: true, status: 201 }; }
+    throw new Error('unexpected ' + url);
+  };
+  const VB = require('../functions/vitals-beacon.js');
+  const beacon = (body, headers = {}) => VB.handler({ httpMethod: 'POST', headers: { 'user-agent': 'Mozilla/5.0', 'x-nf-client-connection-ip': '192.0.2.7', ...headers }, body: JSON.stringify(body) });
+  await beacon({ path: '/hub', lcp: 1800, cls: 0.02, nav: 'navigate', device: 'mobile' });
+  eq(rows.length, 1, 'beacon stored');
+  ok(!('ua' in rows[0]) && !('ip' in rows[0]), 'no UA / IP stored');
+  await beacon({ path: '/hub', lcp: 1800 }, { 'user-agent': '' });
+  await beacon({ path: '/hub' });
+  eq(rows.length, 1, 'no UA, or no metric → dropped');
+  eq((await VB.handler({ httpMethod: 'POST', headers: {}, body: 'x'.repeat(3000) })).statusCode, 413, 'oversize → 413');
+}
+
+console.log(`efficiency (items 87/91/95/96): ${n} checks passed`);

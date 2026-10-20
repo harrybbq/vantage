@@ -1,10 +1,10 @@
 import { useEffect, useState } from 'react';
-import { apiUrl } from '../lib/authFetch';
+import { authFetch } from '../lib/authFetch';
 
 /**
  * useWeather — current conditions for the greeting-header chip.
  *
- * Calls the key-less `weather` Netlify function (server-side IP geo +
+ * Calls the key-less `weather` Netlify function (Netlify edge geo +
  * Open-Meteo), caches the result in localStorage for 30 minutes so the
  * chip is instant on subsequent loads and we don't hammer the function.
  * Returns null until loaded, and stays null on any failure (the chip
@@ -50,7 +50,11 @@ export function useWeather(enabled = true) {
     let cancelled = false;
     (async () => {
       try {
-        const res = await fetch(apiUrl('/.netlify/functions/weather'));
+        // authFetch attaches the session when there is one: the function
+        // serves a few calls an hour per IP to anyone and more to a
+        // signed-in caller (item 95). Location comes from Netlify's own
+        // geo header server-side; no third party sees the IP.
+        const res = await authFetch('/.netlify/functions/weather');
         const data = await res.json().catch(() => ({}));
         if (cancelled) return;
         if (data && typeof data.tempC === 'number') {
