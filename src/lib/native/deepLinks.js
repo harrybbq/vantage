@@ -2,6 +2,9 @@ import { createClient } from '@supabase/supabase-js';
 import { supabase, SUPABASE_URL, SUPABASE_PUBLIC_KEY } from '../supabase';
 import { isNativeApp } from './platform';
 import { parseAuthCallback, AUTH_CALLBACK_URL } from './authCallback';
+import { parseWearableCallback } from './wearableReturn';
+import { requestConnect, openAuthorize, finishConnect, deliverWearableResult } from './wearableConnect';
+import { apiUrl } from '../authFetch';
 
 /**
  * Native sign-in: system browser out, custom scheme back.
@@ -79,6 +82,16 @@ async function closeBrowser() {
 const handled = new Set();
 
 export async function handleUrl(url) {
+  // WHOOP / Oura return (wearable-callback) — its own host, its own path.
+  const wc = parseWearableCallback(url);
+  if (wc) {
+    if (handled.has(url)) return true;
+    handled.add(url);
+    closeBrowser();
+    deliverWearableResult(wc.provider, await finishConnect(wc, wearableDeps()));
+    return true;
+  }
+
   const cb = parseAuthCallback(url);
   if (!cb) return false;
   if (handled.has(url)) return true;
@@ -134,11 +147,48 @@ export async function nativeOAuth(provider, queryParams) {
   await Browser.open({ url: data.url, presentationStyle: 'popover' });
 }
 
+/* ── WHOOP / Oura connect (STARTUP item 115) ───────────────────────────
+ * The real side effects for lib/native/wearableConnect.js, which holds
+ * the logic and the reasons. Web: the page navigates, as it always did.
+ * Native: the system browser, and the return comes back through
+ * handleUrl above. */
+function wearableDeps() {
+  let storage = null;
+  try { storage = window.localStorage; } catch { /* private mode: in-memory fallback */ }
+  return {
+    native: isNativeApp(),
+    fetch: (...a) => fetch(...a),
+    apiUrl,
+    getToken: async () => (await supabase.auth.getSession()).data?.session?.access_token,
+    storage,
+    crypto: globalThis.crypto,
+    openBrowser: async (url) => {
+      const { Browser } = await import('@capacitor/browser');
+      await Browser.open({ url, presentationStyle: 'popover' });
+    },
+    navigate: (url) => { window.location.href = url; },
+  };
+}
+
+/**
+ * Start a WHOOP / Oura connect from the panel. `beforeOpen(body)` runs
+ * between the server's answer and leaving for the provider (the WHOOP
+ * panel stashes its redirect diagnostics there). → { native }. Throws
+ * with a user-facing message.
+ */
+export async function startWearableConnect(provider, beforeOpen) {
+  const deps = wearableDeps();
+  const r = await requestConnect(provider, deps);
+  if (beforeOpen) beforeOpen(r.body);
+  await openAuthorize(r, deps);
+  return { native: r.native };
+}
+
 let started = false;
 
 /**
- * Listen for the auth callback. Call once at app start; a no-op on the
- * web, and safe to call again.
+ * Listen for the auth and wearable callbacks. Call once at app start; a
+ * no-op on the web, and safe to call again.
  */
 export async function initDeepLinks() {
   if (started || !isNativeApp()) return;
