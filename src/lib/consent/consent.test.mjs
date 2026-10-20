@@ -4,7 +4,7 @@
  * never reaches outside `consent`.
  */
 import assert from 'node:assert/strict';
-import { consentStatus, isGranted, consentPatch, shouldAskOnce } from './consent.js';
+import { consentStatus, isGranted, consentPatch, shouldAskOnce, consentChanges, LOCAL_GRANT_WINDOW_MS } from './consent.js';
 
 let n = 0;
 const eq = (a, b, m) => { assert.deepEqual(a, b, m); n++; };
@@ -57,6 +57,23 @@ const T2 = '2026-10-02T09:00:00.000Z';
   ok(shouldAskOnce({ tutorialCompleted: true, consent: { ai: T1 } }, true), 'a consent object without askedAt still gets the one-time ask');
   ok(!shouldAskOnce({ tutorialCompleted: true, consent: { askedAt: T1 } }, true), 'answered once → never again');
   ok(!shouldAskOnce(null, true), 'no state');
+}
+
+// ── What goes in the durable record (item 99) ──
+{
+  const now = Date.parse(T2);
+  eq(consentChanges(undefined, { health: T2, ai: null, askedAt: T2 }, now),
+    [{ kind: 'health', granted: true }, { kind: 'ai', granted: false }], 'first answer: a yes and a no');
+  eq(consentChanges({ health: T1, ai: T2 }, { health: null, ai: T2 }, now), [{ kind: 'health', granted: false }], 'withdrawal');
+  eq(consentChanges({ health: T1 }, { health: T1 }, now), [], 'no change, nothing recorded');
+  eq(consentChanges({ health: T1 }, {}, now), [], "becoming 'unasked' is not a decision");
+  eq(consentChanges({ ai: null }, { ai: T1 }, now), [], 'an old grant arriving by sync was recorded on the device that made it');
+  eq(consentChanges({ ai: null }, { ai: new Date(now - LOCAL_GRANT_WINDOW_MS + 5000).toISOString() }, now),
+    [{ kind: 'ai', granted: true }], 'a fresh grant is recorded');
+  const prev = { health: T1 };
+  const a = consentPatch(prev, { health: false }, T2);
+  const b = consentPatch(a, { health: true }, T2);
+  eq(consentChanges(a, b, now), [{ kind: 'health', granted: true }], 're-grant after withdrawal is stamped fresh, so it is recorded');
 }
 
 console.log(`consent: ${n} checks passed`);

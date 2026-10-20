@@ -15,6 +15,7 @@
  * call rather than making it without asking.
  */
 import { isGranted } from './consent';
+import { settleGrant } from './ledger';
 
 let host = null;
 let current = {};
@@ -37,9 +38,15 @@ export function hasConsent(kind) {
 export async function requestConsent(kind) {
   if (isGranted(current, kind)) return true;
   if (!host) return false;
+  let granted = false;
   try {
-    return !!(await host(kind));
+    granted = !!(await host(kind));
   } catch {
     return false;
   }
+  // A fresh yes: record it (consent_events) and save it before the
+  // caller's request goes out — the server checks consent too (items
+  // 98/99). Bounded and never throws (ledger.js).
+  if (granted) await settleGrant(kind);
+  return granted;
 }

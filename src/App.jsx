@@ -42,6 +42,7 @@ import { useWhoopAutoSync } from './lib/whoopClient';
 import { useOuraAutoSync } from './lib/ouraClient';
 import { useAutomations } from './hooks/useAutomations';
 import { usePublishProfile } from './lib/friends/usePublishProfile';
+import { useConsentLedger } from './lib/consent/ledger';
 import { useRatings } from './hooks/useRatings';
 import { useCoinGrants } from './hooks/useCoinGrants';
 import BottomTabBar from './components/mobile/BottomTabBar';
@@ -380,6 +381,8 @@ function Board({ userId, userEmail, onSignOut, initialSettings }) {
   // Debounced inside the hook; safely no-ops if the social schema
   // hasn't been applied yet.
   usePublishProfile(userId, S, hasPro, visionState, { hydrated, loadError, update });
+  // Durable consent record + save-on-grant (item 99, lib/consent/ledger.js).
+  useConsentLedger(userId, S?.consent, hydrated, flushNow);
 
   // Warm the lazy section chunks once the hub is up and the browser is
   // idle, so the first tap on Track or Shop doesn't wait on the network
