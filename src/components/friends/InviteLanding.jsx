@@ -3,6 +3,7 @@ import Icon from '../Icon';
 import {
   previewInvite, acceptInvite, rememberPendingInvite, peekPendingInvite, takePendingInvite,
 } from '../../lib/friends/invites';
+import StoreLinks from '../webaccess/StoreLinks';
 import './friends-dm.css';
 
 /**
@@ -29,7 +30,10 @@ function avatarColor(name = '') {
 
 const GONE = new Set(['invalid', 'revoked', 'expired', 'unavailable']);
 
-export default function InviteLanding({ code, session, onSignIn, onDone }) {
+// appOnly (web gate, item 131 — App decides): the web app is invite-only
+// and this visitor isn't in it, so the call to action is the store apps
+// instead of signing in here. The inviter preview stays.
+export default function InviteLanding({ code, session, onSignIn, onDone, appOnly = false }) {
   const [preview, setPreview] = useState({ state: 'loading' }); // loading | ok | gone | off
   const [phase, setPhase] = useState('idle');                   // idle | sending | sent | note
   const [note, setNote] = useState('');
@@ -54,6 +58,7 @@ export default function InviteLanding({ code, session, onSignIn, onDone }) {
   const first = name.replace(/^@/, '').split(' ')[0];
 
   async function accept() {
+    if (appOnly) return;
     if (!signedIn) { rememberPendingInvite(code); onSignIn?.(); return; }
     setPhase('sending'); setErr('');
     const res = await acceptInvite(code);
@@ -133,6 +138,15 @@ export default function InviteLanding({ code, session, onSignIn, onDone }) {
           <>
             <p className="inv-card-text" role="status">{phase === 'note' ? note : relNote}</p>
             <button type="button" className="btn btn-primary" onClick={done}>Open Vantage</button>
+          </>
+        ) : appOnly ? (
+          <>
+            <p className="inv-card-text"><strong>{first}</strong> invited you to be friends on Vantage.</p>
+            <div className="wa-invite-app">
+              <p className="inv-card-text"><strong>Open in the Vantage app</strong> — get it on iPhone or Android, then find {inviter?.handle ? <strong>@{inviter.handle}</strong> : first} under Friends.</p>
+              <StoreLinks compact />
+            </div>
+            <button type="button" className="btn btn-ghost inv-card-secondary" onClick={done}>Not now</button>
           </>
         ) : (
           <>
