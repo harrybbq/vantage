@@ -65,7 +65,7 @@ function useLevelling(S, visionState, hub) {
       settling, ovr, tier, nextTier, cats, lvl, xp, next, from, pct, toGo: Math.max(0, next - xp),
       honours: { have: vs.unlockedCount || 0, total: vs.totalCount || VISIONS.length, recent, next: nextHonour },
       league: me && rows.length > 1 ? { pos: me.pos, of: rows.length, note: gapNote(rows) } : null,
-      prestige: badge ? { text: `${badge.band.label} ${badge.numeral}`, n: S.prestige } : null,
+      prestige: badge ? { text: `Prestige ${badge.numeral}`, n: S.prestige } : null,
     };
   }, [S.__slim, S.ratings, S.prestige, S.visions, visionState, hub?.board]);
 }

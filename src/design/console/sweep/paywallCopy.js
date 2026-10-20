@@ -11,11 +11,14 @@
  * customisation and the wider widget set. The table says exactly that.
  */
 
-/** Which cap the sheet is about. Unknown ids (bare `paywall:`, `paywall:friends`) read as the generic entry. */
+/** Feature entries with their own wording that are not FREE_CAPS keys. */
+export const FEATURE_KEYS = ['widgetSizes', 'widgets', 'friends'];
+
+/** Which cap the sheet is about. Unknown ids (a bare `paywall:`) read as the generic entry. */
 export function resolveCapKey(openId, caps) {
   if (typeof openId !== 'string' || !openId.startsWith('paywall:')) return null;
   const key = openId.slice('paywall:'.length);
-  return caps && caps[key] ? key : 'generic';
+  return (caps && caps[key]) || FEATURE_KEYS.includes(key) ? key : 'generic';
 }
 
 /** Is the sheet open at all? */
@@ -61,7 +64,7 @@ export function compareRows(caps, hitKey = null) {
     }));
   return [
     ...numeric,
-    { key: 'widgets', label: 'Widget set', free: 'Core', pro: 'Full', hit: false },
+    { key: 'widgets', label: 'Widget set and sizes', free: 'Core, standard size', pro: 'Full, all sizes', hit: hitKey === 'widgets' || hitKey === 'widgetSizes' },
     { key: 'accents', label: 'Accent colours', free: '6', pro: '12 + your own', hit: false },
     { key: 'brief', label: "Today's brief", free: '–', pro: 'Every morning', hit: false },
     { key: 'themes', label: 'Themes', free: 'Both', pro: 'Both', hit: false },
@@ -82,6 +85,15 @@ export function headline(capKey, caps, { hasPro = false, count = null } = {}) {
     return { tag: 'Pro is active', title: "You're already on Pro", sub: 'Manage your subscription in Settings.' };
   }
   if (!cap || cap.feature) {
+    if (capKey === 'widgetSizes') {
+      return { tag: 'A Pro extra', title: 'Bigger widgets are part of Pro', sub: 'Every widget works at its standard size for free. Pro lets you make them wider and taller. Both themes stay free.' };
+    }
+    if (capKey === 'widgets') {
+      return { tag: 'A Pro extra', title: 'This widget is part of Pro', sub: 'The core widget set stays free. Pro adds the wider set and bigger sizes. Both themes stay free.' };
+    }
+    if (capKey === 'friends') {
+      return { tag: 'Vantage Pro', title: 'More with your friends', sub: 'Friends, messages and your league stay free. Pro raises the limits and opens customisation.' };
+    }
     if (capKey === 'ourApps') {
       return { tag: 'A Pro extra', title: 'Our Apps are part of Pro', sub: 'Add FloorplanStudio and the rest to your hub. Both themes and every core feature stay free.' };
     }

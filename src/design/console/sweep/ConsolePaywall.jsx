@@ -137,7 +137,7 @@ function PaywallSheet({ openId, onClose, onManage, onShowToast, onOpenLegal, cou
           {purchasing ? 'Opening the store…' : `Continue with ${(PACKAGE_LABEL[chosen?.identifier] || chosen?.product?.title || 'this plan').toLowerCase()}`}
         </Button>
       ) : (
-        <Button variant="primary" block onClick={onClose} disabled={loading}>{loading ? 'Loading…' : 'OK'}</Button>
+        <Button variant="primary" block onClick={onClose} disabled={loading}>{loading ? 'Loading…' : 'Got it'}</Button>
       )}
       <div className="cx-sweep-pw-legal">
         {!hasPro && (

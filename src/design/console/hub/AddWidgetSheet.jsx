@@ -113,7 +113,7 @@ export default function AddWidgetSheet({ S, items, hasPro, isOwner, presetIds, o
                  size={t.def}
                  state={added ? 'added' : (!ready || locked) ? 'dim' : ''}
                  onClick={() => {
-                   if (locked) { onClose(); onOpenPaywall?.(presetIds.has(type) ? 'ourApps' : 'generic'); return; }
+                   if (locked) { onClose(); onOpenPaywall?.(presetIds.has(type) ? 'ourApps' : 'widgets'); return; }
                    if (!ready) { go(where); return; }
                    add(type);
                  }} />

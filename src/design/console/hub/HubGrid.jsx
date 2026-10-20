@@ -474,7 +474,7 @@ export default function HubGrid({
                         presetIds={presetIds}
                         anchor={cellRefs.current.get(item.id)?.querySelector('.cx-hub-more-btn') || null}
                         onSize={s => onSize(item.id, s)}
-                        onPro={() => onOpenPaywall?.('generic')}
+                        onPro={() => onOpenPaywall?.('widgetSizes')}
                         onMove={dlt => { flipRef.current = snapshot(null); onMove(idx, idx + dlt); }}
                         onEdit={onEditBlocks ? onEditBlocks(item) : null}
                         onRemove={() => onRemove(item.id)}

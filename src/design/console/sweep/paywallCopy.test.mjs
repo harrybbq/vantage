@@ -21,11 +21,20 @@ const CAPS = {
 let n = 0;
 const t = (name, fn) => { try { fn(); n++; } catch (e) { console.error(`✗ ${name}`); throw e; } };
 
+t('feature entries have their own wording', () => {
+  assert.equal(resolveCapKey('paywall:widgetSizes', CAPS), 'widgetSizes');
+  assert.match(headline('widgetSizes', CAPS).title, /Bigger widgets/);
+  assert.match(headline('widgets', CAPS).title, /part of Pro/);
+  assert.match(headline('friends', CAPS).title, /friends/);
+  assert.ok(compareRows(CAPS, 'widgetSizes').find(r => r.key === 'widgets').hit, 'the widget row is the one highlighted');
+});
+
 t('resolveCapKey: known caps pass through; bare and unknown ids fall back to generic', () => {
   assert.equal(resolveCapKey('paywall:trackers', CAPS), 'trackers');
   assert.equal(resolveCapKey('paywall:ourApps', CAPS), 'ourApps');
   assert.equal(resolveCapKey('paywall:', CAPS), 'generic');
-  assert.equal(resolveCapKey('paywall:friends', CAPS), 'generic');
+  assert.equal(resolveCapKey('paywall:friends', CAPS), 'friends');
+  assert.equal(resolveCapKey('paywall:nope', CAPS), 'generic');
   assert.equal(resolveCapKey('addHabitModal', CAPS), null);
   assert.equal(resolveCapKey(null, CAPS), null);
   assert.equal(isPaywallId('paywall:x'), true);

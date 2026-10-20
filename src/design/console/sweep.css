@@ -602,3 +602,4 @@ html[data-design="console"] .cx-sweep-achievements {
   --ach-node-locked-bg: var(--cx-s2);
   --ach-node-locked-bdr: var(--cx-line);
 }
+html[data-design="console"] .cx-sweep-rail .fc-card-slot { scroll-margin-top: calc(var(--m-appbar-h, 52px) + 12px); }
