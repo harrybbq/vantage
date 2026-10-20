@@ -394,8 +394,9 @@ code fails soft until it is run, so order doesn't matter.
     profiles with avatars per view. Cache 5–10 min; avatars for the top 100 only.
 92. `[ ]` **AFTER** Presence writes a `profiles` UPDATE every 60 s per open
     app (`usePublishProfile.js`). Every 5 min is enough.
-93. `[ ]` **LAUNCH** `whoop-cron` syncs users one by one inside a 20 s
+93. `[~]` **LAUNCH** `whoop-cron` syncs users one by one inside a 20 s
     budget — only ~10–20 users a night. Batch in parallel or run every 2 h.
+    *Status 2026-10-20: done in code — whoop-cron and oura-cron run accounts through a bounded pool (4 at a time, oldest first, stop starting at 20 s, in-flight finish; refresh-token-first and CAS writes unchanged). WHOOP's limit is 100 requests/min and 10,000/day per app, so a run spends ≤ 60 WHOOP calls (~12 accounts) and whoop-cron now runs every 10 min 06:00–08:50 UTC (not :30, when oura-cron runs), skipping accounts already synced that morning — ~180 accounts a morning for <10% of the daily limit. Owner: after the deploy, check one morning's Netlify function log for "not reached" counts; WHOOP also caps an unapproved app at 10 users — apply for production approval / a higher limit in the WHOOP developer dashboard before launch.*
 94. `[ ]` **LAUNCH** Custom SMTP for Supabase Auth. The built-in mailer
     allows a few emails an hour; signups and resets fail at ~50 users.
 95. `[ ]` **AFTER** `weather` has no auth and calls ipwho.is per request;

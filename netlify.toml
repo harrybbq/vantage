@@ -178,10 +178,14 @@
   schedule = "0 3 * * *"
 
 # whoop-cron passively syncs each connected account's WHOOP data into
-# their state. 06:00 UTC = overnight recovery/sleep are finalised and
-# the app is closed, so the server-side merge can't race a client save.
+# their state. From 06:00 UTC = overnight recovery/sleep are finalised and
+# the app is closed, so the server-side merge rarely meets a client save.
+# Every 10 minutes until 08:50 (item 93): WHOOP allows 100 requests a
+# minute, so one run syncs ~12 accounts (≈60 calls) and each later run
+# picks up the accounts not yet synced this morning. :30 is skipped so a
+# run never overlaps oura-cron (06:30) on an account with both devices.
 [functions."whoop-cron"]
-  schedule = "0 6 * * *"
+  schedule = "0,10,20,40,50 6-8 * * *"
 
 # oura-cron does the same for Oura rings, half an hour later. The stagger
 # is deliberate: an account with BOTH devices would otherwise have two

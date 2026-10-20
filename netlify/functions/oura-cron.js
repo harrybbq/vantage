@@ -24,7 +24,28 @@ const { sb, getFreshToken, fetchOuraData, mergeOuraIntoState } = require('../lib
 const { requireScheduler } = require('../lib/cronAuth');
 const { mergeStateCAS } = require('../lib/stateWrite');
 
-const DAYS = 3; // enough to catch anything a run or two ago missed
+const { pool } = require('../lib/pool');
+
+const DAYS = 3;                 // enough to catch anything a run or two ago missed
+const CONCURRENCY = 4;
+const START_BUDGET_MS = 20_000; // stop starting accounts after this; in-flight ones finish
+
+/** One account, exactly as the serial loop did it. → outcome string. */
+async function syncOne(userId, env) {
+  const accessToken = await getFreshToken(userId, env);
+  if (!accessToken) return 'skipped';
+
+  const { vitals, burn } = await fetchOuraData(accessToken, DAYS);
+  if (!Object.keys(vitals).length && !Object.keys(burn).length) return 'skipped';
+
+  // Read, merge, compare-and-set write (lib/stateWrite.js): a client
+  // save that lands between our read and our write is never
+  // overwritten. Additive merge only; no state yet → no junk row.
+  const outcome = await mergeStateCAS(userId, st => mergeOuraIntoState(st, vitals, burn), env);
+  if (outcome === 'missing') return 'skipped';
+  if (outcome === 'conflict') return 'conflicted';
+  return 'synced';
+}
 
 exports.handler = async (event) => {
   const denied = requireScheduler(event, { 'Content-Type': 'application/json' }, 'CRON_SECRET');
@@ -50,43 +71,31 @@ exports.handler = async (event) => {
     return { statusCode: 502 };
   }
   const rows = await tokRes.json().catch(() => []);
-  let synced = 0, skipped = 0, failed = 0, deferred = 0, conflicted = 0;
 
-  // Wall-clock budget. Each account costs four upstream calls plus
-  // a read and a write, so an unbounded serial loop stops being
-  // viable as soon as there are real users — and a function killed
-  // mid-loop is indistinguishable from one that worked. Stopping
-  // deliberately, and saying how many were left, is the difference
-  // between a backlog and a silent hole in everyone's data.
-  //
-  // 20 s, not 60: Netlify's scheduled-function limit is shorter than a
-  // minute, and a run killed mid-account can die between WHOOP rotating
-  // a refresh token and us storing it — which disconnects that user.
-  // Stopping early costs a deferral; being killed costs a connection.
-  const DEADLINE = Date.now() + 20_000;
+  // A bounded pool (item 93), like whoop-cron: CONCURRENCY accounts at
+  // once, oldest first; stop STARTING at the deadline and let in-flight
+  // accounts finish — 20 s leaves them room inside Netlify's 30 s
+  // scheduled limit. A run killed mid-account can die between Oura
+  // rotating a refresh token and us storing it, which disconnects that
+  // user; stopping early only costs a deferral to the next run.
+  // Oura's limit (5,000 requests per 5 minutes, per Oura's API terms as
+  // summarised by integrators) is far above what one run can spend
+  // (~5 calls an account), so there is no request budget here, and one
+  // run a day stays enough until the log shows accounts "not reached" —
+  // then add runs as whoop-cron does.
+  const { results, notReached } = await pool(rows, CONCURRENCY,
+    ({ user_id: userId }) => syncOne(userId, env),
+    { deadline: Date.now() + START_BUDGET_MS });
 
-  for (const { user_id: userId } of rows) {
-    if (Date.now() > DEADLINE) { deferred++; continue; }
-    try {
-      const accessToken = await getFreshToken(userId, env);
-      if (!accessToken) { skipped++; continue; }
-
-      const { vitals, burn } = await fetchOuraData(accessToken, DAYS);
-      if (!Object.keys(vitals).length && !Object.keys(burn).length) { skipped++; continue; }
-
-      // Read, merge, compare-and-set write (lib/stateWrite.js): a client
-      // save that lands between our read and our write is never
-      // overwritten. Additive merge only; no state yet → no junk row.
-      const outcome = await mergeStateCAS(userId, st => mergeOuraIntoState(st, vitals, burn), env);
-      if (outcome === 'missing') { skipped++; continue; }
-      if (outcome === 'conflict') { conflicted++; continue; }
-      synced++;
-    } catch (e) {
-      console.error('oura-cron: user sync failed', userId, e?.message);
-      failed++;
+  const count = { synced: 0, skipped: 0, conflicted: 0, failed: 0 };
+  for (const r of results) {
+    if (r.ok) count[r.value] = (count[r.value] || 0) + 1;
+    else {
+      console.error('oura-cron: user sync failed', r.item.user_id, r.error?.message);
+      count.failed++;
     }
   }
 
-  console.info(`oura-cron: ${synced} synced, ${skipped} skipped, ${failed} failed, ${conflicted} busy (retry next run), ${deferred} deferred to the next run, of ${rows.length}`);
+  console.info(`oura-cron: ${count.synced} synced, ${count.skipped} skipped, ${count.failed} failed, ${count.conflicted} busy (retry next run), ${notReached} not reached (next run), of ${rows.length}`);
   return { statusCode: 200 };
 };
