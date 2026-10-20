@@ -941,6 +941,23 @@ work. The log track can start (L1–L2) while I4 batches run.
 
 ## 9. Risks and open questions for the owner
 
+### Owner decisions — 2026-10-20
+- **PITR: yes**, for the migration window — enabled before the image migration (Phase "images",
+  existing pictures swapped) and kept until 30 days after the last per-user cleanup; recommended
+  permanently from public launch. ~$100/month for 7 days, hourly billed, outside the spend cap.
+  Recovery foundations (restore markers, one-user recovery from a restored copy, runbook, drill) are
+  being built separately (docs/RESTORE_RUNBOOK.md, supabase/recovery_2026_10b.sql).
+- **Build-order rule: accepted.** The first App Store / Play binaries are built from the read-switch
+  build or later — store installs don't self-update.
+- **`moodLog`: deleted, never returning.** Removed once after hydration by `lib/state/retiredKeys.js`
+  (commit "Delete the retired mood entries"), so it is NOT migrated into `daily_log` — drop it from the
+  backfill, the kinds list and the draft SQL's comments.
+- **Ranking rule for hand-entered days:** a manual entry counts towards ratings only if it was logged
+  within **3 days** of the day itself (wearable values always count). This needs the entry's write time,
+  which the `daily_log` rows (created_at / journal) provide — implement it in `netlify/lib/recompute.js`
+  at the read switch, with the client mirror kept in parity (`check:parity`). Apple Health Shortcut data
+  counts like a wearable source (owner-only surface).
+
 **Risks**
 
 1. **Old native builds are permanent.** Native builds never get the
