@@ -9,6 +9,7 @@ import AddFriendModal from './AddFriendModal';
 import ReportFriendModal from './ReportFriendModal';
 import MessagesModal from './MessagesModal';
 import FriendPanel from './FriendPanel';
+import SafetyNotices from './SafetyNotices';
 import { useFriends } from '../../lib/friends/useFriends';
 import { getFriendPublicStats, reportSnapshot } from '../../lib/friends/queries';
 import { listConversations } from '../../lib/friends/messages';
@@ -397,6 +398,8 @@ export default function FriendsRail({ userId, onUpgrade, panelSlot = null, layou
   if (needsHandle) {
     return (
       <>
+        {/* A handle reset by moderation lands here — the notice says why. */}
+        <SafetyNotices userId={userId} />
         <div className="fc-panel">
           <div className="fc-panel-head">
             <span className="fc-panel-label">Friends</span>
@@ -466,9 +469,13 @@ export default function FriendsRail({ userId, onUpgrade, panelSlot = null, layou
 
   return (
     <>
+      <SafetyNotices userId={userId} />
+
       <PendingRequestsList
         pending={friends.pending}
         busyId={busyRequestId}
+        userId={userId}
+        onBlocked={() => { friends.refresh().catch(() => {}); }}
         onAccept={async id => {
           setBusyRequestId(id);
           try { await friends.accept(id); }

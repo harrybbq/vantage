@@ -414,3 +414,76 @@ html[data-theme="dark-os"] .inv-card-eyebrow { color: var(--em-light); }
 /* Pending request that came through my invite link. */
 .fc-request-via { display: block; color: var(--em-text); font-weight: 600; }
 html[data-theme="dark-os"] .fc-request-via { color: var(--em-light); }
+
+/* ── Report sheet (ReportFriendModal) — item 110 ──────────────────────
+   Eleven reasons, a help line and a text box can outgrow a phone: the
+   sheet caps its height and scrolls inside, so the backdrop stays
+   tappable. Signposts are plain, solid and readable — never a toast. */
+.report-modal {
+  max-height: calc(100vh - 32px);
+  max-height: calc(100dvh - 32px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+.report-modal .report-reason-chip { font-size: 13px; color: var(--text-mid); }
+.report-modal .report-reason-chip.selected { color: var(--em-text); }
+.report-hint {
+  margin: 0; font-family: var(--body); font-size: 13px; line-height: 1.45; color: var(--text-mid);
+}
+.report-signpost {
+  margin: 0; padding: 10px 12px; border-radius: 9px;
+  border: 1px solid rgba(180, 35, 24, .35); background: rgba(180, 35, 24, .07);
+  font-family: var(--body); font-size: 13px; line-height: 1.45; color: var(--text);
+}
+html[data-theme="dark-os"] .report-signpost {
+  border-color: rgba(255, 138, 122, .4); background: rgba(255, 138, 122, .08); color: #ddd8ce;
+}
+.report-ack {
+  margin: 4px 0 12px; padding: 12px 14px; border-radius: 10px;
+  border: 1px solid rgba(var(--em-rgb), .35); background: rgba(var(--em-rgb), .08);
+  font-family: var(--body);
+}
+.report-ack-title { font-size: 14px; font-weight: 700; color: var(--em-text); margin-bottom: 4px; }
+.report-ack p { margin: 0; font-size: 13px; line-height: 1.5; color: var(--text); }
+html[data-theme="dark-os"] .report-ack p { color: #ddd8ce; }
+.report-modal .report-signpost + .handle-claim-sub { margin-top: 12px; }
+
+/* ── Safety notices (SafetyNotices) — items 110, 111 ──────────────────
+   Solid cards in the rail's own colours: a notice is something a person
+   reads, so it gets the readable text tokens and a 44px "Got it" on
+   touch. The suspended banner is calm (amber), never red. */
+.sn-wrap { display: flex; flex-direction: column; gap: 8px; margin-bottom: 8px; }
+.sn-card {
+  padding: 12px 14px; border-radius: 12px;
+  border: 1px solid var(--border); background: var(--bg-raised);
+  font-family: var(--body); min-width: 0;
+}
+html[data-theme="dark-os"] .sn-card { background: var(--os-surface); border-color: var(--os-border); }
+.sn-card.is-good { border-color: rgba(var(--em-rgb), .4); box-shadow: inset 3px 0 0 var(--em); }
+.sn-card.is-info { box-shadow: inset 3px 0 0 var(--text-mid); }
+.sn-card.is-warn { border-color: rgba(176, 110, 20, .45); box-shadow: inset 3px 0 0 #b06e14; }
+html[data-theme="dark-os"] .sn-card.is-warn { border-color: rgba(232, 168, 72, .45); box-shadow: inset 3px 0 0 #e8a848; }
+.sn-head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+.sn-title { font-size: 14px; font-weight: 700; color: var(--text); line-height: 1.3; }
+.sn-when { flex-shrink: 0; font-family: var(--mono); font-size: 12px; color: var(--text-mid); }
+.sn-body { margin: 6px 0 0; font-size: 13px; line-height: 1.5; color: var(--text); overflow-wrap: anywhere; }
+html[data-theme="dark-os"] .sn-body { color: #ddd8ce; }
+.sn-appeal { color: var(--text-mid); }
+html[data-theme="dark-os"] .sn-appeal { color: #b5afa4; }
+.sn-ok {
+  margin-top: 10px; min-height: 32px; padding: 0 14px; border-radius: 8px; cursor: pointer;
+  border: 1px solid var(--border); background: var(--bg-base); color: var(--text);
+  font-family: var(--body); font-size: 13px; font-weight: 600;
+}
+html[data-theme="dark-os"] .sn-ok { background: var(--os-surface2); border-color: var(--os-border-md); color: #ddd8ce; }
+.sn-ok:focus-visible, .sn-more:focus-visible { outline: 2px solid var(--em); outline-offset: 2px; }
+.sn-more {
+  align-self: flex-start; padding: 6px 2px; border: none; background: none; cursor: pointer;
+  font-family: var(--body); font-size: 13px; color: var(--text-mid);
+  text-decoration: underline; text-underline-offset: 2px;
+}
+.sn-list { list-style: none; margin: 4px 0 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+.sn-list li { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 2px 8px; }
+.sn-list .sn-body { flex-basis: 100%; margin-top: 2px; color: var(--text-mid); }
+.sn-list-title { font-family: var(--body); font-size: 13px; font-weight: 600; color: var(--text); }
+@media (hover: none) { .sn-ok { min-height: 44px; } .sn-more { min-height: 44px; } }

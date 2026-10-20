@@ -8,6 +8,13 @@
  *   onAccept    — async (requesterId) => void
  *   onDecline   — async (requesterId) => void
  *   busyId      — currently-acting request id (disables both buttons)
+ *   userId      — the signed-in user (reporter / blocker)
+ *   onBlocked   — (requester) => void, after a block from a request row
+ *
+ * Each request also carries Report / Block (item 110e; Online Safety Act
+ * draft G4): an unwanted request is exactly where a stranger first makes
+ * contact, so the way to refuse it for good belongs on the request, not
+ * only on a friend card the stranger never gets.
  */
 const COLORS = ['#1a7a4a', '#2563eb', '#7c3aed', '#c2410c', '#0891b2', '#be185d', '#854d0e'];
 
@@ -18,13 +25,14 @@ function avatarColor(seed) {
 }
 
 import Icon from '../Icon';
+import ReportBlockButton from './ReportBlockButton';
 import './friends-dm.css';
 
 function initials(name) {
   return (name || '').split(' ').map(p => p[0]).join('').slice(0, 2).toUpperCase() || '?';
 }
 
-export default function PendingRequestsList({ pending, onAccept, onDecline, busyId }) {
+export default function PendingRequestsList({ pending, onAccept, onDecline, busyId, userId = null, onBlocked }) {
   if (!pending || pending.length === 0) return null;
 
   return (
@@ -67,6 +75,12 @@ export default function PendingRequestsList({ pending, onAccept, onDecline, busy
                   aria-label={`Decline request from @${p.handle}`}
                   title="Decline"
                 ><Icon name="x" size={14} /></button>
+                <ReportBlockButton
+                  userId={userId}
+                  target={{ id: p.id, name, handle: p.handle }}
+                  where="friend-request"
+                  onBlocked={onBlocked}
+                />
               </div>
             </div>
           );
