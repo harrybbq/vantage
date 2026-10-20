@@ -122,6 +122,19 @@ async function removeStorage(userId, url, serviceKey) {
   return removed;
 }
 
+// The shared leaderboard snapshot (lib/sharedCache.js, `function_cache`)
+// can hold the deleted user's name and avatar for up to 5 minutes. Drop
+// the leaderboard rows so the next view rebuilds without them. Best
+// effort: a missing table (SQL not run yet) or any error is ignored.
+async function purgeLeaderboardCache(url, serviceKey) {
+  try {
+    const res = await fetch(`${url}/rest/v1/function_cache?key=like.leaderboard:*`, {
+      method: 'DELETE', headers: svc(serviceKey, { Prefer: 'return=minimal' }),
+    });
+    if (!res.ok && res.status !== 404) console.error('delete-account: leaderboard cache purge', res.status);
+  } catch { /* best effort */ }
+}
+
 async function deleteRevenueCatSubscriber(userId) {
   const rcKey = process.env.REVENUECAT_SECRET_API_KEY;
   if (!rcKey) return false;
@@ -209,6 +222,7 @@ exports.handler = async (event) => {
   await Promise.all([
     removeStorage(userId, url, serviceKey),
     deleteRevenueCatSubscriber(userId),
+    purgeLeaderboardCache(url, serviceKey),
   ]).catch(() => null);
 
   return { statusCode: 200, headers: CORS, body: JSON.stringify({ ok: true }) };

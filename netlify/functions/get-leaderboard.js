@@ -12,6 +12,29 @@
  * Stale-self refresh: if the caller's ratings_computed_at is null or > 24h
  * old, the caller is recomputed via the shared helper before the board is
  * built. Keeps the user's own row honest no matter how stale they were.
+ *
+ * ── Shared cache (item 91) ──────────────────────────────────────────────
+ * The GLOBAL top 100 is the same for everyone, so it is built at most
+ * once per BOARD_TTL_MS and shared: module scope on a warm instance, and
+ * one row in public.function_cache across instances (lib/sharedCache.js;
+ * fails soft to module scope until retention_2026_10b.sql is run). A
+ * build is ~8 queries (500 candidates, suspended set, 4+ snapshot
+ * chunks, avatars/colours); a cached view is 1–3 small ones.
+ *
+ * Only the shared part is cached. Per caller, every view still reads
+ * the caller's own profile fresh and, from it: marks their row, swaps in
+ * their current numbers, drops them from what THEY see if they have
+ * just opted out, and computes their true rank + pinned row when they
+ * are outside the top 100. Friends boards are per-user and never cached.
+ *
+ * What the cache delays, by at most BOARD_TTL_MS for OTHER viewers: a
+ * new opt-out, a suspension, a rating change. Five minutes, on a board
+ * the client already caches for 60 s.
+ *
+ * Avatars: only the 100 rows that are shown carry one (they are data
+ * URIs, several kB each). The weekly pool reads 500 candidates WITHOUT
+ * avatars and fetches them for the final 100 only; friends boards past
+ * 100 rows get initials (the client already renders those).
  */
 
 const { pauseGate } = require('../lib/killSwitch');
@@ -19,6 +42,7 @@ const sbKeys = require('../lib/sbKeys');
 const { recomputeUser } = require('../lib/recompute');
 const { suspendedIds } = require('../lib/suspended');
 const { inChunks } = require('../lib/pgPage');
+const { createSharedCache, pgCacheStore } = require('../lib/sharedCache');
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
@@ -49,6 +73,22 @@ const SNAPSHOT_MIN_AGE_MS = 6 * 24 * 60 * 60 * 1000; // ≥6 days = "weekly"
 const FORMULA_EPOCH_ISO = '2026-09-14T00:00:00.000Z';
 const GLOBAL_TOP_N = 100;
 const WEEKLY_CANDIDATE_POOL = 500; // wider net for weekly-climb candidates
+const AVATAR_TOP_N = 100;          // rows past this get initials, not a data URI
+const BOARD_TTL_MS = 5 * 60_000;   // shared global board lifetime
+
+// Profile columns for a board row. Avatars are fetched separately for
+// the rows that are actually shown (see attachAvatarsAndColors).
+const ROW_COLS = 'id,handle,display_name,ratings,ratings_ovr,ratings_computed_at,prestige';
+const ME_COLS = ROW_COLS + ',avatar_url,leaderboard_optin,lifetime_rating';
+
+const boardCache = createSharedCache({ ttlMs: BOARD_TTL_MS });
+let storeFor = null; // { url, store } — one per instance, so its missing-table memory sticks
+function sharedStore(supabaseUrl, serviceKey) {
+  if (!storeFor || storeFor.url !== supabaseUrl) {
+    storeFor = { url: supabaseUrl, store: pgCacheStore({ supabaseUrl, serviceKey }) };
+  }
+  return storeFor.store;
+}
 
 // ── Tiny rate limit ──
 const RATE_LIMIT_WINDOW_MS = 60_000;
@@ -144,32 +184,42 @@ function rowFromProfile(p, snapshotOvr, callerId) {
   };
 }
 
-// Best-effort: colour each row's name with the user's chosen accent
-// (profiles.leaderboard_color, opt-in via Settings). Kept as a separate
-// query so a missing column (migration not yet applied) can't break the
-// board — a 400 just means no colours this run.
+// Best-effort: avatars for the shown rows, and each row's name colour
+// (profiles.leaderboard_color, opt-in via Settings). One query for both;
+// if leaderboard_color isn't there yet (migration not applied) the 400
+// falls back to avatars alone, and any failure leaves initials / no
+// colours — never a broken board.
 //
 // Pro and lifetime only, checked HERE against the server-owned tier: the
 // colour is a Pro customisation (CLAUDE.md tier line), and the column is
 // client-writable, so a free account that set it directly was showing a
 // paid feature to everyone.
-async function attachNameColors(supabaseUrl, serviceKey, rows) {
+//
+// The first AVATAR_TOP_N rows get an avatar; every row gets its colour.
+// Chunked: the URL must not grow with the board (a friends board can be
+// long). A failed chunk throws → the fallback / nothing this run.
+async function attachAvatarsAndColors(supabaseUrl, serviceKey, rows, { avatars = true } = {}) {
+  const avatarIds = new Set(avatars ? rows.slice(0, AVATAR_TOP_N).map(r => r.userId).filter(Boolean) : []);
   const ids = Array.from(new Set(rows.map(r => r.userId).filter(Boolean)));
   if (!ids.length) return;
+  const read = (cols) => inChunks(ids, (csv, offset, limit) => sb(supabaseUrl, serviceKey,
+    `/rest/v1/profiles?id=in.(${csv})&select=${cols}&order=id&limit=${limit}&offset=${offset}`
+  ), { what: 'leaderboard avatars/colours' });
+  let data = null;
   try {
-    // Chunked: ~101 ids today (board + pinned row), but the URL must not
-    // grow with the board. A failed chunk throws → no colours this run.
-    const data = await inChunks(ids, (csv, offset, limit) => sb(supabaseUrl, serviceKey,
-      `/rest/v1/profiles?id=in.(${csv})&select=id,leaderboard_color,tier&order=id&limit=${limit}&offset=${offset}`
-    ), { what: 'leaderboard colours' });
-    const byId = new Map(data
-      .filter(d => d.tier === 'pro' || d.tier === 'lifetime')
-      .map(d => [d.id, d.leaderboard_color]));
-    for (const r of rows) {
-      const c = byId.get(r.userId);
-      if (c && /^#[0-9a-fA-F]{6}$/.test(c)) r.nameColor = c;
-    }
-  } catch { /* best effort */ }
+    data = await read(avatarIds.size ? 'id,avatar_url,leaderboard_color,tier' : 'id,leaderboard_color,tier');
+  } catch {
+    if (avatarIds.size) { try { data = await read('id,avatar_url'); } catch { data = null; } }
+  }
+  if (!data) return;
+  const byId = new Map(data.map(d => [d.id, d]));
+  for (const r of rows) {
+    const d = byId.get(r.userId);
+    if (!d) continue;
+    if (avatarIds.has(r.userId) && 'avatar_url' in d) r.avatarUrl = d.avatar_url || null;
+    const c = (d.tier === 'pro' || d.tier === 'lifetime') ? d.leaderboard_color : null;
+    if (c && /^#[0-9a-fA-F]{6}$/.test(c)) r.nameColor = c;
+  }
 }
 
 // Lifetime sort key: prestige × 100 + OVR (mirrors the generated
@@ -204,7 +254,7 @@ async function buildFriendsBoard({ supabaseUrl, serviceKey, callerId, timeframe 
   // Chunked — a well-connected user's friend list is an unbounded
   // `in.()`. A failed read shows an empty board, as it always has.
   const allProfiles = await inChunks(ids, (csv, offset, limit) => sb(supabaseUrl, serviceKey,
-    `/rest/v1/profiles?id=in.(${csv})&select=id,handle,display_name,avatar_url,ratings,ratings_ovr,ratings_computed_at,prestige` +
+    `/rest/v1/profiles?id=in.(${csv})&select=${ROW_COLS}` +
     `&order=id&limit=${limit}&offset=${offset}`
   ), { what: 'friends board profiles' }).catch(() => []);
   const suspended = await suspendedIds({ supabaseUrl, serviceKey });
@@ -214,49 +264,101 @@ async function buildFriendsBoard({ supabaseUrl, serviceKey, callerId, timeframe 
   const rows = profiles.map(p => rowFromProfile(p, snaps.get(p.id), callerId));
   const sorted = sortRows(rows, timeframe);
   sorted.forEach((r, i) => { r.rank = i + 1; });
+  // Avatars for the top 100 (initials past that) + Pro name colours.
+  await attachAvatarsAndColors(supabaseUrl, serviceKey, sorted);
 
   const callerRank = (sorted.find(r => r.isSelf) || {}).rank || null;
   return { rows: sorted, callerRank };
 }
 
-async function buildGlobalBoard({ supabaseUrl, serviceKey, callerId, timeframe }) {
-  // Caller's own profile (whether opted in or not — used for the pinned
-  // row and to detect opt-out state). The board excludes opted-out users.
-  const meRes = await sb(supabaseUrl, serviceKey,
-    `/rest/v1/profiles?id=eq.${callerId}&select=id,handle,display_name,avatar_url,ratings,ratings_ovr,ratings_computed_at,leaderboard_optin,prestige,lifetime_rating`
-  );
-  const meRows = meRes.ok ? await meRes.json() : [];
-  const me = meRows[0] || null;
-
-  // Candidate pool: top by OVR among opted-in users. For weekly we widen
-  // the pool because climb leaders aren't always OVR leaders.
+/**
+ * The shared part of the global board: the top GLOBAL_TOP_N opted-in,
+ * unsuspended users, ranked, with climb, avatars and name colours.
+ * Caller-agnostic (isSelf is false on every row) so it can be cached for
+ * everyone; buildGlobalBoard personalises a copy.
+ */
+async function buildSharedGlobalRows({ supabaseUrl, serviceKey, timeframe }) {
+  // Candidate pool: top by lifetime among opted-in users. For weekly we
+  // widen the pool because climb leaders aren't always OVR leaders.
+  // No avatars here — 500 data URIs to show 100 was the waste (item 91).
   const limit = timeframe === 'weekly' ? WEEKLY_CANDIDATE_POOL : GLOBAL_TOP_N;
   const candRes = await sb(supabaseUrl, serviceKey,
-    `/rest/v1/profiles?leaderboard_optin=eq.true&ratings_ovr=not.is.null&select=id,handle,display_name,avatar_url,ratings,ratings_ovr,ratings_computed_at,prestige&order=lifetime_rating.desc&limit=${limit}`
+    `/rest/v1/profiles?leaderboard_optin=eq.true&ratings_ovr=not.is.null&select=${ROW_COLS}&order=lifetime_rating.desc&limit=${limit}`
   );
-  // Suspended users are removed from the public board (item 63). The
-  // caller's own pinned row below is unaffected — only others see less.
+  // A failed read must not be cached (and shared) as "nobody is on the
+  // board": throw, and the cache serves its last good copy or the
+  // handler answers 500 as before.
+  if (!candRes.ok) throw new Error(`candidates read ${candRes.status}`);
+  // Suspended users are removed from the public board (item 63). A
+  // suspended caller still sees their own pinned row (buildGlobalBoard).
   const suspended = await suspendedIds({ supabaseUrl, serviceKey });
-  const candidates = (candRes.ok ? await candRes.json() : [])
-    .filter(p => p.id === callerId || !suspended.has(p.id));
+  const candidates = (await candRes.json()).filter(p => !suspended.has(p.id));
 
-  const candIds = candidates.map(p => p.id);
-  const snaps = await fetchSnapshotOvrs(supabaseUrl, serviceKey, candIds);
-  let rows = candidates.map(p => rowFromProfile(p, snaps.get(p.id), callerId));
-  rows = sortRows(rows, timeframe).slice(0, GLOBAL_TOP_N);
+  const snaps = await fetchSnapshotOvrs(supabaseUrl, serviceKey, candidates.map(p => p.id));
+  const rows = sortRows(candidates.map(p => rowFromProfile(p, snaps.get(p.id), null)), timeframe)
+    .slice(0, GLOBAL_TOP_N);
   rows.forEach((r, i) => { r.rank = i + 1; });
+  await attachAvatarsAndColors(supabaseUrl, serviceKey, rows);
+  return rows;
+}
+
+/**
+ * Personalise the shared rows for one caller. Pure — exported for the
+ * tests. `me` is the caller's fresh profile (null = the read failed).
+ *   · their own row is marked isSelf and carries their CURRENT numbers
+ *     (the shared copy can be up to BOARD_TTL_MS old);
+ *   · if they have opted out since the copy was built, they don't see
+ *     themselves on it (others may, until the next rebuild);
+ *   · returns { rows, callerInTop } — fresh objects; the cached rows are
+ *     never mutated.
+ */
+function personaliseRows(sharedRows, me, callerId) {
+  let rows = sharedRows.map(r => ({ ...r, isSelf: r.userId === callerId }));
+  const idx = rows.findIndex(r => r.isSelf);
+  if (idx === -1) return { rows, callerInTop: null };
+  // Profile read failed → keep the shared row as it is, just marked.
+  if (!me) return { rows, callerInTop: rows[idx] };
+  if (me.leaderboard_optin === false || me.ratings_ovr == null) {
+    rows = rows.filter(r => !r.isSelf);
+    rows.forEach((r, i) => { r.rank = i + 1; });
+    return { rows, callerInTop: null };
+  }
+  const old = rows[idx];
+  const fresh = rowFromProfile(me, null, callerId);
+  rows[idx] = {
+    ...old,
+    username: fresh.username,
+    avatarUrl: me.avatar_url || null,
+    ovr: fresh.ovr,
+    categories: fresh.categories,
+    prestige: fresh.prestige,
+    ratingsComputedAt: fresh.ratingsComputedAt,
+    // Same snapshot baseline, today's OVR.
+    climb: old.climb == null ? null : old.climb + (fresh.ovr - old.ovr),
+  };
+  return { rows, callerInTop: rows[idx] };
+}
+
+async function buildGlobalBoard({ supabaseUrl, serviceKey, callerId, timeframe, me }) {
+  const shared = await boardCache.get(`leaderboard:global:${timeframe}:v1`,
+    () => buildSharedGlobalRows({ supabaseUrl, serviceKey, timeframe }),
+    { store: sharedStore(supabaseUrl, serviceKey) });
+
+  const { rows, callerInTop } = personaliseRows(shared.data, me, callerId);
 
   // Caller pinning + true rank
   let callerRank = null;
-  const callerInTop = rows.find(r => r.isSelf);
   if (callerInTop) {
     callerRank = callerInTop.rank;
   } else if (me && me.leaderboard_optin && me.ratings_ovr != null) {
+    // One snapshot read for the caller, used for both the weekly rank
+    // and the pinned row's climb (it used to be read twice).
+    const callerSnap = (await fetchSnapshotOvrs(supabaseUrl, serviceKey, [callerId])).get(callerId);
     // Compute caller's true rank among opted-in users.
     if (timeframe === 'alltime') {
       const myLifetime = (me.prestige || 0) * 100 + (me.ratings_ovr || 0);
       const cntRes = await sb(supabaseUrl, serviceKey,
-        `/rest/v1/profiles?leaderboard_optin=eq.true&lifetime_rating=gt.${myLifetime}&select=id`,
+        `/rest/v1/profiles?leaderboard_optin=eq.true&lifetime_rating=gt.${myLifetime}&select=id&limit=1`,
         { headers: { Prefer: 'count=exact' } }
       );
       const range = cntRes.headers.get('content-range') || '';
@@ -265,22 +367,22 @@ async function buildGlobalBoard({ supabaseUrl, serviceKey, callerId, timeframe }
     } else {
       // Weekly: rank = 1 + count of opted-in users with strictly higher
       // climb. We don't have a column for climb — approximate by counting
-      // candidates we've already loaded that beat caller's climb.
-      const callerSnap = (await fetchSnapshotOvrs(supabaseUrl, serviceKey, [callerId])).get(callerId);
+      // board rows that beat caller's climb.
       const callerClimb = callerSnap == null ? null : (me.ratings_ovr - callerSnap);
       if (callerClimb != null) {
         callerRank = 1 + rows.filter(r => r.climb != null && r.climb > callerClimb).length;
       }
     }
     // Pin caller's row at the end with their true rank.
-    const callerRow = rowFromProfile(me, (await fetchSnapshotOvrs(supabaseUrl, serviceKey, [callerId])).get(callerId), callerId);
+    const callerRow = rowFromProfile(me, callerSnap, callerId);
     callerRow.rank = callerRank || rows.length + 1;
+    await attachAvatarsAndColors(supabaseUrl, serviceKey, [callerRow], { avatars: false });
     rows.push(callerRow);
   } else {
     callerRank = null; // opted out (or never rated) — UI shows opt-in CTA
   }
 
-  return { rows, callerRank };
+  return { rows, callerRank, computedAt: new Date(shared.at).toISOString() };
 }
 
 // ── Handler ──────────────────────────────────────────────────────────────
@@ -321,32 +423,36 @@ exports.handler = async (event) => {
   const scope     = body.scope === 'global' ? 'global' : 'friends';
   const timeframe = body.timeframe === 'weekly' ? 'weekly' : 'alltime';
 
-  // ── Stale-self check: refresh caller's ratings if >24h or missing.
-  // Done before the board build so the caller's row reflects today.
+  // ── The caller's own profile, read ONCE: the stale-self check uses it,
+  // and the global board personalises the shared copy with it.
+  // Stale-self: refresh the caller's ratings if >24h old or missing,
+  // before the board so their row reflects today (then re-read it).
+  const readMe = async () => {
+    const r = await sb(supabaseUrl, serviceKey, `/rest/v1/profiles?id=eq.${callerId}&select=${ME_COLS}`);
+    return r.ok ? ((await r.json())[0] || null) : null;
+  };
+  let me = null;
   try {
-    const meCheck = await sb(supabaseUrl, serviceKey,
-      `/rest/v1/profiles?id=eq.${callerId}&select=ratings_computed_at`
-    );
-    const meRow = meCheck.ok ? (await meCheck.json())[0] : null;
-    const stale = !meRow?.ratings_computed_at ||
-      (Date.now() - new Date(meRow.ratings_computed_at).getTime()) > STALE_MS;
+    me = await readMe();
+    const stale = !me?.ratings_computed_at ||
+      (Date.now() - new Date(me.ratings_computed_at).getTime()) > STALE_MS;
     if (stale) {
-      await recomputeUser(callerId, { supabaseUrl, serviceKey }, { createdAt: caller?.created_at || null })
+      const done = await recomputeUser(callerId, { supabaseUrl, serviceKey }, { createdAt: caller?.created_at || null })
         .catch(() => null);
+      if (done && scope === 'global') me = (await readMe()) || me;
     }
   } catch { /* non-fatal — the board still loads with whatever profile holds */ }
 
   try {
     const board = scope === 'global'
-      ? await buildGlobalBoard({ supabaseUrl, serviceKey, callerId, timeframe })
+      ? await buildGlobalBoard({ supabaseUrl, serviceKey, callerId, timeframe, me })
       : await buildFriendsBoard({ supabaseUrl, serviceKey, callerId, timeframe });
-    await attachNameColors(supabaseUrl, serviceKey, board.rows);
 
     return {
       statusCode: 200, headers: CORS,
       body: JSON.stringify({
         scope, timeframe,
-        computedAt: new Date().toISOString(),
+        computedAt: board.computedAt || new Date().toISOString(),
         callerRank: board.callerRank,
         rows: board.rows,
       }),
@@ -359,3 +465,6 @@ exports.handler = async (event) => {
     };
   }
 };
+
+// For efficiency.test.mjs: pure helpers + the cache, no network.
+exports._test = { personaliseRows, rowFromProfile, sortRows, boardCache, BOARD_TTL_MS, AVATAR_TOP_N };

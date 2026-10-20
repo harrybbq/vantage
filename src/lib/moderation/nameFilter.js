@@ -108,3 +108,16 @@ export function publicNameProblem(text, what = 'name') {
     ? `That ${what} can't include links, email addresses or phone numbers — other people see it.`
     : `That ${what} isn't allowed — other people see it. Please pick another.`;
 }
+
+/**
+ * The words the blocklist is checked against — each word of the
+ * normalised text, its stretched-letters-collapsed form, and runs of
+ * single letters joined up. Exported so the DM filter
+ * (./messageFilter.js) reads text exactly the way this filter does,
+ * with its own, narrower list.
+ */
+export function candidateWords(text) {
+  const out = new Set();
+  for (const w of words(normalise(text))) { out.add(w); out.add(collapse(w)); }
+  return out;
+}

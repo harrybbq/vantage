@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { SUPPORT_EMAIL, SECURITY_EMAIL, isPlaceholderEmail, mailtoHref } from '../lib/support';
 
 // ── Shared prose wrapper ─────────────────────────────────────────────────
 // Exported for the /support and /delete-account pages (support/
@@ -32,7 +33,7 @@ export function Ul({ items }) {
   );
 }
 
-const LAST_UPDATED = '2 October 2026';
+const LAST_UPDATED = '20 October 2026';
 
 function Updated() {
   return (
@@ -53,6 +54,18 @@ export function Todo({ children }) {
       fontFamily: 'var(--mono)', fontSize: '12px', padding: '1px 5px', borderRadius: '4px',
       background: 'rgba(200,151,10,.16)', color: '#e0b43c', border: '1px dashed rgba(200,151,10,.5)',
     }}>{children}</span>
+  );
+}
+
+// A contact address from lib/support.js — the one place they live. While
+// it is still the "[your-domain]" placeholder it renders as a marked
+// TODO, never as a mailto nobody can send to.
+function ContactEmail({ address, subject }) {
+  if (isPlaceholderEmail(address)) return <Todo>{address} — to be confirmed</Todo>;
+  return (
+    <a href={mailtoHref(address, subject)} style={{ color: LINK_COLOR, textDecoration: 'underline', textUnderlineOffset: '2px' }}>
+      {address}
+    </a>
   );
 }
 
@@ -83,12 +96,33 @@ export function PageLink({ to, go, children }) {
 // in the same change). It separates what your DEVICE contacts directly —
 // which hands that provider your IP address — from what our functions
 // contact on your behalf, which does not.
+//
+// Revised 2026-10-20 against the code (STARTUP_REQUIREMENTS item 100,
+// docs/STORE_PRIVACY_LABELS.md §4 M1–M16, docs/DPIA_DRAFT.md). When the
+// behaviour behind a sentence changes, change the sentence in the same
+// commit — the store labels are filled in from this page. Evidence:
+//   · deletion: netlify/functions/delete-account.js (immediate, cascade);
+//     user_data_history (14 snapshots, cascade); Supabase Pro daily
+//     backups, 7 days (no PITR today)
+//   · purchase history: lib/billing/revenuecat.js logIn(Supabase id)
+//   · crash reports: netlify/functions/client-error.js → client_errors
+//     (30-day purge: audit_schema_2026_10.sql note; schedule = item 96)
+//   · AI coach payload: lib/coach/snapshot.js buildSnapshot() + the
+//     server's wearable guard in ai-coach-daily.js
+//   · AI caps: netlify/lib/aiQuota.js (food scan 3/week free, 40/day Pro)
+//   · ratings from logging days: lib/ratings/derive.js vitalsPoints etc.
+//   · invite preview: preview_friend_invite (dm_upgrade_2026_10.sql)
+//   · community foods: food_contributions_schema.sql
+//   · closed reports deleted after 12 months: launch batch B's SQL —
+//     until that runs, §11's report line is a commitment, not yet a job
+//   · owner-only (not described as features): Apple Health import,
+//     recipe-from-video, and everything in lib/native/ownerSurfaces.js
 function PrivacyPolicyContent({ go }) {
   return (
     <>
       <Section title="1. Who We Are">
         <P>Vantage ("the App", "we", "us") is a personal productivity, goal-tracking and wellness application, available on the web and as a mobile app. The data controller for personal data processed through the App is <Todo>[Company name, registered address — to be completed on incorporation]</Todo>.</P>
-        <P>For any privacy question or request, contact us at the support email shown on the App's store listing, or via Settings inside the App (see <PageLink to="support" go={go}>Support</PageLink>). To report a security vulnerability, email <Todo>security@[domain — to be confirmed]</Todo>. This policy is written for users in the United Kingdom and European Economic Area, but it applies to everyone who uses the App.</P>
+        <P>For any privacy question or request, email <ContactEmail address={SUPPORT_EMAIL} subject="Privacy request" />, or use Settings → Report a problem inside the App (see <PageLink to="support" go={go}>Support</PageLink>). To report a security vulnerability, email <ContactEmail address={SECURITY_EMAIL} subject="Security report" />. This policy is written for users in the United Kingdom and European Economic Area, but it applies to everyone who uses the App.</P>
       </Section>
 
       <Section title="2. Data We Collect">
@@ -96,30 +130,39 @@ function PrivacyPolicyContent({ go }) {
         <Ul items={[
           'Account data — your email address, used to create and authenticate your account.',
           'Profile & social data (optional) — a display name, a unique @handle you may claim, a profile picture, your level and ratings, and — if you enable them — an activity streak, a 91-day activity heatmap, recent achievement wins, and an online-status indicator. See section 6 for who can see what.',
-          'User-generated content — boards, trackers, achievements, shopping wish-list items, savings pots, holiday plans, habit entries, notes, group names and group pictures you create inside the App.',
+          'User-generated content — boards, trackers, achievements, shopping wish-list items, holiday plans, notes, group names and group pictures you create inside the App.',
+          'Money you enter — savings goals, balances and contributions, accounts and interest rates, monthly income and spending, and subscriptions and bills with their costs and renewal dates. All of it is typed in by you; Vantage has no connection to your bank and does not see your transactions.',
+          'Habits you are breaking — each habit\'s name, when you last slipped, and how many relapses you have recorded. A habit\'s name can say something about your health (for example a quit-drinking habit): it is sent to the AI brief only if you use it (section 7), and shown to friends only if you turn on the habit-streak card (section 6).',
+          'Self-check scores — your scores from the Brain, Finance, Fitness and Social self-checks, used in your ratings.',
+          'Friends — the people you add as friends, friend requests you send and receive, and invite links you create.',
           'Direct messages — messages you exchange with accepted friends are stored in our database so they can be delivered and shown in your conversation history. They are transmitted over TLS but are not end-to-end encrypted; treat them like email, not like a sealed letter.',
           'Nutrition data — food log entries, macro targets and goals you record, stored in our database and linked to your account.',
-          'Health & fitness data (optional, with your explicit consent) — vitals you enter yourself, and, if you connect WHOOP, connect an Oura Ring, or import Apple Health data, daily metrics such as sleep duration, resting heart rate, heart-rate variability, recovery/readiness score, strain, energy expenditure (calories) and workout summaries. See section 3.',
+          'Shared foods (optional) — if you choose to share a food you created, its name, brand and nutrition values are added to food search for every user. Your name is never shown with it; we keep a record that you shared it so it can be moderated, and it is removed when you delete your account.',
+          'Health & fitness data (section 3) — things you type in yourself: weight, body measurements (such as waist, chest, hips and body fat), sleep, resting heart rate, workouts, steps and calories burned; your height, age and sex if you give them for a calorie estimate. And, only with your explicit consent, if you connect WHOOP or an Oura Ring: daily metrics such as sleep duration, resting heart rate, heart-rate variability, recovery/readiness score, strain, energy expenditure (calories), steps and workout summaries.',
           'Reports and blocks — if you report or block someone, we store who reported whom, the reason you chose and any note you add. A report can include a copy of the reported person\'s handle and display name at the time, and recent messages from them if you report from a conversation.',
-          'Payment & subscription data — if you purchase Vantage Pro, the purchase is processed by Apple (App Store), Google (Google Play) and RevenueCat. We receive your subscription status and a transaction reference. We never receive or store your card number.',
-          'Device & notification data — if you enable push notifications, we store a device push token so notifications can be delivered via Apple/Google push services (Firebase Cloud Messaging).',
-          'Camera images (optional) — if you use the AI food scanner (3 free scans a week; unlimited on Pro), a single camera frame is sent to Anthropic\'s API to identify the food (section 7). We do not store the image.',
-          'Approximate location — to show local weather, our server looks up the approximate city for your IP address (section 8). We do not store the result against your account, and we never collect precise (GPS) location.',
+          'Payment & subscription data — if you buy Vantage Pro, the purchase is processed by Apple (App Store) or Google (Google Play), and RevenueCat, our subscription provider, keeps the purchase and renewal history of your Pro subscription (which plan, when it started, renewed or ended, and the store) linked to your Vantage account ID. We receive your subscription status. We never receive or store your card number.',
+          'Device & notification data — if you turn on push notifications, we store a device push token so notifications can be delivered via Apple/Google push services (Firebase Cloud Messaging). In the app, the token is only created once you agree to notifications.',
+          'Camera images (optional) — if you use the AI food scanner (3 free scans a week; more on Pro, within a daily fair-use limit), a single camera frame is sent to Anthropic\'s API to identify the food (section 7). We do not store the image.',
+          'Approximate location — to show local weather, our hosting provider (Netlify) works out your approximate city from your connection and passes only that to our server, which uses it (or a position rounded to about 11 km) to fetch the forecast (section 8). Your IP address is not sent to any weather or location service, nothing is stored against your account, and we never collect precise (GPS) location.',
           'Third-party sign-in data (optional) — if you sign in with Google or Apple, we receive a minimal profile from that provider (section 9).',
           'Session data — a session token kept by our authentication provider to keep you signed in.',
           'Preferences — colour scheme, background and similar choices, stored in your browser\'s / device\'s localStorage and in your account.',
+          'Crash reports — when the App hits an error, it sends us the error message and technical trace, the screen it happened on, your browser or device type and the App version, linked to your account if you are signed in. We use them only to find and fix bugs, and delete them after 30 days (section 11).',
           'Anonymous performance measurements (web app only) — on about one page load in five, the browser measures how quickly the page loaded and responded and sends us those timings with the page path and a coarse device type (phone, tablet or desktop); they are stored without your account, IP address or any other identifier and are used only to find and fix slow pages.',
           'Problem reports — if you use Settings → Report a problem, we store what you write, the category you choose and the page you were on, linked to your account so we can follow up.',
         ]} />
-        <P>We do not collect precise location data, biometric identification data, advertising identifiers, contact lists or purchase history. We use no advertising or analytics trackers.</P>
+        <P>We do not collect precise location data, biometric identification data, advertising identifiers or your phone’s contact list, and we have no access to your bank. We use no advertising or analytics trackers.</P>
+        <P>Mood entries from the retired Mood feature were deleted in October 2026. Copies age out of the history snapshots within 14 days and of our database provider&apos;s backups within 7 days (section 11).</P>
+        <P>A few features on the website are still being tested on the developer&apos;s own account (for example an Apple Health import). They are not available to users, are not part of the iOS or Android app, and are not described here; if one becomes available, this policy will be updated first.</P>
       </Section>
 
       <Section title="3. Health Data & Your Explicit Consent">
-        <P>Vitals, sleep, heart-rate and nutrition information are health data — "special category" data under UK GDPR. We ask for your explicit consent to health data on a consent screen that every account sees once, and again before you connect WHOOP or an Oura Ring or turn on Apple Health import — no connected source is set up without it. Saying no is fine: features that do not need health data keep working, and anything you choose to type in yourself (such as a weight or a meal) is still saved to your account and shown only to you.</P>
+        <P>Vitals, body measurements, sleep, heart-rate, activity and nutrition information are health data — "special category" data under UK GDPR. We ask for your explicit consent to health data on a consent screen that every account sees once, and again before you connect WHOOP or an Oura Ring — no connected source is set up without it. Saying no is fine: features that do not need health data keep working, and anything you choose to type in yourself (such as a weight or a meal) is still saved to your account and shown only to you.</P>
         <Ul items={[
-          'You can withdraw consent at any time in Settings → Privacy → Consent. To stop a connected source sending anything further, also use Disconnect on its WHOOP or Oura panel (this immediately deletes that device’s stored access tokens) or turn off Apple Health sync. You can delete individual entries or your whole account at any time; metrics already recorded stay in your history until you do.',
-          'Health data is used solely to show you your own trends, widgets and (if you use it) the daily AI brief. It is never shown to other users, never used for advertising, and never sold.',
-          'WHOOP and Oura data is fetched from their respective APIs under your OAuth authorisation; Apple Health data only ever reaches us when you explicitly export or sync it.',
+          'You can withdraw consent at any time in Settings → Privacy → Consent. To stop a connected source sending anything further, also use Disconnect on its WHOOP or Oura panel (this immediately deletes that device’s stored access tokens). You can delete individual entries or your whole account at any time; metrics already recorded stay in your history until you do.',
+          'Health data is used solely to show you your own trends and widgets. It is never used for advertising and never sold. Your readings — weights, measurements, sleep, heart rate, meals — are never shown to other users. One thing others can see is derived from it: your ratings (shown to friends, and on the leaderboard and in groups if you take part) are partly worked out from how many days you logged vitals, activity and on-target nutrition, with activity counted only up to a daily cap. The ratings show a score, never the readings behind it.',
+          'The daily AI brief (section 7) does not receive your Vitals log, body measurements, food log or anything from WHOOP or Oura — only the trackers, habits and other items listed there.',
+          'WHOOP and Oura data is fetched from their respective APIs under your OAuth authorisation.',
         ]} />
       </Section>
 
@@ -127,7 +170,7 @@ function PrivacyPolicyContent({ go }) {
         <Ul items={[
           'Performance of a contract — your email, account and app content are processed to deliver the service you signed up for.',
           'Explicit consent — health & fitness data (section 3), AI features (section 7) and push notifications. You can withdraw consent at any time without affecting the rest of the App.',
-          'Legitimate interests — storing preferences, keeping the service secure, screening uploaded group pictures and profile pictures, handling reports and preventing abuse of social features.',
+          'Legitimate interests — storing preferences, keeping the service secure, finding and fixing crashes (crash reports), keeping history snapshots so lost data can be recovered, screening uploaded group pictures and profile pictures, handling reports and preventing abuse of social features.',
           'Legal obligation — keeping records we are required to keep, and responding to lawful requests.',
         ]} />
       </Section>
@@ -141,6 +184,7 @@ function PrivacyPolicyContent({ go }) {
           'To send transactional emails (account confirmation, password reset) — we send no marketing emails.',
           'To deliver push notifications you have enabled.',
           'To verify subscription entitlements for Vantage Pro.',
+          'To find and fix bugs and crashes.',
         ]} />
       </Section>
 
@@ -152,27 +196,29 @@ function PrivacyPolicyContent({ go }) {
           'Friends — people you accept as friends can see your profile card: display name, avatar, level, and any of streak / heatmap / recent wins / online status you have enabled. Each has its own toggle. The habit-streak card, which shows the habit\'s name, is off unless you turn it on.',
           'Groups — if you join a group, its members see your display name, profile picture, rating and weekly climb. The group\'s name, picture and weekly score appear on its division\'s board to other groups.',
           'Direct messages — visible only to you and the recipient (and stored as described in section 2). If the recipient reports a conversation, recent messages from it are included in the report for review.',
+          'Invite links — if you share a friend-invite link, anyone who opens it, signed in or not, sees your display name, @handle, profile picture, level and rating, until the link expires (after 30 days) or has been used up.',
+          'Ratings — the level and ratings others see are scores. The Fitness rating (and the overall rating that includes it) is partly worked out from how many days you logged vitals, activity and nutrition; nobody sees the readings themselves (section 3).',
+          'Shared foods — a food you choose to share appears in everyone\'s food search with its name, brand and nutrition values, never with your name.',
         ]} />
       </Section>
 
       <Section title="7. AI Features (Anthropic)">
         <P>These optional features send data to Anthropic's API, our AI provider. We ask for your consent before the first one runs, and you can withdraw it in Settings → Privacy → Consent:</P>
         <Ul items={[
-          'AI food scanner (3 free scans a week; unlimited on Pro) — one camera frame per scan, used to identify the food and estimate nutrition.',
-          'Daily brief / AI coach — a compact snapshot of your own App data (e.g. first name, recent habits, trackers, goals, vitals and macro trends) is sent to generate your personal daily brief.',
-          'Recipe from a video — the title and description of a YouTube or TikTok video you save are sent to extract the ingredient list and estimate macros.',
+          'AI food scanner (3 free scans a week; more on Pro, within a daily fair-use limit) — one camera frame per scan, used to identify the food and estimate nutrition.',
+          <>Daily AI brief (Vantage Pro) — once a day, a summary of your own App data is sent to write your brief. It contains: your first name; today&apos;s date; the habits you are breaking, with their names, days since your last relapse and number of relapses; your achievements (names, whether done, coin values); your trackers (names, units, goals and the last 14 days of values) — except any tracker filled from WHOOP or Oura, which is left out; up to two holidays in the next 90 days (destination and days to go); how many wish-list items you have and up to two you can afford now (name and coin cost); your coin balance; your last few briefs; and which kinds of tip you have recently dismissed. It does not contain your email, your account ID, your Vitals log, body measurements, food log, money entries, messages or anything from WHOOP or Oura.</>,
         ]} />
         <P>Separately, and not optional: when a group picture is uploaded, or before your profile picture is shown to other people, the image is sent to Anthropic's API to screen it for content that breaks the Terms. Until a picture passes, other people see your initial instead; the picture itself stays on your account. This is done on the basis of legitimate interests (keeping the App safe).</P>
-        <P>In each case the data is sent to Anthropic's API to generate the result and is handled by Anthropic under its commercial terms, under which data sent via the API is not used to train their models. We do not store the camera frame or the snapshot we send; the result (for example your brief) is saved in your account. If you never use the optional features, none of your data is sent to Anthropic by them. AI output can be wrong — see the Terms of Service health disclaimer.</P>
+        <P>In each case the data is sent to Anthropic's API to produce the result, without your name, email or account ID attached (beyond the first name in the brief). Anthropic handles it under its commercial terms: it does not use data sent through its API to train its models, and it may retain inputs and outputs for a limited period (for example for safety and abuse monitoring) before deleting them. We do not store the camera frame or the summary we send; the result (for example your brief) is saved in your account. If you never use the optional features, none of your data is sent to Anthropic by them. AI output can be wrong — see the Terms of Service health disclaimer.</P>
       </Section>
 
       <Section title="8. Third Parties (Processors and Services We Contact)">
         <P><strong>Providers that run the App</strong> (they process your personal data on our behalf):</P>
         <Ul items={[
-          'Supabase — database and authentication, hosted in the EU. Stores your account, app content, messages, nutrition and health data.',
+          'Supabase — database and authentication, hosted in the EU. Stores your account, app content, money entries, messages, nutrition and health data, history snapshots and crash reports.',
           'Netlify — web hosting and the serverless functions that power sync, leaderboards, groups and integrations. Receives your IP address when you use the App.',
           'Anthropic — AI features and screening of group and profile pictures, as described in section 7.',
-          'RevenueCat, Apple and Google — subscription billing and entitlement management for Vantage Pro. Payment details are handled by the platform you purchase through.',
+          'RevenueCat — manages Vantage Pro subscriptions: keeps the purchase and renewal history of your subscription, linked to your Vantage account ID, and tells us whether Pro is active. Apple and Google — billing for purchases made through their stores; payment details are handled by the platform you buy through and never reach us.',
           'Firebase Cloud Messaging (Google) — delivery of push notifications you enable; processes your device push token.',
           'Google / Apple sign-in — optional authentication only (section 9).',
         ]} />
@@ -183,11 +229,9 @@ function PrivacyPolicyContent({ go }) {
         ]} />
         <P><strong>Services our servers contact on your behalf</strong> (they see the request, not your account):</P>
         <Ul items={[
-          <>ipwho.is — <strong>receives your IP address</strong> so our weather function can find your approximate city. Nothing else is sent.</>,
-          'Open-Meteo — weather forecasts for that approximate location, and historic weather and place lookups for holiday destinations you add.',
+          'Open-Meteo — weather forecasts for your approximate location (a city name or a position rounded to about 11 km — never your IP address), and historic weather and place lookups for holiday destinations you add.',
           'Frankfurter (frankfurter.app) — currency exchange rates for holiday destinations.',
           'Open Food Facts, USDA FoodData Central and FatSecret — food search. Only your search text or a scanned barcode is sent.',
-          'YouTube (Google) and TikTok — when you save a cooking video, the video\'s public page or oEmbed data is fetched to read its title and description.',
           'GNews — news headlines for the news widget, including any topic you search for.',
           'Finnhub — stock and market quotes for the ticker symbols you add to the market widget.',
           'Shop websites — when you paste a product link, or open Shopping, our server fetches that product page to read its name, image and current price.',
@@ -197,7 +241,6 @@ function PrivacyPolicyContent({ go }) {
           'Google Fonts — the App\'s typefaces.',
           'Google favicon service — small brand logos next to foods and shops; the brand\'s website name is sent.',
           'GitHub API — only if you add the GitHub widget: the GitHub username you enter is looked up to show that public profile and its repositories.',
-          'YouTube image servers (i.ytimg.com) — thumbnails for cooking videos you save.',
         ]} />
         <P>We do not sell, rent, or share your data with advertisers or data brokers.</P>
       </Section>
@@ -215,20 +258,23 @@ function PrivacyPolicyContent({ go }) {
 
       <Section title="11. Data Retention & Deletion">
         <Ul items={[
-          <>Account &amp; content — retained while your account is active. Delete your account at any time via Settings → Account → Delete account (see <PageLink to="delete-account" go={go}>Delete your account</PageLink>); your login and all associated data are permanently erased within 30 days.</>,
+          <>Account &amp; content — retained while your account is active. Delete your account at any time via Settings → Account → Delete account (see <PageLink to="delete-account" go={go}>Delete your account</PageLink>). Deletion is immediate: your login and everything stored against your account — app data, history snapshots, profile, food log, friends, messages, push tokens, WHOOP and Oura connections, uploaded files and your RevenueCat subscription record — are deleted at once.</>,
+          'Backups — our database provider (Supabase) keeps daily backups of the whole database for 7 days. A deleted account can survive in those backups until they roll off, so it is fully gone within 7 days — inside the 30 days we commit to. Backups cannot be edited and are used only to restore the service after a failure.',
           'History snapshots — to recover from accidental loss, we automatically keep up to 14 daily copies of your app data (without images). Older copies are replaced as new ones are made, and all of them are deleted with your account.',
           'WHOOP and Oura tokens — deleted immediately when you disconnect that device.',
           'Direct messages — retained until you delete them or your account.',
-          'Reports — a report you make, or one made about you, may be kept after the account involved is deleted, only as long as needed to deal with it and with repeat abuse.',
+          'Reports — a report you make, or one made about you, is kept while it is being dealt with and may be kept after the account involved is deleted, so repeat abuse can be recognised. A closed report is deleted automatically 12 months after it was closed.',
           'Problem reports — kept until the problem is dealt with; if you delete your account first, the report loses its link to you.',
-          'Camera frames & AI snapshots — not stored by us; discarded after each request.',
+          'Crash reports — deleted after 30 days. If you delete your account sooner, they lose their link to you.',
+          'Purchase records — Apple and Google keep their own records of purchases made through their stores, under their own policies.',
+          'Camera frames & AI summaries — not stored by us; discarded after each request (Anthropic\'s own limited retention is described in section 7).',
           'Subscriptions — deleting your account does not cancel an App Store or Google Play subscription; cancel it in the store.',
           'Data export — you can export your data at any time in Settings → Account.',
         ]} />
       </Section>
 
       <Section title="12. Security">
-        <P>All data is encrypted in transit (TLS). Database access is protected by row-level security so users can only read what they are entitled to; server-side keys never ship in the app. No system is perfectly secure — if we become aware of a breach affecting your personal data we will notify you and the ICO as required by law. To report a vulnerability, email <Todo>security@[domain — to be confirmed]</Todo>.</P>
+        <P>All data is encrypted in transit (TLS). Database access is protected by row-level security so users can only read what they are entitled to; server-side keys never ship in the app. No system is perfectly secure — if we become aware of a breach affecting your personal data we will notify you and the ICO as required by law. To report a vulnerability, email <ContactEmail address={SECURITY_EMAIL} subject="Security report" />.</P>
       </Section>
 
       <Section title="13. Cookies & Local Storage">
@@ -295,6 +341,7 @@ function TermsContent({ go }) {
           'Refunds for store purchases are handled by Apple or Google under their policies. Nothing in these terms affects your statutory rights, including your rights under UK consumer law.',
           'If we change the price of your subscription we will give you notice in advance, and the change will only apply from your next renewal.',
           'Free features remain free unless we clearly communicate otherwise with adequate notice.',
+          'Pro lifts the free plan\'s limits on lists such as habits, achievements, trackers and holidays. AI features keep a daily fair-use limit on Pro, so that one account cannot run up costs for everyone.',
         ]} />
       </Section>
 
@@ -306,8 +353,8 @@ function TermsContent({ go }) {
         <P><strong>Vantage is not a medical device and does not provide medical advice.</strong></P>
         <Ul items={[
           'Nutrition figures (including AI food-scanner estimates and third-party food databases) are estimates and may be inaccurate.',
-          'Vitals and fitness metrics from WHOOP, an Oura Ring, Apple Health or manual entry are for general wellness information only.',
-          'AI-generated content (the daily brief, coach suggestions, food identification) can be wrong. Never rely on it for medical, dietary or mental-health decisions.',
+          'Vitals and fitness metrics from WHOOP, an Oura Ring or manual entry are for general wellness information only.',
+          'AI-generated content (the daily brief, food identification) and the coach\'s rule-based tips can be wrong. Never rely on them for medical, dietary or mental-health decisions.',
           'Always consult a qualified professional before changing your diet, exercise, or health regimen — and never disregard professional advice because of something shown in the App.',
           'If you may be experiencing a medical emergency, call emergency services immediately.',
         ]} />
@@ -331,8 +378,8 @@ function TermsContent({ go }) {
           'Block — blocking removes the person from your friends, stops them messaging you and stops them sending you friend requests.',
           'Review — every report is reviewed by a person. We aim to act within 24 hours. Group pictures and profile pictures are also screened automatically before others see them, and held back if the screen is unsure.',
           'Action — depending on what we find we may remove or reset content (for example a display name, handle or group picture), hide an account from the leaderboard, search and group boards, suspend it, or close it. Serious or repeated breaches lead to permanent closure. Content that may be illegal can be reported to the police or other authorities.',
-          'Evidence — a report, with a copy of the reported handle and display name and any messages attached to it, may be kept after the account involved is deleted, so that repeat abuse can be recognised.',
-          <>Disagree with a decision? Contact us via the support address on the store listing (see <PageLink to="support" go={go}>Support</PageLink>) and we will look at it again.</>,
+          'Evidence — a report, with a copy of the reported handle and display name and any messages attached to it, may be kept after the account involved is deleted, so that repeat abuse can be recognised. Closed reports are deleted 12 months after they are closed.',
+          <>Disagree with a decision? Email <ContactEmail address={SUPPORT_EMAIL} subject="Moderation decision" /> (see <PageLink to="support" go={go}>Support</PageLink>) and we will look at it again.</>,
         ]} />
       </Section>
 
@@ -341,7 +388,7 @@ function TermsContent({ go }) {
       </Section>
 
       <Section title="9. Third-Party Services">
-        <P>Optional integrations (WHOOP, Oura, Apple Health, Google / Apple sign-in, Open Food Facts) are provided by third parties under their own terms and privacy policies. We are not responsible for third-party services, and integrations may change or become unavailable if a provider changes its API.</P>
+        <P>Optional integrations (WHOOP, Oura, Google / Apple sign-in, Open Food Facts) are provided by third parties under their own terms and privacy policies. We are not responsible for third-party services, and integrations may change or become unavailable if a provider changes its API.</P>
       </Section>
 
       <Section title="10. App Store & Google Play">

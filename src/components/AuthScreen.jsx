@@ -98,7 +98,7 @@ function AppleGlyph() {
   );
 }
 
-export default function AuthScreen({ onOpenLegal }) {
+export default function AuthScreen({ onOpenLegal, webInviteOnly = false }) {
   // Sign in with Apple renders at every width. It used to be gated to
   // phone-sized viewports, which hid it on iPad and in landscape while
   // Google stayed — exactly the case App Store 4.8 rejects.
@@ -305,6 +305,11 @@ export default function AuthScreen({ onOpenLegal }) {
             <h1 style={S.heading}>{HEADINGS[mode]}</h1>
           </motion.div>
         </AnimatePresence>
+
+        {/* Web gate in invite-only mode (item 131, App passes it — never native). */}
+        {webInviteOnly && (
+          <p style={S.webNote}>The full app is on iPhone and Android. Web access is by invitation.</p>
+        )}
 
         {error && <div style={S.errorBanner} role="alert" aria-live="assertive">{error}</div>}
         {info  && <div style={S.infoBanner}  role="status" aria-live="polite">{info}</div>}
@@ -568,6 +573,10 @@ const S = {
     marginBottom: 22, lineHeight: 1.15, letterSpacing: '-0.3px',
   },
 
+  webNote: {
+    margin: '-10px 0 16px', fontSize: 13, lineHeight: 1.5,
+    color: 'var(--text-mid, #4a4540)',
+  },
   errorBanner: {
     background: 'rgba(220,38,38,0.07)',
     border: '1px solid rgba(220,38,38,0.22)',

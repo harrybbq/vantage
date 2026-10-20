@@ -4,10 +4,11 @@
  * Opened via openId === 'addMobileWidgetModal'. Selecting a type
  * fires onAdd with the new widget descriptor and closes itself.
  *
- * Listed widgets are stubbed when their data source isn't wired
- * yet (Calories / Mail); they still get added to the
- * stack so the user can see the slot exist — the body renders a
- * "Coming soon" stub from MobileWidget.
+ * Nothing that doesn't work is offered. "Recent Mail" was listed here
+ * as a "coming soon" stub and came out of the picker on 2026-10-20
+ * (STARTUP_REQUIREMENTS item 119 — a store reviewer reads a dead row as
+ * an unfinished app). Its META and stub render case stay in
+ * MobileWidget, so a stack that already holds one keeps its card.
  */
 import { WIDGET_META } from './MobileWidget';
 import Icon from '../Icon';
@@ -61,7 +62,8 @@ export default function AddMobileWidgetModal({ openId, onClose, existingTypes, o
     'calories',
     'market',
     'news',
-    'mail',
+    // 'mail' stood here — a "coming soon" stub; removed from the picker
+    // 2026-10-20 (item 119). META + render case kept for existing stacks.
     // Owner-only AND web-only: absent from native builds entirely, so
     // an app-store reviewer never meets a brokerage surface.
     ...(tradingWidgetAvailable() && (typeof window !== 'undefined' && window.__vantageOwner) ? ['trading'] : []),

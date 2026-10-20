@@ -3,6 +3,8 @@ import Icon from '../Icon';
 import SettingsGroup from './SettingsGroup';
 import { encryptExport, decryptExport, passphraseStrength } from '../../lib/data/exportCrypto';
 import { collectAccountData } from '../../lib/data/accountExport';
+import { saveExport } from '../../lib/data/saveExport';
+import { isNativeApp, apiBase } from '../../lib/native/platform';
 
 /**
  * Export my data.
@@ -22,13 +24,17 @@ import { collectAccountData } from '../../lib/data/accountExport';
 const INCLUDED = 'Your app data (vitals, habits, trackers, savings, boards and settings), your food log, '
   + 'your profile, your friend list and your messages.';
 
-function download(name, text) {
-  const url = URL.createObjectURL(new Blob([text], { type: 'application/json' }));
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = name;
-  a.click();
-  URL.revokeObjectURL(url);
+// Getting the file out (item 67 / pack P7). On the web it downloads, as
+// it always has. In the iOS/Android app `<a download>` does nothing, so
+// the file goes to the system share sheet (Save to Files, Drive, mail…)
+// — from its own button, because navigator.share needs a fresh tap and
+// building + encrypting the file can outlast the first one. Android's
+// WebView has no navigator.share at all; until @capacitor/share and
+// @capacitor/filesystem are added (native setup), the card says so and
+// points at the website. lib/data/saveExport.js has the details.
+function shareUnavailableText() {
+  return `This device can't save files from inside the app yet. Sign in at ${apiBase().replace(/^https?:\/\//, '')} `
+    + 'and export from Settings → Account → Your data — it downloads there.';
 }
 
 function stamp() {
@@ -67,17 +73,55 @@ export default function DataExportCard({ S, userId, onOpenLegal }) {
   const [openPass, setOpenPass] = useState('');
   const [openFile, setOpenFile] = useState(null);
 
+  // { name, text, ok } — a file built in the app, waiting for the tap
+  // that opens the share sheet. Never set on the web.
+  const [pending, setPending] = useState(null);
+
+  const native = isNativeApp();
+  const shareMissing = native && (typeof navigator === 'undefined' || typeof navigator.share !== 'function');
+
   const strength = passphraseStrength(pass);
   const mismatch = confirm.length > 0 && confirm !== pass;
   const canEncrypt = pass.length >= 8 && !mismatch && !busy;
 
+  // Web: download now. App: hold the file for the share button.
+  // `ok(verb)` is the success message, verb = 'Downloaded' | 'Saved'.
+  async function deliver(name, text, ok) {
+    if (native) {
+      setPending({ name, text, ok });
+      setMsg(null);
+      return true;
+    }
+    const r = await saveExport(name, text);
+    if (r === 'downloaded') { setMsg({ kind: 'ok', text: ok('Downloaded') }); return true; }
+    setMsg({ kind: 'err', text: 'Could not save the file. Please try again.' });
+    return false;
+  }
+
+  // Called straight from the click so the share sheet gets the tap.
+  async function handleShare() {
+    if (!pending) return;
+    const r = await saveExport(pending.name, pending.text);
+    if (r === 'shared') { setMsg({ kind: 'ok', text: pending.ok('Saved') }); setPending(null); }
+    else if (r === 'cancelled') { /* sheet closed; the file stays ready */ }
+    else if (r === 'unsupported') { setMsg({ kind: 'err', text: shareUnavailableText() }); setPending(null); }
+    else setMsg({ kind: 'err', text: 'Could not open the share sheet. Try again.' });
+  }
+
+  function guardShare() {
+    if (!shareMissing) return false;
+    setMsg({ kind: 'err', text: shareUnavailableText() });
+    return true;
+  }
+
   async function handleEncrypted() {
+    if (guardShare()) return;
     setBusy(true); setMsg(null);
     try {
       const env = await encryptExport(await envelopeFor(S, userId), pass);
-      download(`vantage-export-${stamp()}.vantage.json`, JSON.stringify(env, null, 2));
-      setPass(''); setConfirm('');
-      setMsg({ kind: 'ok', text: 'Downloaded. Keep the passphrase somewhere safe — it is the only way back in.' });
+      const done = await deliver(`vantage-export-${stamp()}.vantage.json`, JSON.stringify(env, null, 2),
+        verb => `${verb}. Keep the passphrase somewhere safe — it is the only way back in.`);
+      if (done) { setPass(''); setConfirm(''); }
     } catch (e) {
       setMsg({ kind: 'err', text: e.message || 'Could not encrypt the export.' });
     } finally {
@@ -92,10 +136,11 @@ export default function DataExportCard({ S, userId, onOpenLegal }) {
       + 'every message you have sent or received — readable by anything that opens it.',
     );
     if (!ok) return;
+    if (guardShare()) return;
     setBusy(true); setMsg(null);
     try {
-      download(`vantage-export-${stamp()}.json`, JSON.stringify(await envelopeFor(S, userId), null, 2));
-      setMsg({ kind: 'ok', text: 'Downloaded as plain text.' });
+      await deliver(`vantage-export-${stamp()}.json`, JSON.stringify(await envelopeFor(S, userId), null, 2),
+        verb => `${verb} as plain text.`);
     } catch (e) {
       setMsg({ kind: 'err', text: e.message || 'Could not build the export.' });
     } finally {
@@ -105,13 +150,14 @@ export default function DataExportCard({ S, userId, onOpenLegal }) {
 
   async function handleOpen() {
     if (!openFile) return;
+    if (guardShare()) return;
     setBusy(true); setMsg(null);
     try {
       const env = JSON.parse(await openFile.text());
       const data = await decryptExport(env, openPass);
-      download(`vantage-export-${stamp()}-decrypted.json`, JSON.stringify(data, null, 2));
-      setOpenPass(''); setOpenFile(null); setOpenMode(false);
-      setMsg({ kind: 'ok', text: 'Opened and saved as a readable copy.' });
+      const done = await deliver(`vantage-export-${stamp()}-decrypted.json`, JSON.stringify(data, null, 2),
+        () => 'Opened and saved as a readable copy.');
+      if (done) { setOpenPass(''); setOpenFile(null); setOpenMode(false); }
     } catch (e) {
       setMsg({ kind: 'err', text: e.message || 'Could not open that file.' });
     } finally {
@@ -164,7 +210,7 @@ export default function DataExportCard({ S, userId, onOpenLegal }) {
 
           <button className="dx-primary" onClick={handleEncrypted} disabled={!canEncrypt}>
             <Icon name="download" size={15} />
-            {busy ? 'Encrypting…' : 'Download encrypted file'}
+            {busy ? 'Encrypting…' : native ? 'Create encrypted file' : 'Download encrypted file'}
           </button>
 
           <div className="dx-alts">
@@ -205,6 +251,19 @@ export default function DataExportCard({ S, userId, onOpenLegal }) {
             </button>
           </div>
         </>
+      )}
+
+      {pending && (
+        <div className="dx-msg dx-msg-ok" role="status">
+          <div style={{ marginBottom: 10 }}>Your file is ready: {pending.name}</div>
+          <button className="dx-primary" onClick={handleShare}>
+            <Icon name="download" size={15} />
+            Save or share the file
+          </button>
+          <div className="dx-alts">
+            <button className="dx-link" onClick={() => setPending(null)}>Discard</button>
+          </div>
+        </div>
       )}
 
       {msg && (

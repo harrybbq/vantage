@@ -13,7 +13,7 @@ import { reportUser, blockUser, reportSnapshot } from '../../lib/friends/queries
  * Props:
  *   userId     the signed-in user (reporter / blocker)
  *   target     { id, name, handle? } — the person on the row
- *   where      'leaderboard' | 'group' — carried in the report snapshot
+ *   where      'leaderboard' | 'group' | 'friend-request' — carried in the report snapshot
  *   onBlocked  (target) => void — hide them locally once blocked
  *   variant    'icon' (a ⚑ button for a row) | 'text' (Report · Block)
  */

@@ -31,7 +31,15 @@
  *            cached 24h in localStorage. Falls back to the static
  *            brand card if the fetch fails. Cheap, no API key needed.
  */
-export const APP_PRESETS = [
+import { OWNER_SURFACES_IN_BUILD } from '../lib/native/ownerSurfaces';
+
+// Web build only (item 119). The presets link out to separate apps that
+// aren't part of Vantage, and the URL carries a personal account name —
+// neither belongs in a store binary. In a native build
+// OWNER_SURFACES_IN_BUILD folds to `false`, the array literal is dropped
+// and the URL never reaches the bundle. A widget already on a hub falls
+// back to the RETIRED_PRESETS stub below instead of a blank card.
+const WEB_PRESETS = [
   {
     id: 'floorplanstudio',
     name: 'FloorplanStudio',
@@ -42,6 +50,8 @@ export const APP_PRESETS = [
     live: true,
   },
 ];
+
+export const APP_PRESETS = OWNER_SURFACES_IN_BUILD ? WEB_PRESETS : [];
 
 /**
  * Presets that used to be here.
@@ -57,6 +67,9 @@ export const RETIRED_PRESETS = {
   // Never deployed — it only ever rendered a "deploy first" slot, and
   // owner-only at that. Removed 2026-08-19.
   tubelube: 'TubeLube',
+  // Not in the native build (see APP_PRESETS above): a FloorplanStudio
+  // card synced from the web explains itself rather than rendering empty.
+  ...(OWNER_SURFACES_IN_BUILD ? {} : { floorplanstudio: 'FloorplanStudio' }),
 };
 
 /** Look up a preset by its id. */

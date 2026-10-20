@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
+import { loadOwnProfile } from '../lib/friends/profileReads';
 import {
   initRevenueCat,
   loginRevenueCat,
@@ -39,12 +40,11 @@ export function useSubscription(userId) {
 
     async function load() {
       // Fetch both Supabase reads in parallel
+      // tier is no longer readable by a direct select once the column
+      // grants are narrowed (item 83) — it comes from the my_profile RPC
+      // (loadOwnProfile falls back to today's select until that SQL runs).
       const [profileResult, configResult] = await Promise.all([
-        supabase
-          .from('profiles')
-          .select('tier')
-          .eq('id', userId)
-          .maybeSingle(),
+        loadOwnProfile(userId).then(data => ({ data, error: null }), error => ({ data: null, error })),
         supabase
           .from('config')
           .select('value')
@@ -54,7 +54,10 @@ export function useSubscription(userId) {
       if (cancelled) return;
 
       let dbTier = 'free';
-      if (!profileResult.data) {
+      // Only a read that SUCCEEDED and found no row means "first login".
+      // A failed read (offline, a blip) must not try to create the row —
+      // the insert would only bounce off the existing one.
+      if (!profileResult.data && !profileResult.error) {
         // Insert the id ONLY. `tier` is server-owned — the column grant
         // in supabase/profiles_column_lockdown.sql withholds it from
         // the client, so naming it here would make first login fail
@@ -64,7 +67,7 @@ export function useSubscription(userId) {
           .from('profiles')
           .insert({ id: userId })
           .single();
-      } else {
+      } else if (profileResult.data) {
         dbTier = profileResult.data.tier || 'free';
       }
       setTier(dbTier);

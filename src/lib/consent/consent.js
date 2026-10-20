@@ -61,3 +61,29 @@ export function shouldAskOnce(S, hydrated) {
   if (!S.tutorialCompleted) return false;
   return !S.consent?.askedAt;
 }
+
+/** A grant stamped longer ago than this arrived by sync from another
+ *  device (a fresh local grant is stamped "now" by consentPatch, and a
+ *  re-grant after a withdrawal gets a new stamp), so that device already
+ *  recorded it. */
+export const LOCAL_GRANT_WINDOW_MS = 2 * 60_000;
+
+/**
+ * Status changes between two consent objects that belong in the durable
+ * record (consent_events, item 99 — lib/consent/ledger.js).
+ * → [{ kind, granted }]. Becoming 'unasked' is never a decision.
+ */
+export function consentChanges(prev, next, now = Date.now()) {
+  const out = [];
+  for (const kind of KINDS) {
+    const a = consentStatus(prev, kind);
+    const b = consentStatus(next, kind);
+    if (a === b || b === 'unasked') continue;
+    if (b === 'granted') {
+      const at = Date.parse(next[kind]);
+      if (Number.isFinite(at) && now - at > LOCAL_GRANT_WINDOW_MS) continue;
+    }
+    out.push({ kind, granted: b === 'granted' });
+  }
+  return out;
+}

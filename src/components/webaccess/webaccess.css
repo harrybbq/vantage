@@ -1,0 +1,150 @@
+/* Web gate (item 131): the app-store page, store buttons, owner panel.
+   Theme tokens only, so cream-pro and dark-os both hold. Phones: the
+   page scrolls inside itself and nothing is wider than the viewport. */
+
+/* ── Gate page ─────────────────────────────────────────────────────── */
+.wa-gate {
+  position: fixed; inset: 0;
+  overflow-y: auto; -webkit-overflow-scrolling: touch;
+  display: flex; flex-direction: column; align-items: center;
+  padding: 40px 16px 32px; box-sizing: border-box;
+  font-family: var(--sans, 'DM Sans', sans-serif);
+  background-color: var(--bg-base, #f8f4ec);
+  background-image:
+    radial-gradient(circle at 20% 0%, rgba(26,122,74,0.05), transparent 60%),
+    radial-gradient(circle at 80% 100%, rgba(26,122,74,0.06), transparent 55%);
+}
+.wa-brand { display: flex; align-items: center; gap: 12px; margin: auto 0 22px; }
+.wa-brand-mark {
+  width: 40px; height: 40px; border-radius: 11px;
+  display: flex; align-items: center; justify-content: center; color: #fff;
+  background: linear-gradient(145deg, var(--em-mid, #2a9e62) 0%, var(--em, #1a7a4a) 100%);
+  box-shadow: 0 4px 14px rgba(26,122,74,0.28);
+}
+.wa-brand-name {
+  font-family: var(--display, 'Playfair Display', serif);
+  font-size: 18px; font-style: italic; font-weight: 600; color: var(--em, #1a7a4a);
+}
+html[data-theme="dark-os"] .wa-brand-name { color: var(--text); }
+.wa-card {
+  width: 100%; max-width: 440px; box-sizing: border-box; margin-bottom: auto;
+  padding: 32px 28px 22px; border-radius: 18px;
+  background: var(--bg-raised, #fdfaf3); border: 1px solid var(--border, #e2dccf);
+  box-shadow: 0 14px 36px rgba(26,122,74,0.10), 0 2px 8px rgba(28,26,23,0.06);
+}
+html[data-theme="dark-os"] .wa-card { box-shadow: 0 18px 50px rgba(0,0,0,.45); }
+.wa-eyebrow {
+  font-family: var(--mono, 'DM Mono', monospace); font-size: var(--fs-floor);
+  letter-spacing: 2.5px; text-transform: uppercase; font-weight: 500;
+  color: var(--em-mid, #2a9e62); margin-bottom: 6px;
+}
+.wa-heading {
+  font-family: var(--display, 'Playfair Display', serif);
+  font-size: 26px; font-style: italic; font-weight: 600; line-height: 1.15;
+  letter-spacing: -.3px; color: var(--em, #1a7a4a); margin: 0 0 12px;
+}
+html[data-theme="dark-os"] .wa-heading { color: var(--text); }
+.wa-text, .wa-safe {
+  font-size: 15px; line-height: 1.55; color: var(--text-mid, #4a4540); margin: 0 0 18px;
+}
+.wa-safe { font-size: 14px; margin: 18px 0 16px; }
+.wa-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.wa-btn {
+  flex: 1 1 140px; min-height: 44px; padding: 11px 16px; border-radius: 10px;
+  font-family: var(--mono, 'DM Mono', monospace); font-size: var(--fs-floor);
+  letter-spacing: 1.2px; text-transform: uppercase; font-weight: 600; cursor: pointer;
+  color: #fff; border: 1px solid var(--em, #1a7a4a);
+  background: linear-gradient(180deg, var(--em-mid, #2a9e62) 0%, var(--em, #1a7a4a) 100%);
+}
+.wa-btn:disabled { opacity: .6; cursor: wait; }
+.wa-btn-ghost { background: transparent; color: var(--text, #1c1a17); border-color: var(--border, #e2dccf); }
+.wa-btn-danger {
+  flex: 0 0 auto; background: rgba(220,38,38,0.10); border-color: rgba(220,38,38,0.35); color: #dc2626;
+}
+html[data-theme="dark-os"] .wa-btn-danger { color: #f87171; }
+.wa-signed-in {
+  margin: 12px 0 0; font-family: var(--mono, 'DM Mono', monospace); font-size: var(--fs-floor);
+  letter-spacing: .3px; color: var(--text-muted, #8a8278); overflow-wrap: anywhere;
+}
+.wa-delete { margin-top: 24px; padding-top: 18px; border-top: 1px solid var(--border, #e2dccf); }
+.wa-delete-title { font-size: 15px; font-weight: 600; color: #dc2626; margin: 0 0 6px; }
+html[data-theme="dark-os"] .wa-delete-title { color: #f87171; }
+.wa-delete-text { font-size: 13px; line-height: 1.6; color: var(--text-mid, #4a4540); margin: 0 0 10px; }
+.wa-legal {
+  margin-top: 20px; padding-top: 14px; border-top: 1px solid var(--border, #e2dccf);
+  display: flex; flex-wrap: wrap; justify-content: center; gap: 4px 16px;
+}
+.wa-legal button {
+  background: none; border: 0; padding: 6px 0; cursor: pointer;
+  font-family: var(--mono, 'DM Mono', monospace); font-size: var(--fs-floor);
+  letter-spacing: .4px; color: var(--text-muted, #8a8278);
+}
+.wa-legal button:hover { color: var(--em, #1a7a4a); text-decoration: underline; }
+.wa-msg {
+  margin: 10px 0; font-size: 13px; line-height: 1.5; color: var(--text-mid, #4a4540);
+}
+.wa-msg-warn { color: #b45309; }
+html[data-theme="dark-os"] .wa-msg-warn { color: #fbbf24; }
+.wa-msg-err { color: #b91c1c; }
+html[data-theme="dark-os"] .wa-msg-err { color: #f87171; }
+
+/* ── Store buttons ─────────────────────────────────────────────────── */
+.wa-stores { display: flex; flex-wrap: wrap; gap: 10px; }
+.wa-store {
+  flex: 1 1 150px; min-height: 52px; box-sizing: border-box;
+  display: flex; flex-direction: column; justify-content: center;
+  padding: 8px 14px; border-radius: 12px; text-decoration: none;
+  background: #111; color: #fff; border: 1px solid #111;
+}
+html[data-theme="dark-os"] .wa-store { background: #f2efe8; color: #111; border-color: #f2efe8; }
+.wa-store-small { font-size: 12px; line-height: 1.2; opacity: .85; }
+.wa-store-big { font-size: 17px; font-weight: 600; line-height: 1.25; }
+.wa-store-soon {
+  background: transparent; color: var(--text-mid, #4a4540); border: 1px dashed var(--border, #d6cfbf);
+}
+html[data-theme="dark-os"] .wa-store-soon { background: transparent; color: var(--text-mid); border-color: var(--border); }
+.wa-stores-compact .wa-store { min-height: 46px; }
+.wa-stores-compact .wa-store-big { font-size: 15px; }
+
+/* ── Owner panel (Settings → Tools) ────────────────────────────────── */
+.wa-panel { display: flex; flex-direction: column; gap: 14px; max-width: 640px; }
+.wa-mode-row { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+.wa-mode-pill {
+  font-family: var(--mono); font-size: var(--fs-floor); letter-spacing: 1px; text-transform: uppercase;
+  font-weight: 700; padding: 6px 10px; border-radius: 999px;
+  color: var(--em, #1a7a4a); background: rgba(26,122,74,.10); border: 1px solid rgba(26,122,74,.25);
+}
+html[data-theme="dark-os"] .wa-mode-pill { color: var(--em-light, #4ade80); }
+.wa-mode-pill-locked { color: #b45309; background: rgba(217,119,6,.10); border-color: rgba(217,119,6,.3); }
+html[data-theme="dark-os"] .wa-mode-pill-locked { color: #fbbf24; }
+.wa-confirm {
+  padding: 12px 14px; border-radius: 10px; border: 1px solid var(--border);
+  background: var(--bg-raised, rgba(255,255,255,.04));
+}
+.wa-confirm p { margin: 0 0 10px; font-size: 13px; line-height: 1.55; color: var(--text); }
+.wa-confirm-actions { display: flex; flex-wrap: wrap; gap: 8px; justify-content: flex-end; }
+.wa-label {
+  display: block; margin-bottom: 6px; font-family: var(--mono); font-size: var(--fs-floor);
+  letter-spacing: 1.2px; text-transform: uppercase; color: var(--text-muted);
+}
+.wa-add-row { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr) auto; gap: 8px; }
+@media (max-width: 640px) {
+  .wa-add-row { grid-template-columns: minmax(0, 1fr) auto; }
+  .wa-add-row > input:first-child { grid-column: 1 / -1; }
+}
+.wa-empty { margin: 0; font-size: 13px; color: var(--text-muted); }
+.wa-list { list-style: none; margin: 0; padding: 0; border-top: 1px solid var(--border); }
+.wa-row {
+  display: flex; align-items: center; gap: 10px; padding: 10px 0; border-bottom: 1px solid var(--border);
+}
+.wa-row-main { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.wa-row-email { font-size: 14px; color: var(--text); overflow-wrap: anywhere; }
+.wa-row-meta {
+  font-family: var(--mono); font-size: var(--fs-floor); letter-spacing: .3px; color: var(--text-muted);
+  overflow-wrap: anywhere;
+}
+.wa-row-actions { display: flex; gap: 6px; flex: 0 0 auto; }
+
+/* ── Invite landing (app-only call to action) ───────────────────────── */
+.wa-invite-app { margin-top: 4px; text-align: left; }
+.wa-invite-app .wa-stores { margin: 10px 0 4px; }

@@ -348,6 +348,11 @@ code fails soft until it is run, so order doesn't matter.
     *Status 2026-09-30: done except WHOOP/Oura grant revocation (no documented endpoint found); export now includes food log, profile, friendships, messages.*
     *Still open (pack P7, 2026-10-20): export `download()` uses `a.download`, a no-op in a WebView — use
     the share sheet (`navigator.share` with a File, or @capacitor/share + filesystem).*
+    *Status 2026-10-20 (P7): in the app the export is built, then a "Save or share the file" button hands it
+    to `navigator.share` with a File (`src/lib/data/saveExport.js`, 7 tests); the web still downloads. iOS
+    WKWebView supports this (iOS 15+); Android's System WebView has no `navigator.share`, so Android shows
+    "export from the website" until `@capacitor/share` + `@capacitor/filesystem` are added (npm install +
+    `npx cap sync`, a native step) — verify both on a device.*
 68. `[~]` **LAUNCH** Defaults for 13–17s: handle search and leaderboard
     are ON; `shareStreak` publishes habit names (e.g. a quit-drinking
     streak) to friends by default.
@@ -364,18 +369,20 @@ code fails soft until it is run, so order doesn't matter.
     devDependencies (clears item 22's critical/high — none ship).
     *Status 2026-09-30: personal emails replaced with placeholders in SQL; dead SpotifyBar removed (revoke that Last.fm key — it stays in git history); salary comment neutralised; Capacitor CLI/assets moved to devDependencies; PR build workflow added. `TRADING_APP_CLAUDE.md:9` still holds a real email; `dist/` is still committed per the deploy flow.*
 
-83. `[ ]` **LAUNCH** Any signed-in user can still read every column of a
+83. `[~]` **LAUNCH** Any signed-in user can still read every column of a
     searchable profile — `tier` (who pays), `ratings`,
     `prestige_baseline`, `last_active_at` — whatever `leaderboard_optin`
     says. Fix with column-level SELECT grants (the `groups` pattern in
     `group_crest_schema.sql`), after moving own-row reads of `tier` and
     `last_active_at` to a definer RPC. Needs a client audit of every
     `from('profiles').select(...)` first.
-84. `[ ]` **LAUNCH** Name filter and avatar screening bind honest clients
+    *Status 2026-10-20: done in code. Public set = id, handle, display_name, avatar_url, level, ratings_ovr, suspended_at (`src/lib/friends/profileColumns.js`; a build test keeps it equal to the SQL grant and fails if any client select names another column). Own private fields (tier, is_searchable, leaderboard_*) via `my_profile()`, friends' last_active_at via `friend_presence()` (accepted friends only) — both fall back to today's selects until the SQL runs. Category `ratings` stay visible only where the leaderboard/group functions show them (service role; item 103 still open). Owner: deploy, THEN run `supabase/privacy_lockdown_2026_10b.sql` (header has verify queries).*
+84. `[~]` **LAUNCH** Name filter and avatar screening bind honest clients
     only: a user can still PATCH `handle`/`display_name`/`avatar_url` on
     their own row directly. Binding needs those writes moved to a
     service-role function, then
     `revoke update (handle, display_name, avatar_url) on public.profiles from authenticated;`.
+    *Status 2026-10-20: done in code — `netlify/functions/profile-update` (requireUser, `social` kill switch, 10/min brake + 40 changing writes/day durable via ai_usage, server name filter, avatar screening that fails closed) is the client's only writer of the three; the SQL revokes their UPDATE and INSERT grants. Order: deploy first (the new client works under either grant set), then run `supabase/privacy_lockdown_2026_10b.sql`.*
 
 85. `[~]` **LAUNCH** Supabase is retiring the legacy `anon`/`service_role`
     keys by the end of 2026. The new `sb_secret_…` keys go in the `apikey`
@@ -389,9 +396,10 @@ code fails soft until it is run, so order doesn't matter.
     no WAF, no rate-limiting rules, no firewall traffic rules. Add a
     rate-limit rule on `/.netlify/functions/*` (per-IP) before launch —
     the in-function limits are per instance.
-87. `[ ]` **AFTER** `push-dispatch` runs every minute — ~44k invocations a
+87. `[x]` **AFTER** `push-dispatch` runs every minute — ~44k invocations a
     month on credit-based pricing, mostly finding nothing. Consider
     every 5 minutes, or trigger it from the queue insert instead.
+    *Status 2026-10-20: every 5 minutes (`*/5 * * * *` in netlify.toml) — ~44.6k → ~8.9k invocations and empty-queue reads a month. Nothing needs 1-minute latency: the only queue producers are the friend-request/accept triggers; DMs don't push; push isn't live until FCM (item 15). Trigger-on-insert rejected: scheduled functions aren't URL-invocable and pg_net would need a secret in the DB. Revisit if DM pushes are added.*
 88. `[x]` **AFTER** Supabase compute is **Small**, not Micro — about $5/month
     over the Pro plan's $10 compute credit. Micro covers today's load; Small
     gives the whole-state saves headroom. Owner's call; switching restarts
@@ -404,20 +412,24 @@ code fails soft until it is run, so order doesn't matter.
     releases; Personal's 1,000 credits would not cover the current pace.
 90. `[x]` **AFTER** `global-trending` read every user's state on each refresh
     — the first thing to saturate the DB. *Done 2026-10-05 (#225): Trending removed.*
-91. `[ ]` **AFTER** `get-leaderboard` has no shared cache and pulls ~500
+91. `[~]` **AFTER** `get-leaderboard` has no shared cache and pulls ~500
     profiles with avatars per view. Cache 5–10 min; avatars for the top 100 only.
-92. `[ ]` **AFTER** Presence writes a `profiles` UPDATE every 60 s per open
+    *Status 2026-10-20: done in code — the global top 100 (per timeframe) is built at most once per 5 min and shared: module scope per instance + one `function_cache` row across instances (lib/sharedCache.js; falls back to module scope until the SQL runs). A cached view is auth + the caller's own profile (+ rank count / colour for a caller outside the top 100) instead of ~10 queries incl. 500 profiles with avatars. Per-caller parts (isSelf, current numbers, opt-out, true rank, pinned row) stay live; friends boards are never cached. Weekly pool reads 500 candidates without avatars and fetches avatars for the 100 shown; friends boards past 100 rows get initials. Others see an opt-out/suspension within ≤ 5 min. Owner: run `supabase/retention_2026_10b.sql` (creates `function_cache`).*
+92. `[~]` **AFTER** Presence writes a `profiles` UPDATE every 60 s per open
     app (`usePublishProfile.js`). Every 5 min is enough.
+    *Status 2026-10-20: done in code — heartbeat every 5 min while visible, plus on sign-in and on return (if the last ping is ≥ 2 min old); the debounced publish writes level/presence only when they change. Online threshold 3 → 11 min (`ONLINE_THRESHOLD_MS`), Settings copy updated. Ships with the deploy; no SQL.*
 93. `[~]` **LAUNCH** `whoop-cron` syncs users one by one inside a 20 s
     budget — only ~10–20 users a night. Batch in parallel or run every 2 h.
     *Status 2026-10-20: done in code — whoop-cron and oura-cron run accounts through a bounded pool (4 at a time, oldest first, stop starting at 20 s, in-flight finish; refresh-token-first and CAS writes unchanged). WHOOP's limit is 100 requests/min and 10,000/day per app, so a run spends ≤ 60 WHOOP calls (~12 accounts) and whoop-cron now runs every 10 min 06:00–08:50 UTC (not :30, when oura-cron runs), skipping accounts already synced that morning — ~180 accounts a morning for <10% of the daily limit. Owner: after the deploy, check one morning's Netlify function log for "not reached" counts; WHOOP also caps an unapproved app at 10 users — apply for production approval / a higher limit in the WHOOP developer dashboard before launch.*
 94. `[ ]` **LAUNCH** Custom SMTP for Supabase Auth. The built-in mailer
     allows a few emails an hour; signups and resets fail at ~50 users.
-95. `[ ]` **AFTER** `weather` has no auth and calls ipwho.is per request;
+95. `[~]` **AFTER** `weather` has no auth and calls ipwho.is per request;
     `client-error` and `vitals-beacon` are open writes. Require auth / cache
     by IP / rate-limit (pairs with item 86).
-96. `[ ]` **AFTER** Retention: nothing prunes `client_errors`,
+    *Status 2026-10-20: done in code — weather reads Netlify's own `x-nf-geo` header (lat/lon, or the city name → Open-Meteo geocoder); **ipwho.is is no longer called at all**, so no third party receives the IP (closes STORE_PRIVACY_LABELS Q3 — the privacy policy / labels can drop ipwho.is once this is live). No geo header → chip hidden (logged once per instance). Per IP: 12 calls/h anonymous, up to 60/h with a valid session (verified only past the allowance, verdict cached), 10/min burst; weather cached 30 min per ~11 km cell; `useWeather` sends the session. client-error / vitals-beacon: per-IP minute+hour limits, identical-report dedupe, empty/non-object/no-UA input dropped, and a durable cross-instance cap (1,000 errors / 3,000 vitals an hour, trigger in `retention_2026_10b.sql`). Owner: after deploy, confirm the weather chip still shows (if not, the function log says "no usable x-nf-geo" — tell the next session); still add the Netlify rate-limit rule (item 86).*
+96. `[~]` **AFTER** Retention: nothing prunes `client_errors`,
     `rating_snapshots` or `web_vitals` — schedule a monthly delete of old rows.
+    *Status 2026-10-20: done in code (also DPIA G11, G13) — `retention-prune` scheduled function, weekly Sun 04:47 UTC, calls `public.retention_prune` in batches of ≤ 500 (250 ms apart, ≤ 20 batches per table, 20 s budget): client_errors 30 d, web_vitals 90 d, rating_snapshots 90 d (readers need ≤ 21), sent/dead notifications 30 d, coach_nudges 60 d, CLOSED reports 12 months after closing (with their evidence snapshot; never open ones, never `retention_hold = true`), expired caches. User content (user_data, nutrition_log, messages, friendships, profiles, …) is refused by the JS and by the SQL, and asserted in `check:efficiency`. Stops for `VANTAGE_PAUSE=all|retention` (incident evidence). No pg_cron in the project, so Netlify cron. Owner: run `supabase/retention_2026_10b.sql`, then the dry-run query in its header; set `retention_hold` on any report referred to police/IWF. Privacy policy should state the windows (batch A).*
 97. `[x]` **LAUNCH** AI food scans had no server-side tier check.
     *Done 2026-10-05 (#225): 3 free a week, unlimited on Pro, enforced in ai-food-detect.*
 
@@ -451,13 +463,15 @@ code fails soft until it is run, so order doesn't matter.
 ### From the DPIA and privacy-label drafts — 2026-10-20
 `docs/DPIA_DRAFT.md` (gaps G1–G26) and `docs/STORE_PRIVACY_LABELS.md`. New findings only; everything
 else maps onto existing items.
-98. `[ ]` **LAUNCH** Consent is enforced in the app only. `whoop-cron`, `oura-cron`, `whoop-sync`,
+98. `[~]` **LAUNCH** Consent is enforced in the app only. `whoop-cron`, `oura-cron`, `whoop-sync`,
     `oura-sync` and `health-sync` keep syncing after a user withdraws health consent (until they also
     press Disconnect), and the AI functions don't check AI consent server-side. Skip/refuse on the server
     (one JSON-path read), or have withdrawal call `wearable-disconnect`. (DPIA G1)
-99. `[ ]` **LAUNCH** No durable consent record — consent lives only in the user-editable state. Add an
+    *Status 2026-10-20: done in code — `netlify/lib/consentGate.js` (pure rule + tests). Health: sync stops when consent is declined/withdrawn; never-asked accounts keep syncing, matching the app. AI: only an explicit yes. Crons filter with one batched `state->consent` read; whoop-sync/oura-sync/health-sync and ai-coach-daily/ai-food-detect (scan)/recipe-from-video refuse with a clear 403. destination-brief left out: no AI call, no user data. Live once deployed; consent_events (item 99) refines it after the SQL.*
+99. `[~]` **LAUNCH** No durable consent record — consent lives only in the user-editable state. Add an
     append-only `consent_events` table (kind, granted/withdrawn, time, copy version, cascade). (G2)
-100. `[ ]` **BLOCKS** Privacy policy vs code (labels draft "Mismatches", DPIA G10/G13):
+    *Status 2026-10-20: done in code — table in `supabase/privacy_lockdown_2026_10b.sql` (RLS insert/select own, no update/delete for anyone, server-stamped time, 60/h throttle, cascade); `src/lib/consent/ledger.js` records each consent change after hydration and a just-in-time "Allow" waits for the record + a state save. Fails soft until the owner runs the SQL. Bump `CONSENT_COPY_VERSION` when the consent wording changes.*
+100. `[~]` **BLOCKS** Privacy policy vs code (labels draft "Mismatches", DPIA G10/G13):
     - says accounts are erased "within 30 days" — deletion is immediate, backups keep 7 days;
     - says "we do not collect purchase history" — RevenueCat keeps it, linked to the user id;
     - crash reports (`client_errors`: stack, page, UA, user id) not mentioned, never purged;
@@ -472,6 +486,12 @@ else maps onto existing items.
     - "health data is never shown to others" needs a qualifier (the Fitness rating counts logging days);
     - report retention "as long as needed" vs 12 months in ABUSE_HANDLING with nothing deleting them —
       add automatic 12-month deletion of closed reports; fix the stale reporter-cascade line there.
+    *Status 2026-10-20: policy, terms and consent-sheet copy rewritten from the code (`LegalPage.jsx`,
+    `consentCopy.js`; evidence list at the top of PrivacyPolicyContent); section numbers unchanged; Last
+    updated 20 Oct 2026. Still needed outside this change: the 12-month closed-report deletion (batch B's
+    SQL — the policy already states it), a scheduled 30-day `client_errors` purge (item 96 — the policy
+    states 30 days), confirm `REVENUECAT_SECRET_API_KEY` is set in Netlify (the policy says the RevenueCat
+    record goes with the account), the controller identity and inboxes (`src/lib/support.js`).*
 101. `[x]` **BLOCKS** The "Join Waitlist" form (AI Coach — already shipped) stores emails for marketing
     and is reachable in the native build, including the paywall's fallback button. Remove it
     (recommended) or declare marketing use.
@@ -480,9 +500,16 @@ else maps onto existing items.
     table and its rows are untouched — owner to decide whether to delete them (SQL, owner-run).
     Also decided: friend list declared as Apple "Contacts"; wearable data stays out of the AI coach
     at launch (`AI_WEARABLE_DATA_ALLOWED` unset).*
-102. `[ ]` **BLOCKS** Android: the manifest has no `CAMERA` permission (barcode + AI food scan can't
+102. `[~]` **BLOCKS** Android: the manifest has no `CAMERA` permission (barcode + AI food scan can't
     work natively); Firebase Messaging mints a token at startup before notification consent; check the
     merged manifest for the advertising-ID permission.
+    *Status 2026-10-20: done in code — manifest declares CAMERA (camera features `required=false`) and
+    POST_NOTIFICATIONS, `firebase_messaging_auto_init_enabled=false`, and AD_ID `tools:node="remove"`;
+    `useCapacitor` registers (mints the token) only after the user's own opt-in on that device, not
+    merely because Android ≤12 grants notifications at install. On the build machine: `npx cap sync
+    android`, build, then check `app/build/intermediates/merged_manifests/*/AndroidManifest.xml` has
+    CAMERA and no AD_ID; on a device: barcode scan asks for the camera, and no FCM token is created
+    (no `push_tokens` row) until Enable is tapped.*
 103. `[ ]` **LAUNCH** Decide whether category ratings (fitness, finance) are visible to others — the
     fitness rating draws on health data (`netlify/lib/recompute.js`). (G10)
 104. `[ ]` **LAUNCH** Lock-screen-safe push text before push goes live (esp. coach nudges). (G8)
@@ -504,50 +531,151 @@ else maps onto existing items.
 109. `[ ]` **LAUNCH** Governance the Codes expect: a named accountable person with written
     responsibilities; written content policies, queue prioritisation and moderator guidance; a written
     appeals process; a complaints route that works without an account (pairs with item 72).
-110. `[ ]` **LAUNCH** Reporting loop: acknowledge reports to the reporter and tell them the outcome;
+110. `[~]` **LAUNCH** Reporting loop: acknowledge reports to the reporter and tell them the outcome;
     tell the reported user about action taken; more report reasons (child safety, threats, self-harm,
     sexual content, scams); report + block from an incoming friend request.
-111. `[ ]` **LAUNCH** Suspension doesn't stop DMs — a suspended user can still message friends. Block
+    *Status 2026-10-20: done in code — in-app `safety_notices` (report received by DB trigger; outcome on
+    dismiss/resolve/suspend; suspension, reset and lift told to the reported user, never who reported and
+    never for a child-safety report); reasons child safety, threats or violence, hate, sexual content,
+    self-harm, scam or fraud added (old stored labels unchanged), urgent ones first in the queue with crisis
+    signposting on the sheet; Report/Block on incoming requests. Owner: run `supabase/safety_2026_10b.sql`.*
+111. `[~]` **LAUNCH** Suspension doesn't stop DMs — a suspended user can still message friends. Block
     sends (and probably receipt) for suspended accounts in RLS.
-112. `[ ]` **LAUNCH** Owner tools the Terms already promise: reset a user's display name / handle /
+    *Status 2026-10-20: done in code — RLS refuses a suspended account's messages, reactions, friend
+    requests/accepts and unsends; its earlier messages/reactions are hidden from the other person while
+    suspended (never deleted; the report snapshot and the queue keep them); the app shows a calm suspended
+    banner and read-only conversations. Policy-tested on Postgres 16. Owner: run `supabase/safety_2026_10b.sql`.*
+112. `[~]` **LAUNCH** Owner tools the Terms already promise: reset a user's display name / handle /
     avatar from the moderation queue; re-screen avatars published before screening existed.
+    *Status 2026-10-20: done in code — queue "Reset…" (service role, audited in `moderation_actions`, the
+    same value refused if the app re-publishes it, user told) and "Resolve"; "Re-screen profile pictures"
+    in Security → Moderation (4 per press, owner daily AI cap 200, flags only — keep or remove). Owner: run
+    `supabase/safety_2026_10b.sql`, then press re-screen until the backlog is 0 (needs ANTHROPIC_API_KEY).*
 113. `[ ]` **LAUNCH** NCA child-sexual-abuse reporting duty (in force for user-to-user services since
     7 Apr 2026): register and write the procedure (how evidence is preserved, who files, within what
     time). Add a mute option (Codes user control); supportive information for child users.
+    *Status 2026-10-20 (part): procedure skeleton in `docs/ABUSE_HANDLING.md` (in force since 7 Apr 2026;
+    register, who files, preserve-don't-spread, file within the SI 2026/268 time, record) — the owner fills
+    the blanks and the solicitor confirms. Registration, mute and child supportive information still open.*
 114. `[ ]` **LAUNCH** Teen defaults only apply to NEW accounts: older accounts kept handle search and
     leaderboard on; online status and the heatmap default on. There is no age signal at all — decide
     (with the solicitor) on collecting a birth year and age-specific defaults. Fix the stale lines in
     `docs/ABUSE_HANDLING.md` (reports now survive reporter deletion; the 10-message evidence copy; the
     NCA duty is in force). Confirm `audit_schema_2026_10.sql` and `dm_upgrade_2026_10.sql` are run in
     production (the DM one is confirmed 2026-10-18).
+    *Status 2026-10-20 (part): `docs/ABUSE_HANDLING.md` stale lines fixed (reports survive reporter
+    deletion; the 10-message snapshot at report time; NCA duty in force). The age signal and old-account
+    defaults are still open.*
 
 ### From the store submission pack — 2026-10-20 (`docs/STORE_SUBMISSION_PACK.md` §8, P1–P12)
-115. `[ ]` **BLOCKS** WHOOP/Oura connect fails inside the native app: the panel navigates the WebView to
+115. `[~]` **BLOCKS** WHOOP/Oura connect fails inside the native app: the panel navigates the WebView to
     the provider, the callback returns to the website root, and the OAuth `state` is bound to an
     HttpOnly cookie the system browser doesn't have. Open the authorize URL with `Browser.open`, bind
     state without a cookie for native starts, redirect native callbacks to `com.vantage.app://…`;
     verify on a device. (P1)
+    *Status 2026-10-20: done in code. Native starts send a PKCE-style challenge (verifier stays on the
+    device); the state is signed + 10-min + provider + challenge, no cookie; the callback hands code+state
+    to `com.vantage.app://wearable-callback` WITHOUT exchanging, and the app's POST finish exchanges only
+    with the verifier and a session for the state's user (lib/oauthState.js "Native starts" says why a
+    cookie-less signed state alone would reopen the cross-account attack). Same registered redirect URI;
+    web flow byte-for-byte unchanged; `check:wearableconnect`. Needs: the `wearable-callback` host in the
+    Android intent filter, `com.vantage.app` as an iOS URL type once `ios/` exists, then a device test.
+    Later hardening: verified App Links / Universal Links instead of the custom scheme.*
 116. `[ ]` **BLOCKS** Review purchases: sandbox events are dropped unless `REVENUECAT_ALLOW_SANDBOX=true`,
     so a reviewer who buys Pro gets a 403 from the coach. Recommended: set it for the review window
     only, then off. And `config.pro_live` must be `'true'` before submission. (P2, P3)
 117. `[ ]` **BLOCKS** Sign in with Apple tokens aren't revoked on account deletion (Apple expects it):
     needs the native SIWA flow's authorization code, or the provider token captured at sign-in. (P8)
-118. `[ ]` **BLOCKS** DM text (and the opt-in shared streak habit name) isn't filtered (Apple 1.2 asks
+118. `[~]` **BLOCKS** DM text (and the opt-in shared streak habit name) isn't filtered (Apple 1.2 asks
     for a filtering method): reuse `checkPublicText` on send, mirror it server-side. (P9)
-119. `[ ]` **LAUNCH** Copy and widgets for things that don't ship: remove "Recent Mail — coming soon"
+    *Status 2026-10-20 (DMs): done in code — the composer refuses slurs and unambiguous explicit terms
+    with an inline reason (draft kept), and a BEFORE INSERT trigger refuses the same list in the database
+    (`vb_message_text_blocked`; list parity checked in the build, JS↔SQL verdicts compared on Postgres 16).
+    Same normalisation as `checkPublicText`, deliberately narrower list: no general swearing, links or
+    help-seeking words ("rape", "paedo", "nudes"). The shared-streak habit name is batch C's half.*
+119. `[~]` **LAUNCH** Copy and widgets for things that don't ship: remove "Recent Mail — coming soon"
     from the mobile picker (keep its META for existing stacks); the tutorial still describes Trending
     and Apple Health; Track says "Syncs from WHOOP, Oura or Apple Health"; drop the "Our Apps" preset
     (links to a separate external app, URL carries a personal account name) from the native build.
     (P5, P10, P11)
-120. `[ ]` **LAUNCH** Subscription copy (3.1.2): the More drawer hard-codes "from £3.99/mo" — read it from
+    *Status 2026-10-20: done in code — Recent Mail out of the picker (META/stub kept); tutorial steps rewritten (no
+    Trending, no Apple Health); Track help and auto-fill hints name Apple Health only for the owner;
+    `APP_PRESETS` is empty in native builds (URL absent from the native bundle — checked with a
+    `VITE_NATIVE_BUILD=true` build), old cards show the retired-preset stub.*
+120. `[~]` **LAUNCH** Subscription copy (3.1.2): the More drawer hard-codes "from £3.99/mo" — read it from
     the store product like SubscriptionPanel; soften "Unlimited everything" (AI still has daily caps).
     Rename the hub's rule-based "AI Coach" banner to "Coach" or add a not-medical-advice line. (P6, P12)
+    *Status 2026-10-20: done in code — chip price from `getOfferings()` (none quoted when nothing loads); "No caps on your
+    lists" / "Higher limits" with the AI fair-use cap stated; scan upsell "More with Pro"; the banner is
+    "Coach" with "Tips from your own logs · not medical advice".*
 121. `[ ]` **LAUNCH** Store-form decisions (pack §2–4): Apple "Social Media" = No (Yes → 16+ in
     Australia); alcohol references Infrequent (or change the habit placeholder); export compliance
     "none of the algorithms" + `ITSAppUsesNonExemptEncryption=false` (one line from the solicitor);
     iPad support or not; Play audience 13+ bands or 18+.
 122. `[ ]` **LAUNCH** Create the reviewer demo accounts 4–6 weeks before submitting — ratings cap
     history at account age, so a fresh account looks empty. (Pack §1.)
+
+123. `[ ]` **BLOCKS** `REVENUECAT_SECRET_API_KEY` is not set in Netlify (owner confirmed 2026-10-20). Without
+    it, account deletion can't remove the RevenueCat subscriber (the /delete-account page says it does),
+    and the webhook can't confirm a subscriber's real state from RevenueCat's API (item 46 falls back to
+    trusting event order). Harmless today — RevenueCat only creates records for native purchases, and none
+    exist yet — but set it when the store products are created: RevenueCat → Project settings → API keys →
+    Secret API key (`sk_…`, v1) → Netlify env `REVENUECAT_SECRET_API_KEY`, Functions scope → redeploy.
+
+### From the wearable approvals pack — 2026-10-20 (`docs/WEARABLE_APPROVALS.md`, C1–C17, D1–D10)
+Confirmed (official pages, via search excerpts — read the full terms in a browser before submitting):
+WHOOP caps an unapproved app at **10 members**; Oura's API also caps at **10 users** without approval;
+WHOOP 100 req/min + 10,000/day; Oura can't read Gen3/Ring 4 users without an active Oura Membership;
+both providers' terms bar using their data to train/feed AI (keep `AI_WEARABLE_DATA_ALLOWED` unset —
+for Oura effectively permanently).
+124. `[ ]` **BLOCKS (WHOOP approval)** Wearable-derived values reach ratings and the friends heatmap that
+    others see, with no opt-in (`recompute.js` sleep/RHR days, workout burn, auto-ticked trackers, active
+    days; `usePublishProfile.js`). WHOOP's terms count "derivatives" as WHOOP Data and require the user's
+    explicit opt-in before showing it to others. Owner decision D1: exclude wearable-sourced data from
+    shared ratings/heatmap (recommended) or add an opt-in. Fix the "never shown to others" copy to match.
+125. `[ ]` **LAUNCH** Revoke provider grants: WHOOP documents `DELETE /developer/v2/user/access` and asks
+    apps to call it on disconnect — call it on disconnect AND account deletion (corrects item 67's "no
+    documented endpoint"); Oura: check whether an endpoint exists.
+126. `[ ]` **LAUNCH** Branding/labels per WHOOP's guidelines: no home-made WHOOP/Oura logos, don't rename
+    provider metrics (WHOOP Recovery shown under "Readiness"; Oura Readiness stored as "Recovery"), WHOOP's
+    recovery colours, name the provider instead of "wearable"; drop the unused `read:profile` scope.
+127. `[ ]` **LAUNCH** While approval is pending: a server-side allow-list for connect (≤10 incl. one slot for
+    WHOOP's reviewer) with a clear message instead of "connect failed (denied)"; surface Oura errors
+    (today "Synced 0 days"); budget sync-on-open against WHOOP's daily limit (~400–600 DAU would exhaust it)
+    and request an increase in the approval. Decide D4 (delete device history on disconnect option) and
+    D7 (first native build with WHOOP/Oura hidden or held).
+128. `[ ]` **LAUNCH** Submit WHOOP's production approval (draft answers + 13-shot list in the pack §2) and
+    register Oura + send the questions email (§3), after 124–127; file both replies with the DPIA (G7).
+
+### From the domain-day pack — 2026-10-20 (`docs/domain-day/`)
+129. `[~]` **LAUNCH** Invite links made inside the native app point at `localhost`:
+    `src/lib/friends/invites.js` builds the URL from the current page address — use `webOrigin()`
+    (as deepLinks does). Unverified on a device; fix after the safety batch merges (it owns src/lib/friends).
+    *Status 2026-10-20: fixed in code — invites.js uses webOrigin(); verify a shared invite from the native app opens on another phone.*
+130. `[ ]` **LAUNCH** Domain day (when bought): follow `docs/domain-day/CHECKLIST.md` in order — every
+    allow-list first, keep `vantagevision.netlify.app` live (native builds, webhooks and the Health Shortcut
+    call it by name; no day-one redirect), sign in to a heavy real account on the new origin before
+    switching the Supabase Site URL (local stashes are per-origin), change `DEFAULT_API_BASE` before the
+    first store build. Email: Resend (EU region) for Auth SMTP — free tier caps at 100/day, upgrade before
+    any launch push; Zoho mailbox + aliases (`EMAIL.md`). Links/Universal links wait for the native apps.
+131. `[~]` **LAUNCH** Mobile-only public launch: web gate (owner decision 2026-10-20). In a web browser the full
+    app is for an owner-kept allow-list (owner + friends); everyone else signed in on the web gets "Vantage is
+    on iPhone and Android" with store links, Sign out and Delete my account (Google's web-deletion rule). Native
+    apps, `/privacy` `/terms` `/support` `/delete-account` are never gated; `/invite/<code>` keeps the preview
+    but its call to action becomes the store apps. A server-side SWITCH (`config.web_access`), shipped OPEN.
+    Launch-day steps (owner): (1) run `supabase/web_access_2026_10b.sql` (needs owner_content.sql; verify block
+    in its header); (2) Settings → Tools → Web access: add friends' sign-in emails (you are always allowed);
+    (3) at launch press "Switch web to invite-only…" → confirm; (4) verify in a private window with a
+    non-listed test account: it gets the app-store page, the public pages still open. Reopen with the same
+    panel. Fill `src/lib/storeLinks.js` when the listings exist (null shows "Coming soon").
+    *Status 2026-10-20: done in code — `src/lib/webAccess.js` (decision, `check:webaccess`, incl. a test that
+    the gated path never mounts the state hook), gate page + owner panel in `src/components/webaccess/`,
+    delete flow shared with Settings (`src/lib/account/deleteAccount.js`); SQL dry-run on Postgres 16
+    (`scripts/webaccess/test-web-access-sql.sh`). Owner: steps 1–4 above.*
+    *Launch-day copy (from the gate agent): when switching to invite-only, change the privacy policy's
+    opening line "available on the web and as a mobile app" (LegalPage.jsx) to "…as a mobile app; the web
+    version is by invitation"; export and Settings-path lines stay true in the apps. /delete-account already
+    tells gated web visitors to use the gate page's Delete button.*
 
 ## Phase 7 — Running it safely once it's public
 
@@ -609,6 +737,7 @@ can stop the bleeding in minutes, and you meet the legal clock.
     restore a `user_data_history` snapshot to a test account and time
     it. A backup that has never been restored is a hope, not a backup.
     *Status 2026-09-30: docs/RESTORE_RUNBOOK.md (restore from user_data_history, drill checklist, PITR notes). Run the first drill.*
+    *Status 2026-10-20: runbook rewritten as a decision tree (history restore → copy + one-user recovery → whole-project restore as last resort) with a quarterly drill that uses a free daily backup + one-user recovery on a test account, and a results log. The SQL is dry-run tested on Postgres 16 (`scripts/recovery/test-recovery-sql.sh`). First drill still to run by the owner, after `recovery_2026_10b.sql` is applied.*
 
 ## Phase 6 — Scale readiness (before real user numbers)
 
@@ -627,10 +756,11 @@ can stop the bleeding in minutes, and you meet the legal clock.
     function-only writes (no client delete), journal 90 days, dual-write → backfill → 14 days of zero
     mismatches → read switch → owner-run per-user cleanup. The first native binary must be built from the
     read-switch build or later.*
-27. `[ ]` **Decide on Supabase PITR.** Pro gives 7-day daily backups;
+27. `[~]` **Decide on Supabase PITR.** Pro gives 7-day daily backups;
     PITR is a paid add-on. Given data safety is the project's stated #1
     rule and there has already been one wipe incident, decide
     deliberately rather than during an incident.
+    *Status 2026-10-20: decided — PITR ON for the state-size migration window (enable before the image migration I4, off 30 days after the last L7 cleanup) and recommended permanently from public launch; 7 days ≈ $100/month ($0.137/h, outside the spend cap, stops daily backups, needs Small — we're on Small). Foundations built so it's useful the day it's bought and daily backups are useful today: `supabase/recovery_2026_10b.sql` (append-only `ops_log` restore markers + `ops_mark()`, and one-user recovery `export_user_bundle` in a restored copy → `import_user_bundle` dry_run/restore_missing in production, insert-only, never overwrites state), `netlify/lib/opsMark.js`, `docs/RESTORE_RUNBOOK.md` (decision tree, whole-project checklist, "Buying PITR" checklist), `scripts/recovery/README.md`. Owner: run `recovery_2026_10b.sql`; buy PITR before I4 using the runbook checklist (and update DPIA row 23 + running costs).*
 
 ---
 
@@ -752,6 +882,11 @@ Standing rules for both wearables, so a third one doesn't relearn them:
   user's tokens under the attacker's id — health data to the wrong
   person. The cookie is `SameSite=Lax` on purpose: the provider's
   redirect is a top-level GET, which Lax allows and Strict would block.
+  Native (app) starts can't use the cookie, so they bind with a
+  verifier the app keeps (PKCE shape) and the callback never exchanges
+  their code itself — the app finishes with verifier + session. A
+  cookie-less state that the callback would exchange on its own is the
+  same hole again (item 115).
 - **Every new user-scoped table needs `on delete cascade`** to
   `auth.users(id)`, or account deletion leaves it behind (see item 20).
 - **Disconnect must delete the tokens**, because the privacy policy says

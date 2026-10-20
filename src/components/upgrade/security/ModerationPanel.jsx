@@ -3,7 +3,8 @@
  * currently suspended or banned, and group pictures the screen couldn't
  * decide. The report queue and the crest queue are the existing
  * components, reused; this panel adds the suspended list (with Lift)
- * and the counts that tie them together. Reports waiting over a day are
+ * and the counts that tie them together, plus the one-off re-screen of
+ * profile pictures published before screening existed (item 112). Reports waiting over a day are
  * marked; a stale-reports alert opens the queue oldest first.
  */
 import { useMemo, useState } from 'react';
@@ -12,6 +13,7 @@ import { useFocusTarget } from './useFocusTarget';
 import { Updated, CardHead, ConfirmButton, Calm, Gate } from './parts';
 import ModerationQueue from '../../moderation/ModerationQueue';
 import CrestQueue from './CrestQueue';
+import AvatarRescreen from './AvatarRescreen';
 import { postAction } from '../../../lib/security/api';
 import { ago, stamp, fmtInt, num } from '../../../lib/security/format';
 
@@ -86,6 +88,8 @@ export default function ModerationPanel({ focus }) {
       </section>
 
       <CrestQueue className="sec-card" onChanged={md.reload} />
+
+      <AvatarRescreen className="sec-card" />
     </div>
   );
 }

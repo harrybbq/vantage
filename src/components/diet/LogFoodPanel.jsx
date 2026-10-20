@@ -697,7 +697,7 @@ export default function LogFoodPanel({
                   <button type="button" className="lfp-btn-line" onClick={() => cameraRef.current && cameraRef.current.identify()}>Identify with AI</button>
                   {quotaLine(quota) && (
                     <span className="ai-scan-quota" role="status">
-                      {quotaLine(quota)} · <button type="button" className="ai-scan-quota-pro" onClick={() => onOpenModal?.('paywall:aiScans')}>Unlimited with Pro</button>
+                      {quotaLine(quota)} · <button type="button" className="ai-scan-quota-pro" onClick={() => onOpenModal?.('paywall:aiScans')}>More with Pro</button>
                     </span>
                   )}
                   <span className="lfp-mono-muted">Point at a barcode, or use AI to read a plate or packet.</span>

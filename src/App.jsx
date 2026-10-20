@@ -43,6 +43,7 @@ import { useWhoopAutoSync } from './lib/whoopClient';
 import { useOuraAutoSync } from './lib/ouraClient';
 import { useAutomations } from './hooks/useAutomations';
 import { usePublishProfile } from './lib/friends/usePublishProfile';
+import { useConsentLedger } from './lib/consent/ledger';
 import { useRatings } from './hooks/useRatings';
 import { useCoinGrants } from './hooks/useCoinGrants';
 import BottomTabBar from './components/mobile/BottomTabBar';
@@ -60,7 +61,18 @@ import { installGlobalErrorHandlers } from './lib/telemetry/reportError';
 // window.onerror + unhandledrejection → client-error reports (item 77).
 installGlobalErrorHandlers();
 import { initDeepLinks } from './lib/native/deepLinks';
+import { WEARABLE_RETURN_EVENT } from './lib/native/wearableConnect';
 import TermsAcceptanceSheet from './components/TermsAcceptanceSheet';
+import WebAccessBoundary from './components/webaccess/WebAccessBoundary';
+import { useWebAccess } from './components/webaccess/useWebAccess';
+import { loadWebAccessMode } from './lib/webAccessClient';
+import { isGated, inviteAppOnly } from './lib/webAccess';
+
+// Web gate (item 131): ask for the mode now, alongside getSession, so the
+// answer is usually here before the session is. Native: no request.
+loadWebAccessMode();
+// The app-store page — only a gated web visitor ever loads it.
+const WebAccessGate = lazy(() => import('./components/webaccess/WebAccessGate'));
 
 // Owner-only surfaces, absent from native builds (lib/native/ownerSurfaces.js).
 // Lazy so the flag can drop them: with VITE_NATIVE_BUILD set these fold
@@ -392,6 +404,8 @@ function Board({ userId, userEmail, onSignOut, initialSettings }) {
   // Debounced inside the hook; safely no-ops if the social schema
   // hasn't been applied yet.
   usePublishProfile(userId, S, hasPro, visionState, { hydrated, loadError, update });
+  // Durable consent record + save-on-grant (item 99, lib/consent/ledger.js).
+  useConsentLedger(userId, S?.consent, hydrated, flushNow);
 
   // Warm the lazy section chunks once the hub is up and the browser is
   // idle, so the first tap on Track or Shop doesn't wait on the network
@@ -425,6 +439,16 @@ function Board({ userId, userEmail, onSignOut, initialSettings }) {
   // Account.
   const [settingsTab, setSettingsTab] = useState(initialSettings || null);
   const [trackTab, setTrackTab] = useState(null);
+
+  // Native WHOOP / Oura return (lib/native/deepLinks): the app's version
+  // of landing on `/?whoop=connected`. Go to Settings › Tools, where the
+  // panel takes the parked result — it may not be mounted yet if the app
+  // cold-started behind the browser. Never fires on the web.
+  useEffect(() => {
+    const go = () => { setSettingsTab({ tab: 'tools', n: Date.now() }); setActiveSection('settings'); };
+    window.addEventListener(WEARABLE_RETURN_EVENT, go);
+    return () => window.removeEventListener(WEARABLE_RETURN_EVENT, go);
+  }, []);
 
   function navigate(id) {
     // 'profile' is no longer a section of its own — the photo, name,
@@ -1121,6 +1145,11 @@ export default function App() {
     try { return parseInvitePath(window.location.pathname) || peekPendingInvite(); } catch { return null; }
   });
   const [inviteAuth, setInviteAuth] = useState(false);
+
+  // Web gate (item 131) — ships open; see lib/webAccess.js. Decides
+  // whether Board may mount at all for this visitor (WebAccessBoundary).
+  const access = useWebAccess({ session: session || null, publicRoute: !!legalPage });
+
   function closeInvite() {
     takePendingInvite();
     setInviteCode(null);
@@ -1206,13 +1235,13 @@ export default function App() {
     );
   }
 
-  if (session === undefined) {
-    return (
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', color: 'var(--text-muted)', fontFamily: 'var(--mono)', fontSize: '13px', letterSpacing: '2px' }}>
-        LOADING...
-      </div>
-    );
-  }
+  const loader = (
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', color: 'var(--text-muted)', fontFamily: 'var(--mono)', fontSize: '13px', letterSpacing: '2px' }}>
+      LOADING...
+    </div>
+  );
+
+  if (session === undefined) return loader;
 
   if (inviteCode && !(inviteAuth && !session)) {
     return (
@@ -1220,6 +1249,7 @@ export default function App() {
         <InviteLanding
           code={inviteCode}
           session={session}
+          appOnly={inviteAppOnly(access.decision)}
           onSignIn={() => setInviteAuth(true)}
           onDone={closeInvite}
         />
@@ -1231,13 +1261,33 @@ export default function App() {
     return (
       <>
         {inviteCode && <Suspense fallback={null}><InvitePill onCancel={closeInvite} /></Suspense>}
-        <AuthScreen onOpenLegal={setLegalPage} />
+        <AuthScreen onOpenLegal={setLegalPage} webInviteOnly={access.decision === 'invite-only'} />
       </>
     );
   }
+  // Board — and with it every state load and save — mounts ONLY through
+  // this boundary. A gated web visitor gets the app-store page instead and
+  // Board never runs for them (webAccess.test.mjs pins both).
   return (
-    <SubscriptionProvider userId={session.user.id}>
-      <Board userId={session.user.id} userEmail={session.user.email} onSignOut={handleSignOut} initialSettings={pendingSettings} />
-    </SubscriptionProvider>
+    <WebAccessBoundary
+      decision={access.decision}
+      signedIn
+      fallback={isGated(access.decision) ? (
+        <Suspense fallback={loader}>
+          <WebAccessGate
+            userId={session.user.id}
+            email={session.user.email}
+            unverified={access.decision === 'unverified'}
+            onRetry={access.retry}
+            onSignOut={handleSignOut}
+            onOpenLegal={setLegalPage}
+          />
+        </Suspense>
+      ) : loader}
+    >
+      <SubscriptionProvider userId={session.user.id}>
+        <Board userId={session.user.id} userEmail={session.user.email} onSignOut={handleSignOut} initialSettings={pendingSettings} />
+      </SubscriptionProvider>
+    </WebAccessBoundary>
   );
 }

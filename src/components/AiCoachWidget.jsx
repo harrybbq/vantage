@@ -29,6 +29,8 @@ function flattenForLegacy(insight) {
 }
 
 // ── Compact teaser banner (Pro not on sale yet) ──────────────────────────
+// Labelled "Coach", not "AI Coach" (item 120): the insights in this
+// widget come from rules in lib/coach/heuristics, not from a model.
 // The waitlist this used to point at was removed (2026-10-20): it collected
 // emails for marketing, which the privacy policy says Vantage doesn't do.
 function AiCoachBanner({ insight, onOpenPaywall }) {
@@ -41,7 +43,7 @@ function AiCoachBanner({ insight, onOpenPaywall }) {
     <div className="ai-coach-banner">
       <span className="ai-coach-banner-icon">✦</span>
       <div className="ai-coach-banner-body">
-        <span className="ai-coach-banner-label">AI Coach</span>
+        <span className="ai-coach-banner-label">Coach</span>
         <span className="ai-coach-banner-insight">
           {hook}
           {rest && <span className="ai-coach-banner-blurred"> {rest}</span>}
@@ -67,7 +69,7 @@ function AiCoachUpgradeBanner({ insight, onOpenPaywall }) {
     <div className="ai-coach-banner">
       <span className="ai-coach-banner-icon">✦</span>
       <div className="ai-coach-banner-body">
-        <span className="ai-coach-banner-label">AI Coach</span>
+        <span className="ai-coach-banner-label">Coach</span>
         <span className="ai-coach-banner-insight">
           {hook}
           {rest && <span className="ai-coach-banner-blurred"> {rest}</span>}
@@ -88,7 +90,7 @@ function AiCoachFull({ insight, onAct, onDismiss }) {
       <span className="ai-coach-banner-icon">✦</span>
       <div className="ai-coach-banner-body">
         <span className="ai-coach-banner-label">
-          AI Coach <span className="ai-coach-pro-badge">Pro</span>
+          Coach <span className="ai-coach-pro-badge">Pro</span>
         </span>
         <span className="ai-coach-banner-insight-full">
           <strong>{insight.title}.</strong> {insight.body}
@@ -101,6 +103,13 @@ function AiCoachFull({ insight, onAct, onDismiss }) {
             {insight.verb.label}
           </button>
         )}
+        {/* These tips are rule-based (lib/coach/heuristics), so the label
+            is "Coach", not "AI Coach" — the AI daily brief keeps its own
+            name and its own "AI-generated · not medical advice" line.
+            Some tips touch sleep, weight or training: item 120. */}
+        <span style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-floor)', color: 'var(--text-muted)', letterSpacing: 0.4, marginTop: 4 }}>
+          Tips from your own logs · not medical advice
+        </span>
       </div>
       {onDismiss && (
         <button

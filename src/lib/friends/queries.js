@@ -1,5 +1,9 @@
 import { supabase } from '../supabase';
 import { publicNameProblem } from '../moderation/nameFilter.js';
+import { PUBLIC_PROFILE_SELECT, OWN_WRITE_RETURNING } from './profileColumns.js';
+import { loadOwnProfile, loadFriendPresence, patchOwnProfileCache } from './profileReads.js';
+import { writePublicProfile } from './profileWrites.js';
+import { safetyErrorKind } from '../moderation/notices.js';
 
 /**
  * Friends data layer — every Supabase call from the social feature
@@ -25,9 +29,11 @@ export const FREE_FRIEND_CAP = 5;
 
 // Presence threshold — a friend whose last_active_at is within this
 // window is "online". The heartbeat in usePublishProfile fires every
-// 60s while the tab is visible, so this gives 3 missed pings of
-// tolerance for transient network issues before going offline.
-export const ONLINE_THRESHOLD_MS = 3 * 60 * 1000;
+// 5 min while the app is visible (item 92: was 60 s), plus on sign-in
+// and on return to the app, so this is two intervals plus a minute of
+// slack: one missed ping (a network blip) doesn't flip a friend
+// offline, and someone who closes the app drops off within ~11 min.
+export const ONLINE_THRESHOLD_MS = 11 * 60 * 1000;
 
 const DAY_MS = 86_400_000;
 
@@ -65,6 +71,10 @@ export function validateHandle(handle) {
  *  silently swallowed. */
 function friendlyError(err, fallback = 'Something went wrong.') {
   const msg = err?.message || '';
+  // Suspension guards (supabase/safety_2026_10b.sql) — say it plainly.
+  const safety = safetyErrorKind(err);
+  if (safety === 'suspended') return 'Your account is suspended, so friend requests are paused.';
+  if (safety === 'peer-suspended') return 'This account is suspended, so the request can\'t be accepted right now.';
   if (/Friend limit reached/i.test(msg)) {
     return 'Friend limit reached — upgrade to Pro for unlimited friends.';
   }
@@ -89,55 +99,65 @@ function friendlyError(err, fallback = 'Something went wrong.') {
  *  (paywall_schema usually creates it on first login, but this is a
  *  defensive check for older accounts or fresh test users). */
 export async function getOwnProfile(userId) {
-  const { data, error } = await supabase
-    .from('profiles')
-    .select('id, handle, display_name, avatar_url, level, is_searchable, last_active_at, tier')
-    .eq('id', userId)
-    .maybeSingle();
-  if (error) throw new Error(friendlyError(error, 'Could not load profile.'));
-  return data;
+  // Private own-row fields (tier, is_searchable, last_active_at, …) come
+  // through the my_profile RPC — profileReads.js (item 83).
+  try {
+    return await loadOwnProfile(userId);
+  } catch (error) {
+    throw new Error(friendlyError(error, 'Could not load profile.'));
+  }
 }
 
-/** Claim or update your handle. Validates locally first, then writes
- *  through the self-update RLS policy. The unique constraint catches
- *  races where two users hit submit simultaneously on the same handle. */
+/** Claim or update your handle. Validates locally first (instant
+ *  feedback), then saves through profile-update, which re-checks the
+ *  format and the public-text filter on the server (item 84) — the
+ *  client can no longer PATCH handle itself once the SQL has run. The
+ *  unique constraint still settles two people racing for one handle. */
 export async function setHandle(userId, handle) {
   const err = validateHandle(handle);
   if (err) throw new Error(err);
-  const { data, error } = await supabase
-    .from('profiles')
-    .update({ handle })
-    .eq('id', userId)
-    .select()
-    .single();
-  if (error) throw new Error(friendlyError(error, 'Could not save handle.'));
-  return data;
+  const out = await writePublicProfile(userId, { handle: handle.trim() });
+  return out?.profile || null;
 }
 
-/** Update display_name / avatar_url / is_searchable. Each call
- *  upserts the row in case the paywall init missed it (defensive). */
+/** Update your own profile fields. display_name / avatar_url (what
+ *  strangers see) go through profile-update; the private settings and
+ *  presence (is_searchable, level, last_active_at, leaderboard_*) are
+ *  still written directly under the column grant. */
 export async function updateOwnProfile(userId, patch) {
-  const allowed = ['display_name', 'avatar_url', 'is_searchable', 'level', 'last_active_at', 'leaderboard_optin', 'leaderboard_color'];
+  const direct = ['is_searchable', 'level', 'last_active_at', 'leaderboard_optin', 'leaderboard_color'];
   const clean = Object.fromEntries(
-    Object.entries(patch).filter(([k]) => allowed.includes(k))
+    Object.entries(patch || {}).filter(([k]) => direct.includes(k))
   );
+  const pub = {};
   // Last line of defence for the display name other people see: a name
   // the public-text filter refuses is published as no name at all. The
   // user's own S.profile.name is untouched — this only decides what
-  // leaves the device.
+  // leaves the device. (The server applies the same filter, bindingly.)
   // 40 chars: the profiles_display_name_len check (audit SQL).
-  if (typeof clean.display_name === 'string') clean.display_name = clean.display_name.slice(0, 40);
-  if (typeof clean.display_name === 'string' && publicNameProblem(clean.display_name)) {
-    clean.display_name = null;
+  if ('display_name' in (patch || {})) {
+    let name = typeof patch.display_name === 'string' ? patch.display_name.slice(0, 40) : null;
+    if (typeof name === 'string' && publicNameProblem(name)) name = null;
+    pub.display_name = name;
   }
-  if (Object.keys(clean).length === 0) return null;
-  const { data, error } = await supabase
-    .from('profiles')
-    .update(clean)
-    .eq('id', userId)
-    .select()
-    .maybeSingle();
-  if (error) throw new Error(friendlyError(error, 'Could not save profile.'));
+  if ('avatar_url' in (patch || {})) pub.avatar_url = patch.avatar_url ?? null;
+
+  let data = null;
+  if (Object.keys(clean).length) {
+    const res = await supabase
+      .from('profiles')
+      .update(clean)
+      .eq('id', userId)
+      .select(OWN_WRITE_RETURNING)
+      .maybeSingle();
+    if (res.error) throw new Error(friendlyError(res.error, 'Could not save profile.'));
+    patchOwnProfileCache(userId, clean);
+    data = res.data;
+  }
+  if (Object.keys(pub).length) {
+    const out = await writePublicProfile(userId, pub);
+    data = out?.profile || data;
+  }
   return data;
 }
 
@@ -192,18 +212,21 @@ export async function listAcceptedFriends(userId) {
     e.requester_id === userId ? e.addressee_id : e.requester_id
   );
   if (otherIds.length === 0) return [];
-  const { data: profiles, error: pErr } = await supabase
-    .from('profiles')
-    // last_active_at drives the online-bubble heuristic in the rail.
-    // Pulled here (rather than per-friend on selection) so the list
-    // can sort online-first without an N+1 round-trip. ratings_ovr is
-    // the server-canonical overall rating (written by the recompute
-    // function) — it replaced `level` on the friend card.
-    .select('id, handle, display_name, avatar_url, level, ratings_ovr, last_active_at')
-    .in('id', otherIds);
+  // ratings_ovr is the server-canonical overall rating (written by the
+  // recompute function) — it replaced `level` on the friend card.
+  // last_active_at drives the online bubble; it is friends-only now
+  // (item 83), so it comes from the friend_presence RPC alongside.
+  const [{ data: profiles, error: pErr }, presence] = await Promise.all([
+    supabase
+      .from('profiles')
+      .select(PUBLIC_PROFILE_SELECT)
+      .in('id', otherIds),
+    loadFriendPresence(otherIds),
+  ]);
   if (pErr) throw new Error(friendlyError(pErr, 'Could not load friend profiles.'));
   return (profiles || []).map(p => ({
     ...p,
+    last_active_at: presence.get(p.id) ?? null,
     accepted_at: edges.find(e =>
       e.requester_id === p.id || e.addressee_id === p.id
     )?.accepted_at,
@@ -250,7 +273,7 @@ export async function listPendingRequests(userId) {
   if (ids.length === 0) return [];
   const { data: profiles, error: pErr } = await supabase
     .from('profiles')
-    .select('id, handle, display_name, avatar_url, level, ratings_ovr')
+    .select(PUBLIC_PROFILE_SELECT)
     .in('id', ids);
   if (pErr) throw new Error(friendlyError(pErr, 'Could not load requesters.'));
   return (profiles || []).map(p => {

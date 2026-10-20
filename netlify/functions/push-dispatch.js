@@ -8,7 +8,8 @@
  * Android delivery from a single API.
  *
  * Triggered by:
- *   - Netlify Scheduled Function (every 1 minute) — see netlify.toml
+ *   - Netlify Scheduled Function (every 5 minutes, item 87 — was every
+ *     minute) — see netlify.toml for why 5 minutes of latency is fine
  *   - HTTP POST with the dispatch secret (manual / one-off)
  *
  * Required Netlify env vars (all set in dashboard):

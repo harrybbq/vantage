@@ -28,6 +28,7 @@ const { pauseGate } = require('../lib/killSwitch');
 const { requireUser, underLimit, tooMany } = require('../lib/requireUser');
 const { withinDailyAiCap, overDailyCap } = require('../lib/aiQuota');
 const { isOwnerEmail } = require('../lib/owner');
+const { consentGate } = require('../lib/consentGate');
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
@@ -168,6 +169,9 @@ exports.handler = async (event) => {
   // Same answer as a bad token, deliberately — see admin-set-rating.js.
   if (!isOwnerEmail(auth.email)) return reply(403, { error: 'forbidden' });
   if (!underLimit('ai-recipe', auth.userId, 10)) return tooMany(CORS);
+  // AI consent on the server too (item 98) — owner-only, same rule.
+  const noConsent = await consentGate(auth.userId, 'ai', CORS);
+  if (noConsent) return noConsent;
   if (!process.env.ANTHROPIC_API_KEY) return reply(503, { error: 'Reading videos is not set up on this site yet.' });
 
   let url;

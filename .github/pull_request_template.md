@@ -19,6 +19,7 @@ Tick what applies, delete what doesn't. Anything unticked needs a reason.
 - [ ] New view → `with (security_invoker = true)`.
 - [ ] New `security definer` function → `set search_path = ''` (or `public`), and `revoke execute … from public, anon` (plus `authenticated` unless it's meant to be called by clients).
 - [ ] Additive only: no `drop`, no `update`/`delete` of existing rows, no destructive migration. Re-runnable (`if not exists`, `drop … if exists` before `create`).
+- [ ] Starts and ends with the fail-soft `ops_mark` start/done block, so a restore point can be read off `ops_log` (`docs/RESTORE_RUNBOOK.md` "Restore markers").
 - [ ] Client code fails soft until the owner has run the SQL (a 400/404 behaves exactly like today).
 - [ ] After the owner runs it: **Supabase → Advisors** (security + performance) checked and clean.
 

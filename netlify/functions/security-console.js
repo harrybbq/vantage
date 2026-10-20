@@ -493,7 +493,10 @@ async function userAction(env, ownerId, b, ban) {
 
   // Ban implies suspended (hidden from public boards); lifting a ban
   // lifts the suspension too. Suspend alone never touches auth.
-  const out = await M.setSuspended(env, userId, b.on);
+  // Audited, and the user told in-app (account_suspended / _restored)
+  // unless the caller says not to (the queue does for child-safety
+  // reports — no tip-off).
+  const out = await M.setSuspended(env, userId, b.on, { actorId: ownerId, note: note || null, notifyUser: b.notify !== false });
   overviewCache.at = 0;
   console.info(`security-console: ${ban ? 'ban' : 'suspend'} ${b.on ? 'on' : 'off'} by owner${note ? ' (with note)' : ''}`);
   // A ban blocks sign-in and token refresh; it does NOT end a session

@@ -17,6 +17,7 @@
 const { pauseGate } = require('../lib/killSwitch');
 const { getFreshToken, fetchWhoopData } = require('../lib/whoop');
 const { requireUser, underLimit, tooMany } = require('../lib/requireUser');
+const { consentGate } = require('../lib/consentGate');
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
@@ -42,6 +43,11 @@ exports.handler = async (event) => {
   if (auth.error) return auth.error;
   const userId = auth.userId;
   if (!underLimit('whoop-sync', userId, 6)) return tooMany(CORS);
+  // Declined / withdrawn health consent stops the pull here too, not
+  // only in the app (item 98). Never-asked accounts keep syncing, as the
+  // app does.
+  const noConsent = await consentGate(userId, 'health', CORS);
+  if (noConsent) return noConsent;
 
   let body = {};
   try { body = JSON.parse(event.body || '{}'); } catch { /* fine */ }

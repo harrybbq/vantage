@@ -26,7 +26,7 @@ export const FREE_CAPS = {
   ourApps: {
     feature: true,
     label: 'Our Apps',
-    sub: 'Our Apps are a Pro bonus — add FloorplanStudio and more straight to your hub. Upgrade to unlock them, plus proactive coach nudges, the AI daily brief, and every cap removed.',
+    sub: 'Our Apps are a Pro bonus — add FloorplanStudio and more straight to your hub. Upgrade to unlock them, plus proactive coach nudges, the AI daily brief, and the free-plan limits lifted.',
   },
   // Generic upgrade entry — used by surfaces that don't have a specific
   // cap to cite (the mobile More-drawer "Go Pro" chip, etc.). The
@@ -35,7 +35,7 @@ export const FREE_CAPS = {
   generic: {
     feature: true,
     label: 'Vantage Pro',
-    sub: 'Unlock unlimited everything, proactive coach nudges, the daily AI brief, accent colours, and every Pro perk across mobile + desktop.',
+    sub: 'Unlock higher limits, proactive coach nudges, the daily AI brief, accent colours, and every Pro perk across mobile + desktop.',
   },
 };
 
