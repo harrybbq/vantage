@@ -166,10 +166,18 @@
     Cache-Control = "no-cache, no-store, must-revalidate"
 
 # ── Scheduled Functions ──────────────────────────────────────────────
-# push-dispatch sweeps the notifications_queue every minute. Cheap —
-# the function returns immediately when the queue is empty.
+# push-dispatch sweeps the notifications_queue every 5 minutes (item 87;
+# was every minute — ~44k invocations a month, nearly all finding an
+# empty queue). An empty run is one small PostgREST read and a return.
+# What can wait up to 5 minutes: the only producers today are the
+# friend-request / friend-accepted triggers (notifications_schema.sql).
+# DMs don't push, coach nudges carry their own scheduled_at, and push
+# isn't live until FCM is configured (item 15). Trigger-on-insert
+# (pg_net → function) was considered and not done: Netlify scheduled
+# functions can't be invoked by URL, and it would put a secret in the DB.
+# If a real-time kind ever arrives (e.g. DM pushes), revisit this line.
 [functions."push-dispatch"]
-  schedule = "* * * * *"
+  schedule = "*/5 * * * *"
 
 # snapshot-ratings writes one rating snapshot per opted-in user per day.
 # Powers the leaderboard's weekly-climb metric (current_ovr − snap_ovr).

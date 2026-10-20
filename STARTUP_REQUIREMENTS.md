@@ -389,9 +389,10 @@ code fails soft until it is run, so order doesn't matter.
     no WAF, no rate-limiting rules, no firewall traffic rules. Add a
     rate-limit rule on `/.netlify/functions/*` (per-IP) before launch —
     the in-function limits are per instance.
-87. `[ ]` **AFTER** `push-dispatch` runs every minute — ~44k invocations a
+87. `[x]` **AFTER** `push-dispatch` runs every minute — ~44k invocations a
     month on credit-based pricing, mostly finding nothing. Consider
     every 5 minutes, or trigger it from the queue insert instead.
+    *Status 2026-10-20: every 5 minutes (`*/5 * * * *` in netlify.toml) — ~44.6k → ~8.9k invocations and empty-queue reads a month. Nothing needs 1-minute latency: the only queue producers are the friend-request/accept triggers; DMs don't push; push isn't live until FCM (item 15). Trigger-on-insert rejected: scheduled functions aren't URL-invocable and pg_net would need a secret in the DB. Revisit if DM pushes are added.*
 88. `[x]` **AFTER** Supabase compute is **Small**, not Micro — about $5/month
     over the Pro plan's $10 compute credit. Micro covers today's load; Small
     gives the whole-state saves headroom. Owner's call; switching restarts
