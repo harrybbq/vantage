@@ -13,9 +13,15 @@ import './savings.css'
 import './prime.css'
 import './log-food.css'
 import './boot.css'
-// Last on purpose: shop.css is the final word on .shop-* rules, which is
-// what the mobile shopping layout depends on. Don't reorder.
+// Last of the CLASSIC sheets on purpose: shop.css is the final word on
+// .shop-* rules, which is what the mobile shopping layout depends on.
+// Don't reorder.
 import './shop.css'
+// The console redesign, after every classic sheet so its equal-specificity
+// rules win. Every selector in it is scoped to html[data-design="console"],
+// so it is inert for the classic design (src/design/console/README.md).
+import './design/console/index.css'
+import { applyDesign, NO_SESSION_DESIGN } from './hooks/useDesign'
 import App from './App.jsx'
 import RootErrorBoundary from './components/RootErrorBoundary.jsx'
 import './lib/telemetry/webVitals.js' // anonymous 1-in-5 page-load performance beacon (prod web only)
@@ -29,6 +35,10 @@ const queryClient = new QueryClient({
     },
   },
 })
+
+// <html data-design> before first paint (sign-in screen included). The
+// signed-in board takes over from here (useApplyDesign in App.jsx).
+applyDesign(NO_SESSION_DESIGN)
 
 createRoot(document.getElementById('root')).render(
   <StrictMode>

@@ -1,0 +1,166 @@
+/* ════════════════════════════════════════════════════════════════════
+   Console design tokens — Direction A "Console, refined" + C's bands.
+
+   SCOPING RULE: every selector in src/design/console/ starts with
+   html[data-design="console"]. Nothing here may change the classic
+   design. Token names are prefixed --cx- so they cannot collide with the
+   classic tokens (--text, --mono, --bg-base …) that not-yet-redesigned
+   classic components still read in console mode. The band and rail
+   tokens (--band-*, --promo, --releg, --plan) are the exceptions, named
+   as the spec names them; none of those names exist in classic CSS.
+
+   Themes: ids stay `dark-os` and `cream-pro` (what S.theme holds).
+   cream-pro is drawn as "Paper" (neutral, not parchment). Paper is the
+   base block, so pre-auth (no data-theme) gets Paper too.
+
+   Accent: the static --cx-accent* values below are the Direction A table
+   (default green). In console mode useDesign sets --cx-accent,
+   --cx-accent-fill, --cx-on-accent and --cx-accent-tint INLINE on <html>
+   from the user's scheme (lib/design/design.js consoleAccentVars), which
+   overrides these. Never hard-code an accent colour in area CSS.
+
+   DIRECTIONS.md §A table; contrast checked in redesign/tools/contrast.mjs
+   (0 failures) and pinned again by tokens.test.mjs next to this file.
+   ════════════════════════════════════════════════════════════════════ */
+
+/* ── Paper (cream-pro, and the pre-auth default) ── */
+html[data-design="console"] {
+  /* surfaces */
+  --cx-bg: #EEEDE9;
+  --cx-s1: #FBFBF9;
+  --cx-s2: #F3F2EE;
+  --cx-s3: #E7E5DF;
+  /* text */
+  --cx-text: #1B1A17;
+  --cx-mid: #45423C;
+  --cx-muted: #64605A;
+  /* lines: decorative / inputs + controls (≥ 3:1) */
+  --cx-line: #DDDAD3;
+  --cx-line-strong: #8B877F;
+  /* accent (overridden inline per scheme) */
+  --cx-accent: #17744A;
+  --cx-accent-fill: #1A7A4A;
+  --cx-on-accent: #FFFFFF;
+  --cx-accent-tint: rgba(26, 122, 74, 0.09);
+  /* semantics */
+  --cx-gold: #7A5000;
+  --cx-gold-tint: rgba(122, 80, 0, 0.08);
+  --cx-night: #3B4FB8;
+  --cx-danger: #B42318;
+  --cx-warn: #8A5A00;
+  --cx-track: #E2E0DA;            /* empty part of a bar */
+  --cx-shadow: 0 1px 2px rgba(20, 18, 14, 0.05);
+  --cx-scrim: rgba(20, 18, 14, 0.4);
+  color-scheme: light;
+
+  /* C's tier bands, contrast-tuned as TEXT on bg/s1/s2 */
+  --band-bronze: #8A5225;
+  --band-silver: #5B6576;
+  --band-gold: #7D5D00;
+  --band-emerald: #0D7A47;
+  --band-diamond: #0B6B7C;
+  --band-ruby: #B3133F;
+  /* league rails + trip planning status */
+  --promo: #0D7A47;
+  --releg: #B42318;
+  --plan: #8A5A00;
+
+  /* type: DM Sans for words, DM Mono for numerals only.
+     Loaded weights (index.html): DM Sans 300/400/500/600, DM Mono 400/500.
+     There is NO DM Sans 700 — use 600 for bold. */
+  --cx-sans: 'DM Sans', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --cx-mono: 'DM Mono', ui-monospace, 'SFMono-Regular', Menlo, monospace;
+  --cx-fs-12: 12px; --cx-lh-12: 16px;
+  --cx-fs-13: 13px; --cx-lh-13: 18px;
+  --cx-fs-15: 15px; --cx-lh-15: 22px;
+  --cx-fs-17: 17px; --cx-lh-17: 24px;
+  --cx-fs-22: 22px; --cx-lh-22: 28px;
+  --cx-fs-28: 28px; --cx-lh-28: 32px;
+  --cx-fs-40: 40px; --cx-lh-40: 44px;   /* numerals */
+
+  /* radius: panel · cell/button · chip · bar (50% only for avatars) */
+  --cx-r-panel: 12px;
+  --cx-r-cell: 8px;
+  --cx-r-chip: 6px;
+  --cx-r-bar: 2px;
+  --cx-r-sheet: 16px;
+
+  /* spacing */
+  --cx-sp-4: 4px;
+  --cx-sp-8: 8px;
+  --cx-sp-12: 12px;
+  --cx-sp-16: 16px;
+  --cx-sp-20: 20px;
+  --cx-sp-24: 24px;
+  --cx-sp-32: 32px;
+
+  /* controls */
+  --cx-control-h: 40px;           /* buttons; 48px on coarse pointers (base.css) */
+  --cx-input-h: 48px;
+  --cx-chip-h: 28px;
+  --cx-check: 20px;
+
+  /* motion: state changes · sheets */
+  --cx-dur-fast: 120ms;
+  --cx-dur: 200ms;
+  --cx-ease: cubic-bezier(.2, .7, .2, 1);
+}
+
+/* ── Dark OS ── */
+html[data-design="console"][data-theme="dark-os"] {
+  --cx-bg: #0E0E0C;
+  --cx-s1: #151513;
+  --cx-s2: #1D1D1A;
+  --cx-s3: #26251F;
+  --cx-text: #E6E1D6;
+  --cx-mid: #B1AB9F;
+  --cx-muted: #928C81;
+  --cx-line: #2A2926;
+  --cx-line-strong: #6B685F;
+  --cx-accent: #3FBF7F;
+  --cx-accent-fill: #1A7A4A;
+  --cx-on-accent: #FFFFFF;
+  --cx-accent-tint: rgba(26, 122, 74, 0.12);
+  --cx-gold: #E3B341;
+  --cx-gold-tint: rgba(227, 179, 65, 0.12);
+  --cx-night: #9DB0FF;
+  --cx-danger: #F2706B;
+  --cx-warn: #E3A341;
+  --cx-track: #2A2926;
+  --cx-shadow: none;              /* hairlines do the elevation on dark */
+  --cx-scrim: rgba(0, 0, 0, 0.5);
+  color-scheme: dark;
+
+  --band-bronze: #D39A5E;
+  --band-silver: #AEB8C6;
+  --band-gold: #E6BE4A;
+  --band-emerald: #3FD08A;
+  --band-diamond: #5ED3E6;
+  --band-ruby: #FF6B8B;
+  --promo: #3FD08A;
+  --releg: #F2706B;
+  --plan: #E3A341;
+}
+
+/* Reduced motion: durations collapse, so anything built on the tokens
+   stands still without its own media query. */
+@media (prefers-reduced-motion: reduce) {
+  html[data-design="console"] {
+    --cx-dur-fast: 0ms;
+    --cx-dur: 0ms;
+  }
+}
+
+/* ── Band classes (lib/ratings/bands.js bandClass) ── */
+html[data-design="console"] .cx-band-bronze { color: var(--band-bronze); }
+html[data-design="console"] .cx-band-silver { color: var(--band-silver); }
+html[data-design="console"] .cx-band-gold { color: var(--band-gold); }
+html[data-design="console"] .cx-band-emerald { color: var(--band-emerald); }
+html[data-design="console"] .cx-band-diamond { color: var(--band-diamond); }
+html[data-design="console"] .cx-band-ruby { color: var(--band-ruby); }
+html[data-design="console"] .cx-band-bg-bronze { background: var(--band-bronze); }
+html[data-design="console"] .cx-band-bg-silver { background: var(--band-silver); }
+html[data-design="console"] .cx-band-bg-gold { background: var(--band-gold); }
+html[data-design="console"] .cx-band-bg-emerald { background: var(--band-emerald); }
+html[data-design="console"] .cx-band-bg-diamond { background: var(--band-diamond); }
+html[data-design="console"] .cx-band-bg-ruby { background: var(--band-ruby); }

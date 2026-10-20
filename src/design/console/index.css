@@ -1,0 +1,13 @@
+/* ════════════════════════════════════════════════════════════════════
+   Console design — the single CSS entry, imported once by src/main.jsx
+   AFTER every classic stylesheet, so equal-specificity console rules win.
+   Everything here is inert unless <html data-design="console">.
+   Area agents edit only their own file; nobody edits this list except to
+   add a NEW area file (README.md, "File ownership").
+   ════════════════════════════════════════════════════════════════════ */
+@import './tokens.css';
+@import './base.css';
+@import './shell.css';
+@import './hub.css';
+@import './track.css';
+@import './sweep.css';

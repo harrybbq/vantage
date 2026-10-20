@@ -14,7 +14,8 @@ import MobileHubSection from './components/mobile/MobileHubSection';
 import SettingsSection from './components/SettingsSection';
 import { OWNER_SURFACES_IN_BUILD } from './lib/native/ownerSurfaces';
 import { parseSecurityLink } from './lib/security/deepLink';
-import { SCHEMES, applyScheme, applyTheme, resolveEffectiveTheme, schemeFromHex } from './components/SettingsSection';
+import { SCHEMES, applyScheme, applyTheme, resolveEffectiveTheme, schemeFromHex, currentAccentHex } from './components/SettingsSection';
+import { useApplyDesign, DesignProvider } from './hooks/useDesign';
 import { useSubscriptionContext } from './context/SubscriptionContext';
 import Modals from './components/Modals';
 import PaywallModal from './components/PaywallModal';
@@ -181,6 +182,16 @@ function Board({ userId, userEmail, onSignOut, initialSettings }) {
   const { atLimit } = useTierLimits();
   const { hasPro } = useSubscriptionContext();
   const { isOwner } = useIsOwner(userId);
+  // ── Design switch (console redesign foundation; src/design/console/README.md) ──
+  // 'classic' | 'console' from S.design, console owner-preview only until the
+  // launch flip. Sets <html data-design> + the console accent vars; provided
+  // to the tree below via <DesignProvider>. Must stay above any early return.
+  const design = useApplyDesign(S, {
+    isOwner,
+    accent: currentAccentHex(S),
+    theme: resolveEffectiveTheme(S.theme || 'cream-pro'),
+  });
+  // ── end design switch ──
   // Passive WHOOP sync — refreshes vitals/burn whenever the app opens or
   // regains focus (throttled), so data stays fresh without visiting Track.
   useWhoopAutoSync(S, update);
@@ -762,7 +773,7 @@ function Board({ userId, userEmail, onSignOut, initialSettings }) {
   }));
 
   return (
-    <>
+    <DesignProvider design={design}>
       {/* Migration banner */}
       {showBanner && (
         <div style={{
@@ -1118,7 +1129,7 @@ function Board({ userId, userEmail, onSignOut, initialSettings }) {
         onNavigate={navigate}
         onClose={() => update(prev => ({ ...prev, tutorialCompleted: true }))}
       />
-    </>
+    </DesignProvider>
   );
 }
 
