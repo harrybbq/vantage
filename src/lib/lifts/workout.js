@@ -73,6 +73,7 @@ import {
 } from './lifts.js';
 import { liftsOf, withLifts, makeEntry, LIMITS, newId, defaultGym, setLastGym, withGyms, gymName, gymList } from './store.js';
 import { PROGRAMME_MUSCLES, musclesOf, norm } from './muscles.js';
+import { cataloguePending } from './catalogue.js';
 import { plannedSessions, blockProgress, EXTRA } from './plan.js';
 
 export { MUSCLES, PROGRAMME_MUSCLES, musclesOf } from './muscles.js';
@@ -535,11 +536,19 @@ export function addExercises(prev, liftIds, { ids = newId } = {}) {
   return withActive(prev, a => {
     const list = liftsOf(prev).list;
     const add = [];
-    for (const id of want) {
-      if (!list.some(l => l.id === id) || a.exercises.some(e => e.liftId === id) || add.some(e => e.liftId === id)) continue;
-      const p = previousSets(prev, id, { gym: a.gym || null });
+    for (const want0 of want) {
+      // A catalogue pick is added pending (its lift is created when a set is
+      // ticked); one whose name is already a lift uses that lift instead.
+      const cat = list.some(l => l.id === want0) ? null : cataloguePending(want0);
+      const same = cat ? findByName(list, cat.name) : null;
+      const id = same ? same.id : want0;
+      const pending = cat && !same ? cat : null;
+      if ((!pending && !list.some(l => l.id === id)) || a.exercises.some(e => e.liftId === id) || add.some(e => e.liftId === id)) continue;
+      const p = pending ? null : previousSets(prev, id, { gym: a.gym || null });
       const n = p ? Math.max(1, Math.min(10, p.sets.length)) : 1;
-      add.push({ liftId: id, sets: Array.from({ length: n }, () => row(ids('st'))) });
+      const ex = { liftId: id, sets: Array.from({ length: n }, () => row(ids('st'))) };
+      if (pending) ex.pending = pending;
+      add.push(ex);
     }
     return add.length ? { ...a, exercises: [...a.exercises, ...add] } : a;
   });
@@ -650,19 +659,24 @@ export function removeExercise(prev, ei) {
  * new lift's last weights, nothing ticked (a done set of the old lift is
  * not a set of the new one). A lift already in the workout is refused.
  */
-export function swapExercise(prev, ei, liftId) {
+export function swapExercise(prev, ei, liftId0) {
   const list = liftsOf(prev).list;
-  if (!list.some(l => l.id === liftId)) return prev;
+  const cat = list.some(l => l.id === liftId0) ? null : cataloguePending(liftId0);
+  const same = cat ? findByName(list, cat.name) : null;
+  const liftId = same ? same.id : liftId0;
+  const pending = cat && !same ? cat : null;
+  if (!pending && !list.some(l => l.id === liftId)) return prev;
   return withActive(prev, a => {
     if (a.exercises.some((e, i) => i !== ei && e.liftId === liftId)) return a;
     return mapEx(a, ei, ex => {
       if (ex.liftId === liftId) return ex;
-      const p = previousSession(prev, liftId, { gym: a.gym || null, night: a.shift === 'night' });
+      const p = pending ? null : previousSession(prev, liftId, { gym: a.gym || null, night: a.shift === 'night' });
       const sets = ex.sets.map((s, i) => {
         const b = p && p.sets.length ? p.sets[Math.min(i, p.sets.length - 1)] : null;
         return { ...s, weight: b ? b.weight : null, rpe: null, done: false };
       });
       const out = { liftId, sets };
+      if (pending) out.pending = pending;
       if (ex.target) out.target = ex.target;
       return out;
     });

@@ -459,6 +459,8 @@ html[data-lifts-focus] .lifts .lw-head { top: env(safe-area-inset-top, 0px); }
 .lifts .lw-tick { flex: none; display: grid; place-items: center; width: 28px; height: 28px; margin: 8px; box-sizing: border-box; border-radius: 50%;
   border: 2px solid var(--lf-line-strong); font-family: var(--lf-mono); font-size: 13px; font-weight: 700; color: var(--lf-on-accent); }
 .lifts .lw-tick.is-on { background: var(--lf-accent); border-color: var(--lf-accent); }
+.lifts .lw-pick-sec { display: flex; flex-direction: column; gap: 2px; padding: 18px 4px 8px; margin-top: 8px; border-top: 1px solid var(--lf-line); }
+.lifts .lw-pick-sec p { margin: 0; }
 .lifts .lw-pick-empty { display: flex; flex-direction: column; align-items: flex-start; gap: 10px; padding: 16px 0; }
 .lifts .lw-pick-foot { display: flex; flex-direction: column; gap: 6px; width: 100%; min-width: 0; }
 .lifts .lw-pick-names { margin: 0; font-family: var(--lf-mono); font-size: var(--lf-fs-floor); line-height: 16px; color: var(--lf-mid); white-space: nowrap;
