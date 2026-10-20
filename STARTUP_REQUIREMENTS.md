@@ -515,9 +515,20 @@ else maps onto existing items.
 104. `[ ]` **LAUNCH** Lock-screen-safe push text before push goes live (esp. coach nudges). (G8)
 105. `[ ]` **LAUNCH** Test the AI coach with eating-disorder, self-harm and relapse style inputs and
     record the results. (G15)
-106. `[ ]` **LAUNCH** Confirm the Netlify functions' region (none set in netlify.toml — likely US) for
+106. `[~]` **LAUNCH** Confirm the Netlify functions' region (none set in netlify.toml — likely US) for
     the transfer analysis; written policy for owner/admin access to user data and a log of moderation
     reads; Art. 30 records / LIAs if the solicitor says so. (G5, G18, G25)
+    *Status 2026-10-20: drafted — region finding + steps in `docs/ROPA.md` §2: all 44 functions are v1
+    with no per-function config, so the site-level region applies; default for sites made after 4 Oct
+    2023 is `cmh` US East (Ohio); `lhr`/`fra`/`dub` are self-serve on Pro (Netlify's
+    context-and-tools repo + docs extracts, checked 2026-10-20). Even in the EU, Netlify Inc. (US) stays
+    a restricted transfer under its DPA (EU SCCs + UK Addendum); DPF status unconfirmed.
+    `docs/ADMIN_ACCESS_POLICY.md` (who, five purposes, what's logged today vs not, `ops_mark('access',…)`
+    habit, record template, specs A1–A4 to log evidence reads and bans). `docs/ROPA.md` (Art. 30 —
+    REQUIRED: the under-250 exemption doesn't cover special category data, ICO; activities A1–A14,
+    recipients, transfers, retention as built, LIAs L1–L7 for the solicitor). Owner: read the Supabase
+    region, set the Netlify Functions region to match, redeploy, record it; check Netlify on the DPF
+    list; adopt the access policy; solicitor: Q-A1–A4, LIAs, R-1–R-4.*
 107. `[x]` **AFTER** Legacy `moodLog` still sits in users' state though Mood was removed — tell users
     and offer deletion, or remove it additive-first per CLAUDE.md. (G12)
     *Done 2026-10-20 (owner's decision: delete, never returning): `lib/state/retiredKeys.js` removes
@@ -528,9 +539,16 @@ else maps onto existing items.
     weather so no third party sees the IP.
 
 ### From the Online Safety Act draft — 2026-10-20 (`docs/ONLINE_SAFETY_ACT_DRAFT.md`)
-109. `[ ]` **LAUNCH** Governance the Codes expect: a named accountable person with written
+109. `[~]` **LAUNCH** Governance the Codes expect: a named accountable person with written
     responsibilities; written content policies, queue prioritisation and moderator guidance; a written
     appeals process; a complaints route that works without an account (pairs with item 72).
+    *Status 2026-10-20: drafted — `docs/OSA_GOVERNANCE.md`: what the Codes expect scaled to a one-person
+    company (ICU A2 named person = all services; A3 written responsibilities = multi-risk, which Vantage
+    is on the draft's ratings), fill-in appointment, responsibilities + cover arrangement, 5-line code of
+    conduct, training record, monthly evidence log (with query), complaints/appeals procedure, yearly
+    review checklist. Cross-refers to the OSA draft rather than repeating it. Owner: fill in and sign
+    §2–§4, do the §5 training, set the monthly/yearly reminders, fill the complaint timings here and in
+    the Terms; support address still item 72.*
 110. `[x]` **LAUNCH** Reporting loop: acknowledge reports to the reporter and tell them the outcome;
     tell the reported user about action taken; more report reasons (child safety, threats, self-harm,
     sexual content, scams); report + block from an incoming friend request.
@@ -551,12 +569,24 @@ else maps onto existing items.
     same value refused if the app re-publishes it, user told) and "Resolve"; "Re-screen profile pictures"
     in Security → Moderation (4 per press, owner daily AI cap 200, flags only — keep or remove). Owner: run
     `supabase/safety_2026_10b.sql`, then press re-screen until the backlog is 0 (needs ANTHROPIC_API_KEY). SQL applied 2026-10-20; the avatar re-screen backlog is still to clear.*
-113. `[ ]` **LAUNCH** NCA child-sexual-abuse reporting duty (in force for user-to-user services since
+113. `[~]` **LAUNCH** NCA child-sexual-abuse reporting duty (in force for user-to-user services since
     7 Apr 2026): register and write the procedure (how evidence is preserved, who files, within what
     time). Add a mute option (Codes user control); supportive information for child users.
     *Status 2026-10-20 (part): procedure skeleton in `docs/ABUSE_HANDLING.md` (in force since 7 Apr 2026;
     register, who files, preserve-don't-spread, file within the SI 2026/268 time, record) — the owner fills
     the blanks and the solicitor confirms. Registration, mute and child supportive information still open.*
+    *Status 2026-10-20 (procedure): `docs/ABUSE_HANDLING.md` NCA section completed from sources checked
+    today — verified: s.66 + s.69 commenced 7 Apr 2026 by SI 2026/262 (Commencement No. 7); SI 2026/268
+    made 9 Mar 2026, in force 7 Apr (the earlier SI 2025/368 was revoked before commencing). Grooming
+    text counts, not only images; the IWF doesn't discharge the duty. Registration via the NCA CSEA-IRP
+    (organisation → Referral Bureau review Mon–Fri → administrator adds filers); 999 first if
+    unregistered and a child is at imminent risk; `retention_hold` on the report at once; URN 5 years,
+    content ≥ 1 year (secondary source — verify). The 2026 urgency time frames weren't readable (sites
+    blocked) — working rule in the doc, solicitor to confirm. Still open: **register on the CSEA-IRP**
+    (and who registers before the company exists), fill the blanks, rehearse once; specs for approval in
+    ABUSE_HANDLING "Open product gaps": G-1 mute, G-2 "Staying safe" supportive info (shown to everyone
+    until item 114 gives an age signal), G-3 a reported user can delete their account and cascade the
+    evidence away (recommend: refuse deletion while a report is on hold).*
 114. `[ ]` **LAUNCH** Teen defaults only apply to NEW accounts: older accounts kept handle search and
     leaderboard on; online status and the heatmap default on. There is no age signal at all — decide
     (with the solicitor) on collecting a birth year and age-specific defaults. Fix the stale lines in
