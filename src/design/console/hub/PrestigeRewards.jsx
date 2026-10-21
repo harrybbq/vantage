@@ -53,6 +53,11 @@ export function CardStylePicker({ S, update }) {
   );
 }
 
+/** A locked row: the numeral is already in the first column, so just a lock. */
+function Locked({ at }) {
+  return <span className="cx-muted" role="img" aria-label={`Unlocks at ${prestigeName(at)}`} title={`Unlocks at ${prestigeName(at)}`}><Icon name="lock" size={14} strokeWidth={1.75} /></span>;
+}
+
 function Preview({ r, S }) {
   if (r.kind === 'accent') return <span className="cx-hub-rw-swatch" style={{ background: accentHex(r.id) || 'var(--cx-s3)' }} aria-hidden="true" />;
   if (r.kind === 'card') return <span className="cx-hub-cs-swatch is-small" data-cx-card={r.id} aria-hidden="true" />;
@@ -100,7 +105,7 @@ export default function PrestigeRewardsSheet({ S, update, onClose, onOpenRatings
               <span className="cx-hub-rw-name">{STANDING_REWARD.name}</span>
               <span className="cx-hub-rw-desc">{STANDING_REWARD.desc}</span>
             </span>
-            <span className="cx-hub-rw-st">{p ? <span className="cx-gold" aria-label="Unlocked">◆</span> : <span className="cx-muted">Prestige I</span>}</span>
+            <span className="cx-hub-rw-st">{p ? <span className="cx-gold" aria-label="Unlocked">◆</span> : <Locked at={1} />}</span>
           </li>
           {REWARDS.map(r => {
             const on = r.at <= p;
@@ -117,7 +122,7 @@ export default function PrestigeRewardsSheet({ S, update, onClose, onOpenRatings
                   <span className="cx-hub-rw-desc">{r.desc}</span>
                 </span>
                 <span className="cx-hub-rw-st">
-                  {on ? <span className="cx-gold" aria-label="Unlocked">◆</span> : next ? <span className="cx-accent">Next</span> : <span className="cx-muted">{prestigeName(r.at)}</span>}
+                  {on ? <span className="cx-gold" aria-label="Unlocked">◆</span> : next ? <span className="cx-accent">Next</span> : <Locked at={r.at} />}
                 </span>
               </li>
             );
