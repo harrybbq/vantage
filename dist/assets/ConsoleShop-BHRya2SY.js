@@ -1,1 +1,0 @@
-import{j as e}from"./index-cU-63DbE.js";import r from"./ShopSection-DwXRxUz2.js";import"./SectionHelp-BPGlm9xJ.js";function n({S:o,update:s,onOpenModal:t,onShowCoinToast:p}){return e.jsx("div",{className:"cx-sweep-scope cx-sweep-shop",children:e.jsx(r,{S:o,update:s,active:!0,onOpenModal:t,onShowCoinToast:p})})}export{n as default};
