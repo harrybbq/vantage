@@ -35,7 +35,7 @@ import { donutSegments } from '../../../components/ratings/RatingsDonut';
 import { useDarkSurface } from '../../../hooks/useDarkSurface';
 import { VISIONS, VISIONS_BY_ID } from '../../../lib/visions/definitions';
 import { timeAgo } from '../../../utils/helpers';
-import { Avatar } from './DivisionTable';
+import { Avatar, Diamonds } from './DivisionTable';
 import { boardRows, gapNote, ordinal } from './LeagueWidget';
 
 const CATS = [{ id: 'brain', label: 'Brain' }, { id: 'finance', label: 'Finance' }, { id: 'fitness', label: 'Fitness' }, { id: 'social', label: 'Social' }];
@@ -69,6 +69,9 @@ function usePlayer(S, visionState, hub) {
       settling, ovr, best, workOn, cats, pg,
       honours: { have: vs.unlockedCount || 0, total: vs.totalCount || VISIONS.length, recent, next: nextHonour },
       league: me && rows.length > 1 ? { pos: me.pos, of: rows.length, note: gapNote(rows) } : null,
+      // Four rows for the strip's friends column: the top four, or the
+      // top three and you when you are further down.
+      board: rows.length > 1 ? (rows.slice(0, 4).some(x => x.isSelf) || !me ? rows.slice(0, 4) : [...rows.slice(0, 3), me]) : [],
       prestige: p ? { text: prestigeName(p), n: p } : null,
     };
   }, [S.__slim, S.ratings, S.prestige, S.visions, visionState, hub?.board]);
@@ -76,9 +79,10 @@ function usePlayer(S, visionState, hub) {
 
 /** The OVR ring. `halo` (0‥1) draws a thin gold arc round the outside —
  *  the climb to the next prestige — and `prestige` names the level in
- *  the hole under OVR (2026-10-21: prestige lives on the number it
- *  counts, not in a column of its own). */
-function Donut({ cats, ovr, size, stroke, dark, halo = null, prestige = '' }) {
+ *  the hole under OVR, or `medal` puts a "P1" medal on top of the ring
+ *  (2026-10-21: prestige lives on the number it counts, not in a column
+ *  of its own). */
+function Donut({ cats, ovr, size, stroke, dark, halo = null, prestige = '', medal = '' }) {
   const colours = RATING_COLOURS[dark ? 'dark' : 'light'];
   const ratings = Object.fromEntries(cats.map(c => [c.id, c.v || 0]));
   const segs = donutSegments(ratingShares(ratings, cats));
@@ -103,6 +107,7 @@ function Donut({ cats, ovr, size, stroke, dark, halo = null, prestige = '' }) {
           )}
         </>}
       </svg>
+      {medal && <span className="cx-hub-medal cx-num" aria-hidden="true">{medal}</span>}
       <span className="cx-hub-donut-c">
         <span className={`cx-num ${bandClass(ovr)}`}>{ovr ?? '–'}</span>
         <span className="cx-muted">OVR</span>
@@ -156,24 +161,18 @@ export function PlayerStrip({ S, visionState, hub, navigate, onOpenVisions, onOp
           <button type="button" className="cx-chip" onClick={() => navigate?.('shop')} aria-label={`${fmt(S.coins)} coins, open the shop`}>
             <Icon name="coin" size={14} strokeWidth={1.75} /> <span className="cx-num">{fmt(S.coins)}</span>
           </button>
-          <button type="button" className="cx-chip" onClick={() => navigate?.('leaderboard')}
-                  aria-label={L.league ? `${ordinal(L.league.pos)} of ${L.league.of} friends${L.league.note ? `, ${L.league.note}` : ''}. Open the leaderboard` : 'League: pre-season. Open the leaderboard'}
-                  title={L.league?.note || undefined}>
-            <Icon name="trophy" size={14} strokeWidth={1.75} />
-            {L.league ? <span><b>{ordinal(L.league.pos)}</b> <span className="cx-muted">of {L.league.of}</span></span> : <span className="cx-muted">Pre-season</span>}
-          </button>
         </div>
       </div>
 
       {/* OVR and prestige together (2026-10-21). Prestige is how many
-          times OVR has filled, so it sits on the ring: named in the hole,
+          times OVR has filled, so it sits on the ring: a "P1" medal on top,
           and the gold arc round the outside is the climb to the next one.
           Two controls: the ring and categories open the ratings, the
           prestige line under them opens the rewards. */}
       <div className="cx-hub-pl-ovr">
         <button type="button" className="cx-hub-pl-rate" onClick={onOpenRatings}
                 aria-label={`OVR ${L.ovr ?? 'loading'}${L.prestige ? `, ${L.prestige.text}` : ''}. Open your ratings`}>
-          <Donut cats={L.cats} ovr={L.ovr} size={132} stroke={10} dark={dark} halo={L.settling ? null : haloOf(pg)} prestige={L.prestige ? L.prestige.text : ''} />
+          <Donut cats={L.cats} ovr={L.ovr} size={132} stroke={10} dark={dark} halo={L.settling ? null : haloOf(pg)} medal={L.prestige ? `P${L.prestige.n}` : ''} />
           <span className="cx-hub-pl-cats">
             <span className="cx-hub-pl-h">
               <span className="cx-hub-pl-t">Categories</span>
@@ -186,6 +185,8 @@ export function PlayerStrip({ S, visionState, hub, navigate, onOpenVisions, onOp
         <button type="button" className="cx-hub-pl-prog" onClick={onOpenRewards}
                 aria-label={`${L.prestige ? L.prestige.text : 'No prestige yet'}. ${toGoText(pg)}.${pg.reward ? ` Next unlock: ${pg.reward.name}.` : ''} Open prestige rewards`}>
           <span className="cx-hub-pl-h">
+            <span className="cx-gold cx-hub-nowrap"><span aria-hidden="true">◆</span> {L.prestige ? L.prestige.text : 'Prestige 0'}</span>
+            <span className="cx-muted" aria-hidden="true">·</span>
             {pg.ready
               ? <span className="cx-hub-pl-ready">Ready to prestige</span>
               : <span className="cx-mid">{toGoText(pg)}</span>}
@@ -193,6 +194,25 @@ export function PlayerStrip({ S, visionState, hub, navigate, onOpenVisions, onOp
           </span>
         </button>
       </div>
+
+      {/* Friends this week — the column prestige used to take. Opens the
+          leaderboard. */}
+      <button type="button" className="cx-hub-pl-fr" onClick={() => navigate?.('leaderboard')}
+              aria-label={L.league ? `Friends league: ${ordinal(L.league.pos)} of ${L.league.of}${L.league.note ? `, ${L.league.note}` : ''}. Open the leaderboard` : 'Friends league. Open the leaderboard'}>
+        <span className="cx-hub-pl-h">
+          <span className="cx-hub-pl-t">Friends</span><span className="cx-hub-sp" />
+          <span className="cx-muted">{L.league ? <><b className="cx-text">{ordinal(L.league.pos)}</b> of {L.league.of}</> : 'Pre-season'}</span>
+        </span>
+        {L.board.length ? L.board.map(f => (
+          <span key={f.id} className={`cx-hub-pl-frow${f.isSelf ? ' is-self' : ''}`}>
+            <span className="cx-num cx-muted">{f.pos}</span>
+            <span className="cx-hub-pl-fnm"><span className="cx-hub-ell">{f.isSelf ? 'You' : f.name}</span><Diamonds n={f.prestige} /></span>
+            <span className="cx-num cx-muted">{f.weekly != null ? `${f.weekly > 0 ? '+' : ''}${f.weekly}` : ''}</span>
+            <span className={`cx-num ${bandClass(f.ovr)}`}>{f.ovr ?? '–'}</span>
+          </span>
+        )) : <span className="cx-muted">Add a friend to start a league.</span>}
+        {L.league?.note && <span className="cx-mid cx-hub-pl-fnote">{L.league.note}</span>}
+      </button>
 
       <button type="button" className="cx-hub-pl-hon" onClick={onOpenVisions} aria-label={`Honours, ${L.honours.have} of ${L.honours.total}. Open Honours`}>
         <span className="cx-hub-pl-h"><span className="cx-hub-pl-t">Honours</span><span className="cx-hub-sp" /><span className="cx-muted"><span className="cx-num">{L.honours.have}</span> of <span className="cx-num">{L.honours.total}</span></span></span>
