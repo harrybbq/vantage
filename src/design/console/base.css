@@ -236,6 +236,24 @@ html[data-design="console"] .cx-input:not(#cx-id) {
   font: 400 16px/22px var(--cx-sans); /* 16 px, not 15: iOS zooms the page on focus below 16 */
   transition: border-color var(--cx-dur-fast) var(--cx-ease);
 }
+/* Date and time boxes on iOS. WebKit draws them natively: they keep a
+   built-in minimum width, ignore width: 100%, and centre their value —
+   so two side by side (Starts / Ends in the add-event sheet) spilled
+   out of their grid columns and crammed into each other on an iPhone,
+   while Chromium drew the same form fine. Dropping the native
+   appearance makes them size like any other input; the picker still
+   opens on tap. */
+html[data-design="console"] input:is([type="date"], [type="time"], [type="datetime-local"], [type="month"], [type="week"]) {
+  min-width: 0;
+  max-width: 100%;
+}
+html[data-design="console"] .cx-input:not(#cx-id):is([type="date"], [type="time"], [type="datetime-local"], [type="month"], [type="week"]) {
+  -webkit-appearance: none;
+  appearance: none;
+  text-align: left;
+  line-height: calc(var(--cx-input-h) - 2px);
+}
+html[data-design="console"] .cx-input:not(#cx-id)::-webkit-date-and-time-value { text-align: left; margin: 0; }
 html[data-design="console"] textarea.cx-input:not(#cx-id) { height: auto; min-height: 96px; padding: 12px 14px; resize: vertical; }
 html[data-design="console"] .cx-input:not(#cx-id)::placeholder { color: var(--cx-muted); opacity: 1; }
 html[data-design="console"] .cx-input:not(#cx-id):focus { border-color: var(--cx-accent); outline: none; }
