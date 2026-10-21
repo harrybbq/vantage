@@ -7861,8 +7861,12 @@ div.m-hubdrawer-coach { cursor: default; display: flex; flex-direction: column; 
 /* Motion: the drawer is a position change, not a flourish — respect the
    preference by fading instead of sliding, and keep it usable. */
 @media (prefers-reduced-motion: reduce) {
-  .m-hubdrawer { transition: opacity .12s linear; transform: none; opacity: 0; }
-  .m-hubdrawer.is-open { opacity: 1; }
+  /* Faded rather than slid off screen, so the closed drawer must also
+     stop catching taps: without this an invisible panel sat over the left
+     of the phone hub and swallowed every tap there for anyone with Reduce
+     Motion on. */
+  .m-hubdrawer { transition: opacity .12s linear, visibility 0s linear .12s; transform: none; opacity: 0; visibility: hidden; pointer-events: none; }
+  .m-hubdrawer.is-open { opacity: 1; visibility: visible; pointer-events: auto; transition: opacity .12s linear; }
   .m-hubdrawer-scrim { transition: none; }
 }
 

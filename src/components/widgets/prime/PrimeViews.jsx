@@ -209,7 +209,9 @@ function ListL({ d }) {
     </div>
   );
 }
-function ChecksL({ d }) {
+/* A yes/no tracker's box ticks it for today when the card can write
+   (onAct present); elsewhere, and for number trackers, it stays a mark. */
+function ChecksL({ d, onAct }) {
   return (
     <div className="pv pv-list">
       <div className="pv-list-head">
@@ -218,7 +220,21 @@ function ChecksL({ d }) {
       </div>
       {d.rows.map((r, i) => (
         <div className="pv-row pv-check" key={r.n + i}>
-          <span className="pv-tick" style={{ background: r.bg, borderColor: r.bd }}>{r.ck}</span>
+          {r.act && onAct ? (
+            <button
+              type="button"
+              className="pv-tick pv-tick-btn"
+              style={{ background: r.bg, borderColor: r.bd }}
+              role="checkbox"
+              aria-checked={!!r.done}
+              aria-label={`${r.done ? 'Untick' : 'Tick'} ${r.act.name} for today`}
+              onPointerDown={e => e.stopPropagation()}
+              onTouchStart={e => e.stopPropagation()}
+              onClick={e => { e.stopPropagation(); onAct(r.act); }}
+            >{r.ck}</button>
+          ) : (
+            <span className="pv-tick" style={{ background: r.bg, borderColor: r.bd }}>{r.ck}</span>
+          )}
           <span className="pv-row-n" style={{ color: r.fg }}>{r.n}</span>
           <span className="pv-row-m">{r.v}</span>
         </div>

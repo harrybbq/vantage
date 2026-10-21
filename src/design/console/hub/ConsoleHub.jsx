@@ -21,6 +21,7 @@ import { PrimeEditorSheet } from '../../../components/widgets/prime/PrimeEditor'
 import QuickFoodMenu from '../../../components/widgets/prime/QuickFoodMenu';
 import { PRIMES, primeOf, withBlocks, withBlockOpts } from '../../../lib/hub/primeBlocks';
 import { applyRelapse } from '../../../lib/habits/relapse';
+import { toggleTrackerToday } from '../../../lib/trackers/tickEffects';
 import { isRetiredWidget } from '../../../lib/widgets/retired';
 import { useHubGrid, makeId } from './useHubGrid';
 import { useFriendsHub } from './useFriendsHub';
@@ -69,8 +70,9 @@ export default function ConsoleHub(props) {
 
   const onPrimeAct = useCallback(act => {
     if (act?.kind === 'relapse') update(prev => applyRelapse(prev, act.id, Date.now()));
+    if (act?.kind === 'tick') toggleTrackerToday(update, act.trackerId, onShowCoinToast);
     if (act?.kind === 'logfood') setFoodMenu(cur => (cur ? null : { rect: act.rect || null }));
-  }, [update]);
+  }, [update, onShowCoinToast]);
 
   const renderBody = (item, size) => (
     <WidgetBody

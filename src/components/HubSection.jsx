@@ -12,6 +12,7 @@ import { tradingWidgetAvailable, TRADING_WIDGET_BUILD_EXCLUDED } from '../lib/tr
 import { isRetiredWidget } from '../lib/widgets/retired';
 import { apiFetch } from '../lib/authFetch';
 import { applyRelapse } from '../lib/habits/relapse';
+import { toggleTrackerToday } from '../lib/trackers/tickEffects';
 import MarketBody from './widgets/MarketWidget';
 import NewsBody from './widgets/NewsWidget';
 import { reflow, MIN_W, MIN_H, SNAP_GAP as REFLOW_GAP } from '../lib/hub/reflow';
@@ -683,9 +684,10 @@ export default function HubSection({ S, update, active, onOpenModal, onOpenPaywa
   const [foodMenu, setFoodMenu] = useState(null);   // { rect } | null
   const onPrimeAct = useCallback(act => {
     if (act?.kind === 'relapse') update(prev => applyRelapse(prev, act.id, Date.now()));
+    if (act?.kind === 'tick') toggleTrackerToday(update, act.trackerId, onShowCoinToast);
     // The small recent-foods menu; full search stays on the diet page.
     if (act?.kind === 'logfood') setFoodMenu(cur => (cur ? null : { rect: act.rect || null }));
-  }, [update]);
+  }, [update, onShowCoinToast]);
   const closeFoodMenu = useCallback(() => setFoodMenu(null), []);
   const openFoodSearch = useCallback(() => {
     // Same hand-off the Macros widget uses: NutritionSection reads the

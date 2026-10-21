@@ -130,7 +130,8 @@ function TopBar({ S, section, userId, navigate, onOpenModal, onOpenPalette, now 
         </button>
       )}
       <SocialChips userId={userId} onOpen={() => navigate('hub')} />
-      <CoinsChip S={S} onOpen={() => onOpenModal('coinHistoryModal')} />
+      {/* The hub's player strip already shows the balance; one is enough. */}
+      {section !== 'hub' && <CoinsChip S={S} onOpen={() => onOpenModal('coinHistoryModal')} />}
       <Avatar S={S} onClick={() => navigate('profile')} />
     </header>
   );

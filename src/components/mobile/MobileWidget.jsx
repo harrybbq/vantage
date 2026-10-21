@@ -21,6 +21,7 @@ import { APP_PRESETS, getAppPreset, RETIRED_PRESETS } from '../../data/appPreset
 import { fetchAppPreview } from '../../lib/appPreview';
 import { strikeState } from '../../lib/habits/strikes';
 import { applyRelapse } from '../../lib/habits/relapse';
+import { toggleTrackerToday } from '../../lib/trackers/tickEffects';
 import { isCut, current as cutCurrent } from '../../lib/habits/cutdown';
 import { habitElapsed, cutHeadline } from '../../lib/habits/progress';
 import { SavingsPotsBody, SavingsProjectionBody } from '../savings/SavingsWidgets';
@@ -504,6 +505,7 @@ export default function MobileWidget({ widget, S, update, onRemove, navigate, us
                 userId={userId}
                 onAct={act => {
                   if (act?.kind === 'relapse') update(prev => applyRelapse(prev, act.id, Date.now()));
+                  if (act?.kind === 'tick') toggleTrackerToday(update, act.trackerId);
                   if (act?.kind === 'logfood') setFoodMenu(cur => (cur ? null : { rect: act.rect || null }));
                 }}
               />

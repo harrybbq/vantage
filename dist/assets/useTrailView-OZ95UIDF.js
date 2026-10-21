@@ -1,1 +1,0 @@
-import{r as a}from"./index-PcriEGkw.js";const e=t=>`vb_habit_view_${t}`;function u(t){const[o,l]=a.useState(()=>{try{return localStorage.getItem(e(t))==="trail"}catch{return!1}}),c=a.useCallback(()=>{l(s=>{const r=!s;try{r?localStorage.setItem(e(t),"trail"):localStorage.removeItem(e(t))}catch{}return r})},[t]);return[o,c]}export{u};

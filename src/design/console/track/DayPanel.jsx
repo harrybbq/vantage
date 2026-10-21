@@ -17,7 +17,7 @@ import { eventColour, eventWhen, eventsOn } from '../../../lib/calendar/events';
 import { trackerDone, trackerProgress, trackerStep, dailyGoalOf, fmtTrackerValue } from '../../../lib/trackers/done';
 import { sourceById, isAutoFilled, autoProvenance } from '../../../lib/trackers/autoLog';
 import { countWeekLogs, getTodayStr } from '../../../utils/helpers';
-import { fireGoal, fireStreak7, fireStreak30 } from '../../../utils/confetti';
+import { fireTickEffects } from '../../../lib/trackers/tickEffects';
 import { Checkbox, Button } from '../ui';
 import { applyTick, tapValue } from './tick';
 import { itineraryOn, billsInRange, money, trackerCompletion } from './model';
@@ -27,21 +27,7 @@ const ITEM_ICON = { travel: 'plane', stay: 'bed', food: 'utensils', activity: 't
 const longDate = iso => new Date(iso + 'T12:00').toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' });
 const shortDate = iso => new Date(iso + 'T12:00').toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' });
 
-/** Fire a tick's effects the way classic QuickLog does. */
-export function fireTickEffects(effects, onShowCoinToast) {
-  for (const e of effects) {
-    if (e.type === 'award') {
-      onShowCoinToast?.('+' + e.amount + ' ⬡ — ' + e.tracker.name + ' weekly goal!', true);
-      fireGoal();
-    } else if (e.type === 'streak7') {
-      fireStreak7();
-      onShowCoinToast?.(`🔥 7 day streak on ${e.tracker.name}!`, true);
-    } else if (e.type === 'streak30') {
-      fireStreak30();
-      onShowCoinToast?.('🔥 30 day streak — incredible consistency!', true);
-    }
-  }
-}
+export { fireTickEffects };
 
 function Ring({ pct, colour }) {
   const R = 8, C = 2 * Math.PI * R;

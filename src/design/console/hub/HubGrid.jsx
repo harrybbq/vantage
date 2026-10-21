@@ -28,7 +28,7 @@ import { createPortal } from 'react-dom';
 import Icon from '../../../components/Icon';
 import { WidgetFrame } from '../ui';
 import { packGrid, dropIndex, effectiveSize, sizesFor, isProSize, SIZE_LABEL, SIZE_DIMS } from './grid';
-import { createDragScroller } from '../../../lib/mobile/dragScroll';
+import { createDragScroller, zoneSize } from '../../../lib/mobile/dragScroll';
 
 const HOLD_MS = 450;
 const reduced = () => typeof window !== 'undefined' && window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -232,6 +232,27 @@ export default function HubGrid({
     return true;
   }
 
+  /* Edge auto-scroll watches the dragged WIDGET, not the pointer: a tall
+     card held by its middle reaches the top of the screen long before the
+     finger does. Going up it reads the card's top edge, going down its
+     bottom edge. The edge is offset into the zone so a card just touching
+     the bar creeps (~3-4 px a frame) and only speeds up if it's pushed
+     further past it (lib/mobile/dragScroll ramps by depth). */
+  function edgeY(d, bounds) {
+    const top = d.r0.top + (d.py - d.sy);
+    const bottom = top + d.r0.height;
+    const zone = zoneSize(bounds.bottom - bounds.top);
+    const lead = zone * 0.7;
+    const up = top <= bounds.top + zone, down = bottom >= bounds.bottom - zone;
+    if (up && (!down || d.dir < 0)) return top + lead;
+    if (down) return bottom - lead;
+    return d.py;
+  }
+  function feedScroller(d) {
+    if (!d?.scroller) return;
+    d.scroller.move(edgeY(d, d.bounds()));
+  }
+
   /* A pick-up must never also count as a click on whatever is under the
      pointer: a held tracker checkbox would tick itself, a held title would
      navigate. Armed when the drag BEGINS and ended after the drop, because
@@ -275,10 +296,18 @@ export default function HubGrid({
         if (Math.hypot(ev.clientX - sx, ev.clientY - sy) < 4) return;
         started = begin(id, sx, sy, 'mouse');
         if (!started) return cleanup();
+        const d0 = dragRef.current;
+        d0.bounds = () => {
+          const bar = document.querySelector('.cx-shell-top');
+          return { top: bar ? rectOf(bar).bottom : 0, bottom: window.innerHeight };
+        };
+        d0.scroller = createDragScroller({ getBounds: d0.bounds, onScrolled: () => retarget() });
       }
       const d = dragRef.current;
       if (!d) return;
+      d.dir = Math.sign(ev.clientY - d.py) || d.dir || 0;
       d.px = ev.clientX; d.py = ev.clientY; d.moved = true;
+      feedScroller(d);
       retarget();
     };
     const up = () => { cleanup(); if (started) finish(false); };
@@ -323,22 +352,21 @@ export default function HubGrid({
         if (!begin(id, sx, sy, 'touch')) return;
         if (navigator.vibrate) { try { navigator.vibrate(18); } catch { /* ignore */ } }
         const d = dragRef.current;
-        d.scroller = createDragScroller({
-          getBounds: () => {
-            const bar = document.querySelector('.m-tabs, .cx-shell-tabs');
-            const top = document.querySelector('.m-appbar, .cx-shell-appbar');
-            return { top: top ? rectOf(top).bottom : 0, bottom: bar ? rectOf(bar).top : window.innerHeight };
-          },
-          onScrolled: () => retarget(),
-        });
+        d.bounds = () => {
+          const bar = document.querySelector('.m-tabs, .cx-shell-tabs');
+          const top = document.querySelector('.m-appbar, .cx-shell-appbar');
+          return { top: top ? rectOf(top).bottom : 0, bottom: bar ? rectOf(bar).top : window.innerHeight };
+        };
+        d.scroller = createDragScroller({ getBounds: d.bounds, onScrolled: () => retarget() });
         const move = ev => {
           const p = ev.touches[0];
           const dd = dragRef.current;
           if (!p || !dd) return;
           ev.preventDefault();
+          dd.dir = Math.sign(p.clientY - dd.py) || dd.dir || 0;
           dd.px = p.clientX; dd.py = p.clientY;
           if (Math.hypot(dd.px - dd.sx, dd.py - dd.sy) > 6) dd.moved = true;
-          dd.scroller?.move(p.clientY);
+          feedScroller(dd);
           retarget();
         };
         const end = () => {
