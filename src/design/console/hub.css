@@ -140,7 +140,9 @@ html[data-design="console"] .cx-hub-page.is-phone .cx-hub { gap: var(--cx-hub-ga
 /* ════════ Player strip (desktop) ════════ */
 html[data-design="console"] .cx-hub-player {
   display: grid;
-  grid-template-columns: minmax(200px, 250px) minmax(220px, 1fr) minmax(320px, 1.45fr) minmax(220px, 1fr);
+  /* profile | OVR + prestige | honours. Prestige had a column of its own
+     until 2026-10-21; it now sits on the OVR ring. */
+  grid-template-columns: minmax(220px, 280px) minmax(440px, 2.1fr) minmax(240px, 1.15fr);
   align-items: stretch;
   overflow: hidden;
 }
@@ -152,8 +154,7 @@ html[data-design="console"] .cx-hub-player > * {
 html[data-design="console"] .cx-hub-player > :first-child { border-left: 0; }
 html[data-design="console"] .cx-hub-player > button { cursor: pointer; }
 html[data-design="console"] .cx-hub-player > button:hover,
-html[data-design="console"] .cx-hub-pl-hit:hover,
-html[data-design="console"] .cx-hub-pl-league:hover { background: var(--cx-s2); }
+html[data-design="console"] .cx-hub-pl-ovr > button:hover { background: var(--cx-s2); }
 html[data-design="console"] .cx-hub-pl-id { display: flex; flex-direction: column; gap: 12px; }
 html[data-design="console"] .cx-hub-pl-who {
   display: flex; align-items: center; gap: 12px; padding: 0; border: 0; background: none;
@@ -166,22 +167,20 @@ html[data-design="console"] .cx-hub-pl-tag {
   display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden;
 }
 html[data-design="console"] .cx-hub-pl-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: auto; }
-html[data-design="console"] .cx-hub-pl-lvl { display: flex; flex-direction: column; gap: 8px; padding: 0 !important; }
-html[data-design="console"] .cx-hub-pl-hit {
-  display: flex; flex-direction: column; gap: 10px; padding: 18px 20px 8px; border: 0; background: none;
-  color: inherit; text-align: left; cursor: pointer; font: inherit;
-}
 html[data-design="console"] .cx-hub-pl-h { display: flex; align-items: center; gap: 8px; min-width: 0; font: 400 var(--cx-fs-12)/var(--cx-lh-12) var(--cx-sans); }
 html[data-design="console"] .cx-hub-pl-t { font: 600 var(--cx-fs-13)/var(--cx-lh-13) var(--cx-sans); color: var(--cx-text); }
-html[data-design="console"] .cx-hub-pl-big { display: flex; align-items: baseline; gap: 10px; font-size: var(--cx-fs-13); }
-html[data-design="console"] .cx-hub-pl-ends { display: flex; justify-content: space-between; font-size: var(--cx-fs-12); line-height: var(--cx-lh-12); }
-html[data-design="console"] .cx-hub-pl-league {
-  display: flex; align-items: center; gap: 6px; margin-top: auto; padding: 8px 20px 16px; border: 0; background: none;
-  color: var(--cx-text); cursor: pointer; text-align: left; font: 400 var(--cx-fs-13)/var(--cx-lh-13) var(--cx-sans); min-width: 0;
+/* The OVR column: ring + categories (opens ratings), then the prestige
+   line (opens rewards), indented to start under the categories. */
+html[data-design="console"] .cx-hub-pl-ovr { display: flex; flex-direction: column; padding: 0 !important; }
+html[data-design="console"] .cx-hub-pl-ovr > button {
+  border: 0; background: none; color: inherit; text-align: left; font: inherit; cursor: pointer; min-width: 0;
 }
-html[data-design="console"] .cx-hub-pl-league b { font-weight: 600; }
-html[data-design="console"] .cx-hub-pl-league .cx-mid { white-space: nowrap; }
-html[data-design="console"] .cx-hub-pl-rate { display: flex; align-items: center; gap: 20px; }
+html[data-design="console"] .cx-hub-pl-rate { display: flex; align-items: center; gap: 24px; padding: 16px 20px 8px; flex: 1 1 auto; }
+html[data-design="console"] .cx-hub-pl-prog { padding: 4px 20px 14px calc(20px + 132px + 24px); }
+html[data-design="console"] .cx-hub-pl-prog .cx-hub-pl-h { flex-wrap: wrap; row-gap: 2px; }
+html[data-design="console"] .cx-hub-pl-ovr .cx-text { color: var(--cx-text); }
+html[data-design="console"] .cx-hub-donut-p { margin-top: 3px; font: 600 10.5px/14px var(--cx-sans); letter-spacing: 0.04em; white-space: nowrap; }
+html[data-design="console"] .cx-hub-halo { transition: stroke-dasharray var(--cx-dur) var(--cx-ease); }
 html[data-design="console"] .cx-hub-pl-cats { display: flex; flex-direction: column; gap: 2px; flex: 1 1 auto; min-width: 0; }
 html[data-design="console"] .cx-hub-pl-cats > .cx-hub-pl-h { margin-bottom: 6px; }
 html[data-design="console"] .cx-hub-catrow {
@@ -203,9 +202,8 @@ html[data-design="console"] .cx-hub-donut-c > .cx-num { font-size: var(--cx-fs-2
 html[data-design="console"] .cx-hub-pl-rate .cx-hub-donut-c > .cx-num { font-size: var(--cx-fs-40); line-height: var(--cx-lh-40); }
 
 @media (max-width: 1180px) {
-  html[data-design="console"] .cx-hub-player { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  html[data-design="console"] .cx-hub-player > :nth-child(3) { border-left: 0; }
-  html[data-design="console"] .cx-hub-player > :nth-child(n + 3) { border-top: 1px solid var(--cx-line); }
+  html[data-design="console"] .cx-hub-player { grid-template-columns: minmax(200px, 0.8fr) minmax(0, 2fr); }
+  html[data-design="console"] .cx-hub-player > :nth-child(3) { grid-column: 1 / -1; border-left: 0; border-top: 1px solid var(--cx-line); }
 }
 
 /* ════════ Compact player card (phone) ════════ */
@@ -646,7 +644,6 @@ html[data-design="console"] .cx-hub-cell .m-vitals-delta { position: static; fon
 html[data-design="console"] body:has(.cx-hub-ratings) .modal-overlay { z-index: 2100; }
 
 /* ════════ Prestige (player strip) ════════ */
-html[data-design="console"] .cx-hub-pl-unlock { font: 400 var(--cx-fs-12)/var(--cx-lh-12) var(--cx-sans); color: var(--cx-text); }
 html[data-design="console"] .cx-hub-pl-ready { font-weight: 600; color: var(--cx-accent); }
 
 /* ════════ Hub card styles (prestige rewards, S.cardStyle) ════════
@@ -737,4 +734,3 @@ html[data-design="console"] .cx-hub-rw-swatch { display: block; width: 22px; hei
 html[data-design="console"] .cx-hub-rw-cs { display: flex; flex-direction: column; gap: 8px; }
 html[data-design="console"] .cx-hub-rw-cs > p { margin: 0; }
 html[data-design="console"] .cx-hub-rw-h { margin: 0; font: 600 var(--cx-fs-15)/var(--cx-lh-15) var(--cx-sans); color: var(--cx-text); }
-html[data-design="console"] .cx-hub-pl-dia { font-size: 0.55em; vertical-align: 0.35em; margin-right: 0.25em; }

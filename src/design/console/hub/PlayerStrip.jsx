@@ -49,7 +49,9 @@ function usePlayer(S, visionState, hub) {
     const ovr = settling ? null : (r.ovr || null);
     // OVR is the only level (2026-10-21): no band names beside it, just
     // where the points come from.
-    const best = settling ? null : (categoryProfile(S).best?.label || null);
+    const prof = settling ? null : categoryProfile(S);
+    const best = prof?.best?.label || null;
+    const workOn = prof?.workOn?.label || null;
     const cats = CATS.map(c => ({ ...c, v: settling ? null : (r[c.id] ?? null) }));
     const vs = visionState || {};
     const p = Math.max(0, Math.floor(Number(S.prestige) || 0));
@@ -64,7 +66,7 @@ function usePlayer(S, visionState, hub) {
     const rows = boardRows(hub?.board);
     const me = rows.find(x => x.isSelf);
     return {
-      settling, ovr, best, cats, pg,
+      settling, ovr, best, workOn, cats, pg,
       honours: { have: vs.unlockedCount || 0, total: vs.totalCount || VISIONS.length, recent, next: nextHonour },
       league: me && rows.length > 1 ? { pos: me.pos, of: rows.length, note: gapNote(rows) } : null,
       prestige: p ? { text: prestigeName(p), n: p } : null,
@@ -72,7 +74,11 @@ function usePlayer(S, visionState, hub) {
   }, [S.__slim, S.ratings, S.prestige, S.visions, visionState, hub?.board]);
 }
 
-function Donut({ cats, ovr, size, stroke, dark }) {
+/** The OVR ring. `halo` (0‥1) draws a thin gold arc round the outside —
+ *  the climb to the next prestige — and `prestige` names the level in
+ *  the hole under OVR (2026-10-21: prestige lives on the number it
+ *  counts, not in a column of its own). */
+function Donut({ cats, ovr, size, stroke, dark, halo = null, prestige = '' }) {
   const colours = RATING_COLOURS[dark ? 'dark' : 'light'];
   const ratings = Object.fromEntries(cats.map(c => [c.id, c.v || 0]));
   const segs = donutSegments(ratingShares(ratings, cats));
@@ -88,14 +94,27 @@ function Donut({ cats, ovr, size, stroke, dark }) {
                   strokeDasharray={`${s.length.toFixed(2)} ${(C - s.length).toFixed(2)}`}
                   strokeDashoffset={(-s.offset + C / 4).toFixed(2)} />
         ))}
+        {halo != null && <>
+          <circle cx="66" cy="66" r={HALO_R} fill="none" stroke="var(--cx-track)" strokeWidth={HALO_W} />
+          {halo > 0 && (
+            <circle className="cx-hub-halo" cx="66" cy="66" r={HALO_R} fill="none" stroke="var(--cx-gold)" strokeWidth={HALO_W} strokeLinecap="round"
+                    strokeDasharray={`${(HALO_C * Math.min(1, halo)).toFixed(2)} ${HALO_C.toFixed(2)}`}
+                    strokeDashoffset={(HALO_C / 4).toFixed(2)} />
+          )}
+        </>}
       </svg>
       <span className="cx-hub-donut-c">
         <span className={`cx-num ${bandClass(ovr)}`}>{ovr ?? '–'}</span>
         <span className="cx-muted">OVR</span>
+        {prestige && <span className="cx-gold cx-hub-donut-p"><span aria-hidden="true">◆</span> {prestige}</span>}
       </span>
     </span>
   );
 }
+
+// The halo sits outside the category ring (r 52, ~9 wide) in the same 132 box.
+const HALO_R = 63, HALO_W = 2.5, HALO_C = 2 * Math.PI * HALO_R;
+const haloOf = pg => (pg.ready ? 1 : Math.max(0, Math.min(1, (pg.pct || 0) / 100)));
 
 function CatBar({ c }) {
   return (
@@ -137,47 +156,43 @@ export function PlayerStrip({ S, visionState, hub, navigate, onOpenVisions, onOp
           <button type="button" className="cx-chip" onClick={() => navigate?.('shop')} aria-label={`${fmt(S.coins)} coins, open the shop`}>
             <Icon name="coin" size={14} strokeWidth={1.75} /> <span className="cx-num">{fmt(S.coins)}</span>
           </button>
+          <button type="button" className="cx-chip" onClick={() => navigate?.('leaderboard')}
+                  aria-label={L.league ? `${ordinal(L.league.pos)} of ${L.league.of} friends${L.league.note ? `, ${L.league.note}` : ''}. Open the leaderboard` : 'League: pre-season. Open the leaderboard'}
+                  title={L.league?.note || undefined}>
+            <Icon name="trophy" size={14} strokeWidth={1.75} />
+            {L.league ? <span><b>{ordinal(L.league.pos)}</b> <span className="cx-muted">of {L.league.of}</span></span> : <span className="cx-muted">Pre-season</span>}
+          </button>
         </div>
       </div>
 
-      <div className="cx-hub-pl-lvl">
-        <button type="button" className="cx-hub-pl-hit" onClick={onOpenRewards} aria-label={`${L.prestige ? L.prestige.text : 'No prestige yet'}. ${toGoText(pg)}.${pg.reward ? ` Next unlock: ${pg.reward.name}.` : ''} Open prestige rewards`}>
-          {/* The level you are at, big; how far to the next one, small.
-              The other way round, "30 OVR to Prestige II" read as
-              "Prestige 30". */}
-          <span className="cx-hub-pl-big">
-            <span className="cx-gold cx-t40 cx-hub-nowrap"><span className="cx-hub-pl-dia" aria-hidden="true">◆</span>{L.prestige ? L.prestige.text : 'Prestige 0'}</span>
+      {/* OVR and prestige together (2026-10-21). Prestige is how many
+          times OVR has filled, so it sits on the ring: named in the hole,
+          and the gold arc round the outside is the climb to the next one.
+          Two controls: the ring and categories open the ratings, the
+          prestige line under them opens the rewards. */}
+      <div className="cx-hub-pl-ovr">
+        <button type="button" className="cx-hub-pl-rate" onClick={onOpenRatings}
+                aria-label={`OVR ${L.ovr ?? 'loading'}${L.prestige ? `, ${L.prestige.text}` : ''}. Open your ratings`}>
+          <Donut cats={L.cats} ovr={L.ovr} size={132} stroke={10} dark={dark} halo={L.settling ? null : haloOf(pg)} prestige={L.prestige ? L.prestige.text : ''} />
+          <span className="cx-hub-pl-cats">
+            <span className="cx-hub-pl-h">
+              <span className="cx-hub-pl-t">Categories</span>
+              <span className="cx-hub-sp" />
+              {L.best && <span className="cx-muted cx-hub-nowrap">Best at <span className="cx-text">{L.best}</span>{L.workOn && <> · Work on <span className="cx-text">{L.workOn}</span></>}</span>}
+            </span>
+            {L.cats.map(c => <CatBar key={c.id} c={c} />)}
           </span>
+        </button>
+        <button type="button" className="cx-hub-pl-prog" onClick={onOpenRewards}
+                aria-label={`${L.prestige ? L.prestige.text : 'No prestige yet'}. ${toGoText(pg)}.${pg.reward ? ` Next unlock: ${pg.reward.name}.` : ''} Open prestige rewards`}>
           <span className="cx-hub-pl-h">
             {pg.ready
               ? <span className="cx-hub-pl-ready">Ready to prestige</span>
-              : <span className="cx-mid">{pg.next ? `${pg.toGo == null ? '–' : pg.toGo} OVR left until ${pg.nextName}` : 'Every prestige reached'}</span>}
+              : <span className="cx-mid">{toGoText(pg)}</span>}
+            {pg.reward && <span className="cx-muted cx-hub-ell">· next unlock: <span className="cx-text">{pg.reward.name}</span></span>}
           </span>
-          <span className="cx-hub-bar is-thick"><i style={{ width: `${pg.pct}%` }} /></span>
-          <span className="cx-hub-pl-ends cx-num cx-muted"><span>OVR {L.ovr ?? '–'}</span><span>99</span></span>
-          {pg.reward && (
-            <span className="cx-hub-pl-unlock"><span className="cx-muted">Next unlock:</span> {pg.reward.name} <span className="cx-muted">at {prestigeName(pg.reward.at)}</span></span>
-          )}
-        </button>
-        <button type="button" className="cx-hub-pl-league" onClick={() => navigate?.('leaderboard')}>
-          <Icon name="trophy" size={14} strokeWidth={1.75} />
-          {L.league
-            ? <><b>{ordinal(L.league.pos)}</b><span className="cx-muted">of {L.league.of} friends</span>{L.league.note && <><span className="cx-hub-sp" /><span className="cx-mid">{L.league.note}</span></>}</>
-            : <span className="cx-muted">League: pre-season</span>}
         </button>
       </div>
-
-      <button type="button" className="cx-hub-pl-rate" onClick={onOpenRatings} aria-label={`OVR ${L.ovr ?? 'loading'}. Open your ratings`}>
-        <Donut cats={L.cats} ovr={L.ovr} size={112} stroke={10} dark={dark} />
-        <span className="cx-hub-pl-cats">
-          <span className="cx-hub-pl-h">
-            <span className="cx-hub-pl-t">Categories</span>
-            <span className="cx-hub-sp" />
-            {L.best && <span className="cx-muted cx-hub-nowrap">Best at {L.best}</span>}
-          </span>
-          {L.cats.map(c => <CatBar key={c.id} c={c} />)}
-        </span>
-      </button>
 
       <button type="button" className="cx-hub-pl-hon" onClick={onOpenVisions} aria-label={`Honours, ${L.honours.have} of ${L.honours.total}. Open Honours`}>
         <span className="cx-hub-pl-h"><span className="cx-hub-pl-t">Honours</span><span className="cx-hub-sp" /><span className="cx-muted"><span className="cx-num">{L.honours.have}</span> of <span className="cx-num">{L.honours.total}</span></span></span>
@@ -203,13 +218,12 @@ export function PlayerCard({ S, visionState, hub, navigate, onOpenVisions, onOpe
     <section className="cx-panel cx-hub-pcard" aria-label="Your prestige and ratings">
       <div className="cx-hub-pc-top">
         <button type="button" className="cx-hub-pc-donut" onClick={onOpenRatings} aria-label={`OVR ${L.ovr ?? 'loading'}. Open your ratings`}>
-          <Donut cats={L.cats} ovr={L.ovr} size={84} stroke={8} dark={dark} />
+          <Donut cats={L.cats} ovr={L.ovr} size={84} stroke={8} dark={dark} halo={L.settling ? null : haloOf(pg)} />
         </button>
         <button type="button" className="cx-hub-pc-lvl" onClick={onOpenRewards} aria-label={`${L.prestige ? L.prestige.text : 'No prestige yet'}. ${toGoText(pg)}. Open prestige rewards`}>
           <span className="cx-hub-pl-h">
             <span className="cx-hub-pc-t">{L.prestige ? <><span className="cx-gold" aria-hidden="true">◆</span> {L.prestige.text}</> : 'Prestige'}</span>
           </span>
-          <span className="cx-hub-bar"><i style={{ width: `${pg.pct}%` }} /></span>
           <span className="cx-hub-pl-h cx-mid"><span className="cx-hub-ell">{toGoText(pg)}</span></span>
           {pg.reward && <span className="cx-hub-pl-h cx-muted"><span className="cx-hub-ell">Next unlock: {pg.reward.name}</span></span>}
         </button>
