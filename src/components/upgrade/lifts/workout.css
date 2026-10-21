@@ -441,11 +441,12 @@ html[data-lifts-focus] .lifts .lw-head { top: env(safe-area-inset-top, 0px); }
 .lifts .lw-body { display: flex; flex-direction: column; gap: 10px; padding: 12px; border-radius: var(--lf-r-cell); border: 1px solid var(--lf-line); }
 .lifts .lw-body .lf-eyebrow { margin: 0; }
 .lifts .lw-body-figs { display: flex; justify-content: center; gap: 18px; }
-.lifts .lw-body-fig { margin: 0; display: flex; flex-direction: column; align-items: center; gap: 4px; width: min(132px, 40%); }
+.lifts .lw-body-fig { margin: 0; display: flex; flex-direction: column; align-items: center; gap: 4px; width: min(150px, 42%); }
 .lifts .lw-body-fig svg { width: 100%; height: auto; display: block; }
 .lifts .lw-body-fig figcaption { font-family: var(--lf-mono); font-size: var(--lf-fs-floor); letter-spacing: .06em; text-transform: uppercase; color: var(--lf-muted); }
-.lifts .lw-body-base { fill: color-mix(in srgb, var(--lf-line-strong) 22%, transparent); }
-.lifts .lw-body-zone { fill: color-mix(in srgb, var(--lf-line-strong) 32%, transparent); stroke: var(--lf-line-strong); stroke-width: .6; stroke-opacity: .55; }
+.lifts .lw-body-fig svg polygon { stroke: var(--lf-s1); stroke-width: .7; stroke-linejoin: round; }
+.lifts .lw-body-base { fill: color-mix(in srgb, var(--lf-line-strong) 26%, transparent); }
+.lifts .lw-body-zone { fill: color-mix(in srgb, var(--lf-line-strong) 42%, transparent); }
 .lifts .lw-body-fill { fill: var(--lf-accent); transition: fill-opacity var(--lf-dur-sheet) var(--lf-ease); }
 .lifts .lw-body-sum { margin: 0; }
 .lifts .lw-body-rows { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
