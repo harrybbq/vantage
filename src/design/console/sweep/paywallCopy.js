@@ -65,7 +65,9 @@ export function compareRows(caps, hitKey = null) {
   return [
     ...numeric,
     { key: 'widgets', label: 'Widget set and sizes', free: 'Core, standard size', pro: 'Full, all sizes', hit: hitKey === 'widgets' || hitKey === 'widgetSizes' },
-    { key: 'accents', label: 'Accent colours', free: '6', pro: '12 + your own', hit: false },
+    // Accents: 3 free + 6 earned by prestige; Pro has 12 (incl. the 3 that
+    // used to be honour-earned) + its own. Prestige-only accents are never Pro.
+    { key: 'accents', label: 'Accent colours', free: '3 + 6 by prestige', pro: '12 + your own', hit: false },
     { key: 'brief', label: "Today's brief", free: '–', pro: 'Every morning', hit: false },
     { key: 'themes', label: 'Themes', free: 'Both', pro: 'Both', hit: false },
   ];
