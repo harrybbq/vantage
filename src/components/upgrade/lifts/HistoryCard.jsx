@@ -90,11 +90,11 @@ export default function HistoryCard({ S, update, today }) {
         {grids.length > 1 && <span className="lf-meta">{plural(all, 'workout')} since {grids[grids.length - 1].year}</span>}
       </div>
       {lifted.sets > 0 && (
-        <dl className="lh-lifted" data-testid="lh-lifted">
+        <div className="lh-lifted-wrap"><dl className="lh-lifted" data-testid="lh-lifted">
           <div><dt>Total lifted</dt><dd className="lf-num">{liftedText(lifted.all)}</dd></div>
           <div><dt>This year</dt><dd className="lf-num">{liftedText(lifted.year)}</dd></div>
           <div><dt>This month</dt><dd className="lf-num">{liftedText(lifted.month)}</dd></div>
-        </dl>
+        </dl></div>
       )}
       <YearBlock g={grids[0]} today={today} />
       <Legend />

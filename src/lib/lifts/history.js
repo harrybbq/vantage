@@ -155,12 +155,9 @@ export function liftedTotals(S, today = '') {
   return { all: r2(all), year: r2(year), month: r2(month), sets };
 }
 
-/** "8,450 kg" under 10 t, "12.4 t" from there, "1,204 t" past 1,000 t. */
+/** Always kilograms, whole numbers: "8,450 kg", "1,203,900 kg". */
 export function liftedText(kg) {
-  const v = Number(kg) || 0;
-  if (v < 10000) return `${Math.round(v).toLocaleString('en-GB')} kg`;
-  const t = v / 1000;
-  return `${t < 1000 ? t.toLocaleString('en-GB', { maximumFractionDigits: 1 }) : Math.round(t).toLocaleString('en-GB')} t`;
+  return `${Math.round(Number(kg) || 0).toLocaleString('en-GB')} kg`;
 }
 
 /** How many imported days the store holds. */

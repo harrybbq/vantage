@@ -86,7 +86,7 @@ t('total lifted: weight x reps, both dumbbells, added weight only for bodyweight
   const r = liftedTotals(S2, '2026-10-20');
   assert.deepEqual(r, { all: 2180, year: 1480, month: 1400, sets: 4 }, 'a bodyweight-only set adds no weight, so is not a weighted set');
   assert.equal(liftedTotals({}, '2026-10-20').all, 0, 'no store, nothing lifted');
-  assert.deepEqual([liftedText(8450), liftedText(12430), liftedText(1203900)], ['8,450 kg', '12.4 t', '1,204 t']);
+  assert.deepEqual([liftedText(8450), liftedText(12430), liftedText(1203900)], ['8,450 kg', '12,430 kg', '1,203,900 kg']);
 });
 
 console.log(`history: ${n} tests passed`);
