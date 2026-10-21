@@ -538,7 +538,30 @@ async function recomputeUser(userId, env, opts = {}) {
   return { ratings, computedAt, prestige: inp.prestige, baseline: inp.baseline };
 }
 
+/**
+ * Recompute, in place, the profiles in `profiles` whose stored rating
+ * predates the current formula (ratingsEpoch.js oldFormula) — at most
+ * `cap` of them, in parallel. Each recompute reads a JSON-path
+ * projection of one state, not the state. Rows that fail keep their
+ * stored values. Mutates and returns the profile objects:
+ * ratings, ratings_ovr, ratings_computed_at.
+ */
+async function refreshOldFormula(profiles, env, cap = 25) {
+  const { oldFormula } = require('./ratingsEpoch');
+  const stale = (profiles || []).filter(p => p && p.id && p.ratings_ovr != null && oldFormula(p.ratings_computed_at)).slice(0, cap);
+  if (!stale.length) return profiles;
+  const done = await Promise.allSettled(stale.map(p => recomputeUser(p.id, env)));
+  done.forEach((d, i) => {
+    if (d.status !== 'fulfilled') return;
+    const p = stale[i];
+    p.ratings = d.value.ratings;
+    p.ratings_ovr = d.value.ratings.ovr;
+    p.ratings_computed_at = d.value.computedAt;
+  });
+  return profiles;
+}
+
 module.exports = {
-  deriveRatings, derivePoints, recomputeUser, fetchMacroDays,
+  deriveRatings, derivePoints, recomputeUser, fetchMacroDays, refreshOldFormula,
   loadRatingInputs, writeRatings, fetchCreatedAt, RATING_STATE_KEYS,
 };

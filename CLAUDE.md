@@ -95,8 +95,14 @@ A new dashboard surface styled like a Home Assistant wall panel (owner has a ref
 
 ## Playtest feedback (Finlay, 2026-08-10) — LIVING DOCUMENT
 Artifact: https://claude.ai/code/artifact/d192f4b0-0bf1-431b-b636-001f685e6f37
-File: `/tmp/.../scratchpad/vantage-feedback.html` — republish the SAME
-path (or pass the URL as `url`) to keep that link.
+(also https://claude.ai/artifact/SszHK487TVbY3nJ27WmZj4 — same page.)
+File: `/tmp/.../scratchpad/ba-site-237/vantage-feedback.html` — republish
+with that URL as `url` to keep the link. Since 2026-10-21 screenshots
+are image FILES (`img/*.jpg`, published via `files` with `root` set to
+the folder), not data URIs — the page had reached 13.6 MB of a 16 MB
+cap. A scratchpad doesn't survive the session: in a new one, `read` the
+artifact with `path` for the page and each `img/` file, add entries,
+and publish the page plus every referenced image (≤255 files a call).
 
 **Keep it current, with evidence.** Whenever anything visual ships,
 update the artifact in the same session — it is the running record of

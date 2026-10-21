@@ -19,6 +19,8 @@
 const sbKeys = require('../lib/sbKeys');
 const { requireScheduler } = require('../lib/cronAuth');
 const { chunk } = require('../lib/pgPage');
+const { refreshOldFormula } = require('../lib/recompute');
+const { oldFormula } = require('../lib/ratingsEpoch');
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
@@ -54,7 +56,7 @@ exports.handler = async (event) => {
   let written = 0, skipped = 0, considered = 0, offset = 0;
   while (true) {
     const res = await sb(supabaseUrl, serviceKey,
-      `/rest/v1/profiles?ratings_ovr=not.is.null&select=id,ratings,ratings_ovr&order=id&limit=${PAGE_SIZE}&offset=${offset}`
+      `/rest/v1/profiles?ratings_ovr=not.is.null&select=id,ratings,ratings_ovr,ratings_computed_at&order=id&limit=${PAGE_SIZE}&offset=${offset}`
     );
     if (!res.ok) {
       const detail = await res.text().catch(() => '');
@@ -86,6 +88,17 @@ exports.handler = async (event) => {
       }
       const before = candidates.length;
       candidates = candidates.filter(p => !recentSet.has(p.id));
+      skipped += before - candidates.length;
+    }
+
+    // A snapshot is the baseline a league week is measured from, so it
+    // must be on the current formula: recompute anyone still carrying a
+    // rating from before the last change, and skip (not snapshot) those
+    // that could not be — a stale baseline is a fake climb next week.
+    if (candidates.some(p => oldFormula(p.ratings_computed_at))) {
+      await refreshOldFormula(candidates, { supabaseUrl, serviceKey }, 200);
+      const before = candidates.length;
+      candidates = candidates.filter(p => !oldFormula(p.ratings_computed_at));
       skipped += before - candidates.length;
     }
 

@@ -43,10 +43,20 @@ function climbSince(now, then, prestigedAt, thenAt) {
   return now - then;
 }
 
+/** Was this stored rating computed with an older formula (or never)?
+ *  profiles.ratings is only recomputed when its owner uses the app, so
+ *  after a formula change a friend who has not opened it since still
+ *  carries the old number — on everyone's board and into the snapshot
+ *  their league week is measured from. */
+function oldFormula(computedAt) {
+  const t = computedAt ? Date.parse(computedAt) : NaN;
+  return !Number.isFinite(t) || t < Date.parse(FORMULA_EPOCH_ISO);
+}
+
 /** The later of `from` and the formula epoch, as a Date. */
 function sinceEpoch(from) {
   const epoch = new Date(FORMULA_EPOCH_ISO);
   return from && from.getTime() > epoch.getTime() ? from : epoch;
 }
 
-module.exports = { FORMULA_EPOCH_ISO, climbSince, sinceEpoch };
+module.exports = { FORMULA_EPOCH_ISO, climbSince, sinceEpoch, oldFormula };
