@@ -39,7 +39,7 @@
 
 const { pauseGate } = require('../lib/killSwitch');
 const sbKeys = require('../lib/sbKeys');
-const { recomputeUser } = require('../lib/recompute');
+const { recomputeUser, refreshOldFormula } = require('../lib/recompute');
 const { suspendedIds } = require('../lib/suspended');
 const { inChunks } = require('../lib/pgPage');
 const { createSharedCache, pgCacheStore } = require('../lib/sharedCache');
@@ -244,6 +244,9 @@ async function buildFriendsBoard({ supabaseUrl, serviceKey, callerId, timeframe 
   ), { what: 'friends board profiles' }).catch(() => []);
   const suspended = await suspendedIds({ supabaseUrl, serviceKey });
   const profiles = allProfiles.filter(p => p.id === callerId || !suspended.has(p.id));
+  // Friends who have not opened the app since the formula changed still
+  // carry the old number; recompute them here rather than show it.
+  await refreshOldFormula(profiles, { supabaseUrl, serviceKey });
 
   const snaps = await fetchSnapshotOvrs(supabaseUrl, serviceKey, ids);
   const rows = profiles.map(p => rowFromProfile(p, snaps.get(p.id), callerId));
@@ -278,6 +281,8 @@ async function buildSharedGlobalRows({ supabaseUrl, serviceKey, timeframe }) {
   // suspended caller still sees their own pinned row (buildGlobalBoard).
   const suspended = await suspendedIds({ supabaseUrl, serviceKey });
   const candidates = (await candRes.json()).filter(p => !suspended.has(p.id));
+  // Same for the global board, a capped number per (cached) build.
+  await refreshOldFormula(candidates, { supabaseUrl, serviceKey });
 
   const snaps = await fetchSnapshotOvrs(supabaseUrl, serviceKey, candidates.map(p => p.id));
   const rows = sortRows(candidates.map(p => rowFromProfile(p, snaps.get(p.id), null)), timeframe)

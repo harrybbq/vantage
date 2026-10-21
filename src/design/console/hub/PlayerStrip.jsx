@@ -28,7 +28,6 @@
 import { useMemo } from 'react';
 import Icon from '../../../components/Icon';
 import { bandClass, bandVar } from '../../../lib/ratings/bands';
-import { categoryProfile } from '../../../lib/ratings/profile';
 import { prestigeProgress, prestigeName } from '../../../lib/ratings/prestigeRewards';
 import { RATING_COLOURS, ratingShares } from '../../../lib/ratings/palette';
 import { donutSegments } from '../../../components/ratings/RatingsDonut';
@@ -47,11 +46,6 @@ function usePlayer(S, visionState, hub) {
     const settling = !!S.__slim;
     const r = S.ratings || {};
     const ovr = settling ? null : (r.ovr || null);
-    // OVR is the only level (2026-10-21): no band names beside it, just
-    // where the points come from.
-    const prof = settling ? null : categoryProfile(S);
-    const best = prof?.best?.label || null;
-    const workOn = prof?.workOn?.label || null;
     const cats = CATS.map(c => ({ ...c, v: settling ? null : (r[c.id] ?? null) }));
     const vs = visionState || {};
     const p = Math.max(0, Math.floor(Number(S.prestige) || 0));
@@ -66,7 +60,7 @@ function usePlayer(S, visionState, hub) {
     const rows = boardRows(hub?.board);
     const me = rows.find(x => x.isSelf);
     return {
-      settling, ovr, best, workOn, cats, pg,
+      settling, ovr, cats, pg,
       honours: { have: vs.unlockedCount || 0, total: vs.totalCount || VISIONS.length, recent, next: nextHonour },
       league: me && rows.length > 1 ? { pos: me.pos, of: rows.length, note: gapNote(rows) } : null,
       // Four rows for the strip's friends column: the top four, or the
@@ -177,7 +171,6 @@ export function PlayerStrip({ S, visionState, hub, navigate, onOpenVisions, onOp
             <span className="cx-hub-pl-h">
               <span className="cx-hub-pl-t">Categories</span>
               <span className="cx-hub-sp" />
-              {L.best && <span className="cx-muted cx-hub-nowrap">Best at <span className="cx-text">{L.best}</span>{L.workOn && <> · Work on <span className="cx-text">{L.workOn}</span></>}</span>}
             </span>
             {L.cats.map(c => <CatBar key={c.id} c={c} />)}
           </span>

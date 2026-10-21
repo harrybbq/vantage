@@ -2,7 +2,7 @@
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
 const require = createRequire(import.meta.url);
-const { climbSince, sinceEpoch, FORMULA_EPOCH_ISO } = require('./ratingsEpoch.js');
+const { climbSince, sinceEpoch, oldFormula, FORMULA_EPOCH_ISO } = require('./ratingsEpoch.js');
 
 const MON = '2026-11-02T03:00:00.000Z';
 // No prestige: plain difference, falls allowed (callers clamp).
@@ -22,4 +22,10 @@ const before = new Date(Date.parse(FORMULA_EPOCH_ISO) - 86_400_000);
 const after = new Date(Date.parse(FORMULA_EPOCH_ISO) + 86_400_000);
 assert.equal(sinceEpoch(before).toISOString(), FORMULA_EPOCH_ISO);
 assert.equal(sinceEpoch(after), after);
+// A stored rating from before the formula change (or never computed) is old.
+assert.equal(oldFormula(null), true);
+assert.equal(oldFormula('garbage'), true);
+assert.equal(oldFormula(before.toISOString()), true);
+assert.equal(oldFormula(after.toISOString()), false);
+assert.equal(oldFormula(FORMULA_EPOCH_ISO), false, 'computed at the epoch is on the new formula');
 console.log('ratingsEpoch: ok');
