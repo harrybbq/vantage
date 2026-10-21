@@ -115,7 +115,7 @@ export default function FriendListRow({ friend, selected, onClick, onMessage }) 
           {unread && <span className="fc-row-unread">{friend.unread > 9 ? '9+' : friend.unread}</span>}
         </button>
       )}
-      <div className={`fc-row-level ovr-chip ovr-tier-${prestige.key}`} title={`OVR ${ovr} · ${prestige.label}`}>{ovr}</div>
+      <div className={`fc-row-level ovr-chip ovr-tier-${prestige.key}`} title={`OVR ${ovr}`}>{ovr}</div>
     </div>
   );
 }

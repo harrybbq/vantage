@@ -1,5 +1,4 @@
 /**
-import Icon from './Icon';
  * RatingsPanel — F5 Sprint 3 surface (Ledger design, 2026-05-12),
  * extended in Sprint 5 with self-checks for all four categories.
  *
@@ -21,6 +20,7 @@ import Icon from './Icon';
  * by the shared 30-day cooldown.
  */
 import { useState, useRef, useEffect } from 'react';
+import Icon from './Icon';
 import { categoryBreakdown, cleanBaseline } from '../lib/ratings/derive';
 import { categoryProfile, nextStep } from '../lib/ratings/profile';
 import { getTodayStr } from '../utils/helpers';
@@ -246,7 +246,7 @@ export default function RatingsPanel({ S, update, compact = false }) {
               repeat is what we just removed. */}
           <span className="sr-only">
             {settling ? 'Loading your overall rating' : <>
-              Overall rating {ovr} of 99 — {glow.label}
+              Overall rating {ovr} of 99
               {prestigeLevel > 0 ? `, prestige ${toRoman(prestigeLevel)}` : ''}
             </>}
           </span>
@@ -425,7 +425,7 @@ function BreakdownModal({ S, category, onClose, onTakeCheck }) {
           fontFamily: 'var(--mono)', fontSize: 'var(--fs-floor)', color: 'var(--text-muted)',
           margin: '0 0 14px', lineHeight: 1.65, letterSpacing: 0.4,
         }}>
-          TIER · <span style={{ color: t.color }}>{t.label.toUpperCase()}</span> · {totalPoints.toFixed(1)} POINTS
+          {totalPoints.toFixed(1)} POINTS
         </p>
         <ul style={{ listStyle: 'none', margin: 0, padding: 0, display: 'flex', flexDirection: 'column', gap: 6 }}>
           {rows.map((row, i) => {

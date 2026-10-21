@@ -28,7 +28,7 @@
 import { useMemo } from 'react';
 import Icon from '../../../components/Icon';
 import { bandClass, bandVar } from '../../../lib/ratings/bands';
-import { ovrTier, OVR_TIERS } from '../../../lib/ratings/tiers';
+import { categoryProfile } from '../../../lib/ratings/profile';
 import { prestigeProgress, prestigeName } from '../../../lib/ratings/prestigeRewards';
 import { RATING_COLOURS, ratingShares } from '../../../lib/ratings/palette';
 import { donutSegments } from '../../../components/ratings/RatingsDonut';
@@ -47,8 +47,9 @@ function usePlayer(S, visionState, hub) {
     const settling = !!S.__slim;
     const r = S.ratings || {};
     const ovr = settling ? null : (r.ovr || null);
-    const tier = ovr != null ? ovrTier(ovr) : null;
-    const nextTier = tier ? OVR_TIERS.find(t => t.min > tier.max) : null;
+    // OVR is the only level (2026-10-21): no band names beside it, just
+    // where the points come from.
+    const best = settling ? null : (categoryProfile(S).best?.label || null);
     const cats = CATS.map(c => ({ ...c, v: settling ? null : (r[c.id] ?? null) }));
     const vs = visionState || {};
     const p = Math.max(0, Math.floor(Number(S.prestige) || 0));
@@ -63,7 +64,7 @@ function usePlayer(S, visionState, hub) {
     const rows = boardRows(hub?.board);
     const me = rows.find(x => x.isSelf);
     return {
-      settling, ovr, tier, nextTier, cats, pg,
+      settling, ovr, best, cats, pg,
       honours: { have: vs.unlockedCount || 0, total: vs.totalCount || VISIONS.length, recent, next: nextHonour },
       league: me && rows.length > 1 ? { pos: me.pos, of: rows.length, note: gapNote(rows) } : null,
       prestige: p ? { text: prestigeName(p), n: p } : null,
@@ -174,10 +175,9 @@ export function PlayerStrip({ S, visionState, hub, navigate, onOpenVisions, onOp
         <Donut cats={L.cats} ovr={L.ovr} size={112} stroke={10} dark={dark} />
         <span className="cx-hub-pl-cats">
           <span className="cx-hub-pl-h">
-            <span className="cx-hub-pl-t">Rating</span>
-            {L.tier && <span className={`cx-hub-tier ${bandClass(L.ovr)}`}>{L.tier.label}</span>}
+            <span className="cx-hub-pl-t">Categories</span>
             <span className="cx-hub-sp" />
-            {L.nextTier && <span className="cx-muted cx-hub-nowrap">{L.nextTier.label} at {L.nextTier.min}</span>}
+            {L.best && <span className="cx-muted cx-hub-nowrap">Best at {L.best}</span>}
           </span>
           {L.cats.map(c => <CatBar key={c.id} c={c} />)}
         </span>
@@ -212,7 +212,6 @@ export function PlayerCard({ S, visionState, hub, navigate, onOpenVisions, onOpe
         <button type="button" className="cx-hub-pc-lvl" onClick={onOpenRewards} aria-label={`${L.prestige ? L.prestige.text : 'No prestige yet'}. ${toGoText(pg)}. Open prestige rewards`}>
           <span className="cx-hub-pl-h">
             <span className="cx-hub-pc-t">{L.prestige ? <><span className="cx-gold" aria-hidden="true">◆</span> {L.prestige.text}</> : 'Prestige'}</span>
-            {L.tier && <span className={`cx-hub-tier ${bandClass(L.ovr)}`}>{L.tier.label}</span>}
           </span>
           <span className="cx-hub-bar"><i style={{ width: `${pg.pct}%` }} /></span>
           <span className="cx-hub-pl-h cx-mid"><span className="cx-hub-ell">{toGoText(pg)}</span></span>

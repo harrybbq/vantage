@@ -22,7 +22,6 @@ import { useEffect, useRef, useState } from 'react';
 import Icon from '../../../components/Icon';
 import { Sheet } from '../ui';
 import { bandClass, bandVar, bandOf } from '../../../lib/ratings/bands';
-import { ovrTier } from '../../../lib/ratings/tiers';
 import AddFriendModal from '../../../components/friends/AddFriendModal';
 import ReportFriendModal from '../../../components/friends/ReportFriendModal';
 import MessagesModal from '../../../components/friends/MessagesModal';
@@ -174,7 +173,6 @@ export function FriendCardCx({ f, hub, showMessage = true, inSheet = false }) {
     return () => { document.removeEventListener('pointerdown', close); document.removeEventListener('keydown', key, true); };
   }, [menu]);
   if (!f) return null;
-  const tier = f.ovr != null ? ovrTier(f.ovr) : null;
   return (
     <div className={`cx-hub-fc${inSheet ? ' is-sheet' : ''}`}>
       <div className="cx-hub-fc-head">
@@ -185,7 +183,6 @@ export function FriendCardCx({ f, hub, showMessage = true, inSheet = false }) {
         </div>
         <div className="cx-hub-fc-ovr">
           <span className={`cx-num ${bandClass(f.ovr)}`}>{f.ovr ?? '–'}</span>
-          {tier && <span className={`cx-hub-tier ${bandClass(f.ovr)}`}>{tier.label}</span>}
         </div>
       </div>
       <div className="cx-hub-fc-cats">

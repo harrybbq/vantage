@@ -108,7 +108,7 @@ export default function FriendCard({
           <div className="fc-name">{friend.name}</div>
           <div className="fc-meta-row">
             <span className="fc-handle">@{friend.handle}</span>
-            <span className={`fc-level ovr-chip ovr-tier-${prestige.key}`} title={`${prestige.label} tier`}>OVR {ovr}</span>
+            <span className={`fc-level ovr-chip ovr-tier-${prestige.key}`} title={`OVR ${ovr} of 99`}>OVR {ovr}</span>
             <PrestigeBadge prestige={friend.prestige} size="sm" />
           </div>
         </div>
