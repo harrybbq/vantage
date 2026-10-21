@@ -1,9 +1,12 @@
 /**
- * PrestigeBadge — colour-band + Roman-numeral chip, e.g. "GREEN IV".
+ * PrestigeBadge — the prestige number in its band colour, e.g. "P4".
+ * (Until 2026-10-21 it read "GREEN IV": a second name, with a numeral
+ * that restarted each colour, for the number shown as Prestige 4
+ * everywhere else.)
  * Renders nothing at P0. Sizes: 'sm' (leaderboard rows / chips) and
  * 'md' (RatingsPanel hero / modal headers).
  *
- * From Prestige VII the badge is SOLID (filled with its band colour) —
+ * From Prestige 7 the badge is SOLID (filled with its band colour) —
  * a prestige reward (lib/ratings/prestigeRewards.js). Below that it is
  * the outlined chip it always was.
  */
@@ -17,7 +20,7 @@ export default function PrestigeBadge({ prestige, size = 'sm', style }) {
   return (
     <span
       className={`prestige-badge prestige-badge-${size} prestige-${badge.band.key}${solid ? ' is-solid' : ''}`}
-      title={`Prestige ${prestige} — ${badge.text}`}
+      title={`Prestige ${prestige}`}
       style={solid ? { ...solid, ...style } : style}
     >
       {badge.text}

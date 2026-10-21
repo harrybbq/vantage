@@ -737,3 +737,4 @@ html[data-design="console"] .cx-hub-rw-swatch { display: block; width: 22px; hei
 html[data-design="console"] .cx-hub-rw-cs { display: flex; flex-direction: column; gap: 8px; }
 html[data-design="console"] .cx-hub-rw-cs > p { margin: 0; }
 html[data-design="console"] .cx-hub-rw-h { margin: 0; font: 600 var(--cx-fs-15)/var(--cx-lh-15) var(--cx-sans); color: var(--cx-text); }
+html[data-design="console"] .cx-hub-pl-dia { font-size: 0.55em; vertical-align: 0.35em; margin-right: 0.25em; }

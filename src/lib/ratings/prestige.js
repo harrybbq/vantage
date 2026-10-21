@@ -58,5 +58,5 @@ export function prestigeBadge(prestige) {
   const band = PRESTIGE_BANDS.find(b => clamped >= b.min && clamped <= b.max) || PRESTIGE_BANDS[0];
   // Position within the band: P1→1, P10→1, P19→10, P99→10, etc.
   const numeral = toRoman(clamped - band.min + 1);
-  return { band, numeral, text: `${band.label.toUpperCase()} ${numeral}` };
+  return { band, numeral, text: `P${clamped}` };
 }

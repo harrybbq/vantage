@@ -179,7 +179,8 @@ competitive climb restarts — **no user data is wiped**.
   not compared — bump it to the DEPLOY day whenever the maths changes.
 - Lifetime sort key: `profiles.lifetime_rating` (generated column,
   `prestige*100 + ratings_ovr`). All-time leaderboards sort by it.
-- Display: colour band + Roman numeral badge (e.g. GREEN IV) —
+- Display: "Prestige 4" in words, "P4" on badges, coloured by band (until
+  2026-10-21 badges read "GREEN IV", a numeral that restarted per colour) —
   `src/lib/ratings/prestige.js` (bands config) + `PrestigeBadge.jsx` +
   `.prestige-*` CSS. Bands: P1-9 forest green, 10-19 yellow, 20-29 indigo,
   30-39 red, 40-49 burgundy, 50-59 purple, 60-69 ocean, 70-79 cyan,

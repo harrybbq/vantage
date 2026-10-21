@@ -32,7 +32,7 @@
  *   rows[].avatarColor  optional ground for the initials avatar (a group crest)
  *
  * Prestige rewards (lib/ratings/prestigeRewards.js): a row with prestige
- * gets its avatar ring (Avatar `prestige`) and, from Prestige VII, a solid
+ * gets its avatar ring (Avatar `prestige`) and, from Prestige 7, a solid
  * badge. Both are drawn from the prestige number alone.
  *
  * Every rating number (category cells, OVR) is coloured by its tier band
@@ -56,7 +56,7 @@ export function Diamonds({ n }) {
   const solid = solidBadgeStyle(p);
   return (
     <span className={`cx-dt-pr${solid ? ' is-solid' : ''}`} style={solid || undefined} title={`Prestige ${p}`} aria-label={`Prestige ${p}`}>
-      {p <= 3 ? '◆'.repeat(p) : `◆${p}`}
+      P{p}
     </span>
   );
 }

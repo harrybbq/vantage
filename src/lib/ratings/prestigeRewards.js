@@ -22,11 +22,11 @@
  *                    draw it without any extra public field)
  *   CARD_STYLES / resolveCardStyle() / withCardStyle()
  *                    hub card finishes (console only), S.cardStyle
- *   prestigeProgress()  "N OVR to Prestige II" for the player strip
+ *   prestigeProgress()  "N OVR to Prestige 2" for the player strip
  *
  * ── Grandfathering (accents) ─────────────────────────────────────────
  * Purple, Sunset and Rose used to be earned by an honour (ach-3,
- * streak-7, log-7). They now come at Prestige I, III and V. Nobody loses
+ * streak-7, log-7). They now come at Prestige 1, 3 and 5. Nobody loses
  * one they had:
  *   - an honour stamped before LEGACY_ACCENT_CUTOFF (or stamped with no
  *     date at all) still unlocks its old accent;
@@ -35,7 +35,7 @@
  * The accents added for prestige (Moss, Lagoon, Ultramarine) are NOT
  * given to Pro: they are status.
  */
-import { PRESTIGE_BANDS, PRESTIGE_MAX, prestigeBadge, toRoman } from './prestige.js';
+import { PRESTIGE_BANDS, PRESTIGE_MAX, prestigeBadge } from './prestige.js';
 import { onAccent, accentFor, contrast } from '../design/contrast.js';
 
 /** Honour stamps dated before this still unlock their old accent.
@@ -87,7 +87,7 @@ export const REWARDS = Object.freeze([
   { at: 9,  kind: 'card',   id: 'gilt',        name: 'Gilt edge card style',
     desc: 'A fine gold border round every hub card.' },
   { at: 10, kind: 'frame',  id: 'segmented',   name: 'Segmented ring',
-    desc: 'Your avatar ring broken into twelve segments. Prestige X also moves you into the Yellow band.' },
+    desc: 'Your avatar ring broken into twelve segments. At Prestige 10 your colour also changes to yellow.' },
   { at: 11, kind: 'accent', id: 'lagoon',      name: 'Lagoon accent',
     desc: 'A deep blue-green that only prestige unlocks. Pro does not include it.' },
   { at: 12, kind: 'card',   id: 'engraved',    name: 'Engraved card style',
@@ -95,7 +95,7 @@ export const REWARDS = Object.freeze([
   { at: 15, kind: 'frame',  id: 'halo',        name: 'Halo',
     desc: 'A soft glow in your band colour behind your avatar.' },
   { at: 20, kind: 'accent', id: 'ultramarine', name: 'Ultramarine accent',
-    desc: 'A vivid deep blue that only prestige unlocks. Prestige XX also moves you into the Indigo band.' },
+    desc: 'A vivid deep blue that only prestige unlocks. At Prestige 20 your colour also changes to indigo.' },
 ].map(r => Object.freeze(r)));
 
 /** What reaching any prestige gives you, before the ladder. */
@@ -111,10 +111,10 @@ const clampP = p => {
   return Number.isFinite(n) && n > 0 ? Math.min(n, PRESTIGE_MAX) : 0;
 };
 
-/** "Prestige III". Absolute numerals (RatingsPanel's convention). '' for P0. */
+/** "Prestige 3". Ordinary numbers, one name everywhere. '' for P0. */
 export function prestigeName(p) {
   const n = clampP(p);
-  return n ? `Prestige ${toRoman(n)}` : '';
+  return n ? `Prestige ${n}` : '';
 }
 
 /** Rewards unlocked at prestige `p` (ladder order). */
@@ -204,7 +204,7 @@ export function accentAccess(scheme, { visions = {}, prestige = 0, hasPro = fals
  * How a user's avatar frame and badge are drawn, from their prestige
  * number. null at P0 (no frame, no badge).
  *   { p, band, bandLabel, colour, ring: 'single'|'double'|'segmented',
- *     halo: bool, badge: 'outline'|'solid', name: 'Prestige IV' }
+ *     halo: bool, badge: 'outline'|'solid', name: 'Prestige 4' }
  */
 export function frameFor(prestige) {
   const p = clampP(prestige);

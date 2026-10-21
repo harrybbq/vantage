@@ -18,7 +18,6 @@ import PrestigeBadge from './PrestigeBadge';
 import PrestigeFrame from './PrestigeFrame';
 import { backdropClose } from '../utils/backdropClose';
 import { useDesign } from '../hooks/useDesign';
-import { toRoman } from '../lib/ratings/prestige';
 import {
   REWARDS, STANDING_REWARD, KIND_LABEL, PRESTIGE_ACCENTS, prestigeProgress, prestigeName,
 } from '../lib/ratings/prestigeRewards';
@@ -71,7 +70,7 @@ function RewardsModal({ S, onClose }) {
                 {p ? prestigeName(p) : 'No prestige yet'} {p > 0 && <PrestigeBadge prestige={p} size="sm" />}
               </div>
               <div style={{ ...mono, color: 'var(--text-muted)', marginTop: 4 }}>
-                {pg.ready ? 'OVR 99: prestige up from your ratings.' : pg.next ? `${pg.toGo == null ? '–' : pg.toGo} OVR to ${pg.nextName}` : 'Every prestige reached.'}
+                {pg.ready ? 'OVR 99: prestige up from your ratings.' : pg.next ? `${pg.toGo == null ? '–' : pg.toGo} OVR left until ${pg.nextName}` : 'Every prestige reached.'}
               </div>
               <div style={{ height: 6, borderRadius: 3, background: 'var(--border)', marginTop: 6, overflow: 'hidden' }} aria-hidden="true">
                 <div style={{ width: `${pg.pct}%`, height: '100%', background: 'var(--em)' }} />
@@ -99,7 +98,7 @@ function RewardsModal({ S, onClose }) {
                     ? <PrestigeBadge prestige={r.at} size="sm" />
                     : <Icon name="layout-grid" size={18} />;
               return (
-                <Row key={r.id} at={toRoman(r.at)} on={on} next={next} swatch={swatch} title={r.name}
+                <Row key={r.id} at={r.at} on={on} next={next} swatch={swatch} title={r.name}
                      kind={r.kind === 'card' ? `${KIND_LABEL.card} · new design only` : KIND_LABEL[r.kind]} desc={r.desc}>
                   {on ? '✓' : next ? 'Next' : `P${r.at}`}
                 </Row>

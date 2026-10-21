@@ -16,7 +16,6 @@ import {
   REWARDS, STANDING_REWARD, KIND_LABEL, CARD_STYLES, PRESTIGE_ACCENTS,
   prestigeProgress, prestigeName, frameFor, resolveCardStyle, withCardStyle,
 } from '../../../lib/ratings/prestigeRewards';
-import { toRoman } from '../../../lib/ratings/prestige';
 
 /** The original three accents' colours (SettingsSection SCHEMES), for swatches. */
 const OLD_ACCENT_HEX = { purple: '#5a1a7a', orange: '#7a3a1a', pink: '#7a1a4a' };
@@ -79,10 +78,9 @@ export default function PrestigeRewardsSheet({ S, update, onClose, onOpenRatings
           <div className="cx-hub-rw-now-t">
             <span className="cx-t17 cx-hub-rw-strong">{p ? prestigeName(p) : 'No prestige yet'}</span>
             <span className="cx-t13 cx-muted">
-              {frame ? `${frame.bandLabel} band. ` : ''}
               {pg.ready
                 ? 'OVR 99: you can prestige now, from your ratings.'
-                : pg.next ? `${pg.toGo == null ? '–' : pg.toGo} OVR to ${pg.nextName}.` : 'Every prestige reached.'}
+                : pg.next ? `${pg.toGo == null ? '–' : pg.toGo} OVR left until ${pg.nextName}.` : 'Every prestige reached.'}
             </span>
             <span className="cx-hub-bar is-thick" aria-hidden="true"><i style={{ width: `${pg.pct}%` }} /></span>
           </div>
@@ -112,7 +110,7 @@ export default function PrestigeRewardsSheet({ S, update, onClose, onOpenRatings
             const next = pg.reward && pg.reward.id === r.id;
             return (
               <li key={r.id} className={`cx-hub-rw-row${on ? ' is-on' : ''}${next ? ' is-next' : ''}`}>
-                <span className="cx-hub-rw-at cx-num">{toRoman(r.at)}</span>
+                <span className="cx-hub-rw-at cx-num">{r.at}</span>
                 <span className="cx-hub-rw-pv"><Preview r={r} S={S} /></span>
                 <span className="cx-hub-rw-tx">
                   <span className="cx-hub-rw-name">

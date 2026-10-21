@@ -107,11 +107,13 @@ function CatBar({ c }) {
   );
 }
 
-/** "25 OVR to Prestige II" / "Ready to prestige" / "–" while loading. */
+/** "25 OVR left until Prestige 2" / "Ready to prestige" / "–" while loading.
+ *  "left until", not "to": beside a big number, "30 OVR to Prestige II"
+ *  was read as "Prestige 30". */
 function toGoText(pg) {
   if (pg.ready) return 'Ready to prestige';
   if (!pg.next) return 'Every prestige reached';
-  return `${pg.toGo == null ? '–' : pg.toGo} OVR to ${pg.nextName}`;
+  return `${pg.toGo == null ? '–' : pg.toGo} OVR left until ${pg.nextName}`;
 }
 
 export function PlayerStrip({ S, visionState, hub, navigate, onOpenVisions, onOpenRatings, onOpenRewards }) {
@@ -132,11 +134,6 @@ export function PlayerStrip({ S, visionState, hub, navigate, onOpenVisions, onOp
         </button>
         {S.profile?.tagline && <p className="cx-hub-pl-tag">{S.profile.tagline}</p>}
         <div className="cx-hub-pl-chips">
-          {L.prestige && (
-            <button type="button" className="cx-chip" onClick={onOpenRewards} title="Prestige rewards">
-              <span className="cx-gold" aria-hidden="true">◆</span> {L.prestige.text}
-            </button>
-          )}
           <button type="button" className="cx-chip" onClick={() => navigate?.('shop')} aria-label={`${fmt(S.coins)} coins, open the shop`}>
             <Icon name="coin" size={14} strokeWidth={1.75} /> <span className="cx-num">{fmt(S.coins)}</span>
           </button>
@@ -145,17 +142,16 @@ export function PlayerStrip({ S, visionState, hub, navigate, onOpenVisions, onOp
 
       <div className="cx-hub-pl-lvl">
         <button type="button" className="cx-hub-pl-hit" onClick={onOpenRewards} aria-label={`${L.prestige ? L.prestige.text : 'No prestige yet'}. ${toGoText(pg)}.${pg.reward ? ` Next unlock: ${pg.reward.name}.` : ''} Open prestige rewards`}>
-          <span className="cx-hub-pl-h">
-            <span className="cx-hub-pl-t">Prestige</span>
-            <span className="cx-hub-sp" />
-            {L.prestige
-              ? <span className="cx-gold cx-hub-nowrap"><span aria-hidden="true">◆</span> {L.prestige.text}</span>
-              : <span className="cx-muted">None yet</span>}
-          </span>
+          {/* The level you are at, big; how far to the next one, small.
+              The other way round, "30 OVR to Prestige II" read as
+              "Prestige 30". */}
           <span className="cx-hub-pl-big">
+            <span className="cx-gold cx-t40 cx-hub-nowrap"><span className="cx-hub-pl-dia" aria-hidden="true">◆</span>{L.prestige ? L.prestige.text : 'Prestige 0'}</span>
+          </span>
+          <span className="cx-hub-pl-h">
             {pg.ready
-              ? <span className="cx-t17 cx-hub-pl-ready">Ready to prestige</span>
-              : <><span className="cx-num cx-t40">{pg.toGo == null || !pg.next ? '–' : pg.toGo}</span><span className="cx-muted">{pg.next ? `OVR to ${pg.nextName}` : 'Every prestige reached'}</span></>}
+              ? <span className="cx-hub-pl-ready">Ready to prestige</span>
+              : <span className="cx-mid">{pg.next ? `${pg.toGo == null ? '–' : pg.toGo} OVR left until ${pg.nextName}` : 'Every prestige reached'}</span>}
           </span>
           <span className="cx-hub-bar is-thick"><i style={{ width: `${pg.pct}%` }} /></span>
           <span className="cx-hub-pl-ends cx-num cx-muted"><span>OVR {L.ovr ?? '–'}</span><span>99</span></span>

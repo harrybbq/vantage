@@ -25,11 +25,10 @@ import { categoryBreakdown, cleanBaseline } from '../lib/ratings/derive';
 import { categoryProfile, nextStep } from '../lib/ratings/profile';
 import { getTodayStr } from '../utils/helpers';
 import { ovrTier } from '../lib/ratings/tiers';
-import { PRESTIGE_MAX, toRoman } from '../lib/ratings/prestige';
+import { PRESTIGE_MAX } from '../lib/ratings/prestige';
 import RatingsDonut from './ratings/RatingsDonut';
 import { RATING_COLOURS, ratingShares } from '../lib/ratings/palette';
 import { useDarkSurface } from '../hooks/useDarkSurface';
-import PrestigeBadge from './PrestigeBadge';
 import PrestigeRewardsButton from './PrestigeRewardsButton';
 import { supabase } from '../lib/supabase';
 import { apiFetch } from '../lib/authFetch';
@@ -236,7 +235,7 @@ export default function RatingsPanel({ S, update, compact = false }) {
             ratings={settling ? {} : r}
             ovr={settling ? null : ovr}
             tier={glow}
-            prestigeLabel={prestigeLevel > 0 ? `PRESTIGE ${toRoman(prestigeLevel)}` : ''}
+            prestigeLabel={prestigeLevel > 0 ? `PRESTIGE ${prestigeLevel}` : ''}
             dark={dark}
             size={compact ? 132 : 156}
             onSelect={setActiveBreakdown}
@@ -247,18 +246,11 @@ export default function RatingsPanel({ S, update, compact = false }) {
           <span className="sr-only">
             {settling ? 'Loading your overall rating' : <>
               Overall rating {ovr} of 99
-              {prestigeLevel > 0 ? `, prestige ${toRoman(prestigeLevel)}` : ''}
+              {prestigeLevel > 0 ? `, prestige ${prestigeLevel}` : ''}
             </>}
           </span>
         </div>
 
-        {/* Prestige badge — own row so it never crowds the donut in the
-            144px rail / compact variants. */}
-        {prestigeLevel > 0 && (
-          <div className="ratings-ledger-prestige-row">
-            <PrestigeBadge prestige={prestigeLevel} size="md" />
-          </div>
-        )}
 
         {/* Prestige-up CTA — only at OVR 99 and below the prestige cap.
             The server re-validates against canonical profiles values. */}
