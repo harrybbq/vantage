@@ -156,6 +156,11 @@ export const DEFAULT_STATE = {
   // the prestige-up flow. Display-only — the server enforces all
   // prestige rules; editing this changes nothing friend-visible.
   prestige: 0,
+  // Local cache of profiles.prestige_baseline: the raw points per
+  // category at the last prestige, which the rating subtracts so each
+  // climb starts from the floor. Same source and status as `prestige`.
+  // null = never prestiged (or not heard back from the server yet).
+  prestigeBaseline: null,
   // Result of the most-recent IQ self-check (F5 Sprint 4). Optional;
   // null means the user hasn't taken it. testVersion lets us migrate
   // the test bank later without invalidating old scores silently.

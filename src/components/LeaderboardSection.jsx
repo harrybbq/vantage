@@ -66,7 +66,7 @@ export default function LeaderboardSection({
             <div className="sec-title">Leaderboard <SectionHelp
               title="Leaderboard"
               rows={[
-                { term: 'OVR', def: 'Brain, Finance, Fitness and Social, each out of 99, averaged.' },
+                { term: 'OVR', def: 'Every point you earn in Brain, Finance, Fitness or Social. Your best category counts in full, the others a bit less.' },
                 { term: 'Group score', def: "How much every member's OVR grew since Monday, added up." },
                 { term: 'Divisions', def: 'Top three go up on Monday, bottom three go down.' },
                 { term: 'Prestige', def: 'At 99 you can trade it for a colour band and start again.' },

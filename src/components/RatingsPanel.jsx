@@ -21,7 +21,7 @@ import Icon from './Icon';
  * by the shared 30-day cooldown.
  */
 import { useState, useRef, useEffect } from 'react';
-import { categoryBreakdown } from '../lib/ratings/derive';
+import { categoryBreakdown, cleanBaseline } from '../lib/ratings/derive';
 import { ovrTier } from '../lib/ratings/tiers';
 import { PRESTIGE_MAX, toRoman } from '../lib/ratings/prestige';
 import RatingsDonut from './ratings/RatingsDonut';
@@ -139,9 +139,11 @@ export default function RatingsPanel({ S, update, compact = false }) {
       const body = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(body.error || 'Prestige failed.');
       // Adopt the server's post-prestige numbers immediately.
+      const baseline = cleanBaseline(body.baseline);
       update(prev => ({
         ...prev,
         prestige: body.prestige,
+        ...(baseline ? { prestigeBaseline: baseline } : {}),
         ratings: { ...(prev.ratings || {}), ...(body.ratings || {}), computedAt: body.computedAt },
       }));
     } catch (e) {

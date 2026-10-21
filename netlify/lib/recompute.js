@@ -31,16 +31,20 @@ function clamp(n, lo = 1, hi = 99) {
 function ymd(ms) {
   return new Date(ms).toISOString().slice(0, 10);
 }
-/* How much a point is worth on the 1-99 scale. Mirrors RATING_SCALE in
-   src/lib/ratings/derive.js — see the note there for why it is 8, what
-   the simulation said, and what to bump alongside it. This copy exists
-   because a number other people can see must not be computed on the
-   machine of the person it flatters; `npm run check:parity` fails the
-   build if the two ever disagree. */
-const RATING_SCALE = 8;
-function toRating(points, k = RATING_SCALE) {
+/* Points → the 1-99 scale. Mirrors toRating in src/lib/ratings/derive.js
+   — see the note there for the curve, why OVR comes from the weighted
+   total rather than the mean, and what to bump alongside it. This copy
+   exists because a number other people can see must not be computed on
+   the machine of the person it flatters; `npm run check:parity` fails
+   the build if the two ever disagree. */
+const OVR_FULL = 170;
+const BREADTH_WEIGHTS = [1, 0.5, 0.35, 0.25];
+const PILLAR_FULL = OVR_FULL / BREADTH_WEIGHTS.reduce((a, b) => a + b, 0);
+const CURVE = 0.75;
+const CATEGORIES = ['brain', 'finance', 'fitness', 'social'];
+function toRating(points, full) {
   if (!Number.isFinite(points) || points <= 0) return 1;
-  return clamp(1 + Math.sqrt(points * k));
+  return clamp(1 + 98 * Math.pow(Math.min(1, points / full), CURVE));
 }
 
 /* ── Which day keys count (mirror of derive.js) ──────────────────────
@@ -181,29 +185,41 @@ function trackerPoints(state, category, win) {
   return Math.min(total, TRACKER_CAP_N * 10);
 }
 
-/* Lifetime days on which anything in the category was logged, at 0.6 a
-   day — the per-category equivalent of vitalsPoints, and what stops
-   Brain, Finance and Social freezing inside the first year. Mirrors
-   categoryDayPoints in derive.js. */
-const CATEGORY_DAY_POINTS = 0.6;
+/* Days you showed up in a category, DAY_POINTS each, for life. Fitness
+   counts a ticked tracker, a vitals entry or logged activity as showing
+   up, and on-target macro days (a count without dates) as a floor.
+   Mirrors pillarDays in derive.js. */
+const DAY_POINTS = 1;
+const loggedTruthy = v => v !== false && v !== 0 && v != null && v !== '';
 
-function categoryDayPoints(state, category, win) {
+function pillarDays(state, category, win, macroDays = 0) {
+  const days = new Set();
   const ids = new Set((state.trackers || []).filter(t => t.category === category).map(t => t.id));
-  if (!ids.size) return 0;
-  const logs = state.logs || {};
-  let days = 0;
-  for (const key of Object.keys(logs)) {
-    if (days >= win.cap) break;
-    if (!isCountableDay(key, win)) continue;
-    const day = logs[key] || {};
-    for (const id of ids) {
-      const v = day[id];
-      const truthy = v !== false && v !== 0 && v != null && v !== '';
-      if (truthy) { days++; break; }
+  if (ids.size) {
+    const logs = state.logs || {};
+    for (const key of Object.keys(logs)) {
+      if (!isCountableDay(key, win)) continue;
+      const day = logs[key] || {};
+      for (const id of ids) if (loggedTruthy(day[id])) { days.add(key); break; }
     }
   }
-  return days * CATEGORY_DAY_POINTS;
+  if (category === 'fitness') {
+    const vitals = state.vitalsLog || {};
+    for (const key of Object.keys(vitals)) {
+      const e = vitals[key];
+      if (e && (e.weight != null || e.sleep != null || e.rhr != null) && isCountableDay(key, win)) days.add(key);
+    }
+    const burn = state.burnLog || {};
+    for (const key of Object.keys(burn)) {
+      const list = Array.isArray(burn[key]) ? burn[key] : [];
+      if (list.some(a => Number(a?.kcal) > 0) && isCountableDay(key, win)) days.add(key);
+    }
+  }
+  let n = Math.min(days.size, win.cap);
+  if (category === 'fitness') n = Math.max(n, Math.max(0, Math.min(macroDays || 0, win.cap)));
+  return n;
 }
+const dayPoints = (state, category, win, macroDays) => pillarDays(state, category, win, macroDays) * DAY_POINTS;
 
 function savingsPoints(state) {
   const goals = (state.savings || []).filter(g => (g.target || 0) >= SAVINGS_MIN_TARGET);
@@ -225,7 +241,7 @@ function savingsPoints(state) {
 function selfCheckPoints(score) {
   if (!score?.result) return 0;
   const result = Math.max(70, Math.min(130, score.result));
-  return ((result - 70) / 60) * 12 + 6;
+  return ((result - 70) / 60) * 4 + 2;
 }
 const brainScorePoints      = s => selfCheckPoints(s.brainScore);
 const financeScorePoints    = s => selfCheckPoints(s.financeScore);
@@ -243,40 +259,6 @@ function socialPoints(state, friendCount = 0, win) {
     if (logs[k] && Object.keys(logs[k]).length > 0) activeDays++;
   }
   return (friends / 20) * 12 + (activeDays / 30) * 16;
-}
-
-// Health contributions (vitals / burn / macros) — mirror derive.js.
-// Lifetime accumulations, per-day capped (self-reported data rewards
-// consistency, never magnitudes).
-const BURN_DAY_CAP_KCAL = 600;
-
-function vitalsPoints(state, win) {
-  const log = state.vitalsLog || {};
-  let days = 0;
-  for (const k of Object.keys(log)) {
-    if (days >= win.cap) break;
-    if (!isCountableDay(k, win)) continue;
-    const e = log[k];
-    if (e && (e.weight != null || e.sleep != null || e.rhr != null)) days++;
-  }
-  return days * 0.4;
-}
-
-function burnPoints(state, win) {
-  const log = state.burnLog || {};
-  let pts = 0, days = 0;
-  for (const k of Object.keys(log)) {
-    if (days >= win.cap) break;
-    if (!isCountableDay(k, win)) continue;
-    const list = Array.isArray(log[k]) ? log[k] : [];
-    const kcal = list.reduce((sum, a) => sum + (Number(a?.kcal) || 0), 0);
-    if (kcal > 0) { pts += Math.min(kcal, BURN_DAY_CAP_KCAL) / BURN_DAY_CAP_KCAL * 0.5; days++; }
-  }
-  return pts;
-}
-
-function macroPoints(macroDays = 0) {
-  return Math.max(0, macroDays) * 0.5;
 }
 
 /**
@@ -342,6 +324,8 @@ function countedVisions(state, win) {
   return { ids, scale: xp > win.visionXpCap ? win.visionXpCap / xp : 1 };
 }
 
+const VISION_XP_PER_POINT = 40;
+
 function visionPoints(state, category, win) {
   const { ids, scale } = countedVisions(state, win);
   let points = 0;
@@ -349,7 +333,7 @@ function visionPoints(state, category, win) {
     const def = VISION_XP[id];
     if (def.category && def.category !== category) continue;
     const weight = def.category ? 1 : 0.25;
-    points += (def.xp / 4) * weight;
+    points += (def.xp / VISION_XP_PER_POINT) * weight;
   }
   return points * scale;
 }
@@ -371,30 +355,27 @@ function derivePoints(rawState, friendCount = 0, macroDays = 0, createdAt = null
   return {
     brain:
       brainScorePoints(state) +
-      categoryDayPoints(state, 'brain', win) +
+      dayPoints(state, 'brain', win) +
       trackerPoints(state, 'brain', win) * 1.0 +
       achievementPoints(state, 'brain') * 2.5 +
       visionPoints(state, 'brain', win),
     finance:
       financeScorePoints(state) +
-      categoryDayPoints(state, 'finance', win) +
+      dayPoints(state, 'finance', win) +
       savingsPoints(state) +
       trackerPoints(state, 'finance', win) * 1.0 +
       achievementPoints(state, 'finance') * 2.5 +
       visionPoints(state, 'finance', win),
     fitness:
       fitnessScorePoints(state) +
-      categoryDayPoints(state, 'fitness', win) +
-      trackerPoints(state, 'fitness', win) * 1.2 +
-      achievementPoints(state, 'fitness') * 2.5 +
-      visionPoints(state, 'fitness', win) +
-      vitalsPoints(state, win) +
-      burnPoints(state, win) +
       // nutrition rows are client-written too, so the same age cap holds
-      macroPoints(Math.min(macroDays, win.cap)),
+      dayPoints(state, 'fitness', win, macroDays) +
+      trackerPoints(state, 'fitness', win) * 1.0 +
+      achievementPoints(state, 'fitness') * 2.5 +
+      visionPoints(state, 'fitness', win),
     social:
       socialSelfCheckPoints(state) +
-      categoryDayPoints(state, 'social', win) +
+      dayPoints(state, 'social', win) +
       socialPoints(state, friendCount, win) +
       achievementPoints(state, 'social') * 2.5 +
       visionPoints(state, 'social', win),
@@ -406,18 +387,24 @@ function derivePoints(rawState, friendCount = 0, macroDays = 0, createdAt = null
  * (profiles.prestige_baseline): per-category raw points captured at
  * prestige time, subtracted here so the post-prestige climb starts
  * from the floor without wiping any user data. {} = no prestige yet.
+ *
+ * OVR is the weighted total — best category in full, the rest by
+ * BREADTH_WEIGHTS — not the mean of the four. Mirrors ratingsFromPoints
+ * in derive.js.
  */
 function deriveRatings(state, friendCount = 0, baseline = {}, macroDays = 0, createdAt = null) {
   const pts = derivePoints(state, friendCount, macroDays, createdAt);
-  const adj = cat => Math.max(0, pts[cat] - (Number(baseline?.[cat]) || 0));
-
-  const brain   = toRating(adj('brain'));
-  const finance = toRating(adj('finance'));
-  const fitness = toRating(adj('fitness'));
-  const social  = toRating(adj('social'));
-  const ovr     = clamp((brain + finance + fitness + social) / 4);
-
-  return { brain, finance, fitness, social, ovr };
+  const adj = {};
+  for (const c of CATEGORIES) adj[c] = Math.max(0, pts[c] - (Number(baseline?.[c]) || 0));
+  const total = CATEGORIES.map(c => adj[c]).sort((a, b) => b - a)
+    .reduce((sum, v, i) => sum + v * BREADTH_WEIGHTS[i], 0);
+  return {
+    brain:   toRating(adj.brain, PILLAR_FULL),
+    finance: toRating(adj.finance, PILLAR_FULL),
+    fitness: toRating(adj.fitness, PILLAR_FULL),
+    social:  toRating(adj.social, PILLAR_FULL),
+    ovr:     toRating(total, OVR_FULL),
+  };
 }
 
 /* The state keys the maths above reads — and nothing else. The state
@@ -483,9 +470,8 @@ async function loadRatingInputs(userId, { supabaseUrl, serviceKey }, { createdAt
 
   // Prestige baseline: raw points snapshotted at prestige time. The
   // canonical (friend-visible) ratings are computed net of it so each
-  // prestige climb restarts from the floor. Client derive.js stays
-  // un-baselined (local preview may briefly run higher post-prestige —
-  // accepted skew; server value is canonical).
+  // prestige climb restarts from the floor. It is returned to the app,
+  // which caches it as S.prestigeBaseline and subtracts it the same way.
   const profRes = await fetch(
     `${supabaseUrl}/rest/v1/profiles?id=eq.${userId}&select=prestige,prestige_baseline`,
     { headers }
@@ -539,13 +525,16 @@ async function writeRatings(userId, ratings, { supabaseUrl, serviceKey }) {
  * `opts.createdAt` — the account's creation time if the caller already
  * has it (saves an auth round trip).
  *
- * Returns { ratings, computedAt, prestige } on success, throws on failure.
+ * Returns { ratings, computedAt, prestige, baseline } on success, throws
+ * on failure. `baseline` goes back to the app so its local number is net
+ * of the last prestige too (S.prestigeBaseline) — without it the app
+ * would read 99 while the leaderboard restarted the climb.
  */
 async function recomputeUser(userId, env, opts = {}) {
   const inp = await loadRatingInputs(userId, env, opts);
   const ratings = deriveRatings(inp.state, inp.friends, inp.baseline, inp.macroDays, inp.createdAt);
   const computedAt = await writeRatings(userId, ratings, env);
-  return { ratings, computedAt, prestige: inp.prestige };
+  return { ratings, computedAt, prestige: inp.prestige, baseline: inp.baseline };
 }
 
 module.exports = {

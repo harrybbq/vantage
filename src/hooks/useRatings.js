@@ -19,11 +19,12 @@
  *     friends rail use case.
  */
 import { useEffect, useRef } from 'react';
-import { deriveRatings } from '../lib/ratings/derive';
+import { deriveRatings, cleanBaseline, CATEGORIES } from '../lib/ratings/derive';
 import { supabase } from '../lib/supabase';
 import { apiUrl } from '../lib/authFetch';
 
 const CLIENT_DEBOUNCE_MS = 1500;
+const sameBaseline = (a, b) => !!a && CATEGORIES.every(c => Number(a[c]) === Number(b[c]));
 const SERVER_DEBOUNCE_MS = 30_000;
 const MACRO_DAYS_TTL_MS = 5 * 60_000;
 
@@ -85,13 +86,18 @@ export function useRatings(userId, S, update, friendCount = 0, hydrated = true) 
       vit: Object.keys(S.vitalsLog || {}).length,
       brn: Object.keys(S.burnLog || {}).length,
       md:  macroDaysRef.current.value,
+      pb:  S.prestigeBaseline || null,
     });
 
     // ── Client recompute ──
     if (sig !== lastClientSigRef.current) {
       clearTimeout(clientTimerRef.current);
       clientTimerRef.current = setTimeout(() => {
-        const next = deriveRatings(S, { friendCount, macroDays: macroDaysRef.current.value });
+        const next = deriveRatings(S, {
+          friendCount,
+          macroDays: macroDaysRef.current.value,
+          baseline: S.prestigeBaseline || {},
+        });
         const prev = S.ratings || {};
         // Skip the write if nothing changed (avoids endless update loops
         // since update() schedules a cloud save which re-runs this hook).
@@ -128,10 +134,17 @@ export function useRatings(userId, S, update, friendCount = 0, hydrated = true) 
           // Cache the canonical prestige locally (S.prestige) so badge
           // surfaces don't need a profiles round-trip. Server remains
           // the source of truth (profiles.prestige).
+          // Same for the prestige baseline, which the local rating
+          // subtracts — without it the app would read 99 after a
+          // prestige while the leaderboard restarted the climb.
           if (res.ok) {
             const body = await res.json().catch(() => null);
             if (body && typeof body.prestige === 'number') {
               update(p => (p.prestige === body.prestige ? p : { ...p, prestige: body.prestige }));
+            }
+            const baseline = cleanBaseline(body?.baseline);
+            if (baseline) {
+              update(p => (sameBaseline(p.prestigeBaseline, baseline) ? p : { ...p, prestigeBaseline: baseline }));
             }
           }
           lastServerSigRef.current = sig;

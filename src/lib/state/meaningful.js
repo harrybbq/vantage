@@ -49,7 +49,7 @@ export const MEANINGFUL_IGNORE = [
   // Seeded settings objects.
   'notifications', 'privacy', 'lastfm',
   // Derived or server caches, rewritten on load.
-  'ratings', 'prestige', 'streaks', 'coachMemory', 'coachBriefHistory',
+  'ratings', 'prestige', 'prestigeBaseline', 'streaks', 'coachMemory', 'coachBriefHistory',
   'coachBrief', 'whoopLastError',
   // Auto-stamped: plan posting writes { from } the first time it looks.
   // Posted months are counted below.

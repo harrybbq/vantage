@@ -119,7 +119,7 @@ exports.handler = async (event) => {
     let profiles;
     try {
       profiles = await inChunks(ids, (csv, offset, limit) => sb(env.supabaseUrl, env.serviceKey,
-        `/rest/v1/profiles?id=in.(${csv})&select=id,ratings_ovr&order=id&limit=${limit}&offset=${offset}`),
+        `/rest/v1/profiles?id=in.(${csv})&select=id,ratings_ovr,prestiged_at&order=id&limit=${limit}&offset=${offset}`),
       { what: 'settle profiles' });
     } catch {
       return readFailed('profiles');
