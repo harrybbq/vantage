@@ -7,25 +7,19 @@
  *                 to swipe. W never counts for PBs, rep maxes, e1RM or the
  *                 chart (it still counts for volume and is saved).
  *   ExerciseMenu  ⋯ on an exercise (§3.5.3) — Swap ›, Add note ›, View
- *                 history › (a sheet OVER the workout), Rest for this
- *                 exercise 60 / 90 / 120 / 180 (lift.restSec), the read-only
+ *                 history › (a sheet OVER the workout), the read-only
  *                 CompareScope line with "Change in Manage lifts ›", and
  *                 Remove (danger, 12 px gap, Undo 5 s). A lift not created
- *                 yet (pending) can't have history / its own rest — says why.
- *   WorkoutMenu   the header ⋯ (§3.5.7) — rename, rest default, night flag,
- *                 gym, end-of-rest sound / vibration, and Discard with the
- *                 two-step confirm.
+ *                 yet (pending) can't have history — says why.
+ *   WorkoutMenu   the header ⋯ (§3.5.7) — rename, night flag, gym, and
+ *                 Discard with the two-step confirm. (The rest timer and its
+ *                 settings were removed on 2026-10-21.)
  *   GymSheet      which gym — before any set is ticked a tap just switches;
  *                 with done sets it asks first (they're saved under it).
  */
 import { useState } from 'react';
 import Icon from '../../../Icon';
-import { Sheet, Segmented, Button, GymSwitch, CompareScope } from '../ui';
-import { REST_PRESETS } from '../../../../lib/lifts/store';
-import { clock } from '../../../../lib/lifts/workout';
-
-const restLabel = v => (v < 120 ? `${v} s` : `${v / 60} min`);
-const restOpts = REST_PRESETS.map(v => ({ value: v, label: restLabel(v) }));
+import { Sheet, Button, GymSwitch, CompareScope } from '../ui';
 
 function MenuRow({ icon, children, sub, onClick, disabled, testId, right = 'chevron-right' }) {
   return (
@@ -62,7 +56,7 @@ export function SetMenu({ si, set, liftName, onType, onDelete, onClose }) {
   );
 }
 
-export function ExerciseMenu({ ex, lift, gymLabel, restNow, onSwap, onNote, onHistory, onRest, onManage, onRemove, onClose }) {
+export function ExerciseMenu({ ex, lift, gymLabel, onSwap, onNote, onHistory, onManage, onRemove, onClose }) {
   const pending = !!(lift && lift.pending);
   const name = lift ? lift.name : 'Exercise';
   return (
@@ -73,12 +67,6 @@ export function ExerciseMenu({ ex, lift, gymLabel, restNow, onSwap, onNote, onHi
         <MenuRow icon="chart-column" onClick={onHistory} disabled={pending} testId="lw-m-history"
                  sub={pending ? 'History opens once its first set is ticked — the lift is created then.' : 'Opens over the workout'}>View history</MenuRow>
       </ul>
-      <div className="lw-menu-sec">
-        <p className="lf-eyebrow" id="lw-m-rest">Rest after a set of this exercise</p>
-        <Segmented options={restOpts.map(o => ({ ...o, disabled: pending }))} value={REST_PRESETS.includes(restNow) ? restNow : null} onChange={onRest}
-                   label="Rest for this exercise" full testId="lw-m-rest" />
-        <p className="lf-meta">{pending ? 'Set it once the lift exists (after its first ticked set).' : `Now ${clock(restNow)}. Saved to this lift for every workout.`}</p>
-      </div>
       {lift && (
         <div className="lw-menu-sec">
           <CompareScope lift={lift} gymLabel={gymLabel} onManage={pending ? null : onManage} />
@@ -94,11 +82,10 @@ export function ExerciseMenu({ ex, lift, gymLabel, restNow, onSwap, onNote, onHi
   );
 }
 
-export function WorkoutMenu({ active, gymLabel, prefs, onRename, onRest, onNight, onGym, onPref, onDiscard, onClose }) {
+export function WorkoutMenu({ active, gymLabel, onRename, onNight, onGym, onDiscard, onClose }) {
   const [name, setName] = useState(active.name);
   const [asking, setAsking] = useState(false);
   const night = active.shift === 'night';
-  const rest = active.restSec;
   return (
     <Sheet title="Workout" eyebrow={`// ${active.name}`} onClose={onClose} testId="lw-wkmenu" width={480}>
       <div className="lw-menu-sec">
@@ -107,11 +94,6 @@ export function WorkoutMenu({ active, gymLabel, prefs, onRename, onRest, onNight
           <input id="lw-wk-name" className="lf-cellbox lw-input" value={name} maxLength={60} onChange={e => setName(e.target.value)}
                  onBlur={() => onRename(name)} onKeyDown={e => { if (e.key === 'Enter') e.currentTarget.blur(); }} data-testid="lw-wk-name" />
         </label>
-      </div>
-      <div className="lw-menu-sec">
-        <p className="lf-eyebrow">Rest default</p>
-        <Segmented options={restOpts} value={REST_PRESETS.includes(rest) ? rest : null} onChange={onRest} label="Rest default" full testId="lw-wk-rest" />
-        <p className="lf-meta">For exercises without their own rest. Remembered for the next workout.</p>
       </div>
       <ul className="lw-menu">
         <li>
@@ -122,20 +104,6 @@ export function WorkoutMenu({ active, gymLabel, prefs, onRename, onRest, onNight
           </label>
         </li>
         <MenuRow icon="locate-fixed" onClick={onGym} testId="lw-wk-gym" sub={gymLabel ? `Training at ${gymLabel}` : 'No gym set'}>Gym</MenuRow>
-        <li>
-          <label className="lw-switch">
-            <span className="lw-switch-text"><b>Tone at the end of rest</b><span>A short sound when the rest is over. Off by default.</span></span>
-            <input type="checkbox" role="switch" checked={!!prefs.restTone} onChange={e => onPref('restTone', e.target.checked)} data-testid="lw-wk-tone" />
-            <span className="lw-switch-ui" aria-hidden="true" />
-          </label>
-        </li>
-        <li>
-          <label className="lw-switch">
-            <span className="lw-switch-text"><b>Vibrate at the end of rest</b><span>Where the phone supports it.</span></span>
-            <input type="checkbox" role="switch" checked={prefs.restVibrate !== false} onChange={e => onPref('restVibrate', e.target.checked)} />
-            <span className="lw-switch-ui" aria-hidden="true" />
-          </label>
-        </li>
       </ul>
       <div className="lw-menu-danger">
         {asking ? (

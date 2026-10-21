@@ -2,7 +2,7 @@
  * The workout logger (Upgrade → Lifts, owner-only) — modelled on the
  * flow of the owner's gym app: a suggested workout for today, a live
  * session with a set table per exercise (Set · Previous · Reps · KG ·
- * RPE · ✓), a rest timer, and a summary on Finish.
+ * RPE · ✓) and a summary on Finish.
  *
  * Pure: no React, no network, no clock. `now`, `today` and id makers are
  * parameters, so workout.test.mjs can pin every number.
@@ -11,7 +11,7 @@
  *   active    the workout in progress, persisted on every edit so a
  *             refresh, a sleeping phone or a closed app never loses it.
  *             { id, date, startedAt, name, source, rotaSession?, shift?,
- *               restSec, rest?: { endsAt, total },
+ *               (restSec / rest on workouts started before 2026-10-21: ignored),
  *               exercises: [{ liftId, note?, target?, pending?: { key, name, load, muscles },
  *                             sets: [{ id, reps, weight, rpe?, type?: 'W'|'D'|'F', done }] }] }
  *             Only one at a time: startWorkout is a no-op while one exists.
@@ -79,8 +79,6 @@ import { plannedSessions, blockProgress, EXTRA } from './plan.js';
 export { MUSCLES, PROGRAMME_MUSCLES, musclesOf } from './muscles.js';
 
 const EPS = 1e-9;
-export const DEFAULT_REST_SEC = 90;
-export const REST_LIMITS = [15, 600];
 export const MAX_SESSIONS = 400;
 export const RECENT_N = 10;
 export const RPE_CHIPS = [5, 6, 7, 8, 9, 10];
@@ -492,7 +490,7 @@ export function startWorkout(prev, opts = {}) {
     }
     const active = {
       id: ids('wk'), date: today, startedAt: now, name: String(name || 'Workout').slice(0, LIMITS.name), source,
-      restSec: clampRest(l.restSec ?? DEFAULT_REST_SEC), exercises,
+      exercises,
     };
     if (rotaSession) active.rotaSession = rotaSession;
     if (shift) active.shift = shift;
@@ -592,15 +590,14 @@ export function setProblem(st, lift) {
   return null;
 }
 
-/** Rest after a set of `lift`: the lift's own restSec, else the workout's, else 90 s. */
-export const restSecFor = (active, lift) => clampRest((lift && num(lift.restSec)) || (active && active.restSec) || DEFAULT_REST_SEC);
 
 /**
  * ✓ a set (or un-✓ it). Ticking an empty field fills it from Previous
  * (the same set index of the last time — by shift, previousSession), as
  * the gym app does; a set that still isn't a valid set is refused (prev
- * returned — see setProblem). Ticking starts the rest timer (the lift's
- * own rest, else the workout's) and creates a pending exercise's lift.
+ * returned — see setProblem). Ticking creates a pending exercise's lift.
+ * (It started a rest timer until 2026-10-21; the owner found the timer
+ * got in the way and it was removed.)
  */
 export function toggleDone(prev, ei, si, now = 0, opts = {}) {
   const a = activeOf(prev);
@@ -622,8 +619,7 @@ export function toggleDone(prev, ei, si, now = 0, opts = {}) {
   if (filled.weight == null) filled.weight = 0;
   return withLifts(prev, l => {
     const y = mapSet(l.active, ei, si, () => ({ ...filled, done: true }));
-    const total = restSecFor(y, lift);
-    let out = { ...l, active: { ...y, rest: { endsAt: num(now) + total * 1000, total, liftId: ex.liftId } } };
+    let out = { ...l, active: y };
     if (ex.pending) {
       // The first ticked set of a programme exercise creates its lift (once).
       const m = materialise(out, out.active.exercises[ei], now);
@@ -734,91 +730,6 @@ export function setWorkoutGym(prev, gym) {
 /** Done sets in the workout (how many would be re-tagged by a gym change). */
 export const doneSetCount = a => (a ? a.exercises.reduce((k, ex) => k + ex.sets.filter(st => st.done).length, 0) : 0);
 
-export const clampRest = s => Math.max(REST_LIMITS[0], Math.min(REST_LIMITS[1], Math.round(num(s) || DEFAULT_REST_SEC)));
-
-/** Rest length for this workout, remembered (S.lifts.restSec) for the next one. */
-export function setRestSec(prev, sec) {
-  const v = clampRest(sec);
-  const a = activeOf(prev);
-  const L = liftsOf(prev);
-  if (L.restSec === v && (!a || a.restSec === v)) return prev;
-  return withLifts(prev, l => ({ ...l, restSec: v, ...(a ? { active: { ...a, restSec: v } } : {}) }));
-}
-/** +15 s (or any `sec`) on the running rest timer. */
-export function extendRest(prev, sec, now) {
-  return withActive(prev, a => {
-    if (!a.rest || num(a.rest.endsAt) <= num(now)) return a;
-    return { ...a, rest: { endsAt: num(a.rest.endsAt) + sec * 1000, total: num(a.rest.total) + sec } };
-  });
-}
-export function skipRest(prev) {
-  return withActive(prev, a => {
-    if (!a.rest) return a;
-    const out = { ...a };
-    delete out.rest;
-    return out;
-  });
-}
-/** Seconds left on the rest timer, or 0. */
-export const restLeft = (active, now) => (active && active.rest
-  ? Math.max(0, Math.min(num(active.rest.total) || Infinity, Math.ceil((num(active.rest.endsAt) - num(now)) / 1000))) : 0);
-
-/** Seconds PAST the end of the rest (overtime, counted up as "+0:12"), or 0. */
-export const restOver = (active, now) => (active && active.rest
-  ? Math.max(0, Math.floor((num(now) - num(active.rest.endsAt)) / 1000)) : 0);
-
-/**
- * The rest timer as the dock draws it, from the stored end time (never a
- * ticking counter — a sleeping phone or a background tab can't drift it):
- * → { phase: 'idle'|'running'|'ending'|'over', left, over, total, pct, liftId }
- *   running  more than 10 s left; ending  the last 10 s (the bar tints);
- *   over     past the end — counts up, never auto-dismissed.
- * pct is how much of the rest has gone (0–1), 1 once over.
- */
-export function restState(active, now) {
-  const r = active && active.rest;
-  if (!r || num(r.endsAt) == null) return { phase: 'idle', left: 0, over: 0, total: 0, pct: 0, liftId: null };
-  const total = Math.max(0, num(r.total) || 0);
-  const ms = num(r.endsAt) - num(now);
-  if (ms <= 0) return { phase: 'over', left: 0, over: Math.floor(-ms / 1000), total, pct: 1, liftId: r.liftId || null };
-  const left = Math.min(total || Infinity, Math.ceil(ms / 1000));
-  const pct = total ? Math.max(0, Math.min(1, 1 - ms / (total * 1000))) : 0;
-  return { phase: left <= 10 ? 'ending' : 'running', left, over: 0, total, pct, liftId: r.liftId || null };
-}
-
-/**
- * −15 / +15 s (any `sec`) on the rest timer. +sec past the end restarts a
- * short rest of `sec` from now; −sec never ends before now (it lands on
- * "rest over"). The total follows so the ring stays honest.
- */
-export function adjustRest(prev, sec, now) {
-  const d = Math.round(num(sec) || 0);
-  if (!d) return prev;
-  return withActive(prev, a => {
-    if (!a.rest) return a;
-    const end = num(a.rest.endsAt), t = num(now);
-    if (end <= t) {
-      if (d < 0) return a;
-      return { ...a, rest: { ...a.rest, endsAt: t + d * 1000, total: d } };
-    }
-    const nextEnd = Math.max(t, end + d * 1000);
-    const total = Math.max(0, Math.round(num(a.rest.total) + (nextEnd - end) / 1000));
-    return { ...a, rest: { ...a.rest, endsAt: nextEnd, total } };
-  });
-}
-
-/** A preset (60 / 90 / 120 / 180) for the rest that is running: the same start, a new length. */
-export function setRestTotal(prev, sec, now) {
-  const v = clampRest(sec);
-  return withActive(prev, a => {
-    if (!a.rest) return a;
-    const started = num(a.rest.endsAt) - num(a.rest.total) * 1000;
-    const endsAt = Math.max(num(now), started + v * 1000);
-    if (endsAt === num(a.rest.endsAt) && v === num(a.rest.total)) return a;
-    return { ...a, rest: { ...a.rest, endsAt, total: v } };
-  });
-}
-
 /**
  * Override the workout's shift: 'night' (80 % load, night Previous) or
  * back to a day session. Previous follows at once. The rota's own shift
@@ -912,19 +823,16 @@ export function planProgress(active) {
 
 /**
  * What the minimised workout's bar says — read-only, from S.lifts.active:
- * → { name, clock, done, sets, rest: 'm:ss' | '+m:ss' | null, text } | null.
+ * → { name, clock, done, sets, text } | null.
  * Never writes: minimising and resuming leave the workout byte-identical.
  */
 export function miniBarModel(active, now) {
   if (!active) return null;
   const p = planProgress(active);
-  const r = restState(active, now);
-  const rest = r.phase === 'idle' ? null : r.phase === 'over' ? `+${clock(r.over)}` : clock(r.left);
   const name = String(active.name || 'Workout');
   const time = clock(elapsedSec(active, now));
   const parts = [name.toUpperCase(), time, `${p.done}/${p.sets}`];
-  if (rest) parts.push(`REST ${rest}`);
-  return { name, clock: time, done: p.done, sets: p.sets, rest, text: parts.join(' · ') };
+  return { name, clock: time, done: p.done, sets: p.sets, text: parts.join(' · ') };
 }
 
 /** Throw the workout away. The log is not touched — nothing was written to it. */

@@ -15,7 +15,6 @@
   font-family: var(--lf-mono); font-size: max(13px, var(--lf-fs-floor)); font-variant-numeric: tabular-nums; color: var(--lf-mid); }
 .lw-mini-txt b { color: var(--lf-text); font-weight: 600; overflow: hidden; text-overflow: ellipsis; min-width: 0; flex: 0 1 auto; }
 .lw-mini-txt span { flex: none; }
-.lw-mini-rest { color: var(--lf-accent-ink); }
 .lw-mini-go { flex: none; display: inline-flex; align-items: center; min-height: 40px; padding: 0 14px; border-radius: var(--lf-r-cell);
   background: var(--lf-accent); color: var(--lf-on-accent); font-weight: 700; font-size: 14px; }
 .lw-mini.is-pill .lw-mini-go { min-height: 28px; border-radius: 999px; font-size: 13px; padding: 0 12px; }

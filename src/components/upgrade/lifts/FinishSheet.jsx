@@ -25,7 +25,11 @@
  * one at Lifts (the same 'lifts' auto-fill rule Track offers). The tick
  * itself is written by useAutomations, never here.
  *
- * Props: summary (summariseWorkout), saved, templateSaved, gymLabel,
+ * Under the tiles, the body map (BodyMap): where the sets went, each
+ * muscle filled by the share of its session target that was done.
+ *
+ * Props: summary (summariseWorkout), saved, templateSaved, gymLabel, lifts
+ * (the lift list, for the body map's muscle tags),
  * gymName(id), onSave, onKeepGoing, onDiscard, onSaveTemplate(name, { update }),
  * onClose, trackers, linked (trackers on a lifts/workout rule), dayLog
  * (S.logs for the workout's day), onLinkTracker(id).
@@ -36,10 +40,11 @@ import { Sheet, Button, PbMark, NightMark } from './ui';
 import { clock, volumeText } from '../../../lib/lifts/workout';
 import { realSetText, roundEstimate } from '../../../lib/lifts/ui';
 import { perGymOf, fmtKg } from '../../../lib/lifts/lifts';
+import BodyMap from './BodyMap';
 
 export default function FinishSheet({
   summary, saved, onSave, onKeepGoing, onDiscard, onSaveTemplate, onClose, templateSaved, gymLabel = null,
-  trackers = [], linked = [], dayLog = {}, onLinkTracker = null,
+  trackers = [], linked = [], dayLog = {}, onLinkTracker = null, lifts = [],
 }) {
   const [name, setName] = useState(summary ? summary.session.name : '');
   // The likeliest "gym" tracker first; the owner can pick any other.
@@ -85,6 +90,8 @@ export default function FinishSheet({
           <div><dt>Sets</dt><dd>{summary.setsDone}<span className="lw-tile-of">/{planned}</span></dd></div>
           <div><dt>Exercises</dt><dd>{summary.exercises}</dd></div>
         </dl>
+
+        {!nothing && <BodyMap session={s} list={lifts} />}
 
         {summary.pbs.length > 0 ? (
           <section className="lw-fin-pbs" aria-label="New personal bests — real sets">

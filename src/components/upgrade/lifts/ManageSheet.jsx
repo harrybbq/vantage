@@ -8,7 +8,7 @@
  * switch [Per gym | All gyms] — the ONLY place that setting is edited
  * (CompareScope elsewhere explains it and links here). The ⋯ holds Move up
  * / down, Weight step (1 / 1.25 / 2 / 2.5 / 5 → lift.step, or per gym for a
- * machine → lift.stepByGym), Rest default (→ lift.restSec), Archive, and
+ * machine → lift.stepByGym), Archive, and
  * Delete for a lift with no sets.
  * "+ Add lift" expands to name · Loaded as · Machine switch.
  * Gyms: name (✎), set count, ⋯ (Archive; Delete if no sets), + Add gym.
@@ -18,11 +18,10 @@
 import { useEffect, useRef, useState } from 'react';
 import Icon from '../../Icon';
 import { Sheet, Button, IconButton, Segmented, Chip } from './ui';
-import { STEP_CHOICES, REST_PRESETS } from '../../../lib/lifts/store';
+import { STEP_CHOICES } from '../../../lib/lifts/store';
 import { LOAD_TYPES, LOAD_LABEL, bannedRule, perGymOf, perGymByName, stepFor, DEFAULT_STEP } from '../../../lib/lifts/lifts';
 
 const COMPARE = [{ value: 'gym', label: 'Per gym' }, { value: 'all', label: 'All gyms' }];
-const restTxt = s => (s % 60 ? `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}` : `${s / 60} min`);
 const ROW_H = 64;
 
 /** Name as text + ✎ → an inline input with Save / Cancel. */
@@ -68,7 +67,7 @@ function LiftRow({ lift, count, index, total, gyms, focus, onRename, onPerGym, o
   const meta = [
     LOAD_LABEL[lift.load], `${count} ${count === 1 ? 'set' : 'sets'}`,
     lift.step ? `step ${lift.step}` : null, steps ? `step ${steps}` : null,
-    lift.restSec ? `rest ${restTxt(lift.restSec)}` : null, bannedRule(lift) ? 'not in programme' : null,
+    bannedRule(lift) ? 'not in programme' : null,
   ].filter(Boolean).join(' · ');
   const dy = drag && drag.id === lift.id ? drag.dy : 0;
   return (
@@ -93,12 +92,11 @@ function LiftRow({ lift, count, index, total, gyms, focus, onRename, onPerGym, o
   );
 }
 
-/** The lift's ⋯: move, weight step, rest default, archive / delete. */
-function LiftMenu({ lift, count, gyms, first, last, onClose, onMove, onStep, onRest, onArchive, onDelete }) {
+/** The lift's ⋯: move, weight step, archive / delete. */
+function LiftMenu({ lift, count, gyms, first, last, onClose, onMove, onStep, onArchive, onDelete }) {
   const per = perGymOf(lift);
   const def = DEFAULT_STEP[lift.load] || 2.5;
   const stepOpts = [{ value: '', label: `Default · ${def}` }, ...STEP_CHOICES.map(s => ({ value: String(s), label: String(s) }))];
-  const restOpts = [{ value: '', label: 'Workout' }, ...REST_PRESETS.map(s => ({ value: String(s), label: restTxt(s) }))];
   const act = fn => () => { fn(); onClose(); };
   return (
     <Sheet title={lift.name} eyebrow="// Manage lift" onClose={onClose} testId="lh-liftmenu">
@@ -125,10 +123,6 @@ function LiftMenu({ lift, count, gyms, first, last, onClose, onMove, onStep, onR
           </div>
         )}
         {per && <p className="lf-meta">A machine&apos;s stack differs gym to gym, so each gym keeps its own step.</p>}
-        <p className="lf-eyebrow">// Rest default</p>
-        <Segmented label="Rest default" size="sm" full options={restOpts} value={lift.restSec ? String(lift.restSec) : ''}
-                   onChange={v => onRest(lift.id, v === '' ? null : Number(v))} testId="lh-rest" />
-        <p className="lf-meta">The rest timer after a set of this lift. “Workout” uses the workout&apos;s default (90 s).</p>
         <div className="lh-menu-gap" />
         <Button variant="secondary" size="lg" block icon={lift.archived ? 'rotate-ccw' : 'archive'} onClick={act(() => onArchive(lift.id, !lift.archived))}>
           {lift.archived ? 'Restore' : 'Archive'}
@@ -232,7 +226,7 @@ function AddGym({ onAddGym }) {
 }
 
 export default function ManageSheet({
-  lifts, counts, onClose, onAdd, onRename, onMove, onArchive, onDelete, onPerGym, onStep, onRest,
+  lifts, counts, onClose, onAdd, onRename, onMove, onArchive, onDelete, onPerGym, onStep,
   gyms = [], gymCounts = new Map(), onAddGym, onRenameGym, onArchiveGym, onDeleteGym, focus = null,
 }) {
   const [menu, setMenu] = useState(null);
@@ -330,7 +324,7 @@ export default function ManageSheet({
 
       {menuLift && (
         <LiftMenu lift={menuLift} count={counts.get(menuLift.id) || 0} gyms={gyms} first={ai <= 0} last={ai < 0 || ai === active.length - 1}
-                  onClose={() => setMenu(null)} onMove={onMove} onStep={onStep} onRest={onRest} onArchive={onArchive} onDelete={onDelete} />
+                  onClose={() => setMenu(null)} onMove={onMove} onStep={onStep} onArchive={onArchive} onDelete={onDelete} />
       )}
     </Sheet>
   );
