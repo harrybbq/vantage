@@ -7,8 +7,8 @@
  *   shareableView(S)       What OTHER people's numbers are computed from:
  *                          ratings (src/lib/ratings/derive.js, mirrored
  *                          server-side in netlify/lib/wearableShare.js),
- *                          vision unlocks (and so the level friends and
- *                          handle search see) and the friends heatmap.
+ *                          vision unlocks (which feed those ratings) and
+ *                          the friends heatmap.
  *                          WHOOP's terms count derivatives of its data as
  *                          WHOOP Data and need the user's explicit opt-in
  *                          before anyone else sees them; D1 chose to

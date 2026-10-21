@@ -533,7 +533,6 @@ html[data-design="console"] .cx-sweep-tile-top { display: flex; align-items: cen
 html[data-design="console"] .cx-sweep-tile-glyph { display: grid; place-items: center; width: 32px; height: 32px; border-radius: var(--cx-r-cell); background: var(--cx-s1); color: var(--cx-muted); border: 1px solid var(--cx-line); }
 html[data-design="console"] .cx-sweep-tile.is-on .cx-sweep-tile-glyph { color: var(--cx-gold); border-color: var(--cx-gold); }
 html[data-design="console"] .cx-sweep-tile-mark { font: 400 var(--cx-fs-15)/1 var(--cx-sans); }
-html[data-design="console"] .cx-sweep-tile-xp { font-size: var(--cx-fs-12); line-height: var(--cx-lh-12); color: var(--cx-muted); }
 html[data-design="console"] .cx-sweep-tile-title { font: 600 var(--cx-fs-13)/var(--cx-lh-13) var(--cx-sans); color: var(--cx-text); }
 html[data-design="console"] .cx-sweep-tile:not(.is-on) .cx-sweep-tile-title { color: var(--cx-mid); }
 html[data-design="console"] .cx-sweep-tile-desc { font: 400 var(--cx-fs-12)/var(--cx-lh-12) var(--cx-sans); color: var(--cx-muted); }

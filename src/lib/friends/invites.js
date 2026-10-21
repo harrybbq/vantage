@@ -76,7 +76,7 @@ export async function regenerateInvite() {
 
 /**
  * The inviter's card for the landing page. Works signed out.
- * → { ok: true, inviter: { id, name, handle, avatarUrl, level, ovr },
+ * → { ok: true, inviter: { id, name, handle, avatarUrl, ovr, prestige },
  *     relationship: 'none'|'self'|'friends'|'outgoing'|'incoming',
  *     expiresAt }
  * (`inviter.id` is null when signed out.)
@@ -94,8 +94,10 @@ export async function previewInvite(code) {
       name: p.display_name || (p.handle ? `@${p.handle}` : 'A Vantage user'),
       handle: p.handle || null,
       avatarUrl: p.avatar_url || null,
-      level: p.level ?? null,
       ovr: p.ratings_ovr ?? null,
+      // 0 until supabase/prestige_rewards_2026_10.sql adds it to the
+      // preview (fail soft: no frame, no badge). Level is not read.
+      prestige: Math.max(0, Math.floor(Number(p.prestige) || 0)),
     },
     relationship: data.relationship || 'none',
     expiresAt: data.expires_at || null,

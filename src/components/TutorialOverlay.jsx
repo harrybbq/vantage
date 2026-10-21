@@ -87,13 +87,13 @@ const STEPS_CREAM = [
   {
     id: 'leaderboard', label: 'Leaderboard',
     title: 'Compete + climb',
-    body: 'Your OVR rating (Brain / Finance / Fitness / Social, each 0–99) ranks you against friends or globally, all-time or weekly climb. Add people straight from the board, message friends, and at OVR 99 Prestige up for a colour-band badge (GREEN I → CRIMSON X). You choose whether you appear on the global board, in Settings → Privacy.',
+    body: 'Your OVR rating (Brain / Finance / Fitness / Social, each 0–99) ranks you against friends or globally, all-time or weekly climb. Add people straight from the board, message friends, and at OVR 99 Prestige up for a colour-band badge (GREEN I → CRIMSON X) and a reward: accents, an avatar frame, card styles. You choose whether you appear on the global board, in Settings → Privacy.',
     target: 'nav-tab-leaderboard', placement: 'right', arrowDir: 'left',
   },
   {
     id: 'settings', label: 'Settings',
     title: 'Make it yours',
-    body: 'Colour schemes — some free, some unlocked by earning Honours, more with Pro (plus a coloured leaderboard name). Connect a WHOOP band or Oura ring. Decide whether coins are required to buy shop items. Set macro goals, manage every privacy toggle (search, leaderboard, what friends see), browse the Honours catalogue, export your data, and replay this tour.',
+    body: 'Colour schemes — some free, some unlocked by reaching a prestige, more with Pro (plus a coloured leaderboard name). Connect a WHOOP band or Oura ring. Decide whether coins are required to buy shop items. Set macro goals, manage every privacy toggle (search, leaderboard, what friends see), browse the Honours catalogue, export your data, and replay this tour.',
     target: 'nav-tab-settings', placement: 'right', arrowDir: 'left',
   },
   {
@@ -159,13 +159,13 @@ const STEPS_DARK = [
   {
     id: 'leaderboard', label: 'leaderboard',
     title: 'leaderboard',
-    body: 'Server-canonical ratings. Friends / Global × all-time / weekly-climb. Add friends straight from the board. At OVR 99: prestige — colour-band badge (forest → crimson), climb restarts, nothing else wiped. Global visibility: your call, settings → privacy.',
+    body: 'Server-canonical ratings. Friends / Global × all-time / weekly-climb. Add friends straight from the board. At OVR 99: prestige — colour-band badge (forest → crimson) + a reward (accent / frame / card style), climb restarts, nothing else wiped. Global visibility: your call, settings → privacy.',
     target: 'nav-tab-leaderboard', placement: 'right', arrowDir: 'left',
   },
   {
     id: 'settings', label: 'settings',
     title: 'settings',
-    body: 'Colour schemes: free tier + honour-unlocked + Pro (incl. coloured leaderboard name). WHOOP / Oura connections. Shop coin gate on/off. Macros, privacy toggles (search / leaderboard / profile shares), Honours catalogue, data export, replay this tour.',
+    body: 'Colour schemes: free tier + prestige-unlocked + Pro (incl. coloured leaderboard name). WHOOP / Oura connections. Shop coin gate on/off. Macros, privacy toggles (search / leaderboard / profile shares), Honours catalogue, data export, replay this tour.',
     target: 'nav-tab-settings', placement: 'right', arrowDir: 'left',
   },
   {

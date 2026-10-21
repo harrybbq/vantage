@@ -33,7 +33,7 @@ export function Ul({ items }) {
   );
 }
 
-const LAST_UPDATED = '20 October 2026';
+const LAST_UPDATED = '21 October 2026';
 
 function Updated() {
   return (
@@ -129,7 +129,7 @@ function PrivacyPolicyContent({ go }) {
         <P>We collect only what is needed to provide the service:</P>
         <Ul items={[
           'Account data — your email address, used to create and authenticate your account.',
-          'Profile & social data (optional) — a display name, a unique @handle you may claim, a profile picture, your level and ratings, and — if you enable them — an activity streak, a 91-day activity heatmap, recent achievement wins, and an online-status indicator. See section 6 for who can see what.',
+          'Profile & social data (optional) — a display name, a unique @handle you may claim, a profile picture, your ratings and prestige, and — if you enable them — an activity streak, a 91-day activity heatmap, recent achievement wins, and an online-status indicator. See section 6 for who can see what.',
           'User-generated content — boards, trackers, achievements, shopping wish-list items, holiday plans, notes, group names and group pictures you create inside the App.',
           'Money you enter — savings goals, balances and contributions, accounts and interest rates, monthly income and spending, and subscriptions and bills with their costs and renewal dates. All of it is typed in by you; Vantage has no connection to your bank and does not see your transactions.',
           'Habits you are breaking — each habit\'s name, when you last slipped, and how many relapses you have recorded. A habit\'s name can say something about your health (for example a quit-drinking habit): it is sent to the AI brief only if you use it (section 7), and shown to friends only if you turn on the habit-streak card (section 6).',
@@ -160,7 +160,7 @@ function PrivacyPolicyContent({ go }) {
         <P>Vitals, body measurements, sleep, heart-rate, activity and nutrition information are health data — "special category" data under UK GDPR. We ask for your explicit consent to health data on a consent screen that every account sees once, and again before you connect WHOOP or an Oura Ring — no connected source is set up without it. Saying no is fine: features that do not need health data keep working, and anything you choose to type in yourself (such as a weight or a meal) is still saved to your account and shown only to you.</P>
         <Ul items={[
           'You can withdraw consent at any time in Settings → Privacy → Consent. To stop a connected source sending anything further, also use Disconnect on its WHOOP or Oura panel (this immediately deletes that device’s stored access tokens and, for WHOOP, withdraws Vantage’s access at WHOOP too). You can delete individual entries or your whole account at any time, and Settings → Tools → Health & sync → “Delete data synced from WHOOP/Oura” removes everything those devices sent while keeping what you entered yourself; metrics already recorded stay in your history until you do.',
-          'Health data is used solely to show you your own trends and widgets. It is never used for advertising and never sold. Your readings — weights, measurements, sleep, heart rate, meals — are never shown to other users. One thing others can see is derived from what you enter yourself: your ratings (shown to friends, and on the leaderboard and in groups if you take part) are partly worked out from how many days you logged vitals, activity and on-target nutrition, with activity counted only up to a daily cap. The ratings show a score, never the readings behind it. Nothing from WHOOP or an Oura Ring counts toward your ratings, your achievements and level, or the activity heatmap friends see — those use only what you log yourself.',
+          'Health data is used solely to show you your own trends and widgets. It is never used for advertising and never sold. Your readings — weights, measurements, sleep, heart rate, meals — are never shown to other users. One thing others can see is derived from what you enter yourself: your ratings (shown to friends, and on the leaderboard and in groups if you take part) are partly worked out from how many days you logged vitals, activity and on-target nutrition, with activity counted only up to a daily cap. The ratings show a score, never the readings behind it. Nothing from WHOOP or an Oura Ring counts toward your ratings, your achievements and honours, or the activity heatmap friends see — those use only what you log yourself.',
           'The daily AI brief (section 7) does not receive your Vitals log, body measurements, food log or anything from WHOOP or Oura — only the trackers, habits and other items listed there.',
           'WHOOP and Oura data is fetched from their respective APIs under your OAuth authorisation.',
         ]} />
@@ -192,12 +192,12 @@ function PrivacyPolicyContent({ go }) {
         <P>Everything social in Vantage is controlled in Settings → Privacy:</P>
         <Ul items={[
           'Handle search — you are only findable by @handle search while "Show me in handle search" is on. It is off by default for new accounts and needs a claimed handle. Accounts created before this default changed keep the setting they had — check it in Settings → Privacy.',
-          'Leaderboard — the global leaderboard shows your display name, profile picture, level, rating and prestige. You appear on it only while "Show me on the global leaderboard" is on; it is off by default for new accounts (older accounts: as above). Friends see you on the friends board regardless. Pro users may optionally colour their name.',
-          'Friends — people you accept as friends can see your profile card: display name, avatar, level, and any of streak / heatmap / recent wins / online status you have enabled. Each has its own toggle. The habit-streak card, which shows the habit\'s name, is off unless you turn it on.',
+          'Leaderboard — the global leaderboard shows your display name, profile picture, rating and prestige. You appear on it only while "Show me on the global leaderboard" is on; it is off by default for new accounts (older accounts: as above). Friends see you on the friends board regardless. Pro users may optionally colour their name.',
+          'Friends — people you accept as friends can see your profile card: display name, avatar, rating, prestige, and any of streak / heatmap / recent wins / online status you have enabled. Each has its own toggle. The habit-streak card, which shows the habit\'s name, is off unless you turn it on.',
           'Groups — if you join a group, its members see your display name, profile picture, rating and weekly climb. The group\'s name, picture and weekly score appear on its division\'s board to other groups.',
           'Direct messages — visible only to you and the recipient (and stored as described in section 2). If the recipient reports a conversation, recent messages from it are included in the report for review.',
-          'Invite links — if you share a friend-invite link, anyone who opens it, signed in or not, sees your display name, @handle, profile picture, level and rating, until the link expires (after 30 days) or has been used up.',
-          'Ratings — the level and ratings others see are scores. The Fitness rating (and the overall rating that includes it) is partly worked out from how many days you logged vitals, activity and nutrition; nobody sees the readings themselves (section 3).',
+          'Invite links — if you share a friend-invite link, anyone who opens it, signed in or not, sees your display name, @handle, profile picture, rating and prestige, until the link expires (after 30 days) or has been used up.',
+          'Ratings — the ratings and prestige others see are scores. The Fitness rating (and the overall rating that includes it) is partly worked out from how many days you logged vitals, activity and nutrition; nobody sees the readings themselves (section 3).',
           'Shared foods — a food you choose to share appears in everyone\'s food search with its name, brand and nutrition values, never with your name.',
         ]} />
       </Section>

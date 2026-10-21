@@ -49,18 +49,17 @@ export function planAvatar({ photoSrc, hash, screen, retry, serverAvatar, now = 
 }
 
 /**
- * The direct (non-public-text) profile patch: level when it changed,
- * presence cleared once when sharing is off, and last_active_at
- * piggy-backed on a write that is happening anyway when a ping is due.
- * → {} when nothing needs writing.
+ * The direct (non-public-text) profile patch: presence cleared once when
+ * sharing is off. → {} when nothing needs writing. Presence pings are
+ * the heartbeat's job.
+ *
+ * It used to carry `level` too, with presence piggy-backed on it. Level
+ * was retired (2026-10), so profiles.level is no longer written: the
+ * column stays (no destructive SQL) and keeps whatever it last held,
+ * which nothing reads any more.
  */
-export function planDirectPatch({ level, sentLevel, presenceOff, sentPresence, lastPingAt, now = Date.now() }) {
+export function planDirectPatch({ presenceOff, sentPresence }) {
   const out = {};
-  if (level !== sentLevel) out.level = level;
-  if (presenceOff) {
-    if (sentPresence !== 'off') out.last_active_at = null;
-  } else if (Object.keys(out).length && now - (lastPingAt || 0) >= PRESENCE_REPING_MS) {
-    out.last_active_at = new Date(now).toISOString();
-  }
+  if (presenceOff && sentPresence !== 'off') out.last_active_at = null;
   return out;
 }

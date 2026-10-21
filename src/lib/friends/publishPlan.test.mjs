@@ -54,14 +54,12 @@ const ok = (c, m) => { assert.ok(c, m); n++; };
 
 // ── Direct patch ──
 {
-  const now = 10 * 60_000;
-  eq(planDirectPatch({ level: 4, sentLevel: 4, presenceOff: false, sentPresence: 'on', lastPingAt: 0, now }), {}, 'nothing changed → no write');
-  eq(planDirectPatch({ level: 5, sentLevel: 4, presenceOff: false, sentPresence: 'on', lastPingAt: now - 1000, now }), { level: 5 }, 'level changed, ping recent → level only');
-  eq(planDirectPatch({ level: 5, sentLevel: 4, presenceOff: false, sentPresence: 'on', lastPingAt: 0, now }),
-    { level: 5, last_active_at: new Date(now).toISOString() }, 'level changed, ping due → piggy-back presence');
-  eq(planDirectPatch({ level: 4, sentLevel: 4, presenceOff: true, sentPresence: 'on', lastPingAt: 0, now }), { last_active_at: null }, 'presence turned off → cleared once');
-  eq(planDirectPatch({ level: 4, sentLevel: 4, presenceOff: true, sentPresence: 'off', lastPingAt: 0, now }), {}, '…and not again');
-  eq(planDirectPatch({ level: 5, sentLevel: 4, presenceOff: true, sentPresence: 'off', lastPingAt: 0, now }), { level: 5 }, 'presence off never publishes a time');
+  eq(planDirectPatch({ presenceOff: false, sentPresence: 'on' }), {}, 'nothing changed → no write');
+  eq(planDirectPatch({ presenceOff: true, sentPresence: 'on' }), { last_active_at: null }, 'presence turned off → cleared once');
+  eq(planDirectPatch({ presenceOff: true, sentPresence: 'off' }), {}, '…and not again');
+  // Level was retired (2026-10): an old caller passing it never writes it.
+  eq(planDirectPatch({ level: 5, sentLevel: 4, presenceOff: false, sentPresence: 'on' }), {}, 'level is never written');
+  ok(!('level' in planDirectPatch({ level: 5, sentLevel: 4, presenceOff: true, sentPresence: 'on' })), 'not even alongside presence');
 }
 
 console.log(`publishPlan: ${n} checks passed`);
