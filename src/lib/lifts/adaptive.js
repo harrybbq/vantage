@@ -153,6 +153,25 @@ const groupsOfParts = parts => {
   return out;
 };
 
+/**
+ * GROUP counting — the body map's rule (bodymap.js): a set credits every
+ * muscle tagged on its lift (muscles.js musclesOf), the first tag in full
+ * and the others at half. Group sets, group targets and twice-a-week hits
+ * all count this way, so the week and "This workout" agree; parts keep
+ * their own finer weights (EXERCISE_PARTS).
+ */
+const creditGroups = (lift, sets, into) => {
+  musclesOf(lift).forEach((m, i) => { if (GROUPS.includes(m)) into[m] = (into[m] || 0) + sets * (i === 0 ? 1 : 0.5); });
+  return into;
+};
+/** Group sets one programme session gives → { group: sets } (optional work only with `optional`). */
+export function sessionGroups(code, { optional = false } = {}) {
+  const out = {};
+  for (const x of PROGRAMME[code] || []) if (optional || !x.optional) creditGroups({ name: x.name }, num(x.sets) || 0, out);
+  return out;
+}
+const hitsOf = groupSets => Object.keys(groupSets).filter(g => groupSets[g] >= 2);
+
 /** Targets are whole or half sets. */
 export const round05 = n => Math.round(n * 2) / 2;
 /** A part the programme gives less than this a week has no target (it's a side effect, not a job). */
@@ -171,6 +190,15 @@ export const BASE_TARGETS = (() => {
   return out;
 })();
 
+/** The programme's week by GROUP (body-map counting, optional work included) → { group: sets }, half-set rounded. */
+export const BASE_GROUP_TARGETS = (() => {
+  const sum = {};
+  for (const code of Object.keys(PROGRAMME)) for (const [g, n] of Object.entries(sessionGroups(code, { optional: true }))) sum[g] = (sum[g] || 0) + n;
+  const out = {};
+  for (const [g, n] of Object.entries(sum)) if (n >= MIN_TARGET - 1e-9) out[g] = round05(n);
+  return out;
+})();
+
 // ── The week's tally ──────────────────────────────────────────────
 
 /** id → lift, built once per list (lists are replaced, never mutated, on a write). */
@@ -184,22 +212,25 @@ function liftById(list) {
 const liftOfEx = (ids, ex) => ids.get(ex.liftId) || (ex.name ? { name: ex.name } : ex.pending && ex.pending.name ? { name: ex.pending.name } : null);
 
 /** Part sets and per-session group hits from a list of workouts. */
+/** Part sets, group sets (body-map counting) and per-session group hits from a list of workouts. */
 function tally(workouts, list) {
   const ids = liftById(list);
   const parts = {};
+  const groups = {};
   const hits = {};
   for (const w of workouts) {
     const g = {};
     for (const ex of (w && w.exercises) || []) {
       const n = workSets(ex);
       if (!n) continue;
-      const ps = partsOf(liftOfEx(ids, ex));
-      addInto(parts, ps, n);
-      for (const [p, wt] of Object.entries(ps)) g[GROUP_OF[p]] = (g[GROUP_OF[p]] || 0) + wt * n;
+      const lift = liftOfEx(ids, ex);
+      addInto(parts, partsOf(lift), n);
+      creditGroups(lift, n, g);
     }
-    for (const [grp, n] of Object.entries(g)) if (n >= 2) hits[grp] = (hits[grp] || 0) + 1;
+    for (const [grp, n] of Object.entries(g)) groups[grp] = (groups[grp] || 0) + n;
+    for (const grp of hitsOf(g)) hits[grp] = (hits[grp] || 0) + 1;
   }
-  return { parts, hits };
+  return { parts, groups, hits };
 }
 
 /** The week (block) around `today` → { start, end, days, entries, workouts, done, upcoming, missed }. */
@@ -225,13 +256,16 @@ function weekAt(S, today) {
 function assumedLoad(week, list) {
   const logged = new Set(week.workouts.map(w => sessionOfWorkout(w, list)).filter(Boolean));
   const parts = {};
+  const groups = {};
   const hits = {};
   for (const code of week.done) {
     if (logged.has(code)) continue;
     addInto(parts, sessionParts(code), 1);
-    for (const [g, n] of Object.entries(groupsOfParts(sessionParts(code)))) if (n >= 2) hits[g] = (hits[g] || 0) + 1;
+    const g = sessionGroups(code);
+    addInto(groups, g, 1);
+    for (const grp of hitsOf(g)) hits[grp] = (hits[grp] || 0) + 1;
   }
-  return { parts, hits };
+  return { parts, groups, hits };
 }
 
 // ── Self-adjusting targets ────────────────────────────────────────
@@ -386,12 +420,15 @@ export function weekView(S, today, { extra = null } = {}) {
     done: round1((t.parts[part] || 0) + (a.parts[part] || 0)),
     target: targets[part] || 0,
   })).filter(p => p.target > 0 || p.done > 0);
+  // Groups count the body map's way (first muscle tag 1, others ½); a part's
+  // self-adjustment moves its group's target by the same amount.
   const groups = GROUPS.map(group => {
-    const ps = parts.filter(p => p.group === group);
+    const moved = PARTS.reduce((s, [p, g]) => s + (g === group ? (targets[p] || 0) - (BASE_TARGETS[p] || 0) : 0), 0);
+    const base = BASE_GROUP_TARGETS[group] || 0;
     return {
       group,
-      done: round1(ps.reduce((s, p) => s + p.done, 0)),
-      target: ps.reduce((s, p) => s + p.target, 0),
+      done: round1((t.groups[group] || 0) + (a.groups[group] || 0)),
+      target: base ? Math.max(0, round05(base + moved)) : 0,
       hits: (t.hits[group] || 0) + (a.hits[group] || 0),
     };
   }).filter(g => g.target > 0 || g.done > 0);
@@ -484,7 +521,7 @@ export function buildAdaptive(S, today, session) {
   for (const code of week.upcoming) {
     if (!ANCHOR_CODES.includes(code)) continue;
     addInto(coming, sessionParts(code), 1);
-    for (const [g, n] of Object.entries(groupsOfParts(sessionParts(code)))) if (n >= 2) hits[g] = (hits[g] || 0) + 1;
+    for (const g of hitsOf(sessionGroups(code))) hits[g] = (hits[g] || 0) + 1;
   }
   // A missed anchor is accepted as missed: its share comes off the week.
   const catchUp = ANCHORS[session].filter(c => week.missed.includes(c));

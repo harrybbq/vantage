@@ -9,10 +9,11 @@
 import assert from 'node:assert/strict';
 import {
   PARTS, GROUP_OF, GROUPS, UPPER_GROUPS, LOWER_GROUPS, PRIORITY, EXERCISE_PARTS, partsOf, sessionParts,
-  BASE_TARGETS, MIN_TARGET, weekTargets, readinessOn, RED_RPE_CAP, weekView, buildAdaptive, trimForRed, adaptStretches, MAX_HISTORY,
+  BASE_TARGETS, BASE_GROUP_TARGETS, sessionGroups, MIN_TARGET, weekTargets, readinessOn, RED_RPE_CAP, weekView, buildAdaptive, trimForRed, adaptStretches, MAX_HISTORY,
 } from './adaptive.js';
 import { suggestWorkout, suggestedStart, startWorkout, activeOf, progId, estimateMinutes } from './workout.js';
 import { blockProgress } from './plan.js';
+import { workoutLoad, sessionTargets as bmSessionTargets } from './bodymap.js';
 import { shiftOn } from '../rotation/pattern.js';
 import { PROGRAMME, STRETCHES } from '../../data/trainingProgramme.js';
 
@@ -86,6 +87,13 @@ t('parts: every programme exercise is mapped, every part rolls up to a known gro
   assert.deepEqual(partsOf({ name: 'Seated calf raise' }), { Soleus: 1 });
   assert.deepEqual(partsOf(null), {});
 });
+t('BASE_GROUP_TARGETS: the programme week by group, counted like the body map (optional work included)', () => {
+  const nonOptional = {};
+  for (const c of CODES) for (const [m, x] of Object.entries(bmSessionTargets(c))) nonOptional[m] = (nonOptional[m] || 0) + x;
+  assert.deepEqual(nonOptional, { Chest: 10, Triceps: 11, Shoulders: 23, Back: 20, Biceps: 13, 'Lower back': 6, Glutes: 13.5, Hamstrings: 10.5, Quads: 11.5, Calves: 8, Abs: 6 });
+  assert.deepEqual(BASE_GROUP_TARGETS, { ...nonOptional, Triceps: 13, Quads: 14.5, Glutes: 15 }, '+ overhead extension 2, walking lunge 3 quads / 1.5 glutes');
+  for (const g of GROUPS) assert.deepEqual(sessionGroups('Push')[g] || 0, bmSessionTargets('Push')[g] || 0, g);
+});
 t('BASE_TARGETS: the programme week, lower back twice (Legs 4 + Lower 2)', () => {
   assert.equal(BASE_TARGETS['Lower back'], 6);
   for (const [p, v] of Object.entries(BASE_TARGETS)) assert.equal(v * 2, Math.round(v * 2), `${p}: whole or half sets (${v})`);
@@ -143,8 +151,12 @@ t('weekView: shape, parts / groups / hits from the logged sets', () => {
   assert.equal(grp('Shoulders').hits, 2, 'Push, and the archer pull on Pull');
   assert.equal(grp('Quads').done, 0);
   assert.equal(grp('Quads').hits, 0);
-  // groups add up their parts
-  for (const g of v.groups) assert.ok(Math.abs(g.done - v.parts.filter(p => p.group === g.group).reduce((a, p) => a + p.done, 0)) < 0.11, g.group);
+  // Groups count the body map's way (first tag 1, others ½): the same numbers as This workout, added up.
+  const sumLoads = {};
+  for (const w of S.lifts.sessions.filter(w => w.date >= B.push && w.date <= B.legs)) for (const [m, x] of Object.entries(workoutLoad(w, LIST))) sumLoads[m] = (sumLoads[m] || 0) + x;
+  for (const g of v.groups) assert.equal(g.done, Math.round((sumLoads[g.group] || 0) * 10) / 10, `${g.group} matches the body map`);
+  assert.equal(grp('Shoulders').done, 13.5, 'shoulder press 3 + laterals 4 + dip 2 + incline 1.5 + archer 3');
+  assert.equal(grp('Shoulders').target, 23, 'not the parts’ 26 (a press set is one shoulder set, not 1.5)');
   // the Finish sheet's unsaved workout is counted in
   const withLegs = weekView(S, B.legs, { extra: W(B.legs, 'Legs') });
   assert.equal(withLegs.groups.find(g => g.group === 'Quads').hits, 1);
@@ -367,6 +379,9 @@ t('(e) two full weeks with the main lift rising → +1, with the reason', () => 
   const v = weekView(S, B.push);
   assert.equal(v.parts.find(p => p.part === 'Lats').target, 16.5);
   assert.ok(v.changes.some(c => c.part === 'Side delts'));
+  const backMoved = changes.filter(c => GROUP_OF[c.part] === 'Back').reduce((a, c) => a + c.to - c.from, 0);
+  assert.ok(backMoved > 0);
+  assert.equal(v.groups.find(g => g.group === 'Back').target, BASE_GROUP_TARGETS.Back + backMoved, 'a part’s +1 moves its group’s target too');
   // One full week is not enough.
   assert.deepEqual(weekTargets({ lifts: { list: LIST, log: [], sessions: block(B1) } }, B.push).changes, []);
 });
