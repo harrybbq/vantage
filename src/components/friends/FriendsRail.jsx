@@ -10,6 +10,7 @@ import ReportFriendModal from './ReportFriendModal';
 import MessagesModal from './MessagesModal';
 import FriendPanel from './FriendPanel';
 import SafetyNotices from './SafetyNotices';
+import FriendsPrestigeSource from './FriendsPrestigeSource';
 import { useFriends } from '../../lib/friends/useFriends';
 import { getFriendPublicStats, reportSnapshot } from '../../lib/friends/queries';
 import { listConversations } from '../../lib/friends/messages';
@@ -65,6 +66,8 @@ export default function FriendsRail({ userId, onUpgrade, panelSlot = null, layou
   const friends = useFriends(userId, hasPro);
 
   const [selectedId, setSelectedId] = useState(null);
+  // Friends' prestige (avatar rings, badges), from the friends board.
+  const [prestigeById, setPrestigeById] = useState({});
   const [selectedStats, setSelectedStats] = useState(null);
   const [statsLoading, setStatsLoading] = useState(false);
   const [showHandleModal, setShowHandleModal] = useState(false);
@@ -326,6 +329,7 @@ export default function FriendsRail({ userId, onUpgrade, panelSlot = null, layou
       ovr: base.ratings_ovr || 1,
       online: !!base.online,
       avatar_url: base.avatar_url || null,
+      prestige: prestigeById[base.id] || 0,
       streak: selectedStats?.current_streak || 0,
       streakHabit: selectedStats?.streak_habit || null,
       heatmap: selectedStats?.heatmap_days || [],
@@ -335,7 +339,7 @@ export default function FriendsRail({ userId, onUpgrade, panelSlot = null, layou
       // FriendCard's quiet-state strip.
       lastSeenDays: base.lastSeenDays,
     };
-  }, [selectedId, friends.friends, selectedStats]);
+  }, [selectedId, friends.friends, selectedStats, prestigeById]);
 
   // ── friend list row shape (FriendListRow expects the mock shape) ──
   // Sort online-first, then by OVR desc as a tie-breaker so the
@@ -351,6 +355,7 @@ export default function FriendsRail({ userId, onUpgrade, panelSlot = null, layou
       // simply never handed one, so every row fell back to initials —
       // and now the chat opened from a row would have done the same.
       avatar_url: f.avatar_url || null,
+      prestige: prestigeById[f.id] || 0,
       streak: 0,           // not in list view; row shows handle / last-seen instead
       streakHabit: null,
       lastSeenDays: f.lastSeenDays,
@@ -360,7 +365,7 @@ export default function FriendsRail({ userId, onUpgrade, panelSlot = null, layou
       if (a.online !== b.online) return a.online ? -1 : 1;
       return (b.ovr || 0) - (a.ovr || 0);
     });
-  }, [friends.friends, unread]);
+  }, [friends.friends, unread, prestigeById]);
 
   // The inbox, joined with the friend list and partner facts. Unread
   // only counts conversations you can act on (friends, not blocked).
@@ -492,6 +497,7 @@ export default function FriendsRail({ userId, onUpgrade, panelSlot = null, layou
 
       <FriendsTabs tab={tab} onTab={setTab} friendCount={rows.length} unread={total} />
 
+      {friends.friends.length > 0 && <FriendsPrestigeSource onData={setPrestigeById} />}
       {tab === 'messages' ? (
         <ConversationList
           rows={inbox}

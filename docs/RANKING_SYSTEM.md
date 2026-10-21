@@ -6,7 +6,7 @@ task. Keep it in sync if you change the logic.
 
 > **Golden rule:** the rating algorithm lives in **TWO places that must stay
 > bit-for-bit identical** — the client `src/lib/ratings/derive.js` and the
-> server `netlify/functions/recompute-ratings.js`. They run in separate module
+> server `netlify/lib/recompute.js`. They run in separate module
 > graphs (Vite bundle vs Netlify function) so the code is duplicated, not
 > imported. **Any change to one MUST be mirrored in the other**, or friends see
 > different numbers than the user (a silent rating bug).
@@ -17,8 +17,12 @@ task. Keep it in sync if you change the logic.
 
 Four **category ratings** + one **OVR composite**, each an integer **1–99**:
 
-- `brain`, `finance`, `fitness`, `social` (1–99 each)
-- `ovr = round((brain + finance + fitness + social) / 4)` (1–99)
+- `brain`, `finance`, `fitness`, `social` (1–99 each) — where your points
+  came from: what you are best at, what to work on
+- `ovr` (1–99) — from your points across ALL four, weighted: best category
+  in full, then ×0.5, ×0.35, ×0.25 (`BREADTH_WEIGHTS`). Not the mean
+  (until 2026-10-21 it was, and anyone who skipped a category was held
+  under 20 for life). Progress in any category raises it.
 
 Stored in two places:
 
@@ -53,57 +57,57 @@ user edits state ──► useRatings (1.5s debounce)
 
 ## 3. The maths
 
-### 3a. Points → rating curve (`toRating`)
-Each category sums raw "points" from several sources, then:
+### 3a. Points → rating curve (`toRating`) — since 2026-10-21
 
 ```js
-toRating(points) = clamp( 1 + sqrt(points), 1, 99 )   // round to int
-points <= 0 → rating 1
+toRating(points, full) = clamp(round(1 + 98 × min(1, points / full)^0.75), 1, 99)
+points <= 0 → 1
+
+category: full = PILLAR_FULL   (= OVR_FULL / Σ BREADTH_WEIGHTS ≈ 81)
+ovr:      full = OVR_FULL = 170, points = Σ sorted-desc category points × [1, 0.5, 0.35, 0.25]
 ```
 
-The `sqrt` makes early progress feel fast and high ratings feel earned. (There
-is a `k` multiplier param defaulting to 1; currently unused per-category.)
+Category points are net of the prestige baseline (§4b) before either curve.
+Tuned so a committed all-rounder prestiges about every 90 days, one category
+done well about every 6 months, two categories three days a week inside a
+year — `src/lib/ratings/ladder.test.mjs` simulates those people through the
+real code and prints the numbers. The weights are monotone: more points
+anywhere never lowers OVR.
 
 ### 3b. Per-category composition (raw points before `toRating`)
 
 ```
-brainPts   = brainScore        + brainTrackers*1.0  + brainAch*2.5   + brainVisions
-financePts = financeScore      + savings            + finTrackers*1.0+ finAch*2.5  + finVisions
-fitnessPts = fitnessScore      + fitTrackers*1.2    + fitAch*2.5     + fitVisions   + vitalsPts + burnPts + macroPts
-socialPts  = socialSelfCheck   + socialPoints(friends+activity) + socAch*2.5 + socVisions
-ovr        = round((brain+finance+fitness+social)/4)
+brainPts   = selfCheck + days×1 + trackers30d       + ach×2.5 + visions
+financePts = selfCheck + days×1 + trackers30d + savings + ach×2.5 + visions
+fitnessPts = selfCheck + days×1 + trackers30d       + ach×2.5 + visions
+socialPts  = selfCheck + days×1 + socialPoints(friends + active days) + ach×2.5 + visions
 ```
 
-Health contributions (added 2026-07 — LIFETIME accumulations, owner
-call: they feed the prestige climb, so no rolling window; per-day caps
-are the anti-gaming layer since all inputs are self-reported):
+**Days you showed up** (`pillarDays`, DAY_POINTS = 1): lifetime count of
+days with something logged in the category, once per category per day. For
+Fitness a day counts if a fitness tracker was ticked, OR vitals were logged
+(weight/sleep/RHR), OR activity was logged (any kcal > 0) — the union, not a
+sum. On-target macro days (`ctx.macroDays`, a count without dates — nutrition
+lives in its own tables; client caches it, server counts it with
+`fetchMacroDays`) set a floor on that count. Until 2026-10-21 vitals, burn
+and macros paid Fitness extra on top of its days (≈1.4/day more), so a
+fitness-only user climbed ~3× faster than a brain-only one doing the same
+work.
 
-```
-vitalsPts = (days in S.vitalsLog with any entry) × 0.4
-burnPts   = Σ per day: min(dayActivityKcal, 600)/600 × 0.5   (S.burnLog)
-macroPts  = onTargetMacroDays × 0.5
-```
-
-`onTargetMacroDays` = lifetime count of nutrition_daily_summary rows
-with calories within [50%, 130%] of the CURRENT Calories goal (goal
-changes over time — accepted approximation). This is the ONE fitness
-input not in synced state: the client passes a cached count via
-`ctx.macroDays` (5-min TTL in useRatings) for the local preview; the
-server counts the table itself via `fetchMacroDays()` in
-netlify/lib/recompute.js — same pattern as friendCount. prestige-up.js
-includes macroDays in the baseline snapshot so prestige resets these
-points too.
+`onTargetMacroDays` = lifetime count of nutrition_daily_summary rows with
+calories within [50%, 130%] of the CURRENT Calories goal (accepted
+approximation).
 
 ### 3c. The point sources
 
 | Source | Function | Max / shape |
 |---|---|---|
-| **Self-check** (per category) | `selfCheckPoints(score)` | 16-question quiz result `70–130` → linearly `6–18` pts. Stored at `S.brainScore` / `financeScore` / `fitnessScore` / `socialScore` = `{ result, ts, testVersion }`. Re-takeable every 30 days. |
-| **Trackers** | `trackerPoints(S, cat)` | Per tracker: `(days logged in last 30 / 30) * 10`. No logs = 0 (creating trackers is worthless without history). Fitness trackers ×1.2, others ×1.0. |
+| **Self-check** (per category) | `selfCheckPoints(score)` | 16-question quiz result `70–130` → linearly `2–6` pts (was 6–18 until 2026-10-21). Stored at `S.brainScore` / `financeScore` / `fitnessScore` / `socialScore` = `{ result, ts, testVersion }`. Re-takeable every 30 days. |
+| **Trackers** | `trackerPoints(S, cat)` | Per tracker: `(days logged in last 30 / 30) * 10`, capped at 4 trackers' worth per category. No logs = 0 (creating trackers is worthless without history). Same weight in every category since 2026-10-21. |
 | **Achievements** | `achievementPoints(S, cat)` | See anti-gaming below. Multiplied by **2.5** in the composition. |
 | **Savings** (finance only) | `savingsPoints(S)` | Goals with target ≥ £10; counted target capped at £25k total; per-goal `min(current,target)/target`. Full £25k completion = 30 pts. |
 | **Social** | `socialPoints(S, friendCount)` | `friends/20 * 12` (caps at 20 friends) + `activeDays/30 * 16` (distinct days with any log in last 30). |
-| **Visions** | `visionPoints(S, cat)` | System milestones (`src/lib/visions/definitions.js`), user can't create/edit them — clean anti-gaming anchors. Each unlocked vision = `xp/4` pts to its category; uncategorised visions split `0.25` across all four. |
+| **Visions** | `visionPoints(S, cat)` | System milestones (`src/lib/visions/definitions.js`), user can't create/edit them — clean anti-gaming anchors. Each unlocked vision = `xp/40` pts to its category (was xp/4 until 2026-10-21 — the 8,200 xp catalogue was worth seven prestiges by itself); uncategorised visions split `0.25` across all four. |
 
 Key constants (both files): `DAY_MS`, `TIME_SPACING_MS = 7 days`,
 `SAVINGS_MIN_TARGET = 10`, `SAVINGS_TOTAL_CAP = 25000`,
@@ -136,7 +140,7 @@ The whole point: ratings should reflect sustained real activity, not bursts.
 5. **Savings caps + min target** — goals < £10 ignored; total counted target
    capped at £25k; overshooting a goal doesn't multiply.
 
-6. **Self-checks** map a bounded `70–130` score to `6–18` pts, so one quiz can't
+6. **Self-checks** map a bounded `70–130` score to `2–6` pts, so one quiz can't
    dominate; re-takeable only every 30 days (`isCooldownActive` in
    `SelfCheck.jsx`).
 
@@ -161,11 +165,22 @@ competitive climb restarts — **no user data is wiped**.
   baseline, so every climb starts from zero.
 - Cooldowns / self-check results / achievements / logs are untouched —
   competitive reset only.
-- **Client `derive.js` stays un-baselined** (local preview may briefly read
-  higher than the canonical value right after prestiging; server is canonical).
+- The client subtracts the same baseline: `recompute-ratings` and
+  `prestige-up` return it, `useRatings` caches it as `S.prestigeBaseline`
+  (additive key; server-cache, ignored by the wipe guard) and passes it to
+  `deriveRatings(S, { baseline })`. Before 2026-10-21 the client was
+  un-baselined — harmless while nobody could prestige, wrong once a
+  committed user does it every three months.
+- **Weekly numbers across a prestige** (`netlify/lib/ratingsEpoch.js`
+  `climbSince`): a prestige between two snapshots counts as the climb to 99
+  plus the climb since, for the weekly board and the group leagues. The
+  7-day prestige cooldown keeps it to one per week. The same file holds
+  `FORMULA_EPOCH_ISO`: snapshots from before the last formula change are
+  not compared — bump it to the DEPLOY day whenever the maths changes.
 - Lifetime sort key: `profiles.lifetime_rating` (generated column,
   `prestige*100 + ratings_ovr`). All-time leaderboards sort by it.
-- Display: colour band + Roman numeral badge (e.g. GREEN IV) —
+- Display: "Prestige 4" in words, "P4" on badges, coloured by band (until
+  2026-10-21 badges read "GREEN IV", a numeral that restarted per colour) —
   `src/lib/ratings/prestige.js` (bands config) + `PrestigeBadge.jsx` +
   `.prestige-*` CSS. Bands: P1-9 forest green, 10-19 yellow, 20-29 indigo,
   30-39 red, 40-49 burgundy, 50-59 purple, 60-69 ocean, 70-79 cyan,
@@ -209,13 +224,15 @@ uses to label individual category bars.)
 
 ## 7. Gotchas / invariants for an agent
 
-- **Mirror derive.js ↔ recompute-ratings.js on every change.** Different module
-  graphs; no shared import. Drift = friends see wrong numbers.
-- The server approximates `visionPoints` differently (it can't import the
-  visions definitions module) — see the note in `recompute-ratings.js`. If you
-  change vision weighting, reconcile both.
-- All sub-scores feed `toRating` (sqrt curve) then clamp 1–99 — adding raw
-  points has diminishing visible effect at the top.
+- **Mirror derive.js ↔ netlify/lib/recompute.js on every change.** Different
+  module graphs; no shared import. Drift = friends see wrong numbers.
+  `npm run check:parity` (part of the build) runs both, fresh and after a
+  prestige, and fails past one point.
+- The server reads vision xp from the mirrored table in
+  `netlify/lib/visionXp.js`. If you change vision weighting, reconcile both.
+- Change the curve or any weight → re-run `npm run check:ladder` (it prints
+  days per prestige) and bump `FORMULA_EPOCH_ISO` in
+  `netlify/lib/ratingsEpoch.js` to the deploy day.
 - Never trust `S.ratings` for anything authoritative; the server value on
   `profiles` is canonical for friend-facing display.
 - `friendCount` is only available server-side (from `friendships`); the client

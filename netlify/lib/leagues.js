@@ -31,6 +31,7 @@
 
 const { inChunks } = require('./pgPage');
 const { serviceKeyHeaders } = require('./sbKeys');
+const { climbSince, sinceEpoch } = require('./ratingsEpoch');
 
 const DIVISIONS = [
   { num: 1,  name: 'Obsidian' },
@@ -104,7 +105,9 @@ function sb(supabaseUrl, serviceKey, path, init = {}) {
 }
 
 /**
- * Monday's OVR for each of `userIds`.
+ * Monday's OVR for each of `userIds` — or, in the week the rating
+ * formula changed, the first snapshot after the change (ratingsEpoch.js),
+ * so nobody is paid for the ruler moving.
  *
  * PostgREST cannot express DISTINCT ON, so this asks for every snapshot
  * in the window oldest-first and keeps the first per user — which is
@@ -124,7 +127,7 @@ async function fetchBaselines(userIds, { supabaseUrl, serviceKey }, from = weekS
   try {
     rows = await inChunks(userIds, (csv, offset, limit) => sb(supabaseUrl, serviceKey,
       `/rest/v1/rating_snapshots?user_id=in.(${csv})` +
-      `&snapshotted_at=gte.${from.toISOString()}` +
+      `&snapshotted_at=gte.${sinceEpoch(from).toISOString()}` +
       `&select=user_id,ovr,brain,finance,fitness,social,snapshotted_at` +
       `&order=snapshotted_at.asc,user_id.asc&limit=${limit}&offset=${offset}`
     ), { firstPer: 'user_id', what: 'league baselines' });
@@ -169,9 +172,10 @@ function joinedByWeekStart(joinedAt, from = weekStart()) {
  *
  * `split` is the same subtraction per category, which is what lets the
  * group card say where its week came from. Those four do NOT sum to the
- * OVR climb — OVR is the mean of four ratings, so a group climbing 4 in
- * fitness alone moves 1 overall. The card labels them as category
- * points for that reason.
+ * OVR climb — OVR weights your best category in full and the rest less
+ * (src/lib/ratings/derive.js) — so the card labels them as category
+ * points. A member who prestiged this week shows no category split:
+ * their categories restarted too.
  */
 function memberScore(profile, baseline, joinedAt = null, from = weekStart()) {
   const current = profile?.ratings_ovr;
@@ -179,12 +183,15 @@ function memberScore(profile, baseline, joinedAt = null, from = weekStart()) {
   if (current == null || baseOvr == null || !joinedByWeekStart(joinedAt, from)) {
     return { climb: null, counted: 0, split: { brain: 0, finance: 0, fitness: 0, social: 0 } };
   }
-  const climb = Math.max(0, current - baseOvr);
+  // Across a prestige: the climb to 99 plus the climb since (ratingsEpoch.js).
+  const climb = Math.max(0, climbSince(current, baseOvr, profile?.prestiged_at, baseline?.snapshotted_at));
   const split = {};
+  const p = Date.parse(profile?.prestiged_at || ''), t = Date.parse(baseline?.snapshotted_at || '');
+  const prestigedSince = Number.isFinite(p) && Number.isFinite(t) && p > t;
   for (const c of CATEGORIES) {
     const now = profile?.ratings?.[c];
     const then = baseline?.[c];
-    split[c] = (now == null || then == null) ? 0 : Math.max(0, now - then);
+    split[c] = (prestigedSince || now == null || then == null) ? 0 : Math.max(0, now - then);
   }
   return { climb, counted: climb, split };
 }

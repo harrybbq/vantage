@@ -1,5 +1,4 @@
 /**
-import Icon from './Icon';
  * RatingsPanel — F5 Sprint 3 surface (Ledger design, 2026-05-12),
  * extended in Sprint 5 with self-checks for all four categories.
  *
@@ -21,13 +20,16 @@ import Icon from './Icon';
  * by the shared 30-day cooldown.
  */
 import { useState, useRef, useEffect } from 'react';
-import { categoryBreakdown } from '../lib/ratings/derive';
+import Icon from './Icon';
+import { categoryBreakdown, cleanBaseline } from '../lib/ratings/derive';
+import { categoryProfile, nextStep } from '../lib/ratings/profile';
+import { getTodayStr } from '../utils/helpers';
 import { ovrTier } from '../lib/ratings/tiers';
-import { PRESTIGE_MAX, toRoman } from '../lib/ratings/prestige';
+import { PRESTIGE_MAX } from '../lib/ratings/prestige';
 import RatingsDonut from './ratings/RatingsDonut';
 import { RATING_COLOURS, ratingShares } from '../lib/ratings/palette';
 import { useDarkSurface } from '../hooks/useDarkSurface';
-import PrestigeBadge from './PrestigeBadge';
+import PrestigeRewardsButton from './PrestigeRewardsButton';
 import { supabase } from '../lib/supabase';
 import { apiFetch } from '../lib/authFetch';
 import { isCooldownActive, daysUntilRetake } from './SelfCheck';
@@ -53,25 +55,25 @@ const SELF_CHECKS = {
     stateKey: 'brainScore',
     Component: BrainCheck,
     ctaTitle: 'Brain rating self-check',
-    blurb: '16 short reasoning questions · 12-min cap · contributes ~6–18 points.',
+    blurb: '16 short reasoning questions · 12-min cap · contributes ~2–6 points.',
   },
   finance: {
     stateKey: 'financeScore',
     Component: FinanceCheck,
     ctaTitle: 'Finance literacy self-check',
-    blurb: '16 short money-literacy questions · 12-min cap · contributes ~6–18 points.',
+    blurb: '16 short money-literacy questions · 12-min cap · contributes ~2–6 points.',
   },
   fitness: {
     stateKey: 'fitnessScore',
     Component: FitnessCheck,
     ctaTitle: 'Fitness knowledge self-check',
-    blurb: '16 short exercise-science questions · 12-min cap · contributes ~6–18 points.',
+    blurb: '16 short exercise-science questions · 12-min cap · contributes ~2–6 points.',
   },
   social: {
     stateKey: 'socialScore',
     Component: SocialCheck,
     ctaTitle: 'Social skills self-check',
-    blurb: '16 short interpersonal-skills questions · 12-min cap · contributes ~6–18 points.',
+    blurb: '16 short interpersonal-skills questions · 12-min cap · contributes ~2–6 points.',
   },
 };
 
@@ -116,6 +118,7 @@ export default function RatingsPanel({ S, update, compact = false }) {
   // two different answers to one question.
   const shares = ratingShares(settling ? {} : r, CATEGORIES);
   const [prestigeError, setPrestigeError] = useState(null);
+  const focus = categoryProfile(S, { today: getTodayStr() });
   // CTA shows on the local OVR hitting 99; the endpoint re-checks the
   // CANONICAL profiles.ratings_ovr, so a gamed local value gets a 400.
   const canPrestige = !settling && ovr >= 99 && prestigeLevel < PRESTIGE_MAX && !!update;
@@ -139,9 +142,11 @@ export default function RatingsPanel({ S, update, compact = false }) {
       const body = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(body.error || 'Prestige failed.');
       // Adopt the server's post-prestige numbers immediately.
+      const baseline = cleanBaseline(body.baseline);
       update(prev => ({
         ...prev,
         prestige: body.prestige,
+        ...(baseline ? { prestigeBaseline: baseline } : {}),
         ratings: { ...(prev.ratings || {}), ...(body.ratings || {}), computedAt: body.computedAt },
       }));
     } catch (e) {
@@ -230,7 +235,7 @@ export default function RatingsPanel({ S, update, compact = false }) {
             ratings={settling ? {} : r}
             ovr={settling ? null : ovr}
             tier={glow}
-            prestigeLabel={prestigeLevel > 0 ? `PRESTIGE ${toRoman(prestigeLevel)}` : ''}
+            prestigeLabel={prestigeLevel > 0 ? `PRESTIGE ${prestigeLevel}` : ''}
             dark={dark}
             size={compact ? 132 : 156}
             onSelect={setActiveBreakdown}
@@ -240,19 +245,12 @@ export default function RatingsPanel({ S, update, compact = false }) {
               repeat is what we just removed. */}
           <span className="sr-only">
             {settling ? 'Loading your overall rating' : <>
-              Overall rating {ovr} of 99 — {glow.label}
-              {prestigeLevel > 0 ? `, prestige ${toRoman(prestigeLevel)}` : ''}
+              Overall rating {ovr} of 99
+              {prestigeLevel > 0 ? `, prestige ${prestigeLevel}` : ''}
             </>}
           </span>
         </div>
 
-        {/* Prestige badge — own row so it never crowds the donut in the
-            144px rail / compact variants. */}
-        {prestigeLevel > 0 && (
-          <div className="ratings-ledger-prestige-row">
-            <PrestigeBadge prestige={prestigeLevel} size="md" />
-          </div>
-        )}
 
         {/* Prestige-up CTA — only at OVR 99 and below the prestige cap.
             The server re-validates against canonical profiles values. */}
@@ -271,6 +269,7 @@ export default function RatingsPanel({ S, update, compact = false }) {
             {prestigeError}
           </div>
         )}
+        <PrestigeRewardsButton S={S} />
 
         {/* Legend. Always present, and it is what stops identity ever
             resting on colour alone — every arc gets a word, its score
@@ -307,6 +306,29 @@ export default function RatingsPanel({ S, update, compact = false }) {
             );
           })}
         </ul>
+
+        {/* What the four say about you (lib/ratings/profile.js). OVR is
+            earned from points in any category, so the four are where
+            your points come from — this puts that in words, with the one
+            thing that would move the weakest. Each line opens that
+            category's breakdown. */}
+        {!settling && (
+          <div className="ratings-ledger-focus">
+            {focus.best ? <>
+              <button type="button" className="ratings-focus-row" onClick={() => setActiveBreakdown(focus.best.id)}>
+                <span className="ratings-focus-k">Best at</span>
+                <span className="ratings-focus-v">{focus.best.label}</span>
+              </button>
+              <button type="button" className="ratings-focus-row" onClick={() => setActiveBreakdown(focus.workOn.id)}>
+                <span className="ratings-focus-k">Work on</span>
+                <span className="ratings-focus-v">{focus.workOn.label}</span>
+                <span className="ratings-focus-step">{focus.workOn.step.text}</span>
+              </button>
+            </> : (
+              <p className="ratings-focus-start">Every day you tick a tracker earns points, in any category.</p>
+            )}
+          </div>
+        )}
         </div>
       </div>
 
@@ -363,6 +385,7 @@ function BreakdownModal({ S, category, onClose, onTakeCheck }) {
   const t = tier(score);
   const rows = categoryBreakdown(S, category);
   const totalPoints = rows.reduce((sum, r) => sum + (r.points || 0), 0);
+  const step = nextStep(S, category, { today: getTodayStr() });
 
   const checkCfg = SELF_CHECKS[category];
   const lastResult = checkCfg ? S?.[checkCfg.stateKey] : null;
@@ -394,7 +417,7 @@ function BreakdownModal({ S, category, onClose, onTakeCheck }) {
           fontFamily: 'var(--mono)', fontSize: 'var(--fs-floor)', color: 'var(--text-muted)',
           margin: '0 0 14px', lineHeight: 1.65, letterSpacing: 0.4,
         }}>
-          TIER · <span style={{ color: t.color }}>{t.label.toUpperCase()}</span> · {totalPoints.toFixed(1)} POINTS
+          {totalPoints.toFixed(1)} POINTS
         </p>
         <ul style={{ listStyle: 'none', margin: 0, padding: 0, display: 'flex', flexDirection: 'column', gap: 6 }}>
           {rows.map((row, i) => {
@@ -406,7 +429,10 @@ function BreakdownModal({ S, category, onClose, onTakeCheck }) {
                 border: '1px solid var(--border)',
                 background: 'var(--card, rgba(255,255,255,0.04))',
               }}>
-                <span style={{ flex: 1, fontFamily: 'var(--sans)', fontSize: 12.5 }}>{row.label}</span>
+                <span style={{ flex: 1, fontFamily: 'var(--sans)', fontSize: 12.5 }}>
+                  {row.label}
+                  {row.hint && <span style={{ display: 'block', color: 'var(--text-muted)', fontSize: 'var(--fs-floor)', marginTop: 2 }}>{row.hint}</span>}
+                </span>
                 <span style={{
                   fontFamily: 'var(--mono)', fontSize: 'var(--fs-floor)',
                   color: row.points > 0 ? 'var(--em-text)' : 'var(--text-muted)',
@@ -424,11 +450,16 @@ function BreakdownModal({ S, category, onClose, onTakeCheck }) {
             );
           })}
         </ul>
+        <div className="ratings-next-step">
+          <div className="ratings-next-step-k">Next step</div>
+          <div className="ratings-next-step-v">{step.text}</div>
+        </div>
         <p style={{
           fontFamily: 'var(--mono)', fontSize: 'var(--fs-floor)', color: 'var(--text-muted)',
           marginTop: 14, lineHeight: 1.65, letterSpacing: 0.4,
         }}>
-          Friends see a server-recomputed copy of these ratings — editing your local data won't change what they see.
+          Points in any category raise your OVR. Your best category counts in full, the next half, then a third, then a quarter.
+          Friends see a server-recomputed copy — editing your local data won't change what they see.
         </p>
 
         {checkCfg && onTakeCheck && (

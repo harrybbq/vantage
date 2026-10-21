@@ -102,7 +102,7 @@ async function membersOf(groupId, env, viewerId = null) {
   if (!ids.length) return [];
 
   const pRes = await sb(env.supabaseUrl, env.serviceKey,
-    `/rest/v1/profiles?id=in.(${ids.join(',')})&select=id,handle,display_name,avatar_url,ratings,ratings_ovr,prestige`);
+    `/rest/v1/profiles?id=in.(${ids.join(',')})&select=id,handle,display_name,avatar_url,ratings,ratings_ovr,prestige,prestiged_at`);
   const profiles = pRes.ok ? await pRes.json() : [];
   const byId = new Map(profiles.map(p => [p.id, p]));
   const baselines = await fetchBaselines(ids, env);
@@ -149,7 +149,7 @@ async function divisionStandings(division, env) {
   let byId = new Map(), baselines = new Map();
   if (ids.length) {
     const pRes = await sb(env.supabaseUrl, env.serviceKey,
-      `/rest/v1/profiles?id=in.(${ids.join(',')})&select=id,handle,display_name,ratings_ovr`);
+      `/rest/v1/profiles?id=in.(${ids.join(',')})&select=id,handle,display_name,ratings_ovr,prestiged_at`);
     byId = new Map((pRes.ok ? await pRes.json() : []).map(p => [p.id, p]));
     baselines = await fetchBaselines(ids, env);
   }

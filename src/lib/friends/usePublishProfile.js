@@ -13,17 +13,18 @@ import { streakForFriends, planAvatar, planDirectPatch, PRESENCE_INTERVAL_MS, PR
  * Debounced sync of the user's public-facing data:
  *   - profiles.{display_name, avatar_url} — through profile-update, the
  *     server-side name filter + avatar screening (item 84)
- *   - profiles.{level, last_active_at} — direct, only when changed
- *   - public_stats.{level, current_streak, streak_habit, heatmap_days,
+ *   - profiles.last_active_at — direct (the heartbeat below; cleared once
+ *     when presence sharing is turned off)
+ *   - public_stats.{current_streak, streak_habit, heatmap_days,
  *                   recent_wins}
  *
  * Runs whenever S changes, debounced 4 s so a flurry of edits (e.g.
  * the user logs five trackers in a row) writes once at the end.
  *
- * Why duplicate `level` in profiles?
- *   profiles is read by strangers in handle search and by friends in
- *   the friend list. Surfacing level there avoids having to also
- *   read public_stats (which is friend-only) for every search hit.
+ * Level was retired (2026-10). profiles.level and public_stats.level
+ * are no longer written; the columns stay (no destructive SQL) and
+ * nothing reads them. Prestige, which replaced it as the long-term
+ * goal, is server-owned (profiles.prestige, via prestige-up).
  *
  * Why a hook?
  *   Same reason as useVisions — the alternative is wiring a sync
@@ -127,8 +128,9 @@ function recentWins(S) {
 
 // `hydrated` / `loadError` come from useVisionBoardState. Until the
 // cloud copy has arrived, S is the local backup or the factory seed —
-// publishing that would push a stale or empty card (name blank, level
-// 1, no streak) over the real one for every friend to see.
+// publishing that would push a stale or empty card (name blank, no
+// streak) over the real one for every friend to see.
+// `visionState` is unused since Level was retired; App.jsx still passes it.
 export function usePublishProfile(userId, S, hasPro, visionState, { hydrated = false, loadError = null, update = null } = {}) {
   // Skip publish entirely if the user has no profile (paywall_schema
   // creates one on first login but we don't want to tightly couple).
@@ -146,17 +148,13 @@ export function usePublishProfile(userId, S, hasPro, visionState, { hydrated = f
   // What the server holds, so only real changes are written (item 92:
   // fewer profile UPDATEs; item 84: fewer profile-update calls). Seeded
   // from the own-row read on the first publish of a session.
-  const sentRef = useRef({ userId: null, server: null, level: undefined, presence: undefined, refusedName: undefined, pubBackoffUntil: 0 });
+  const sentRef = useRef({ userId: null, server: null, presence: undefined, refusedName: undefined, pubBackoffUntil: 0 });
   // Last presence write (heartbeat or piggy-backed), shared by both effects.
   const lastPingRef = useRef({ userId: null, at: 0 });
 
   useEffect(() => {
     if (!userId || !S) return;
     if (!hydrated || loadError) return;
-    // The visions hook returns a fallback shape when state hasn't
-    // loaded yet; skip until we have a real level.
-    const level = visionState?.level || 1;
-
     // Privacy toggles — per-field opt-out on what friends see. When a
     // toggle is off we publish a zeroed-out value so the friend card
     // simply has nothing to render for that field. Server-side schema
@@ -174,7 +172,6 @@ export function usePublishProfile(userId, S, hasPro, visionState, { hydrated = f
       // profiles slice
       // 40 chars: the profiles_display_name_len check (audit SQL).
       display_name: ownName && !publicNameProblem(ownName) ? ownName.slice(0, 40) : null,
-      level,
       // public_stats slice
       current_streak: streak.days,
       streak_habit:   streak.name,
@@ -195,7 +192,7 @@ export function usePublishProfile(userId, S, hasPro, visionState, { hydrated = f
     // Skip the network round-trip if the meaningful slice hasn't
     // changed. Presence is the heartbeat's job, not this one's.
     const sig = JSON.stringify({
-      d: payload.display_name, l: payload.level,
+      d: payload.display_name,
       s: payload.current_streak, sh: payload.streak_habit,
       h: payload.heatmap_days.map(x => x.intensity).join(''),
       w: payload.recent_wins.map(x => x.name).join('|'),
@@ -207,13 +204,12 @@ export function usePublishProfile(userId, S, hasPro, visionState, { hydrated = f
     timerRef.current = setTimeout(async () => {
       let sent = sentRef.current;
       if (sent.userId !== userId) {
-        sent = sentRef.current = { userId, server: null, level: undefined, presence: undefined, refusedName: undefined, pubBackoffUntil: 0 };
+        sent = sentRef.current = { userId, server: null, presence: undefined, refusedName: undefined, pubBackoffUntil: 0 };
       }
       if (!sent.server) {
         try {
           const own = await loadOwnProfile(userId);
           sent.server = { display_name: own?.display_name ?? null, avatar_url: own?.avatar_url ?? null };
-          if (sent.level === undefined && own) sent.level = own.level;
           if (sent.presence === undefined && own) sent.presence = own.last_active_at ? 'on' : 'off';
         } catch { /* unknown: send, the server skips no-ops */ }
       }
@@ -263,17 +259,11 @@ export function usePublishProfile(userId, S, hasPro, visionState, { hydrated = f
       }
     }
 
-    /** level / presence-off → a direct UPDATE, only when it changed. */
+    /** presence-off → a direct UPDATE, once. */
     async function publishDirect(sent) {
-      const lp = lastPingRef.current;
-      const patch = planDirectPatch({
-        level: payload.level, sentLevel: sent.level,
-        presenceOff, sentPresence: sent.presence,
-        lastPingAt: lp.userId === userId ? lp.at : 0,
-      });
+      const patch = planDirectPatch({ presenceOff, sentPresence: sent.presence });
       if (Object.keys(patch).length === 0) return;
       await updateOwnProfile(userId, patch);
-      if ('level' in patch) sent.level = patch.level;
       if ('last_active_at' in patch) {
         sent.presence = patch.last_active_at ? 'on' : 'off';
         if (patch.last_active_at) lastPingRef.current = { userId, at: Date.now() };
@@ -284,7 +274,6 @@ export function usePublishProfile(userId, S, hasPro, visionState, { hydrated = f
      *  (friends-only by RLS). */
     function publishStats() {
       return upsertOwnPublicStats(userId, {
-        level: payload.level,
         current_streak: payload.current_streak,
         streak_habit: payload.streak_habit,
         heatmap_days: payload.heatmap_days,
@@ -311,7 +300,7 @@ export function usePublishProfile(userId, S, hasPro, visionState, { hydrated = f
     }
 
     return () => clearTimeout(timerRef.current);
-  }, [userId, S, hasPro, visionState, hydrated, loadError]);
+  }, [userId, S, hasPro, hydrated, loadError]);
 
   // ── Presence heartbeat (item 92) ───────────────────────────────
   // The debounced publish above only fires when state CHANGES. If a

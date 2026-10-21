@@ -1,17 +1,22 @@
 /**
- * Ratings derivation — what the four numbers are made of.
+ * Ratings derivation — what the numbers are made of.
  *
  * Pure. Walks the user's state and returns 1-99 ratings for Brain,
- * Finance, Fitness and Social, plus the OVR mean of the four.
+ * Finance, Fitness and Social, plus OVR.
  *
- * Each category sums points from its own sources, then
- * `toRating` maps points to the scale as `1 + √(points × RATING_SCALE)`.
+ * Each category sums points from its own sources:
  *
- *   Brain    self-check · lifetime logged days · trackers (30d) ·
- *            achievements · visions
- *   Finance  the same, plus savings goals
- *   Fitness  the same, plus vitals, activity burn and on-target macro days
- *   Social   the same, plus friends and days active
+ *   all four  self-check · days you showed up (for life) · trackers
+ *             (last 30 days) · achievements · honours (visions)
+ *   Finance   plus savings goals
+ *   Fitness   "showing up" also counts vitals, activity and on-target
+ *             calorie days
+ *   Social    plus friends and days active
+ *
+ * OVR comes from the TOTAL across the four (2026-10-21, owner's call):
+ * progress in any category raises it, and a category you never use
+ * costs nothing. The four category ratings show where the points came
+ * from — what you are best at, what to work on. See toRating.
  *
  * ── What changed on 2026-08-19, and why ──────────────────────────────
  * An audit ran every one of these through the real code rather than
@@ -27,11 +32,11 @@
  *     give Brain and Social a ladder of their own — between them they
  *     had none at all.
  *   · Only Fitness had a source that accumulated for life. Every
- *     category has one now: `categoryDayPoints`.
+ *     category has one now: days you showed up (`pillarDays`).
  *   · Tracker points were uncapped in tracker COUNT, so owning more
  *     checkboxes beat keeping better habits. Capped at TRACKER_CAP_N.
  *   · The scale itself was calibrated for a game nobody could finish.
- *     See RATING_SCALE.
+ *     (Replaced again on 2026-10-21 — see toRating.)
  *
  * ── Anti-gaming, unchanged ───────────────────────────────────────────
  *   Achievements  count only if completed ≥7 days after being created,
@@ -68,51 +73,55 @@ function ymd(d) {
 }
 
 /**
- * How much a point is worth on the 1-99 scale.
+ * Points → the 1-99 scale.
  *
- * At 1 — where this sat until 2026-08-19 — the scale said 99 and the
- * game ended at 42. A committed year landed on 24, three categories
- * froze in the low twenties for good, and Prestige, which unlocks at
- * OVR 99, could not be reached by anyone. Two thirds of the number the
- * whole app is built around were decorative.
+ * History, briefly: until 2026-10-21 each category ran on
+ * `1 + √(points × RATING_SCALE)` and OVR was the MEAN of the four. Two
+ * problems, both measured in a simulation before anything changed:
  *
- * 6 was set from the profiles rather than picked, and it was better
- * than 1. It was still too slow in the middle.
+ *   · Pace. A committed user (all four categories, six days a week)
+ *     sat at 28 after three months and reached 99 — where Prestige
+ *     unlocks — after about six years. The owner wants a prestige
+ *     roughly every three months.
+ *   · The mean. A category you never use sits on the floor, and the
+ *     average of four drags everyone who does fewer than four. Real
+ *     profiles: median OVR 4.5, best 32. A fitness-and-reading user was
+ *     capped under 20 for life whatever the curve.
  *
- * ── 2026-09-14: 6 → 8 ────────────────────────────────────────────────
- * Simulated against a committed profile — trackers in all four
- * categories logged six days a week, vitals and burn daily, a dozen
- * real achievements, a part-funded pot, twelve friends — the ladder ran
- * like this:
+ * Now: OVR is set by your points across all four, so progress in any
+ * of them moves it and none you skip holds it back. Your best category
+ * counts in full, the next at half, then 0.35, then 0.25
+ * (BREADTH_WEIGHTS). Summed flat, four categories earned four times
+ * what one did, so a committed all-rounder prestiged every three months
+ * and someone who only trains every eleven; weighted, it is three and
+ * about six. Doing more still climbs faster; doing one thing well is
+ * not a penalty. Each category also keeps its own 1-99 rating
+ * (PILLAR_FULL) — what the profile uses to show what you are best at
+ * and what to work on.
  *
- *            OVR at 6mo    avg days per level, OVR 28-45
- *   was            29                21.5
- *   now            37                11.7
+ *   rating = 1 + 98 × min(1, points / full)^CURVE
  *
- * Three weeks of daily logging for one point is not a ladder, it is a
- * wait. Two people reported it as "stuck", which is the correct reading
- * of a number that does not move.
+ * A steadier curve than the square root: the square root put a week of
+ * effort at 50 and then took four days a point through the eighties.
+ * OVR_FULL was tuned on the SECOND climb — after a prestige the
+ * baseline takes away everything paid once (self-checks, honours,
+ * friends, tracker form), so the repeating sources set the cycle. See
+ * ladder.test.mjs for the profiles and the numbers.
  *
- * What it does NOT do is hand out the top: 99 still takes about seven
- * years of the same commitment (was ~9), which is the "better part of a
- * decade" this was calibrated for in the first place. The sqrt keeps
- * early progress fast and the 90s earned.
- *
- * Changing this moves every rating on the leaderboard at once — which
- * is why FORMULA_EPOCH_ISO in get-leaderboard.js is bumped with it, so
- * nobody is handed a week's "climb" they did not earn. Every user's
- * number rises by the same proportion, so the order is unchanged.
+ * Changing these moves every number on the leaderboard at once, which
+ * is why FORMULA_EPOCH_ISO in get-leaderboard.js is bumped with them.
  */
-const RATING_SCALE = 8;
+const OVR_FULL = 170;
+const BREADTH_WEIGHTS = [1, 0.5, 0.35, 0.25];
+// An even all-rounder's four categories reach 99 together with OVR.
+const PILLAR_FULL = OVR_FULL / BREADTH_WEIGHTS.reduce((a, b) => a + b, 0);
+const CURVE = 0.75;
 
-/**
- * Map raw "rating points" to the 1-99 scale via sqrt, so early progress
- * feels fast and the 90s feel earned.
- */
-function toRating(points, k = RATING_SCALE) {
+// Rounded DOWN, so 99 means the bar is full — every point of the climb
+// earned — and never "nearly full, rounded up". Prestige unlocks there.
+function toRating(points, full) {
   if (!Number.isFinite(points) || points <= 0) return 1;
-  const r = 1 + Math.sqrt(points * k);
-  return clamp(r);
+  return clamp(Math.floor(1 + 98 * Math.pow(Math.min(1, points / full), CURVE)));
 }
 
 // ── Which day keys count (mirror of netlify/lib/recompute.js) ─────────────
@@ -260,44 +269,52 @@ function trackerPoints(S, category, win = dayWindow(null)) {
   return Math.min(total, TRACKER_CAP_N * 10);
 }
 
-// ── Lifetime logged days, per category ────────────────────────────────────
+// ── Days you showed up, per category ──────────────────────────────────
 //
-// Fitness climbed for years because vitals, burn and macros pay 1.4
-// points a day forever. Brain, Finance and Social had nothing of the
-// kind: every source they owned was either a one-off number or a
-// rolling 30-day window that reset. So all three froze around 23 inside
-// the first year and stayed there — permanently, not for a while.
-//
-// This is the missing half: a day on which you logged anything in a
-// category is worth 0.4 points, for life, exactly as a day with a
-// vitals entry always has been. Consistency earns; the window measures
-// whether you are on it, this measures whether you have been at it.
+// A day on which you did something in a category is worth DAY_POINTS,
+// for life, once per category per day. Until 2026-10-21 Fitness had
+// three extra accruals of its own — vitals 0.4, burn up to 0.5, macros
+// 0.5 a day — on top of its 0.6, so a fitness-only user climbed about
+// three times faster than a brain-only one doing the same work. Those
+// are now ways to SHOW UP in Fitness, not extra pay: a day counts if a
+// fitness tracker was ticked, or vitals were logged, or activity was
+// logged. On-target macro days arrive as a count without dates
+// (ctx.macroDays — nutrition is in its own tables), so they set a
+// floor rather than joining the union: a food-only user still earns
+// every day they log, and someone who does both is not paid twice.
+const DAY_POINTS = 1;
 
-// 0.4 → 0.6 on 2026-09-14, alongside RATING_SCALE. Fitness has three
-// lifetime accruals of its own (vitals, burn, macros) worth 1.4 a day
-// on top of this; Brain, Finance and Social have this line and nothing
-// else. So the category that measured itself automatically climbed
-// three times faster than the three you have to show up for, and since
-// OVR is the mean of the four, the three slow ones set the pace.
-const CATEGORY_DAY_POINTS = 0.6;
+const loggedTruthy = v => v !== false && v !== 0 && v != null && v !== '';
 
-function categoryDayPoints(S, category, win = dayWindow(null)) {
+function pillarDays(S, category, win = dayWindow(null), macroDays = 0) {
+  const days = new Set();
   const ids = new Set((S.trackers || []).filter(t => t.category === category).map(t => t.id));
-  if (!ids.size) return 0;
-  const logs = S.logs || {};
-  let days = 0;
-  for (const key of Object.keys(logs)) {
-    if (days >= win.cap) break;
-    if (!isCountableDay(key, win)) continue;
-    const day = logs[key] || {};
-    for (const id of ids) {
-      const v = day[id];
-      const truthy = v !== false && v !== 0 && v != null && v !== '';
-      if (truthy) { days++; break; }
+  if (ids.size) {
+    const logs = S.logs || {};
+    for (const key of Object.keys(logs)) {
+      if (!isCountableDay(key, win)) continue;
+      const day = logs[key] || {};
+      for (const id of ids) if (loggedTruthy(day[id])) { days.add(key); break; }
     }
   }
-  return days * CATEGORY_DAY_POINTS;
+  if (category === 'fitness') {
+    const vitals = S.vitalsLog || {};
+    for (const key of Object.keys(vitals)) {
+      const e = vitals[key];
+      if (e && (e.weight != null || e.sleep != null || e.rhr != null) && isCountableDay(key, win)) days.add(key);
+    }
+    const burn = S.burnLog || {};
+    for (const key of Object.keys(burn)) {
+      const list = Array.isArray(burn[key]) ? burn[key] : [];
+      if (list.some(a => Number(a?.kcal) > 0) && isCountableDay(key, win)) days.add(key);
+    }
+  }
+  let n = Math.min(days.size, win.cap);
+  if (category === 'fitness') n = Math.max(n, Math.max(0, Math.min(macroDays || 0, win.cap)));
+  return n;
 }
+
+const dayPoints = (S, category, win, macroDays) => pillarDays(S, category, win, macroDays) * DAY_POINTS;
 
 // ── Rule 5: savings points ─────────────────────────────────────────────────
 
@@ -329,15 +346,15 @@ function savingsPoints(S) {
 // ── Self-check contributions ──────────────────────────────────────────────
 //
 // Each ranked category has an optional 16-question self-check (see
-// BrainCheck / FinanceCheck / FitnessCheck / SocialCheck). A score of
-// 100 (median) maps to ~12 points, 130 to ~18, 70 to ~6. Bounded so
-// a single test can't dominate the rating.
+// BrainCheck / FinanceCheck / FitnessCheck / SocialCheck). 70 → 2
+// points, 100 → 4, 130 → 6. Was 6-18 until 2026-10-21: four honest
+// questionnaires on day one were worth a third of a climb on the new
+// scale, which is a number handed out, not earned.
 
 function selfCheckPoints(score) {
   if (!score || !score.result) return 0;
-  // Map [70, 130] → [6, 18] linearly, clamp outside.
   const result = Math.max(70, Math.min(130, score.result));
-  return ((result - 70) / 60) * 12 + 6;
+  return ((result - 70) / 60) * 4 + 2;
 }
 
 function brainScorePoints(S)   { return selfCheckPoints(S.brainScore); }
@@ -364,55 +381,6 @@ function socialPoints(S, friendCount = 0, win = dayWindow(null)) {
   return (friends / 20) * 12 + (activeDays / 30) * 16;
 }
 
-// ── Health contributions (vitals / burn / macros) — 2026-07 ───────────────
-//
-// Lifetime accumulations (owner call: points feed the prestige climb,
-// so no rolling window). All self-reported, so each is per-day capped —
-// consistency earns, magnitudes don't:
-//
-//   vitals: 0.4 pt per calendar day with any vitals entry (weight /
-//           sleep / resting HR — the Vitals widget writes S.vitalsLog)
-//   burn:   up to 0.5 pt per day, scaled by min(activityKcal, 600)/600
-//           (S.burnLog — exercise + steps; typing a huge number earns
-//           no more than a real session)
-//   macros: 0.5 pt per on-target nutrition day. Nutrition lives in
-//           Supabase tables, not synced state, so the count arrives
-//           via ctx.macroDays (client passes a cached count for the
-//           local view; the server counts the table itself — same
-//           pattern as friendCount).
-
-const BURN_DAY_CAP_KCAL = 600;
-
-function vitalsPoints(S, win = dayWindow(null)) {
-  const log = S.vitalsLog || {};
-  let days = 0;
-  for (const k of Object.keys(log)) {
-    if (days >= win.cap) break;
-    if (!isCountableDay(k, win)) continue;
-    const e = log[k];
-    if (e && (e.weight != null || e.sleep != null || e.rhr != null)) days++;
-  }
-  return days * 0.4;
-}
-
-function burnPoints(S, win = dayWindow(null)) {
-  const log = S.burnLog || {};
-  let pts = 0, days = 0;
-  for (const k of Object.keys(log)) {
-    if (days >= win.cap) break;
-    if (!isCountableDay(k, win)) continue;
-    const list = Array.isArray(log[k]) ? log[k] : [];
-    const kcal = list.reduce((sum, a) => sum + (Number(a?.kcal) || 0), 0);
-    if (kcal > 0) { pts += Math.min(kcal, BURN_DAY_CAP_KCAL) / BURN_DAY_CAP_KCAL * 0.5; days++; }
-  }
-  return pts;
-}
-
-// nutrition rows are client-written too, so the same age cap holds
-function macroPoints(macroDays = 0, win = dayWindow(null)) {
-  return Math.max(0, Math.min(macroDays || 0, win.cap)) * 0.5;
-}
-
 // ── Visions contribution ───────────────────────────────────────────────────
 
 /**
@@ -421,7 +389,11 @@ function macroPoints(macroDays = 0, win = dayWindow(null)) {
  * anchors for ratings.
  *
  * Each definition can optionally declare a category. Unlocked visions
- * in `category` contribute (xp / 4) points to that category's rating.
+ * in `category` contribute xp / VISION_XP_PER_POINT points to that
+ * category. 40 since 2026-10-21 (was 4): the catalogue is 8,200 xp, so
+ * at 4 it was worth seven prestiges by itself and a 30-day streak paid
+ * a sixth of a climb. At 40 the whole set is worth under one climb,
+ * spread over the year or more it takes to earn.
  * Visions without a category contribute equally to ALL categories
  * (rewards general progress).
  *
@@ -443,6 +415,8 @@ function countedVisions(S, win) {
   return { ids, scale: xp > win.visionXpCap ? win.visionXpCap / xp : 1 };
 }
 
+const VISION_XP_PER_POINT = 40;
+
 function visionPoints(S, category, win = dayWindow(null)) {
   const { ids, scale } = countedVisions(S, win);
   let points = 0;
@@ -451,7 +425,7 @@ function visionPoints(S, category, win = dayWindow(null)) {
     if (def.category && def.category !== category) continue;
     // Uncategorised visions split equally across the 4 categories
     const weight = def.category ? 1 : 0.25;
-    points += (def.xp / 4) * weight;
+    points += (def.xp / VISION_XP_PER_POINT) * weight;
   }
   return points * scale;
 }
@@ -459,62 +433,116 @@ function visionPoints(S, category, win = dayWindow(null)) {
 // ── Public API ─────────────────────────────────────────────────────────────
 
 /**
+ * Raw points per category, before the curve and before any prestige
+ * baseline. Mirrors derivePoints in netlify/lib/recompute.js.
+ *
  * ctx: { friendCount, macroDays, createdAt } — createdAt is the account's
  * creation time (ISO or ms, e.g. session.user.created_at). Leave it out
  * and day keys are unfloored and uncapped; the server passes it, so the
  * leaderboard number is the capped one either way.
  */
-export function deriveRatings(rawS, ctx = {}) {
+export function derivePoints(rawS, ctx = {}) {
   // Item 124 / D1: WHOOP- and Oura-derived values never move a rating —
   // the server canonical number (netlify/lib/recompute.js) leaves them
   // out the same way, and the parity check holds the two together.
   const S = shareableView(rawS || {});
   const friendCount = ctx.friendCount || 0;
   const win = dayWindow(ctx.createdAt);
-
-  const brainPts =
-    brainScorePoints(S) +
-    categoryDayPoints(S, 'brain', win) +
-    trackerPoints(S, 'brain', win) * 1.0 +
-    achievementPoints(S, 'brain') * 2.5 +
-    visionPoints(S, 'brain', win);
-
-  const financePts =
-    financeScorePoints(S) +
-    categoryDayPoints(S, 'finance', win) +
-    savingsPoints(S) +
-    trackerPoints(S, 'finance', win) * 1.0 +
-    achievementPoints(S, 'finance') * 2.5 +
-    visionPoints(S, 'finance', win);
-
-  const fitnessPts =
-    fitnessScorePoints(S) +
-    categoryDayPoints(S, 'fitness', win) +
-    trackerPoints(S, 'fitness', win) * 1.2 +
-    achievementPoints(S, 'fitness') * 2.5 +
-    visionPoints(S, 'fitness', win) +
-    vitalsPoints(S, win) +
-    burnPoints(S, win) +
-    macroPoints(ctx.macroDays, win);
-
-  const socialPts =
-    socialSelfCheckPoints(S) +
-    categoryDayPoints(S, 'social', win) +
-    socialPoints(S, friendCount, win) +
-    achievementPoints(S, 'social') * 2.5 +
-    visionPoints(S, 'social', win);
-
-  const brain   = toRating(brainPts);
-  const finance = toRating(financePts);
-  const fitness = toRating(fitnessPts);
-  const social  = toRating(socialPts);
-  const ovr     = clamp((brain + finance + fitness + social) / 4);
-
   return {
-    brain, finance, fitness, social, ovr,
+    brain:
+      brainScorePoints(S) +
+      dayPoints(S, 'brain', win) +
+      trackerPoints(S, 'brain', win) * 1.0 +
+      achievementPoints(S, 'brain') * 2.5 +
+      visionPoints(S, 'brain', win),
+    finance:
+      financeScorePoints(S) +
+      dayPoints(S, 'finance', win) +
+      savingsPoints(S) +
+      trackerPoints(S, 'finance', win) * 1.0 +
+      achievementPoints(S, 'finance') * 2.5 +
+      visionPoints(S, 'finance', win),
+    fitness:
+      fitnessScorePoints(S) +
+      dayPoints(S, 'fitness', win, ctx.macroDays) +
+      trackerPoints(S, 'fitness', win) * 1.0 +
+      achievementPoints(S, 'fitness') * 2.5 +
+      visionPoints(S, 'fitness', win),
+    social:
+      socialSelfCheckPoints(S) +
+      dayPoints(S, 'social', win) +
+      socialPoints(S, friendCount, win) +
+      achievementPoints(S, 'social') * 2.5 +
+      visionPoints(S, 'social', win),
+  };
+}
+
+/** Per-category points this climb: raw minus the prestige baseline. */
+function climbPoints(pts, baseline = {}) {
+  const adj = {};
+  for (const c of CATEGORIES) adj[c] = Math.max(0, (Number(pts?.[c]) || 0) - (Number(baseline?.[c]) || 0));
+  return adj;
+}
+
+/** The OVR total: best category in full, the rest by BREADTH_WEIGHTS. */
+function ovrPoints(adj) {
+  return CATEGORIES.map(c => adj[c]).sort((a, b) => b - a)
+    .reduce((sum, v, i) => sum + v * BREADTH_WEIGHTS[i], 0);
+}
+
+/**
+ * Points → ratings. `baseline` is the prestige snapshot
+ * (profiles.prestige_baseline, cached locally as S.prestigeBaseline):
+ * per-category raw points at the moment of the last prestige, taken
+ * off so each climb starts from the floor. Nothing is wiped.
+ */
+export function ratingsFromPoints(pts, baseline = {}) {
+  const adj = climbPoints(pts, baseline);
+  return {
+    brain:   toRating(adj.brain, PILLAR_FULL),
+    finance: toRating(adj.finance, PILLAR_FULL),
+    fitness: toRating(adj.fitness, PILLAR_FULL),
+    social:  toRating(adj.social, PILLAR_FULL),
+    ovr:     toRating(ovrPoints(adj), OVR_FULL),
+  };
+}
+
+/** ctx as derivePoints, plus `baseline` (the prestige snapshot). */
+export function deriveRatings(rawS, ctx = {}) {
+  return {
+    ...ratingsFromPoints(derivePoints(rawS, ctx), ctx.baseline),
     computedAt: new Date().toISOString(),
   };
 }
+
+/** How many more OVR points this climb needs before it reads 99 (full). */
+export function pointsToPrestige(pts, baseline = {}) {
+  return Math.max(0, OVR_FULL - ovrPoints(climbPoints(pts, baseline)));
+}
+
+/** What one more point in `category` is worth toward OVR right now. */
+export function breadthWeight(pts, baseline, category) {
+  const adj = climbPoints(pts, baseline);
+  const rank = CATEGORIES.filter(c => c !== category && adj[c] > adj[category]).length;
+  return BREADTH_WEIGHTS[rank];
+}
+
+/** A server baseline (profiles.prestige_baseline) as { brain, finance,
+ *  fitness, social } numbers, or null when it is empty (never
+ *  prestiged) or not the right shape. */
+export function cleanBaseline(b) {
+  if (!b || typeof b !== 'object') return null;
+  const out = {};
+  let any = false;
+  for (const c of CATEGORIES) {
+    const v = Number(b[c]);
+    out[c] = Number.isFinite(v) && v > 0 ? v : 0;
+    if (out[c] > 0) any = true;
+  }
+  return any ? out : null;
+}
+
+export { OVR_FULL, PILLAR_FULL, DAY_POINTS, BREADTH_WEIGHTS };
 
 /**
  * Returns the contribution breakdown for one category. Used by the
@@ -524,42 +552,40 @@ export function categoryBreakdown(rawS, category, ctx = {}) {
   const S = shareableView(rawS || {});
   const friendCount = ctx.friendCount || 0;
   const win = dayWindow(ctx.createdAt);
+  const days = n => ({ key: 'days', label: 'Days you showed up', points: n });
   switch (category) {
     case 'brain':
       return [
-        { label: 'Brain self-check', points: brainScorePoints(S) },
-        { label: 'Days logged (lifetime)', points: categoryDayPoints(S, 'brain', win) },
-        { label: 'Brain trackers',   points: trackerPoints(S, 'brain', win) * 1.0 },
-        { label: 'Brain achievements', points: achievementPoints(S, 'brain') * 2.5 },
-        { label: 'Brain honours',    points: visionPoints(S, 'brain', win) },
+        { key: 'check', label: 'Brain self-check', points: brainScorePoints(S) },
+        days(dayPoints(S, 'brain', win)),
+        { key: 'trackers', label: 'Brain trackers, last 30 days', points: trackerPoints(S, 'brain', win) },
+        { key: 'achievements', label: 'Brain achievements', points: achievementPoints(S, 'brain') * 2.5 },
+        { key: 'honours', label: 'Brain honours', points: visionPoints(S, 'brain', win) },
       ];
     case 'finance':
       return [
-        { label: 'Finance self-check', points: financeScorePoints(S) },
-        { label: 'Days logged (lifetime)', points: categoryDayPoints(S, 'finance', win) },
-        { label: 'Savings goals',    points: savingsPoints(S) },
-        { label: 'Finance trackers', points: trackerPoints(S, 'finance', win) * 1.0 },
-        { label: 'Finance achievements', points: achievementPoints(S, 'finance') * 2.5 },
-        { label: 'Finance honours',  points: visionPoints(S, 'finance', win) },
+        { key: 'check', label: 'Finance self-check', points: financeScorePoints(S) },
+        days(dayPoints(S, 'finance', win)),
+        { key: 'savings', label: 'Savings goals', points: savingsPoints(S) },
+        { key: 'trackers', label: 'Finance trackers, last 30 days', points: trackerPoints(S, 'finance', win) },
+        { key: 'achievements', label: 'Finance achievements', points: achievementPoints(S, 'finance') * 2.5 },
+        { key: 'honours', label: 'Finance honours', points: visionPoints(S, 'finance', win) },
       ];
     case 'fitness':
       return [
-        { label: 'Fitness self-check', points: fitnessScorePoints(S) },
-        { label: 'Days logged (lifetime)', points: categoryDayPoints(S, 'fitness', win) },
-        { label: 'Fitness trackers', points: trackerPoints(S, 'fitness', win) * 1.2 },
-        { label: 'Fitness achievements', points: achievementPoints(S, 'fitness') * 2.5 },
-        { label: 'Fitness honours',  points: visionPoints(S, 'fitness', win) },
-        { label: 'Vitals log days',  points: vitalsPoints(S, win) },
-        { label: 'Activity burn',    points: burnPoints(S, win) },
-        { label: 'On-target macro days', points: macroPoints(ctx.macroDays, win) },
+        { key: 'check', label: 'Fitness self-check', points: fitnessScorePoints(S) },
+        { ...days(dayPoints(S, 'fitness', win, ctx.macroDays)), hint: 'A tracker ticked, vitals or activity logged, or calories on target' },
+        { key: 'trackers', label: 'Fitness trackers, last 30 days', points: trackerPoints(S, 'fitness', win) },
+        { key: 'achievements', label: 'Fitness achievements', points: achievementPoints(S, 'fitness') * 2.5 },
+        { key: 'honours', label: 'Fitness honours', points: visionPoints(S, 'fitness', win) },
       ];
     case 'social':
       return [
-        { label: 'Social self-check', points: socialSelfCheckPoints(S) },
-        { label: 'Days logged (lifetime)', points: categoryDayPoints(S, 'social', win) },
-        { label: 'Friends + activity', points: socialPoints(S, friendCount, win) },
-        { label: 'Social achievements', points: achievementPoints(S, 'social') * 2.5 },
-        { label: 'Social honours',   points: visionPoints(S, 'social', win) },
+        { key: 'check', label: 'Social self-check', points: socialSelfCheckPoints(S) },
+        days(dayPoints(S, 'social', win)),
+        { key: 'friends', label: 'Friends + activity', points: socialPoints(S, friendCount, win) },
+        { key: 'achievements', label: 'Social achievements', points: achievementPoints(S, 'social') * 2.5 },
+        { key: 'honours', label: 'Social honours', points: visionPoints(S, 'social', win) },
       ];
     default:
       return [];

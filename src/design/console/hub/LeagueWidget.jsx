@@ -38,10 +38,10 @@ export function gapNote(rows) {
   const first = s => String(s || '').replace(/^@/, '@').split(/\s+/)[0];
   if (i === 0) {
     const d = (rows[0].ovr || 0) - (rows[1].ovr || 0);
-    return d > 0 ? `${d} OVR clear of ${first(rows[1].name)}` : `Level with ${first(rows[1].name)}`;
+    return d > 0 ? `${d} OVR clear of ${first(rows[1].name)}` : `Even with ${first(rows[1].name)}`;
   }
   const d = (rows[i - 1].ovr || 0) - (rows[i].ovr || 0);
-  return d > 0 ? `${d} OVR behind ${first(rows[i - 1].name)}` : `Level with ${first(rows[i - 1].name)}`;
+  return d > 0 ? `${d} OVR behind ${first(rows[i - 1].name)}` : `Even with ${first(rows[i - 1].name)}`;
 }
 
 export function leagueMeta(hub) {

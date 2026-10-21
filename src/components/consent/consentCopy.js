@@ -8,7 +8,7 @@
  *   · health — WHOOP and Oura only. Apple Health import is owner-only
  *     and compiled out of the native build, so it is not offered here.
  *   · health "where" — true since item 124 (2026-10-20): WHOOP/Oura
- *     values are left out of ratings, visions/level and the friends
+ *     values are left out of ratings, visions (honours) and the friends
  *     heatmap (lib/wearables/strip.js, netlify/lib/wearableShare.js).
  *   · ai — what lib/coach/snapshot.js actually sends (WHOOP/Oura-fed
  *     trackers withheld by the wearable guard), the one camera frame of
@@ -20,7 +20,7 @@ export const CONSENT_COPY = {
     title: 'Health data',
     prompt: 'Allow health data?',
     what: 'Weight, sleep, heart rate, HRV, recovery, strain, steps and calories burned — from WHOOP or an Oura Ring.',
-    where: 'Stored in your Vantage account (EU servers). Your readings are never shown to anyone else, never used for ads and never sold, and nothing from WHOOP or Oura counts toward your ratings, level or the activity friends see. Synced values stay in your account until you delete them.',
+    where: 'Stored in your Vantage account (EU servers). Your readings are never shown to anyone else, never used for ads and never sold, and nothing from WHOOP or Oura counts toward your ratings or the activity friends see. Synced values stay in your account until you delete them.',
     ask: 'Needed before connecting WHOOP or Oura.',
   },
   ai: {

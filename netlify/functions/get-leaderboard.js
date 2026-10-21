@@ -53,24 +53,10 @@ const CORS = {
 const STALE_MS = 24 * 60 * 60 * 1000;
 const SNAPSHOT_MIN_AGE_MS = 6 * 24 * 60 * 60 * 1000; // ≥6 days = "weekly"
 
-/**
- * The day the rating formula was corrected.
- *
- * Weekly climb is `today's OVR − the OVR we stored a week ago`, which
- * only means anything if both were computed the same way. The server
- * had been pricing every vision at a flat 8 xp against a catalogue
- * running 50–1000, so correcting it moves most users up by several
- * points at once. Comparing across that would have handed everyone a
- * one-off climb they did not earn — in the same week the group league
- * starts scoring on exactly that number.
- *
- * So snapshots from before the correction are not read. Climb shows as
- * "—" until a week of comparable ones exists, which is the truthful
- * answer to "how much did you move this week" when the ruler changed.
- * The rows stay in the table; nothing is deleted. Once past
- * this + 7 days the constant is inert and can go.
- */
-const FORMULA_EPOCH_ISO = '2026-09-14T00:00:00.000Z';
+// Snapshots from before the last formula change are not compared, and
+// a prestige between two snapshots counts as the climb to 99 plus the
+// climb since — see netlify/lib/ratingsEpoch.js.
+const { FORMULA_EPOCH_ISO, climbSince } = require('../lib/ratingsEpoch');
 const GLOBAL_TOP_N = 100;
 const WEEKLY_CANDIDATE_POOL = 500; // wider net for weekly-climb candidates
 const AVATAR_TOP_N = 100;          // rows past this get initials, not a data URI
@@ -78,7 +64,7 @@ const BOARD_TTL_MS = 5 * 60_000;   // shared global board lifetime
 
 // Profile columns for a board row. Avatars are fetched separately for
 // the rows that are actually shown (see attachAvatarsAndColors).
-const ROW_COLS = 'id,handle,display_name,ratings,ratings_ovr,ratings_computed_at,prestige';
+const ROW_COLS = 'id,handle,display_name,ratings,ratings_ovr,ratings_computed_at,prestige,prestiged_at';
 const ME_COLS = ROW_COLS + ',avatar_url,leaderboard_optin,lifetime_rating';
 
 const boardCache = createSharedCache({ ttlMs: BOARD_TTL_MS });
@@ -115,7 +101,7 @@ function sb(supabaseUrl, serviceKey, path, init = {}) {
 }
 
 // ── Snapshot fetch (batched) ─────────────────────────────────────────────
-// Returns Map<userId, snapshotOvr> — the most recent snapshot per user that
+// Returns Map<userId, { ovr, at }> — the most recent snapshot per user that
 // is at least SNAPSHOT_MIN_AGE_MS old. Implemented via PostgREST's
 // `in.(...)` + ORDER BY; we then keep only the newest qualifying row per
 // user in JS (DISTINCT ON would be ideal but isn't expressible in PostgREST).
@@ -153,17 +139,16 @@ async function fetchSnapshotOvrs(supabaseUrl, serviceKey, userIds) {
   }
   const out = new Map();
   for (const r of rows) {
-    if (!out.has(r.user_id)) out.set(r.user_id, r.ovr); // first = newest per user
+    if (!out.has(r.user_id)) out.set(r.user_id, { ovr: r.ovr, at: r.snapshotted_at }); // first = newest per user
   }
   return out;
 }
 
-// Build a leaderboard row from a profile + (optional) snapshot ovr.
-function rowFromProfile(p, snapshotOvr, callerId) {
+// Build a leaderboard row from a profile + (optional) snapshot { ovr, at }.
+// prestiged_at is read only to measure the climb; it is not in the row.
+function rowFromProfile(p, snap, callerId) {
   const ratings = p.ratings || {};
-  const climb = (snapshotOvr == null || p.ratings_ovr == null)
-    ? null
-    : p.ratings_ovr - snapshotOvr;
+  const climb = climbSince(p.ratings_ovr, snap?.ovr, p.prestiged_at, snap?.at);
   return {
     rank: 0, // assigned by caller
     userId: p.id,
@@ -368,7 +353,7 @@ async function buildGlobalBoard({ supabaseUrl, serviceKey, callerId, timeframe, 
       // Weekly: rank = 1 + count of opted-in users with strictly higher
       // climb. We don't have a column for climb — approximate by counting
       // board rows that beat caller's climb.
-      const callerClimb = callerSnap == null ? null : (me.ratings_ovr - callerSnap);
+      const callerClimb = climbSince(me.ratings_ovr, callerSnap?.ovr, me.prestiged_at, callerSnap?.at);
       if (callerClimb != null) {
         callerRank = 1 + rows.filter(r => r.climb != null && r.climb > callerClimb).length;
       }

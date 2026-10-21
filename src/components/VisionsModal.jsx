@@ -22,7 +22,8 @@ export default function VisionsModal({ open, S, onClose }) {
   if (!open) return null;
   const unlocked = S?.visions || {};
 
-  // Sort: unlocked first (newest unlock at top), then locked by ascending xp.
+  // Sort: unlocked first (newest unlock at top), then locked by ascending
+  // weight (`xp` is now only a ratings weight, never shown), easiest first.
   const rows = VISIONS.slice().sort((a, b) => {
     const ua = unlocked[a.id]?.unlockedAt;
     const ub = unlocked[b.id]?.unlockedAt;
@@ -102,11 +103,6 @@ export default function VisionsModal({ open, S, onClose }) {
                     </div>
                   )}
                 </div>
-                <span style={{
-                  fontFamily: 'var(--mono)', fontSize: 'var(--fs-floor)', letterSpacing: .8,
-                  color: isOn ? 'var(--em-text)' : 'var(--text-muted)', fontWeight: 700,
-                  flexShrink: 0,
-                }}>+{v.xp} XP</span>
               </li>
             );
           })}

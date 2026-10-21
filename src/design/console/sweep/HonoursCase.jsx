@@ -2,8 +2,8 @@
  * Honours — the trophy case. Console's answer to VisionsModal.
  *
  * Same data as the classic catalogue (VISIONS + S.visions, read only):
- * every honour, earned ones first, newest first; locked ones by XP so
- * the nearest is next. What changes is the drawing:
+ * every honour, earned ones first, newest first; locked ones by weight
+ * (`xp`, a ratings weight that is never shown) so the nearest is next. What changes is the drawing:
  *   - a grid of tiles, not a list of rows
  *   - a Lucide glyph per honour instead of its emoji (emoji stay out
  *     of chrome; the honour definitions keep theirs for classic)
@@ -64,7 +64,7 @@ export default function HonoursCase({ S, onClose }) {
         <div className="cx-sweep-honours-sum">
           <p className="cx-t13 cx-mid">
             <span className="cx-num cx-gold">{earned}</span> of <span className="cx-num">{total}</span> earned.
-            {' '}Each one is checked against what you've logged and adds XP to your level.
+            {' '}Each one is checked against what you've logged and feeds your ratings.
           </p>
           <div className="cx-sweep-bar is-gold" aria-hidden="true"><i style={{ width: `${total ? (earned / total) * 100 : 0}%` }} /></div>
         </div>
@@ -78,7 +78,7 @@ export default function HonoursCase({ S, onClose }) {
                   <span className="cx-sweep-tile-glyph" aria-hidden="true"><Icon name={honourGlyph(v)} size={18} strokeWidth={1.75} /></span>
                   {on
                     ? <span className="cx-sweep-tile-mark cx-gold" aria-label="Earned">◆</span>
-                    : <span className="cx-sweep-tile-xp cx-num">+{v.xp}</span>}
+                    : <span className="cx-sweep-tile-mark cx-muted" aria-label="Not yet earned">◇</span>}
                 </div>
                 <div className="cx-sweep-tile-title">{v.title}</div>
                 <div className="cx-sweep-tile-desc">{v.desc}</div>

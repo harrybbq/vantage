@@ -586,8 +586,8 @@ function ProfileCard({ profile, S, update, handle, onSaveName, onSaveTagline, on
               title={settling
                 ? 'Loading your rating…'
                 : visionState
-                  ? `OVR ${ovr}/99 · ${prestige.label} tier · ${visionState.unlockedCount}/${visionState.totalCount} honours earned`
-                  : `OVR ${ovr}/99 · ${prestige.label} tier`}
+                  ? `OVR ${ovr}/99 · ${visionState.unlockedCount}/${visionState.totalCount} honours earned`
+                  : `OVR ${ovr}/99`}
             >
               OVR {settling ? '—' : ovr}
             </span>

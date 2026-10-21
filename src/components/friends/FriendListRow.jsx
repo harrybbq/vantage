@@ -22,6 +22,7 @@
  */
 import Icon from '../Icon';
 import { ovrTier } from '../../lib/ratings/tiers';
+import { frameProps } from '../PrestigeFrame';
 
 const COLORS = ['#1a7a4a', '#2563eb', '#7c3aed', '#c2410c', '#0891b2', '#be185d', '#854d0e'];
 
@@ -66,7 +67,7 @@ export default function FriendListRow({ friend, selected, onClick, onMessage }) 
       onClick={onClick}
       onKeyDown={onKeyDown}
     >
-      <div className="fc-row-avatar-wrap">
+      <div {...frameProps(friend.prestige, 'fc-row-avatar-wrap')}>
         {friend.avatar_url ? (
           <img
             className="fc-row-avatar fc-row-avatar-img"
@@ -114,7 +115,7 @@ export default function FriendListRow({ friend, selected, onClick, onMessage }) 
           {unread && <span className="fc-row-unread">{friend.unread > 9 ? '9+' : friend.unread}</span>}
         </button>
       )}
-      <div className={`fc-row-level ovr-chip ovr-tier-${prestige.key}`} title={`OVR ${ovr} · ${prestige.label}`}>{ovr}</div>
+      <div className={`fc-row-level ovr-chip ovr-tier-${prestige.key}`} title={`OVR ${ovr}`}>{ovr}</div>
     </div>
   );
 }

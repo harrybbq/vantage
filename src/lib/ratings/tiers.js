@@ -14,6 +14,12 @@
  *   80-89  diamond
  *   90-99  ruby
  *
+ * Colour only since 2026-10-21: OVR is the one level and Prestige the
+ * one thing above it, so the band NAMES are no longer shown anywhere —
+ * "Gold · Emerald at 60" beside the number read as a second ladder.
+ * The keys still pick the glow and number colour; `label` stays for
+ * code that keys off it, not for display.
+ *
  * NOTE: this is DISTINCT from the 3-tier Starting / Mid / Elite scale
  * used inside RatingsPanel to label individual category bars. That
  * scale answers "where on the journey is this category"; this one is

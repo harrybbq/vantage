@@ -129,10 +129,10 @@ export default function GroupBoard({ data, onLeave, onRename, onRotateCode, onKi
           </div>
 
           {/* Where the week came from. These four are category points,
-              which do NOT add up to the OVR figure above — OVR is the
-              mean of four ratings, so four points of fitness alone move
-              the group one. Labelled as such rather than quietly not
-              adding up. */}
+              which do NOT add up to the OVR figure above — OVR weights
+              each member's best category in full and the rest less
+              (lib/ratings/derive.js). Labelled as such rather than
+              quietly not adding up. */}
           <div className="grp-split">
             <div className="grp-rule">
               <span>Where the growth came from</span><i />

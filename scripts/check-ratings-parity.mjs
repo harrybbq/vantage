@@ -299,13 +299,25 @@ const TOLERANCE = 1;
 let checked = 0;
 const failures = [];
 
+/* Every case twice: fresh, and after a prestige. A prestige snapshots
+   the raw points per category as profiles.prestige_baseline and both
+   sides take it off — the app from its cached S.prestigeBaseline — so
+   a baseline that one side ignored would leave the app at 99 while the
+   leaderboard restarted the climb. Since 2026-10-21 a committed user
+   prestiges every three months, so that is the common case, not an
+   edge. Uneven on purpose: the OVR weights depend on which category
+   is ahead after the subtraction. */
+const BASELINES = [{}, { brain: 6, finance: 0, fitness: 40, social: 3.5 }];
 for (const [name, S, friendCount, macroDays, createdAt = null] of cases()) {
-  const c = clientDerive(S, { friendCount, macroDays, createdAt });
-  const s = serverDerive(S, friendCount, {}, macroDays, createdAt);
-  for (const k of [...CATS, 'ovr']) {
-    checked++;
-    if (Math.abs(c[k] - s[k]) > TOLERANCE) {
-      failures.push(`${name} · ${k}: app ${c[k]}, leaderboard ${s[k]} (off by ${c[k] - s[k]})`);
+  for (const baseline of BASELINES) {
+    const c = clientDerive(S, { friendCount, macroDays, createdAt, baseline });
+    const s = serverDerive(S, friendCount, baseline, macroDays, createdAt);
+    const tag = Object.keys(baseline).length ? ' (after a prestige)' : '';
+    for (const k of [...CATS, 'ovr']) {
+      checked++;
+      if (Math.abs(c[k] - s[k]) > TOLERANCE) {
+        failures.push(`${name}${tag} · ${k}: app ${c[k]}, leaderboard ${s[k]} (off by ${c[k] - s[k]})`);
+      }
     }
   }
 }

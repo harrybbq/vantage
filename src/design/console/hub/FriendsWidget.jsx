@@ -22,7 +22,6 @@ import { useEffect, useRef, useState } from 'react';
 import Icon from '../../../components/Icon';
 import { Sheet } from '../ui';
 import { bandClass, bandVar, bandOf } from '../../../lib/ratings/bands';
-import { ovrTier } from '../../../lib/ratings/tiers';
 import AddFriendModal from '../../../components/friends/AddFriendModal';
 import ReportFriendModal from '../../../components/friends/ReportFriendModal';
 import MessagesModal from '../../../components/friends/MessagesModal';
@@ -52,7 +51,7 @@ function FriendRow({ f, onOpen, selected = false }) {
     <li>
       <button type="button" className={`cx-hub-fr${selected ? ' is-on' : ''}`} onClick={() => onOpen(f.id)}
               aria-label={`${f.name}${f.unread ? `, ${f.unread} unread` : ''}, OVR ${f.ovr ?? 'unknown'}`}>
-        <Avatar name={f.name} url={f.avatar_url} size={32} online={f.online} />
+        <Avatar name={f.name} url={f.avatar_url} size={32} online={f.online} prestige={f.prestige} />
         <span className="cx-hub-fr-txt">
           <span className="cx-hub-fr-nm"><span className={`cx-hub-ell${f.unread ? ' is-strong' : ''}`}>{f.name}</span><Diamonds n={f.prestige} /></span>
           {f.lastText
@@ -174,18 +173,16 @@ export function FriendCardCx({ f, hub, showMessage = true, inSheet = false }) {
     return () => { document.removeEventListener('pointerdown', close); document.removeEventListener('keydown', key, true); };
   }, [menu]);
   if (!f) return null;
-  const tier = f.ovr != null ? ovrTier(f.ovr) : null;
   return (
     <div className={`cx-hub-fc${inSheet ? ' is-sheet' : ''}`}>
       <div className="cx-hub-fc-head">
-        <Avatar name={f.name} url={f.avatar_url} size={56} online={f.online} />
+        <Avatar name={f.name} url={f.avatar_url} size={56} online={f.online} prestige={f.prestige} />
         <div className="cx-hub-fc-id">
           <span className="cx-hub-fc-nm"><span className="cx-hub-ell">{f.name}</span><Diamonds n={f.prestige} /></span>
           <span className="cx-hub-fc-sub">{f.handle ? `@${f.handle}` : ''}{f.online ? <> · <span className="cx-hub-onl">online now</span></> : f.lastSeenDays != null ? ` · ${seenLine(f).toLowerCase()}` : ''}</span>
         </div>
         <div className="cx-hub-fc-ovr">
           <span className={`cx-num ${bandClass(f.ovr)}`}>{f.ovr ?? '–'}</span>
-          {tier && <span className={`cx-hub-tier ${bandClass(f.ovr)}`}>{tier.label}</span>}
         </div>
       </div>
       <div className="cx-hub-fc-cats">
@@ -271,7 +268,7 @@ export function FriendTakeover({ hub }) {
       </div>
       <div className="cx-hub-take-chat">
         <div className="cx-hub-take-h">
-          <Avatar name={f.name} url={f.avatar_url} size={28} online={f.online} />
+          <Avatar name={f.name} url={f.avatar_url} size={28} online={f.online} prestige={f.prestige} />
           <span className="cx-hub-take-t">{f.name}</span>
           <span className="cx-hub-sp" />
           <span className="cx-muted cx-hub-nowrap">Messages are only between friends</span>

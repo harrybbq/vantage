@@ -5,7 +5,7 @@ export const DEFAULT_STATE = {
     { id: 'a1', name: 'Save £10,000', desc: 'Build emergency fund', icon: '💰', x: 40, y: 40, completed: false, coins: 100, category: 'finance' },
     { id: 'a2', name: 'Buy a House', desc: 'Get on the property ladder', icon: '🏠', x: 370, y: 40, completed: false, locked: true, coins: 500, category: 'finance' },
     { id: 'a3', name: 'Run 5K', desc: 'Complete a 5K run', icon: '🏃', x: 40, y: 210, completed: false, coins: 50, category: 'fitness' },
-    { id: 'a4', name: 'Run 10K', desc: 'Level up to 10K', icon: '🏅', x: 370, y: 210, completed: false, locked: true, coins: 80, category: 'fitness' },
+    { id: 'a4', name: 'Run 10K', desc: 'Build up to 10K', icon: '🏅', x: 370, y: 210, completed: false, locked: true, coins: 80, category: 'fitness' },
   ],
   connections: [['a1', 'a2'], ['a3', 'a4']],
   trackers: [
@@ -69,12 +69,12 @@ export const DEFAULT_STATE = {
   //   yesterday's focus/watch/micro lines.
   coachMemory: {},
   coachBriefHistory: [],
-  // ── Visions / Level system ────────────────────────────────────────
+  // ── Visions (shown as "Honours") ──────────────────────────────────
   // visions: { [visionId]: { unlockedAt: ISO } }
   //   System-tracked milestones (habit streaks, logging consistency,
   //   completed-achievement counts). Stamped once when their `check(S)`
-  //   first passes. XP from these + a small drip from completed user
-  //   achievements drives the displayed Level. See src/lib/visions.
+  //   first passes. Each one's weight feeds the ratings; there is no
+  //   Level any more (retired 2026-10). See src/lib/visions.
   // visionsBackfilled: marks the first-load silent backfill as done so
   //   we don't fire a burst of toasts when the feature lands for users
   //   whose state already meets several visions.
@@ -156,6 +156,11 @@ export const DEFAULT_STATE = {
   // the prestige-up flow. Display-only — the server enforces all
   // prestige rules; editing this changes nothing friend-visible.
   prestige: 0,
+  // Local cache of profiles.prestige_baseline: the raw points per
+  // category at the last prestige, which the rating subtracts so each
+  // climb starts from the floor. Same source and status as `prestige`.
+  // null = never prestiged (or not heard back from the server yet).
+  prestigeBaseline: null,
   // Result of the most-recent IQ self-check (F5 Sprint 4). Optional;
   // null means the user hasn't taken it. testVersion lets us migrate
   // the test bank later without invalidating old scores silently.

@@ -1,0 +1,40 @@
+/* ── Prestige avatar frames ─────────────────────────────────────────────
+   One stylesheet for both designs (classic and console). The classes come
+   from frameAttrs() in src/lib/ratings/prestigeRewards.js, which also sets
+   --pf-c to the band colour. P0 avatars get no class, so they render as
+   they always did.
+
+     .pf             a 2px ring in the band colour, just outside the avatar
+     .pf-double      a second, finer ring outside that       (Prestige IV)
+     .pf-segmented   the inner ring broken into 12 segments   (Prestige X)
+     .pf-halo        a soft glow in the band colour           (Prestige XV)
+
+   The rings are pseudo-elements on the avatar's WRAPPER (an <img> cannot
+   carry them), drawn outside its box so no layout moves. */
+.pf { position: relative; border-radius: 50%; }
+.pf::after,
+.pf-double::before {
+  content: ''; position: absolute; border-radius: 50%; pointer-events: none;
+  box-sizing: border-box;
+}
+.pf::after { inset: -3px; border: 2px solid var(--pf-c); }
+.pf-double::before { inset: -6px; border: 1px solid var(--pf-c); opacity: .7; }
+.pf-segmented::after {
+  border: 0;
+  background: repeating-conic-gradient(from -12deg, var(--pf-c) 0 24deg, transparent 24deg 30deg);
+  -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 2.5px), #000 calc(100% - 2px));
+          mask: radial-gradient(farthest-side, transparent calc(100% - 2.5px), #000 calc(100% - 2px));
+}
+.pf-halo { box-shadow: 0 0 12px 3px color-mix(in srgb, var(--pf-c) 45%, transparent); }
+
+/* A wrapper added round an avatar that had none (classic leaderboard,
+   invite page, handle search). Sized by its avatar. */
+.pf-wrap { display: inline-flex; flex-shrink: 0; vertical-align: middle; }
+/* Invite page: the avatar's centring margin moves to the wrapper so the
+   ring stays round. */
+.inv-card .pf-wrap { margin: 0 auto 12px; }
+.inv-card .pf-wrap > .inv-card-avatar { margin: 0; }
+
+@media (prefers-reduced-motion: no-preference) {
+  .pf::after, .pf-double::before { transition: opacity .2s ease; }
+}

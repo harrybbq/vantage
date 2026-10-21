@@ -66,10 +66,10 @@ export default function LeaderboardSection({
             <div className="sec-title">Leaderboard <SectionHelp
               title="Leaderboard"
               rows={[
-                { term: 'OVR', def: 'Brain, Finance, Fitness and Social, each out of 99, averaged.' },
+                { term: 'OVR', def: 'Every point you earn in Brain, Finance, Fitness or Social. Your best category counts in full, the others a bit less.' },
                 { term: 'Group score', def: "How much every member's OVR grew since Monday, added up." },
                 { term: 'Divisions', def: 'Top three go up on Monday, bottom three go down.' },
-                { term: 'Prestige', def: 'At 99 you can trade it for a colour band and start again.' },
+                { term: 'Prestige', def: 'At a full 99 you can prestige: your OVR starts again and P1, P2… goes up by one, with a reward.' },
               ]}
               foot="Hide yourself from the global board in Settings → Privacy."
             /></div>

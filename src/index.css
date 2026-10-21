@@ -5371,6 +5371,88 @@ html[data-bg-photo] .section.m-hub-wrap .m-hub-hero{ box-shadow:none; padding:12
   font-variant-numeric: tabular-nums;
   text-align: right;
 }
+/* Best at / work on, under the key (RatingsPanel, lib/ratings/profile.js). */
+.ratings-ledger-focus {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  border-top: 1px solid var(--border);
+  padding-top: 8px;
+  min-width: 0;
+}
+.ratings-focus-row {
+  display: grid;
+  grid-template-columns: 64px minmax(0, 1fr);
+  align-items: baseline;
+  column-gap: 10px;
+  width: 100%;
+  min-height: 32px;
+  padding: 5px 6px;
+  border-radius: 6px;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  -webkit-tap-highlight-color: transparent;
+}
+.ratings-focus-row:hover { background: rgba(var(--em-rgb), 0.06); }
+.ratings-focus-row:focus-visible { outline: 2px solid var(--em); outline-offset: -2px; }
+.ratings-focus-k {
+  font-family: var(--mono);
+  font-size: var(--fs-floor);
+  letter-spacing: 1.2px;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+.ratings-focus-v {
+  font-family: var(--mono);
+  font-size: var(--fs-floor);
+  letter-spacing: 1.2px;
+  text-transform: uppercase;
+  font-weight: 700;
+  color: var(--text);
+  min-width: 0;
+}
+.ratings-focus-step {
+  grid-column: 2;
+  font-family: var(--sans);
+  font-size: var(--fs-floor);
+  line-height: 1.45;
+  color: var(--text-muted);
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.ratings-focus-start {
+  margin: 0;
+  padding: 4px 6px;
+  font-family: var(--sans);
+  font-size: var(--fs-floor);
+  line-height: 1.45;
+  color: var(--text-muted);
+}
+.ratings-next-step {
+  margin-top: 12px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+}
+.ratings-next-step-k {
+  font-family: var(--mono);
+  font-size: var(--fs-floor);
+  letter-spacing: 1.2px;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  margin-bottom: 4px;
+}
+.ratings-next-step-v {
+  font-family: var(--sans);
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--text);
+}
+
 /* The label is the only thing allowed to give way — truncating a word
    is recoverable, a number sliding out of its column is not. */
 .ratings-legend-label {

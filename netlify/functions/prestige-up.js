@@ -146,7 +146,7 @@ exports.handler = async (event) => {
     const ratings = deriveRatings(inp.state, inp.friends, baseline, inp.macroDays, inp.createdAt);
     const computedAt = await writeRatings(userId, ratings, env);
 
-    return reply(200, { ok: true, prestige: newPrestige, ratings, computedAt });
+    return reply(200, { ok: true, prestige: newPrestige, ratings, computedAt, baseline });
   } catch (e) {
     console.error('prestige-up failed', e?.message);
     return reply(500, { error: 'prestige failed' });

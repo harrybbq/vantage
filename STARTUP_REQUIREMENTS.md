@@ -141,6 +141,15 @@ action outside the repo.
       friend card, published on a debounce by `usePublishProfile`, and
       not a leaderboard input. Moving it needs that write server-side
       first.
+      *2026-10-21: moot — Level was retired. The client no longer writes
+      or reads `profiles.level` / `public_stats.level`; the columns and the
+      UPDATE grant stay (no destructive SQL). Revoking that grant later is
+      optional tidying. Prestige (server-owned via `prestige-up`) is the
+      long-term goal now, and its rewards are looks only
+      (`src/lib/ratings/prestigeRewards.js`): accents, avatar frame and
+      badge, console hub card styles. `supabase/prestige_rewards_2026_10.sql`
+      (owner-run, either order) adds prestige to handle search and the
+      invite preview.*
 24. `[~]` **Health-sync token hardened.** It was minted with
     `Date.now() + Math.random()` whenever `crypto.randomUUID` was
     missing — not a CSPRNG, so the token guarding health writes was

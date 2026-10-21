@@ -69,9 +69,9 @@ exports.handler = async (event) => {
   try {
     // created_at from the verified auth user floors and caps the day
     // keys the rating counts (see netlify/lib/recompute.js dayWindow).
-    const { ratings, computedAt, prestige } = await recomputeUser(
+    const { ratings, computedAt, prestige, baseline } = await recomputeUser(
       userId, { supabaseUrl, serviceKey }, { createdAt: user?.created_at || null });
-    return { statusCode: 200, headers: CORS, body: JSON.stringify({ ok: true, ratings, computedAt, prestige }) };
+    return { statusCode: 200, headers: CORS, body: JSON.stringify({ ok: true, ratings, computedAt, prestige, baseline }) };
   } catch (e) {
     console.error('recompute-ratings failed', e?.message);
     return { statusCode: 500, headers: CORS, body: JSON.stringify({ error: 'recompute failed' }) };
