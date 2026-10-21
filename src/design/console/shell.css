@@ -23,7 +23,8 @@
    bars. The drawn tab bar is 56 px of targets plus at least 28 px below
    them, more where the home indicator needs it (84 px with no inset). */
 html[data-design="console"] {
-  --cx-shell-side-w: 216px;
+  --cx-shell-side-w: 64px;        /* the rail the page makes room for */
+  --cx-shell-side-open-w: 216px;  /* widened over the page while in use */
   --cx-shell-top-h: 60px;
   --cx-shell-app-h: 52px;
   --cx-shell-tab-h: 56px;
@@ -32,9 +33,6 @@ html[data-design="console"] {
   --m-appbar-h: var(--cx-shell-app-h);
   /* classic adds --m-safe-bottom (the raw inset) to this, so subtract it */
   --m-tabs-h: calc(var(--cx-shell-tab-h) + var(--cx-shell-tab-pad) - env(safe-area-inset-bottom, 0px));
-}
-@media (max-width: 1100px) and (min-width: 769px) {
-  html[data-design="console"] { --cx-shell-side-w: 64px; }
 }
 
 /* Shared bits */
@@ -64,36 +62,54 @@ html[data-design="console"] .cx-shell-mi:focus-visible {
   outline-offset: 2px;
 }
 
-/* ── Desktop sidebar (216 px; a 64 px icon rail from 769 to 1100) ──
+/* ── Desktop sidebar: a 64 px icon rail that widens to 216 px while in use ──
+   Like classic's rail, it rests collapsed and opens OVER the page (the
+   page only ever makes room for the rail), so nothing underneath moves.
+   It opens on mouse hover (after a short delay, so sweeping the pointer
+   across it doesn't flash it open) and while a keyboard user is inside it
+   (:focus-visible, not :focus — a tap on a touch screen navigates and
+   leaves it collapsed). Icons keep the same x in both states.
    A div with role=navigation, not <nav>: classic styles the bare <nav>
    element (fixed, 56 px, widening on hover). */
 html[data-design="console"] .cx-shell-side {
   position: fixed; top: 0; left: 0; bottom: 0; z-index: 200;
   width: var(--cx-shell-side-w); box-sizing: border-box;
   display: flex; flex-direction: column; gap: 2px;
-  padding: var(--cx-sp-16) var(--cx-sp-12);
+  padding: var(--cx-sp-16) 10px;
   background: var(--cx-bg);
   border-right: 1px solid var(--cx-line);
   overflow-y: auto; overflow-x: hidden;
   font-family: var(--cx-sans);
+  transition: width var(--cx-dur) var(--cx-ease), box-shadow var(--cx-dur) var(--cx-ease);
 }
+@media (hover: hover) and (pointer: fine) {
+  html[data-design="console"] .cx-shell-side:hover { transition-delay: 90ms; }
+}
+html[data-design="console"] .cx-shell-side:is(:hover, :has(:focus-visible)) {
+  box-shadow: 12px 0 32px -12px rgba(0, 0, 0, .35);
+}
+@media (hover: hover) and (pointer: fine) {
+  html[data-design="console"] .cx-shell-side:hover { width: var(--cx-shell-side-open-w); }
+}
+html[data-design="console"] .cx-shell-side:has(:focus-visible) { width: var(--cx-shell-side-open-w); }
 html[data-design="console"] .cx-shell-brand {
   display: flex; align-items: center; gap: 10px;
-  padding: 4px 8px 20px;
+  padding: 4px 9px 20px; white-space: nowrap;
   font: 600 var(--cx-fs-17)/1 var(--cx-sans); letter-spacing: -0.01em;
   color: var(--cx-text);
 }
+/* The Vantage mark (components/Logo: the italic V with the gold bar, as on
+   the app icon and classic's sidebar), drawn in the user's accent. */
 html[data-design="console"] .cx-shell-logo {
-  flex: none; width: 26px; height: 26px; border-radius: var(--cx-r-chip);
-  display: grid; place-items: center;
-  background: var(--cx-accent-fill); color: var(--cx-on-accent);
-  font: 600 var(--cx-fs-15)/1 var(--cx-sans);
+  flex: none; width: 26px; height: 26px;
+  display: grid; place-items: center; overflow: visible;
 }
+html[data-design="console"] .cx-shell-logo svg { overflow: visible; }
 html[data-design="console"] .cx-shell-side-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2px; }
 html[data-design="console"] .cx-shell-ni {
   display: flex; align-items: center; gap: var(--cx-sp-12);
-  width: 100%; min-height: 40px; box-sizing: border-box;
-  padding: 0 10px; margin: 0;
+  width: 100%; min-height: 44px; box-sizing: border-box;
+  padding: 0 12px; margin: 0;
   border: 0; border-radius: var(--cx-r-cell);
   background: transparent; color: var(--cx-mid);
   font: 500 var(--cx-fs-15)/var(--cx-lh-15) var(--cx-sans);
@@ -105,14 +121,19 @@ html[data-design="console"] .cx-shell-ni.is-on { background: var(--cx-s2); color
 html[data-design="console"] .cx-shell-ni.is-on svg { color: var(--cx-accent); }
 html[data-design="console"] .cx-shell-ni-label { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 html[data-design="console"] .cx-shell-ni .cx-shell-kbd { margin-left: auto; }
-html[data-design="console"] .cx-shell-signout { margin-top: auto; }
-@media (max-width: 1100px) and (min-width: 769px) {
-  html[data-design="console"] .cx-shell-side { padding: var(--cx-sp-16) var(--cx-sp-8); align-items: center; }
-  html[data-design="console"] .cx-shell-brand { padding: 4px 0 20px; font-size: 0; gap: 0; }
-  html[data-design="console"] .cx-shell-ni { width: 44px; min-height: 44px; padding: 0; justify-content: center; }
-  html[data-design="console"] .cx-shell-ni-label,
-  html[data-design="console"] .cx-shell-ni .cx-shell-kbd { display: none; }
+/* Labels, hints and the wordmark show only while the rail is open. */
+html[data-design="console"] .cx-shell-ni-label,
+html[data-design="console"] .cx-shell-ni .cx-shell-kbd {
+  opacity: 0; transition: opacity var(--cx-dur-fast) var(--cx-ease);
 }
+html[data-design="console"] .cx-shell-brand { color: transparent; transition: color var(--cx-dur-fast) var(--cx-ease); }
+@media (hover: hover) and (pointer: fine) {
+  html[data-design="console"] .cx-shell-side:hover :is(.cx-shell-ni-label, .cx-shell-ni .cx-shell-kbd) { opacity: 1; transition-delay: 120ms; }
+  html[data-design="console"] .cx-shell-side:hover .cx-shell-brand { color: var(--cx-text); transition-delay: 120ms; }
+}
+html[data-design="console"] .cx-shell-side:has(:focus-visible) :is(.cx-shell-ni-label, .cx-shell-ni .cx-shell-kbd) { opacity: 1; }
+html[data-design="console"] .cx-shell-side:has(:focus-visible) .cx-shell-brand { color: var(--cx-text); }
+html[data-design="console"] .cx-shell-signout { margin-top: auto; }
 
 /* ── Desktop top bar (60 px) ── */
 html[data-design="console"] .cx-shell-top {

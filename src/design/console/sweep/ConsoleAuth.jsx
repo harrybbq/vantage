@@ -24,6 +24,7 @@
  * launch flip (README "Gotchas"); verified in a harness until then.
  */
 import { useCallback, useEffect, useState } from 'react';
+import Logo from '../../../components/Logo';
 import { supabase } from '../../../lib/supabase';
 import { withTimeout, friendlyAuthError } from '../../../utils/withTimeout';
 import { isNativeApp, webOrigin } from '../../../lib/native/platform';
@@ -140,7 +141,7 @@ export default function ConsoleAuth({ onOpenLegal, webInviteOnly = false }) {
     <div className="cx-sweep-auth" data-testid="cx-auth">
       <div className="cx-sweep-auth-col">
         <div className="cx-sweep-auth-brand">
-          <span className="cx-sweep-auth-mark" aria-hidden="true">V</span>
+          <span className="cx-sweep-auth-mark" aria-hidden="true"><Logo size={36} c="var(--cx-accent)" c2="var(--cx-gold)" /></span>
           <span className="cx-sweep-auth-word">Vantage</span>
         </div>
 

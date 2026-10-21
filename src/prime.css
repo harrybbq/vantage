@@ -313,6 +313,17 @@ html[data-theme="dark-os"] {
   color: #fff;
   font-size: var(--fs-floor); line-height: 11px; text-align: center;
 }
+/* A tickable box (the Trackers card's Today list): same look, but a real
+   button with a thumb-sized hit area that does not change the layout. */
+.pv-tick-btn {
+  position: relative; padding: 0; margin: 0; cursor: pointer;
+  font-family: inherit; appearance: none; -webkit-appearance: none;
+  transition: background-color .12s ease, border-color .12s ease;
+}
+.pv-tick-btn::before { content: ''; position: absolute; inset: -12px -10px; }
+.pv-tick-btn:hover { border-color: var(--em-text, #2fbf83) !important; }
+.pv-tick-btn:focus-visible { outline: 2px solid var(--em-text, #2fbf83); outline-offset: 2px; }
+.pv-tick-btn:active { transform: none; }
 
 .pv-heat-head { flex: none; height: 22px; display: flex; align-items: center; }
 .pv-heat-day {

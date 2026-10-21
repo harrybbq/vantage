@@ -299,7 +299,8 @@ const trackerBlocks = {
     const rows = list.slice(0, 8).map(t => {
       const d = done(t);
       const v = t.type === 'boolean' ? '' : `${t.unit === '£' ? '£' : ''}${Number(today[t.id]) || 0}${t.unit && t.unit !== '£' ? t.unit : ''}`;
-      return { n: t.name || 'Tracker', v, ck: d ? '✓' : '',
+      return { n: t.name || 'Tracker', v, ck: d ? '✓' : '', done: d,
+               act: t.type === 'boolean' ? { kind: 'tick', trackerId: t.id, name: t.name || 'Tracker' } : null,
                bg: d ? '#2fbf83' : 'transparent', bd: d ? '#2fbf83' : 'var(--border)',
                fg: d ? 'var(--text-mid)' : 'var(--text)' };
     });

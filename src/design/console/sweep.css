@@ -437,10 +437,8 @@ html[data-design="console"] .cx-sweep-auth-col {
   }
 }
 html[data-design="console"] .cx-sweep-auth-brand { display: flex; align-items: center; gap: 10px; }
-html[data-design="console"] .cx-sweep-auth-mark {
-  display: grid; place-items: center; width: 32px; height: 32px; border-radius: var(--cx-r-cell);
-  background: var(--cx-accent-fill); color: var(--cx-on-accent); font: 600 var(--cx-fs-17)/1 var(--cx-sans);
-}
+html[data-design="console"] .cx-sweep-auth-mark { display: grid; place-items: center; width: 32px; height: 32px; }
+html[data-design="console"] .cx-sweep-auth-mark svg { overflow: visible; }
 html[data-design="console"] .cx-sweep-auth-word { font: 600 var(--cx-fs-17)/var(--cx-lh-17) var(--cx-sans); }
 html[data-design="console"] .cx-sweep-auth-titles { display: flex; flex-direction: column; gap: var(--cx-sp-8); }
 html[data-design="console"] .cx-sweep-auth-titles p { margin: 0; }
