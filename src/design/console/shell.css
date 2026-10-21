@@ -98,12 +98,13 @@ html[data-design="console"] .cx-shell-brand {
   font: 600 var(--cx-fs-17)/1 var(--cx-sans); letter-spacing: -0.01em;
   color: var(--cx-text);
 }
+/* The Vantage mark (components/Logo: the italic V with the gold bar, as on
+   the app icon and classic's sidebar), drawn in the user's accent. */
 html[data-design="console"] .cx-shell-logo {
-  flex: none; width: 26px; height: 26px; border-radius: var(--cx-r-chip);
-  display: grid; place-items: center;
-  background: var(--cx-accent-fill); color: var(--cx-on-accent);
-  font: 600 var(--cx-fs-15)/1 var(--cx-sans);
+  flex: none; width: 26px; height: 26px;
+  display: grid; place-items: center; overflow: visible;
 }
+html[data-design="console"] .cx-shell-logo svg { overflow: visible; }
 html[data-design="console"] .cx-shell-side-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2px; }
 html[data-design="console"] .cx-shell-ni {
   display: flex; align-items: center; gap: var(--cx-sp-12);

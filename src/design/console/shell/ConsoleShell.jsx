@@ -14,6 +14,7 @@
  */
 import { useState } from 'react';
 import Icon from '../../../components/Icon';
+import Logo from '../../../components/Logo';
 import { Sheet } from '../ui';
 import { haptic } from '../../../hooks/useCapacitor';
 import { usePendingCount } from '../../../lib/friends/usePendingCount';
@@ -88,7 +89,7 @@ function Sidebar({ section, isOwner, navigate, onSignOut }) {
   const lit = navSection(section);
   return (
     <div className="cx-shell-side" role="navigation" aria-label="Main" data-shell-nav="side">
-      <div className="cx-shell-brand"><span className="cx-shell-logo" aria-hidden="true">V</span>Vantage</div>
+      <div className="cx-shell-brand"><span className="cx-shell-logo" aria-hidden="true"><Logo size={30} c="var(--cx-accent)" c2="var(--cx-gold)" /></span>Vantage</div>
       <ul className="cx-shell-side-list">
         {items.map(it => {
           const on = lit === it.id;
