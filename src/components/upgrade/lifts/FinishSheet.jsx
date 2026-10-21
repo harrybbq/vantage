@@ -26,10 +26,12 @@
  * itself is written by useAutomations, never here.
  *
  * Under the tiles, the body map (BodyMap): where the sets went, each
- * muscle filled by the share of its session target that was done.
+ * muscle filled by the share of its session target that was done — or,
+ * on its This week tab, of the week's target, this workout included.
  *
  * Props: summary (summariseWorkout), saved, templateSaved, gymLabel, lifts
- * (the lift list, for the body map's muscle tags),
+ * (the lift list, for the body map's muscle tags), S + today (the body
+ * map's This week tab: the rota block's tally with this workout in it),
  * gymName(id), onSave, onKeepGoing, onDiscard, onSaveTemplate(name, { update }),
  * onClose, trackers, linked (trackers on a lifts/workout rule), dayLog
  * (S.logs for the workout's day), onLinkTracker(id).
@@ -44,7 +46,7 @@ import BodyMap from './BodyMap';
 
 export default function FinishSheet({
   summary, saved, onSave, onKeepGoing, onDiscard, onSaveTemplate, onClose, templateSaved, gymLabel = null,
-  trackers = [], linked = [], dayLog = {}, onLinkTracker = null, lifts = [],
+  trackers = [], linked = [], dayLog = {}, onLinkTracker = null, lifts = [], S = null, today = null,
 }) {
   const [name, setName] = useState(summary ? summary.session.name : '');
   // The likeliest "gym" tracker first; the owner can pick any other.
@@ -91,7 +93,7 @@ export default function FinishSheet({
           <div><dt>Exercises</dt><dd>{summary.exercises}</dd></div>
         </dl>
 
-        {!nothing && <BodyMap session={s} list={lifts} />}
+        {!nothing && <BodyMap session={s} list={lifts} S={S} today={today} />}
 
         {summary.pbs.length > 0 ? (
           <section className="lw-fin-pbs" aria-label="New personal bests — real sets">

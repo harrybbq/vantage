@@ -24,10 +24,18 @@
  * A muscle the session does not ask for, or a workout that is not one of
  * the five sessions, is measured against the most any session asks of
  * that muscle — the most the programme ever wants of it in one go.
+ *
+ * ── Parts ("All muscles") ────────────────────────────────────────────
+ * bodyMapParts is the same measure by muscle PART (adaptive.js PARTS:
+ * upper chest, side delts, triceps long head …): a set credits the
+ * parts its lift works (partsOf, already weighted), against what the
+ * session asks of each part (sessionParts), else the most any session
+ * asks of it.
  */
 import { PROGRAMME } from '../../data/trainingProgramme.js';
 import { musclesOf, PROGRAMME_MUSCLES, MUSCLES } from './muscles.js';
 import { sessionOfWorkout } from './plan.js';
+import { PARTS, partsOf, sessionParts } from './adaptive.js';
 
 const SECONDARY = 0.5;
 /** Muscles the figure draws. 'Other' has nowhere to go. */
@@ -86,4 +94,43 @@ export function bodyMap(w, list = []) {
     return { muscle, done: round1(done), target: round1(target), ratio, planned };
   });
   return { session, muscles };
+}
+
+/** The most any session asks of each part → { [part]: sets }. */
+export const PEAK_PARTS = (() => {
+  const out = {};
+  for (const code of Object.keys(PROGRAMME)) {
+    for (const [p, n] of Object.entries(sessionParts(code))) out[p] = Math.max(out[p] || 0, n);
+  }
+  return out;
+})();
+
+/** Working sets a workout put into each muscle part → { [part]: sets }. */
+export function workoutPartLoad(w, list = []) {
+  const out = {};
+  for (const ex of (w && w.exercises) || []) {
+    const lift = list.find(l => l && l.id === ex.liftId) || (ex.name ? { name: ex.name } : null);
+    const n = (ex.sets || []).filter(s => s && s.done !== false && s.type !== 'W').length;
+    if (!n) continue;
+    for (const [p, wt] of Object.entries(partsOf(lift))) out[p] = (out[p] || 0) + wt * n;
+  }
+  return out;
+}
+
+/**
+ * → { session, parts: [{ part, group, done, target, ratio, planned }] } —
+ * bodyMap by muscle part, one row per part (PARTS order).
+ */
+export function bodyMapParts(w, list = []) {
+  const session = sessionOfWorkout(w, list);
+  const targets = session ? sessionParts(session) : {};
+  const load = workoutPartLoad(w, list);
+  const parts = PARTS.map(([part, group]) => {
+    const planned = (targets[part] || 0) > 0;
+    const target = planned ? targets[part] : (PEAK_PARTS[part] || 0);
+    const done = load[part] || 0;
+    const ratio = target > 0 ? Math.min(1, done / target) : done > 0 ? 1 : 0;
+    return { part, group, done: round1(done), target: round1(target), ratio, planned };
+  });
+  return { session, parts };
 }

@@ -457,6 +457,22 @@ html[data-lifts-focus] .lifts .lw-head { top: env(safe-area-inset-top, 0px); }
 .lifts .lw-body-bar i { display: block; height: 100%; border-radius: 3px; background: var(--lf-accent); }
 .lifts .lw-body-rows li.is-extra { color: var(--lf-mid); }
 .lifts .lw-body-rows li.is-extra .lw-body-bar i { background: var(--lf-line-strong); }
+/* This workout | This week tabs + the All muscles switch: one row on a dialog, stacked on a phone. */
+.lifts .lw-body-ctl { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; }
+.lifts .lw-body-tabs { flex: 1 1 230px; display: flex; }
+.lifts .lw-body-tabs > button { flex: 1 1 0; }
+.lifts .lw-body-switch { flex: 0 0 auto; min-height: 44px; padding: 0; border-bottom: 0; gap: 10px; }
+.lifts .lw-body-switch .lw-switch-text b { font-size: 14px; font-weight: 500; color: var(--lf-mid); white-space: nowrap; }
+.lifts .lw-body-ctl:has(.lw-body-tabs) .lw-body-switch { margin-left: auto; }
+.lifts .lw-body-panel { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+.lifts .lw-body-note { margin: 0; padding: 8px 10px; border-radius: var(--lf-r-cell); border: 1px solid color-mix(in srgb, var(--lf-pb) 45%, transparent);
+  background: var(--lf-pb-tint); color: var(--lf-pb); font-size: var(--lf-fs-meta); line-height: 18px; }
+/* All muscles: parts under their group's heading. */
+.lifts .lw-body-rows.is-parts > li.lw-body-grp { display: block; min-height: 0; }
+.lifts .lw-body-rows.is-parts > li.lw-body-grp + li.lw-body-grp { border-top: 1px solid var(--lf-line); }
+.lifts .lw-body-grph { display: block; padding: 8px 0 2px; font-family: var(--lf-mono); font-size: var(--lf-fs-floor); line-height: 16px; letter-spacing: .06em;
+  text-transform: uppercase; color: var(--lf-muted); }
+.lifts .lw-body-rows.is-parts .lw-body-rows li { grid-template-columns: minmax(136px, 1.3fr) minmax(0, 1fr) 92px; min-height: 28px; }
 @media (prefers-reduced-motion: reduce) { .lifts .lw-body-fill { transition: none; } }
 .lifts .lw-fin-pbs { padding: 10px 12px; border-radius: var(--lf-r-cell); border: 1px solid var(--lf-pb); background: var(--lf-pb-tint); }
 .lifts .lw-fin-pbh { margin: 0 0 4px; font-family: var(--lf-mono); font-size: var(--lf-fs-floor); letter-spacing: .06em; text-transform: uppercase; color: var(--lf-pb); font-weight: 600; }

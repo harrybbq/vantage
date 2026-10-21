@@ -273,7 +273,7 @@ export default function LiftsTab({ S, update, hydrated = true }) {
                          onDeleteTemplate={id => update(prev => deleteTemplate(prev, id))} />
       )}
       {finish && (
-        <FinishSheet summary={finish.summary} saved={finish.saved} templateSaved={finish.templateSaved} lifts={lifts.list}
+        <FinishSheet summary={finish.summary} saved={finish.saved} templateSaved={finish.templateSaved} lifts={lifts.list} S={S} today={today}
                      gymLabel={finish.summary.session.gym ? gymName(finish.summary.session.gym) : null}
                      trackers={S.trackers || []} linked={liftsLinkedTrackers(S)}
                      dayLog={(S.logs || {})[finish.summary.session.date] || {}}
