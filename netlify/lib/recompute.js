@@ -44,7 +44,8 @@ const CURVE = 0.75;
 const CATEGORIES = ['brain', 'finance', 'fitness', 'social'];
 function toRating(points, full) {
   if (!Number.isFinite(points) || points <= 0) return 1;
-  return clamp(1 + 98 * Math.pow(Math.min(1, points / full), CURVE));
+  // Rounded down: 99 only when the bar is full (mirrors derive.js).
+  return clamp(Math.floor(1 + 98 * Math.pow(Math.min(1, points / full), CURVE)));
 }
 
 /* ── Which day keys count (mirror of derive.js) ──────────────────────

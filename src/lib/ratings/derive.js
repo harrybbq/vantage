@@ -117,9 +117,11 @@ const BREADTH_WEIGHTS = [1, 0.5, 0.35, 0.25];
 const PILLAR_FULL = OVR_FULL / BREADTH_WEIGHTS.reduce((a, b) => a + b, 0);
 const CURVE = 0.75;
 
+// Rounded DOWN, so 99 means the bar is full — every point of the climb
+// earned — and never "nearly full, rounded up". Prestige unlocks there.
 function toRating(points, full) {
   if (!Number.isFinite(points) || points <= 0) return 1;
-  return clamp(1 + 98 * Math.pow(Math.min(1, points / full), CURVE));
+  return clamp(Math.floor(1 + 98 * Math.pow(Math.min(1, points / full), CURVE)));
 }
 
 // ── Which day keys count (mirror of netlify/lib/recompute.js) ─────────────
@@ -513,11 +515,9 @@ export function deriveRatings(rawS, ctx = {}) {
   };
 }
 
-/** How many more OVR points this climb needs before it reads 99 —
- *  where the rounded rating reaches 99, a hair short of OVR_FULL. */
-const PRESTIGE_AT = OVR_FULL * Math.pow(97.5 / 98, 1 / CURVE);
+/** How many more OVR points this climb needs before it reads 99 (full). */
 export function pointsToPrestige(pts, baseline = {}) {
-  return Math.max(0, PRESTIGE_AT - ovrPoints(climbPoints(pts, baseline)));
+  return Math.max(0, OVR_FULL - ovrPoints(climbPoints(pts, baseline)));
 }
 
 /** What one more point in `category` is worth toward OVR right now. */
