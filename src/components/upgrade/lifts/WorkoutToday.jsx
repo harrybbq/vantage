@@ -16,6 +16,14 @@
  *   night         after a night shift's midnight `nightOf` makes the eyebrow
  *                 "Counts for Tuesday's night shift" (lib/rotation/trainingDay.js)
  *
+ * Adaptive (lib/lifts/adaptive.js, owner 2026-10-21): Upper / Lower are
+ * built from what the week still owes, and each preview row carries its
+ * tags — the part it serves ("side delts 4 / 9"), a gold "+1 Push" for a
+ * missed anchor's catch-up, a red "≤ RPE 7" on a WHOOP-red anchor (old set
+ * count struck through). Chips: WHOOP readiness when synced, the catch-up;
+ * a below-standard note under a catch-up; a red box on a red day. The
+ * stretch block is adaptStretches' ("tuned for this week", "· added").
+ *
  * The session is the PLAN's (lib/lifts/plan.js — the rota, the owner's
  * Rotation edits, what was trained); nothing here writes to the rota. The
  * gym switch writes S.lifts.lastGym. Build my own calls `onBuild` (LiftsTab
@@ -31,7 +39,8 @@ import WeekStrip from './WeekStrip';
 import { suggestWorkout, minutesText, elapsedSec } from '../../../lib/lifts/workout';
 import { blockPips, nextTraining, lastSessionSummary, dowOf } from '../../../lib/lifts/home';
 import { perGymOf, perGymByName, fmtKg } from '../../../lib/lifts/lifts';
-import { STRETCH_GOAL, stretchesFor } from '../../../data/trainingProgramme';
+import { adaptStretches } from '../../../lib/lifts/adaptive';
+import { STRETCH_GOAL, STRETCHES } from '../../../data/trainingProgramme';
 
 const DOW = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 const MON = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
@@ -48,7 +57,10 @@ export default function WorkoutToday({
   const pips = useMemo(() => blockPips(S, today), [S, today]);
   const next = useMemo(() => (sug.restDay ? nextTraining(S, today) : null), [S, today, sug.restDay]);
   const last = useMemo(() => (desktop ? lastSessionSummary(S, { today }) : null), [S, today, desktop]);
-  const stretches = stretchesFor(sug.restDay ? 'Rest' : sug.rotaSession);
+  const stretches = useMemo(() => adaptStretches(S, today, sug.restDay ? 'Rest' : sug.rotaSession, STRETCHES), [S, today, sug.restDay, sug.rotaSession]);
+  const ad = sug.adaptive || null;
+  const ready = ad && ad.readiness;
+  const red = !!(ad && ad.red);
   const [all, setAll] = useState(false);
 
   const noProgramme = !sug.label && !sug.plan;
@@ -57,6 +69,11 @@ export default function WorkoutToday({
   const eyebrow = nightOf ? `// Counts for ${dowLong(nightOf)}'s night shift` : `// Today · ${dayTitle(today)}${shiftWord ? ` · ${shiftWord}` : ''}`;
   // The eyebrow already carries "Night 1": the reason line starts at the why.
   const reason = shiftWord && sug.reason.startsWith(`${shiftWord} · `) ? sug.reason.slice(shiftWord.length + 3) : sug.reason;
+  // Adaptive (lib/lifts/adaptive.js): the catch-up sentence, else the plan's move, else what the build is for.
+  const catchNote = ad && ad.catchUp.length && !red ? ad.notes.find(x => / missed this week/.test(x)) : null;
+  const builtNote = ad && ad.built && !red ? ad.notes.find(x => x.startsWith('Built for this week')) : null;
+  const whyLine = catchNote || (sug.plan && sug.plan.source === 'dynamic' ? null : builtNote) || null;
+  const notCarried = ad && ad.catchUp.length ? Math.max(0, ad.missedSets - ad.catchUpSets) : 0;
   const title = noProgramme ? 'No programme yet' : sug.restDay && !sug.plan?.done?.length ? 'Rest day' : sug.name;
   const restLine = sug.restDay && next ? `Rest day — next: ${next.session} ${next.word}` : null;
   const showGym = gyms.length > 1;
@@ -76,10 +93,20 @@ export default function WorkoutToday({
       </div>
       <p className="lh-sug-why" data-testid="wk-reason">
         {sug.plan && sug.plan.source === 'dynamic' && <span className="lh-moved" title="Moved by the plan"><Icon name="repeat" size={12} /> </span>}
-        {noProgramme ? 'Today sits outside your rota pattern. Build your own workout, or log a set.' : restLine || reason}
+        {noProgramme ? 'Today sits outside your rota pattern. Build your own workout, or log a set.' : restLine || whyLine || reason}
       </p>
-      {(sug.night || (showGym && training)) && (
+      {training && red && ready && (
+        <p className="lh-redbox" data-testid="wk-redbox">
+          <b>WHOOP recovery {ready.score}% · red.</b>{' '}
+          {ad.built ? 'Trimmed to what twice-a-week needs — two sets for each muscle still short of its second session.'
+            : `Same exercises, one set fewer each, and keep every set to about RPE ${sug.exercises.find(x => x.rpeCap)?.rpeCap || 7}. ${sug.name} still counts as done for the week.`}
+        </p>
+      )}
+      {(sug.night || (showGym && training) || (training && (ready || (ad && ad.catchUpSets > 0)))) && (
         <div className="lh-chiprow">
+          {training && ready && !red && <span className={`lh-chip is-${ready.band}`} data-testid="wk-ready">WHOOP {ready.score}% · {ready.band}</span>}
+          {training && red && <span className="lh-chip is-red" data-testid="wk-ready">red · {ad.built ? 'twice-a-week only' : '−1 set per exercise'}</span>}
+          {training && ad && ad.catchUpSets > 0 && <span className="lh-chip is-plus" data-testid="wk-catchup">+{ad.catchUpSets} sets · {ad.catchUp.join(' + ')} catch-up</span>}
           {sug.night && <NightChip className="lh-nightchip" />}
           {showGym && training && <GymSwitch gyms={gyms} value={gym} onChange={onGym} label="Gym for this workout" testId="wk-gym" />}
         </div>
@@ -90,14 +117,23 @@ export default function WorkoutToday({
           <ol className="lh-preview" data-testid="wk-preview">
             {preview.map(x => {
               const w = x.weight != null ? `${sug.night ? '☾ ' : ''}${fmtKg(x.weight)} kg` : null;
+              const tags = x.tags || [];
               return (
                 <li key={x.liftKey}>
-                  <span className="lh-preview-n">{x.name}{x.optional && <em> · optional</em>}</span>
-                  {isMachine(x) && gymLbl && <span className="lh-gymtag">{gymLbl}</span>}
-                  <span className="lh-preview-t lf-num">
-                    {x.sets} × {x.reps}
-                    {w && <span className={`lh-preview-w${sug.night ? ' is-night' : ''}`}>{w}</span>}
-                  </span>
+                  <div className="lh-preview-row">
+                    <span className="lh-preview-n">{x.name}{x.optional && <em> · optional</em>}</span>
+                    {isMachine(x) && gymLbl && <span className="lh-gymtag">{gymLbl}</span>}
+                    <span className="lh-preview-t lf-num">
+                      <span>{x.setsWas != null && <><del className="lh-was" aria-label={`was ${x.setsWas}`}>{x.setsWas}</del> </>}{x.sets} × {x.reps}</span>
+                      {w && <span className={`lh-preview-w${sug.night ? ' is-night' : ''}`}>{w}</span>}
+                    </span>
+                  </div>
+                  {(tags.length > 0 || x.why) && (
+                    <div className="lh-preview-tags" data-testid="wk-tags">
+                      {tags.map(tg => <span key={tg.text} className={`lh-tag is-${tg.kind}`}>{tg.text}</span>)}
+                      {x.why && <span className="lh-preview-why">{x.why}</span>}
+                    </div>
+                  )}
                 </li>
               );
             })}
@@ -108,9 +144,14 @@ export default function WorkoutToday({
           {all && !desktop && sug.exercises.length > 4 && (
             <button type="button" className="lh-rowbtn" onClick={() => setAll(false)}>Show fewer</button>
           )}
+          {notCarried > 0 && (
+            <p className="lh-warn" data-testid="wk-below">
+              This week will finish below standard: {ad.catchUp.join(' and ')}’s other {notCarried} sets aren’t carried.
+            </p>
+          )}
         </>
       )}
-      {!desktop && <Stretches stretches={stretches} rest={sug.restDay} folded />}
+      {!desktop && <Stretches stretches={stretches} rest={sug.restDay} red={red} folded />}
       <div className="lh-sug-acts">
         {training && (
           active
@@ -135,20 +176,24 @@ export default function WorkoutToday({
       </div>
       <div className="lh-today-side">
         <WeekStrip S={S} today={today} gymName={gymName} className="lh-card" />
-        {desktop && <Stretches stretches={stretches} rest={sug.restDay} />}
+        {desktop && <Stretches stretches={stretches} rest={sug.restDay} red={red} />}
         {desktop && last && <LastSession last={last} gymName={gymName} />}
       </div>
     </div>
   );
 }
 
-/** BLOCK ▮▮▮▯▯ 3 of 5 · P P L U L — done accent, today outlined, missed muted with a carry arrow. */
+/**
+ * WEEK ▮▮▮▯▯ 3 of 5 · P P L U L — done accent, today outlined, missed hatched
+ * (an anchor accepted as missed; a missed Upper / Lower adds a carry arrow).
+ * The week is one rota block (lib/lifts/plan.js).
+ */
 function BlockPips({ bp }) {
-  const words = { done: 'done', today: 'today', missed: 'missed, carried forward', todo: 'to do' };
-  const aria = `Block: ${bp.done} of ${bp.total} done — ${bp.pips.map(p => `${p.code} ${words[p.state]}`).join(', ')}`;
+  const words = p => (p.state === 'missed' ? (p.carried ? 'missed, carried forward' : 'missed') : { done: 'done', today: 'today', todo: 'to do' }[p.state]);
+  const aria = `This week: ${bp.done} of ${bp.total} done — ${bp.pips.map(p => `${p.code} ${words(p)}`).join(', ')}`;
   return (
     <div className="lh-pips" role="img" aria-label={aria} data-testid="wk-block">
-      <span className="lh-pips-lbl" aria-hidden="true">Block</span>
+      <span className="lh-pips-lbl" aria-hidden="true">Week</span>
       <span className="lh-pips-bar" aria-hidden="true">
         {bp.pips.map(p => <i key={p.code} className={`lh-pip is-${p.state}`} />)}
       </span>
@@ -206,16 +251,21 @@ function ResumeBanner({ active, now, gymName, onResume, onDiscard }) {
  * session's stretches, or a rest day's mobility flow. Folded under the
  * preview on a phone; expanded in the right column on desktop.
  */
-function Stretches({ stretches, rest, folded = false }) {
+function Stretches({ stretches, rest, red = false, folded = false }) {
   const head = `${rest ? 'Mobility for a rest day' : 'Stretch after'} · ${stretches.length} moves`;
+  // adaptStretches (lib/lifts/adaptive.js) marks what it added for this week.
+  const tuned = stretches.some(st => st.added) ? (red && stretches.some(st => st.added === 'red day') ? 'longer flow on a red day' : 'tuned for this week') : null;
   const body = (
     <>
       <p className="lf-meta lh-stretch-goal">{STRETCH_GOAL}</p>
       <ul className="lh-stretch-list">
         {stretches.map(st => (
-          <li key={st.name}>
-            <div className="lh-stretch-top"><span>{st.name}</span><span className="lh-stretch-hold lf-num">{st.hold}</span></div>
-            <p className="lf-meta">{st.why}</p>
+          <li key={st.name} className={st.added ? 'is-added' : undefined}>
+            <div className="lh-stretch-top">
+              <span>{st.name}{st.added && <span className="lh-stretch-add"> · added</span>}</span>
+              <span className="lh-stretch-hold lf-num">{st.hold}</span>
+            </div>
+            <p className="lf-meta">{st.added && <span className="lh-stretch-addwhy">{st.added[0].toUpperCase() + st.added.slice(1)}. </span>}{st.why}</p>
           </li>
         ))}
       </ul>
@@ -224,14 +274,14 @@ function Stretches({ stretches, rest, folded = false }) {
   if (folded) {
     return (
       <details className="lh-stretch" data-testid="wk-stretch">
-        <summary><Icon name="chevron-right" size={16} className="lh-stretch-chev" /><span>{head}</span></summary>
+        <summary><Icon name="chevron-right" size={16} className="lh-stretch-chev" /><span>{head}{tuned && <small className="lh-stretch-tuned"> · {tuned}</small>}</span></summary>
         {body}
       </details>
     );
   }
   return (
     <section className="lh-card lh-stretch is-open" data-testid="wk-stretch">
-      <p className="lf-eyebrow">// {head}</p>
+      <p className="lf-eyebrow">// {head}{tuned && <span className="lh-stretch-tuned"> · {tuned}</span>}</p>
       {body}
     </section>
   );

@@ -515,7 +515,7 @@ export function buildAdaptive(S, today, session) {
     if (red) return 2;
     const top = prio(c.main) > 1.25 ? 5 : 4;
     const want = Math.ceil((need[c.main] || 0) / (c.parts[c.main] || 1) - SLACK);
-    return Math.max(2, Math.min(top, want, PER_SESSION_CAP - (load[c.main] || 0)));
+    return Math.max(2, Math.min(top, want, Math.floor(PER_SESSION_CAP - (load[c.main] || 0) + 1e-9)));
   };
 
   // 1. Twice a week first: each group short of its second hit gets an exercise.

@@ -410,7 +410,10 @@ t('(e) weekTargets: memoised; ~400 sessions of history stays fast', () => {
   const sug = suggestWorkout({ ...S, lifts: { ...S.lifts, sessions: [...sessions, W(B.push, 'Push'), W(B.pull, 'Pull'), W(B.legs, 'Legs')] } }, B.upper);
   const full = performance.now() - t2;
   assert.equal(sug.name, 'Upper');
-  assert.ok(full < 150, `suggestWorkout cold with 400 sessions: ${full.toFixed(1)} ms`);
+  // Months at 100 % have raised targets (half-set parts included): sets stay whole.
+  const lower = buildAdaptive({ ...S, lifts: { ...S.lifts, sessions: [...sessions, ...block(B.push).slice(0, 4)] } }, B.lower, 'Lower');
+  for (const r of [sug, lower]) for (const x of r.exercises) assert.ok(Number.isInteger(x.sets) && x.sets >= 2, `${x.name}: ${x.sets} sets`);
+  assert.ok(full < 150,`suggestWorkout cold with 400 sessions: ${full.toFixed(1)} ms`);
 });
 
 // ── (f) Stretches ─────────────────────────────────────────────────
