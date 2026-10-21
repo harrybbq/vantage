@@ -1,6 +1,8 @@
 /**
- * Vision definitions — system-tracked milestones that grant XP toward
- * the displayed Level. Each definition is a pure { check(S) → bool }
+ * Vision definitions — system-tracked milestones, shown to users as
+ * "Honours". Each one's `xp` is a WEIGHT for the ratings (lib/ratings/
+ * derive.js, mirrored in netlify/lib/visionXp.js); it is never shown,
+ * and there is no Level any more (retired 2026-10). Each definition is a pure { check(S) → bool }
  * predicate; the visions runtime stamps `unlockedAt` the first time a
  * predicate flips true and never un-stamps after.
  *
@@ -13,17 +15,14 @@
  * Adding a new vision:
  *   1. Append a stable `id` (used as the key in S.visions — DO NOT
  *      rename existing IDs or users will lose unlocks).
- *   2. Pick an XP value that scales with effort (see XP curve below).
+ *   2. Pick an xp weight that scales with effort (see scale below), then
+ *      run `npm run check:visions` for the server mirror line.
  *   3. Write a pure check(S) — must not throw on missing fields.
  *
  * XP scale (rough):
  *    50  — first nudge ("you've started")
  *   200  — committed (a few weeks of effort)
  *   500  — long-haul (multi-month)
- *
- * User-created achievement completions also drip a small amount of
- * XP per completion via derive.js — that's intentional so people who
- * mostly use the board view still see their level move.
  */
 import { habitElapsed } from '../habits/progress.js';
 

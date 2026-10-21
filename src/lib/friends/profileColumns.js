@@ -13,7 +13,8 @@
  *   handle        search results, friend list, requests, inbox, invites
  *   display_name  the same surfaces
  *   avatar_url    the same surfaces (screened server-side, item 84)
- *   level         friend list / requests (cosmetic, client-written)
+ *   level         retired 2026-10 (no longer written or selected; the
+ *                 grant stays so an older client's select still works)
  *   ratings_ovr   the OVR chip on the friend list, requests and search
  *   suspended_at  the inbox's "Account suspended" note — already shown
  *                 to anyone who has a thread with that account
@@ -36,12 +37,12 @@ export const PUBLIC_PROFILE_COLUMNS = Object.freeze([
 ]);
 
 /** The friend-list / requests column set. */
-export const PUBLIC_PROFILE_SELECT = 'id, handle, display_name, avatar_url, level, ratings_ovr';
+export const PUBLIC_PROFILE_SELECT = 'id, handle, display_name, avatar_url, ratings_ovr';
 
 /** What a write through PostgREST may ask back (RETURNING needs SELECT
  *  on every column it names, so `.select()` with no argument — `*` —
  *  would fail the whole UPDATE once the grants are narrowed). */
-export const OWN_WRITE_RETURNING = 'id, handle, display_name, avatar_url, level';
+export const OWN_WRITE_RETURNING = 'id, handle, display_name, avatar_url';
 
 /*
  * LEGACY fallbacks — used ONLY when the RPC that replaces them is

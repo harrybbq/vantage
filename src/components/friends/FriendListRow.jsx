@@ -22,6 +22,7 @@
  */
 import Icon from '../Icon';
 import { ovrTier } from '../../lib/ratings/tiers';
+import { frameProps } from '../PrestigeFrame';
 
 const COLORS = ['#1a7a4a', '#2563eb', '#7c3aed', '#c2410c', '#0891b2', '#be185d', '#854d0e'];
 
@@ -66,7 +67,7 @@ export default function FriendListRow({ friend, selected, onClick, onMessage }) 
       onClick={onClick}
       onKeyDown={onKeyDown}
     >
-      <div className="fc-row-avatar-wrap">
+      <div {...frameProps(friend.prestige, 'fc-row-avatar-wrap')}>
         {friend.avatar_url ? (
           <img
             className="fc-row-avatar fc-row-avatar-img"

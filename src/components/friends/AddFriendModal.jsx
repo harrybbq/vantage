@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import Overlay from '../ui/Overlay';
 import InviteLinkSection from './InviteLinkSection';
+import PrestigeBadge from '../PrestigeBadge';
 
 /**
  * Invite link first (InviteLinkSection — the way a new user with no
@@ -153,6 +154,7 @@ export default function AddFriendModal({
                     <div className="add-friend-result-info">
                       <div className="add-friend-result-name">
                         {profile.display_name || `@${profile.handle}`}
+                        {profile.prestige > 0 && <> <PrestigeBadge prestige={profile.prestige} size="sm" /></>}
                       </div>
                       <div className="add-friend-result-meta">
                         @{profile.handle} · OVR {profile.ratings_ovr || 1}

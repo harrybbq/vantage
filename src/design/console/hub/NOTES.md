@@ -18,3 +18,9 @@ changes needed in files this area does not own (see ../README.md §7).
 - Player strip carries `data-cx-tour="hub"` (the tour's hub stop rings it).
 - HubFooter: gone under console (App.jsx gates it); resolved.
 - Phone drag auto-scroll: the console bars are `.cx-shell-appbar` / `.cx-shell-tabs`, which the fallback already matches (classic `.m-*` bars are not mounted under console). Verified: holding a dragged cell over the tab bar scrolls the page.
+
+## Prestige rewards (2026-10-21)
+
+- Level/XP retired: the player strip's second column is now Prestige (OVR to the next prestige, a bar of OVR/99, the next reward); it and the prestige chip open `PrestigeRewards.jsx` (the rewards sheet). Data: `lib/ratings/prestigeRewards.js`.
+- `Avatar` takes `prestige` (ring from `frameAttrs`, styles in `components/prestige-frame.css`, shared with classic); `Diamonds` is solid from Prestige VII. DivisionTable passes `rows[].prestige` to both.
+- Hub card styles: `S.cardStyle` (additive, `withCardStyle`), drawn as `data-cx-card` on `.cx-hub` (hub.css). `CardStylePicker` is also mounted in SWEEP's Settings › Appearance.

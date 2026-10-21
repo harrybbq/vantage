@@ -33,7 +33,7 @@ import { markTermsAcceptedPending } from '../../../components/TermsAcceptanceShe
 import { Button, Checkbox } from '../ui';
 
 const COPY = {
-  login: { title: 'Sign in', sub: 'Your level, ratings and hub are where you left them.', submit: 'Sign in' },
+  login: { title: 'Sign in', sub: 'Your ratings, prestige and hub are where you left them.', submit: 'Sign in' },
   signup: { title: 'Create your account', sub: 'Free, with both themes and every core feature.', submit: 'Create account' },
   reset: { title: 'Reset your password', sub: "We'll email you a link to set a new one.", submit: 'Send reset link' },
 };

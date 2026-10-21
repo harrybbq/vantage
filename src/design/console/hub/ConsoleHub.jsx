@@ -2,7 +2,8 @@
  * The console hub (desktop and phone) — mounted by App.jsx through the
  * ConsoleHub slot (hub/index.js) with the SectionProps bag.
  *
- *   1. Levelling first: the player strip (desktop) / compact card (phone).
+ *   1. The player first: the strip (desktop) / compact card (phone), with
+ *      prestige progress; it opens the Prestige rewards sheet.
  *   2. The widget grid: fixed size families, one shared order in S.hubGrid.
  *   3. The "Add widget" bar naming the three sizes.
  *
@@ -10,6 +11,8 @@
  * classic FriendPanel does; Esc or a press outside returns to the grid.
  *
  * Data safety: the only layout write is S.hubGrid (useHubGrid.commit).
+ * The rewards sheet writes S.cardStyle (one additive key, withCardStyle);
+ * the chosen finish is drawn through `data-cx-card` on the hub.
  * Widget bodies write the same keys they write in classic (logs, habits,
  * vitalsLog …), always through functional `update`.
  */
@@ -31,6 +34,8 @@ import HubGrid from './HubGrid';
 import WidgetBody from './WidgetBody';
 import AddWidgetSheet from './AddWidgetSheet';
 import { PlayerStrip, PlayerCard } from './PlayerStrip';
+import PrestigeRewardsSheet from './PrestigeRewards';
+import { resolveCardStyle } from '../../../lib/ratings/prestigeRewards';
 import { FriendTakeover, FriendsOverlays, friendsMeta } from './FriendsWidget';
 import { leagueMeta } from './LeagueWidget';
 import { todayMeta } from './TodayWidget';
@@ -50,6 +55,7 @@ export default function ConsoleHub(props) {
   const { grid, commit, presetIds } = useHubGrid(S, update, { isOwner });
   const hub = useFriendsHub({ userId, hasPro });
   const [ratingsOpen, setRatingsOpen] = useState(false);
+  const [rewardsOpen, setRewardsOpen] = useState(false);
   const [addOpen, setAddOpen] = useState(false);
   const [primeEdit, setPrimeEdit] = useState(null);   // item id
   const [foodMenu, setFoodMenu] = useState(null);     // { rect } | null
@@ -88,14 +94,16 @@ export default function ConsoleHub(props) {
   const editing = primeEdit && items.find(i => i.id === primeEdit);
   const patchEditing = fn => commit(g => patchItem(g, primeEdit, fn));
   const openRatings = () => setRatingsOpen(true);
+  const openRewards = () => setRewardsOpen(true);
+  const cardStyle = resolveCardStyle(S);
   const takeover = !isMobile && hub.selected;
 
   return (
     <section className={`section active cx-page cx-hub-page${isMobile ? ' is-phone' : ' is-desk'}`} aria-label="Hub">
-      <div className="cx-hub">
+      <div className="cx-hub" data-cx-card={cardStyle}>
         {isMobile
-          ? <PlayerCard S={S} visionState={visionState} hub={hub} navigate={navigate} onOpenVisions={onOpenVisions} onOpenRatings={openRatings} />
-          : <PlayerStrip S={S} visionState={visionState} hub={hub} navigate={navigate} onOpenVisions={onOpenVisions} onOpenRatings={openRatings} />}
+          ? <PlayerCard S={S} visionState={visionState} hub={hub} navigate={navigate} onOpenVisions={onOpenVisions} onOpenRatings={openRatings} onOpenRewards={openRewards} />
+          : <PlayerStrip S={S} visionState={visionState} hub={hub} navigate={navigate} onOpenVisions={onOpenVisions} onOpenRatings={openRatings} onOpenRewards={openRewards} />}
 
         {takeover ? (
           <FriendTakeover hub={hub} />
@@ -143,6 +151,14 @@ export default function ConsoleHub(props) {
         <Sheet title="Ratings" onClose={() => setRatingsOpen(false)} className="cx-hub-ratings" testId="cx-hub-ratings-sheet" width={520}>
           <RatingsPanel S={S} update={update} />
         </Sheet>
+      )}
+      {rewardsOpen && (
+        <PrestigeRewardsSheet
+          S={S}
+          update={update}
+          onClose={() => setRewardsOpen(false)}
+          onOpenRatings={() => { setRewardsOpen(false); setRatingsOpen(true); }}
+        />
       )}
       {addOpen && (
         <AddWidgetSheet

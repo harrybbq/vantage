@@ -21,7 +21,7 @@ export const TOUR_STEPS = [
   {
     id: 'hub',
     title: 'Your hub',
-    body: 'Your level, your rating and the widgets you choose. A widget can be added once there is something for it to show.',
+    body: 'Your rating, your progress to the next prestige and the widgets you choose. A widget can be added once there is something for it to show.',
     targets: ['[data-cx-tour="hub"]', '[data-cx-nav="hub"]', '#nav-tab-hub', 'tab:Hub'],
     navTo: 'hub',
   },

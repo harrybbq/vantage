@@ -368,6 +368,8 @@ html[data-design="console"] .cx-dt-who {
 html[data-design="console"] .cx-dt-nm { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 html[data-design="console"] .cx-dt-sub { display: block; font: 400 var(--cx-fs-12)/var(--cx-lh-12) var(--cx-sans); color: var(--cx-muted); }
 html[data-design="console"] .cx-dt-pr { flex: none; color: var(--cx-gold); font: 400 var(--cx-fs-12)/1 var(--cx-sans); letter-spacing: .02em; }
+/* Prestige VII+: the badge is filled with the band colour (inline style). */
+html[data-design="console"] .cx-dt-pr.is-solid { padding: 2px 5px; border-radius: var(--cx-r-chip); border: 1px solid; }
 html[data-design="console"] .cx-dt-att { width: 30px; text-align: right; font-size: var(--cx-fs-13) !important; }
 html[data-design="console"] .cx-dt-wk { width: 34px; text-align: right; font-size: var(--cx-fs-12) !important; white-space: nowrap; }
 html[data-design="console"] .cx-dt-ovr { width: 34px; text-align: right; font-size: var(--cx-fs-17) !important; }
@@ -642,3 +644,96 @@ html[data-design="console"] .cx-hub-cell .m-vitals-delta { position: static; fon
    could not be tapped. Lifted only while the ratings sheet is open, so
    no other console sheet changes order. */
 html[data-design="console"] body:has(.cx-hub-ratings) .modal-overlay { z-index: 2100; }
+
+/* ════════ Prestige (player strip) ════════ */
+html[data-design="console"] .cx-hub-pl-unlock { font: 400 var(--cx-fs-12)/var(--cx-lh-12) var(--cx-sans); color: var(--cx-text); }
+html[data-design="console"] .cx-hub-pl-ready { font-weight: 600; color: var(--cx-accent); }
+
+/* ════════ Hub card styles (prestige rewards, S.cardStyle) ════════
+   Set on .cx-hub as data-cx-card; the swatches in the picker reuse the
+   same attribute. A lifted (dragged) cell keeps its accent border. */
+html[data-design="console"] .cx-hub[data-cx-card="rule"] :is(.cx-hub-cell:not(.is-lifted) > .cx-wf, .cx-hub-player, .cx-hub-pcard),
+html[data-design="console"] .cx-hub-cs-swatch[data-cx-card="rule"] {
+  box-shadow: inset 0 2px 0 var(--cx-accent-fill), var(--cx-shadow);
+}
+html[data-design="console"] .cx-hub[data-cx-card="ticks"] :is(.cx-hub-cell:not(.is-lifted) > .cx-wf, .cx-hub-player, .cx-hub-pcard),
+html[data-design="console"] .cx-hub-cs-swatch[data-cx-card="ticks"] {
+  --cx-hub-tick: var(--cx-muted);
+  background:
+    linear-gradient(var(--cx-hub-tick), var(--cx-hub-tick)) left 6px top 6px / 10px 1.5px no-repeat,
+    linear-gradient(var(--cx-hub-tick), var(--cx-hub-tick)) left 6px top 6px / 1.5px 10px no-repeat,
+    linear-gradient(var(--cx-hub-tick), var(--cx-hub-tick)) right 6px top 6px / 10px 1.5px no-repeat,
+    linear-gradient(var(--cx-hub-tick), var(--cx-hub-tick)) right 6px top 6px / 1.5px 10px no-repeat,
+    linear-gradient(var(--cx-hub-tick), var(--cx-hub-tick)) left 6px bottom 6px / 10px 1.5px no-repeat,
+    linear-gradient(var(--cx-hub-tick), var(--cx-hub-tick)) left 6px bottom 6px / 1.5px 10px no-repeat,
+    linear-gradient(var(--cx-hub-tick), var(--cx-hub-tick)) right 6px bottom 6px / 10px 1.5px no-repeat,
+    linear-gradient(var(--cx-hub-tick), var(--cx-hub-tick)) right 6px bottom 6px / 1.5px 10px no-repeat,
+    var(--cx-s1);
+}
+html[data-design="console"] .cx-hub[data-cx-card="gilt"] :is(.cx-hub-cell:not(.is-lifted) > .cx-wf, .cx-hub-player, .cx-hub-pcard),
+html[data-design="console"] .cx-hub-cs-swatch[data-cx-card="gilt"] {
+  border-color: var(--cx-gold);
+  box-shadow: inset 0 0 0 1px var(--cx-gold-tint), var(--cx-shadow);
+}
+html[data-design="console"] .cx-hub[data-cx-card="engraved"] :is(.cx-hub-cell:not(.is-lifted) > .cx-wf, .cx-hub-player, .cx-hub-pcard),
+html[data-design="console"] .cx-hub-cs-swatch[data-cx-card="engraved"] {
+  border-color: var(--cx-line-strong);
+  box-shadow: inset 0 1px 4px rgba(0, 0, 0, 0.16), inset 0 -1px 0 rgba(255, 255, 255, 0.04);
+}
+
+/* The picker: one chip per style, a small swatch of the finish in each. */
+html[data-design="console"] .cx-hub-cs { display: grid; grid-template-columns: repeat(auto-fill, minmax(132px, 1fr)); gap: 8px; }
+html[data-design="console"] .cx-hub-cs-opt {
+  display: grid; grid-template-columns: auto minmax(0, 1fr); grid-template-rows: auto auto; column-gap: 10px; align-items: center;
+  min-height: var(--cx-control-h); padding: 8px 10px; box-sizing: border-box;
+  border: 1px solid var(--cx-line-strong); border-radius: var(--cx-r-cell); background: var(--cx-s1);
+  color: var(--cx-text); text-align: left; cursor: pointer; font: inherit;
+}
+html[data-design="console"] .cx-hub-cs-opt.is-on { border-color: var(--cx-accent); background: var(--cx-accent-tint); }
+html[data-design="console"] .cx-hub-cs-opt:disabled { cursor: not-allowed; opacity: .6; }
+html[data-design="console"] .cx-hub-cs-opt > .cx-hub-cs-swatch { grid-row: 1 / 3; }
+html[data-design="console"] .cx-hub-cs-name { font: 600 var(--cx-fs-13)/var(--cx-lh-13) var(--cx-sans); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+html[data-design="console"] .cx-hub-cs-hint { font: 400 var(--cx-fs-12)/var(--cx-lh-12) var(--cx-sans); color: var(--cx-muted); }
+html[data-design="console"] .cx-hub-cs-swatch {
+  display: block; width: 34px; height: 26px; box-sizing: border-box; flex: none;
+  border: 1px solid var(--cx-line); border-radius: 6px; background: var(--cx-s1); box-shadow: var(--cx-shadow);
+}
+html[data-design="console"] .cx-hub-cs-swatch.is-small { width: 26px; height: 20px; }
+html[data-design="console"] .cx-hub-cs-swatch[data-cx-card="ticks"] {
+  background:
+    linear-gradient(var(--cx-muted), var(--cx-muted)) left 3px top 3px / 6px 1.5px no-repeat,
+    linear-gradient(var(--cx-muted), var(--cx-muted)) left 3px top 3px / 1.5px 6px no-repeat,
+    linear-gradient(var(--cx-muted), var(--cx-muted)) right 3px bottom 3px / 6px 1.5px no-repeat,
+    linear-gradient(var(--cx-muted), var(--cx-muted)) right 3px bottom 3px / 1.5px 6px no-repeat,
+    var(--cx-s1);
+}
+
+/* ════════ Prestige rewards sheet ════════ */
+html[data-design="console"] .cx-hub-rw { display: flex; flex-direction: column; gap: var(--cx-sp-16); min-width: 0; }
+html[data-design="console"] .cx-hub-rw-now { display: flex; align-items: center; gap: 16px; padding: 6px 4px 0 6px; min-width: 0; }
+html[data-design="console"] .cx-hub-rw-now-t { display: flex; flex-direction: column; gap: 6px; flex: 1 1 auto; min-width: 0; }
+html[data-design="console"] .cx-hub-rw-strong { font-weight: 600; color: var(--cx-text); }
+html[data-design="console"] .cx-hub-rw-lede { margin: 0; }
+html[data-design="console"] .cx-hub-rw-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; border-top: 1px solid var(--cx-line); }
+html[data-design="console"] .cx-hub-rw-row {
+  display: grid; grid-template-columns: 30px 38px minmax(0, 1fr) auto; align-items: center; gap: 10px;
+  padding: 10px 2px; border-bottom: 1px solid var(--cx-line); min-width: 0;
+}
+html[data-design="console"] .cx-hub-rw-row:not(.is-on) .cx-hub-rw-pv { opacity: .55; }
+html[data-design="console"] .cx-hub-rw-row.is-next { background: var(--cx-accent-tint); }
+html[data-design="console"] .cx-hub-rw-at { color: var(--cx-muted); font-size: var(--cx-fs-12); text-align: center; }
+html[data-design="console"] .cx-hub-rw-row.is-on .cx-hub-rw-at { color: var(--cx-gold); }
+html[data-design="console"] .cx-hub-rw-pv { display: grid; place-items: center; min-height: 32px; }
+html[data-design="console"] .cx-hub-rw-tx { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+html[data-design="console"] .cx-hub-rw-name {
+  display: flex; align-items: center; flex-wrap: wrap; gap: 6px; min-width: 0;
+  font: 600 var(--cx-fs-13)/var(--cx-lh-13) var(--cx-sans); color: var(--cx-text);
+}
+html[data-design="console"] .cx-hub-rw-name > svg { color: var(--cx-mid); flex: none; }
+html[data-design="console"] .cx-hub-rw-kind { font: 400 var(--cx-fs-12)/var(--cx-lh-12) var(--cx-sans); color: var(--cx-muted); }
+html[data-design="console"] .cx-hub-rw-desc { font: 400 var(--cx-fs-12)/var(--cx-lh-12) var(--cx-sans); color: var(--cx-mid); }
+html[data-design="console"] .cx-hub-rw-st { font: 400 var(--cx-fs-12)/var(--cx-lh-12) var(--cx-sans); white-space: nowrap; text-align: right; }
+html[data-design="console"] .cx-hub-rw-swatch { display: block; width: 22px; height: 22px; border-radius: 6px; }
+html[data-design="console"] .cx-hub-rw-cs { display: flex; flex-direction: column; gap: 8px; }
+html[data-design="console"] .cx-hub-rw-cs > p { margin: 0; }
+html[data-design="console"] .cx-hub-rw-h { margin: 0; font: 600 var(--cx-fs-15)/var(--cx-lh-15) var(--cx-sans); color: var(--cx-text); }

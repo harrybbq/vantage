@@ -600,8 +600,8 @@ html[data-hub-os] .hub-os-top > .ratings-ledger .ratings-ledger-body {
   align-items: center;
   gap: 12px;
 }
-html[data-hub-os] .hub-os-top > .ratings-ledger .ratings-ledger-donut-wrap { grid-column: 1; }
-html[data-hub-os] .hub-os-top > .ratings-ledger .ratings-ledger-legend { grid-column: 2; }
+html[data-hub-os] .hub-os-top > .ratings-ledger .ratings-ledger-donut-wrap { grid-column: 1; grid-row: 1; }
+html[data-hub-os] .hub-os-top > .ratings-ledger .ratings-ledger-legend { grid-column: 2; grid-row: 1; }
 /* The badge is redundant here — the hole already reads PRESTIGE IV. */
 html[data-hub-os] .hub-os-top > .ratings-ledger .ratings-ledger-prestige-row { display: none; }
 /* The 99-only CTA gets its own full-width row rather than a column. */
@@ -623,6 +623,14 @@ html[data-hub-os] .hub-os-top > .ratings-ledger .ratings-focus-row {
 }
 html[data-hub-os] .hub-os-top > .ratings-ledger .ratings-focus-v { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 html[data-hub-os] .hub-os-top > .ratings-ledger .ratings-focus-step { display: none; }
+/* Prestige rewards button: its own full-width row, kept short — as an
+   unplaced child it took the ring's column and pushed the key down. */
+html[data-hub-os] .hub-os-top > .ratings-ledger .ratings-rewards-btn {
+  grid-column: 1 / -1;
+  min-height: 30px;
+  padding-top: 4px;
+  padding-bottom: 4px;
+}
 html[data-hub-os] .hub-os-top > .ratings-ledger .ratings-ledger-donut-wrap {
   padding: 0;
   flex-shrink: 0;

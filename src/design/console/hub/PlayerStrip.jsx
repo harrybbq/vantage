@@ -1,30 +1,35 @@
 /**
- * Levelling at the top of the hub (DIRECTIONS.md §A "Levelling").
+ * The player at the top of the hub (DIRECTIONS.md §A, the strip that
+ * used to carry Level/XP — Level was retired 2026-10).
  *
- * Desktop strip: identity + prestige / coins chips | Level, XP bar and
- * league position | OVR donut with the four category bars | Honours with
- * the latest two and the next one. Phone: one compact card with the
- * donut, the level bar, the four categories in a row and an honours /
- * league line.
+ * Desktop strip: identity (avatar in its prestige frame) + prestige /
+ * coins chips | Prestige: OVR to the next prestige, a bar of OVR/99 and
+ * the next reward, then the league position | OVR donut with the four
+ * category bars | Honours with the latest two and the next one. Phone:
+ * one compact card with the donut, the prestige bar, the four
+ * categories in a row and an honours / league line.
  *
  * Every rating number is drawn in its tier-band colour (lib/ratings/
  * bands.js). Sources — all existing, nothing derived twice:
- *   visionState (lib/visions useVisions) level, XP, honours count
+ *   visionState (lib/visions useVisions) honours count
  *   S.ratings / S.prestige                OVR, categories, prestige
+ *   lib/ratings/prestigeRewards           progress to the next prestige,
+ *                                         the next reward, the frame
  *   S.visions + VISIONS_BY_ID             latest honours, the next one
  *   friends board (useFriendsHub)         league position
  * While S is the local backup (`__slim`) the ratings show a dash, as
  * RatingsPanel does, rather than a number that corrects itself.
  *
- * Taps go where they go today: the donut and categories open the full
- * Ratings panel (classic RatingsPanel in a sheet), level and honours the
- * Honours catalogue, the league line the leaderboard, coins the shop.
+ * Taps: the donut and categories open the full Ratings panel (classic
+ * RatingsPanel in a sheet), the prestige block and chip the Prestige
+ * rewards sheet, honours the Honours catalogue, the league line the
+ * leaderboard, coins the shop.
  */
 import { useMemo } from 'react';
 import Icon from '../../../components/Icon';
 import { bandClass, bandVar } from '../../../lib/ratings/bands';
 import { ovrTier, OVR_TIERS } from '../../../lib/ratings/tiers';
-import { prestigeBadge } from '../../../lib/ratings/prestige';
+import { prestigeProgress, prestigeName } from '../../../lib/ratings/prestigeRewards';
 import { RATING_COLOURS, ratingShares } from '../../../lib/ratings/palette';
 import { donutSegments } from '../../../components/ratings/RatingsDonut';
 import { useDarkSurface } from '../../../hooks/useDarkSurface';
@@ -34,9 +39,10 @@ import { Avatar } from './DivisionTable';
 import { boardRows, gapNote, ordinal } from './LeagueWidget';
 
 const CATS = [{ id: 'brain', label: 'Brain' }, { id: 'finance', label: 'Finance' }, { id: 'fitness', label: 'Fitness' }, { id: 'social', label: 'Social' }];
+const CAT_LABEL = { brain: 'Brain', finance: 'Finance', fitness: 'Fitness', social: 'Social' };
 const fmt = n => Number(n || 0).toLocaleString('en-GB');
 
-function useLevelling(S, visionState, hub) {
+function usePlayer(S, visionState, hub) {
   return useMemo(() => {
     const settling = !!S.__slim;
     const r = S.ratings || {};
@@ -45,12 +51,8 @@ function useLevelling(S, visionState, hub) {
     const nextTier = tier ? OVR_TIERS.find(t => t.min > tier.max) : null;
     const cats = CATS.map(c => ({ ...c, v: settling ? null : (r[c.id] ?? null) }));
     const vs = visionState || {};
-    const lvl = vs.level || 1;
-    const next = vs.nextLevelAt || 0;
-    const span = vs.spanThisLevel || 0;
-    const xp = vs.xp || 0;
-    const from = next - span;
-    const pct = Math.max(0, Math.min(100, vs.pctToNext ?? 0)); // already 0-100
+    const p = Math.max(0, Math.floor(Number(S.prestige) || 0));
+    const pg = prestigeProgress(ovr, p);
     const stamped = S.visions || {};
     const recent = Object.entries(stamped)
       .filter(([id]) => VISIONS_BY_ID[id])
@@ -60,12 +62,11 @@ function useLevelling(S, visionState, hub) {
     const nextHonour = VISIONS.filter(v => !stamped[v.id]).sort((a, b) => a.xp - b.xp)[0] || null;
     const rows = boardRows(hub?.board);
     const me = rows.find(x => x.isSelf);
-    const badge = prestigeBadge(S.prestige || 0);
     return {
-      settling, ovr, tier, nextTier, cats, lvl, xp, next, from, pct, toGo: Math.max(0, next - xp),
+      settling, ovr, tier, nextTier, cats, pg,
       honours: { have: vs.unlockedCount || 0, total: vs.totalCount || VISIONS.length, recent, next: nextHonour },
       league: me && rows.length > 1 ? { pos: me.pos, of: rows.length, note: gapNote(rows) } : null,
-      prestige: badge ? { text: `Prestige ${badge.numeral}`, n: S.prestige } : null,
+      prestige: p ? { text: prestigeName(p), n: p } : null,
     };
   }, [S.__slim, S.ratings, S.prestige, S.visions, visionState, hub?.board]);
 }
@@ -105,16 +106,24 @@ function CatBar({ c }) {
   );
 }
 
-export function PlayerStrip({ S, visionState, hub, navigate, onOpenVisions, onOpenRatings }) {
-  const L = useLevelling(S, visionState, hub);
+/** "25 OVR to Prestige II" / "Ready to prestige" / "–" while loading. */
+function toGoText(pg) {
+  if (pg.ready) return 'Ready to prestige';
+  if (!pg.next) return 'Every prestige reached';
+  return `${pg.toGo == null ? '–' : pg.toGo} OVR to ${pg.nextName}`;
+}
+
+export function PlayerStrip({ S, visionState, hub, navigate, onOpenVisions, onOpenRatings, onOpenRewards }) {
+  const L = usePlayer(S, visionState, hub);
+  const pg = L.pg;
   const dark = useDarkSurface();
   const name = (S.profile?.name || '').trim() || 'You';
   const handle = hub?.friends?.ownProfile?.handle;
   return (
-    <section className="cx-panel cx-hub-player" aria-label="Your level and ratings" data-cx-tour="hub">
+    <section className="cx-panel cx-hub-player" aria-label="Your prestige and ratings" data-cx-tour="hub">
       <div className="cx-hub-pl-id">
         <button type="button" className="cx-hub-pl-who" onClick={() => navigate?.('settings')} aria-label="Your profile, in Settings">
-          <Avatar name={name} url={S.profile?.photo || null} size={44} self />
+          <Avatar name={name} url={S.profile?.photo || null} size={44} self prestige={L.prestige ? L.prestige.n : 0} />
           <span className="cx-hub-pl-nm">
             <span className="cx-hub-ell cx-hub-pl-name">{name}</span>
             {handle && <span className="cx-muted cx-hub-ell">@{handle}</span>}
@@ -123,7 +132,7 @@ export function PlayerStrip({ S, visionState, hub, navigate, onOpenVisions, onOp
         {S.profile?.tagline && <p className="cx-hub-pl-tag">{S.profile.tagline}</p>}
         <div className="cx-hub-pl-chips">
           {L.prestige && (
-            <button type="button" className="cx-chip" onClick={onOpenRatings} title={`Prestige ${L.prestige.n}`}>
+            <button type="button" className="cx-chip" onClick={onOpenRewards} title="Prestige rewards">
               <span className="cx-gold" aria-hidden="true">◆</span> {L.prestige.text}
             </button>
           )}
@@ -134,11 +143,24 @@ export function PlayerStrip({ S, visionState, hub, navigate, onOpenVisions, onOp
       </div>
 
       <div className="cx-hub-pl-lvl">
-        <button type="button" className="cx-hub-pl-hit" onClick={onOpenVisions} aria-label={`Level ${L.lvl}, ${fmt(L.toGo)} XP to level ${L.lvl + 1}. Open Honours`}>
-          <span className="cx-hub-pl-h"><span className="cx-hub-pl-t">Level</span><span className="cx-hub-sp" /><span className="cx-muted">{fmt(L.toGo)} XP to level {L.lvl + 1}</span></span>
-          <span className="cx-hub-pl-big"><span className="cx-num cx-t40">{L.lvl}</span><span className="cx-num cx-muted">{fmt(L.xp)} / {fmt(L.next)} XP</span></span>
-          <span className="cx-hub-bar is-thick"><i style={{ width: `${L.pct}%` }} /></span>
-          <span className="cx-hub-pl-ends cx-num cx-muted"><span>{fmt(L.from)}</span><span>{fmt(L.next)}</span></span>
+        <button type="button" className="cx-hub-pl-hit" onClick={onOpenRewards} aria-label={`${L.prestige ? L.prestige.text : 'No prestige yet'}. ${toGoText(pg)}.${pg.reward ? ` Next unlock: ${pg.reward.name}.` : ''} Open prestige rewards`}>
+          <span className="cx-hub-pl-h">
+            <span className="cx-hub-pl-t">Prestige</span>
+            <span className="cx-hub-sp" />
+            {L.prestige
+              ? <span className="cx-gold cx-hub-nowrap"><span aria-hidden="true">◆</span> {L.prestige.text}</span>
+              : <span className="cx-muted">None yet</span>}
+          </span>
+          <span className="cx-hub-pl-big">
+            {pg.ready
+              ? <span className="cx-t17 cx-hub-pl-ready">Ready to prestige</span>
+              : <><span className="cx-num cx-t40">{pg.toGo == null || !pg.next ? '–' : pg.toGo}</span><span className="cx-muted">{pg.next ? `OVR to ${pg.nextName}` : 'Every prestige reached'}</span></>}
+          </span>
+          <span className="cx-hub-bar is-thick"><i style={{ width: `${pg.pct}%` }} /></span>
+          <span className="cx-hub-pl-ends cx-num cx-muted"><span>OVR {L.ovr ?? '–'}</span><span>99</span></span>
+          {pg.reward && (
+            <span className="cx-hub-pl-unlock"><span className="cx-muted">Next unlock:</span> {pg.reward.name} <span className="cx-muted">at {prestigeName(pg.reward.at)}</span></span>
+          )}
         </button>
         <button type="button" className="cx-hub-pl-league" onClick={() => navigate?.('leaderboard')}>
           <Icon name="trophy" size={14} strokeWidth={1.75} />
@@ -168,7 +190,7 @@ export function PlayerStrip({ S, visionState, hub, navigate, onOpenVisions, onOp
         ))}
         {L.honours.next && (
           <span className="cx-hub-pl-next">
-            <span className="cx-hub-row is-static"><span className="cx-muted" aria-hidden="true">◇</span><span className="cx-mid cx-hub-ell">Next: {L.honours.next.title}</span><span className="cx-hub-sp" /><span className="cx-num cx-muted">+{L.honours.next.xp} XP</span></span>
+            <span className="cx-hub-row is-static"><span className="cx-muted" aria-hidden="true">◇</span><span className="cx-mid cx-hub-ell">Next: {L.honours.next.title}</span><span className="cx-hub-sp" /><span className="cx-muted cx-hub-nowrap">{CAT_LABEL[L.honours.next.category] || 'All round'}</span></span>
             <span className="cx-hub-bar is-gold"><i style={{ width: `${Math.round((L.honours.have / Math.max(1, L.honours.total)) * 100)}%` }} /></span>
           </span>
         )}
@@ -177,24 +199,24 @@ export function PlayerStrip({ S, visionState, hub, navigate, onOpenVisions, onOp
   );
 }
 
-export function PlayerCard({ S, visionState, hub, navigate, onOpenVisions, onOpenRatings }) {
-  const L = useLevelling(S, visionState, hub);
+export function PlayerCard({ S, visionState, hub, navigate, onOpenVisions, onOpenRatings, onOpenRewards }) {
+  const L = usePlayer(S, visionState, hub);
+  const pg = L.pg;
   const dark = useDarkSurface();
   return (
-    <section className="cx-panel cx-hub-pcard" aria-label="Your level and ratings">
+    <section className="cx-panel cx-hub-pcard" aria-label="Your prestige and ratings">
       <div className="cx-hub-pc-top">
         <button type="button" className="cx-hub-pc-donut" onClick={onOpenRatings} aria-label={`OVR ${L.ovr ?? 'loading'}. Open your ratings`}>
           <Donut cats={L.cats} ovr={L.ovr} size={84} stroke={8} dark={dark} />
         </button>
-        <button type="button" className="cx-hub-pc-lvl" onClick={onOpenVisions} aria-label={`Level ${L.lvl}. Open Honours`}>
+        <button type="button" className="cx-hub-pc-lvl" onClick={onOpenRewards} aria-label={`${L.prestige ? L.prestige.text : 'No prestige yet'}. ${toGoText(pg)}. Open prestige rewards`}>
           <span className="cx-hub-pl-h">
-            <span className="cx-hub-pc-t">Level {L.lvl}</span>
+            <span className="cx-hub-pc-t">{L.prestige ? <><span className="cx-gold" aria-hidden="true">◆</span> {L.prestige.text}</> : 'Prestige'}</span>
             {L.tier && <span className={`cx-hub-tier ${bandClass(L.ovr)}`}>{L.tier.label}</span>}
-            <span className="cx-hub-sp" />
-            {L.prestige && <span className="cx-gold cx-hub-nowrap" title={`Prestige ${L.prestige.n}`}>◆ {L.prestige.text.split(' ').pop()}</span>}
           </span>
-          <span className="cx-hub-bar"><i style={{ width: `${L.pct}%` }} /></span>
-          <span className="cx-hub-pl-h cx-muted"><span className="cx-num">{fmt(L.xp)} / {fmt(L.next)} XP</span><span className="cx-hub-sp" /><span>{fmt(L.toGo)} to go</span></span>
+          <span className="cx-hub-bar"><i style={{ width: `${pg.pct}%` }} /></span>
+          <span className="cx-hub-pl-h cx-mid"><span className="cx-hub-ell">{toGoText(pg)}</span></span>
+          {pg.reward && <span className="cx-hub-pl-h cx-muted"><span className="cx-hub-ell">Next unlock: {pg.reward.name}</span></span>}
         </button>
       </div>
       <button type="button" className="cx-hub-pc-cats" onClick={onOpenRatings} aria-label="Category ratings. Open your ratings">

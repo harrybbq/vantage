@@ -122,10 +122,11 @@ export async function setHandle(userId, handle) {
 
 /** Update your own profile fields. display_name / avatar_url (what
  *  strangers see) go through profile-update; the private settings and
- *  presence (is_searchable, level, last_active_at, leaderboard_*) are
- *  still written directly under the column grant. */
+ *  presence (is_searchable, last_active_at, leaderboard_*) are still
+ *  written directly under the column grant. `level` is no longer
+ *  written (Level was retired 2026-10; the column stays). */
 export async function updateOwnProfile(userId, patch) {
-  const direct = ['is_searchable', 'level', 'last_active_at', 'leaderboard_optin', 'leaderboard_color'];
+  const direct = ['is_searchable', 'last_active_at', 'leaderboard_optin', 'leaderboard_color'];
   const clean = Object.fromEntries(
     Object.entries(patch || {}).filter(([k]) => direct.includes(k))
   );
@@ -164,11 +165,12 @@ export async function updateOwnProfile(userId, patch) {
 // ── Public stats ─────────────────────────────────────────────────────
 
 /** Upsert your own public_stats row. Friends read this to render
- *  your friend-card heatmap and recent wins. */
+ *  your friend-card heatmap and recent wins. `level` is not sent (Level
+ *  was retired 2026-10): a new row takes the column default and an
+ *  existing one keeps what it held; nothing reads it. */
 export async function upsertOwnPublicStats(userId, stats) {
   const row = {
     user_id: userId,
-    level: stats.level ?? 1,
     current_streak: stats.current_streak ?? 0,
     streak_habit: stats.streak_habit ?? null,
     heatmap_days: stats.heatmap_days ?? [],

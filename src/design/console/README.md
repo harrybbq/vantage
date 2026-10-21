@@ -29,6 +29,33 @@ abandoned or rolled back without a revert (the git backup is
   `S.widgetPositions`, `S.widgetSizes`, `S.hubWidgets` or `S.mobileWidgets`,
   because classic still reads them and a rollback must find them intact.
 
+### Product changes are not redesign changes
+
+"Classic stays identical" freezes classic **for the redesign**: no console
+work may change how classic looks. A product decision that applies to the
+whole app changes classic on purpose, and is recorded here so a pixel diff
+that moves is not mistaken for a leak.
+
+- **2026-10-21 — Level retired, prestige rewards added** (both designs).
+  Level/XP is gone everywhere; honours stay and still weight the ratings.
+  Prestige now unlocks looks, from ONE pure module,
+  `src/lib/ratings/prestigeRewards.js` (tested by
+  `src/design/prestigeRewards.test.mjs`): accents, an avatar frame and
+  badge, and hub card styles. Classic changes deliberately: the invite page
+  (prestige ring + badge instead of "Level N"), accent gating and copy in
+  Settings (Purple / Sunset / Rose move from honours to Prestige I / III / V,
+  grandfathered; three prestige-only accents added), prestige rings round
+  avatars in the friends list and card, the leaderboard and the invite page
+  (`components/PrestigeFrame.jsx`, `components/prestige-frame.css`, shared
+  by both designs), a solid badge from Prestige VII (`PrestigeBadge`), a
+  badge on handle-search results, the "+N XP" pill removed from the classic
+  Honours catalogue, and a "Prestige rewards" button in the Ratings panel
+  (read-only modal; hidden under console). **Hub card styles are console
+  only**: classic's hub has no equivalent of the widget frame, so it has
+  nothing to restyle. They are local to your own hub (`S.cardStyle`, one
+  additive key), not shown to friends. A P0 account renders exactly as
+  before in classic apart from the removed "+N XP" pill and the accent copy.
+
 ## 1. The design switch
 
 | What | Where |
@@ -247,7 +274,7 @@ read-only. If you need a change to it, write it in your area's `NOTES.md`
 ### HUB
 
 - Slot: `src/design/console/hub/index.js` (`ConsoleHub`), and everything under `src/design/console/hub/`.
-- Owns: the console hub body on desktop and mobile, the 4-column widget grid of fixed size families (Small 1×1, Medium 2×1, Large 2×2; on mobile a 2-column stack), the player strip (Level/XP, OVR donut and category bars in band colours, prestige, coins, honours, league line), the League widget as a **division table with promotion/relegation rails**, the Friends widget, Up next, and console bodies for the widgets.
+- Owns: the console hub body on desktop and mobile, the 4-column widget grid of fixed size families (Small 1×1, Medium 2×1, Large 2×2; on mobile a 2-column stack), the player strip (prestige progress and next reward — Level/XP retired 2026-10, OVR donut and category bars in band colours, prestige, coins, honours, league line), the League widget as a **division table with promotion/relegation rails**, the Friends widget, Up next, and console bodies for the widgets.
 - CSS: `src/design/console/hub.css`.
 - New layout state is a new additive key (for example `S.hubGrid`), derived the first time from `widgetPositions` / `widgetSizes`, which stay untouched.
 - Read-only references: `HubSection.jsx`, `HubOsLayout.jsx`, `mobile/MobileHubSection.jsx`, `mobile/MobileWidget.jsx`, `widgets/LifeWidgets.jsx`, `savings/SavingsWidgets.jsx`, `widgets/prime/*`, `RatingsPanel.jsx`, `ratings/RatingsDonut.jsx`, `PrestigeBadge.jsx`, `LeaderboardPanel.jsx`, `groups/DivisionBoard.jsx`, `friends/*` (FriendsRail, FriendListRow, FriendCard), `lib/hub/*`, `hooks/useLeaderboard.js`, `mobile/AddMobileWidgetModal.jsx`, `Modals.jsx`. Reuse their data hooks and stores, not their markup.
@@ -342,7 +369,10 @@ before committing.
   component) is injected after `console/index.css`. It only targets classic
   classes, but it means console must not rely on source order against those
   files.
-- **Both themes are free; accent schemes beyond the first six stay Pro**
-  (the CLAUDE.md tier line). Console changes looks only, never gating.
+- **Both themes are free; Pro accents stay Pro** (the CLAUDE.md tier
+  line). Three accents are free, six are earned by prestige (Pro keeps the
+  three that used to be honour-earned, never the prestige-only three), and
+  the gating rule is `accentAccess()` in `lib/ratings/prestigeRewards.js`,
+  read by both pickers. Console changes looks only, never gating.
 - The owner-only Upgrade section (Career, Diet, Rotation, Review, Lifts) is
   **not** part of the redesign and stays off the Before & After page.

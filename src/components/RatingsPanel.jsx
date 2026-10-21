@@ -30,6 +30,7 @@ import RatingsDonut from './ratings/RatingsDonut';
 import { RATING_COLOURS, ratingShares } from '../lib/ratings/palette';
 import { useDarkSurface } from '../hooks/useDarkSurface';
 import PrestigeBadge from './PrestigeBadge';
+import PrestigeRewardsButton from './PrestigeRewardsButton';
 import { supabase } from '../lib/supabase';
 import { apiFetch } from '../lib/authFetch';
 import { isCooldownActive, daysUntilRetake } from './SelfCheck';
@@ -276,6 +277,7 @@ export default function RatingsPanel({ S, update, compact = false }) {
             {prestigeError}
           </div>
         )}
+        <PrestigeRewardsButton S={S} />
 
         {/* Legend. Always present, and it is what stops identity ever
             resting on colour alone — every arc gets a word, its score

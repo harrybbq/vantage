@@ -2,6 +2,8 @@ import { useEffect, useRef, useState } from 'react';
 import Icon from '../Icon';
 import FriendsHeatmap from './FriendsHeatmap';
 import { ovrTier } from '../../lib/ratings/tiers';
+import { frameProps } from '../PrestigeFrame';
+import PrestigeBadge from '../PrestigeBadge';
 
 /**
  * Expanded "cheerleader" view of a single friend.
@@ -88,7 +90,7 @@ export default function FriendCard({
     <div className="fc-card">
       {/* Header */}
       <div className="fc-header">
-        <div className="fc-avatar-wrap">
+        <div {...frameProps(friend.prestige, 'fc-avatar-wrap')}>
           {friend.avatar_url ? (
             <img
               className="fc-avatar fc-avatar-img"
@@ -107,6 +109,7 @@ export default function FriendCard({
           <div className="fc-meta-row">
             <span className="fc-handle">@{friend.handle}</span>
             <span className={`fc-level ovr-chip ovr-tier-${prestige.key}`} title={`${prestige.label} tier`}>OVR {ovr}</span>
+            <PrestigeBadge prestige={friend.prestige} size="sm" />
           </div>
         </div>
         {hasMenu && (

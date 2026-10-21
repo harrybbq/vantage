@@ -14,7 +14,7 @@ import SupportCard from './settings/SupportCard';
 import SettingsGroup from './settings/SettingsGroup';
 import { useSubscriptionContext } from '../context/SubscriptionContext';
 import { getOwnProfile, updateOwnProfile } from '../lib/friends/queries';
-import { VISIONS_BY_ID } from '../lib/visions/definitions';
+import { accentAccess, ACCENT_UNLOCKS, PRESTIGE_ACCENTS } from '../lib/ratings/prestigeRewards';
 import Icon from './Icon';
 import TravelPolicyCard from './holiday/TravelPolicyCard';
 import { confirmAndDeleteAccount } from '../lib/account/deleteAccount';
@@ -71,19 +71,25 @@ export function schemeFromHex(hex) {
   };
 }
 
-// Availability tiers:
+// Availability tiers (the rule itself is accentAccess() in
+// lib/ratings/prestigeRewards.js, shared by both designs):
 //   • no flag        → free for everyone (green / blue / slate)
-//   • unlockVision   → earned free by achieving that vision (or Pro)
+//   • prestige: N    → earned by reaching Prestige N. Purple / Sunset /
+//                      Rose (P1 / P3 / P5) used to come from an honour:
+//                      an honour stamped before the cut-off still unlocks
+//                      its accent, and Pro keeps these three. Moss, Lagoon
+//                      and Ultramarine are prestige-only (not Pro).
 //   • pro: true      → Pro only
-// Plus the custom-colour picker (Pro only).
+// The selected accent is always usable. Plus the custom colour (Pro only).
 export const SCHEMES = [
   { id: 'green',  name: 'Forest Green', em: '#1a7a4a', mid: '#2a9e62', light: '#4dc485', grad: 'linear-gradient(145deg,#f0f7f3 0%,#d8eee5 40%,#b0d9c5 70%,#7ec8a8 100%)' },
   { id: 'blue',   name: 'Ocean Blue',   em: '#1a4a7a', mid: '#2a629e', light: '#4d9ec4', grad: 'linear-gradient(145deg,#f0f3f7 0%,#d8e5ee 40%,#b0c5d9 70%,#7ea8c8 100%)' },
   { id: 'slate',  name: 'Slate',        em: '#1a3a5a', mid: '#2a5a8e', light: '#4d8ab0', grad: 'linear-gradient(145deg,#f0f2f7 0%,#d8dfe8 40%,#b0bece 70%,#7ea0be 100%)' },
-  // ── Earned accents — unlocked by achieving a vision (free) ──
-  { id: 'purple', name: 'Purple',       em: '#5a1a7a', mid: '#7a2a9e', light: '#a44dc4', grad: 'linear-gradient(145deg,#f4f0f7 0%,#e5d8ee 40%,#d0b0d9 70%,#b87ec8 100%)', unlockVision: 'ach-3' },
-  { id: 'orange', name: 'Sunset',       em: '#7a3a1a', mid: '#9e5a2a', light: '#c47a4d', grad: 'linear-gradient(145deg,#f7f3f0 0%,#eee0d8 40%,#d9c0b0 70%,#c8977e 100%)', unlockVision: 'streak-7' },
-  { id: 'pink',   name: 'Rose',         em: '#7a1a4a', mid: '#9e2a62', light: '#c44d85', grad: 'linear-gradient(145deg,#f7f0f3 0%,#eed8e5 40%,#d9b0c5 70%,#c87ea8 100%)', unlockVision: 'log-7' },
+  // ── Earned accents — unlocked by prestige (free) ──
+  { id: 'purple', name: 'Purple',       em: '#5a1a7a', mid: '#7a2a9e', light: '#a44dc4', grad: 'linear-gradient(145deg,#f4f0f7 0%,#e5d8ee 40%,#d0b0d9 70%,#b87ec8 100%)', prestige: ACCENT_UNLOCKS.purple.at },
+  { id: 'orange', name: 'Sunset',       em: '#7a3a1a', mid: '#9e5a2a', light: '#c47a4d', grad: 'linear-gradient(145deg,#f7f3f0 0%,#eee0d8 40%,#d9c0b0 70%,#c8977e 100%)', prestige: ACCENT_UNLOCKS.orange.at },
+  { id: 'pink',   name: 'Rose',         em: '#7a1a4a', mid: '#9e2a62', light: '#c44d85', grad: 'linear-gradient(145deg,#f7f0f3 0%,#eed8e5 40%,#d9b0c5 70%,#c87ea8 100%)', prestige: ACCENT_UNLOCKS.pink.at },
+  ...PRESTIGE_ACCENTS.map(a => ({ ...a, grad: pastelGrad(a.em), prestige: ACCENT_UNLOCKS[a.id].at })),
   // ── Pro accents ──
   { id: 'teal',    name: 'Teal',    em: '#0f5e5a', mid: '#1a8c84', light: '#4dc4ba', grad: pastelGrad('#0f5e5a'), pro: true },
   { id: 'crimson', name: 'Crimson', em: '#7a1a1a', mid: '#9e2a2a', light: '#c44d4d', grad: pastelGrad('#7a1a1a'), pro: true },
@@ -564,7 +570,8 @@ export default function SettingsSection({ S, update, active, userId, userEmail, 
   }
 
   function handleSchemeChange(scheme) {
-    if (scheme.pro && !hasPro) return; // Pro accent — gated
+    // Pro accent or not-yet-earned prestige accent — gated.
+    if (accentAccess(scheme, { visions: S.visions, prestige: S.prestige, hasPro, active: (S.colorScheme || 'green') === scheme.id }).locked) return;
     applyScheme(scheme);
     update(prev => ({ ...prev, colorScheme: scheme.id }));
   }
@@ -688,23 +695,19 @@ export default function SettingsSection({ S, update, active, userId, userEmail, 
         <>
         <SettingsGroup
           title="Colour scheme"
-          desc="An accent colour applied across the whole app. ✦ accents unlock by earning honours; 🔒 accents are Pro."
+          desc="An accent colour applied across the whole app. ✦ accents unlock by reaching a prestige; 🔒 accents are Pro."
         >
           <div className="scheme-grid">
             {SCHEMES.map(scheme => {
               const isActive = currentScheme === scheme.id;
-              // Availability: Pro users get everything; vision-locked
-              // accents unlock when the vision is achieved; the active
-              // scheme is always allowed (never strand an existing pick).
-              const visionMet = scheme.unlockVision && !!(S.visions || {})[scheme.unlockVision];
-              const proLocked = scheme.pro && !hasPro;
-              const visionLocked = scheme.unlockVision && !visionMet && !hasPro;
-              const locked = (proLocked || visionLocked) && !isActive;
-              const lockHint = proLocked
-                ? 'Upgrade to Pro to unlock this accent'
-                : visionLocked
-                  ? `Unlock by earning: ${VISIONS_BY_ID[scheme.unlockVision]?.title || 'an honour'}`
-                  : '';
+              // Availability (accentAccess, shared with console): prestige
+              // unlocks the earned accents (an old honour or Pro keeps the
+              // original three); the active scheme is always allowed.
+              const access = accentAccess(scheme, { visions: S.visions, prestige: S.prestige, hasPro, active: isActive });
+              const proLocked = access.locked && access.by === 'pro';
+              const visionLocked = access.locked && access.by === 'prestige';
+              const locked = access.locked;
+              const lockHint = access.title;
               return (
                 <button
                   key={scheme.id}

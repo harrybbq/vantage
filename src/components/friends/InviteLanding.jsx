@@ -5,6 +5,8 @@ import {
 } from '../../lib/friends/invites';
 import StoreLinks from '../webaccess/StoreLinks';
 import './friends-dm.css';
+import PrestigeFrame from '../PrestigeFrame';
+import PrestigeBadge from '../PrestigeBadge';
 
 /**
  * /invite/<code> — what a friend sees when they open your link.
@@ -128,12 +130,14 @@ export default function InviteLanding({ code, session, onSignIn, onDone, appOnly
   } else {
     content = (
       <>
-        {inviter?.avatarUrl
-          ? <img className="inv-card-avatar" src={inviter.avatarUrl} alt="" />
-          : <div className="inv-card-avatar" style={{ background: avatarColor(name) }} aria-hidden="true">{name.replace(/^@/, '').split(' ').map(p => p[0]).join('').slice(0, 2).toUpperCase()}</div>}
+        <PrestigeFrame prestige={inviter?.prestige}>
+          {inviter?.avatarUrl
+            ? <img className="inv-card-avatar" src={inviter.avatarUrl} alt="" />
+            : <div className="inv-card-avatar" style={{ background: avatarColor(name) }} aria-hidden="true">{name.replace(/^@/, '').split(' ').map(p => p[0]).join('').slice(0, 2).toUpperCase()}</div>}
+        </PrestigeFrame>
         <div className="inv-card-name">{name}</div>
         {inviter?.handle && <div className="inv-card-handle">@{inviter.handle}</div>}
-        {inviter?.level != null && <div className="inv-card-level">Level {inviter.level}</div>}
+        {inviter?.prestige > 0 && <div style={{ marginTop: 10 }}><PrestigeBadge prestige={inviter.prestige} size="sm" /></div>}
         {phase === 'note' || relNote ? (
           <>
             <p className="inv-card-text" role="status">{phase === 'note' ? note : relNote}</p>

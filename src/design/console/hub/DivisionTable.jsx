@@ -31,10 +31,16 @@
  *   formatValue (v) => node for the right-most value (default: the number)
  *   rows[].avatarColor  optional ground for the initials avatar (a group crest)
  *
+ * Prestige rewards (lib/ratings/prestigeRewards.js): a row with prestige
+ * gets its avatar ring (Avatar `prestige`) and, from Prestige VII, a solid
+ * badge. Both are drawn from the prestige number alone.
+ *
  * Every rating number (category cells, OVR) is coloured by its tier band
  * (lib/ratings/bands.js). Styles: hub.css, `.cx-dt*`.
  */
 import { bandClass } from '../../../lib/ratings/bands';
+import { frameAttrs, solidBadgeStyle } from '../../../lib/ratings/prestigeRewards';
+import '../../../components/prestige-frame.css';
 
 const CATS = [['brain', 'Brn', 'Brain'], ['finance', 'Fin', 'Finance'], ['fitness', 'Fit', 'Fitness'], ['social', 'Soc', 'Social']];
 
@@ -47,17 +53,20 @@ export function initialsOf(name) {
 export function Diamonds({ n }) {
   const p = Number(n) || 0;
   if (p < 1) return null;
+  const solid = solidBadgeStyle(p);
   return (
-    <span className="cx-dt-pr" title={`Prestige ${p}`} aria-label={`Prestige ${p}`}>
+    <span className={`cx-dt-pr${solid ? ' is-solid' : ''}`} style={solid || undefined} title={`Prestige ${p}`} aria-label={`Prestige ${p}`}>
       {p <= 3 ? '◆'.repeat(p) : `◆${p}`}
     </span>
   );
 }
 
-export function Avatar({ name, url, size = 24, self = false, online = false, color = null }) {
+/** `prestige` draws the reward ring (nothing at P0). */
+export function Avatar({ name, url, size = 24, self = false, online = false, color = null, prestige = 0 }) {
   const ground = color && !url ? { background: color, color: '#FFFFFF' } : null;
+  const pf = frameAttrs(prestige);
   return (
-    <span className={`cx-av${self ? ' is-self' : ''}`} style={{ width: size, height: size, fontSize: Math.max(11, Math.round(size * 0.38)), ...ground }} aria-hidden="true">
+    <span className={`cx-av${self ? ' is-self' : ''}${pf ? ` ${pf.className}` : ''}`} style={{ width: size, height: size, fontSize: Math.max(11, Math.round(size * 0.38)), ...ground, ...(pf ? pf.style : null) }} aria-hidden="true">
       {url ? <img src={url} alt="" /> : initialsOf(name)}
       {online && <i className="cx-av-on" />}
     </span>
@@ -108,13 +117,13 @@ export default function DivisionTable({
                 <td className="cx-dt-name">
                   {onRow ? (
                     <button type="button" className="cx-dt-who" onClick={e => { e.stopPropagation(); onRow(r); }}>
-                      <Avatar name={r.name} url={r.avatarUrl} self={r.isSelf} color={r.avatarColor} />
+                      <Avatar name={r.name} url={r.avatarUrl} self={r.isSelf} color={r.avatarColor} prestige={r.prestige} />
                       <span className="cx-dt-nm">{r.name}{r.sub && <small className="cx-dt-sub">{r.sub}</small>}</span>
                       <Diamonds n={r.prestige} />
                     </button>
                   ) : (
                     <span className="cx-dt-who">
-                      <Avatar name={r.name} url={r.avatarUrl} self={r.isSelf} color={r.avatarColor} />
+                      <Avatar name={r.name} url={r.avatarUrl} self={r.isSelf} color={r.avatarColor} prestige={r.prestige} />
                       <span className="cx-dt-nm">{r.name}{r.sub && <small className="cx-dt-sub">{r.sub}</small>}</span>
                       <Diamonds n={r.prestige} />
                     </span>

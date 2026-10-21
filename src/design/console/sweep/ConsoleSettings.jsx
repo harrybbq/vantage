@@ -4,8 +4,10 @@
  * The tabs become one segmented control. Appearance is rebuilt (it is
  * where the look is chosen, so it has to speak console): the two themes
  * as "Paper" and "Dark OS", both free; the accent schemes with exactly
- * classic's gating (three free, three earned by honours, six Pro, plus a
- * Pro custom colour); and the owner-only Design switch.
+ * classic's gating (three free, six earned by prestige, six Pro, plus a
+ * Pro custom colour — the rule is accentAccess() in lib/ratings/
+ * prestigeRewards.js, shared with classic); the hub card style (a
+ * prestige reward, console only); and the owner-only Design switch.
  *
  * Every other tab is the classic SettingsSection, mounted whole and driven
  * through its own `requestedTab` prop, with its header and tab strip
@@ -21,7 +23,8 @@ import SettingsSection, {
   SCHEMES, THEMES, applyTheme, applyScheme, schemeFromHex, resolveEffectiveTheme,
 } from '../../../components/SettingsSection';
 import { useSubscriptionContext } from '../../../context/SubscriptionContext';
-import { VISIONS_BY_ID } from '../../../lib/visions/definitions';
+import { accentAccess } from '../../../lib/ratings/prestigeRewards';
+import { CardStylePicker } from '../hub/PrestigeRewards';
 import { OWNER_SURFACES_IN_BUILD } from '../../../lib/native/ownerSurfaces';
 import Icon from '../../../components/Icon';
 import { Segmented } from '../ui';
@@ -62,7 +65,7 @@ function Appearance({ S, update, userId, hasPro }) {
     update(prev => ({ ...prev, theme: id }));
   }
   function pickScheme(scheme) {
-    if (scheme.pro && !hasPro) return;
+    if (accentAccess(scheme, { visions: S.visions, prestige: S.prestige, hasPro, active: currentScheme === scheme.id }).locked) return;
     applyScheme(scheme);
     update(prev => ({ ...prev, colorScheme: scheme.id }));
   }
@@ -104,15 +107,13 @@ function Appearance({ S, update, userId, hasPro }) {
         <div className="cx-sweep-schemes" role="radiogroup" aria-label="Accent colour">
           {SCHEMES.map(scheme => {
             const on = currentScheme === scheme.id;
-            // Classic's availability rule, unchanged: Pro gets everything;
-            // an honour unlocks its accent; the active one is never stranded.
-            const visionMet = scheme.unlockVision && !!(S.visions || {})[scheme.unlockVision];
-            const proLocked = scheme.pro && !hasPro;
-            const visionLocked = scheme.unlockVision && !visionMet && !hasPro;
-            const locked = (proLocked || visionLocked) && !on;
-            const hint = proLocked
-              ? 'Pro'
-              : visionLocked ? `Earn ${VISIONS_BY_ID[scheme.unlockVision]?.title || 'an honour'}` : '';
+            // Classic's availability rule (accentAccess): prestige unlocks
+            // the earned accents, an old honour or Pro keeps the original
+            // three, Pro unlocks its six; the active one is never stranded.
+            const access = accentAccess(scheme, { visions: S.visions, prestige: S.prestige, hasPro, active: on });
+            const proLocked = access.locked && access.by === 'pro';
+            const locked = access.locked;
+            const hint = access.hint;
             return (
               <button
                 key={scheme.id}
@@ -120,7 +121,7 @@ function Appearance({ S, update, userId, hasPro }) {
                 role="radio"
                 aria-checked={on}
                 disabled={locked}
-                title={locked ? (proLocked ? 'Upgrade to Pro to unlock this accent' : `Unlock by earning: ${VISIONS_BY_ID[scheme.unlockVision]?.title || 'an honour'}`) : scheme.name}
+                title={locked ? access.title : scheme.name}
                 className={`cx-sweep-scheme${on ? ' is-on' : ''}${locked ? ' is-locked' : ''}`}
                 onClick={() => pickScheme(scheme)}
               >
@@ -148,7 +149,19 @@ function Appearance({ S, update, userId, hasPro }) {
             aria-label="Custom accent colour"
           />
         </div>
-        {!hasPro && <p className="cx-t13 cx-muted">Three accents are free and three are earned with honours. Pro adds six more and a colour of your own.</p>}
+        <p className="cx-t13 cx-muted">
+          {hasPro
+            ? 'Three accents are earned only by prestige: Moss, Lagoon and Ultramarine.'
+            : 'Three accents are free and six are earned by prestige. Pro adds six more and a colour of your own.'}
+        </p>
+      </section>
+
+      <section className="cx-panel cx-sweep-group">
+        <header className="cx-sweep-group-head">
+          <h2 className="cx-sweep-group-title">Hub card style</h2>
+          <span className="cx-t13 cx-muted">Earned by prestige</span>
+        </header>
+        <CardStylePicker S={S} update={update} />
       </section>
 
       {DesignSwitch && (

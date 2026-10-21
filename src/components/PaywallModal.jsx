@@ -255,7 +255,7 @@ export default function PaywallModal({ openId, onClose, onManage, onShowToast, o
               <PaywallFeature icon={<Icon name="zap" size={15} />} title="Proactive nudges" sub="Coach spots patterns in your week and nudges before you slip." />
               <PaywallFeature icon={<Icon name="sparkles" size={15} />} title="Daily brief + weekly review" sub="3-line focus / watch / micro action every morning. Sundays: a deep look back." />
               <PaywallFeature icon={<Icon name="infinity" size={15} />} title="No caps on your lists" sub="Habits, achievements, trackers, holidays, links — no free-plan limits. AI features keep a fair daily limit." />
-              <PaywallFeature icon={<Icon name="palette" size={15} />} title="Accent colours + full history" sub="Every accent, a colour of your own, your entire year of data." />
+              <PaywallFeature icon={<Icon name="palette" size={15} />} title="Accent colours + full history" sub="Twelve accents, a colour of your own, your entire year of data." />
             </div>
 
             {/* Storefront — three package cards. Replaces the single

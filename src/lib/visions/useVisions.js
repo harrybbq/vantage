@@ -17,8 +17,8 @@ import { VISIONS_BY_ID } from './definitions';
  *   Wiring a check into each is invasive and easy to forget. Watching
  *   `S` from one place is cheaper to maintain and impossible to miss.
  *
- * Returns: the derived level/xp object so callers can render it
- * without re-deriving themselves.
+ * Returns: the honours count ({ unlockedCount, totalCount }) so callers
+ * can render it without re-deriving it.
  */
 export function useVisions(S, update, showToast, onUnlock) {
   // Ref guards against the toast-storm-on-load problem. Stays true
