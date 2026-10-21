@@ -30,6 +30,7 @@ import LiftDetail from './LiftDetail';
 import LogSheet from './LogSheet';
 import ManageSheet from './ManageSheet';
 import WorkoutToday from './WorkoutToday';
+import WeekMuscles from './WeekMuscles';
 import LiftList from './LiftList';
 import WorkoutLive from './WorkoutLive';
 import FinishSheet from './FinishSheet';
@@ -251,6 +252,7 @@ export default function LiftsTab({ S, update, hydrated = true }) {
                         onStart={startSuggested} onBuild={buildOwn} onResume={goWorkout} onDiscard={discard}
                         onQuickLog={() => setSheet({ kind: 'log' })} canQuickLog={inUse.length > 0}
                         gyms={activeGymList} gym={curGym} onGym={pickGym} gymName={gymName} />
+          <WeekMuscles S={S} today={today} />
           <HistoryCard S={S} update={update} today={calendarToday} />
           <LiftList list={lifts.list} summaries={summaries} counts={counts} today={today} activeGym={active && active.gym ? active.gym : curGym}
                     gymOrder={gymOrder} gymName={gymName} bwOf={bwOf} pbsMonth={totals.pbsMonth}

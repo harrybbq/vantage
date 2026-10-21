@@ -1,0 +1,58 @@
+/* ── THIS WEEK, by muscle (WeekMuscles.jsx) — prefix `wm-` ──────────
+   Mockup 04 of the adaptive-training design. Reads the Lifts tokens
+   (lifts-tokens.css); works in Dark OS and Cream through them.
+   Row: name · bar · "12 / 30" · two hit dots · chevron. At 360 px the
+   card's inner width is ~296 px, so the name and value columns are
+   fixed and the bar takes what is left. Rows are buttons: ≥ 44 px tall
+   on coarse pointers (--lf-hit). Desktop (≥ 1024): upper and lower body
+   in two columns. */
+
+.lifts .wm { display: flex; flex-direction: column; gap: 12px; }
+.lifts .wm-cols { display: grid; grid-template-columns: minmax(0, 1fr); min-width: 0; }
+@media (min-width: 1024px) {
+  .lifts .wm-cols { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 32px; align-items: start; }
+}
+.lifts .wm-list { list-style: none; margin: 0; padding: 0; min-width: 0; }
+.lifts .wm-g { border-bottom: 1px solid var(--lf-line); min-width: 0; }
+.lifts .wm-list:last-child > .wm-g:last-child { border-bottom: 0; }
+@media (min-width: 1024px) { .lifts .wm-list > .wm-g:last-child { border-bottom: 0; } }
+
+.lifts .wm-row {
+  display: grid; grid-template-columns: 92px minmax(28px, 1fr) 82px 20px 14px; align-items: center; gap: 8px;
+  width: 100%; min-height: var(--lf-hit); padding: 4px 0; margin: 0; border: 0; background: none; cursor: pointer;
+  font-family: var(--lf-font); font-size: max(14px, var(--lf-fs-floor)); line-height: 18px; color: var(--lf-text); text-align: left;
+  border-radius: var(--lf-r-chip);
+}
+@media (hover: hover) { .lifts .wm-row:hover .wm-n { color: var(--lf-accent-ink); } }
+.lifts .wm-n { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.lifts .wm-g.is-open .wm-n { font-weight: 600; }
+.lifts .wm-chev { color: var(--lf-muted); justify-self: end; }
+
+.lifts .wm-bar { display: block; height: 6px; border-radius: 3px; background: var(--lf-s3); overflow: hidden; min-width: 0;
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--lf-line-strong) 35%, transparent); }
+.lifts .wm-bar > i { display: block; height: 100%; border-radius: 3px; background: var(--lf-accent); }
+.lifts .wm-v { font-size: var(--lf-fs-floor); font-weight: 500; line-height: 16px; color: var(--lf-mid); text-align: right; white-space: nowrap; }
+
+.lifts .wm-dots { display: flex; gap: 4px; justify-content: flex-end; }
+.lifts .wm-dots > i { width: 8px; height: 8px; border-radius: 50%; box-sizing: border-box; border: 1px solid var(--lf-line-strong); }
+.lifts .wm-dots > i.on { background: var(--lf-accent); border-color: var(--lf-accent); }
+
+/* Parts — indented under their group, same bar and value columns. */
+.lifts .wm-parts { list-style: none; margin: 0 0 8px; padding: 4px 0 4px 12px; border-left: 2px solid var(--lf-line); display: flex; flex-direction: column; }
+.lifts .wm-p { display: grid; grid-template-columns: minmax(0, 1fr) minmax(28px, .8fr) 82px; align-items: center; gap: 8px; min-height: 30px; padding: 3px 0;
+  font-size: max(13px, var(--lf-fs-floor)); line-height: 18px; color: var(--lf-mid); }
+.lifts .wm-pn { min-width: 0; overflow-wrap: anywhere; }
+/* The value column lines up with the group rows' (their dots + chevron sit after it). */
+.lifts .wm-p { margin-right: 42px; }
+
+.lifts .wm-legend { margin: 0; font-size: var(--lf-fs-floor); line-height: 16px; color: var(--lf-muted); }
+
+.lifts .wm-warn { margin: 0; padding: 9px 11px; border-radius: var(--lf-r-cell); font-size: max(13px, var(--lf-fs-floor)); line-height: 19px;
+  color: var(--lf-pb); background: var(--lf-pb-tint); border: 1px solid color-mix(in srgb, var(--lf-pb) 35%, transparent); }
+
+.lifts .wm-changes { padding: 10px 11px; border-radius: var(--lf-r-cell); background: var(--lf-s2); font-size: max(13px, var(--lf-fs-floor)); line-height: 19px; color: var(--lf-mid); }
+.lifts .wm-changes-h { margin: 0 0 2px; font-weight: 600; color: var(--lf-text); }
+.lifts .wm-changes ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2px; }
+.lifts .wm-changes li { overflow-wrap: anywhere; }
+.lifts .wm-chg { font-weight: 500; color: var(--lf-muted); }
+.lifts .wm-chg.is-up { color: var(--lf-accent-ink); }
