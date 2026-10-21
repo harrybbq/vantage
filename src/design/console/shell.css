@@ -288,6 +288,18 @@ html[data-design="console"] .cx-shell-pro > svg:first-child { color: var(--cx-ac
   }
 }
 
+/* ── Lifts' live workout ──
+   Focus mode (html[data-lifts-focus], phones and tablets; Lifts
+   workout.css) hides classic's app bar and tab bar so the workout header
+   — with Finish — owns the top of the screen. The console bars have to
+   step aside the same way, or the fixed app bar sits on top of that
+   sticky header. On desktop the header sticks below the bar: classic's
+   52 px offset is short of the console's 60 px top bar. */
+html[data-design="console"][data-lifts-focus] .cx-shell-appbar,
+html[data-design="console"][data-lifts-focus] .cx-shell-tabs,
+html[data-design="console"][data-lifts-focus] .cx-shell-top { display: none !important; }
+html[data-design="console"] .lifts .lw-live.is-desktop .lw-head { top: var(--cx-shell-top-h); }
+
 /* ── Page container: .cx-page ─────────────────────────────────────────
    A console section renders <section className="section active cx-page
    cx-<area>-page">. Classic .section gives the 56 px rail offset, and on
