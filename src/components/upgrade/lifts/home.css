@@ -462,3 +462,18 @@
 .lifts .lh-imp-text { width: 100%; box-sizing: border-box; min-height: 140px; padding: 10px 12px; resize: vertical; font-family: var(--lf-mono); font-size: 16px; line-height: 22px; color: var(--lf-text); }
 .lifts .lh-imp-sum, .lifts .lh-imp-ok { font-size: var(--lf-fs-body); color: var(--lf-text); font-weight: 600; }
 .lifts .lh-imp-bad { font-size: max(13px, var(--lf-fs-floor)); color: var(--lf-danger); }
+
+/* Total lifted (HistoryCard): three figures in a row, or label/figure
+   rows when the card is too narrow for full kilogram figures side by side
+   ("859,130 kg" is ~130 px at 20 px). */
+.lifts .lh-lifted-wrap { container-type: inline-size; }
+.lifts .lh-lifted { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin: 0; }
+.lifts .lh-lifted > div { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.lifts .lh-lifted dt { font-size: max(12px, var(--lf-fs-floor)); color: var(--lf-muted); }
+.lifts .lh-lifted dd { margin: 0; font-size: 20px; line-height: 26px; font-weight: 600; color: var(--lf-text); white-space: nowrap; }
+@container (max-width: 520px) {
+  .lifts .lh-lifted { grid-template-columns: minmax(0, 1fr); gap: 6px; }
+  .lifts .lh-lifted > div { flex-direction: row; align-items: baseline; justify-content: space-between; gap: 12px; }
+  .lifts .lh-lifted dt { font-size: var(--lf-fs-body); }
+  .lifts .lh-lifted dd { font-size: 18px; line-height: 24px; overflow: hidden; text-overflow: ellipsis; }
+}

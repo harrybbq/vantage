@@ -3,7 +3,7 @@
  * Invented data only — this file is public. Run: npm run check:lifts
  */
 import assert from 'node:assert/strict';
-import { workoutDays, yearGrid, historyYears, parsePastDays, mergePastDays, shadeOf, pastDayCount } from './history.js';
+import { workoutDays, yearGrid, historyYears, parsePastDays, mergePastDays, shadeOf, pastDayCount, liftedTotals, liftedText } from './history.js';
 
 let n = 0;
 const t = (name, fn) => { try { fn(); n++; } catch (e) { console.error(`✗ ${name}`); throw e; } };
@@ -72,6 +72,21 @@ t('merging is additive and idempotent', () => {
   const fresh = mergePastDays({ other: 1 }, { '2024-01-01': 1 });
   assert.equal(fresh.other, 1);
   assert.equal(pastDayCount(fresh), 1);
+});
+
+t('total lifted: weight x reps, both dumbbells, added weight only for bodyweight', () => {
+  const S2 = { lifts: { list: [{ id: 'lp', load: 'weight' }, { id: 'db', load: 'per_hand' }, { id: 'dip', load: 'bodyweight_plus' }], log: [
+    { liftId: 'lp', date: '2026-10-13', weight: 100, reps: 10 },      // 1000
+    { liftId: 'db', date: '2026-10-02', weight: 20, reps: 10 },       // 400 (two dumbbells)
+    { liftId: 'dip', date: '2026-03-05', weight: 10, reps: 8 },       // 80 (added weight)
+    { liftId: 'dip', date: '2026-03-05', weight: 0, reps: 12 },       // bodyweight only: 0
+    { liftId: 'lp', date: '2025-12-30', weight: 140, reps: 5 },       // 700, last year
+    { liftId: 'lp', date: '2026-10-14', weight: 'x', reps: 5 },       // junk
+  ] } };
+  const r = liftedTotals(S2, '2026-10-20');
+  assert.deepEqual(r, { all: 2180, year: 1480, month: 1400, sets: 4 }, 'a bodyweight-only set adds no weight, so is not a weighted set');
+  assert.equal(liftedTotals({}, '2026-10-20').all, 0, 'no store, nothing lifted');
+  assert.deepEqual([liftedText(8450), liftedText(12430), liftedText(1203900)], ['8,450 kg', '12,430 kg', '1,203,900 kg']);
 });
 
 console.log(`history: ${n} tests passed`);
