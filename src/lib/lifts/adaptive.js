@@ -133,10 +133,17 @@ const workSets = ex => (ex.sets || []).filter(s => s && s.done !== false && s.ty
 
 const addInto = (into, parts, sets) => { for (const [p, w] of Object.entries(parts)) into[p] = (into[p] || 0) + w * sets; return into; };
 
-/** What one programme session asks of each part → { part: sets }. Optional exercises are not owed. */
-export function sessionParts(code) {
+/**
+ * What one programme session asks of each part → { part: sets }.
+ * Optional exercises are left out by default — they may not happen, so
+ * nothing PROJECTS them (anchors still to come, sessions assumed before
+ * the first log, the catch-up). `{ optional: true }` counts them: the
+ * week's targets do (the owner tracks triceps long head, whose only
+ * programme source is Push's optional overhead extension).
+ */
+export function sessionParts(code, { optional = false } = {}) {
   const out = {};
-  for (const x of PROGRAMME[code] || []) if (!x.optional) addInto(out, partsOf({ name: x.name }), num(x.sets) || 0);
+  for (const x of PROGRAMME[code] || []) if (optional || !x.optional) addInto(out, partsOf({ name: x.name }), num(x.sets) || 0);
   return out;
 }
 /** Group sets a programme session gives each group → { group: sets }. */
@@ -146,11 +153,21 @@ const groupsOfParts = parts => {
   return out;
 };
 
-/** The programme's week → { part: sets }: all five sessions added up. */
+/** Targets are whole or half sets. */
+export const round05 = n => Math.round(n * 2) / 2;
+/** A part the programme gives less than this a week has no target (it's a side effect, not a job). */
+export const MIN_TARGET = 1.5;
+
+/**
+ * The programme's week → { part: sets }: all five sessions added up,
+ * optional exercises included, rounded to the nearest half set. Parts
+ * under MIN_TARGET (glute medius from the lunges) get no target.
+ */
 export const BASE_TARGETS = (() => {
+  const sum = {};
+  for (const code of Object.keys(PROGRAMME)) for (const [p, n] of Object.entries(sessionParts(code, { optional: true }))) sum[p] = (sum[p] || 0) + n;
   const out = {};
-  for (const code of Object.keys(PROGRAMME)) for (const [p, n] of Object.entries(sessionParts(code))) out[p] = (out[p] || 0) + n;
-  for (const p of Object.keys(out)) out[p] = round1(out[p]);
+  for (const [p, n] of Object.entries(sum)) if (n >= MIN_TARGET - 1e-9) out[p] = round05(n);
   return out;
 })();
 
@@ -304,15 +321,15 @@ function computeTargets(S, L, today) {
       const best = lift ? bests.get(norm(lift)) ?? null : null;
       const prev = lastBest[p] ?? null;
       const trend = best == null || prev == null ? null : best > prev * 1.01 ? 1 : best < prev * 0.99 ? -1 : 0;
-      // Full: the week's sets reached the target (rounding slack: BASE is rounded to 0.1).
-      const full = (done[p] || 0) >= targets[p] - 0.06;
+      // Full: the week's sets reached the target (slack for the half-set rounding).
+      const full = (done[p] || 0) >= targets[p] - 0.25 - 1e-9;
       if (full) { if (!streak[p]) streakFrom[p] = prev ?? best; streak[p] = (streak[p] || 0) + 1; } else streak[p] = 0;
       if (trend === -1) { if (!drops[p]) dropFrom[p] = prev; drops[p] = (drops[p] || 0) + 1; } else if (trend !== null) drops[p] = 0;
       if (best != null) lastBest[p] = best;
       const from = targets[p];
       const name = lift ? lift.toLowerCase() : 'its main lift';
       if (streak[p] >= 2 && trend !== -1) {
-        targets[p] = Math.min(round1(base * 1.5), round1(from + 1));
+        targets[p] = Math.min(round05(base * 1.5), from + 1);
         const a = streakFrom[p], z = lastBest[p];
         streak[p] = 0;
         if (targets[p] !== from) {
@@ -320,7 +337,7 @@ function computeTargets(S, L, today) {
           made.push({ part: p, from, to: targets[p], why: `100% two weeks running${lift1}` });
         }
       } else if (drops[p] >= 2) {
-        targets[p] = Math.max(round1(base * 0.7), round1(from - 1));
+        targets[p] = Math.max(round05(base * 0.7), from - 1);
         const a = dropFrom[p], z = lastBest[p];
         drops[p] = 0;
         streak[p] = 0;
@@ -358,26 +375,29 @@ export function weekView(S, today, { extra = null } = {}) {
   if (!week) return null;
   const L = liftsOf(S);
   const workouts = extra ? [...week.workouts, extra] : week.workouts;
+  // The workout being finished may BE a missed anchor: saved, the plan reclaims it.
+  const extraCode = extra ? sessionOfWorkout(extra, L.list) : null;
+  const missed = week.missed.filter(c => c !== extraCode);
   const t = tally(workouts, L.list);
   const a = assumedLoad({ ...week, workouts }, L.list);
   const { targets, changes } = weekTargets(S, today);
   const parts = PARTS.map(([part, group]) => ({
     part, group,
     done: round1((t.parts[part] || 0) + (a.parts[part] || 0)),
-    target: round1(targets[part] || 0),
+    target: targets[part] || 0,
   })).filter(p => p.target > 0 || p.done > 0);
   const groups = GROUPS.map(group => {
     const ps = parts.filter(p => p.group === group);
     return {
       group,
       done: round1(ps.reduce((s, p) => s + p.done, 0)),
-      target: round1(ps.reduce((s, p) => s + p.target, 0)),
+      target: ps.reduce((s, p) => s + p.target, 0),
       hits: (t.hits[group] || 0) + (a.hits[group] || 0),
     };
   }).filter(g => g.target > 0 || g.done > 0);
   return {
-    start: week.start, end: week.end, label: week.label, missed: week.missed,
-    belowStandard: week.missed.length > 0, parts, groups, changes,
+    start: week.start, end: week.end, label: week.label, missed,
+    belowStandard: missed.length > 0, parts, groups, changes,
   };
 }
 
@@ -469,7 +489,7 @@ export function buildAdaptive(S, today, session) {
   // A missed anchor is accepted as missed: its share comes off the week.
   const catchUp = ANCHORS[session].filter(c => week.missed.includes(c));
   const forgiven = {};
-  for (const c of catchUp) addInto(forgiven, sessionParts(c), 1);
+  for (const c of catchUp) addInto(forgiven, sessionParts(c, { optional: true }), 1);
 
   const need = {};
   for (const [p, g] of PARTS) {

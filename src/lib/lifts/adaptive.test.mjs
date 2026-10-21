@@ -9,7 +9,7 @@
 import assert from 'node:assert/strict';
 import {
   PARTS, GROUP_OF, GROUPS, UPPER_GROUPS, LOWER_GROUPS, PRIORITY, EXERCISE_PARTS, partsOf, sessionParts,
-  BASE_TARGETS, weekTargets, readinessOn, RED_RPE_CAP, weekView, buildAdaptive, trimForRed, adaptStretches, MAX_HISTORY,
+  BASE_TARGETS, MIN_TARGET, weekTargets, readinessOn, RED_RPE_CAP, weekView, buildAdaptive, trimForRed, adaptStretches, MAX_HISTORY,
 } from './adaptive.js';
 import { suggestWorkout, suggestedStart, startWorkout, activeOf, progId, estimateMinutes } from './workout.js';
 import { blockProgress } from './plan.js';
@@ -88,6 +88,15 @@ t('parts: every programme exercise is mapped, every part rolls up to a known gro
 });
 t('BASE_TARGETS: the programme week, lower back twice (Legs 4 + Lower 2)', () => {
   assert.equal(BASE_TARGETS['Lower back'], 6);
+  for (const [p, v] of Object.entries(BASE_TARGETS)) assert.equal(v * 2, Math.round(v * 2), `${p}: whole or half sets (${v})`);
+  assert.equal(BASE_TARGETS['Triceps long head'], 2, 'Push’s optional overhead extension counts toward the target');
+  assert.equal(BASE_TARGETS['Triceps lateral & medial'], 12, '11.75 → 12');
+  assert.equal(BASE_TARGETS.Abs, 4, '3.75 → 4');
+  assert.equal(BASE_TARGETS['Outer & inner quads'], 13, 'the optional walking lunge included');
+  assert.equal(BASE_TARGETS['Glute medius'], 1.5, 'two lunges × 0.25 × 3 = 1.5: right at MIN_TARGET');
+  assert.ok(Object.values(BASE_TARGETS).every(v => v >= MIN_TARGET), 'nothing under MIN_TARGET has a target');
+  assert.equal(sessionParts('Push')['Triceps long head'], undefined, 'projections leave optional work out');
+  assert.equal(sessionParts('Push', { optional: true })['Triceps long head'], 2);
   assert.equal(BASE_TARGETS['Side delts'], 10.5, 'lateral raise 4 + 5, shoulder press 3 × 0.5');
   assert.equal(BASE_TARGETS.Lats, 15.5);
   assert.equal(sessionParts('Push')['Side delts'], 5.5);
@@ -151,11 +160,23 @@ t('weekView: sessions before the first workout ever logged are counted from the 
   assert.equal(grp('Quads').hits, 1, 'Legs logged');
   assert.equal(v.parts.find(p => p.part === 'Lats').done, 10);
 });
-t('weekView: a missed Push → below standard', () => {
+t('weekView: a missed Push → below standard; finishing that Push later reclaims it, saved or not', () => {
   const v = weekView(S_([W(B.pull, 'Pull'), W(B.legs, 'Legs')]), B.upper);
   assert.deepEqual(v.missed, ['Push']);
   assert.equal(v.belowStandard, true);
   assert.equal(v.groups.find(g => g.group === 'Chest').hits, 0);
+  // Push day passed empty, Pull logged; Push finished today on the Finish sheet (not saved yet).
+  const S = S_([W(B.pull, 'Pull')]);
+  assert.deepEqual(weekView(S, B.legs).missed, ['Push']);
+  const live = W(B.legs, 'Push');
+  const before = weekView(S, B.legs, { extra: live });
+  assert.deepEqual(before.missed, [], 'the unsaved Push counts as Push');
+  assert.equal(before.belowStandard, false);
+  const saved = weekView({ ...S, lifts: { ...S.lifts, sessions: [...S.lifts.sessions, live] } }, B.legs);
+  assert.deepEqual(saved.missed, [], 'same once saved');
+  assert.deepEqual(before.groups, saved.groups, 'and the same numbers');
+  // An unsaved Legs doesn't reclaim the missed Push.
+  assert.deepEqual(weekView(S, B.legs, { extra: W(B.legs, 'Legs') }).missed, ['Push']);
 });
 
 // ── (a) P / P / L at 100 % → Upper ─────────────────────────────────
@@ -164,9 +185,15 @@ t('(a) Upper after Push, Pull and Legs on plan: the written Upper, every group�
   const S = PPL();
   const r = buildAdaptive(S, B.upper, 'Upper');
   assert.ok(r && r.exercises.length >= 5);
-  assert.deepEqual(r.exercises.map(x => x.name).sort(), PROGRAMME.Upper.map(x => x.name).sort(), 'the same seven movements as written');
+  // The written seven, plus the long-head work Push's optional extension would have done.
+  assert.deepEqual(r.exercises.map(x => x.name).sort(), [...PROGRAMME.Upper.map(x => x.name), 'Overhead cable bar extension'].sort());
   for (const x of PROGRAMME.Upper) assert.equal(byName(r, x.name).sets, x.sets, `${x.name}: ${x.sets} sets, as written`);
-  assert.equal(sum(r.exercises), writtenSets('Upper'));
+  assert.deepEqual(byName(r, 'Overhead cable bar extension').tags[0], { kind: 'need', text: 'triceps long head 0 / 2' });
+  assert.equal(sum(r.exercises), writtenSets('Upper') + 2);
+  // Push with its optional extension done → nothing owed to long head: exactly the written Upper.
+  const full = buildAdaptive(S_([W(B.push, 'Push', { extra: [{ liftId: progId('Overhead cable bar extension'), sets: 2, weight: 30 }] }), W(B.pull, 'Pull'), W(B.legs, 'Legs')]), B.upper, 'Upper');
+  assert.deepEqual(full.exercises.map(x => x.name).sort(), PROGRAMME.Upper.map(x => x.name).sort(), 'the same seven movements as written');
+  assert.equal(sum(full.exercises), writtenSets('Upper'));
   const lat = byName(r, 'Dumbbell lateral raise');
   assert.equal(lat.sets, Math.max(...r.exercises.map(x => x.sets)), 'side delts carry the most sets (taper)');
   assert.match(lat.why, /taper priority/);
@@ -209,8 +236,12 @@ t('(a) Lower after Legs: hyperextension gives lower back its second hit', () => 
   assert.equal(hyper.sets, 2);
   assert.match(hyper.why, /lower back's second hit/);
   assert.deepEqual(hyper.tags[0], { kind: 'need', text: 'lower back 4 / 6' });
-  assert.ok(Math.abs(sum(r.exercises) - writtenSets('Lower')) <= 3, `${sum(r.exercises)} sets vs ${writtenSets('Lower')} written`);
-  assert.ok(!r.exercises.some(x => x.name === 'Walking dumbbell lunge'), 'the written Reverse lunge wins over Legs’ optional lunge');
+  assert.match(byName(r, 'Reverse lunge').why, /^quads' second hit/, 'the written Reverse lunge wins the quads’ hit');
+  // Legs skipped its optional walking lunge, which the week's target counts: Lower picks up a little of it.
+  assert.ok(sum(r.exercises) - writtenSets('Lower') <= 4, `${sum(r.exercises)} sets vs ${writtenSets('Lower')} written`);
+  const withLunge = buildAdaptive(S_([W(B.push, 'Push'), W(B.pull, 'Pull'), W(B.legs, 'Legs', { extra: [{ liftId: progId('Walking dumbbell lunge'), sets: 3, weight: 20 }] }), W(B.upper, 'Upper')]), B.lower, 'Lower');
+  assert.ok(!withLunge.exercises.some(x => x.name === 'Walking dumbbell lunge'), 'Legs did its optional lunge → none on Lower');
+  assert.ok(Math.abs(sum(withLunge.exercises) - writtenSets('Lower')) <= 2, `${sum(withLunge.exercises)} sets vs ${writtenSets('Lower')} written`);
   const after = weekView(S, B.lower, { extra: asWorkout(r, B.lower, 'Lower') });
   for (const g of LOWER_GROUPS) assert.ok(after.groups.find(x => x.group === g).hits >= 2, `${g}: two hits`);
 });
@@ -225,7 +256,8 @@ t('buildAdaptive: null for an anchor, outside the rota, and before any workout i
 t('(b) Push missed → Upper carries +1 set per group Push owed, tagged; not a mammoth', () => {
   const S = S_([W(B.pull, 'Pull'), W(B.legs, 'Legs')]);
   const r = buildAdaptive(S, B.upper, 'Upper');
-  const normal = buildAdaptive(PPL(), B.upper, 'Upper');
+  // On plan with Push's optional extension done (a missed Push forgives its whole share, optional included).
+  const normal = buildAdaptive(S_([W(B.push, 'Push', { extra: [{ liftId: progId('Overhead cable bar extension'), sets: 2, weight: 30 }] }), W(B.pull, 'Pull'), W(B.legs, 'Legs')]), B.upper, 'Upper');
   assert.deepEqual(r.catchUp, ['Push']);
   assert.equal(r.belowStandard, true);
   assert.equal(r.catchUpSets, 3, 'chest, shoulders, triceps');
@@ -325,10 +357,12 @@ t('(e) two full weeks with the main lift rising → +1, with the reason', () => 
   const ch = p => changes.find(c => c.part === p);
   assert.equal(targets.Lats, 16.5);
   assert.deepEqual(ch('Lats'), { part: 'Lats', from: 15.5, to: 16.5, why: '100% two weeks running, lat pulldown up 100 kg → 103.5 kg' });
-  assert.equal(ch('Triceps lateral & medial').to, 12.8, 'a part whose base was rounded (11.75 → 11.8) still counts as full');
-  assert.equal(ch('Abs').to, 4.8, 'Abs 3.75 → 3.8, same');
+  assert.equal(ch('Triceps lateral & medial').to, 13, 'a part whose base was rounded up (11.75 → 12) still counts as full');
+  assert.equal(ch('Abs').to, 5, 'Abs 3.75 → 4, same');
   assert.equal(ch('Glute medius'), undefined, 'parts under two sets a week are left alone');
-  assert.ok(changes.every(c => c.to === c.from + 1 || c.to === Math.round((c.from + 1) * 10) / 10));
+  assert.equal(ch('Triceps long head'), undefined, 'the optional extension was never done: not full');
+  assert.equal(ch('Outer & inner quads'), undefined, 'nor the optional lunge');
+  assert.ok(changes.every(c => c.to === c.from + 1));
   // The week view carries the raised target and the changes.
   const v = weekView(S, B.push);
   assert.equal(v.parts.find(p => p.part === 'Lats').target, 16.5);
