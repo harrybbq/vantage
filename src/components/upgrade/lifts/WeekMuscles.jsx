@@ -67,7 +67,7 @@ export default function WeekMuscles({ S, today }) {
     const label = `${g.group}: ${fmt(g.done)} of ${g.target > 0 ? fmt(g.target) : 'no'} sets, ${hits} of 2 sessions hit`;
     return (
       <li key={g.group} className={`wm-g${isOpen ? ' is-open' : ''}`}>
-        <button type="button" className="wm-row" aria-expanded={isOpen} aria-controls={id} aria-label={label}
+        <button type="button" className="wm-row" aria-expanded={isOpen} aria-controls={isOpen ? id : undefined} aria-label={label}
                 onClick={() => setOpen(isOpen ? null : g.group)} data-testid="wm-row">
           <span className="wm-n" aria-hidden="true">{g.group}</span>
           <Bar done={g.done} target={g.target} />
