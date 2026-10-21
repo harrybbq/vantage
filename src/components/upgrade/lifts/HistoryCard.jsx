@@ -16,7 +16,7 @@
  */
 import { useMemo, useState } from 'react';
 import { Sheet, Button } from './ui';
-import { workoutDays, yearGrid, historyYears, parsePastDays, mergePastDays, pastDayCount } from '../../../lib/lifts/history';
+import { workoutDays, yearGrid, historyYears, parsePastDays, mergePastDays, pastDayCount, liftedTotals, liftedText } from '../../../lib/lifts/history';
 
 const CELL = 10, GAP = 3, PITCH = CELL + GAP;
 const DOW = ['M', '', 'W', '', 'F', '', ''];
@@ -76,6 +76,7 @@ function YearBlock({ g, today, head = 'h3' }) {
 
 export default function HistoryCard({ S, update, today }) {
   const counts = useMemo(() => workoutDays(S), [S]);
+  const lifted = useMemo(() => liftedTotals(S, today), [S, today]);
   const years = useMemo(() => historyYears(counts, today), [counts, today]);
   const grids = useMemo(() => years.map(y => yearGrid(y, counts, today)), [years, counts, today]);
   const [sheet, setSheet] = useState(null);   // 'all' | 'import'
@@ -88,6 +89,13 @@ export default function HistoryCard({ S, update, today }) {
         <p className="lf-eyebrow" id="lh-hist-h">// Workout history</p>
         {grids.length > 1 && <span className="lf-meta">{plural(all, 'workout')} since {grids[grids.length - 1].year}</span>}
       </div>
+      {lifted.sets > 0 && (
+        <dl className="lh-lifted" data-testid="lh-lifted">
+          <div><dt>Total lifted</dt><dd className="lf-num">{liftedText(lifted.all)}</dd></div>
+          <div><dt>This year</dt><dd className="lf-num">{liftedText(lifted.year)}</dd></div>
+          <div><dt>This month</dt><dd className="lf-num">{liftedText(lifted.month)}</dd></div>
+        </dl>
+      )}
       <YearBlock g={grids[0]} today={today} />
       <Legend />
       <div className="lh-hist-acts">

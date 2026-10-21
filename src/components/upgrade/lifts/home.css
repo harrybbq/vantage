@@ -462,3 +462,9 @@
 .lifts .lh-imp-text { width: 100%; box-sizing: border-box; min-height: 140px; padding: 10px 12px; resize: vertical; font-family: var(--lf-mono); font-size: 16px; line-height: 22px; color: var(--lf-text); }
 .lifts .lh-imp-sum, .lifts .lh-imp-ok { font-size: var(--lf-fs-body); color: var(--lf-text); font-weight: 600; }
 .lifts .lh-imp-bad { font-size: max(13px, var(--lf-fs-floor)); color: var(--lf-danger); }
+
+/* Total lifted (HistoryCard): three figures in a row, wrapping on a phone. */
+.lifts .lh-lifted { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin: 0; }
+.lifts .lh-lifted > div { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.lifts .lh-lifted dt { font-size: max(12px, var(--lf-fs-floor)); color: var(--lf-muted); }
+.lifts .lh-lifted dd { margin: 0; font-size: 20px; line-height: 26px; font-weight: 600; color: var(--lf-text); white-space: nowrap; }

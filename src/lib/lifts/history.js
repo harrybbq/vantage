@@ -129,6 +129,40 @@ export function mergePastDays(prev, days) {
   });
 }
 
+/**
+ * Weight lifted across the whole log, with volume()'s rule (lib/lifts/
+ * workout.js): weight × reps for every logged set, both dumbbells for a
+ * per-dumbbell lift, and only the ADDED weight for a bodyweight lift
+ * (bodyweight is not load you put on). Warm-ups count: it was lifted.
+ * Imported past days carry no sets, so they add nothing here.
+ * → { all, year, month, sets } in kg, `today` 'YYYY-MM-DD' for the windows.
+ */
+export function liftedTotals(S, today = '') {
+  const L = liftsOf(S);
+  const per = new Map(L.list.map(l => [l.id, l && l.load === 'per_hand' ? 2 : 1]));
+  const y = String(today).slice(0, 4), ym = String(today).slice(0, 7);
+  let all = 0, year = 0, month = 0, sets = 0;
+  for (const e of L.log) {
+    if (!e) continue;
+    const w = Number(e.weight), r = Number(e.reps);
+    if (!Number.isFinite(w) || !Number.isFinite(r) || w <= 0 || r <= 0) continue;
+    const v = w * r * (per.get(e.liftId) || 1);
+    all += v; sets++;
+    if (y && String(e.date).startsWith(y)) year += v;
+    if (ym && String(e.date).startsWith(ym)) month += v;
+  }
+  const r2 = n => Math.round(n * 100) / 100;
+  return { all: r2(all), year: r2(year), month: r2(month), sets };
+}
+
+/** "8,450 kg" under 10 t, "12.4 t" from there, "1,204 t" past 1,000 t. */
+export function liftedText(kg) {
+  const v = Number(kg) || 0;
+  if (v < 10000) return `${Math.round(v).toLocaleString('en-GB')} kg`;
+  const t = v / 1000;
+  return `${t < 1000 ? t.toLocaleString('en-GB', { maximumFractionDigits: 1 }) : Math.round(t).toLocaleString('en-GB')} t`;
+}
+
 /** How many imported days the store holds. */
 export const pastDayCount = S => {
   const p = liftsOf(S).pastDays;
