@@ -478,9 +478,9 @@ t('date helpers', () => {
     assert.deepEqual(wk.map(c => c.iso), ['2026-10-12', '2026-10-13', '2026-10-14', '2026-10-15', '2026-10-16', '2026-10-17', '2026-10-18']);
     assert.deepEqual(wk.map(c => c.today), [false, true, false, false, false, false, false]);
     assert.equal(wk[0].missed, true, 'Pull passed untrained: missed');
-    assert.equal(wk[1].session, 'Pull', 'and carries forward onto today (plan.js rule)');
-    assert.equal(wk[1].moved, true);
-    assert.equal(wk[3].short, 'Upr', 'short names fit a 46 px cell');
+    assert.equal(wk[1].session, 'Legs', 'an anchor is accepted as missed, not carried (plan.js rule since 2026-10-21)');
+    assert.equal(wk[1].moved, false);
+    assert.equal(wk[2].short, 'Upr', 'short names fit a 46 px cell');
     assert.deepEqual(wk.slice(4).map(c => c.short), ['Rest', 'Rest', 'Rest']);
     assert.ok(wk.every(c => c.short.length <= 4));
     assert.equal(wk[4].code, 'Off');
@@ -506,15 +506,15 @@ t('date helpers', () => {
     assert.ok(dd.exercises.length > 0 && dd.exercises.every(x => x.name && x.sets));
     assert.equal(dayDetail(S, wk[5]).exercises.length, 0, 'a rest day lists no exercises');
   });
-  t('blockPips: done / today (+ carried) / to do, in PPLUL order', () => {
+  t('blockPips: done / missed anchor / today / to do, in PPLUL order', () => {
     const bp = blockPips(HS([W('a', '2026-10-11', 'Push')]), '2026-10-13');
     assert.deepEqual(bp.pips.map(p => p.letter).join(''), 'PPLUL');
-    assert.deepEqual(bp.pips.map(p => p.state), ['done', 'today', 'todo', 'todo', 'todo']);
-    assert.equal(bp.pips[1].carried, true, 'Pull was missed yesterday and carried onto today');
+    assert.deepEqual(bp.pips.map(p => p.state), ['done', 'missed', 'today', 'todo', 'todo']);
+    assert.equal(bp.pips[1].carried, false, 'Pull, an anchor, was missed yesterday — accepted, not carried');
     assert.equal(bp.done, 1);
     assert.equal(bp.total, 5);
     const later = blockPips(HS([W('a', '2026-10-11', 'Push')]), '2026-10-16');
-    assert.ok(later.pips.some(p => p.state === 'missed' && p.carried), 'a rest day: owed sessions read missed, carried');
+    assert.ok(later.pips.some(p => p.state === 'missed' && p.carried), 'a rest day: a missed Upper / Lower still reads missed, carried');
     assert.equal(nextTraining(HS([]), '2026-10-15').session, 'Push');
     assert.equal(nextTraining(HS([]), '2026-10-15').word, 'Mon');
     assert.equal(dayWord('2026-10-16', '2026-10-15'), 'tomorrow');

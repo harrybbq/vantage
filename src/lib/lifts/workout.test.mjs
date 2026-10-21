@@ -579,9 +579,10 @@ t('weekStrip: Mon–Sun with the rota session and trained days', () => {
   assert.equal(w[6].iso, '2026-10-18');
   assert.deepEqual(weekStrip(noHistory(), LEGS_DAY).map(d => d.session), ['Pull', 'Legs', 'Upper', 'Lower', null, null, null], 'no workouts logged: the rota');
   // Workouts are being logged and Sun (Push) + Mon (Pull) passed without one:
-  // both carry forward, so the strip shows the PLAN.
-  assert.deepEqual(w.map(d => d.session), ['Pull', 'Push', 'Pull', 'Legs', null, null, null]);
-  assert.deepEqual(w.map(d => d.moved), [false, true, true, true, false, false, false]);
+  // both are anchors, so they are accepted as missed (Upper picks them up)
+  // and the rest of the week keeps the rota.
+  assert.deepEqual(w.map(d => d.session), ['Pull', 'Legs', 'Upper', 'Lower', null, null, null]);
+  assert.deepEqual(w.map(d => d.moved), [false, false, false, false, false, false, false]);
   assert.equal(w[1].today, true);
   assert.equal(w.filter(d => d.trained).length, 0);
   const w2 = weekStrip(S, '2026-10-05');

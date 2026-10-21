@@ -113,11 +113,15 @@ export function blockPips(S, today) {
   const days = isIso(bp.start) ? plannedSessions(S, { from: bp.start, days: span, today }) : [];
   const tp = days.find(d => d.iso === today);
   const missed = new Set(days.filter(d => d.iso < today && d.missed).map(d => d.patternSession));
-  const codes = SEQ.filter(c => bp.done.includes(c) || bp.owed.includes(c));
+  // A missed anchor (Push / Pull / Legs) stays in the row, hatched — accepted
+  // as missed, not carried (plan.js); a missed Upper / Lower still carries.
+  const accepted = new Set(bp.missed || []);
+  const codes = SEQ.filter(c => bp.done.includes(c) || bp.owed.includes(c) || accepted.has(c));
   const pips = codes.map(c => {
     const done = bp.done.includes(c);
     const isToday = !done && !!tp && tp.trainingDay && tp.session === c;
-    return { code: c, letter: c[0], state: done ? 'done' : isToday ? 'today' : missed.has(c) ? 'missed' : 'todo', carried: !done && missed.has(c) };
+    const miss = accepted.has(c) || missed.has(c);
+    return { code: c, letter: c[0], state: done ? 'done' : isToday ? 'today' : miss ? 'missed' : 'todo', carried: !done && !accepted.has(c) && missed.has(c) };
   });
   return { pips, done: bp.done.length, total: bp.total || codes.length, label: bp.label };
 }
