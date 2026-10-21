@@ -109,6 +109,7 @@ t('Push on a Legs day → Legs carried to the next day (the reason says why)', (
   assert.deepEqual(p.map(x => x.session), ['Push', 'Pull', 'Push', 'Legs', 'Upper']);
   assert.deepEqual(p.map(x => x.source), ['pattern', 'done', 'done', 'dynamic', 'dynamic']);
   assert.equal(p[0].missed, true, 'Sunday passed with no workout');
+  assert.equal(p[0].why, 'Push missed here — done later this block', 'a missed anchor done later still counts as Push');
   assert.equal(p[2].moved, true, 'Push on a Legs day');
   assert.equal(p[3].why, 'Legs — moved from yesterday, you did Push yesterday');
   assert.notEqual(p[3].session, 'Upper', 'the day after Push is not Upper');
@@ -143,10 +144,12 @@ t('two sessions in one day cross off both', () => {
   assert.deepEqual(blockProgress(S, B.push).done, ['Push', 'Pull']);
 });
 
-t('training on a rest day crosses off an owed session; the rest day stays a rest day', () => {
+t('training on a rest day reclaims a missed anchor; the rest day stays a rest day', () => {
   const S = S_([W(B.pull, 'Pull'), W(B.legs, 'Legs'), W(B.upper, 'Upper'), W(B.lower, 'Lower')]);
-  // Thursday night: Push is owed (Sunday missed) and the block's training days are gone.
-  assert.deepEqual(blockProgress(S, B.rest1).owed, ['Push']);
+  // Thursday night: Push was missed on Sunday — an anchor, so accepted as missed, not owed.
+  assert.deepEqual(blockProgress(S, B.rest1).owed, []);
+  assert.deepEqual(blockProgress(S, B.rest1).missed, ['Push']);
+  assert.equal(blockProgress(S, B.rest1).label, '4 of 5 this block · block complete · Push missed');
   assert.equal(plannedOn(S, B.rest1, B.rest1).session, 'Rest', 'the plan changes WHAT, not WHETHER');
   const S2 = S_([W(B.pull, 'Pull'), W(B.legs, 'Legs'), W(B.upper, 'Upper'), W(B.lower, 'Lower'), W(B.rest1, 'Push')]);
   const bp = blockProgress(S2, B.rest2);
@@ -159,19 +162,23 @@ t('training on a rest day crosses off an owed session; the rest day stays a rest
   assert.deepEqual(effectiveOverrides(S2, { today: B.rest2 })[B.rest1], { session: 'Push', derived: 'done' });
 });
 
-t('a missed day carries forward', () => {
+t('a missed anchor is accepted (Upper picks it up); a missed Upper or Lower carries forward', () => {
   const S = S_([]);
   const p = plannedSessions(S, { from: B.push, days: 5, today: B.pull });
-  assert.deepEqual(p.map(x => x.session), ['Push', 'Push', 'Pull', 'Legs', 'Upper']);
+  assert.deepEqual(p.map(x => x.session), ['Push', 'Pull', 'Legs', 'Upper', 'Lower'], 'the rota stands: Push is not crammed in');
   assert.equal(p[0].missed, true);
-  assert.equal(p[0].why, 'Push missed — it carries forward');
-  assert.equal(p[1].why, 'Push — moved from yesterday, Push was missed yesterday');
-  assert.equal(blockProgress(S, B.pull).label, '0 of 5 this block · Push, Pull, Legs, Upper, Lower to do');
+  assert.equal(p[0].why, 'Push missed — Upper picks up a set for each muscle it owed');
+  assert.equal(blockProgress(S, B.pull).label, '0 of 5 this block · Pull, Legs, Upper, Lower to do · Push missed');
   const sug = suggestWorkout(S, B.pull);
-  assert.equal(sug.name, 'Push');
-  assert.equal(sug.rotaSession, 'Push');
-  assert.match(sug.reason, /^Day 2 · Push — moved from yesterday, Push was missed yesterday\. Your first Push logged here\.$/);
-  assert.equal(sug.plan.source, 'dynamic');
+  assert.equal(sug.name, 'Pull');
+  // Upper missed on Wednesday: it carries to Thursday, as before.
+  const U = S_([W(B.push, 'Push'), W(B.pull, 'Pull'), W(B.legs, 'Legs')]);
+  const q = plannedSessions(U, { from: B.upper, days: 2, today: B.lower });
+  assert.deepEqual(q.map(x => x.session), ['Upper', 'Upper']);
+  assert.equal(q[0].why, 'Upper missed — it carries forward');
+  // A missed Legs points at Lower.
+  const G = S_([W(B.push, 'Push'), W(B.pull, 'Pull')]);
+  assert.equal(plannedOn(G, B.legs, B.upper).why, 'Legs missed — Lower picks up a set for each muscle it owed');
 });
 
 t('before the first workout ever logged, past days count as the rota (no reshuffle on day one)', () => {
@@ -223,16 +230,16 @@ t('a hand-set Arms day drops the session it replaced; a hand swap moves it', () 
 t('night shifts keep the 80% load scale on a moved session', () => {
   const NIGHT = { push: '2026-10-19', pull: '2026-10-20' };
   const S = S_([], null, {});
-  S.lifts.list = [...LIST, { id: 'sp', name: 'Machine shoulder press', load: 'weight' }];
-  S.lifts.log = [{ id: 'l1', liftId: 'sp', date: '2026-10-14', weight: 60, reps: 8, createdAt: 1, gym: 'dxc' }];
+  S.lifts.list = [...LIST, { id: 'pd', name: 'Lat pulldown', load: 'weight' }];
+  S.lifts.log = [{ id: 'l1', liftId: 'pd', date: '2026-10-14', weight: 60, reps: 8, createdAt: 1, gym: 'dxc' }];
   const e = plannedOn(S, NIGHT.pull, NIGHT.pull);
-  assert.equal(e.session, 'Push', 'Monday night’s Push was missed and carries');
+  assert.equal(e.session, 'Pull', 'Monday night’s Push was missed — accepted, not carried');
   assert.equal(e.night, true);
   assert.equal(e.loadScale, 0.8);
   const sug = suggestWorkout(S, NIGHT.pull, { gym: 'dxc' });
-  assert.equal(sug.name, 'Push');
+  assert.equal(sug.name, 'Pull');
   assert.equal(sug.night, true);
-  assert.equal(sug.exercises.find(x => x.name === 'Machine shoulder press').weight, 47.5, '60 × 0.8 = 48 → 47.5');
+  assert.equal(sug.exercises.find(x => x.name === 'Lat pulldown').weight, 47.5, '60 × 0.8 = 48 → 47.5');
 });
 
 t('effectiveOverrides leaves the owner’s overrides byte-identical and never writes S', () => {
