@@ -87,7 +87,7 @@ const STEPS_CREAM = [
   {
     id: 'leaderboard', label: 'Leaderboard',
     title: 'Compete + climb',
-    body: 'Your OVR rating (Brain / Finance / Fitness / Social, each 0–99) ranks you against friends or globally, all-time or weekly climb. Add people straight from the board, message friends, and at OVR 99 Prestige up for a colour-band badge (GREEN I → CRIMSON X) and a reward: accents, an avatar frame, card styles. You choose whether you appear on the global board, in Settings → Privacy.',
+    body: 'Your OVR rating (Brain / Finance / Fitness / Social, each 0–99) ranks you against friends or globally, all-time or weekly climb. Add people straight from the board, message friends, and at OVR 99 Prestige up for a colour-band badge (GREEN I → CRIMSON X) and a reward: accents, an avatar frame, a solid badge. You choose whether you appear on the global board, in Settings → Privacy.',
     target: 'nav-tab-leaderboard', placement: 'right', arrowDir: 'left',
   },
   {
@@ -159,7 +159,7 @@ const STEPS_DARK = [
   {
     id: 'leaderboard', label: 'leaderboard',
     title: 'leaderboard',
-    body: 'Server-canonical ratings. Friends / Global × all-time / weekly-climb. Add friends straight from the board. At OVR 99: prestige — colour-band badge (forest → crimson) + a reward (accent / frame / card style), climb restarts, nothing else wiped. Global visibility: your call, settings → privacy.',
+    body: 'Server-canonical ratings. Friends / Global × all-time / weekly-climb. Add friends straight from the board. At OVR 99: prestige — colour-band badge (forest → crimson) + a reward (accent / frame / badge), climb restarts, nothing else wiped. Global visibility: your call, settings → privacy.',
     target: 'nav-tab-leaderboard', placement: 'right', arrowDir: 'left',
   },
   {
