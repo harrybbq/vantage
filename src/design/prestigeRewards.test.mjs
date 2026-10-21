@@ -98,6 +98,23 @@ const eq = (a, b, m) => { assert.deepEqual(a, b, m); n++; };
   }
 }
 
+// ── Frame attributes ──
+{
+  eq(R.frameAttrs(0), null, 'P0 → no attributes (avatar unchanged)');
+  eq(R.frameAttrs(1).className, 'pf pf-single', 'P1 classes');
+  eq(R.frameAttrs(4).className, 'pf pf-double', 'P4 classes');
+  eq(R.frameAttrs(12).className, 'pf pf-segmented pf-double', 'P12 keeps the outer ring');
+  eq(R.frameAttrs(16).className, 'pf pf-segmented pf-double pf-halo', 'P16 halo');
+  eq(R.frameAttrs(1).style, { '--pf-c': '#5dbb7a' }, 'band colour as a custom property');
+  eq(R.solidBadgeStyle(6), null, 'outline badge before P7');
+  const sb = R.solidBadgeStyle(10);
+  ok(sb && contrast(sb.color, sb.background) >= 4.5, 'solid badge text readable (yellow band)');
+  for (const b of PRESTIGE_BANDS) {
+    const st = R.solidBadgeStyle(Math.max(7, b.min));
+    ok(contrast(st.color, st.background) >= 4.5, `${b.key}: solid badge text ≥ 4.5`);
+  }
+}
+
 // ── Card styles ──
 {
   eq(R.CARD_STYLES[0].id, 'plain', 'plain first');

@@ -14,6 +14,7 @@ import { useLeaderboard } from '../hooks/useLeaderboard';
 import { ovrTier } from '../lib/ratings/tiers';
 import { listRelationshipIds, sendFriendRequest } from '../lib/friends/queries';
 import PrestigeBadge from './PrestigeBadge';
+import PrestigeFrame from './PrestigeFrame';
 import FriendRatingsModal from './FriendRatingsModal';
 
 const COLORS = ['#1a7a4a', '#2563eb', '#7c3aed', '#c2410c', '#0891b2', '#be185d', '#854d0e'];
@@ -191,12 +192,14 @@ export default function LeaderboardPanel({
                     <span className={`lb-rank${isMedal ? ' is-medal' : ''}`} style={{ color: medalColor(row.rank) }}>
                       {row.rank}
                     </span>
-                    {row.avatarUrl
-                      ? <img src={row.avatarUrl} alt="" className="lb-avatar lb-avatar-img" />
-                      : <span className="lb-avatar" style={{ background: avatarColor(row.username) }}>
-                          {initials(row.username)}
-                        </span>
-                    }
+                    <PrestigeFrame prestige={row.prestige}>
+                      {row.avatarUrl
+                        ? <img src={row.avatarUrl} alt="" className="lb-avatar lb-avatar-img" />
+                        : <span className="lb-avatar" style={{ background: avatarColor(row.username) }}>
+                            {initials(row.username)}
+                          </span>
+                      }
+                    </PrestigeFrame>
                     <span className="lb-name" style={row.nameColor ? { color: row.nameColor } : undefined}>{row.username}</span>
                     <PrestigeBadge prestige={row.prestige} size="sm" />
                     <span className="lb-secondary">{secondary}</span>

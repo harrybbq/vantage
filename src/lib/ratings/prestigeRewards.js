@@ -36,6 +36,7 @@
  * given to Pro: they are status.
  */
 import { PRESTIGE_BANDS, PRESTIGE_MAX, prestigeBadge, toRoman } from './prestige.js';
+import { onAccent, accentFor, contrast } from '../design/contrast.js';
 
 /** Honour stamps dated before this still unlock their old accent.
  *  Set a little after the release; the owner confirms it at deploy. */
@@ -221,6 +222,33 @@ export function frameFor(prestige) {
     badge: has('solid') ? 'solid' : 'outline',
     name: prestigeName(p),
   };
+}
+
+/**
+ * DOM attributes for an avatar frame, for both designs (the classes are
+ * styled by src/components/prestige-frame.css). null at P0, so a P0 avatar
+ * renders exactly as it did before prestige rewards existed.
+ *   { className: 'pf pf-double pf-halo', style: { '--pf-c': '#5dbb7a' }, title }
+ * A segmented ring keeps the outer ring of the double one under it.
+ */
+export function frameAttrs(prestige) {
+  const f = frameFor(prestige);
+  if (!f) return null;
+  const cls = ['pf', `pf-${f.ring}`];
+  if (f.ring === 'segmented') cls.push('pf-double');
+  if (f.halo) cls.push('pf-halo');
+  return { className: cls.join(' '), style: { '--pf-c': f.colour }, title: f.name };
+}
+
+/** Inline colours for a SOLID badge (P7+), else null (outline badge).
+ *  The text is whichever of near-black / white reads better on the band;
+ *  a band neither reaches 4.5:1 on (mid red) is deepened until it does. */
+export function solidBadgeStyle(prestige) {
+  const f = frameFor(prestige);
+  if (!f || f.badge !== 'solid') return null;
+  const ink = onAccent(f.colour);
+  const bg = contrast(ink, f.colour) >= 4.5 ? f.colour : accentFor(f.colour, ink, 4.5);
+  return { background: bg, color: ink, borderColor: bg };
 }
 
 // ── Hub card styles (console) ───────────────────────────────────────
