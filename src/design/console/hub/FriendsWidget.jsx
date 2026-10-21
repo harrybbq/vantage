@@ -52,7 +52,7 @@ function FriendRow({ f, onOpen, selected = false }) {
     <li>
       <button type="button" className={`cx-hub-fr${selected ? ' is-on' : ''}`} onClick={() => onOpen(f.id)}
               aria-label={`${f.name}${f.unread ? `, ${f.unread} unread` : ''}, OVR ${f.ovr ?? 'unknown'}`}>
-        <Avatar name={f.name} url={f.avatar_url} size={32} online={f.online} />
+        <Avatar name={f.name} url={f.avatar_url} size={32} online={f.online} prestige={f.prestige} />
         <span className="cx-hub-fr-txt">
           <span className="cx-hub-fr-nm"><span className={`cx-hub-ell${f.unread ? ' is-strong' : ''}`}>{f.name}</span><Diamonds n={f.prestige} /></span>
           {f.lastText
@@ -178,7 +178,7 @@ export function FriendCardCx({ f, hub, showMessage = true, inSheet = false }) {
   return (
     <div className={`cx-hub-fc${inSheet ? ' is-sheet' : ''}`}>
       <div className="cx-hub-fc-head">
-        <Avatar name={f.name} url={f.avatar_url} size={56} online={f.online} />
+        <Avatar name={f.name} url={f.avatar_url} size={56} online={f.online} prestige={f.prestige} />
         <div className="cx-hub-fc-id">
           <span className="cx-hub-fc-nm"><span className="cx-hub-ell">{f.name}</span><Diamonds n={f.prestige} /></span>
           <span className="cx-hub-fc-sub">{f.handle ? `@${f.handle}` : ''}{f.online ? <> · <span className="cx-hub-onl">online now</span></> : f.lastSeenDays != null ? ` · ${seenLine(f).toLowerCase()}` : ''}</span>
@@ -271,7 +271,7 @@ export function FriendTakeover({ hub }) {
       </div>
       <div className="cx-hub-take-chat">
         <div className="cx-hub-take-h">
-          <Avatar name={f.name} url={f.avatar_url} size={28} online={f.online} />
+          <Avatar name={f.name} url={f.avatar_url} size={28} online={f.online} prestige={f.prestige} />
           <span className="cx-hub-take-t">{f.name}</span>
           <span className="cx-hub-sp" />
           <span className="cx-muted cx-hub-nowrap">Messages are only between friends</span>
