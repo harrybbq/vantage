@@ -296,7 +296,7 @@ const trackerBlocks = {
        its daily target, when it has one, is (lib/trackers/done.js). */
     const done = t => trackerDone(t, today[t.id]);
     const hit = list.filter(done).length;
-    const rows = list.slice(0, 8).map(t => {
+    const rows = list.slice(0, 12).map(t => {
       const d = done(t);
       const v = t.type === 'boolean' ? '' : `${t.unit === '£' ? '£' : ''}${Number(today[t.id]) || 0}${t.unit && t.unit !== '£' ? t.unit : ''}`;
       return { n: t.name || 'Tracker', v, ck: d ? '✓' : '', done: d,
@@ -341,7 +341,7 @@ const trackerBlocks = {
     const monday = new Date(now);
     monday.setHours(0, 0, 0, 0);
     monday.setDate(monday.getDate() - ((monday.getDay() + 6) % 7));
-    const items = bars(list.slice(0, 5).map((t, i) => {
+    const items = bars(list.slice(0, 8).map((t, i) => {
       let hits = 0;
       for (let d = new Date(monday); d <= new Date(now); d.setDate(d.getDate() + 1)) {
         const v = logs[ymd(d)]?.[t.id];
