@@ -31,7 +31,9 @@
 .lifts .wm-bar { display: block; height: 6px; border-radius: 3px; background: var(--lf-s3); overflow: hidden; min-width: 0;
   box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--lf-line-strong) 35%, transparent); }
 .lifts .wm-bar > i { display: block; height: 100%; border-radius: 3px; background: var(--lf-accent); }
-.lifts .wm-v { font-size: var(--lf-fs-floor); font-weight: 500; line-height: 16px; color: var(--lf-mid); text-align: right; white-space: nowrap; }
+/* Sets with no weekly target (an optional exercise's part): shown, but not as progress. */
+.lifts .wm-bar.is-free > i { background: var(--lf-line-strong); }
+.lifts .wm .wm-v { font-size: var(--lf-fs-floor); font-weight: 500; line-height: 16px; color: var(--lf-mid); text-align: right; white-space: nowrap; }
 
 .lifts .wm-dots { display: flex; gap: 4px; justify-content: flex-end; }
 .lifts .wm-dots > i { width: 8px; height: 8px; border-radius: 50%; box-sizing: border-box; border: 1px solid var(--lf-line-strong); }
@@ -42,8 +44,8 @@
 .lifts .wm-p { display: grid; grid-template-columns: minmax(0, 1fr) minmax(28px, .8fr) 82px; align-items: center; gap: 8px; min-height: 30px; padding: 3px 0;
   font-size: max(13px, var(--lf-fs-floor)); line-height: 18px; color: var(--lf-mid); }
 .lifts .wm-pn { min-width: 0; overflow-wrap: anywhere; }
-/* The value column lines up with the group rows' (their dots + chevron sit after it). */
-.lifts .wm-p { margin-right: 42px; }
+/* The value column lines up with the group rows' (their dots + chevron + two gaps sit after it). */
+.lifts .wm-p { margin-right: 50px; }
 
 .lifts .wm-legend { margin: 0; font-size: var(--lf-fs-floor); line-height: 16px; color: var(--lf-muted); }
 

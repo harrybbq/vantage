@@ -35,7 +35,7 @@ const pct = (done, target) => (target > 0 ? Math.min(100, (done / target) * 100)
 const listOf = codes => (codes.length < 2 ? codes.join('') : `${codes.slice(0, -1).join(', ')} and ${codes[codes.length - 1]}`);
 
 function Bar({ done, target }) {
-  return <span className={`wm-bar${target > 0 && done >= target ? ' is-full' : ''}`} aria-hidden="true"><i style={{ width: `${pct(done, target)}%` }} /></span>;
+  return <span className={`wm-bar${target > 0 ? (done >= target ? ' is-full' : '') : ' is-free'}`} aria-hidden="true"><i style={{ width: `${pct(done, target)}%` }} /></span>;
 }
 function Value({ done, target }) {
   return <span className="wm-v lf-num" aria-hidden="true">{fmt(done)} / {target > 0 ? fmt(target) : '—'}</span>;
