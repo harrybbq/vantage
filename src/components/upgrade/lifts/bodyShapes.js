@@ -19,7 +19,7 @@
  *   front shape is the long head · quadriceps → Quads: the long middle
  *   shape per leg Rectus femoris, the other two Outer & inner quads ·
  *   hamstring → Hamstrings · gluteal → Glutes: Glute max ·
- *   abductors (front) → Glutes: Glute medius · calves → Calves:
+ *   abductors (front) → Glutes, but no part: the shape is the upper inner thigh, not glute medius · calves → Calves:
  *   Gastrocnemius · soleus → Calves: Soleus (mostly below the 200-unit
  *   frame — the library's own figure crops it the same way).
  *
@@ -65,8 +65,8 @@ export const FRONT = [
   ["Shoulders", [["Side delts", "deltOuter"], ["Front delts", "deltInner"]], '78.4,53.1 79.6,47.8 79.2,41.2 75.9,38.0 71.0,36.3 72.2,42.9 71.4,47.3'],
   ["Shoulders", [["Side delts", "deltOuter"], ["Front delts", "deltInner"]], '28.2,47.3 21.2,53.1 20.0,47.8 20.4,40.8 24.5,37.1 28.6,37.1 26.9,43.3'],
   [null, null, '42.4,2.9 40.0,11.8 42.0,19.6 46.1,23.3 49.8,25.3 54.7,22.4 57.6,19.2 59.2,10.2 57.1,2.4 49.8,0.0'],
-  ["Glutes", "Glute medius", '52.7,110.2 54.3,124.9 60.0,110.2 62.0,100.0 64.9,94.3 60.0,92.7 56.7,104.5'],
-  ["Glutes", "Glute medius", '47.8,110.6 44.9,125.3 42.0,115.9 40.4,113.1 39.6,107.3 38.0,102.4 34.7,93.9 39.6,92.2 41.6,99.2 43.7,105.3'],
+  ["Glutes", null, '52.7,110.2 54.3,124.9 60.0,110.2 62.0,100.0 64.9,94.3 60.0,92.7 56.7,104.5'],
+  ["Glutes", null, '47.8,110.6 44.9,125.3 42.0,115.9 40.4,113.1 39.6,107.3 38.0,102.4 34.7,93.9 39.6,92.2 41.6,99.2 43.7,105.3'],
   ["Quads", "Rectus femoris", '34.7,98.8 37.1,108.2 37.1,127.8 34.3,137.1 31.0,132.7 29.4,120.0 28.2,111.4 29.4,100.8 32.2,94.7'],
   ["Quads", "Rectus femoris", '63.3,105.7 64.5,100.0 66.9,94.7 70.2,101.2 71.0,111.8 68.2,133.1 65.3,137.6 62.4,128.6 62.0,111.4'],
   ["Quads", "Outer & inner quads", '38.8,129.4 38.4,112.2 41.2,118.4 44.5,129.4 42.9,135.1 40.0,146.1 36.3,146.5 35.5,140.0'],
