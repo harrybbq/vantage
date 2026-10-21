@@ -634,3 +634,11 @@ html[data-design="console"] .cx-hub-cell .m-vitals-tile { min-width: 0; overflow
 html[data-design="console"] .cx-hub-cell .m-vitals-val { font-size: var(--cx-fs-17); line-height: var(--cx-lh-17); white-space: nowrap; }
 html[data-design="console"] .cx-hub-cell .m-vitals-unit { font-family: var(--cx-mono); font-size: var(--cx-fs-12); color: var(--cx-muted); }
 html[data-design="console"] .cx-hub-cell .m-vitals-delta { position: static; font-family: var(--cx-mono); font-size: var(--cx-fs-12); }
+
+/* ── Ratings sheet: classic modals on top ──
+   The sheet hosts the classic RatingsPanel, whose category breakdown
+   and self-checks open classic .modal-overlay (z 500, portalled to
+   body) — underneath the sheet (z 2000), where they showed dimmed and
+   could not be tapped. Lifted only while the ratings sheet is open, so
+   no other console sheet changes order. */
+html[data-design="console"] body:has(.cx-hub-ratings) .modal-overlay { z-index: 2100; }
