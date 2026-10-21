@@ -84,7 +84,11 @@ export function colsOf(w, h) {
  * title row, but on mobile the host card already has one — passing 0
  * there stops the two stacking up and wasting 32px of every card.
  */
+/** The most rows a list block will size itself for (it scrolls past that). */
+export const MAX_LIST_ROWS = 12;
+
 export function makePacker(meta, head = HEAD) {
+  let curCounts = null;   // row counts for the pack() in progress (see maxOf)
   /* Both EDGES are snapped, not the offset and the size independently.
      Rounding x and w apart lets a right-hand column end a pixel past the
      card's padding — which is exactly the sort of thing that shows up as
@@ -174,12 +178,13 @@ export function makePacker(meta, head = HEAD) {
         pool.forEach(i => {
           const m = meta[ids[i]];
           let add = (slack * m.grow) / weight;
-          if (m.max) add = Math.min(add, m.max - hs[i]);
+          const mx = maxOf(ids[i], curCounts);
+          if (mx) add = Math.min(add, mx - hs[i]);
           hs[i] += add;
           used += add;
         });
         slack -= used;
-        pool = pool.filter(i => !meta[ids[i]].max || hs[i] < meta[ids[i]].max - 0.5);
+        pool = pool.filter(i => { const mx = maxOf(ids[i], curCounts); return !mx || hs[i] < mx - 0.5; });
       }
       /* Nobody wants it, or everyone is capped. Spread it so the column
          reaches the bottom edge — but NOT into a row-stepped list. A
@@ -231,7 +236,21 @@ export function makePacker(meta, head = HEAD) {
     return out;
   }
 
-  return function pack(ids, W, H) {
+  /* A list block's ceiling follows its RECORDS, not a constant: `max`
+     was sized for a typical list (about six trackers), so a seventh row
+     spilled under the next block. With a row count it is the list's own
+     header plus that many rows, never below its full-detail height and
+     never past MAX_LIST_ROWS rows. Without one, the static max stands. */
+  function maxOf(id, counts) {
+    const m = meta[id];
+    const n = counts && counts[id];
+    if (!m.row || !(n > 0)) return m.max;
+    const headH = m.L % m.row;
+    return Math.max(m.L, headH + Math.min(n, MAX_LIST_ROWS) * m.row);
+  }
+
+  return function pack(ids, W, H, counts = null) {
+    curCounts = counts;
     const iw = W - PAD * 2;
 
     // ── Mobile: one column, no ceiling, everything at full detail ──
@@ -243,7 +262,7 @@ export function makePacker(meta, head = HEAD) {
         const h = m.kind === 'chart'
           ? Math.round(iw / 2.3)                       // charts keep an aspect
           : m.views[0] === 'vesselsL' ? 140            // vessels want depth
-            : (m.max || m.L);
+            : (maxOf(id, counts) || m.L);
         items.push(slot(id, 0, 0, y, iw, h));
         y += h + GAP;
       });

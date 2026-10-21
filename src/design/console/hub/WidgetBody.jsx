@@ -43,6 +43,7 @@ export function renderBody(item, ctx) {
     return (
       <PrimeFit
         auto={isMobile}
+        grow={!isMobile}
         head={false}
         widget={item}
         S={S}

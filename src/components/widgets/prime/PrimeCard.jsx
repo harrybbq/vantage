@@ -47,6 +47,7 @@ export default function PrimeCard({
   S,
   width,
   height = null,          // null = mobile: no ceiling, report the height instead
+  grow = false,           // true = may exceed `height` when the content needs it
   guides = false,
   live = false,           // true while a resize drag is in flight
   head = true,            // false = the host draws the title row
@@ -62,11 +63,6 @@ export default function PrimeCard({
 
   const ids = useMemo(() => (key ? blocksOf(widget) : []), [key, widget]);
 
-  const packed = useMemo(() => {
-    if (!key) return { items: [], height: height || 0 };
-    return PACKERS[key][head ? 'head' : 'bare'](ids, width, height);
-  }, [key, ids, width, height, head]);
-
   /* Payloads are keyed by block id, so a resize that changes only the
      LEVEL of a block re-uses the data it already built. */
   const payloads = useMemo(() => {
@@ -75,6 +71,32 @@ export default function PrimeCard({
     ids.forEach(id => { out[id] = blockData(key, id, S, blockOpts(widget, id), ext); });
     return out;
   }, [key, ids, S, widget, ext]);
+
+  /* How many records each list block holds, so a list is sized for its
+     own rows instead of a typical count (lib/hub/pack.js maxOf). */
+  const counts = useMemo(() => {
+    const out = {};
+    for (const id of ids) {
+      const d = payloads[id] && payloads[id].d;
+      const n = d && (Array.isArray(d.rows) ? d.rows.length : Array.isArray(d.items) ? d.items.length : 0);
+      if (n) out[id] = n;
+    }
+    return out;
+  }, [ids, payloads]);
+
+  /* `grow`: the host can make room (the console grid's rows grow with
+     their content), so take the box when everything fits in it and the
+     content's own height when it does not, instead of squeezing a
+     seven-tracker list into a box sized for five. */
+  const packed = useMemo(() => {
+    if (!key) return { items: [], height: height || 0 };
+    const pack = PACKERS[key][head ? 'head' : 'bare'];
+    if (grow && height != null) {
+      const natural = pack(ids, width, null, counts);
+      if (natural.height > height) return pack(ids, width, natural.height, counts);
+    }
+    return pack(ids, width, height, counts);
+  }, [key, ids, width, height, head, counts, grow]);
 
   /* Mobile reports the height it needs so the stack can size the card.
      In an effect, not in render: calling a parent's setter mid-render is
