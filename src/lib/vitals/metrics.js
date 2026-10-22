@@ -16,6 +16,7 @@
  *
  * Pure — no DOM, no React.
  */
+import { recoveryProvider, recoveryName } from './recoverySource.js';
 
 /* `dp` is decimal places for display and `goodHigh` says which
    direction is the good one — null where there is no such thing. Both
@@ -47,13 +48,32 @@ export function fmtMetric(v, m) {
 export function sourceLabel(m, S) {
   if (!m || m.src === 'vitals') return 'you';
   const whoop = !!(S && S.whoopConnected), oura = !!(S && S.ouraConnected);
-  if (whoop && oura && m.key === 'hrv') return '2 src';
+  // The recovery key holds WHOOP's Recovery or Oura's Readiness: name
+  // whichever the log shows, and never pick one when it cannot tell.
+  if (m.key === 'recovery') {
+    const p = recoveryProvider(S);
+    return p || (whoop || oura ? '2 src' : '—');
+  }
+  // Only WHOOP reports strain. HRV and all-day burn come from either.
+  if (m.key === 'strain') return 'whoop';
+  if (whoop && oura && (m.key === 'hrv' || m.key === 'burnKcal')) return '2 src';
   if (whoop) return 'whoop';
   if (oura) return 'oura';
   return '—';
 }
 
 export const metricByKey = key => VITAL_METRICS.find(m => m.key === key) || null;
+
+/**
+ * The label a surface shows for a metric. Only `recovery` varies: the key
+ * holds WHOOP's Recovery or Oura's Readiness, and each is called by its
+ * own name (lib/vitals/recoverySource.js) — neutral when the log cannot
+ * say which. Display only; the stored key is never renamed.
+ */
+export function metricLabel(m, S) {
+  if (!m) return '';
+  return m.key === 'recovery' ? recoveryName(recoveryProvider(S)) : m.label;
+}
 
 /** Does any day in the log carry this key? */
 export function hasData(S, key) {
@@ -75,7 +95,9 @@ export function hasData(S, key) {
 export function metricAvailability(S) {
   const whoop = !!(S && S.whoopConnected);
   const oura = !!(S && S.ouraConnected);
-  return VITAL_METRICS.map(m => {
+  const rec = recoveryName(recoveryProvider(S));
+  return VITAL_METRICS.map(base => {
+    const m = base.key === 'recovery' ? { ...base, label: rec } : base;
     if (m.src === 'vitals') return { ...m, available: true, reason: null };
     // Historical data counts even after a device is disconnected — the
     // numbers are still in the log and still worth charting.
@@ -125,6 +147,6 @@ export function metricSeries(S, keys, days = 30) {
     const points = Object.keys(log).sort()
       .map(d => [new Date(d + 'T12:00').getTime(), log[d] && log[d][key]])
       .filter(([t, v]) => v != null && t >= cutoff);
-    return { key, label: m?.label || key, unit: m?.unit || '', color: m?.color || 'var(--em)', points };
+    return { key, label: m ? metricLabel(m, S) : key, unit: m?.unit || '', color: m?.color || 'var(--em)', points };
   }).filter(s => s.points.length > 0);
 }

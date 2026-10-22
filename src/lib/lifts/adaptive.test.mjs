@@ -329,7 +329,7 @@ t('(c) red on an anchor day: one set fewer each (min 1), RPE 7 cap, same exercis
   });
   assert.deepEqual(sug.adaptive.readiness, { score: 28, band: 'red' });
   assert.equal(sug.adaptive.red, true);
-  assert.match(sug.adaptive.notes[0], /WHOOP recovery 28% · red/);
+  assert.match(sug.adaptive.notes[0], /WHOOP Recovery 28% · red/);
   assert.ok(sug.minutes < suggestWorkout(S_([]), B.push).minutes, 'shorter');
   assert.deepEqual(trimForRed([{ name: 'x', sets: 1 }])[0], { name: 'x', sets: 1, setsWas: 1, rpeCap: 7 }, 'never below one');
   // green and yellow change nothing; no recovery plans as normal
@@ -352,7 +352,7 @@ t('(c) red on Upper: only what twice-a-week needs, two sets each', () => {
   const groupsOf = r.exercises.map(x => GROUP_OF[Object.entries(partsOf({ name: x.name })).sort((a, b) => b[1] - a[1])[0][0]]);
   assert.deepEqual(groupsOf.sort(), ['Back', 'Biceps', 'Chest', 'Triceps'], 'shoulders already had two hits (Push, archer on Pull)');
   assert.ok(sum(r.exercises) <= 10);
-  assert.match(r.notes[0], /WHOOP recovery 22% · red — trimmed/);
+  assert.match(r.notes[0], /WHOOP Recovery 22% · red — trimmed/);
   // a red Upper after a missed Push still carries no catch-up
   const M = buildAdaptive({ ...S_([W(B.pull, 'Pull'), W(B.legs, 'Legs')]), vitalsLog: { [B.upper]: { recovery: 10 } } }, B.upper, 'Upper');
   assert.equal(M.catchUpSets, 0);

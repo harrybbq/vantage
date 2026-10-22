@@ -122,14 +122,20 @@ exports.handler = async (event) => {
   // back what it did not use (a dead token fails after one call), so
   // revoked accounts at the head of the list cannot crowd out the rest.
   let reserved = 0;
+  // A 429 means the app's whole WHOOP allowance is spent for now: stop
+  // starting accounts rather than spend the rest of the run on refusals.
+  // The ones not reached stay oldest-first for the next run (C13).
+  let limited = false;
   const { results, notReached } = await pool(rows, CONCURRENCY, ({ user_id: userId }) => {
     reserved += COST_PER_ACCOUNT;               // synchronous: the next canStart() sees it
     let used = 0;
     const spend = k => { used += k; };
-    return syncOne(userId, env, spend).finally(() => { reserved -= COST_PER_ACCOUNT - Math.min(used, COST_PER_ACCOUNT); });
+    return syncOne(userId, env, spend)
+      .catch(e => { if (e && e.whoopStatus === 429) limited = true; throw e; })
+      .finally(() => { reserved -= COST_PER_ACCOUNT - Math.min(used, COST_PER_ACCOUNT); });
   }, {
     deadline: Date.now() + START_BUDGET_MS,
-    canStart: () => reserved + COST_PER_ACCOUNT <= WHOOP_BUDGET,
+    canStart: () => !limited && reserved + COST_PER_ACCOUNT <= WHOOP_BUDGET,
   });
 
   const count = { synced: 0, skipped: 0, conflicted: 0, failed: 0 };
@@ -142,7 +148,7 @@ exports.handler = async (event) => {
     }
   }
 
-  console.info(`whoop-cron: ${count.synced} synced, ${count.skipped} skipped, ${count.failed} failed, ${count.conflicted} busy (retry next run), ${notReached} not reached (next run), of ${rows.length} due; ${noConsent} without health consent; ~${reserved} WHOOP calls`);
+  console.info(`whoop-cron: ${count.synced} synced, ${count.skipped} skipped, ${count.failed} failed, ${count.conflicted} busy (retry next run), ${notReached} not reached (next run), of ${rows.length} due; ${noConsent} without health consent; ~${reserved} WHOOP calls${limited ? '; stopped early: WHOOP rate limit (429)' : ''}`);
   return { statusCode: 200 };
 };
 

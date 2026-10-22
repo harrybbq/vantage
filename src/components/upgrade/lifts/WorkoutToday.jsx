@@ -20,7 +20,8 @@
  * built from what the week still owes, and each preview row carries its
  * tags — the part it serves ("side delts 4 / 9"), a gold "+1 Push" for a
  * missed anchor's catch-up, a red "≤ RPE 7" on a WHOOP-red anchor (old set
- * count struck through). Chips: WHOOP readiness when synced, the catch-up;
+ * count struck through). Chips: WHOOP Recovery when synced (a dot in
+ * WHOOP's own band colour, text in theme ink), the catch-up;
  * a below-standard note under a catch-up; a red box on a red day. The
  * stretch block is adaptStretches' ("tuned for this week", "· added").
  *
@@ -40,6 +41,7 @@ import { suggestWorkout, minutesText, elapsedSec } from '../../../lib/lifts/work
 import { blockPips, nextTraining, lastSessionSummary, dowOf } from '../../../lib/lifts/home';
 import { perGymOf, perGymByName, fmtKg } from '../../../lib/lifts/lifts';
 import { adaptStretches } from '../../../lib/lifts/adaptive';
+import { WHOOP_RECOVERY_COLOURS } from '../../../lib/vitals/recoverySource';
 import { STRETCH_GOAL, STRETCHES } from '../../../data/trainingProgramme';
 
 const DOW = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
@@ -97,15 +99,28 @@ export default function WorkoutToday({
       </p>
       {training && red && ready && (
         <p className="lh-redbox" data-testid="wk-redbox">
-          <b>WHOOP recovery {ready.score}% · red.</b>{' '}
+          <b>WHOOP Recovery {ready.score}% · red.</b>{' '}
           {ad.built ? 'Trimmed to what twice-a-week needs — two sets for each muscle still short of its second session.'
             : `Same exercises, one set fewer each, and keep every set to about RPE ${sug.exercises.find(x => x.rpeCap)?.rpeCap || 7}. ${sug.name} still counts as done for the week.`}
         </p>
       )}
       {(sug.night || (showGym && training) || (training && (ready || (ad && ad.catchUpSets > 0)))) && (
         <div className="lh-chiprow">
-          {training && ready && !red && <span className={`lh-chip is-${ready.band}`} data-testid="wk-ready">WHOOP {ready.score}% · {ready.band}</span>}
-          {training && red && <span className="lh-chip is-red" data-testid="wk-ready">red · {ad.built ? 'twice-a-week only' : '−1 set per exercise'}</span>}
+          {/* WHOOP's score in WHOOP's name and WHOOP's band colour (item 126):
+              the band is the dot; the words stay in theme ink, because
+              WHOOP's yellow cannot carry text on a light surface. */}
+          {training && ready && !red && (
+            <span className="lh-chip" data-testid="wk-ready">
+              <i className="lh-chip-dot" style={{ background: WHOOP_RECOVERY_COLOURS[ready.band] }} aria-hidden="true" />
+              WHOOP Recovery {ready.score}% · {ready.band}
+            </span>
+          )}
+          {training && red && (
+            <span className="lh-chip is-red" data-testid="wk-ready">
+              <i className="lh-chip-dot" style={{ background: WHOOP_RECOVERY_COLOURS.red }} aria-hidden="true" />
+              red · {ad.built ? 'twice-a-week only' : '−1 set per exercise'}
+            </span>
+          )}
           {training && ad && ad.catchUpSets > 0 && <span className="lh-chip is-plus" data-testid="wk-catchup">+{ad.catchUpSets} sets · {ad.catchUp.join(' + ')} catch-up</span>}
           {sug.night && <NightChip className="lh-nightchip" />}
           {showGym && training && <GymSwitch gyms={gyms} value={gym} onChange={onGym} label="Gym for this workout" testId="wk-gym" />}

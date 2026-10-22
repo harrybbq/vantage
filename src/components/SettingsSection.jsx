@@ -1010,7 +1010,7 @@ export default function SettingsSection({ S, update, active, userId, userEmail, 
         {(wearableSettingsVisible(S) || AppleHealthImport) && (
         <SettingsGroup
           title="Health & sync"
-          desc="Connect a wearable and its vitals flow into your Vitals & Macros history — sleep, resting HR, HRV, recovery and daily burn. Nothing you've logged by hand is ever replaced."
+          desc="Connect WHOOP or an Oura Ring and its vitals flow into your Vitals & Macros history — sleep, resting HR, HRV, WHOOP Recovery or Oura Readiness, and daily burn. Nothing you've logged by hand is ever replaced."
         >
           <WearableSync S={S} update={update} />
           {AppleHealthImport && typeof window !== 'undefined' && window.__vantageOwner && (

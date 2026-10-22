@@ -22,6 +22,7 @@ import { wearableConnectAvailable } from '../lib/native/wearableGate';
 import { connectResultMessage, showWearablePanel } from '../lib/wearables/access';
 import WearableDataDelete from './wearables/WearableDataDelete';
 import WearableAccessNote from './wearables/WearableAccessNote';
+import { recoveryProvider, recoveryName } from '../lib/vitals/recoverySource';
 
 // Health data is special-category (UK GDPR Art. 9): every route that
 // starts a new source of it asks for explicit consent first. Data that
@@ -235,7 +236,9 @@ function WhoopPanel({ S, update, canConnect = true }) {
     setBusy(true);
     if (!silent) setMsg('');
     try {
-      const { vDays, bDays, warnings } = await syncWhoop(update, days);
+      const { vDays, bDays, warnings, rateLimited, message } = await syncWhoop(update, days);
+      // WHOOP's app-wide limit: said calmly, nothing written, try later.
+      if (rateLimited) { setMsg(message); setBusy(false); return; }
       // "Synced 0 days" reads as success and is how a dead connection
       // used to present itself. Say what actually happened instead.
       const base = vDays === 0 && bDays === 0
@@ -521,30 +524,26 @@ function OuraPanel({ S, update, canConnect = true }) {
   );
 }
 
-// Small WHOOP wordmark shown beside the card title once the account is
-// linked — a live "connected" indicator that disappears on disconnect.
+// Plain-text "connected" indicators beside the card title once a device
+// is linked; each disappears on disconnect. Text only, never a mark:
+// WHOOP's terms allow its logo only with written authorisation, and a
+// home-made one (the zigzag W, a ring for Oura) is the thing a reviewer
+// flags first (item 126, gap C5). Use an official asset only if a
+// provider supplies one.
 function WhoopBadge({ connected }) {
   if (!connected) return null;
   return (
-    <span className="vitals-whoop-badge" title="Connected to WHOOP — syncing recovery, sleep, HRV & strain">
-      <svg viewBox="0 0 24 24" width="12" height="12" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
-        <path d="M3 5l4.5 14L12 8l4.5 11L21 5" />
-      </svg>
-      WHOOP
+    <span className="vitals-whoop-badge" title="Connected to WHOOP — syncing Recovery, sleep, HRV & strain">
+      Connected · WHOOP
     </span>
   );
 }
 
-// Small Oura mark shown beside the card title once the ring is linked,
-// the counterpart of WhoopBadge. A ring, because that's what it is.
 function OuraBadge({ connected }) {
   if (!connected) return null;
   return (
-    <span className="vitals-whoop-badge vitals-oura-badge" title="Connected to Oura — syncing sleep, resting HR, HRV & readiness">
-      <svg viewBox="0 0 24 24" width="12" height="12" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="2.4">
-        <circle cx="12" cy="12" r="8" />
-      </svg>
-      OURA
+    <span className="vitals-whoop-badge vitals-oura-badge" title="Connected to Oura — syncing sleep, resting HR, HRV & Readiness">
+      Connected · Oura
     </span>
   );
 }
@@ -642,16 +641,20 @@ export default function VitalsHistoryCard({ S, update }) {
   // the chips should exist before the first sync lands). Oura has no
   // strain, so an Oura-only user doesn't get a Strain chip that opens an
   // empty chart.
+  // The recovery key holds WHOOP's Recovery or Oura's Readiness; each is
+  // labelled by its own name, neutral when the log can't say (item 126).
+  const recLabel = useMemo(() => recoveryName(recoveryProvider(S)), [S]);
   const wearableMetrics = useMemo(() => {
     const log = S.vitalsLog || {};
-    const all = METRICS.filter(m => m.src === 'whoop');
+    const all = METRICS.filter(m => m.src === 'whoop')
+      .map(m => (m.key === 'recovery' ? { ...m, label: recLabel } : m));
     if (S.whoopConnected) return all;
     const hasData = k => Object.values(log).some(day => day && day[k] != null);
     const withData = all.filter(m => hasData(m.key));
     // Freshly connected Oura, nothing synced yet: show what it can fill.
     if (!withData.length && S.ouraConnected) return all.filter(m => m.key !== 'strain');
     return withData;
-  }, [S.whoopConnected, S.ouraConnected, S.vitalsLog]);
+  }, [S.whoopConnected, S.ouraConnected, S.vitalsLog, recLabel]);
   const showWhoopRow = wearableMetrics.length > 0;
 
   // If the selected metric belongs to a row that isn't shown, fall back
@@ -661,7 +664,11 @@ export default function VitalsHistoryCard({ S, update }) {
     if (m && m.src === 'whoop' && !wearableMetrics.some(x => x.key === m.key)) setMetricKey('weight');
   }, [metricKey, wearableMetrics]);
 
-  const metric = METRICS.find(m => m.key === metricKey);
+  const metricBase = METRICS.find(m => m.key === metricKey);
+  const metric = metricBase.key === 'recovery' ? { ...metricBase, label: recLabel } : metricBase;
+  // A provider's metric keeps its capitals mid-sentence ("No WHOOP Recovery
+  // entries"); lowercasing it would be renaming it.
+  const nameInText = metric.key === 'recovery' ? metric.label : metric.label.toLowerCase();
   const range = RANGES.find(r => r.key === rangeKey);
   const log = metric.src === 'macro' ? (S.macroHistory || {}) : (S.vitalsLog || {});
 
@@ -832,7 +839,7 @@ export default function VitalsHistoryCard({ S, update }) {
           ))}
         </div>
         {showWhoopRow && (
-          <div className="vitals-seg vitals-seg-whoop" role="tablist" aria-label="WHOOP metric">
+          <div className="vitals-seg vitals-seg-whoop" role="tablist" aria-label="Device metric">
             {wearableMetrics.map(m => (
               <button key={m.key} type="button" role="tab" aria-selected={metricKey === m.key}
                 className={`vitals-seg-btn${metricKey === m.key ? ' on' : ''}`}
@@ -929,8 +936,8 @@ export default function VitalsHistoryCard({ S, update }) {
       ) : (
         <div className="vitals-sub" style={{ padding: '18px 0' }}>
           {points.length === 1
-            ? `One ${metric.label.toLowerCase()} entry in this range — log a second to draw the trend.`
-            : `No ${metric.label.toLowerCase()} entries in this range.`}
+            ? `One ${nameInText} entry in this range — log a second to draw the trend.`
+            : `No ${nameInText} entries in this range.`}
         </div>
       )}
 
