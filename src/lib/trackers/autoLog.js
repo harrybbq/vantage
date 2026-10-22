@@ -39,6 +39,7 @@ import { recalcStreaks } from '../../utils/streaks.js';
 import { getWeekKey, countWeekLogs, trackerWeeklyCoins } from '../../utils/helpers.js';
 import { isRealIso } from '../rotation/pattern.js';
 import { trainingDayFor, wallClock, dayBefore, dayAfter } from '../rotation/trainingDay.js';
+import { recoveryProviderOn, recoveryName, recoveryShort } from '../vitals/recoverySource.js';
 
 /** The marker meaning "the user has spoken; hands off this cell". */
 export const MANUAL = 'manual';
@@ -192,11 +193,13 @@ export const AUTO_SOURCES = [
     read: vital('strain'),
   },
   {
+    // The key holds WHOOP's Recovery or Oura's Readiness, so the words
+    // here are neutral; sourceWords() names the provider where it is known.
     id: 'recovery',
-    label: 'Recovery at or above',
-    short: 'Recovery', chipUnit: '%',
-    hint: 'WHOOP recovery percentage for the morning.',
-    needs: 'whoop', unit: '%', dp: 0, threshold: 60, step: 5, max: 100,
+    label: 'Recovery / Readiness at or above',
+    short: 'Score', chipUnit: '%', // the chip truncates; "Recovery / R…" read as WHOOP's name
+    hint: 'The morning score your device reports — WHOOP Recovery or Oura Readiness.',
+    needs: 'score', unit: '%', dp: 0, threshold: 60, step: 5, max: 100,
     read: vital('recovery'),
   },
   {
@@ -222,6 +225,22 @@ export const AUTO_SOURCES = [
 ];
 
 export const sourceById = id => AUTO_SOURCES.find(s => s.id === id) || null;
+
+/**
+ * A source's words for a known provider ('whoop' | 'oura' | null, from
+ * lib/vitals/recoverySource.js). Only `recovery` changes: WHOOP's score is
+ * called Recovery and Oura's Readiness, and neither is renamed as the
+ * other (item 126). Unknown → the neutral words above. Display only.
+ */
+export function sourceWords(source, provider) {
+  if (!source || source.id !== 'recovery' || (provider !== 'whoop' && provider !== 'oura')) return source;
+  return {
+    ...source,
+    label: `${recoveryName(provider)} at or above`,
+    short: recoveryShort(provider),
+    hint: provider === 'whoop' ? 'WHOOP Recovery for the morning, as a percentage.' : 'Oura Readiness for the day, 0–100.',
+  };
+}
 
 /** Sources a person can pick: an ownerOnly one only for the owner. */
 export const pickableSources = owner => AUTO_SOURCES.filter(s => !s.ownerOnly || owner);
@@ -487,8 +506,10 @@ export function isAutoFilled(S, day, trackerId) {
 export function autoProvenance(S, day, trackerId) {
   const src = S && S.logsAuto && S.logsAuto[day] && S.logsAuto[day][trackerId];
   if (!src || src === MANUAL) return null;
-  const source = sourceById(src);
-  if (!source) return null;
+  const base = sourceById(src);
+  if (!base) return null;
+  // Whose score filled THIS day, so the line names the right company.
+  const source = base.id === 'recovery' ? sourceWords(base, recoveryProviderOn(S, day)) : base;
   const reading = source.read(S, day);
   // A yes/no source has no reading worth printing ("…: 1").
   if (reading == null || source.flag) return { source, reading, text: source.label };
@@ -496,11 +517,13 @@ export function autoProvenance(S, day, trackerId) {
   return { source, reading, text: `${source.label.replace(/ at least| at or above| reached/, '')}: ${shown}${source.unit ? ' ' + source.unit : ''}` };
 }
 
-/** The rule as a sentence, for a tooltip or a longer line. */
-export function ruleLabel(tracker) {
+/** The rule as a sentence, for a tooltip or a longer line. `provider`
+ *  names whose recovery score it reads (see sourceWords). */
+export function ruleLabel(tracker, provider = null) {
   const rule = ruleFor(tracker);
   if (!rule) return null;
-  const { source, threshold } = rule;
+  const { threshold } = rule;
+  const source = sourceWords(rule.source, provider);
   if (threshold == null || tracker.type !== 'boolean') return source.label;
   return `${source.label} ${threshold}${source.unit ? source.unit : ''}`;
 }
@@ -510,10 +533,11 @@ export function ruleLabel(tracker) {
  * roughly 300px wide. "A wearable recorded a workout" truncated to
  * "A wearable re…" there, which told the reader nothing at all.
  */
-export function ruleChip(tracker) {
+export function ruleChip(tracker, provider = null) {
   const rule = ruleFor(tracker);
   if (!rule) return null;
-  const { source, threshold } = rule;
+  const { threshold } = rule;
+  const source = sourceWords(rule.source, provider);
   if (threshold == null || tracker.type !== 'boolean') return source.short;
   return `${source.short} ≥ ${threshold}${source.chipUnit || ''}`;
 }

@@ -17,7 +17,7 @@
  *     in the week to do it) is not crammed into Upper / Lower: they carry
  *     +1 set for each muscle group it owed, and the week is marked below
  *     standard.
- *   · WHOOP recovery (S.vitalsLog[date].recovery) only acts when RED
+ *   · WHOOP Recovery (S.vitalsLog[date].recovery) only acts when RED
  *     (≤ 33): anchors lose a set per exercise and carry an RPE 7 cap;
  *     Upper / Lower trim to what twice-a-week strictly needs.
  *   · No time cap. Nothing is stored: all of it is worked out from the
@@ -385,7 +385,7 @@ function computeTargets(S, L, today) {
 
 // ── Readiness ─────────────────────────────────────────────────────
 
-/** WHOOP recovery for a day → { score, band: 'green'|'yellow'|'red' } | null. */
+/** WHOOP Recovery for a day → { score, band: 'green'|'yellow'|'red' } | null. */
 export function readinessOn(S, iso) {
   const day = S && S.vitalsLog && isIso(iso) ? S.vitalsLog[iso] : null;
   const v = day && typeof day === 'object' ? num(day.recovery) : null;
@@ -622,7 +622,7 @@ export function buildAdaptive(S, today, session) {
 
   const missedSets = catchUp.reduce((n, c) => n + (PROGRAMME[c] || []).filter(x => !x.optional).reduce((k, x) => k + (num(x.sets) || 0), 0), 0);
   const notes = [];
-  if (red) notes.push(`WHOOP recovery ${readiness.score}% · red — trimmed to what twice-a-week needs.`);
+  if (red) notes.push(`WHOOP Recovery ${readiness.score}% · red — trimmed to what twice-a-week needs.`);
   if (!red && picked.length) {
     const hitsFor = [...new Set(picked.filter(x => x.reason.kind === 'hit').map(x => x.reason.group.toLowerCase()))];
     const taper = [...new Set(picked.filter(x => prio(x.main) > 1).sort((x, y) => prio(y.main) - prio(x.main)).map(x => x.main.toLowerCase()))].slice(0, 2);

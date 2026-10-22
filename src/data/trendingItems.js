@@ -19,7 +19,8 @@ export const TRENDING_ITEMS = [
   { name: 'Dyson Airwrap', emoji: '💨', category: 'Beauty', price: '£480', coins: 480, blurb: 'Styling without the heat damage' },
   { name: 'Nintendo Switch OLED', emoji: '🎮', category: 'Tech', price: '£309', coins: 309, blurb: 'Handheld gaming, brighter screen' },
   { name: 'Le Creuset Dutch Oven', emoji: '🍲', category: 'Kitchen', price: '£265', coins: 265, blurb: 'A pan you pass down' },
-  { name: 'Whoop 4.0 Band', emoji: 'Ⰰ', category: 'Fitness', price: '£229', coins: 229, blurb: 'Recovery + strain tracking' },
+  // A generic emoji, not a glyph picked to look like the band (item 126).
+  { name: 'Whoop 4.0 Band', emoji: '⌚', category: 'Fitness', price: '£229', coins: 229, blurb: 'Recovery + strain tracking' },
   { name: 'Espresso Machine', emoji: '☕', category: 'Kitchen', price: '£350', coins: 350, blurb: 'Barista coffee at home' },
   { name: 'Weighted Blanket', emoji: '🛌', category: 'Home', price: '£60', coins: 60, blurb: 'Sleep, but cosier' },
   { name: 'Bose QuietComfort', emoji: '🔇', category: 'Tech', price: '£280', coins: 280, blurb: 'Over-ear silence' },

@@ -34,7 +34,7 @@ import { coinsToday } from '../coins/daily.js';
 import { ledgerRows } from '../coins/ledger.js';
 import { dayBurn } from '../burn.js';
 import { planDayFor, planGoalFor } from '../plan/planDay.js';
-import { VITAL_METRICS, fmtMetric } from '../vitals/metrics.js';
+import { VITAL_METRICS, fmtMetric, metricLabel } from '../vitals/metrics.js';
 import { visitedCountries, countryForTrip, ALL_COUNTRIES } from '../holiday/destinations.js';
 import { upcomingNew, visitedSummary } from '../holiday/visited.js';
 import { trackerDone } from '../trackers/done.js';
@@ -865,7 +865,8 @@ const nutritionBlocks = {
     const rows = shown.map(({ m, last }) => {
       const a = avg7(m.key);
       return {
-        n: m.label,
+        // WHOOP Recovery / Oura Readiness by name, never one for the other.
+        n: metricLabel(m, S),
         m: a != null ? `7d ${fmtMetric(a, m)}` : '',
         mc: 'var(--text-muted)',
         v: `${fmtMetric(last.v, m)}${unit(m)}${last.day === today ? '' : ' ·'}`,
@@ -873,7 +874,7 @@ const nutritionBlocks = {
     });
     return {
       d: { head: 'VITALS', headR: '', headRs: 'latest · 7-day avg', rows,
-           tiles: shown.slice(0, 3).map(({ m, last }) => ({ t: m.label.toUpperCase(), v: `${fmtMetric(last.v, m)}${unit(m)}` })) },
+           tiles: shown.slice(0, 3).map(({ m, last }) => ({ t: metricLabel(m, S).toUpperCase(), v: `${fmtMetric(last.v, m)}${unit(m)}` })) },
       s: { fl: 'VITALS', fv: shown.slice(0, 2).map(({ m, last }) => `${fmtMetric(last.v, m)}${unit(m)}`).join(' · ') },
     };
   },

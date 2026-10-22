@@ -106,6 +106,32 @@ database; queries in the draft SQL §0). As an alternative,
 `scripts/state-size.mjs` can be run locally on the owner's own export,
 which must never be committed.
 
+**Measured live, 2026-10-22** (aggregate-only queries from draft §0;
+7 rows in `user_data`):
+
+| Measure | Value |
+|---|---|
+| State size, wire (`octet_length(state::text)`) | mean 247 kB · median 4 kB · p90 717 kB · max 1.55 MB |
+| Stored (TOAST-compressed) | mean 261 kB |
+| Largest keys, mean over the users who have them | `burnLog` 281 kB (1 user) · `backgrounds` 196 kB (5 users, max 834 kB) · `holidays` 41 kB (7, max 285 kB) · `lifts` 18 kB (1) · `shopItems` 10 kB (7, max 69 kB) · `vitalsLog` 5 kB (2) |
+
+What this changes:
+- The heaviest account is **1.55 MB**, not ~967 kB, so the payoff is larger than item 25 assumed.
+- `burnLog` is the single largest key on the account that has it, ahead
+  of the pictures. Its WHOOP workout entries grow with every sync, which
+  makes Track L (logs) at least as important as Track I (pictures) for
+  that user.
+- Most accounts are small (median 4 kB), so the migration's risk is
+  concentrated on a few heavy, real accounts. That favours the owner-first
+  canary.
+
+Also checked 2026-10-22: the audit version of `vb_state_meaningful` is
+live and `user_data_health_token_idx` exists (draft §0a). **There is no
+`backgrounds` Storage bucket.** Live Storage has only `cv` and `recipes`
+(CLAUDE.md's "backgrounds bucket" and an `avatars` bucket do not exist), so
+background pictures exist only as data URIs in `state`, and the new
+`media` bucket (I1) is their first Storage home.
+
 ### 1.2 Base64 images in `state` (item 25)
 
 | Field | Written by | Encoding | Typical size as base64 | Rendered by |
@@ -661,15 +687,40 @@ override) for at least a week before it goes on globally.
 
 The gate must ship **now**, because a gate only binds builds that contain it.
 
+*Status 2026-10-22: built.*
+- The SQL is `supabase/state_size_phase0_2026_10.sql`. It is draft §0 with
+  three changes:
+  - `client_builds` is keyed by build as well, so a second device on an old
+    build stays visible;
+  - signed-out visitors may read the `min_build` row only, because the gate
+    reads it while the session is still being restored;
+  - `ops_mark` start and done.
+
+  It was dry-run on Postgres 16 with `scripts/statesize/test-phase0-sql.sh`
+  (grants, what each role reads, census guards, cascades, re-run).
+- Client:
+  - `src/lib/buildGate.js` makes the decisions. It is pure, and
+    `check:buildgate` tests it, including that Board never mounts behind the
+    gate.
+  - `src/lib/buildGateClient.js` does the reads: a 2.5 s cap, then the gate
+    opens. The census is written once per user, platform and build, 5 s
+    after boot.
+  - The UI is in `src/components/buildgate/`, and `App.jsx` wraps the web
+    gate in `BuildGateBoundary`.
+- The gate fails open. A minimum from the future is ignored, and a running
+  app is never stopped.
+
 **Owner runs and decides:**
-- Confirm `supabase/audit_schema_2026_10.sql` is applied (`vb_state_meaningful`
-  audit version, health-token index). Query in draft SQL §0.
-- Run the size measurement (aggregate-only SQL, draft §0) and record the
-  per-key numbers here.
+- ~~Confirm `supabase/audit_schema_2026_10.sql` is applied~~ — done
+  2026-10-22 (§1.1).
+- ~~Run the size measurement and record the per-key numbers here~~ — done
+  2026-10-22 (§1.1).
+- ~~Run `supabase/state_size_phase0_2026_10.sql`~~ — applied and verified
+  2026-10-22.
 - Run the **restore drill** (item 82) as `docs/RESTORE_RUNBOOK.md` describes.
 - **Decide on PITR** (item 27; recommendation in §7).
-- Confirm whether the "backgrounds bucket" that CLAUDE.md mentions exists
-  live. The repo has no SQL for one.
+- ~~Confirm whether the "backgrounds bucket" exists~~ — it does not
+  (2026-10-22, §1.1).
 
 **Rollback:** flags off; the gate's `min_build` stays at 0.
 

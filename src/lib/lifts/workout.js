@@ -346,7 +346,7 @@ export function suggestWorkout(S, today, opts = {}) {
   });
   const missed = (block && block.missed) || [];
   const adaptive = {
-    notes: built ? built.notes : red && isAnchor ? [`WHOOP recovery ${readiness.score}% · red — one set fewer an exercise, every set to about RPE ${RED_RPE_CAP}.`] : [],
+    notes: built ? built.notes : red && isAnchor ? [`WHOOP Recovery ${readiness.score}% · red — one set fewer an exercise, every set to about RPE ${RED_RPE_CAP}.`] : [],
     catchUp: built ? built.catchUp : [],
     catchUpSets: built ? built.catchUpSets || 0 : 0,
     missedSets: built ? built.missedSets || 0 : 0,

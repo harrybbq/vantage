@@ -19,6 +19,8 @@
  * used and the panel is honest about that.
  */
 
+import { whoopBand } from './recoverySource.js';
+
 const DAY = 86_400_000;
 
 /** `YYYY-MM-DD` for a date, from LOCAL parts — toISOString is UTC and
@@ -72,11 +74,16 @@ const PARTS = [
 /**
  * Today's readiness.
  *
- * @returns {{ score, state, parts, source, inputs, note }}
+ * `opts.provider` ('whoop' | 'oura' | null, from
+ * lib/vitals/recoverySource.js recoveryProviderOn) only changes the words:
+ * a WHOOP score is described in WHOOP's own bands (green / yellow / red)
+ * rather than ours, and the note names whose score it is. Unknown → neutral.
+ *
+ * @returns {{ score, state, parts, source, provider, inputs, note }}
  *   `score` is null when there is nothing to go on — the panel shows a
  *   prompt rather than a zero, because a zero is a claim.
  */
-export function readinessFor(vitalsLog, date = ymd(), days = 30) {
+export function readinessFor(vitalsLog, date = ymd(), days = 30, { provider = null } = {}) {
   const log = vitalsLog || {};
   const today = log[date] || {};
 
@@ -104,20 +111,28 @@ export function readinessFor(vitalsLog, date = ymd(), days = 30) {
   const computed = total > 0 ? Math.round((used / total) * 100) : null;
   const score = device != null ? Math.round(Number(device)) : computed;
   const inputs = parts.filter(p => p.has).length;
+  const whoop = device != null && provider === 'whoop';
 
   return {
     score,
-    state: score == null ? 'no data' : score >= 75 ? 'primed' : score >= 55 ? 'steady' : score >= 35 ? 'low' : 'spent',
+    state: score == null ? 'no data'
+      : whoop ? whoopBand(score)
+      : score >= 75 ? 'primed' : score >= 55 ? 'steady' : score >= 35 ? 'low' : 'spent',
     parts,
     source: device != null ? 'device' : inputs ? 'computed' : 'none',
+    provider: device != null ? provider || null : null,
     inputs,
-    note: noteFor(score, device != null, inputs, parts),
+    note: noteFor(score, device != null, inputs, parts, provider),
   };
 }
 
-function noteFor(score, fromDevice, inputs, parts) {
+function noteFor(score, fromDevice, inputs, parts, provider) {
   if (score == null) return 'Log sleep, resting HR or HRV and this fills in.';
-  if (fromDevice) return 'Your wearable’s own recovery score — shown as it reports it.';
+  if (fromDevice) {
+    if (provider === 'whoop') return 'WHOOP’s own Recovery score, shown as WHOOP reports it.';
+    if (provider === 'oura') return 'Oura’s own Readiness score, shown as Oura reports it.';
+    return 'Your device’s own score, shown as it reports it.';
+  }
   // Labels keep their own casing — lowercasing turned "HRV" into "hrv".
   const missing = parts.filter(p => !p.has).map(p => p.label);
   if (inputs === 1) {

@@ -78,6 +78,8 @@ import { WEARABLE_RETURN_EVENT } from './lib/native/wearableConnect';
 import TermsAcceptanceSheet from './components/TermsAcceptanceSheet';
 import WebAccessBoundary from './components/webaccess/WebAccessBoundary';
 import { useWebAccess } from './components/webaccess/useWebAccess';
+import { useBuildGate } from './components/buildgate/useBuildGate';
+import BuildGateBoundary from './components/buildgate/BuildGateBoundary';
 import { loadWebAccessMode } from './lib/webAccessClient';
 import { isGated, inviteAppOnly } from './lib/webAccess';
 
@@ -86,6 +88,7 @@ import { isGated, inviteAppOnly } from './lib/webAccess';
 loadWebAccessMode();
 // The app-store page — only a gated web visitor ever loads it.
 const WebAccessGate = lazy(() => import('./components/webaccess/WebAccessGate'));
+const UpdateRequired = lazy(() => import('./components/buildgate/UpdateRequired'));
 
 // Owner-only surfaces, absent from native builds (lib/native/ownerSurfaces.js).
 // Lazy so the flag can drop them: with VITE_NATIVE_BUILD set these fold
@@ -1259,6 +1262,9 @@ export default function App() {
   // Web gate (item 131) — ships open; see lib/webAccess.js. Decides
   // whether Board may mount at all for this visitor (WebAccessBoundary).
   const access = useWebAccess({ session: session || null, publicRoute: !!legalPage });
+  // Update gate (Phase 0 of docs/STATE_SIZE_PLAN.md) — a build older than
+  // the owner's minimum stops before Board mounts. Fails open.
+  const buildGate = useBuildGate({ session: session || null });
 
   function closeInvite() {
     takePendingInvite();
@@ -1380,28 +1386,38 @@ export default function App() {
     );
   }
   // Board — and with it every state load and save — mounts ONLY through
-  // this boundary. A gated web visitor gets the app-store page instead and
-  // Board never runs for them (webAccess.test.mjs pins both).
+  // these boundaries. An out-of-date build gets the update page and a
+  // gated web visitor the app-store page; Board never runs for either
+  // (buildGate.test.mjs and webAccess.test.mjs pin both).
   return (
-    <WebAccessBoundary
-      decision={access.decision}
-      signedIn
-      fallback={isGated(access.decision) ? (
+    <BuildGateBoundary
+      decision={buildGate.decision}
+      fallback={buildGate.decision === 'update' ? (
         <Suspense fallback={loader}>
-          <WebAccessGate
-            userId={session.user.id}
-            email={session.user.email}
-            unverified={access.decision === 'unverified'}
-            onRetry={access.retry}
-            onSignOut={handleSignOut}
-            onOpenLegal={setLegalPage}
-          />
+          <UpdateRequired native={buildGate.platform === 'native'} build={buildGate.build} onSignOut={handleSignOut} />
         </Suspense>
       ) : loader}
     >
-      <SubscriptionProvider userId={session.user.id}>
-        <Board userId={session.user.id} userEmail={session.user.email} onSignOut={handleSignOut} initialSettings={pendingSettings} />
-      </SubscriptionProvider>
-    </WebAccessBoundary>
+      <WebAccessBoundary
+        decision={access.decision}
+        signedIn
+        fallback={isGated(access.decision) ? (
+          <Suspense fallback={loader}>
+            <WebAccessGate
+              userId={session.user.id}
+              email={session.user.email}
+              unverified={access.decision === 'unverified'}
+              onRetry={access.retry}
+              onSignOut={handleSignOut}
+              onOpenLegal={setLegalPage}
+            />
+          </Suspense>
+        ) : loader}
+      >
+        <SubscriptionProvider userId={session.user.id}>
+          <Board userId={session.user.id} userEmail={session.user.email} onSignOut={handleSignOut} initialSettings={pendingSettings} />
+        </SubscriptionProvider>
+      </WebAccessBoundary>
+    </BuildGateBoundary>
   );
 }

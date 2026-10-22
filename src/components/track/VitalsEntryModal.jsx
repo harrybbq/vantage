@@ -115,8 +115,8 @@ export default function VitalsEntryModal({ S, update, onClose }) {
         {error && <div className="tv-entry-error">{error}</div>}
 
         <p className="tv-note">
-          HRV, recovery, strain and burn come from your wearable — typing over a synced
-          reading would lose it, so they are not offered here.
+          HRV, WHOOP Recovery or Oura Readiness, strain and burn come from WHOOP or Oura —
+          typing over a synced reading would lose it, so they are not offered here.
         </p>
 
         <div className="tv-entry-actions">

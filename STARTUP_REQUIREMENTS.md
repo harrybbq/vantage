@@ -371,6 +371,10 @@ code fails soft until it is run, so order doesn't matter.
     `research`) live in Vantage's Supabase project — one service-role
     key, one Micro instance, one restore unit. Move them to their own
     project before launch.
+    *Status 2026-10-22: runbook in `docs/TRADING_SCHEMA_MOVE.md`. Checked live: the three schemas are
+    self-contained (no FK, view or function crosses into `public`/`auth`; no `anon`/`authenticated`
+    grants; ~158 rows), and Vantage only reaches the trading app over HTTP (`trading-summary` →
+    `TRADING_REPORT_URL`). Owner: create the new project, then follow the runbook.*
 70. `[~]` **AFTER** Repo hygiene: personal emails in
     `lifetime_grants.sql`/`recomp_schema.sql`; an apparent real salary
     comment in `career/companies.js`; a Last.fm key in dead
@@ -406,6 +410,7 @@ code fails soft until it is run, so order doesn't matter.
     no WAF, no rate-limiting rules, no firewall traffic rules. Add a
     rate-limit rule on `/.netlify/functions/*` (per-IP) before launch —
     the in-function limits are per instance.
+    *Status 2026-10-22: researched — not doable as worded on Pro, nothing changed in code. (1) netlify.toml can't reach the path: Netlify's own redirect parser (`@netlify/redirect-parser` 16.1.1, `lib/normalize.js`) rejects any `[[redirects]]` rule whose `from` starts with `/.netlify` ("path" field must not start with "/.netlify"), and `@netlify/config` turns that into a build WARNING and drops the rule — so a `rate_limit` block on `/.netlify/functions/*` would deploy green and do nothing. Rewriting `/api/*` → functions with a `rate_limit` would need every client call moved to `/api/` (none use it today) and still leaves the direct `/.netlify/functions/*` path open, so it is not protection. (2) The Web security UI rules are Enterprise + High-Performance Edge only; code-based rules are on all plans (Netlify docs and pricing, per search results — docs.netlify.com was unreachable from the build sandbox, so re-check on the page: https://docs.netlify.com/manage/security/secure-access-to-sites/rate-limiting/). There is no Pro UI rule to create; the Security center will keep showing "no rate-limiting rules". (3) The one code-based route to a function is per-function `export const config = { rateLimit: { windowLimit, windowSize, aggregateBy: ['ip','domain'], action } }` (type in `@netlify/functions` 6.0.3; docs: https://ntl.fyi/rate-limiting-code), which needs the v2 `export default` function style — all 45 functions are v1. **Follow-up (separate task):** convert the public, cost-bearing functions to v2 and give each a per-IP rule — suggested 300 req / 60 s on `['ip','domain']` for the general set (busiest client path is food-search at a 500 ms debounce ≈ 120/min worst case for one person typing non-stop; the 60 s state poll and friends poll go to Supabase, not functions; per-IP counts are shared behind mobile CGNAT and office NAT, so leave room for 2–3 people searching at once), tighter on the paid-API ones (`ai-food-detect`, `ai-coach-daily`, `recipe-from-video`, e.g. 20 / 60 s). Never rate-limit by IP: `revenuecat-webhook`, the scheduled functions (`push-dispatch`, `snapshot-ratings`, `whoop-cron`, `oura-cron`, `settle-leagues`, `security-sweep`, `retention-prune`), `health-sync` (Apple Health shortcut), `whoop-callback`/`oura-callback`, `csp-report`, `client-error`. Until then the launch posture is the existing per-instance limits plus the durable DB throttles (`ai_usage`, `ingest_caps`), which do hold across instances. Unverified (docs unreachable): window range (search snippets say 1–180 s), the 429 on block, the per-project rule cap on Pro, and whether a v1 function can carry `config.rateLimit`.*
 87. `[x]` **AFTER** `push-dispatch` runs every minute — ~44k invocations a
     month on credit-based pricing, mostly finding nothing. Consider
     every 5 minutes, or trigger it from the queue insert instead.
@@ -532,6 +537,8 @@ else maps onto existing items.
     build (`check:lockscreen`). Outside the repo: optionally run
     `supabase/notifications_lockscreen_2026_10.sql` (triggers stop queueing names/handles); check on a
     real locked phone when push goes live (item 15).*
+    *2026-10-22: `notifications_lockscreen_2026_10.sql` applied by the owner and verified live (neither
+    trigger function writes `display_name` any more).*
 105. `[~]` **LAUNCH** Test the AI coach with eating-disorder, self-harm and relapse style inputs and
     record the results. (G15)
     *Status 2026-10-20: done in code — safe mode (`netlify/lib/coachSafety.js`, client twin
@@ -624,6 +631,8 @@ else maps onto existing items.
     *Status 2026-10-20 (part): `docs/ABUSE_HANDLING.md` stale lines fixed (reports survive reporter
     deletion; the 10-message snapshot at report time; NCA duty in force). The age signal and old-account
     defaults are still open.*
+    *Status 2026-10-22: confirmed live — `audit_schema_2026_10.sql` and `dm_upgrade_2026_10.sql` are both
+    applied (every table, column, function, trigger, index and policy they create is present).*
 
 ### From the store submission pack — 2026-10-20 (`docs/STORE_SUBMISSION_PACK.md` §8, P1–P12)
 115. `[~]` **BLOCKS** WHOOP/Oura connect fails inside the native app: the panel navigates the WebView to
@@ -653,6 +662,8 @@ else maps onto existing items.
     `review_preflight()` / `scripts/reviewer-demo/preflight.mjs` checks `pro_live` and the reviewer
     accounts before submission. Owner: run the SQL, add the accounts, unset `REVENUECAT_ALLOW_SANDBOX`
     if set (`docs/REVIEWER_KIT.md`).*
+    *2026-10-22: `reviewer_access_2026_10.sql` applied by the owner and verified live. Still to do: add the
+    reviewer accounts (once they exist on the company domain), and unset `REVENUECAT_ALLOW_SANDBOX` if set.*
 117. `[~]` **BLOCKS** Sign in with Apple tokens aren't revoked on account deletion (Apple expects it):
     needs the native SIWA flow's authorization code, or the provider token captured at sign-in. (P8)
     *Status 2026-10-20: done in code. Both web and native sign in through Supabase OAuth; there is no
@@ -666,6 +677,8 @@ else maps onto existing items.
     `APPLE_TOKEN_SECRET`), run the SQL, then the smoke test in `docs/SIGN_IN_WITH_APPLE.md`. That test
     confirms Supabase returns Apple's refresh token, which could not be checked from here. Tokens are
     captured from deployment on; earlier Apple sign-ins have none until they sign in again.*
+    *2026-10-22: `apple_revocation_2026_10.sql` applied by the owner and verified live. Still to do: the
+    Apple key and the five Netlify env vars (needs the Apple developer account), then the smoke test.*
 118. `[~]` **BLOCKS** DM text (and the opt-in shared streak habit name) isn't filtered (Apple 1.2 asks
     for a filtering method): reuse `checkPublicText` on send, mirror it server-side. (P9)
     *Status 2026-10-20 (DMs): done in code — the composer refuses slurs and unambiguous explicit terms
@@ -739,9 +752,19 @@ for Oura effectively permanently).
     UNVERIFIED — its docs weren't reachable from the build machine; a community client points at
     `GET https://api.ouraring.com/oauth/revoke?access_token=…`. Owner: confirm on
     cloud.ouraring.com/docs/authentication (or in the §3.2 email), then set `PROVIDERS.oura.revoke`.*
-126. `[ ]` **LAUNCH** Branding/labels per WHOOP's guidelines: no home-made WHOOP/Oura logos, don't rename
+126. `[~]` **LAUNCH** Branding/labels per WHOOP's guidelines: no home-made WHOOP/Oura logos, don't rename
     provider metrics (WHOOP Recovery shown under "Readiness"; Oura Readiness stored as "Recovery"), WHOOP's
     recovery colours, name the provider instead of "wearable"; drop the unused `read:profile` scope.
+    *Status 2026-10-22: done in code, display only (no state key renamed or written).
+    `src/lib/vitals/recoverySource.js` reads whose score `vitalsLog[d].recovery` is from the row's other
+    keys (strain/stepsWhoop → WHOOP, stepsOura → Oura), then the connected flags; can't tell → neutral
+    "Recovery / Readiness" ("Score" in tiles/chips that truncate). Labels flow through Track → Vitals,
+    the hub Vitals widget, the console Vitals prime, auto-fill rules and Lifts ("WHOOP Recovery").
+    WHOOP scores use WHOOP's band colours on marks only (ring arc, tile dot, chip dot) — numbers stay in
+    theme text because #FFDE00 can't carry text on Cream. Plain "Connected · WHOOP/Oura" text replaced
+    the home-made marks; `read:profile` dropped (next reconnect may re-show WHOOP consent). Owner: confirm
+    the three hexes against the full WHOOP Brand & Design Guidelines PDF (the doc quotes an excerpt), and
+    ask Oura (§3 Q8) whether "Oura Readiness" and Vantage's state words are acceptable.*
 127. `[~]` **LAUNCH** While approval is pending: a server-side allow-list for connect (≤10 incl. one slot for
     WHOOP's reviewer) with a clear message instead of "connect failed (denied)"; surface Oura errors
     (today "Synced 0 days"); budget sync-on-open against WHOOP's daily limit (~400–600 DAU would exhaust it)
@@ -757,6 +780,15 @@ for Oura effectively permanently).
     data kept). D7: `WEARABLES_IN_NATIVE = false` in `src/lib/native/wearableGate.js` hides Connect in
     native builds; linked accounts keep Disconnect + delete. Owner: run the SQL, add handles (keep one
     for WHOOP's reviewer), flip to Invite-only. Still open here: the sync-on-open budget (C13).*
+    *Status 2026-10-22: C13 done in code. `whoop-sync` skips an on-open sync (`auto: true`, sent by
+    `useWhoopAutoSync` only) when `whoop_tokens.updated_at` is under 60 min old → 200 `{ skipped: 'recent' }`,
+    which the app ignores (nothing merged or recorded). A 429, or `X-RateLimit-Remaining` ≤ 5, holds the
+    function instance off WHOOP until the reset and answers 429 `{ rateLimited }` with calm words; no
+    retries. `whoop-cron` doesn't pass through the check and stops starting accounts after a 429. Tests:
+    `check:whoopbudget`. Still open: request the limit increase in the approval (item 128).*
+    *2026-10-22: `wearable_access_2026_10.sql` applied by the owner and verified live
+    (`config.wearable_access` = `open`). Still to do: add handles (keep one for WHOOP's reviewer), then
+    flip to Invite-only.*
 128. `[ ]` **LAUNCH** Submit WHOOP's production approval (draft answers + 13-shot list in the pack §2) and
     register Oura + send the questions email (§3), after 124–127; file both replies with the DPIA (G7).
 
@@ -785,6 +817,8 @@ for Oura effectively permanently).
     the gated path never mounts the state hook), gate page + owner panel in `src/components/webaccess/`,
     delete flow shared with Settings (`src/lib/account/deleteAccount.js`); SQL dry-run on Postgres 16
     (`scripts/webaccess/test-web-access-sql.sh`). Owner: steps 1–4 above.*
+    *2026-10-22: step 1 done — `web_access_2026_10b.sql` applied by the owner and verified live
+    (`config.web_access` = `open`). Steps 2–4 are for launch day.*
     *Launch-day copy (from the gate agent): when switching to invite-only, change the privacy policy's
     opening line "available on the web and as a mobile app" (LegalPage.jsx) to "…as a mobile app; the web
     version is by invitation"; export and Settings-path lines stay true in the apps. /delete-account already
@@ -862,6 +896,15 @@ can stop the bleeding in minutes, and you meet the legal clock.
     (DRAFT, do not run). Images → private `media` bucket, references in state, server-side swap with a
     90-day originals ledger; Phase 0 first (build census, update gate, flags, restore drill, PITR).
     Owner decisions listed in the plan. Estimate ~967 kB → ~430 kB.*
+    *Status 2026-10-22: Phase 0 built (shared with item 26) — build stamp, update-required gate (fails
+    open; never stops a running app), build census, `app_config` flags all off.
+    `supabase/state_size_phase0_2026_10.sql` (dry-run tested) is for the owner to run. Measured live
+    (plan §1.1): mean 247 kB, max **1.55 MB**; `backgrounds` up to 834 kB on one account; there is no
+    backgrounds Storage bucket. Next: the owner runs the SQL, does the restore drill and decides on PITR,
+    then Track I1.*
+    *2026-10-22: `state_size_phase0_2026_10.sql` applied by the owner and verified live (flags all off,
+    `min_build` 0, grants and policies as designed, ops_log start/done). The census fills once this
+    build is deployed. Still to do: the restore drill and the PITR decision.*
 26. `[ ]` **Move the per-day logs (`vitalsLog`, `burnLog`, `moodLog`)
     into tables**, the way `nutrition_log` already is. Together with 25
     this takes state from ~967 kB to ~90 kB.
@@ -869,6 +912,8 @@ can stop the bleeding in minutes, and you meet the legal clock.
     function-only writes (no client delete), journal 90 days, dual-write → backfill → 14 days of zero
     mismatches → read switch → owner-run per-user cleanup. The first native binary must be built from the
     read-switch build or later.*
+    *Status 2026-10-22: Phase 0 built (see item 25). Measured: `burnLog` is the largest single key on the
+    account that has it (281 kB, WHOOP workouts), so Track L matters as much as the pictures.*
 27. `[~]` **Decide on Supabase PITR.** Pro gives 7-day daily backups;
     PITR is a paid add-on. Given data safety is the project's stated #1
     rule and there has already been one wipe incident, decide

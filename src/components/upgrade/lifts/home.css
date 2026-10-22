@@ -107,9 +107,10 @@
 .lifts .lh-preview-why { min-width: 0; overflow-wrap: anywhere; }
 .lifts .lh-chip { display: inline-flex; align-items: center; min-height: 32px; padding: 0 10px; box-sizing: border-box; border-radius: var(--lf-r-chip); border: 1px solid var(--lf-line-strong);
   font-family: var(--lf-mono); font-size: var(--lf-fs-floor); letter-spacing: .04em; color: var(--lf-mid); white-space: nowrap; }
-.lifts .lh-chip.is-green { color: var(--lf-accent-ink); border-color: color-mix(in srgb, var(--lf-accent-ink) 65%, transparent); background: var(--lf-done-tint); }
-.lifts .lh-chip.is-yellow, .lifts .lh-chip.is-plus { color: var(--lf-pb); border-color: color-mix(in srgb, var(--lf-pb) 65%, transparent); background: var(--lf-pb-tint); }
+.lifts .lh-chip.is-plus { color: var(--lf-pb); border-color: color-mix(in srgb, var(--lf-pb) 65%, transparent); background: var(--lf-pb-tint); }
 .lifts .lh-chip.is-red { color: var(--lf-danger); border-color: color-mix(in srgb, var(--lf-danger) 65%, transparent); background: var(--lf-danger-tint); }
+/* WHOOP's band colour, as a mark only — the chip's text stays in theme ink. */
+.lifts .lh-chip-dot { width: 8px; height: 8px; border-radius: 50%; flex: none; margin-right: 6px; }
 .lifts .lh-warn, .lifts .lh-redbox { margin: 0; padding: 9px 11px; border-radius: var(--lf-r-cell); font-size: max(13px, var(--lf-fs-floor)); line-height: 19px; }
 .lifts .lh-warn { color: var(--lf-pb); background: var(--lf-pb-tint); border: 1px solid color-mix(in srgb, var(--lf-pb) 40%, transparent); }
 .lifts .lh-redbox { color: var(--lf-text); background: var(--lf-danger-tint); border: 1px solid color-mix(in srgb, var(--lf-danger) 45%, transparent); }
