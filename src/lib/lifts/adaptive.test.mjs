@@ -10,6 +10,7 @@ import assert from 'node:assert/strict';
 import {
   PARTS, GROUP_OF, GROUPS, UPPER_GROUPS, LOWER_GROUPS, PRIORITY, EXERCISE_PARTS, partsOf, sessionParts,
   BASE_TARGETS, BASE_GROUP_TARGETS, sessionGroups, MIN_TARGET, weekTargets, readinessOn, RED_RPE_CAP, weekView, buildAdaptive, trimForRed, adaptStretches, MAX_HISTORY,
+  MAX_EXERCISES, MAX_EXERCISES_WORST,
 } from './adaptive.js';
 import { suggestWorkout, suggestedStart, startWorkout, activeOf, progId, estimateMinutes } from './workout.js';
 import { blockProgress } from './plan.js';
@@ -210,8 +211,10 @@ t('(a) Upper after Push, Pull and Legs on plan: the written Upper, every group�
   assert.equal(lat.sets, Math.max(...r.exercises.map(x => x.sets)), 'side delts carry the most sets (taper)');
   assert.match(lat.why, /taper priority/);
   assert.deepEqual(lat.tags[0], { kind: 'need', text: 'side delts 5.5 / 10.5' });
-  assert.equal(byName(r, 'Dip').why, "chest's second hit");
-  assert.match(byName(r, 'Single-arm cable triceps pushdown (cuff)').why, /^triceps' second hit/);
+  // The dip is a compound: three sets give chest its hit and triceps half-credit sets, so it is
+  // picked first for both groups (owner, Oct 2026: "apply bias toward compound movements such as dips").
+  assert.equal(byName(r, 'Dip').why, 'second hit for chest and triceps');
+  assert.ok(byName(r, 'Single-arm cable triceps pushdown (cuff)'), 'the written pushdown still fills the triceps gap');
   assert.deepEqual(r.catchUp, []);
   assert.equal(r.belowStandard, false);
   assert.equal(r.readiness, null);
@@ -248,7 +251,9 @@ t('(a) Lower after Legs: hyperextension gives lower back its second hit', () => 
   assert.equal(hyper.sets, 2);
   assert.match(hyper.why, /lower back's second hit/);
   assert.deepEqual(hyper.tags[0], { kind: 'need', text: 'lower back 4 / 6' });
-  assert.match(byName(r, 'Reverse lunge').why, /^quads' second hit/, 'the written Reverse lunge wins the quads’ hit');
+  // Compound first: the feet-high leg press gives quads, hamstrings and glutes their hit in one exercise.
+  assert.match(byName(r, 'Leg press, feet high').why, /second hit for quads, hamstrings and glutes/);
+  assert.ok(byName(r, 'Reverse lunge'), 'the written Reverse lunge is still in');
   // Legs skipped its optional walking lunge, which the week's target counts: Lower picks up a little of it.
   assert.ok(sum(r.exercises) - writtenSets('Lower') <= 4, `${sum(r.exercises)} sets vs ${writtenSets('Lower')} written`);
   const withLunge = buildAdaptive(S_([W(B.push, 'Push'), W(B.pull, 'Pull'), W(B.legs, 'Legs', { extra: [{ liftId: progId('Walking dumbbell lunge'), sets: 3, weight: 20 }] }), W(B.upper, 'Upper')]), B.lower, 'Lower');
@@ -349,8 +354,12 @@ t('(c) red on Upper: only what twice-a-week needs, two sets each', () => {
   const r = buildAdaptive(S, B.upper, 'Upper');
   assert.ok(r.exercises.every(x => x.sets === 2));
   assert.ok(r.exercises.every(x => /second hit/.test(x.why)), 'nothing but second hits');
-  const groupsOf = r.exercises.map(x => GROUP_OF[Object.entries(partsOf({ name: x.name })).sort((a, b) => b[1] - a[1])[0][0]]);
-  assert.deepEqual(groupsOf.sort(), ['Back', 'Biceps', 'Chest', 'Triceps'], 'shoulders already had two hits (Push, archer on Pull)');
+  // Four groups owe a second hit (shoulders already had two: Push, archer on Pull). The triceps'
+  // hit is shared between compounds (dip + shoulder press, a half-credit set each) rather than
+  // costing a separate exercise.
+  assert.equal(r.exercises.length, 4);
+  const after = weekView(S, B.upper, { extra: asWorkout(r, B.upper, 'Upper') });
+  for (const g of UPPER_GROUPS) assert.ok(after.groups.find(x => x.group === g).hits >= 2, `${g}: two hits`);
   assert.ok(sum(r.exercises) <= 10);
   assert.match(r.notes[0], /WHOOP Recovery 22% · red — trimmed/);
   // a red Upper after a missed Push still carries no catch-up
@@ -461,6 +470,73 @@ t('(f) press-heavy → pecs on Upper; leg-heavy → hips on Lower; red → the l
   assert.equal(red.filter(x => /dead hang/i.test(x.name)).length, 1);
   const green = adaptStretches({ ...PPL(), vitalsLog: { [B.pull]: { recovery: 80 } } }, B.pull, 'Pull', STRETCHES);
   assert.ok(!green.some(x => x.added === 'red day'));
+});
+
+// ── (f) Shift-length sessions: the exercise cap and the compound bias ───
+// Owner, Oct 2026: "say I miss a few muscle groups then I get to Upper, it should not have 12
+// exercises waiting for me, instead apply bias toward compound movements such as dips … cap it at
+// 8 exercises, maybe 9 in worst case."
+t('(f) the cap: 8, 9 only in the worst case', () => {
+  assert.equal(MAX_EXERCISES, 8);
+  assert.equal(MAX_EXERCISES_WORST, 9);
+});
+t('(f) Push missed: the dip carries shoulders, chest and triceps in one exercise', () => {
+  const r = buildAdaptive(S_([W(B.pull, 'Pull'), W(B.legs, 'Legs')]), B.upper, 'Upper');
+  assert.match(byName(r, 'Dip').why, /second hit for shoulders, chest and triceps/);
+  assert.ok(byName(r, 'Dip').sets >= 4, 'enough dip sets that triceps and shoulders (half credit) reach their hit');
+  assert.ok(r.exercises.length <= MAX_EXERCISES);
+});
+t('(f) Push and Pull missed: Pull’s shoulder catch-up lands on rear delts, not the lateral raise', () => {
+  const r = buildAdaptive(S_([W(B.legs, 'Legs')]), B.upper, 'Upper');
+  assert.deepEqual(r.catchUp, ['Push', 'Pull']);
+  assert.ok(byName(r, 'Cable archer pull (rear delt)').tags.some(tg => tg.text === '+1 Pull'));
+  assert.ok(r.exercises.every(x => x.sets <= 6), r.exercises.map(x => `${x.name} ${x.sets}`).join(', '));
+  assert.ok(r.exercises.length <= MAX_EXERCISES);
+});
+t('(f) half-done Push and Pull: the cap holds and the rest goes on as extra sets', () => {
+  const r = buildAdaptive(S_([
+    W(B.push, 'Push', { skip: ['Dip', 'Machine shoulder press', 'Single-arm cable triceps pushdown (cuff)'] }),
+    W(B.pull, 'Pull', { skip: ['Lat pulldown', 'Incline dumbbell curl, 21s', 'Cable archer pull (rear delt)'] }),
+    W(B.legs, 'Legs')]), B.upper, 'Upper');
+  assert.equal(r.exercises.length, MAX_EXERCISES);
+  assert.ok(r.exercises.some(x => /to keep it to 8 exercises/.test(x.why)), 'the overflow is said out loud');
+});
+t('(f) stress: no built session over 9 exercises or 6 sets an exercise, every group still hit', () => {
+  // Every combination of whole anchors missed, and of half the exercises skipped on each, on both sessions.
+  let seen = 0, max = 0;
+  for (let mask = 0; mask < 64; mask++) {
+    const sessions = [];
+    for (const [i, code] of ['Push', 'Pull', 'Legs'].entries()) {
+      const missed = mask & (1 << i);
+      const half = mask & (1 << (i + 3));
+      if (missed) continue;
+      const names = PROGRAMME[code].filter(x => !x.optional).map(x => x.name);
+      sessions.push(W(B[code.toLowerCase()], code, half ? { skip: names.filter((_, j) => j % 2 === 0) } : {}));
+    }
+    for (const [session, day] of [['Upper', B.upper], ['Lower', B.lower]]) {
+      const ss = session === 'Lower' ? [...sessions, W(B.upper, 'Upper')] : sessions;
+      for (const vitalsLog of [{}, { [day]: { recovery: 20 } }]) {
+        const r = buildAdaptive(S_(ss, { vitalsLog }), day, session);
+        if (!r) continue;
+        seen++;
+        max = Math.max(max, r.exercises.length);
+        const label = `${session} mask=${mask} red=${!!vitalsLog[day]}`;
+        assert.ok(r.exercises.length <= MAX_EXERCISES_WORST, `${label}: ${r.exercises.length} exercises`);
+        assert.ok(r.exercises.every(x => x.sets <= 6), `${label}: ${r.exercises.map(x => `${x.name} ${x.sets}`).join(', ')}`);
+        // Every group still short of two hits gets one from this session (with an anchor
+        // missed, two may no longer be possible — the week is below standard, as agreed).
+        const groups = session === 'Upper' ? UPPER_GROUPS : LOWER_GROUPS;
+        const before = weekView(S_(ss, { vitalsLog }), day);
+        const after = weekView(S_(ss, { vitalsLog }), day, { extra: asWorkout(r, day, session) });
+        for (const g of groups) {
+          const b = before.groups.find(x => x.group === g).hits, a = after.groups.find(x => x.group === g).hits;
+          if (b < 2) assert.ok(a >= b + 1, `${label}: ${g} hit (${b} → ${a})`);
+        }
+      }
+    }
+  }
+  assert.ok(seen >= 200, `${seen} builds checked`);
+  assert.ok(max <= MAX_EXERCISES_WORST);
 });
 
 console.log(`adaptive: ${n} tests passed`);

@@ -446,8 +446,25 @@ const REPS_OF = (() => {
   return out;
 })();
 const PER_SESSION_CAP = 10;
+/**
+ * Exercises in a built Upper / Lower. Owner, Oct 2026: "I don't have
+ * enough time during shift to splurge 12 exercises … cap it at 8, maybe 9
+ * in worst case." Gap filling stops at 8. Only a group that would
+ * otherwise miss its second hit of the week (or a missed anchor's group
+ * nothing in the session touches) may take a 9th. Past the cap, what the
+ * week still owes goes on as extra sets on the exercises already picked,
+ * compounds first.
+ */
+export const MAX_EXERCISES = 8;
+export const MAX_EXERCISES_WORST = 9;
 /** A gap pick must close at least this much priority-weighted need on its own. */
 const MIN_GAIN = 2;
+/** An overflow set must close at least this much priority-weighted need. */
+const MIN_SET_GAIN = 0.5;
+/** Group sets that make a session count as a hit (hitsOf). */
+const HIT = 2;
+/** A missed anchor's +1 sets never take one exercise past this. */
+const CATCH_UP_TOP = 6;
 /** Less than a quarter of a set short isn't worth another set (targets are rounded to 0.1). */
 const SLACK = 0.25;
 const fmt = n => (Number.isInteger(n) ? String(n) : n.toFixed(1));
@@ -460,7 +477,7 @@ function candidates(groups, list, today, sessions = []) {
       const parts = partsOf({ name: x.name });
       const m = mainPart(parts);
       if (!m || !groups.includes(GROUP_OF[m]) || out.has(norm(x.name))) continue;
-      out.set(norm(x.name), { name: x.name, parts, main: m, programme: true });
+      out.set(norm(x.name), { name: x.name, parts, main: m, programme: true, gsets: creditGroups({ name: x.name }, 1, {}) });
     }
   }
   // The owner's own lifts, if trained in the last 60 days (familiar, and at a gym they use).
@@ -473,7 +490,7 @@ function candidates(groups, list, today, sessions = []) {
     const parts = partsOf(lift);
     const m = mainPart(parts);
     if (!m || !groups.includes(GROUP_OF[m]) || !used) continue;
-    out.set(norm(lift.name), { name: lift.name, parts, main: m, programme: false, liftId: lift.id });
+    out.set(norm(lift.name), { name: lift.name, parts, main: m, programme: false, liftId: lift.id, gsets: creditGroups(lift, 1, {}) });
   }
   return [...out.values()];
 }
@@ -489,11 +506,19 @@ const poss = g => { const w = g.toLowerCase(); return w.endsWith('s') ? `${w}'` 
  * (null: not a block day, not an adaptive session, or nothing logged yet —
  * until the first workout the rota stands, as in plan.js — use the programme).
  *
- *   1. twice a week first — each group short of its second hit gets an
- *      exercise (2 sets on a red day, its full share otherwise);
- *   2. then the biggest priority-weighted gaps (not on a red day);
- *   3. a missed anchor: +1 set for each group it owed, on that group's
- *      highest-priority pick (not on a red day).
+ *   1. twice a week first: the groups short of their second hit are
+ *      covered with as few exercises as possible. A compound that hits
+ *      several of them wins (a dip is chest, triceps and shoulders), with
+ *      enough sets that each group it covers gets its hit (2 group sets;
+ *      a secondary muscle counts half, so 4 sets of dips hit triceps);
+ *   2. then the biggest priority-weighted gaps, up to MAX_EXERCISES
+ *      (not on a red day);
+ *   3. when the cap was what stopped step 2, the rest of the week's need
+ *      goes on as extra sets on the exercises already picked;
+ *   4. a missed anchor: +1 set for each group it owed, on the pick that
+ *      works it (its own exercise, else a compound that touches it); a new
+ *      exercise only when nothing in the session touches that group and
+ *      there is room under MAX_EXERCISES_WORST (not on a red day).
  * The session's own written exercises win ties, so a week on plan comes
  * out close to the programme's Upper / Lower.
  */
@@ -538,33 +563,55 @@ export function buildAdaptive(S, today, session) {
 
   const pool = candidates(groups, L.list, today, L.sessions || []);
   const picked = [];
-  const load = {};
+  const load = {};    // part sets this session gives (EXERCISE_PARTS weights)
+  const gload = {};   // group sets this session gives (body-map counting, for hits)
+  const needOf = p => Math.max(0, (need0[p] || 0) - (load[p] || 0));
   const isPicked = c => picked.some(x => x.name === c.name);
+  const addSets = (x, k) => {
+    x.sets += k;
+    for (const [p, w] of Object.entries(x.parts)) load[p] = (load[p] || 0) + w * k;
+    for (const [g, w] of Object.entries(x.gsets || {})) gload[g] = (gload[g] || 0) + w * k;
+  };
   const take = (c, sets, reason) => {
-    const ex = { ...c, sets, reason, tags: [] };
+    const ex = { ...c, sets: 0, reason, tags: [] };
     picked.push(ex);
-    for (const [p, w] of Object.entries(c.parts)) { need[p] = Math.max(0, (need[p] || 0) - w * sets); load[p] = (load[p] || 0) + w * sets; }
+    addSets(ex, sets);
     return ex;
   };
-  const gainOf = (c, sets) => Object.entries(c.parts).reduce((s, [p, w]) => s + prio(p) * Math.min(need[p] || 0, w * sets), 0);
+  const gainOf = (c, sets) => Object.entries(c.parts).reduce((s, [p, w]) => s + prio(p) * Math.min(needOf(p), w * sets), 0);
   const bonus = c => (own.has(norm(c.name)) ? 1 : 0) + (c.programme ? 0.1 : 0);
+  const topOf = c => (red ? 2 : prio(c.main) > 1.25 ? 5 : 4);
   const setsFor = c => {
     if (red) return 2;
-    const top = prio(c.main) > 1.25 ? 5 : 4;
-    const want = Math.ceil((need[c.main] || 0) / (c.parts[c.main] || 1) - SLACK);
-    return Math.max(2, Math.min(top, want, Math.floor(PER_SESSION_CAP - (load[c.main] || 0) + 1e-9)));
+    const want = Math.ceil(needOf(c.main) / (c.parts[c.main] || 1) - SLACK);
+    return Math.max(2, Math.min(topOf(c), want, Math.floor(PER_SESSION_CAP - (load[c.main] || 0) + 1e-9)));
+  };
+  const unhit = () => mustHit.filter(g => (gload[g] || 0) < HIT - 1e-9);
+  /** Sets `c` needs to give group `g` its hit this session, or Infinity. */
+  const setsToHit = (c, g) => {
+    const w = (c.gsets || {})[g] || 0;
+    return w > 0 ? Math.max(1, Math.ceil((HIT - (gload[g] || 0)) / w - 1e-9)) : Infinity;
   };
 
-  // 1. Twice a week first: each group short of its second hit gets an exercise.
-  for (const g of mustHit) {
-    if (picked.some(x => GROUP_OF[x.main] === g)) continue;
-    const opts = pool.filter(c => GROUP_OF[c.main] === g && !isPicked(c));
-    if (!opts.length) continue;
-    const score = c => gainOf(c, setsFor(c)) + bonus(c);
-    const best = opts.reduce((x, y) => (score(y) > score(x) + 1e-9 ? y : x));
-    take(best, setsFor(best), { kind: 'hit', group: g });
+  // 1. Twice a week first, in as few exercises as possible: the pick that
+  //    gives the most still-unhit groups their hit wins (compounds first),
+  //    then the bigger priority-weighted gain.
+  while (unhit().length && picked.length < MAX_EXERCISES_WORST) {
+    const open = unhit();
+    let best = null, bestScore = -1, bestSets = 0, bestCovers = [];
+    for (const c of pool) {
+      if (isPicked(c)) continue;
+      const covers = open.filter(g => setsToHit(c, g) <= topOf(c));
+      if (!covers.length) continue;
+      const sets = Math.min(topOf(c), Math.max(setsFor(c), ...covers.map(g => setsToHit(c, g))));
+      const sc = covers.length * 10 + gainOf(c, sets) + bonus(c);
+      if (sc > bestScore + 1e-9) { best = c; bestScore = sc; bestSets = sets; bestCovers = covers; }
+    }
+    if (!best) break;
+    take(best, bestSets, { kind: 'hit', groups: bestCovers });
   }
-  // 2. Then the biggest priority-weighted gaps (skipped on a red day).
+  // 2. Then the biggest priority-weighted gaps, up to the cap (skipped on a red day).
+  let capped = false;
   if (!red) {
     for (let guard = 0; guard < 12; guard++) {
       let best = null, bestScore = 0, bestSets = 0;
@@ -577,31 +624,55 @@ export function buildAdaptive(S, today, session) {
         if (sc > bestScore + 1e-9) { best = c; bestScore = sc; bestSets = n; }
       }
       if (!best) break;
+      if (picked.length >= MAX_EXERCISES) { capped = true; break; }
       take(best, bestSets, { kind: 'gap' });
     }
   }
   // Later picks overlap earlier ones (a row's mid-back, a pulldown's biceps):
-  // take back sets an exercise no longer needs for its main part.
+  // take back sets an exercise no longer needs for its main part — never
+  // below what a group it was picked to hit needs for that hit.
   if (!red) {
+    const keepsHits = x => (x.reason.groups || []).every(g => (gload[g] || 0) - ((x.gsets || {})[g] || 0) >= HIT - 1e-9);
     for (const x of picked.slice().reverse()) {
       const w = x.parts[x.main] || 1;
-      while (x.sets > 2 && (load[x.main] || 0) - (need0[x.main] || 0) >= w - SLACK) {
-        x.sets -= 1;
-        for (const [p, pw] of Object.entries(x.parts)) load[p] -= pw;
-      }
+      while (x.sets > 2 && (load[x.main] || 0) - (need0[x.main] || 0) >= w - SLACK && keepsHits(x)) addSets(x, -1);
     }
   }
-  // 3. A missed anchor: +1 set for each group it owed (none on a red day).
+  // 3. The cap stopped step 2: what the week still owes goes on as extra
+  //    sets on the picks that work it, compounds and taper parts first.
+  if (!red && capped) {
+    for (let guard = 0; guard < 40; guard++) {
+      let best = null, bestGain = MIN_SET_GAIN - 1e-9;
+      for (const x of picked) {
+        if (x.sets >= topOf(x) || (load[x.main] || 0) >= PER_SESSION_CAP) continue;
+        const g = gainOf(x, 1);
+        if (g > bestGain + 1e-9) { best = x; bestGain = g; }
+      }
+      if (!best) break;
+      addSets(best, 1);
+      best.folded = (best.folded || 0) + 1;
+    }
+  }
+  // 4. A missed anchor: +1 set for each group it owed (none on a red day),
+  //    on the pick that works it; a new exercise only as the last resort.
   let catchUpSets = 0;
   if (!red) {
     for (const code of catchUp) {
-      const owed = Object.entries(groupsOfParts(sessionParts(code))).filter(([g, n]) => groups.includes(g) && n >= 1).map(([g]) => g);
+      const codeParts = sessionParts(code);
+      const owed = Object.entries(groupsOfParts(codeParts)).filter(([g, n]) => groups.includes(g) && n >= 1).map(([g]) => g);
       for (const g of owed) {
-        const ex = picked.filter(x => GROUP_OF[x.main] === g)
-          .sort((x, y) => (prio(y.main) - prio(x.main)) || ((y.parts[y.main] || 0) - (x.parts[x.main] || 0)) || (y.sets - x.sets))[0];
-        if (ex) { ex.sets += 1; catchUpSets += 1; ex.tags.push({ kind: 'plus', text: `+1 ${code}` }); continue; }
+        // The pick that works what THIS session owed in the group (Pull's
+        // shoulders are rear delts, Push's are front and side), then the
+        // taper priority. Never past CATCH_UP_TOP sets on one exercise.
+        const match = x => Object.entries(x.parts).reduce((s, [p, w]) => s + (GROUP_OF[p] === g ? Math.min(w, codeParts[p] || 0) : 0), 0);
+        const byFit = (x, y) => (match(y) - match(x)) || (prio(y.main) - prio(x.main)) || ((y.parts[y.main] || 0) - (x.parts[x.main] || 0)) || (y.sets - x.sets);
+        const room = x => x.sets < CATCH_UP_TOP;
+        const ex = picked.filter(x => room(x) && GROUP_OF[x.main] === g).sort(byFit)[0]
+          || picked.filter(x => room(x) && ((x.gsets || {})[g] || 0) >= 0.5).sort((x, y) => ((y.gsets[g] || 0) - (x.gsets[g] || 0)) || byFit(x, y))[0];
+        if (ex) { addSets(ex, 1); catchUpSets += 1; ex.tags.push({ kind: 'plus', text: `+1 ${code}` }); continue; }
+        if (picked.length >= MAX_EXERCISES_WORST) continue;
         const c = pool.find(p => GROUP_OF[p.main] === g && !isPicked(p));
-        if (c) { take(c, 2, { kind: 'hit', group: g }).tags.push({ kind: 'plus', text: `+2 ${code}` }); catchUpSets += 2; }
+        if (c) { take(c, 2, { kind: 'hit', groups: [g] }).tags.push({ kind: 'plus', text: `+2 ${code}` }); catchUpSets += 2; }
       }
     }
   }
@@ -615,8 +686,11 @@ export function buildAdaptive(S, today, session) {
     const before = round1(done[x.main] || 0);
     const tags = [{ kind: 'need', text: `${x.main.toLowerCase()} ${fmt(before)} / ${fmt(round1(target))}` }, ...x.tags];
     const bits = [];
-    if (x.reason.kind === 'hit') bits.push(`${poss(x.reason.group)} second hit`);
+    const hitGroups = (x.reason.groups || []).map(g => g.toLowerCase());
+    if (x.reason.kind === 'hit' && hitGroups.length === 1) bits.push(`${poss(x.reason.groups[0])} second hit`);
+    if (x.reason.kind === 'hit' && hitGroups.length > 1) bits.push(`second hit for ${listWords(hitGroups)}`);
     if (prio(x.main) > 1) bits.push('taper priority');
+    if (x.folded) bits.push(`+${x.folded} to keep it to ${MAX_EXERCISES} exercises`);
     return { name: x.name, sets: x.sets, reps: REPS_OF[norm(x.name)] || '8–12', why: bits.join(' · '), tags, ...(x.liftId ? { liftId: x.liftId } : {}) };
   });
 
@@ -624,7 +698,7 @@ export function buildAdaptive(S, today, session) {
   const notes = [];
   if (red) notes.push(`WHOOP Recovery ${readiness.score}% · red — trimmed to what twice-a-week needs.`);
   if (!red && picked.length) {
-    const hitsFor = [...new Set(picked.filter(x => x.reason.kind === 'hit').map(x => x.reason.group.toLowerCase()))];
+    const hitsFor = [...new Set(picked.filter(x => x.reason.kind === 'hit').flatMap(x => x.reason.groups.map(g => g.toLowerCase())))];
     const taper = [...new Set(picked.filter(x => prio(x.main) > 1).sort((x, y) => prio(y.main) - prio(x.main)).map(x => x.main.toLowerCase()))].slice(0, 2);
     const bits = [];
     if (hitsFor.length) bits.push(`second hits for ${listWords(hitsFor)}`);
