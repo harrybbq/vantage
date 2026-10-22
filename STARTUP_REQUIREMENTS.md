@@ -883,6 +883,9 @@ can stop the bleeding in minutes, and you meet the legal clock.
     (plan §1.1): mean 247 kB, max **1.55 MB**; `backgrounds` up to 834 kB on one account; there is no
     backgrounds Storage bucket. Next: the owner runs the SQL, does the restore drill and decides on PITR,
     then Track I1.*
+    *2026-10-22: `state_size_phase0_2026_10.sql` applied by the owner and verified live (flags all off,
+    `min_build` 0, grants and policies as designed, ops_log start/done). The census fills once this
+    build is deployed. Still to do: the restore drill and the PITR decision.*
 26. `[ ]` **Move the per-day logs (`vitalsLog`, `burnLog`, `moodLog`)
     into tables**, the way `nutrition_log` already is. Together with 25
     this takes state from ~967 kB to ~90 kB.

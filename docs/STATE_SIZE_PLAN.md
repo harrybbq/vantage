@@ -715,7 +715,8 @@ The gate must ship **now**, because a gate only binds builds that contain it.
   2026-10-22 (§1.1).
 - ~~Run the size measurement and record the per-key numbers here~~ — done
   2026-10-22 (§1.1).
-- Run `supabase/state_size_phase0_2026_10.sql`.
+- ~~Run `supabase/state_size_phase0_2026_10.sql`~~ — applied and verified
+  2026-10-22.
 - Run the **restore drill** (item 82) as `docs/RESTORE_RUNBOOK.md` describes.
 - **Decide on PITR** (item 27; recommendation in §7).
 - ~~Confirm whether the "backgrounds bucket" exists~~ — it does not
