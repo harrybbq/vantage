@@ -8,7 +8,9 @@
  *                   friend · All N.
  *   FriendCardCx    the friend's card: ratings in band colours, streak,
  *                   13-week activity, recent wins, Message, ⋯ Report /
- *                   Block / Remove (the existing report and block flows).
+ *                   Mute / Remove / Block (the existing report and block
+ *                   flows; Mute is item 113 — a muted friend's activity
+ *                   folds behind "Show", nothing is deleted).
  *   FriendTakeover  desktop: the friend takes the widget area, the way the
  *                   classic FriendPanel does — friends list, the
  *                   conversation (MessagesModal inline, unchanged), the card.
@@ -56,7 +58,7 @@ function FriendRow({ f, onOpen, selected = false }) {
           <span className="cx-hub-fr-nm"><span className={`cx-hub-ell${f.unread ? ' is-strong' : ''}`}>{f.name}</span><Diamonds n={f.prestige} /></span>
           {f.lastText
             ? <span className="cx-hub-fr-st is-msg">“{f.lastText}”</span>
-            : <span className="cx-hub-fr-st">{seenLine(f)}</span>}
+            : <span className="cx-hub-fr-st">{f.silenced ? 'Muted' : seenLine(f)}</span>}
         </span>
         {f.unread > 0 && <span className="cx-hub-pill cx-num">{f.unread}</span>}
         <span className={`cx-num cx-hub-fr-ovr ${bandClass(f.ovr)}`}>{f.ovr ?? '–'}</span>
@@ -163,7 +165,11 @@ function Heat({ days = [] }) {
 
 export function FriendCardCx({ f, hub, showMessage = true, inSheet = false }) {
   const [menu, setMenu] = useState(false);
+  // A muted friend's activity is folded, not gone: "Show" opens it for
+  // this look, and it folds again next time (or for good on Unmute).
+  const [showMuted, setShowMuted] = useState(false);
   const menuRef = useRef(null);
+  useEffect(() => { setShowMuted(false); }, [f?.id]);
   useEffect(() => {
     if (!menu) return undefined;
     const close = e => { if (menuRef.current && !menuRef.current.contains(e.target)) setMenu(false); };
@@ -197,6 +203,12 @@ export function FriendCardCx({ f, hub, showMessage = true, inSheet = false }) {
           );
         })}
       </div>
+      {f.silenced && !showMuted ? (
+        <div className="cx-hub-fc-muted">
+          <span className="cx-muted">Muted — their activity and message alerts are hidden. They aren’t told.</span>
+          <button type="button" className="cx-hub-link is-strong" onClick={() => setShowMuted(true)}>Show</button>
+        </div>
+      ) : (<>
       <div className="cx-hub-fc-streak">
         <Icon name="flame" size={18} strokeWidth={1.75} />
         <span className="cx-hub-fc-st">
@@ -214,6 +226,7 @@ export function FriendCardCx({ f, hub, showMessage = true, inSheet = false }) {
           ? f.wins.map((w, i) => <span key={i} className="cx-hub-row is-static"><span className="cx-gold" aria-hidden="true">◆</span><span className="cx-hub-ell">{w.name}</span></span>)
           : <span className="cx-muted">{hub.statsLoading ? 'Loading…' : 'None yet'}</span>}
       </div>
+      </>)}
       <div className="cx-hub-fc-acts" ref={menuRef}>
         {showMessage && (
           <button type="button" className="cx-btn cx-btn--primary cx-hub-grow" onClick={() => hub.openThread(f)}>
@@ -226,6 +239,11 @@ export function FriendCardCx({ f, hub, showMessage = true, inSheet = false }) {
         {menu && (
           <div className="cx-hub-menu is-up" role="menu">
             <button type="button" role="menuitem" onClick={() => { setMenu(false); hub.openReport(f); }}>Report {f.name}</button>
+            {hub.canMute && (
+              <button type="button" role="menuitem" onClick={() => { setMenu(false); if (f.silenced) hub.unmute(f); else hub.mute(f); }}>
+                {f.silenced ? 'Unmute' : 'Mute'}
+              </button>
+            )}
             <button type="button" role="menuitem" onClick={() => { setMenu(false); hub.unfriend(f); }}>Remove friend</button>
             <button type="button" role="menuitem" className="cx-danger" onClick={() => { setMenu(false); hub.block(f); }}>Block</button>
           </div>

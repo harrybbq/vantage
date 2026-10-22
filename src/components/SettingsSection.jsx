@@ -19,6 +19,7 @@ import Icon from './Icon';
 import TravelPolicyCard from './holiday/TravelPolicyCard';
 import { confirmAndDeleteAccount } from '../lib/account/deleteAccount';
 import { privacyOn, privacyToggle } from '../lib/friends/privacy';
+import StayingSafeCard from './settings/StayingSafeCard';
 import { SETTINGS_FOCUS } from '../lib/support';
 
 // Owner-only Apple Health Shortcut panel — compiled out of native builds
@@ -878,6 +879,9 @@ export default function SettingsSection({ S, update, active, userId, userEmail, 
         {userId
           ? <FriendsPrivacyCard userId={userId} S={S} update={update} />
           : <div className="settings-empty">Sign in to manage privacy.</div>}
+        {/* Mute list + who to talk to (item 113). After the friends card
+            because it is about the same people. */}
+        <StayingSafeCard S={S} update={update} />
         {/* Travel policy — private country clearance lists used by the
             Holiday map overlay and trip-card warnings. */}
         <TravelPolicyCard S={S} update={update} />

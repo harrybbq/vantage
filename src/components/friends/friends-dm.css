@@ -492,3 +492,74 @@ html[data-theme="dark-os"] .sn-ok { background: var(--os-surface2); border-color
    own column rather than run under the buttons. */
 .fc-request-row .fc-row-status { overflow-wrap: anywhere; }
 .fc-request-actions { align-items: center; }
+
+/* ── Mute (item 113) ──────────────────────────────────────────────────
+   Quiet, never hidden for good: a muted friend's card folds its activity
+   into one line with Show; a muted conversation sits under a "Muted"
+   label at the end of the inbox with no badge. Same tokens as the rail. */
+.fc-muted-fold {
+  display: flex; align-items: center; gap: 12px; padding: 11px 16px;
+  font-family: var(--body); font-size: 13px; line-height: 1.45; color: var(--text-mid);
+}
+.fc-muted-fold > span { flex: 1; min-width: 0; }
+.fc-muted-show {
+  flex-shrink: 0; min-height: 32px; padding: 0 12px; border-radius: 8px;
+  border: 1px solid var(--border); background: transparent; cursor: pointer;
+  font-family: var(--body); font-size: 13px; font-weight: 600; color: var(--em-text);
+}
+.fc-muted-show:hover { background: rgba(var(--em-rgb), .08); }
+.fc-muted-show:focus-visible { outline: 2px solid var(--em); outline-offset: 2px; }
+html[data-theme="dark-os"] .fc-muted-show { border-color: var(--os-border); color: var(--em-light); }
+@media (pointer: coarse) { .fc-muted-show { min-height: 44px; } }
+
+.dm-inbox-group {
+  padding: 10px 14px 6px; font-family: var(--mono); font-size: 12px; letter-spacing: 1.2px;
+  text-transform: uppercase; color: var(--text-mid);
+  border-top: 1px solid var(--border-lt, var(--border));
+}
+html[data-theme="dark-os"] .dm-inbox-group { border-top-color: var(--os-border); }
+.dm-conv.is-silenced .dm-conv-name { color: var(--text-mid); }
+
+/* ── Staying safe (item 113, supportive information) ──────────────────
+   Calm: the rail's own border and text, links in the accent, no red. */
+.safe-lines {
+  margin: 0 0 12px; padding: 10px 12px; border-radius: 9px;
+  border: 1px solid var(--border); background: var(--bg-raised, transparent);
+  font-family: var(--body); font-size: 13px; line-height: 1.5; color: var(--text);
+  overflow-wrap: anywhere;
+}
+html[data-theme="dark-os"] .safe-lines { border-color: var(--os-border); background: var(--os-surface, transparent); color: #ddd8ce; }
+.safe-lines-title { font-weight: 700; font-size: 13px; margin-bottom: 4px; color: var(--text); }
+html[data-theme="dark-os"] .safe-lines-title { color: #f0ebe1; }
+.safe-lines ul { margin: 0; padding: 0 0 0 18px; display: flex; flex-direction: column; gap: 4px; }
+.safe-lines a { color: var(--em-text); font-weight: 600; text-decoration: underline; text-underline-offset: 2px; }
+html[data-theme="dark-os"] .safe-lines a { color: var(--em-light); }
+
+/* One line under incoming friend requests. */
+.fc-request-hint {
+  margin: 0; padding: 8px 14px 10px; font-family: var(--body); font-size: 12.5px; line-height: 1.45;
+  color: var(--text-mid);
+}
+.report-modal .report-signpost + .safe-lines { margin-top: 10px; }
+.dm-inbox-list > li + li .dm-inbox-group + .dm-conv { border-top: 0; }
+
+/* Settings › Privacy › Staying safe (StayingSafeCard). */
+.safe-mute-head {
+  font-family: var(--mono); font-size: var(--fs-floor); letter-spacing: 1.4px; text-transform: uppercase;
+  color: var(--text-muted); margin: 4px 0 8px;
+}
+.safe-mute-empty { margin: 0 0 14px; font-family: var(--body); font-size: 13px; line-height: 1.5; color: var(--text-mid); }
+.safe-mute-list { list-style: none; margin: 0 0 14px; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.safe-mute-row {
+  display: flex; align-items: center; gap: 12px; padding: 8px 10px 8px 12px; border-radius: 8px;
+  border: 1px solid var(--border); min-width: 0;
+}
+html[data-theme="dark-os"] .safe-mute-row { border-color: var(--os-border); }
+.safe-mute-who { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+.safe-mute-name { font-family: var(--body); font-size: 13.5px; font-weight: 600; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.safe-mute-sub { font-family: var(--mono); font-size: var(--fs-floor); color: var(--text-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.safe-mute-btn { flex-shrink: 0; }
+@media (pointer: coarse) { .safe-mute-btn { min-height: 44px; } }
+.safe-lines-settings { margin-bottom: 0; }
+/* The mute / unmute confirmation in a conversation: calm, not an error. */
+.dm-toast.is-info { color: var(--text-mid); }

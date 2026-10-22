@@ -35,6 +35,8 @@ export default function FriendPanel({
   onClose,
   onBlocked,
   onReport,
+  onMute,
+  onUnmute,
   onBlock,
   onUnfriend,
   onActivity,
@@ -73,6 +75,8 @@ export default function FriendPanel({
             loading={loading}
             statsMissing={statsMissing}
             onReport={onReport}
+            onMute={onMute}
+            onUnmute={onUnmute}
             onBlock={onBlock}
             onUnfriend={onUnfriend}
           />

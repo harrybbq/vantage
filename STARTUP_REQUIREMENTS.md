@@ -623,6 +623,23 @@ else maps onto existing items.
     ABUSE_HANDLING "Open product gaps": G-1 mute, G-2 "Staying safe" supportive info (shown to everyone
     until item 114 gives an age signal), G-3 a reported user can delete their account and cascade the
     evidence away (recommend: refuse deletion while a report is on hold).*
+    *Status 2026-10-22: mute (G-1) and supportive information (G-2) done in code, free for everyone.
+    Mute: an additive state key `S.mutedUsers = { [id]: { at, name, handle } }` (`src/lib/friends/mutes.js`,
+    context `useMutes.js` provided by App's Board); nothing server-side, so the muted person is never told.
+    Mute / Unmute sit beside Report and Block on the friend card (classic + console) and in the DM ⋯ menu;
+    a muted friend's conversation sorts under "Muted" at the end of the inbox, counts towards no badge
+    (rail, tab, header chip — the chip's head count adds `sender_id not in (…)`), and their streak /
+    heatmap / wins fold behind "Show"; the thread stays readable and reportable. Settings › Privacy ›
+    Staying safe lists who is muted with Unmute. Not offered on leaderboard, group or request rows (those
+    people can't DM you); there is no group chat. Supportive information (`src/lib/safety/support.js`,
+    `components/friends/StayingSafe.jsx`): Childline 0800 1111, CEOP (ceop.police.uk), 999 — on every
+    report confirmation (numbers the reason's signpost already shows are not repeated), in a "Blocked"
+    notice after any block, one line under incoming friend requests, and in Settings (plus Samaritans).
+    Shown to everyone: there is no age signal (sign-up's 13+ tick isn't stored). `check:mute` in the build
+    (75 assertions incl. two-device merges and a state without the key). Still open: **NCA CSEA-IRP
+    registration** (owner; and who registers before the company exists), fill the procedure's blanks and
+    rehearse once; G-3; the age signal (item 114) so the "Staying safe" sheet can be shown proactively to
+    13–17s; a list of blocked people (none exists to undo a block in-app).*
 114. `[ ]` **LAUNCH** Teen defaults only apply to NEW accounts: older accounts kept handle search and
     leaderboard on; online status and the heatmap default on. There is no age signal at all — decide
     (with the solicitor) on collecting a birth year and age-specific defaults. Fix the stale lines in

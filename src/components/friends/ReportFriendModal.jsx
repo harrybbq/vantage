@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import Overlay from '../ui/Overlay';
 import { REASONS, reasonInfo } from '../../lib/moderation/reasons';
+import { SupportLines } from './StayingSafe';
 import './friends-dm.css';
 
 /**
@@ -18,6 +19,9 @@ import './friends-dm.css';
  * happens next (the same promise the Terms make): looked at within 24
  * hours, the outcome told in-app (a safety notice — the database files
  * a "we got your report" notice too), the other person never told who.
+ * Then who to talk to and where else to report (item 113, supportive
+ * information — Childline, CEOP, 999), for every reason, leaving out any
+ * number the reason's own signpost has just shown.
  *
  * Props:
  *   open
@@ -101,6 +105,7 @@ export default function ReportFriendModal({ open, friend, onSubmit, onBlock, onC
                   </p>
                 </div>
                 {info.signpost && <p className="report-signpost">{info.signpost}</p>}
+                <SupportLines already={info.signpost || ''} />
                 {onBlock && (
                   <p className="handle-claim-sub">
                     You can also block them, so they can&apos;t message you or send you requests.
