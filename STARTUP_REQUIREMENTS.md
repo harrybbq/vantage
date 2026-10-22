@@ -786,6 +786,9 @@ for Oura effectively permanently).
     function instance off WHOOP until the reset and answers 429 `{ rateLimited }` with calm words; no
     retries. `whoop-cron` doesn't pass through the check and stops starting accounts after a 429. Tests:
     `check:whoopbudget`. Still open: request the limit increase in the approval (item 128).*
+    *2026-10-22: `wearable_access_2026_10.sql` applied by the owner and verified live
+    (`config.wearable_access` = `open`). Still to do: add handles (keep one for WHOOP's reviewer), then
+    flip to Invite-only.*
 128. `[ ]` **LAUNCH** Submit WHOOP's production approval (draft answers + 13-shot list in the pack §2) and
     register Oura + send the questions email (§3), after 124–127; file both replies with the DPIA (G7).
 
