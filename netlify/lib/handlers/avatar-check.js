@@ -26,11 +26,11 @@
  * AI feature — so no AI-consent gate, but the privacy policy has to say
  * that profile photos are sent to Anthropic for screening.
  */
-const { pauseGate } = require('../lib/killSwitch');
+const { pauseGate } = require('../killSwitch');
 const crypto = require('crypto');
-const { requireUser, underLimit, tooMany } = require('../lib/requireUser');
-const { screenImage, parseDataUrl } = require('../lib/imageModeration');
-const { withinDailyAiCap, overDailyCap } = require('../lib/aiQuota');
+const { requireUser, underLimit, tooMany } = require('../requireUser');
+const { screenImage, parseDataUrl } = require('../imageModeration');
+const { withinDailyAiCap, overDailyCap } = require('../aiQuota');
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',

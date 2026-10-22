@@ -24,11 +24,11 @@
  * app on text fetched from any public video. 10 reads a minute, and the
  * durable daily cap in lib/aiQuota.js on top.
  */
-const { pauseGate } = require('../lib/killSwitch');
-const { requireUser, underLimit, tooMany } = require('../lib/requireUser');
-const { withinDailyAiCap, overDailyCap } = require('../lib/aiQuota');
-const { isOwnerEmail } = require('../lib/owner');
-const { consentGate } = require('../lib/consentGate');
+const { pauseGate } = require('../killSwitch');
+const { requireUser, underLimit, tooMany } = require('../requireUser');
+const { withinDailyAiCap, overDailyCap } = require('../aiQuota');
+const { isOwnerEmail } = require('../owner');
+const { consentGate } = require('../consentGate');
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',

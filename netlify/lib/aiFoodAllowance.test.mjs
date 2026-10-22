@@ -37,7 +37,7 @@ global.fetch = async (url, init = {}) => {
   throw new Error('unexpected fetch ' + u);
 };
 
-const { handler } = require('../functions/ai-food-detect.js');
+const { handler } = require('./handlers/ai-food-detect.js');
 const img = 'x'.repeat(200);
 const post = () => handler({ httpMethod: 'POST', headers: { authorization: 'Bearer t', 'x-forwarded-for': '10.0.0.' + (n % 250) }, body: JSON.stringify({ imageBase64: img }) });
 const get = () => handler({ httpMethod: 'GET', headers: { authorization: 'Bearer t' } });

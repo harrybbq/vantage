@@ -175,7 +175,7 @@ world.states = { 'u-declined': { health: null }, 'u-unasked': {}, 'u-granted': {
   eq((await call('u-unasked')).statusCode, 404, 'never-asked passes the gate (then: not connected)');
 }
 {
-  const coach = require('../functions/ai-coach-daily.js');
+  const coach = require('./handlers/ai-coach-daily.js');
   const call = jwt => coach.handler({ httpMethod: 'POST', headers: { authorization: `Bearer ${jwt}` }, body: JSON.stringify({ snapshot: {} }) });
   world.calls.length = 0;
   const u = await call('u-unasked');
@@ -185,7 +185,7 @@ world.states = { 'u-declined': { health: null }, 'u-unasked': {}, 'u-granted': {
   ok(g.statusCode !== 403 || JSON.parse(g.body).consent !== 'ai', 'granted account passes the consent gate');
 }
 {
-  const food = require('../functions/ai-food-detect.js');
+  const food = require('./handlers/ai-food-detect.js');
   const q = await food.handler({ httpMethod: 'GET', headers: { authorization: 'Bearer u-unasked' } });
   eq(q.statusCode, 200, 'the free-scan quota read needs no consent');
   const s = await food.handler({ httpMethod: 'POST', headers: { authorization: 'Bearer u-unasked' }, body: JSON.stringify({ imageBase64: 'x'.repeat(200) }) });

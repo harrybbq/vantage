@@ -52,8 +52,12 @@ const ok = (v, m) => { assert.ok(v, m); n++; };
 
 // ── Source scan: nothing under netlify/ reads the keys directly ─────
 {
-  const roots = [join(here, '..', 'lib'), join(here, '..', 'functions')];
-  const files = roots.flatMap(d => readdirSync(d).filter(f => f.endsWith('.js')).map(f => join(d, f)));
+  // lib/handlers holds the v1 handlers behind the rate-limited v2 entries
+  // (item 86) — the same code that used to sit in functions/, so it is
+  // scanned too. .mjs files count as well (the v2 entries and adapter).
+  const roots = [join(here, '..', 'lib'), join(here, '..', 'lib', 'handlers'), join(here, '..', 'functions')];
+  const files = roots.flatMap(d => readdirSync(d).filter(f => /\.m?js$/.test(f) && !f.endsWith('.test.mjs')).map(f => join(d, f)));
+  ok(files.some(f => f.endsWith(join('handlers', 'get-leaderboard.js'))), 'source scan covers lib/handlers');
   // A Bearer built from something that is (or may be) a Supabase project key.
   const KEYISH = /Bearer \$\{\s*([\w.]*(?:serviceKey|SERVICE_ROLE|SECRET_KEY|ANON|PUBLISHABLE|apikey)[\w.]*|key|e\.key|env\.key)\s*\}/i;
   const offenders = [];

@@ -39,8 +39,8 @@
  *
  * GET. Returns { tempC, tempF, code, isDay, city }.
  */
-const { createIpLimiter, clientIp } = require('../lib/ipLimit');
-const { sessionUserId } = require('../lib/sessionCache');
+const { createIpLimiter, clientIp } = require('../ipLimit');
+const { sessionUserId } = require('../sessionCache');
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',

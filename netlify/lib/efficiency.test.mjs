@@ -194,7 +194,7 @@ function makeSupabase({ cacheTable = true } = {}) {
   delete process.env.VANTAGE_PAUSE;
   const sbx = makeSupabase();
   globalThis.fetch = sbx.fake;
-  const LB = require('../functions/get-leaderboard.js');
+  const LB = require('./handlers/get-leaderboard.js');
   const call = (caller, body, ip = '203.0.113.9') => LB.handler({
     httpMethod: 'POST', headers: { authorization: `Bearer ${caller}`, 'x-forwarded-for': ip },
     body: JSON.stringify(body),
@@ -341,7 +341,7 @@ function makeSupabase({ cacheTable = true } = {}) {
 
 // ── weather ─────────────────────────────────────────────────────────────
 {
-  const W = require('../functions/weather.js');
+  const W = require('./handlers/weather.js');
   const geo = o => Buffer.from(JSON.stringify(o)).toString('base64');
   const LDN = { city: 'London', country: { code: 'GB', name: 'United Kingdom' }, subdivision: { code: 'ENG' }, latitude: 51.5074, longitude: -0.1278, timezone: 'Europe/London' };
   eq(W._test.geoFromHeaders({ 'x-nf-geo': geo(LDN) }), { city: 'London', country: 'GB', latitude: 51.5074, longitude: -0.1278 }, 'base64 x-nf-geo parsed');
