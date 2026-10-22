@@ -371,6 +371,10 @@ code fails soft until it is run, so order doesn't matter.
     `research`) live in Vantage's Supabase project — one service-role
     key, one Micro instance, one restore unit. Move them to their own
     project before launch.
+    *Status 2026-10-22: runbook in `docs/TRADING_SCHEMA_MOVE.md`. Checked live: the three schemas are
+    self-contained (no FK, view or function crosses into `public`/`auth`; no `anon`/`authenticated`
+    grants; ~158 rows), and Vantage only reaches the trading app over HTTP (`trading-summary` →
+    `TRADING_REPORT_URL`). Owner: create the new project, then follow the runbook.*
 70. `[~]` **AFTER** Repo hygiene: personal emails in
     `lifetime_grants.sql`/`recomp_schema.sql`; an apparent real salary
     comment in `career/companies.js`; a Last.fm key in dead
@@ -532,6 +536,8 @@ else maps onto existing items.
     build (`check:lockscreen`). Outside the repo: optionally run
     `supabase/notifications_lockscreen_2026_10.sql` (triggers stop queueing names/handles); check on a
     real locked phone when push goes live (item 15).*
+    *2026-10-22: `notifications_lockscreen_2026_10.sql` applied by the owner and verified live (neither
+    trigger function writes `display_name` any more).*
 105. `[~]` **LAUNCH** Test the AI coach with eating-disorder, self-harm and relapse style inputs and
     record the results. (G15)
     *Status 2026-10-20: done in code — safe mode (`netlify/lib/coachSafety.js`, client twin
@@ -624,6 +630,8 @@ else maps onto existing items.
     *Status 2026-10-20 (part): `docs/ABUSE_HANDLING.md` stale lines fixed (reports survive reporter
     deletion; the 10-message snapshot at report time; NCA duty in force). The age signal and old-account
     defaults are still open.*
+    *Status 2026-10-22: confirmed live — `audit_schema_2026_10.sql` and `dm_upgrade_2026_10.sql` are both
+    applied (every table, column, function, trigger, index and policy they create is present).*
 
 ### From the store submission pack — 2026-10-20 (`docs/STORE_SUBMISSION_PACK.md` §8, P1–P12)
 115. `[~]` **BLOCKS** WHOOP/Oura connect fails inside the native app: the panel navigates the WebView to
@@ -653,6 +661,8 @@ else maps onto existing items.
     `review_preflight()` / `scripts/reviewer-demo/preflight.mjs` checks `pro_live` and the reviewer
     accounts before submission. Owner: run the SQL, add the accounts, unset `REVENUECAT_ALLOW_SANDBOX`
     if set (`docs/REVIEWER_KIT.md`).*
+    *2026-10-22: `reviewer_access_2026_10.sql` applied by the owner and verified live. Still to do: add the
+    reviewer accounts (once they exist on the company domain), and unset `REVENUECAT_ALLOW_SANDBOX` if set.*
 117. `[~]` **BLOCKS** Sign in with Apple tokens aren't revoked on account deletion (Apple expects it):
     needs the native SIWA flow's authorization code, or the provider token captured at sign-in. (P8)
     *Status 2026-10-20: done in code. Both web and native sign in through Supabase OAuth; there is no
@@ -666,6 +676,8 @@ else maps onto existing items.
     `APPLE_TOKEN_SECRET`), run the SQL, then the smoke test in `docs/SIGN_IN_WITH_APPLE.md`. That test
     confirms Supabase returns Apple's refresh token, which could not be checked from here. Tokens are
     captured from deployment on; earlier Apple sign-ins have none until they sign in again.*
+    *2026-10-22: `apple_revocation_2026_10.sql` applied by the owner and verified live. Still to do: the
+    Apple key and the five Netlify env vars (needs the Apple developer account), then the smoke test.*
 118. `[~]` **BLOCKS** DM text (and the opt-in shared streak habit name) isn't filtered (Apple 1.2 asks
     for a filtering method): reuse `checkPublicText` on send, mirror it server-side. (P9)
     *Status 2026-10-20 (DMs): done in code — the composer refuses slurs and unambiguous explicit terms
@@ -785,6 +797,8 @@ for Oura effectively permanently).
     the gated path never mounts the state hook), gate page + owner panel in `src/components/webaccess/`,
     delete flow shared with Settings (`src/lib/account/deleteAccount.js`); SQL dry-run on Postgres 16
     (`scripts/webaccess/test-web-access-sql.sh`). Owner: steps 1–4 above.*
+    *2026-10-22: step 1 done — `web_access_2026_10b.sql` applied by the owner and verified live
+    (`config.web_access` = `open`). Steps 2–4 are for launch day.*
     *Launch-day copy (from the gate agent): when switching to invite-only, change the privacy policy's
     opening line "available on the web and as a mobile app" (LegalPage.jsx) to "…as a mobile app; the web
     version is by invitation"; export and Settings-path lines stay true in the apps. /delete-account already
@@ -862,6 +876,12 @@ can stop the bleeding in minutes, and you meet the legal clock.
     (DRAFT, do not run). Images → private `media` bucket, references in state, server-side swap with a
     90-day originals ledger; Phase 0 first (build census, update gate, flags, restore drill, PITR).
     Owner decisions listed in the plan. Estimate ~967 kB → ~430 kB.*
+    *Status 2026-10-22: Phase 0 built (shared with item 26) — build stamp, update-required gate (fails
+    open; never stops a running app), build census, `app_config` flags all off.
+    `supabase/state_size_phase0_2026_10.sql` (dry-run tested) is for the owner to run. Measured live
+    (plan §1.1): mean 247 kB, max **1.55 MB**; `backgrounds` up to 834 kB on one account; there is no
+    backgrounds Storage bucket. Next: the owner runs the SQL, does the restore drill and decides on PITR,
+    then Track I1.*
 26. `[ ]` **Move the per-day logs (`vitalsLog`, `burnLog`, `moodLog`)
     into tables**, the way `nutrition_log` already is. Together with 25
     this takes state from ~967 kB to ~90 kB.
@@ -869,6 +889,8 @@ can stop the bleeding in minutes, and you meet the legal clock.
     function-only writes (no client delete), journal 90 days, dual-write → backfill → 14 days of zero
     mismatches → read switch → owner-run per-user cleanup. The first native binary must be built from the
     read-switch build or later.*
+    *Status 2026-10-22: Phase 0 built (see item 25). Measured: `burnLog` is the largest single key on the
+    account that has it (281 kB, WHOOP workouts), so Track L matters as much as the pictures.*
 27. `[~]` **Decide on Supabase PITR.** Pro gives 7-day daily backups;
     PITR is a paid add-on. Given data safety is the project's stated #1
     rule and there has already been one wipe incident, decide
