@@ -99,6 +99,10 @@ export const PROGRAMME = {
    *   · Nothing here loads a flexed or rotated spine. Hip thrust and
    *     leg press are the heavy work and both keep the back supported.
    * Proposed, not confirmed — swap freely.
+   *   · 45° hyperextension added 2026-10-21 (owner): lower back was the
+   *     one muscle trained only once a week (Legs). Two sets here make it
+   *     twice, the rule the adaptive planner (lib/lifts/adaptive.js) holds
+   *     every muscle to — spine-friendly, already on the Legs list.
    */
   Lower: [
     { name: 'Hip thrust', sets: 4, reps: '8–12' },
@@ -107,6 +111,7 @@ export const PROGRAMME = {
     { name: 'Reverse lunge', sets: 3, reps: '10 per leg' },
     { name: 'Seated calf raise', sets: 4, reps: '15' },
     { name: 'Pallof press', sets: 3, reps: '12 per side' },
+    { name: '45° hyperextension', sets: 2, reps: '12–15' },
   ],
   Upper: [
     { name: 'Dip', sets: 3, reps: '6–10' },

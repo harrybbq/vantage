@@ -105,7 +105,7 @@
     "check:installprompt": "node src/lib/native/installPrompt.test.mjs",
     "check:coachguard": "node netlify/lib/coachWearableGuard.test.mjs",
     "check:books": "node src/lib/books/books.test.mjs && node netlify/lib/booksFunction.test.mjs",
-    "check:lifts": "node src/lib/lifts/history.test.mjs && node src/lib/lifts/lifts.test.mjs && node src/lib/lifts/workout.test.mjs && node src/lib/lifts/gyms.test.mjs && node src/lib/lifts/plan.test.mjs && node src/lib/lifts/ui.test.mjs"
+    "check:lifts": "node src/lib/lifts/adaptive.test.mjs && node src/lib/lifts/bodymap.test.mjs && node src/lib/lifts/history.test.mjs && node src/lib/lifts/lifts.test.mjs && node src/lib/lifts/workout.test.mjs && node src/lib/lifts/gyms.test.mjs && node src/lib/lifts/plan.test.mjs && node src/lib/lifts/ui.test.mjs"
   },
   "dependencies": {
     "@capacitor/android": "^8.5.3",

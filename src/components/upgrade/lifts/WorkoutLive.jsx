@@ -12,20 +12,19 @@
  * row design in a centred 760 px column, keyboard entry, no 3-pane layout.
  *
  * One ExerciseBlock per exercise (the set table), then + Add exercises and
- * Quick log. The workout ⋯ holds rename / rest default / night / gym /
- * sound / Discard; Finish opens the summary (outline until every planned
+ * Quick log. The workout ⋯ holds rename / night / gym / Discard; Finish opens the summary (outline until every planned
  * set is ticked, or ≥ 1 is and the end of the list is on screen).
  *
- * The dock at the bottom: the rest timer (RestDock) above the number pad
- * (coarse pointers), both portalled. The active row stays scrolled above
- * them. Toasts: Undo (5 s) for deleted sets and removed exercises; the
+ * The dock at the bottom: the number pad (coarse pointers), portalled.
+ * The active row stays scrolled above it. (A rest timer sat above the pad
+ * until 2026-10-21; the owner found it got in the way and it was removed.) Toasts: Undo (5 s) for deleted sets and removed exercises; the
  * in-workout PB toast (real sets only, ≥ 2 earlier sessions of the lift,
  * one per exercise per workout, never an edited set or a past day,
  * heaviest before rep max).
  *
  * Every edit goes through workout.js and is written to S.lifts.active at
- * once (the save upstream is debounced). Minimise / resume, the clock,
- * the rest countdown and every sheet are local — they never write.
+ * once (the save upstream is debounced). Minimise / resume, the clock and
+ * every sheet are local — they never write.
  */
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
@@ -33,19 +32,17 @@ import Icon from '../../Icon';
 import ExerciseBlock from './ExerciseBlock';
 import ExercisePicker from './ExercisePicker';
 import NumPad from './NumPad';
-import RestDock from './workout/RestDock';
 import { SetMenu, ExerciseMenu, WorkoutMenu, GymSheet } from './workout/Menus';
-import { useFocusMode, primeTone, reducedMotion } from './workout/feedback';
+import { useFocusMode } from './workout/feedback';
 import { setLiftsLive } from '../../../lib/lifts/liveBus';
 import { Sheet, Button, IconButton, NightChip, UndoToast, PbToast, useInputMode, useScopeStyle } from './ui';
 import {
   activeOf, elapsedSec, clock, volume, volumeText, previousForExercise, previousSession, addExercises, addSet, updateSet, toggleDone, setProblem,
-  removeSet, removeExercise, insertSet, insertExercise, swapExercise, setNote, renameWorkout, setRestSec, adjustRest, setRestTotal, skipRest,
+  removeSet, removeExercise, insertSet, insertExercise, swapExercise, setNote, renameWorkout,
   discardWorkout, setWorkoutGym, setWorkoutShift, doneSetCount, listWithPending, exerciseLift, setSetType, markPbToasted, livePbSets,
-  planProgress, nextOpenSet, restSecFor,
+  planProgress, nextOpenSet,
 } from '../../../lib/lifts/workout';
-import { withLifts, setLiftRest, setLiftsPref, liftsPrefs } from '../../../lib/lifts/store';
-import { stepFor, perGymOf, personalBests, shortLiftName } from '../../../lib/lifts/lifts';
+import { stepFor, perGymOf, personalBests } from '../../../lib/lifts/lifts';
 import { realSetText, padInput, padStep, livePb } from '../../../lib/lifts/ui';
 
 const fmt = v => (v == null || v === '' ? '' : String(Math.round(Number(v) * 100) / 100));
@@ -78,7 +75,6 @@ export default function WorkoutLive({
   const list = useMemo(() => listWithPending(listIn, active), [listIn, active]);
   const { coarse, layout } = useInputMode();
   const scopeStyle = useScopeStyle();
-  const prefs = liftsPrefs(L);
   useFocusMode(layout !== 'desktop');
   useEffect(() => { setLiftsLive(true); return () => setLiftsLive(false); }, []);
 
@@ -95,8 +91,6 @@ export default function WorkoutLive({
   const [cursor, setCursor] = useState(0);         // the exercise being worked on
   const [undo, setUndo] = useState(null);          // { text, undo, n }
   const [pbToast, setPbToast] = useState(null);    // { text, kinds, n }
-  const [restOpen, setRestOpen] = useState(false);
-  const [restLeaving, setRestLeaving] = useState(false);
   const [atEnd, setAtEnd] = useState(false);
   const [dockH, setDockH] = useState(0);
   const dockRef = useRef(null);
@@ -158,9 +152,8 @@ export default function WorkoutLive({
   const progress = active ? planProgress(active) : { sets: 0, done: 0, exercises: 0, exercisesDone: 0 };
   const open = active ? nextOpenSet(active, cursor) : null;
 
-  // ── The dock's height (rest + pad): the toast and the page's bottom padding follow it ──
-  const resting = !!(active && active.rest);
-  const showDock = resting || !!pad;
+  // ── The dock's height (the pad): the toast and the page's bottom padding follow it ──
+  const showDock = !!pad;
   useLayoutEffect(() => {
     if (!showDock || !dockRef.current) { setDockH(0); return undefined; }
     const el = dockRef.current;
@@ -170,7 +163,7 @@ export default function WorkoutLive({
     const ro = new ResizeObserver(report);
     ro.observe(el);
     return () => ro.disconnect();
-  }, [showDock, restOpen]);
+  }, [showDock]);
   useEffect(() => {
     document.documentElement.style.scrollPaddingBottom = dockH ? `${dockH + 16}px` : '';
   }, [dockH]);
@@ -188,7 +181,7 @@ export default function WorkoutLive({
     return () => document.removeEventListener('pointerdown', off);
   }, [pad]);
   useEffect(() => { if (!coarse) setPad(null); }, [coarse]);
-  // Keep the row being typed into above the pad + rest.
+  // Keep the row being typed into above the pad.
   useEffect(() => {
     if (!pad || !active) return;
     const st = active.exercises[pad.ei] && active.exercises[pad.ei].sets[pad.si];
@@ -319,11 +312,9 @@ export default function WorkoutLive({
     }
     setProb(null);
     if (pad && pad.ei === ei && pad.si === si) setPad(null);
-    if (!st.done && prefs.restTone) primeTone();
     update(prev => toggleDone(prev, ei, si, t, opts));
     if (st.done) return;
     setCursor(ei);
-    setRestLeaving(false);
     // The PB moment — real sets only, the foundation's rules (livePb).
     const edited = ticked.current.has(st.id) || (today && active.date < today);
     ticked.current.add(st.id);
@@ -369,26 +360,6 @@ export default function WorkoutLive({
     setUndo({ text: `${lift ? lift.name : 'Exercise'} removed`, undo: () => update(prev => insertExercise(prev, ei, ex)), n: Date.now() });
   };
 
-  // ── Rest ──
-  const restEx = active.rest && active.rest.liftId ? active.exercises.findIndex(e => e.liftId === active.rest.liftId) : -1;
-  const restLift = restEx >= 0 ? liftAt(restEx) : null;
-  const nextSet = nextOpenSet(active, restEx >= 0 ? restEx : cursor);
-  let nextText = '';
-  if (nextSet) {
-    const st = setAt(nextSet.ei, nextSet.si);
-    const ph = phOf(nextSet.ei, nextSet.si);
-    const w = st.weight ?? (ph ? ph.weight : null), r = st.reps ?? (ph ? ph.reps : null);
-    const v = w != null && r != null ? ` · ${realSetText(w, r, liftAt(nextSet.ei))}` : '';
-    const nl = liftAt(nextSet.ei);
-    nextText = nextSet.ei === restEx ? `NEXT SET ${nextSet.si + 1}${v}` : `NEXT ${nl ? shortLiftName(nl.name).toUpperCase() : 'EXERCISE'}${v}`;
-  }
-  const skip = () => {
-    setRestOpen(false);
-    if (reducedMotion()) { update(prev => skipRest(prev)); return; }
-    setRestLeaving(true);
-    setTimeout(() => { update(prev => skipRest(prev)); setRestLeaving(false); }, 200);
-  };
-  const writeLifts = fn => update(prev => withLifts(prev, fn, Date.now()));
 
   const doneN = doneSetCount(active);
   const allDone = progress.sets > 0 && progress.done === progress.sets;
@@ -469,16 +440,7 @@ export default function WorkoutLive({
       </div>
 
       {showDock && createPortal(
-        <div className={`upg-app sec lifts lw-dock${pad ? ' has-pad' : ''}${restLeaving ? ' is-leaving' : ''}`} ref={dockRef} style={scopeStyle} data-testid="lw-dock">
-          {resting && (
-            <RestDock active={active} nextText={nextText} expanded={restOpen} onExpand={setRestOpen}
-                      onAdjust={sec => update(prev => adjustRest(prev, sec, Date.now()))} onSkip={skip}
-                      onPreset={sec => update(prev => setRestTotal(prev, sec, Date.now()))}
-                      useForExercise={restLift && !restLift.pending ? restLift.restSec === active.rest.total : null}
-                      onUseForExercise={on => restLift && writeLifts(l => setLiftRest(l, restLift.id, on ? active.rest.total : null))}
-                      tone={!!prefs.restTone} vibrate={prefs.restVibrate !== false}
-                      hint={coarse && !prefs.restHintSeen} onHintSeen={() => writeLifts(l => setLiftsPref(l, 'restHintSeen', true))} />
-          )}
+        <div className={`upg-app sec lifts lw-dock${pad ? ' has-pad' : ''}`} ref={dockRef} style={scopeStyle} data-testid="lw-dock">
           {pad && padEx && (() => {
             const st = padEx.sets[pad.si];
             if (!st) return null;
@@ -529,11 +491,10 @@ export default function WorkoutLive({
       )}
 
       {menuEx && (
-        <ExerciseMenu ex={menuEx} lift={menuLift} gymLabel={gymNow ? gymName(gymNow) : null} restNow={restSecFor(active, menuLift)}
+        <ExerciseMenu ex={menuEx} lift={menuLift} gymLabel={gymNow ? gymName(gymNow) : null}
                       onSwap={() => { const ei = exMenu; setExMenu(null); setPicker({ mode: 'swap', ei }); }}
                       onNote={() => { setNoteOpen(exMenu); setExMenu(null); }}
                       onHistory={() => { const id = menuEx.liftId; setExMenu(null); setHistory(id); }}
-                      onRest={sec => menuLift && !menuLift.pending && writeLifts(l => setLiftRest(l, menuLift.id, sec))}
                       onManage={onManage ? () => { setExMenu(null); onManage(); } : null}
                       onRemove={() => removeEx(exMenu)} onClose={() => setExMenu(null)} />
       )}
@@ -546,10 +507,10 @@ export default function WorkoutLive({
       )}
 
       {wkMenu && (
-        <WorkoutMenu active={active} gymLabel={gymNow ? gymName(gymNow) : null} prefs={prefs}
-                     onRename={n => update(prev => renameWorkout(prev, n))} onRest={sec => update(prev => setRestSec(prev, sec))}
+        <WorkoutMenu active={active} gymLabel={gymNow ? gymName(gymNow) : null}
+                     onRename={n => update(prev => renameWorkout(prev, n))}
                      onNight={on => update(prev => setWorkoutShift(prev, on ? 'night' : 'day'))}
-                     onGym={() => { setWkMenu(false); setGymSheet(true); }} onPref={(k, v) => writeLifts(l => setLiftsPref(l, k, v))}
+                     onGym={() => { setWkMenu(false); setGymSheet(true); }}
                      onDiscard={() => { setWkMenu(false); update(prev => discardWorkout(prev)); if (onToast) onToast('Workout discarded — nothing was saved'); }}
                      onClose={() => setWkMenu(false)} />
       )}

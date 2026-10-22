@@ -2,9 +2,8 @@
  * The minimised workout (brief §3.5.8) — app-wide, owner-only.
  *
  *   phones   a 56 px bar above the app's bottom nav on every screen:
- *            ● PUSH · 23:14 · 7/19 · REST 0:56                [Resume]
+ *            ● PUSH · 23:14 · 7/19                           [Resume]
  *   desktop  a pill in the top bar.
- * The REST segment only shows while resting (+0:12 once it's over).
  * Tapping anywhere resumes: Upgrade → Lifts with the workout open
  * (liveBus.requestLiftsResume, then the caller navigates to Upgrade).
  *
@@ -52,13 +51,12 @@ export default function MiniBar({ S, isMobile = false, onOpen }) {
   return (
     <div className={`lifts lw-mini is-${isMobile ? 'bar' : 'pill'}`} style={scope.style} data-testid="lw-mini">
       <button type="button" className="lw-mini-btn" onClick={resume}
-              aria-label={`Workout in progress: ${m.name}, ${m.clock}, ${m.done} of ${m.sets} sets${m.rest ? `, rest ${m.rest}` : ''}. Resume`}>
+              aria-label={`Workout in progress: ${m.name}, ${m.clock}, ${m.done} of ${m.sets} sets. Resume`}>
         <span className="lf-live-dot" aria-hidden="true" />
         <span className="lw-mini-txt" aria-hidden="true">
           <b>{m.name.toUpperCase()}</b>
           <span>· {m.clock}</span>
           <span>· {m.done}/{m.sets}</span>
-          {m.rest && <span className="lw-mini-rest">· REST {m.rest}</span>}
         </span>
         <span className="lw-mini-go" aria-hidden="true">Resume</span>
       </button>

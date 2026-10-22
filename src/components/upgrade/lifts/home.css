@@ -90,12 +90,30 @@
 .lifts .lh-pipc.is-missed { color: var(--lf-muted); }
 
 .lifts .lh-preview { list-style: none; margin: 0; padding: 0; border-top: 1px solid var(--lf-line); }
-.lifts .lh-preview > li { display: flex; align-items: center; gap: 8px; min-height: 40px; padding: 6px 0; box-sizing: border-box; border-bottom: 1px solid var(--lf-line); }
+.lifts .lh-preview > li { display: flex; flex-direction: column; gap: 4px; min-height: 40px; padding: 6px 0; box-sizing: border-box; border-bottom: 1px solid var(--lf-line); }
+.lifts .lh-preview-row { display: flex; align-items: center; gap: 8px; min-height: 28px; min-width: 0; }
 .lifts .lh-preview-n { flex: 1; min-width: 0; font-size: 15px; line-height: 20px; color: var(--lf-text); overflow-wrap: anywhere; }
 .lifts .lh-preview-n em { font-style: normal; color: var(--lf-muted); font-size: max(13px, var(--lf-fs-floor)); }
 .lifts .lh-preview-t { flex: none; display: flex; flex-direction: column; align-items: flex-end; font-size: max(13px, var(--lf-fs-floor)); font-weight: 500; color: var(--lf-mid); }
 .lifts .lh-preview-w { font-size: var(--lf-fs-floor); color: var(--lf-muted); }
 .lifts .lh-preview-w.is-night { color: var(--lf-night); }
+.lifts .lh-was { color: var(--lf-muted); text-decoration-thickness: 1.5px; margin-right: 2px; }
+/* Adaptive (lib/lifts/adaptive.js): why each exercise is there. */
+.lifts .lh-preview-tags { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 6px; min-width: 0; font-size: max(12.5px, var(--lf-fs-floor)); line-height: 17px; color: var(--lf-muted); }
+.lifts .lh-tag { display: inline-flex; align-items: center; min-height: 18px; padding: 0 6px; box-sizing: border-box; border-radius: var(--lf-r-pip); border: 1px solid color-mix(in srgb, var(--lf-accent-ink) 55%, transparent);
+  font-family: var(--lf-mono); font-size: var(--lf-fs-floor); line-height: 16px; color: var(--lf-accent-ink); white-space: nowrap; max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
+.lifts .lh-tag.is-plus { color: var(--lf-pb); border-color: color-mix(in srgb, var(--lf-pb) 60%, transparent); background: var(--lf-pb-tint); }
+.lifts .lh-tag.is-red { color: var(--lf-danger); border-color: color-mix(in srgb, var(--lf-danger) 60%, transparent); background: var(--lf-danger-tint); }
+.lifts .lh-preview-why { min-width: 0; overflow-wrap: anywhere; }
+.lifts .lh-chip { display: inline-flex; align-items: center; min-height: 32px; padding: 0 10px; box-sizing: border-box; border-radius: var(--lf-r-chip); border: 1px solid var(--lf-line-strong);
+  font-family: var(--lf-mono); font-size: var(--lf-fs-floor); letter-spacing: .04em; color: var(--lf-mid); white-space: nowrap; }
+.lifts .lh-chip.is-green { color: var(--lf-accent-ink); border-color: color-mix(in srgb, var(--lf-accent-ink) 65%, transparent); background: var(--lf-done-tint); }
+.lifts .lh-chip.is-yellow, .lifts .lh-chip.is-plus { color: var(--lf-pb); border-color: color-mix(in srgb, var(--lf-pb) 65%, transparent); background: var(--lf-pb-tint); }
+.lifts .lh-chip.is-red { color: var(--lf-danger); border-color: color-mix(in srgb, var(--lf-danger) 65%, transparent); background: var(--lf-danger-tint); }
+.lifts .lh-warn, .lifts .lh-redbox { margin: 0; padding: 9px 11px; border-radius: var(--lf-r-cell); font-size: max(13px, var(--lf-fs-floor)); line-height: 19px; }
+.lifts .lh-warn { color: var(--lf-pb); background: var(--lf-pb-tint); border: 1px solid color-mix(in srgb, var(--lf-pb) 40%, transparent); }
+.lifts .lh-redbox { color: var(--lf-text); background: var(--lf-danger-tint); border: 1px solid color-mix(in srgb, var(--lf-danger) 45%, transparent); }
+.lifts .lh-redbox b { color: var(--lf-danger); font-weight: 600; }
 
 .lifts .lh-stretch > summary { display: flex; align-items: center; gap: 8px; min-height: 44px; cursor: pointer; list-style: none; font-size: 15px; font-weight: 600; color: var(--lf-text); touch-action: manipulation; }
 .lifts .lh-stretch > summary::-webkit-details-marker { display: none; }
@@ -107,6 +125,9 @@
 .lifts .lh-stretch-list p { margin: 2px 0 0; }
 .lifts .lh-stretch-top { display: flex; justify-content: space-between; gap: 10px; min-height: 24px; font-size: 15px; }
 .lifts .lh-stretch-hold { flex: none; font-size: max(13px, var(--lf-fs-floor)); color: var(--lf-mid); }
+.lifts .lh-stretch-tuned { font-weight: 400; font-size: max(13px, var(--lf-fs-floor)); color: var(--lf-muted); }
+.lifts .lh-stretch-add { font-size: max(12px, var(--lf-fs-floor)); color: var(--lf-accent-ink); }
+.lifts .lh-stretch-addwhy { color: var(--lf-accent-ink); }
 .lifts .lh-stretch.is-open { display: flex; flex-direction: column; }
 
 .lifts .lh-sug-acts { display: flex; flex-direction: column; gap: 8px; margin-top: 4px; }

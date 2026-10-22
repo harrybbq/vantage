@@ -30,6 +30,7 @@ import LiftDetail from './LiftDetail';
 import LogSheet from './LogSheet';
 import ManageSheet from './ManageSheet';
 import WorkoutToday from './WorkoutToday';
+import WeekMuscles from './WeekMuscles';
 import LiftList from './LiftList';
 import WorkoutLive from './WorkoutLive';
 import FinishSheet from './FinishSheet';
@@ -44,7 +45,7 @@ import { useLiftsData, todayIso, LiftsProvider } from './useLifts';
 import {
   ensureLifts, withLifts, makeEntry, editEntry, upsertEntry, removeEntry, restoreEntry, addLift, renameLift, setArchived,
   moveLift, deleteLift, recentFirst, newId, defaultGym, setLastGym, setPerGym, addGym, renameGym, setGymArchived, deleteGym,
-  setLiftStep, setLiftRest, gymName as gymNameOf,
+  setLiftStep, gymName as gymNameOf,
 } from '../../../lib/lifts/store';
 import { pbMessage, pbKinds, setText, shortLiftName } from '../../../lib/lifts/lifts';
 import { shiftOn } from '../../../lib/rotation/pattern';
@@ -166,7 +167,6 @@ export default function LiftsTab({ S, update, hydrated = true }) {
     },
     onPerGym: (id, on) => write(l => setPerGym(l, id, on)),
     onStep: (id, step, gym = null) => write(l => setLiftStep(l, id, step, gym)),
-    onRest: (id, sec) => write(l => setLiftRest(l, id, sec)),
     onAddGym: name => {
       const out = addGym(lifts, name);
       if (out.ok) write(l => addGym(l, name, { id: out.id }).lifts);
@@ -252,6 +252,7 @@ export default function LiftsTab({ S, update, hydrated = true }) {
                         onStart={startSuggested} onBuild={buildOwn} onResume={goWorkout} onDiscard={discard}
                         onQuickLog={() => setSheet({ kind: 'log' })} canQuickLog={inUse.length > 0}
                         gyms={activeGymList} gym={curGym} onGym={pickGym} gymName={gymName} />
+          <WeekMuscles S={S} today={today} />
           <HistoryCard S={S} update={update} today={calendarToday} />
           <LiftList list={lifts.list} summaries={summaries} counts={counts} today={today} activeGym={active && active.gym ? active.gym : curGym}
                     gymOrder={gymOrder} gymName={gymName} bwOf={bwOf} pbsMonth={totals.pbsMonth}
@@ -274,7 +275,7 @@ export default function LiftsTab({ S, update, hydrated = true }) {
                          onDeleteTemplate={id => update(prev => deleteTemplate(prev, id))} />
       )}
       {finish && (
-        <FinishSheet summary={finish.summary} saved={finish.saved} templateSaved={finish.templateSaved}
+        <FinishSheet summary={finish.summary} saved={finish.saved} templateSaved={finish.templateSaved} lifts={lifts.list} S={S} today={today}
                      gymLabel={finish.summary.session.gym ? gymName(finish.summary.session.gym) : null}
                      trackers={S.trackers || []} linked={liftsLinkedTrackers(S)}
                      dayLog={(S.logs || {})[finish.summary.session.date] || {}}

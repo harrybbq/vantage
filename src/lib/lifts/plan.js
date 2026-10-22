@@ -19,8 +19,13 @@
  *     once.
  *   · Sessions done in the block — on any day, a rest day included — are
  *     crossed off. A workout that crosses nothing off is an extra.
- *   · A training day that passed with no workout is MISSED: its session
- *     stays owed and carries forward. Days before the first workout ever
+ *   · A training day that passed with no workout is MISSED. An Upper or
+ *     Lower stays owed and carries forward. An ANCHOR — Push, Pull, Legs —
+ *     does not (owner, 2026-10-21): it is accepted as missed, the week
+ *     runs below standard, and the next Upper (for Push / Pull) or Lower
+ *     (for Legs) carries +1 set for each muscle it owed (adaptive.js).
+ *     Logged later in the same block after all, it still counts as that
+ *     session rather than an extra. Days before the first workout ever
  *     logged here count as done to the pattern (the logger can't know
  *     about them, and treating every one as missed would reshuffle the
  *     first week of using it).
@@ -56,6 +61,8 @@ import { liftsOf } from './store.js';
 import { isIso, addDays, dayNo, num } from './lifts.js';
 
 export const EXTRA = 'Extra';
+/** Sessions the programme keeps fixed; Upper and Lower adapt around them (adaptive.js). */
+export const ANCHOR_CODES = Object.freeze(['Push', 'Pull', 'Legs']);
 
 /**
  * Each session's PRIMARY muscle groups — what the 48-hour rule protects.
@@ -261,6 +268,16 @@ function planBlock(ctx, block) {
     const i = remaining.indexOf(code);
     if (i >= 0) { remaining.splice(i, 1); dropped.push(code); }
   };
+  // Anchors whose day passed empty: not carried, but reclaimed if done later in the block.
+  const missedAnchors = [];
+  const takeOrReclaim = code => {
+    if (take(code)) return true;
+    const j = missedAnchors.indexOf(code);
+    if (j < 0) return false;
+    missedAnchors.splice(j, 1);
+    crossed.push(code);
+    return true;
+  };
 
   // 1. What happened, and what the owner decided:
   //    · a workout crosses its session off (an extra when nothing is owed);
@@ -280,7 +297,7 @@ function planBlock(ctx, block) {
     const trainingDay = manual ? (r.shift !== 'leave' && r.session !== 'Rest') : p.session !== 'Rest';
     day.trainingDay = trainingDay;
     if (doneRows.length) {
-      for (const row of doneRows) if (!(row.code && take(row.code))) extras++;
+      for (const row of doneRows) if (!(row.code && takeOrReclaim(row.code))) extras++;
     } else if (manual) {
       if (trainingDay && remaining.includes(r.session)) {
         if (iso < today) take(r.session);
@@ -289,7 +306,14 @@ function planBlock(ctx, block) {
         drop(p.session);
       }
     } else if (iso < today && trainingDay) {
-      if (!first || iso < first) { take(p.session); day.assumed = true; } else day.missed = true;
+      if (!first || iso < first) { take(p.session); day.assumed = true; } else {
+        day.missed = true;
+        if (ANCHOR_CODES.includes(p.session) && remaining.includes(p.session)) {
+          remaining.splice(remaining.indexOf(p.session), 1);
+          missedAnchors.push(p.session);
+          day.accepted = true;
+        }
+      }
     }
   }
   const owedAfterPast = [...remaining, ...block.days.map(d => info.get(d)).filter(d => d.reserved).map(d => d.r.session)];
@@ -338,7 +362,7 @@ function planBlock(ctx, block) {
     if (codes.length && !(codes.length === 1 && codes[0] === day.p.session)) cause = { kind: 'done', iso, codes, p: day.p.session };
     else if (day.missed) cause = { kind: 'missed', iso, p: day.p.session };
   }
-  return { info, crossed, owedAfterPast, dropped, extras, cause };
+  return { info, crossed, owedAfterPast, dropped, extras, cause, missedAnchors };
 }
 
 // ── The plan ───────────────────────────────────────────────────────
@@ -358,7 +382,12 @@ function whyOf(entry, block, ctx) {
       ? `${codes} logged on a ${entry.patternSession} day` : `${codes} logged`;
   }
   if (session === EXTRA) return 'Every session of this block is done — anything now is extra';
-  if (entry.missed) return `${entry.patternSession} missed — it carries forward`;
+  if (entry.missed) {
+    if (ANCHOR_CODES.includes(entry.patternSession) && block.plan.crossed.includes(entry.patternSession)) return `${entry.patternSession} missed here — done later this block`;
+    return ANCHOR_CODES.includes(entry.patternSession)
+      ? `${entry.patternSession} missed — ${entry.patternSession === 'Legs' ? 'Lower' : 'Upper'} picks up a set for each muscle it owed`
+      : `${entry.patternSession} missed — it carries forward`;
+  }
   if (source === 'pattern') return `${session} on your rota`;
   // dynamic: where it came from, and what moved it
   const day = block.plan.info.get(entry.iso);
@@ -424,7 +453,8 @@ export const plannedOn = (S, iso, today) => plannedSessions(S, { from: iso, days
 
 /**
  * Where the current block stands → { start, end, total, done: [codes], owed: [codes],
- * extras, label: "3 of 5 this block · Legs, Lower to do" } | null outside a block.
+ * missed: [anchor codes accepted as missed], extras,
+ * label: "3 of 5 this block · Legs, Lower to do" } | null outside a block.
  * `owed` is what is still to train (today's included until it's logged).
  */
 export function blockProgress(S, today) {
@@ -432,12 +462,13 @@ export function blockProgress(S, today) {
   const ctx = makeCtx(S, t);
   const block = blockAt(ctx, t);
   if (!block) return null;
-  const { crossed, owedAfterPast, extras, dropped } = block.plan;
+  const { crossed, owedAfterPast, extras, dropped, missedAnchors } = block.plan;
   const done = SEQ.filter(s => crossed.includes(s));
   const owed = SEQ.filter(s => owedAfterPast.includes(s));
+  const missed = SEQ.filter(s => missedAnchors.includes(s));
   const total = block.owed.length - dropped.length;   // a session the owner swapped for Arms / Rest / leave isn't owed
-  const label = `${done.length} of ${total} this block · ${owed.length ? `${owed.join(', ')} to do` : 'block complete'}${extras ? ` · ${extras} extra` : ''}`;
-  return { start: block.start, end: block.end, total, done, owed, extras, label };
+  const label = `${done.length} of ${total} this block · ${owed.length ? `${owed.join(', ')} to do` : 'block complete'}${missed.length ? ` · ${missed.join(', ')} missed` : ''}${extras ? ` · ${extras} extra` : ''}`;
+  return { start: block.start, end: block.end, total, done, owed, missed, extras, label };
 }
 
 // ── For every rota consumer ────────────────────────────────────────

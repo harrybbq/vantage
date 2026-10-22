@@ -58,7 +58,7 @@ export function applyTick(prev, { day, trackerId, value, today, now = Date.now()
   next = markManual(next, day, [trackerId]);
 
   // 3. Streaks.
-  const newStreaks = recalcStreaks(newLogs, prev.trackers || [], prev.streaks || {});
+  const newStreaks = recalcStreaks(newLogs, prev.trackers || [], prev.streaks || {}, today);
   next = { ...next, streaks: newStreaks };
 
   // 4. Weekly coin challenge — symmetric award/refund.
