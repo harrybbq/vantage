@@ -9,8 +9,7 @@
  * - If today logged true but yesterday not → reset to 1
  * - If today not yet logged → preserve last streak (not broken until tomorrow)
  */
-export function recalcStreaks(logs, trackers, prevStreaks = {}) {
-  const today = getTodayStr();
+export function recalcStreaks(logs, trackers, prevStreaks = {}, today = getTodayStr()) {
   const boolTrackers = trackers.filter(t => t.type === 'boolean');
 
   const newStreaks = { ...prevStreaks };
