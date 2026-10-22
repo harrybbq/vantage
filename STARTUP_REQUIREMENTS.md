@@ -739,9 +739,19 @@ for Oura effectively permanently).
     UNVERIFIED — its docs weren't reachable from the build machine; a community client points at
     `GET https://api.ouraring.com/oauth/revoke?access_token=…`. Owner: confirm on
     cloud.ouraring.com/docs/authentication (or in the §3.2 email), then set `PROVIDERS.oura.revoke`.*
-126. `[ ]` **LAUNCH** Branding/labels per WHOOP's guidelines: no home-made WHOOP/Oura logos, don't rename
+126. `[~]` **LAUNCH** Branding/labels per WHOOP's guidelines: no home-made WHOOP/Oura logos, don't rename
     provider metrics (WHOOP Recovery shown under "Readiness"; Oura Readiness stored as "Recovery"), WHOOP's
     recovery colours, name the provider instead of "wearable"; drop the unused `read:profile` scope.
+    *Status 2026-10-22: done in code, display only (no state key renamed or written).
+    `src/lib/vitals/recoverySource.js` reads whose score `vitalsLog[d].recovery` is from the row's other
+    keys (strain/stepsWhoop → WHOOP, stepsOura → Oura), then the connected flags; can't tell → neutral
+    "Recovery / Readiness" ("Score" in tiles/chips that truncate). Labels flow through Track → Vitals,
+    the hub Vitals widget, the console Vitals prime, auto-fill rules and Lifts ("WHOOP Recovery").
+    WHOOP scores use WHOOP's band colours on marks only (ring arc, tile dot, chip dot) — numbers stay in
+    theme text because #FFDE00 can't carry text on Cream. Plain "Connected · WHOOP/Oura" text replaced
+    the home-made marks; `read:profile` dropped (next reconnect may re-show WHOOP consent). Owner: confirm
+    the three hexes against the full WHOOP Brand & Design Guidelines PDF (the doc quotes an excerpt), and
+    ask Oura (§3 Q8) whether "Oura Readiness" and Vantage's state words are acceptable.*
 127. `[~]` **LAUNCH** While approval is pending: a server-side allow-list for connect (≤10 incl. one slot for
     WHOOP's reviewer) with a clear message instead of "connect failed (denied)"; surface Oura errors
     (today "Synced 0 days"); budget sync-on-open against WHOOP's daily limit (~400–600 DAU would exhaust it)
@@ -757,6 +767,12 @@ for Oura effectively permanently).
     data kept). D7: `WEARABLES_IN_NATIVE = false` in `src/lib/native/wearableGate.js` hides Connect in
     native builds; linked accounts keep Disconnect + delete. Owner: run the SQL, add handles (keep one
     for WHOOP's reviewer), flip to Invite-only. Still open here: the sync-on-open budget (C13).*
+    *Status 2026-10-22: C13 done in code. `whoop-sync` skips an on-open sync (`auto: true`, sent by
+    `useWhoopAutoSync` only) when `whoop_tokens.updated_at` is under 60 min old → 200 `{ skipped: 'recent' }`,
+    which the app ignores (nothing merged or recorded). A 429, or `X-RateLimit-Remaining` ≤ 5, holds the
+    function instance off WHOOP until the reset and answers 429 `{ rateLimited }` with calm words; no
+    retries. `whoop-cron` doesn't pass through the check and stops starting accounts after a 429. Tests:
+    `check:whoopbudget`. Still open: request the limit increase in the approval (item 128).*
 128. `[ ]` **LAUNCH** Submit WHOOP's production approval (draft answers + 13-shot list in the pack §2) and
     register Oura + send the questions email (§3), after 124–127; file both replies with the DPIA (G7).
 
