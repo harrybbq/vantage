@@ -14,6 +14,7 @@ import NutritionSection from './NutritionSection';
 import VitalsPanel from './track/VitalsPanel';
 import { markManual, isAutoFilled, autoProvenance, ruleLabel, ruleChip, sourceById } from '../lib/trackers/autoLog';
 import AutoFillModal from './track/AutoFillModal';
+import { recoveryProvider } from '../lib/vitals/recoverySource';
 import { trackerDone, trackerStep, dailyGoalOf, fmtTrackerValue } from '../lib/trackers/done';
 import { useIsOwner } from '../hooks/useIsOwner';
 import { OWNER_SURFACES_IN_BUILD } from '../lib/native/ownerSurfaces';
@@ -63,7 +64,7 @@ function TrackerRing({ tracker, count, target, doneToday, onClick }) {
   );
 }
 
-function TrackersList({ trackers, logs, streaks, onDelete, onOpenModal, update, onOpenAuto }) {
+function TrackersList({ trackers, logs, streaks, onDelete, onOpenModal, update, onOpenAuto, recProvider = null }) {
   const today = getTodayStr();
   const todayLogs = logs?.[today] || {};
 
@@ -143,10 +144,10 @@ function TrackersList({ trackers, logs, streaks, onDelete, onOpenModal, update, 
                   type="button"
                   className={`tracker-auto${ruleChip(t) ? ' is-on' : ''}`}
                   onClick={() => onOpenAuto(t)}
-                  title={ruleLabel(t) ? `Filled in automatically — ${ruleLabel(t)}` : 'Fill this in from synced data'}
+                  title={ruleLabel(t, recProvider) ? `Filled in automatically — ${ruleLabel(t, recProvider)}` : 'Fill this in from synced data'}
                 >
                   <Icon name="zap" size={10} />
-                  <span>{ruleChip(t) || 'Auto-fill'}</span>
+                  <span>{ruleChip(t, recProvider) || 'Auto-fill'}</span>
                 </button>
               </div>
               <div className="tracker-row-right">
@@ -862,6 +863,9 @@ export default function TrackSection({ S, update, active, onOpenModal, onShowCoi
   const [tab, setTab] = useState('trackers');
   // Which tracker's auto-fill rule is being edited, if any.
   const [autoFor, setAutoFor] = useState(null);
+  // Whose score a recovery rule reads — WHOOP Recovery / Oura Readiness
+  // by name on the tracker chip, neutral when the log can't say.
+  const recProvider = useMemo(() => recoveryProvider(S), [S.vitalsLog, S.whoopConnected, S.ouraConnected]); // eslint-disable-line react-hooks/exhaustive-deps
   // Auto-fill offers the Lifts rule to the owner only (Lifts is theirs).
   const { isOwner } = useIsOwner(OWNER_SURFACES_IN_BUILD ? userId : null);
   const owner = OWNER_SURFACES_IN_BUILD && isOwner;
@@ -956,6 +960,7 @@ export default function TrackSection({ S, update, active, onOpenModal, onShowCoi
                 onOpenModal={onOpenModal}
                 update={update}
                 onOpenAuto={setAutoFor}
+                recProvider={recProvider}
               />
             </aside>
             <div className="track-main"

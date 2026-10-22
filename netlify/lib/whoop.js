@@ -13,6 +13,83 @@ const TOKEN_URL = 'https://api.prod.whoop.com/oauth/oauth2/token';
 const KJ_TO_KCAL = 1 / 4.184;
 const dayOf = iso => (iso || '').slice(0, 10);
 
+// ── The app-wide request budget (gap C13) ───────────────────────────
+// WHOOP allows 100 requests/minute and 10,000/day for the WHOOP app as a
+// whole — every user's on-open sync and the morning cron share it. Two
+// brakes, both pure so they can be tested:
+//   · syncSkip: an on-open sync for an account synced in the last hour
+//     returns without calling WHOOP. The stamp is whoop_tokens.updated_at,
+//     which getFreshToken bumps on every refresh: WHOOP access tokens last
+//     an hour (expires_in 3600) and are refreshed inside their last two
+//     minutes, so any sync an hour or more after the stamp refreshes and
+//     re-stamps. The stamp therefore tracks the last sync that reached
+//     WHOOP, with no extra write. (A connect stamps it too; the sync the
+//     connect itself starts is not an on-open one, so it still runs.)
+//   · rateBackoff: a 429, or X-RateLimit-Remaining at or under a small
+//     floor, stops further syncs until WHOOP's reset (or a minute when it
+//     gives none). Which window Remaining counts is not assumed — the
+//     smallest value seen is treated as the one that binds.
+const ON_OPEN_WINDOW_MS = 60 * 60_000;
+const RATE_FLOOR = 5;
+const DEFAULT_BACKOFF_MS = 60_000;
+const MAX_BACKOFF_MS = 60 * 60_000;
+
+/**
+ * PURE: should this sync return without calling WHOOP?
+ * → 'rate-limited' | 'recent' | null.
+ * Only an on-open (`auto`) sync is skipped as recent; a manual one, and
+ * the one a connect starts, always runs. A backoff stops both.
+ */
+function syncSkip({ auto = false, updatedAt = null, now = Date.now(), windowMs = ON_OPEN_WINDOW_MS, backoffUntil = 0 } = {}) {
+  if (backoffUntil > now) return 'rate-limited';
+  if (!auto) return null;
+  const t = Date.parse(updatedAt || '');
+  if (!Number.isFinite(t)) return null;
+  const age = now - t;
+  // A stamp from the future (clock skew) is not trusted to skip.
+  return age >= 0 && age < windowMs ? 'recent' : null;
+}
+
+/** First integer in a header — some APIs send "98" and some a
+ *  per-window list ("98, 9876"); for a list the smallest binds. */
+function headerInt(v) {
+  if (v == null || v === '') return null;
+  const nums = String(v).split(',').map(x => parseInt(x, 10)).filter(Number.isFinite);
+  return nums.length ? Math.min(...nums) : null;
+}
+
+/** PURE: WHOOP's rate headers → { remaining, resetSec } (nulls when absent). */
+function parseRateLimit(headers) {
+  const get = k => (headers && typeof headers.get === 'function' ? headers.get(k) : headers && headers[k]);
+  return {
+    remaining: headerInt(get('x-ratelimit-remaining')),
+    resetSec: headerInt(get('x-ratelimit-reset')) ?? headerInt(get('retry-after')),
+  };
+}
+
+/**
+ * PURE: until when to hold off, as a ms timestamp (0 = no backoff).
+ * Bounded both ways, so a missing or absurd reset can neither retry
+ * immediately nor park syncing for a day.
+ */
+function rateBackoff({ status = 200, remaining = null, resetSec = null, now = Date.now(), floor = RATE_FLOOR } = {}) {
+  const limited = status === 429 || (remaining != null && remaining <= floor);
+  if (!limited) return 0;
+  const wait = resetSec != null && resetSec > 0
+    ? Math.min(MAX_BACKOFF_MS, Math.max(1000, resetSec * 1000))
+    : DEFAULT_BACKOFF_MS;
+  return now + wait;
+}
+
+/** Fold one response's rate headers into a running summary. */
+function noteRate(acc, status, headers) {
+  const r = parseRateLimit(headers);
+  if (r.remaining != null && (acc.remaining == null || r.remaining < acc.remaining)) acc.remaining = r.remaining;
+  if (r.resetSec != null && (acc.resetSec == null || r.resetSec > acc.resetSec)) acc.resetSec = r.resetSec;
+  if (status === 429) acc.status = 429;
+  return acc;
+}
+
 // 'YYYY-MM-DDTHH:MM' wall clock where the workout happened, from WHOOP's
 // UTC start plus its timezone_offset ('+01:00'); UTC when no offset.
 function localStart(iso, offset) {
@@ -73,10 +150,14 @@ async function getFreshToken(userId, env) {
     const err = new Error(
       ref.status === 400 || ref.status === 401
         ? 'WHOOP sign-in has expired — reconnect WHOOP below.'
+        : ref.status === 429 ? whoopReason(429)
         : `WHOOP refused to refresh the connection (${ref.status}).`
     );
     err.whoopStatus = ref.status;
     err.whoopDetail = detail.slice(0, 200);
+    // A 429 here is WHOOP's app-wide limit, not this connection failing;
+    // the stored refresh token was not spent, so nothing is lost.
+    if (ref.status === 429) err.rate = noteRate({ status: 429, remaining: null, resetSec: null }, 429, ref.headers);
     throw err;
   }
   const tok = await ref.json();
@@ -110,7 +191,7 @@ function whoopReason(status) {
   if (status === 401) return 'WHOOP rejected our access — reconnect WHOOP below.';
   if (status === 403) return 'WHOOP denied access to this data — reconnect and allow all permissions.';
   if (status === 404) return 'WHOOP no longer offers this endpoint — the app needs updating.';
-  if (status === 429) return 'WHOOP is rate-limiting us — try again in a few minutes.';
+  if (status === 429) return 'WHOOP is busy right now — your data will catch up on the next sync.';
   if (status >= 500) return 'WHOOP is having problems right now — try again later.';
   return `WHOOP returned ${status}.`;
 }
@@ -131,6 +212,7 @@ async function whoopList(path, accessToken, start, end) {
   const out = [];
   let nextToken = null;
   let error = null;
+  const rate = { status: 200, remaining: null, resetSec: null };
   for (let page = 0; page < 5; page++) {
     const params = new URLSearchParams({ start, end, limit: '25' });
     if (nextToken) params.set('nextToken', nextToken);
@@ -141,13 +223,16 @@ async function whoopList(path, accessToken, start, end) {
       error = { path, status: 0, reason: `Could not reach WHOOP (${e.message || 'network error'}).` };
       break;
     }
+    noteRate(rate, res.status, res.headers);
+    // Never retried here: a 429 stops this collection at once, and the
+    // caller backs off rather than coming straight back.
     if (!res.ok) { error = { path, status: res.status, reason: whoopReason(res.status) }; break; }
     const json = await res.json().catch(() => ({}));
     out.push(...(json.records || []));
     nextToken = json.next_token || json.nextToken || null;
     if (!nextToken) break;
   }
-  return { records: out, error };
+  return { records: out, error, rate };
 }
 
 // PURE: map raw WHOOP collections → Vantage store shapes. No I/O, so
@@ -246,6 +331,14 @@ async function fetchWhoopData(accessToken, days = 7) {
   ]);
 
   const parts = [recoveries, sleeps, workouts, cycles];
+  // The tightest rate picture any of the four calls reported.
+  const rate = { status: 200, remaining: null, resetSec: null };
+  for (const p of parts) {
+    if (!p.rate) continue;
+    if (p.rate.status === 429) rate.status = 429;
+    if (p.rate.remaining != null && (rate.remaining == null || p.rate.remaining < rate.remaining)) rate.remaining = p.rate.remaining;
+    if (p.rate.resetSec != null && (rate.resetSec == null || p.rate.resetSec > rate.resetSec)) rate.resetSec = p.rate.resetSec;
+  }
   const errors = parts.map(p => p.error).filter(Boolean);
   if (errors.length === parts.length) {
     // Every collection refused. Report the most actionable status: an
@@ -254,6 +347,7 @@ async function fetchWhoopData(accessToken, days = 7) {
     const lead = auth || errors[0];
     const err = new Error(lead.reason);
     err.whoopStatus = lead.status;
+    err.rate = rate;
     throw err;
   }
 
@@ -263,7 +357,7 @@ async function fetchWhoopData(accessToken, days = 7) {
     workouts: workouts.records,
     cycles: cycles.records,
   });
-  return { ...mapped, warnings: [...new Set(errors.map(e => e.reason))] };
+  return { ...mapped, warnings: [...new Set(errors.map(e => e.reason))], rate };
 }
 
 // PURE: merge synced WHOOP data into an app state object — the exact
@@ -281,4 +375,7 @@ function mergeWhoopIntoState(state, vitals, burn) {
   return { ...state, vitalsLog, burnLog, whoopConnected: true };
 }
 
-module.exports = { sb, getFreshToken, whoopList, whoopReason, mapWhoop, fetchWhoopData, mergeWhoopIntoState, localStart };
+module.exports = {
+  sb, getFreshToken, whoopList, whoopReason, mapWhoop, fetchWhoopData, mergeWhoopIntoState, localStart,
+  syncSkip, parseRateLimit, rateBackoff, ON_OPEN_WINDOW_MS, RATE_FLOOR,
+};

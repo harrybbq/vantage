@@ -22,13 +22,15 @@ import { useState } from 'react';
 import { createPortal } from 'react-dom';
 import { backdropClose } from '../../utils/backdropClose';
 import {
-  AUTO_SOURCES, pickableSources, ruleFor, sourceHasData, proposeAutoLogs, BACKFILL_DAYS,
+  AUTO_SOURCES, pickableSources, ruleFor, sourceHasData, proposeAutoLogs, BACKFILL_DAYS, sourceWords,
 } from '../../lib/trackers/autoLog';
+import { recoveryProvider } from '../../lib/vitals/recoverySource';
 
 const NEEDS = {
   vitals: 'a weight, sleep or heart-rate reading — from WHOOP, Oura, or entered by hand',
   wearable: 'WHOOP or Oura connected, or a workout finished in Vantage',
   whoop: 'WHOOP connected',
+  score: 'WHOOP or Oura connected',
   steps: 'WHOOP or Oura connected',
   lifts: 'a workout saved in Upgrade → Lifts',
 };
@@ -38,7 +40,9 @@ export default function AutoFillModal({ tracker, S, update, onClose, owner = fal
   const [sourceId, setSourceId] = useState(existing ? existing.source.id : '');
   const [threshold, setThreshold] = useState(existing && existing.threshold != null ? String(existing.threshold) : '');
 
-  const source = AUTO_SOURCES.find(s => s.id === sourceId) || null;
+  // WHOOP Recovery / Oura Readiness by name where the log says which.
+  const provider = recoveryProvider(S);
+  const source = sourceWords(AUTO_SOURCES.find(s => s.id === sourceId) || null, provider);
   const wantsThreshold = !!(source && source.threshold != null && tracker.type === 'boolean');
 
   function pick(s) {
@@ -92,7 +96,8 @@ export default function AutoFillModal({ tracker, S, update, onClose, owner = fal
 
           {/* A rule already on the tracker stays listed even where its
               source is not offered (the owner on a native build). */}
-          {pickableSources(owner).concat(existing && existing.source.ownerOnly && !owner ? [existing.source] : []).map(s => {
+          {pickableSources(owner).concat(existing && existing.source.ownerOnly && !owner ? [existing.source] : []).map(raw => {
+            const s = sourceWords(raw, provider);
             const live = sourceHasData(S, s);
             return (
               <button

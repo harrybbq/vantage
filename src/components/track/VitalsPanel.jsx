@@ -15,10 +15,13 @@
  * answers "why is HRV not here".
  */
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { VITAL_METRICS, metricAvailability, fmtMetric, sourceLabel } from '../../lib/vitals/metrics';
+import { VITAL_METRICS, metricAvailability, fmtMetric, sourceLabel, metricLabel } from '../../lib/vitals/metrics';
 import {
   ymd, seriesOf, readinessFor, correlate, strengthOf, trendOf, sparkPath,
 } from '../../lib/vitals/readiness';
+import {
+  recoveryProviderOn, recoveryProvider, recoveryName, recoveryShort, whoopBand, WHOOP_RECOVERY_COLOURS,
+} from '../../lib/vitals/recoverySource';
 import VitalsEntryModal from './VitalsEntryModal';
 
 const RANGES = [
@@ -58,7 +61,20 @@ export default function VitalsPanel({ S, update }) {
   );
   const reasonOf = key => availability.find(m => m.key === key)?.reason || null;
 
-  const ready = useMemo(() => readinessFor(vitalsLog, today), [vitalsLog, today]);
+  /* Whose score today's `recovery` is (item 126): WHOOP's is called
+     Recovery and coloured in WHOOP's bands, Oura's is called Readiness,
+     and Vantage's own computed score keeps "Readiness". Unknown → neutral. */
+  const todayProvider = recoveryProviderOn(S, today);
+  const ready = useMemo(
+    () => readinessFor(vitalsLog, today, 30, { provider: todayProvider }),
+    [vitalsLog, today, todayProvider],
+  );
+  const fromDevice = ready.source === 'device';
+  const readyTitle = fromDevice ? recoveryName(ready.provider) : 'Readiness';
+  const whoopScore = fromDevice && ready.provider === 'whoop';
+  // Log-wide, for the recovery tile and chip: the label sits over 30 days.
+  const recProvider = useMemo(() => recoveryProvider(S), [S]);
+  const labelOf = m => metricLabel(m, S);
 
   // One pass for every tile, so the sparkline, the trend and the value
   // all come from the same series.
@@ -66,17 +82,25 @@ export default function VitalsPanel({ S, update }) {
     const pts = seriesOf(vitalsLog, m.key, 30);
     const last = pts.length ? pts[pts.length - 1] : null;
     const todayVal = vitalsLog[today]?.[m.key];
+    const value = todayVal != null ? todayVal : last?.v;
+    // A WHOOP recovery tile marks its value in WHOOP's band colour; the
+    // number itself stays in theme text (#FFDE00 is unreadable on Cream).
+    const band = m.key === 'recovery' && recProvider === 'whoop' ? whoopBand(value) : null;
     return {
       m,
+      // The corner already names the provider, so the tile says the
+      // provider's own word for it ("Recovery" / "Readiness").
+      label: m.key === 'recovery' ? recoveryShort(recProvider) : m.label,
+      dot: band ? WHOOP_RECOVERY_COLOURS[band] : null,
       locked: !availableKeys.has(m.key),
       lock: reasonOf(m.key),
-      value: todayVal != null ? todayVal : last?.v,
+      value,
       isToday: todayVal != null,
       spark: sparkPath(pts.slice(-14)),
       trend: trendOf(pts.slice(-14), m.dp),
       source: sourceLabel(m, S),
     };
-  }), [vitalsLog, availableKeys, S, today]);
+  }), [vitalsLog, availableKeys, S, today, recProvider]);
 
   const chartMetric = VITAL_METRICS.find(m => m.key === metricKey) || VITAL_METRICS[0];
   const chart = useMemo(() => seriesOf(vitalsLog, metricKey, days), [vitalsLog, metricKey, days]);
@@ -93,11 +117,13 @@ export default function VitalsPanel({ S, update }) {
     <>
       <div className="tv-wrap tv-vitals">
         <div className="tv-rail">
-          {/* ── Readiness ── */}
+          {/* ── Readiness, or the device's own score under its own name ── */}
           <div className="tv-card tv-ready">
-            <div className="tv-rule"><span>Readiness</span><i /></div>
+            <div className="tv-rule"><span>{readyTitle}</span><i /></div>
             <div className="tv-ready-top">
-              <div className="tv-ring" style={{ '--ring-color': readyColour(ready.score) }}>
+              <div className="tv-ring" style={whoopScore
+                ? { '--ring-color': WHOOP_RECOVERY_COLOURS[whoopBand(ready.score)], '--ring-num-color': 'var(--text)' }
+                : { '--ring-color': readyColour(ready.score) }}>
                 <svg viewBox="0 0 112 112" aria-hidden="true">
                   <circle cx="56" cy="56" r="48" className="tv-ring-track" />
                   <circle cx="56" cy="56" r="48" className="tv-ring-arc"
@@ -115,7 +141,10 @@ export default function VitalsPanel({ S, update }) {
                     <div className="tv-part-top">
                       <span className="tv-part-lbl">{p.label}</span>
                       <span className="tv-part-val">{p.has ? p.value : '—'}</span>
-                      <span className="tv-part-w">{Math.round(p.weight * 100)}%</span>
+                      {/* Our weights are how OUR score is built. Beside a
+                          device's score they would read as how ITS score is
+                          built, which is a claim about WHOOP / Oura we can't make. */}
+                      {!fromDevice && <span className="tv-part-w">{Math.round(p.weight * 100)}%</span>}
                     </div>
                     <div className="tv-part-bar"><i style={{ width: `${p.has ? p.pct : 0}%` }} /></div>
                   </div>
@@ -139,12 +168,12 @@ export default function VitalsPanel({ S, update }) {
                   className={`tv-tile${t.locked ? ' is-locked' : ''}${metricKey === t.m.key ? ' is-on' : ''}`}
                   style={{ '--tile-color': t.m.color }}
                   disabled={t.locked}
-                  title={t.locked ? t.lock : `Plot ${t.m.label}`}
+                  title={t.locked ? t.lock : `Plot ${labelOf(t.m)}`}
                   onClick={() => setMetricKey(t.m.key)}
                 >
                   <span className="tv-tile-head">
-                    <i className="tv-tile-dot" />
-                    <span className="tv-tile-lbl">{t.m.label}</span>
+                    <i className="tv-tile-dot" style={t.dot ? { background: t.dot } : undefined} />
+                    <span className="tv-tile-lbl">{t.label}</span>
                     <span className="tv-tile-src">{t.locked ? 'locked' : t.source}</span>
                   </span>
                   <span className="tv-tile-val">
@@ -177,7 +206,7 @@ export default function VitalsPanel({ S, update }) {
           <div className="tv-card tv-chart-card">
             <div className="tv-chart-head">
               <div>
-                <div className="tv-rule tv-rule-bare"><span>{chartMetric.label}</span></div>
+                <div className="tv-rule tv-rule-bare"><span>{labelOf(chartMetric)}</span></div>
                 <div className="tv-chart-now">
                   <span className="tv-chart-num" style={{ color: chartMetric.color }}>
                     {fmtMetric(chart.length ? chart[chart.length - 1].v : null, chartMetric)}
@@ -210,7 +239,7 @@ export default function VitalsPanel({ S, update }) {
                     style={{ '--chip-color': m.color }}
                     title={locked ? reasonOf(m.key) : undefined}
                     onClick={() => setMetricKey(m.key)}>
-                    <i />{m.label}{locked && <em>· locked</em>}
+                    <i />{labelOf(m)}{locked && <em>· locked</em>}
                   </button>
                 );
               })}

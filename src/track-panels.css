@@ -258,7 +258,9 @@
   position:absolute; inset:0; display:flex; flex-direction:column;
   align-items:center; justify-content:center; pointer-events:none;
 }
-.tv-ring-num{ font-size:30px; font-weight:800; line-height:1; color:var(--ring-color); }
+/* The number takes --ring-num-color when set: WHOOP's yellow arc (#FFDE00)
+   cannot carry text on Cream, so a WHOOP score keeps its number in theme text. */
+.tv-ring-num{ font-size:30px; font-weight:800; line-height:1; color:var(--ring-num-color, var(--ring-color)); }
 .tv-ring-state{
   font-family:var(--mono); font-size:var(--fs-floor); letter-spacing:1.4px;
   text-transform:uppercase; color:var(--text-muted); margin-top:3px;

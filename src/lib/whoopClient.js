@@ -8,15 +8,26 @@ import { apiFetch } from './authFetch';
  * returned vitals/burn into app state via update() — so the write flows
  * through the normal save pipeline + anti-wipe guards (no server/client
  * race). Shared by the manual Sync buttons and the passive auto-sync.
+ *
+ * `opts.auto` marks the on-open sync, which the server may answer with
+ * `skipped: 'recent'` (synced within the hour — WHOOP's app-wide budget,
+ * gap C13). Two answers write NOTHING to state, not even the error slot,
+ * because neither says anything about this connection's health:
+ *   · skipped        → { skipped } with zero days;
+ *   · rateLimited    → { rateLimited, message } — WHOOP's own limit, for
+ *                      the whole app; the data arrives on a later sync.
  */
-export async function syncWhoop(update, days = 7) {
+export async function syncWhoop(update, days = 7, { auto = false } = {}) {
   const { data: { session } } = await supabase.auth.getSession();
   const res = await apiFetch('/.netlify/functions/whoop-sync', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session?.access_token}` },
-    body: JSON.stringify({ days }),
+    body: JSON.stringify(auto ? { days, auto: true } : { days }),
   });
   const body = await res.json().catch(() => ({}));
+  if (!res.ok && body.rateLimited) {
+    return { vDays: 0, bDays: 0, warnings: [], rateLimited: true, message: body.error || 'WHOOP is busy right now — your data will catch up on the next sync.' };
+  }
   if (!res.ok) {
     const err = new Error(body.error || 'sync failed');
     err.reconnect = !!body.reconnect;
@@ -25,6 +36,7 @@ export async function syncWhoop(update, days = 7) {
     update(prev => ({ ...prev, whoopLastError: { at: Date.now(), message: err.message, reconnect: err.reconnect } }));
     throw err;
   }
+  if (body.skipped) return { vDays: 0, bDays: 0, warnings: [], skipped: body.skipped };
 
   update(prev => {
     const vitalsLog = { ...(prev.vitalsLog || {}) };
@@ -86,7 +98,10 @@ export function useWhoopAutoSync(S, update, { throttleMs = 10 * 60 * 1000 } = {}
       // but syncWhoop now records the failure in state, so the WHOOP
       // panel can show it instead of the user being left to infer a
       // broken connection from data that simply stopped moving.
-      syncWhoop(updateRef.current, 7).catch(() => {});
+      // `auto`: the server skips it when this account synced within the
+      // hour (WHOOP's app-wide request budget), so a busy day of opens
+      // costs WHOOP one sync an hour per person rather than one per open.
+      syncWhoop(updateRef.current, 7, { auto: true }).catch(() => {});
     };
     run(); // on app open / when the connection becomes known
     const onVisible = () => { if (document.visibilityState === 'visible') run(); };

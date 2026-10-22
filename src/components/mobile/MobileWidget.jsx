@@ -31,7 +31,7 @@ import { useSubscriptionContext } from '../../context/SubscriptionContext';
 import { observeShape } from '../../lib/hub/shape';
 import { createDragScroller } from '../../lib/mobile/dragScroll';
 import { RotationBody } from '../widgets/RotationWidget';
-import { metricAvailability, metricSeries, resolvePicks } from '../../lib/vitals/metrics';
+import { metricAvailability, metricSeries, resolvePicks, sourceLabel } from '../../lib/vitals/metrics';
 import { PickChip, PickList } from '../widgets/GoalsWidget';
 import { tradingWidgetAvailable, TRADING_WIDGET_BUILD_EXCLUDED } from '../../lib/trading/enabled';
 import MarketBody from '../widgets/MarketWidget';
@@ -699,6 +699,12 @@ function VitalsBody({ S, update, picks, onSetPicks }) {
 
   if (picking) {
     const all = metricAvailability(S);
+    // Name the device rather than "wearable" (item 126, gap C8); when the
+    // log can't say which, name both rather than guess.
+    const deviceTag = m => {
+      const src = sourceLabel(m, S);
+      return src === 'whoop' ? 'WHOOP' : src === 'oura' ? 'Oura' : src === '2 src' ? 'WHOOP + Oura' : 'WHOOP or Oura';
+    };
     return (
       <div className="m-vitals is-picking">
         {/* The chip stays, and it toggles. Savings and goals both keep
@@ -715,7 +721,7 @@ function VitalsBody({ S, update, picks, onSetPicks }) {
           items={all.map(m => ({
             id: m.key,
             name: m.label,
-            tag: m.available ? `${m.unit || 'index'} · ${m.src === 'whoop' ? 'wearable' : 'logged by hand'}` : m.reason,
+            tag: m.available ? `${m.unit || 'index'} · ${m.src === 'whoop' ? deviceTag(m) : 'logged by hand'}` : m.reason,
             disabled: !m.available,
           }))}
           picked={shownMetrics.map(m => m.key)}

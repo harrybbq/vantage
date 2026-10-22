@@ -6015,9 +6015,10 @@ html[data-bg-photo] .section.m-hub-wrap .m-hub-hero{ box-shadow:none; padding:12
 .vitals-tooltip-date { font-family: var(--mono); font-size: var(--fs-floor); letter-spacing: .5px; color: var(--text-muted); }
 .vitals-tooltip-val { font-size: 14px; font-weight: 700; color: var(--text); font-variant-numeric: tabular-nums; }
 .vitals-tooltip-val span { font-size: var(--fs-floor); font-weight: 500; color: var(--text-muted); }
-.vitals-card-title { display: inline-flex; align-items: center; gap: 10px; }
-.vitals-whoop-badge { display: inline-flex; align-items: center; gap: 4px; font-family: var(--mono); font-size: var(--fs-floor); font-weight: 700; letter-spacing: 1.4px; color: #16a34a; border: 1px solid rgba(22,163,74,.4); background: rgba(22,163,74,.10); border-radius: 999px; padding: 2px 8px; line-height: 1; }
-.vitals-whoop-badge svg { color: #16a34a; }
+.vitals-card-title { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; }
+/* A plain "Connected · WHOOP" status pill — sentence case, no tracking, no
+   icon, so it reads as a status and not as a home-made wordmark (item 126). */
+.vitals-whoop-badge { display: inline-flex; align-items: center; gap: 4px; font-family: var(--mono); font-size: var(--fs-floor); font-weight: 700; letter-spacing: 0; color: #16a34a; border: 1px solid rgba(22,163,74,.4); background: rgba(22,163,74,.10); border-radius: 999px; padding: 2px 8px; line-height: 1; white-space: nowrap; }
 .vitals-table { width: 100%; border-collapse: collapse; margin-top: 14px; font-variant-numeric: tabular-nums; }
 .vitals-table th {
   font-family: var(--mono); font-size: var(--fs-floor); letter-spacing: 1.2px; text-transform: uppercase;

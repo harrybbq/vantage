@@ -26,7 +26,11 @@ const CORS = {
 };
 
 const AUTH_URL = 'https://api.prod.whoop.com/oauth/oauth2/auth';
-const SCOPES = 'offline read:recovery read:sleep read:workout read:cycles read:profile';
+// No read:profile: nothing in Vantage reads the WHOOP profile or body
+// measurements, and an unused scope is the first thing a reviewer asks
+// about (gap C4). Tokens granted with it keep working; the next
+// reconnect simply asks for less (WHOOP may show its consent screen).
+const SCOPES = 'offline read:recovery read:sleep read:workout read:cycles';
 
 
 exports.handler = async (event) => {
