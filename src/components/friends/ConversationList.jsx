@@ -10,6 +10,10 @@ import './friends-dm.css';
  * no longer a friend, is blocked, or is suspended stays in the list —
  * the history is still yours, and reporting needs it — but is muted and
  * says why, and opens read-only.
+ *
+ * Conversations with someone this account has muted (item 113; rows
+ * flagged `silenced` by lib/friends/mutes.js) come last, under a "Muted"
+ * label, with no unread badge or bold — still listed, still readable.
  */
 const COLORS = ['#1a7a4a', '#2563eb', '#7c3aed', '#c2410c', '#0891b2', '#be185d', '#854d0e'];
 function avatarColor(name = '') {
@@ -36,18 +40,20 @@ export default function ConversationList({ rows, userId, selectedId, loading, on
         </div>
       ) : (
         <ul className="dm-inbox-list">
-          {rows.map(r => {
-            const unread = r.unread > 0;
+          {rows.map((r, i) => {
+            const unread = !r.silenced && r.unread > 0;
+            const firstQuiet = r.silenced && !rows[i - 1]?.silenced;
             const time = relTime(r.last.created_at, now);
             const preview = previewText(r.last, userId);
             return (
               <li key={r.id}>
+                {firstQuiet && <div className="dm-inbox-group" role="presentation">Muted</div>}
                 <button
                   type="button"
-                  className={`dm-conv${unread ? ' is-unread' : ''}${r.muted ? ' is-muted' : ''}${selectedId === r.id ? ' is-selected' : ''}`}
+                  className={`dm-conv${unread ? ' is-unread' : ''}${r.muted ? ' is-muted' : ''}${r.silenced ? ' is-silenced' : ''}${selectedId === r.id ? ' is-selected' : ''}`}
                   onClick={() => onOpen(r)}
                   aria-current={selectedId === r.id ? 'true' : undefined}
-                  aria-label={`${r.name}${r.note ? ` (${r.note})` : ''}. ${unread ? `${r.unread} unread. ` : ''}${preview}. ${time}`}
+                  aria-label={`${r.name}${r.note ? ` (${r.note})` : ''}${r.silenced ? ' (muted)' : ''}. ${unread ? `${r.unread} unread. ` : ''}${preview}. ${time}`}
                 >
                   {r.avatar_url
                     ? <img className="dm-conv-avatar" src={r.avatar_url} alt="" />

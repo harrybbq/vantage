@@ -15,6 +15,9 @@
  * draft G4): an unwanted request is exactly where a stranger first makes
  * contact, so the way to refuse it for good belongs on the request, not
  * only on a friend card the stranger never gets.
+ *
+ * One line under the requests says so in plain words (item 113,
+ * supportive information; ABUSE_HANDLING G-2 point 2).
  */
 const COLORS = ['#1a7a4a', '#2563eb', '#7c3aed', '#c2410c', '#0891b2', '#be185d', '#854d0e'];
 
@@ -26,6 +29,7 @@ function avatarColor(seed) {
 
 import Icon from '../Icon';
 import ReportBlockButton from './ReportBlockButton';
+import { REQUEST_LINE } from '../../lib/safety/support';
 import './friends-dm.css';
 
 function initials(name) {
@@ -86,6 +90,7 @@ export default function PendingRequestsList({ pending, onAccept, onDecline, busy
           );
         })}
       </div>
+      <p className="fc-request-hint">{REQUEST_LINE}</p>
     </div>
   );
 }

@@ -22,11 +22,15 @@ import { getFriendPublicStats, reportSnapshot } from '../../../lib/friends/queri
 import { listConversations } from '../../../lib/friends/messages';
 import { subscribeDMs, getRealtimeState, onRealtimeState } from '../../../lib/friends/realtime';
 import { bumpConversation, clearUnread, previewText } from '../../../lib/friends/dmView';
+import { useMutes } from '../../../lib/friends/useMutes';
+import { silenceFriends } from '../../../lib/friends/mutes';
+import { announceBlocked } from '../../../components/friends/StayingSafe';
 
 const POLL_MS = 60_000;
 
 export function useFriendsHub({ userId, hasPro }) {
   const friends = useFriends(userId, hasPro);
+  const mutes = useMutes();
   const { data: board, loading: boardLoading, error: boardError } = useLeaderboard({ scope: 'friends', timeframe: 'alltime' });
 
   // ── Inbox ──
@@ -73,7 +77,10 @@ export function useFriendsHub({ userId, hasPro }) {
     const mapped = friends.friends.map(f => {
       const b = byBoard[f.id];
       const c = conv[f.id];
-      const unread = c && !c.blockedByMe ? (c.unread || 0) : 0;
+      // A muted friend's messages still arrive, but raise no pill and no
+      // preview (item 113, mute) — the conversation is there when opened.
+      const muted = mutes.isMuted(f.id);
+      const unread = c && !c.blockedByMe && !muted ? (c.unread || 0) : 0;
       return {
         id: f.id,
         name: f.display_name || `@${f.handle}`,
@@ -90,12 +97,14 @@ export function useFriendsHub({ userId, hasPro }) {
         lastText: unread && c && c.last ? previewText(c.last, userId, 60) : null,
       };
     });
-    return mapped.sort((a, b) => {
+    // Muted friends sit below everyone else; silenceFriends flags them
+    // `silenced` for the card's folded activity and the ⋯ Unmute.
+    return silenceFriends(mapped.sort((a, b) => {
       if (!!b.unread !== !!a.unread) return b.unread ? 1 : -1;
       if (a.online !== b.online) return a.online ? -1 : 1;
       return (b.ovr || 0) - (a.ovr || 0);
-    });
-  }, [friends.friends, byBoard, conv, userId]);
+    }), mutes.map);
+  }, [friends.friends, byBoard, conv, userId, mutes]);
 
   const unreadTotal = useMemo(() => rows.reduce((n, r) => n + (r.unread || 0), 0), [rows]);
   // The header chip listens for this, as it does for the classic rail.
@@ -149,7 +158,7 @@ export function useFriendsHub({ userId, hasPro }) {
 
   const block = useCallback(async f => {
     if (!window.confirm(`Block ${f.name}? They'll be removed from your friends and won't be able to find you again.`)) return;
-    try { await friends.block(f.id); setSelectedId(null); setThread(null); }
+    try { await friends.block(f.id); setSelectedId(null); setThread(null); announceBlocked(f); }
     catch (e) { window.alert(e.message || 'Could not block.'); }
   }, [friends]);
   const unfriend = useCallback(async f => {
@@ -189,6 +198,10 @@ export function useFriendsHub({ userId, hasPro }) {
     addOpen, openAdd: () => setAddOpen(true), closeAdd: () => setAddOpen(false),
     reportTarget, openReport: f => setReportTarget(f), closeReport: () => setReportTarget(null), submitReport,
     thread, openThread: f => setThread(f), closeThread: () => setThread(null),
+    // Mute (item 113): private to this account, nobody is told.
+    canMute: mutes.ready,
+    mute: f => mutes.mute({ id: f.id, name: f.name, handle: f.handle }),
+    unmute: f => mutes.unmute(f.id),
     onThreadActivity, onThreadRead, onBlocked,
   };
 }

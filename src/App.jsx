@@ -56,6 +56,8 @@ import { useWhoopAutoSync } from './lib/whoopClient';
 import { useOuraAutoSync } from './lib/ouraClient';
 import { useAutomations } from './hooks/useAutomations';
 import { usePublishProfile } from './lib/friends/usePublishProfile';
+import { MutesProvider } from './lib/friends/useMutes';
+import { BlockedNoticeHost } from './components/friends/StayingSafe';
 import { useConsentLedger } from './lib/consent/ledger';
 import { useRatings } from './hooks/useRatings';
 import { useCoinGrants } from './hooks/useCoinGrants';
@@ -829,6 +831,8 @@ function Board({ userId, userEmail, onSignOut, initialSettings }) {
 
   return (
     <DesignProvider design={design}>
+    {/* Mute (item 113): S.mutedUsers for every friend surface below. */}
+    <MutesProvider mutedUsers={S.mutedUsers} update={update}>
       {/* Migration banner */}
       {showBanner && (
         <div style={{
@@ -1231,6 +1235,9 @@ function Board({ userId, userEmail, onSignOut, initialSettings }) {
         onClose={() => update(prev => ({ ...prev, tutorialCompleted: true }))}
       />
       </DesignSlot>
+      {/* "Blocked" + who to talk to, after any block (item 113). */}
+      <BlockedNoticeHost />
+    </MutesProvider>
     </DesignProvider>
   );
 }

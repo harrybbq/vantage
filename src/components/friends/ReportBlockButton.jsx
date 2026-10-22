@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import ReportFriendModal from './ReportFriendModal';
+import { announceBlocked } from './StayingSafe';
 import { reportUser, blockUser, reportSnapshot } from '../../lib/friends/queries';
 
 /**
@@ -32,6 +33,7 @@ export default function ReportBlockButton({ userId, target, where, onBlocked, va
       await blockUser(userId, target.id);
       setOpen(false);
       onBlocked?.(target);
+      announceBlocked({ name, handle });
     } catch (e) {
       window.alert(e.message || 'Could not block.');
     }

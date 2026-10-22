@@ -457,6 +457,14 @@ html[data-design="console"] .cx-hub-heat i.l1 { background: color-mix(in srgb, v
 html[data-design="console"] .cx-hub-heat i.l2 { background: color-mix(in srgb, var(--cx-accent) 70%, var(--cx-s3)); }
 html[data-design="console"] .cx-hub-heat i.l3 { background: var(--cx-accent); }
 html[data-design="console"] .cx-hub-fc-wins { display: flex; flex-direction: column; gap: 6px; font: 400 var(--cx-fs-13)/var(--cx-lh-13) var(--cx-sans); }
+/* A muted friend's activity, folded (item 113). One quiet line + Show. */
+html[data-design="console"] .cx-hub-fc-muted {
+  display: flex; align-items: center; gap: 12px; padding: 10px 12px;
+  border: 1px dashed var(--cx-line); border-radius: 8px;
+  font: 400 var(--cx-fs-13)/var(--cx-lh-13) var(--cx-sans);
+}
+html[data-design="console"] .cx-hub-fc-muted > .cx-muted { flex: 1 1 auto; min-width: 0; }
+html[data-design="console"] .cx-hub-fc-muted > button { flex: none; }
 html[data-design="console"] .cx-hub-fc-acts { position: relative; display: flex; gap: 8px; }
 html[data-design="console"] .cx-hub-grow { flex: 1 1 auto; }
 html[data-design="console"] .cx-hub-fsheet .cx-sheet-body { padding-top: 4px; }
