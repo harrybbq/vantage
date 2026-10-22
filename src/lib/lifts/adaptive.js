@@ -367,7 +367,7 @@ function computeTargets(S, L, today) {
         const a = streakFrom[p], z = lastBest[p];
         streak[p] = 0;
         if (targets[p] !== from) {
-          const lift1 = a != null && z != null ? (z > a * 1.01 ? `, ${name} up ${kg(a)} → ${kg(z)}` : `, ${name} holding at ${kg(z)}`) : '';
+          const lift1 = a != null && z != null ? (z > a * 1.01 ? `, ${name} e1RM up ${kg(a)} → ${kg(z)}` : `, ${name} e1RM holding at ${kg(z)}`) : '';
           made.push({ part: p, from, to: targets[p], why: `100% two weeks running${lift1}` });
         }
       } else if (drops[p] >= 2) {
@@ -375,7 +375,7 @@ function computeTargets(S, L, today) {
         const a = dropFrom[p], z = lastBest[p];
         drops[p] = 0;
         streak[p] = 0;
-        if (targets[p] !== from) made.push({ part: p, from, to: targets[p], why: `${name} dropped two weeks running${a != null && z != null ? `, ${kg(a)} → ${kg(z)}` : ''}` });
+        if (targets[p] !== from) made.push({ part: p, from, to: targets[p], why: `${name} dropped two weeks running${a != null && z != null ? ` (e1RM ${kg(a)} → ${kg(z)})` : ''}` });
       }
     }
     if (i === weeks.length - 1) changes = made;

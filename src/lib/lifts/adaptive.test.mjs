@@ -368,7 +368,7 @@ t('(e) two full weeks with the main lift rising → +1, with the reason', () => 
   const { targets, changes } = weekTargets(S, B.push);
   const ch = p => changes.find(c => c.part === p);
   assert.equal(targets.Lats, 16.5);
-  assert.deepEqual(ch('Lats'), { part: 'Lats', from: 15.5, to: 16.5, why: '100% two weeks running, lat pulldown up 100 kg → 103.5 kg' });
+  assert.deepEqual(ch('Lats'), { part: 'Lats', from: 15.5, to: 16.5, why: '100% two weeks running, lat pulldown e1RM up 100 kg → 103.5 kg' });
   assert.equal(ch('Triceps lateral & medial').to, 13, 'a part whose base was rounded up (11.75 → 12) still counts as full');
   assert.equal(ch('Abs').to, 5, 'Abs 3.75 → 4, same');
   assert.equal(ch('Glute medius'), undefined, 'parts under two sets a week are left alone');
@@ -394,7 +394,7 @@ t('(e) a night week at 80 % loads is not read as a drop; a real drop two weeks r
   const lats = changes.find(c => c.part === 'Lats');
   assert.equal(lats.from, 15.5);
   assert.equal(lats.to, 14.5);
-  assert.match(lats.why, /^lat pulldown dropped two weeks running, \d+(\.5)? kg → \d+(\.5)? kg$/);
+  assert.match(lats.why, /^lat pulldown dropped two weeks running \(e1RM \d+(\.5)? kg → \d+(\.5)? kg\)$/);
   assert.equal(targets.Lats, 14.5);
   // Side delts went up two full weeks running in B2 (+1), so B1 was below the raised target: no further change.
   assert.equal(targets['Side delts'], 11.5);
