@@ -74,7 +74,10 @@ import {
 import { liftsOf, withLifts, makeEntry, LIMITS, newId, defaultGym, setLastGym, withGyms, gymName, gymList } from './store.js';
 import { PROGRAMME_MUSCLES, musclesOf, norm } from './muscles.js';
 import { cataloguePending } from './catalogue.js';
-import { plannedSessions, blockProgress, EXTRA } from './plan.js';
+import { plannedSessions, blockProgress, EXTRA, ANCHOR_CODES } from './plan.js';
+import { buildAdaptive, trimForRed, readinessOn, RED_RPE_CAP } from './adaptive.js';
+
+const ADAPTIVE_CODES = ['Upper', 'Lower'];
 
 export { MUSCLES, PROGRAMME_MUSCLES, musclesOf } from './muscles.js';
 
@@ -320,14 +323,38 @@ export function suggestWorkout(S, today, opts = {}) {
     return { ...out, restDay: false, name: `${session} day`, rotaSession: session, reason: `${session} isn’t one of the five programme sessions — build your own.` };
   }
   const night = day.shift === 'night';
-  const exercises = prog.map(x => {
-    const lift = findByName(L.list, x.name);
+  // Adaptive training (adaptive.js): Upper / Lower are built from what the
+  // week still owes; an anchor on a WHOOP-red day loses a set an exercise.
+  const readiness = readinessOn(S, today);
+  const red = !!(readiness && readiness.band === 'red');
+  const built = ADAPTIVE_CODES.includes(session) ? buildAdaptive(S, today, session) : null;
+  const isAnchor = ANCHOR_CODES.includes(session);
+  let plan0 = built && built.exercises.length ? built.exercises : prog.map(x => ({ ...x }));
+  if (isAnchor && red) plan0 = trimForRed(plan0).map(x => ({ ...x, tags: [{ kind: 'red', text: `≤ RPE ${x.rpeCap}` }] }));
+  const exercises = plan0.map(x => {
+    const lift = (x.liftId && L.list.find(l => l.id === x.liftId)) || findByName(L.list, x.name);
     const { rows } = planFor(S, lift, { sets: x.sets, reps: x.reps, night, gym });
-    return {
+    const out = {
       liftKey: lift ? lift.id : progId(x.name), liftId: lift ? lift.id : null, name: lift ? lift.name : x.name,
       sets: x.sets, reps: x.reps, optional: !!x.optional, weight: rows[0] ? rows[0].weight : null, rows,
     };
+    if (x.why) out.why = x.why;
+    if (x.tags && x.tags.length) out.tags = x.tags;
+    if (x.setsWas != null && x.setsWas !== x.sets) out.setsWas = x.setsWas;
+    if (x.rpeCap) out.rpeCap = x.rpeCap;
+    return out;
   });
+  const missed = (block && block.missed) || [];
+  const adaptive = {
+    notes: built ? built.notes : red && isAnchor ? [`WHOOP recovery ${readiness.score}% · red — one set fewer an exercise, every set to about RPE ${RED_RPE_CAP}.`] : [],
+    catchUp: built ? built.catchUp : [],
+    catchUpSets: built ? built.catchUpSets || 0 : 0,
+    missedSets: built ? built.missedSets || 0 : 0,
+    belowStandard: missed.length > 0,
+    readiness,
+    built: !!(built && built.exercises.length),
+    red,
+  };
   const sessions = L.sessions || [];
   let last = null;
   for (const s of sessions) if (s && s.rotaSession === session && isIso(s.date) && s.date < today && (!last || s.date > last.date)) last = s;
@@ -336,7 +363,7 @@ export function suggestWorkout(S, today, opts = {}) {
   const reason = `${shiftWord} · ${why} ${lastWords}`;
   return {
     ...out, name: session, rotaSession: session, restDay: false, night, exercises, reason,
-    minutes: estimateMinutes(exercises),
+    minutes: estimateMinutes(exercises), adaptive,
   };
 }
 
