@@ -436,7 +436,26 @@ html[data-lifts-focus] .lifts .lw-head { top: env(safe-area-inset-top, 0px); }
 .lifts .lw-tiles dd { margin: 0; font-family: var(--lf-mono); font-size: var(--lf-fs-hero); line-height: 32px; font-weight: 600; color: var(--lf-text);
   font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .lifts .lw-tile-of { font-size: 16px; color: var(--lf-muted); font-weight: 500; }
-@media (min-width: 1024px) { .lifts .lw-tiles { grid-template-columns: repeat(4, minmax(0, 1fr)); } .lifts .lw-tiles dd { font-size: 22px; } }
+/* Finish pages: ‹ Body · Muscles · Summary ›, swiped or stepped. pan-y keeps vertical scroll native. */
+.lifts .lw-fin-sum { display: flex; flex-direction: column; gap: 14px; }
+.lifts .lw-pager { display: flex; align-items: center; gap: 4px; margin: -4px 0 0; }
+.lifts .lw-pager-arrow { flex: none; display: inline-flex; align-items: center; justify-content: center; width: 44px; height: 44px; padding: 0; border: 0;
+  border-radius: var(--lf-r-cell); background: transparent; color: var(--lf-text); cursor: pointer; }
+.lifts .lw-pager-arrow:hover:not(:disabled) { background: var(--lf-s2); }
+.lifts .lw-pager-arrow:disabled { color: var(--lf-line-strong); cursor: default; }
+.lifts .lw-pager-steps { flex: 1 1 auto; min-width: 0; display: flex; justify-content: center; gap: 2px; list-style: none; margin: 0; padding: 0; }
+.lifts .lw-pager-steps > li { flex: 0 1 auto; min-width: 0; }
+.lifts .lw-pager-steps button { display: inline-flex; align-items: center; gap: 6px; min-height: 44px; padding: 0 8px; border: 0; background: transparent; cursor: pointer;
+  font-family: var(--lf-mono); font-size: var(--lf-fs-floor); letter-spacing: .06em; text-transform: uppercase; color: var(--lf-muted); white-space: nowrap; }
+.lifts .lw-pager-steps i { width: 7px; height: 7px; border-radius: 50%; border: 1.5px solid currentColor; box-sizing: border-box; flex: none; }
+.lifts .lw-pager-steps button.is-on { color: var(--lf-text); font-weight: 600; }
+.lifts .lw-pager-steps button.is-on i { background: var(--lf-accent); border-color: var(--lf-accent); }
+.lifts .lw-page { touch-action: pan-y; min-width: 0; }
+.lifts .lw-page.is-next { animation: lw-page-next var(--lf-dur-sheet) var(--lf-ease); }
+.lifts .lw-page.is-prev { animation: lw-page-prev var(--lf-dur-sheet) var(--lf-ease); }
+@keyframes lw-page-next { from { opacity: 0; transform: translateX(24px); } }
+@keyframes lw-page-prev { from { opacity: 0; transform: translateX(-24px); } }
+@media (prefers-reduced-motion: reduce) { .lifts .lw-page.is-next, .lifts .lw-page.is-prev { animation: none; } }
 /* Body map (BodyMap.jsx): front + back, each muscle filled by the share of its target done. */
 .lifts .lw-body { display: flex; flex-direction: column; gap: 10px; padding: 12px; border-radius: var(--lf-r-cell); border: 1px solid var(--lf-line); }
 .lifts .lw-body .lf-eyebrow { margin: 0; }

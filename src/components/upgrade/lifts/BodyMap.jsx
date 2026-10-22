@@ -15,7 +15,10 @@
  * and an "All muscles" switch: off, the twelve groups; on, the muscle
  * PARTS (front / side / rear delts, upper / lower chest, the triceps
  * heads …) on the figure and in the rows, grouped under their group.
- * Both are local view state — nothing here writes to S.
+ * Both are view state — nothing here writes to S. The Finish sheet pages
+ * it (`view`: 'figure' on its first page, 'rows' on the next) and holds
+ * the tab and the switch itself (`tab`/`onTab`, `all`/`onAll`), so both
+ * pages show the same range; left alone, BodyMap keeps them locally.
  *
  * The figure is anatomical: muscle regions from react-body-highlighter
  * (MIT — see bodyShapes.js), each tagged with a group and a part. A
@@ -141,10 +144,16 @@ function useWeek(S, today, session, list) {
 
 const TABS = [{ id: 'workout', label: 'This workout' }, { id: 'week', label: 'This week' }];
 
-export default function BodyMap({ session, list, S = null, today = null }) {
+export default function BodyMap({ session, list, S = null, today = null, view = 'both', tab: tabIn, onTab, all: allIn, onAll }) {
   const uid = useId().replace(/[^a-zA-Z0-9_-]/g, '');
-  const [tab, setTab] = useState('workout');
-  const [all, setAll] = useState(false);
+  const [tabOwn, setTabOwn] = useState('workout');
+  const [allOwn, setAllOwn] = useState(false);
+  const tab = tabIn || tabOwn;
+  const setTab = onTab || setTabOwn;
+  const all = allIn == null ? allOwn : allIn;
+  const setAll = onAll || setAllOwn;
+  const showFig = view !== 'rows';
+  const showRows = view !== 'figure';
   const tabsRef = useRef(null);
   const map = useMemo(() => bodyMap(session, list), [session, list]);
   const mapParts = useMemo(() => (all ? bodyMapParts(session, list) : null), [all, session, list]);
@@ -204,11 +213,15 @@ export default function BodyMap({ session, list, S = null, today = null }) {
   const scope = onWeek ? 'this week' : 'this workout';
   const panel = (
     <>
-      <div className="lw-body-figs" role="img" aria-label={`Body map, ${scope}${all ? ', all muscles' : ''}. ${summary}.`}>
-        <Figure shapes={FRONT} ratios={ratios} parts={all} label="Front" uid={`${uid}f`} />
-        <Figure shapes={BACK} ratios={ratios} parts={all} label="Back" uid={`${uid}b`} />
-      </div>
-      {onWeek ? (
+      {showFig && (
+        <div className="lw-body-figs" role="img" aria-label={`Body map, ${scope}${all ? ', all muscles' : ''}. ${summary}.`}>
+          <Figure shapes={FRONT} ratios={ratios} parts={all} label="Front" uid={`${uid}f`} />
+          <Figure shapes={BACK} ratios={ratios} parts={all} label="Back" uid={`${uid}b`} />
+        </div>
+      )}
+      {!showFig ? (
+        <p className="lf-meta lw-body-sum">{summary}.</p>
+      ) : onWeek ? (
         <>
           <p className="lf-meta lw-body-sum" data-testid="lw-body-week-sum">{summary}. Full colour means the week&rsquo;s sets for that muscle are done.</p>
           {note && <p className="lw-body-note" data-testid="lw-body-below">{note}</p>}
@@ -216,17 +229,17 @@ export default function BodyMap({ session, list, S = null, today = null }) {
       ) : (
         <p className="lf-meta lw-body-sum">{summary}. Full colour means the session&rsquo;s sets for that muscle are done.</p>
       )}
-      {partGroups ? <PartRows groups={partGroups} /> : (
+      {showRows && (partGroups ? <PartRows groups={partGroups} /> : (
         <ul className="lw-body-rows">
           {rows.map(m => <Row key={m.muscle} label={m.muscle} done={m.done} target={m.target} ratio={m.ratio} extra={m.extra} />)}
         </ul>
-      )}
+      ))}
     </>
   );
 
   return (
-    <section className="lw-body" aria-label="Where the work went" data-testid="lw-body">
-      <p className="lf-eyebrow">// Where the work went</p>
+    <section className={`lw-body is-${view}`} aria-label={view === 'rows' ? 'Muscle by muscle' : 'Where the work went'} data-testid={view === 'rows' ? 'lw-body-rows' : 'lw-body'}>
+      <p className="lf-eyebrow">{view === 'rows' ? '// Muscle by muscle' : '// Where the work went'}</p>
       <div className="lw-body-ctl">
         {week && (
           <div ref={tabsRef} className="lf-segm is-sm lw-body-tabs" role="tablist" aria-label="Body map range" onKeyDown={onTabKey}>
