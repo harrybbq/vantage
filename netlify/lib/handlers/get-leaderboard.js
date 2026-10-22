@@ -37,12 +37,12 @@
  * 100 rows get initials (the client already renders those).
  */
 
-const { pauseGate } = require('../lib/killSwitch');
-const sbKeys = require('../lib/sbKeys');
-const { recomputeUser, refreshOldFormula } = require('../lib/recompute');
-const { suspendedIds } = require('../lib/suspended');
-const { inChunks } = require('../lib/pgPage');
-const { createSharedCache, pgCacheStore } = require('../lib/sharedCache');
+const { pauseGate } = require('../killSwitch');
+const sbKeys = require('../sbKeys');
+const { recomputeUser, refreshOldFormula } = require('../recompute');
+const { suspendedIds } = require('../suspended');
+const { inChunks } = require('../pgPage');
+const { createSharedCache, pgCacheStore } = require('../sharedCache');
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
@@ -56,7 +56,7 @@ const SNAPSHOT_MIN_AGE_MS = 6 * 24 * 60 * 60 * 1000; // ≥6 days = "weekly"
 // Snapshots from before the last formula change are not compared, and
 // a prestige between two snapshots counts as the climb to 99 plus the
 // climb since — see netlify/lib/ratingsEpoch.js.
-const { FORMULA_EPOCH_ISO, climbSince } = require('../lib/ratingsEpoch');
+const { FORMULA_EPOCH_ISO, climbSince } = require('../ratingsEpoch');
 const GLOBAL_TOP_N = 100;
 const WEEKLY_CANDIDATE_POOL = 500; // wider net for weekly-climb candidates
 const AVATAR_TOP_N = 100;          // rows past this get initials, not a data URI

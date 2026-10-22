@@ -32,12 +32,12 @@ function checkRateLimit(ip) {
   return entry.count <= RATE_LIMIT;
 }
 
-const { pauseGate } = require('../lib/killSwitch');
-const { requireUser, underLimit, tooMany } = require('../lib/requireUser');
-const { withinDailyAiCap, overDailyCap } = require('../lib/aiQuota');
-const { FREE_WEEKLY, decide, usedThisWeek, noteLocalUse, isPaidUser, resetsOnIso } = require('../lib/freeAllowance');
-const { isOwnerEmail } = require('../lib/owner');
-const { consentGate } = require('../lib/consentGate');
+const { pauseGate } = require('../killSwitch');
+const { requireUser, underLimit, tooMany } = require('../requireUser');
+const { withinDailyAiCap, overDailyCap } = require('../aiQuota');
+const { FREE_WEEKLY, decide, usedThisWeek, noteLocalUse, isPaidUser, resetsOnIso } = require('../freeAllowance');
+const { isOwnerEmail } = require('../owner');
+const { consentGate } = require('../consentGate');
 
 // Free accounts get a small weekly allowance of AI scans; Pro and
 // lifetime are limited only by the daily cap (aiQuota). Barcode and text

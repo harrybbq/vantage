@@ -30,8 +30,8 @@ const CORS = {
   'Content-Type': 'application/json',
 };
 
-const { fetchWithTimeout, isBlockedHost, extractProductInfo } = require('../lib/productPage');
-const { requireUser, underLimit, tooMany } = require('../lib/requireUser');
+const { fetchWithTimeout, isBlockedHost, extractProductInfo } = require('../productPage');
+const { requireUser, underLimit, tooMany } = require('../requireUser');
 
 exports.handler = async (event) => {
   if (event.httpMethod === 'OPTIONS') {

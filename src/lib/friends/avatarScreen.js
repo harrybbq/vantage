@@ -1,7 +1,7 @@
 import { authFetch } from '../authFetch';
 
 /**
- * Screening for the avatar other people see (functions/avatar-check.js).
+ * Screening for the avatar other people see (netlify/lib/handlers/avatar-check.js).
  *
  * The photo itself stays in S.profile.photo and is never touched here;
  * this only decides whether its small published copy may go out to

@@ -23,7 +23,7 @@
  * another user the wrong headlines.
  */
 
-const { requireUser, underLimit, tooMany } = require('../lib/requireUser');
+const { requireUser, underLimit, tooMany } = require('../requireUser');
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',

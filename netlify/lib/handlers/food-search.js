@@ -30,9 +30,9 @@ const OFF_SEARCH = 'https://search.openfoodfacts.org';
 // lib/foodSources.js at that. Same string in both places now.
 const UA = 'Vantage/1.0 (https://vantagevision.netlify.app)';
 
-const sbKeys = require('../lib/sbKeys');
-const { requireUser, underLimit, tooMany } = require('../lib/requireUser');
-const { searchUSDA, searchFatSecret } = require('../lib/foodSources');
+const sbKeys = require('../sbKeys');
+const { requireUser, underLimit, tooMany } = require('../requireUser');
+const { searchUSDA, searchFatSecret } = require('../foodSources');
 
 /**
  * Foods people here added themselves.

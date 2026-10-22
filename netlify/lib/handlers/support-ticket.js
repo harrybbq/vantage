@@ -22,10 +22,10 @@
  * (`release`, the hashed bundle name) they sent. Nothing from their app
  * state.
  */
-const sbKeys = require('../lib/sbKeys');
-const { requireUser, underLimit, tooMany } = require('../lib/requireUser');
-const { alertConfig, atOrAbove, notifyOwner } = require('../lib/alertNotify');
-const { headlineFor } = require('../lib/alertText');
+const sbKeys = require('../sbKeys');
+const { requireUser, underLimit, tooMany } = require('../requireUser');
+const { alertConfig, atOrAbove, notifyOwner } = require('../alertNotify');
+const { headlineFor } = require('../alertText');
 
 const SEVERITY = 'medium';
 

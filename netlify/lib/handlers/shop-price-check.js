@@ -25,8 +25,8 @@
  * Scraping is best-effort: retailers change markup, some block bots,
  * and a missing price is normal rather than an error.
  */
-const { fetchWithTimeout, isBlockedHost, extractProductInfo, priceToNumber } = require('../lib/productPage');
-const { requireUser, underLimit, tooMany } = require('../lib/requireUser');
+const { fetchWithTimeout, isBlockedHost, extractProductInfo, priceToNumber } = require('../productPage');
+const { requireUser, underLimit, tooMany } = require('../requireUser');
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',

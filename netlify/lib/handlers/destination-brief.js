@@ -26,8 +26,8 @@
  * Returns { place, lat, lon, climate: { tempC, tempMinC, rainDays }, fx: { from, to, rate } }
  * Any part that fails is simply omitted — the client renders what it gets.
  */
-const { pauseGate } = require('../lib/killSwitch');
-const { requireUser, underLimit, tooMany } = require('../lib/requireUser');
+const { pauseGate } = require('../killSwitch');
+const { requireUser, underLimit, tooMany } = require('../requireUser');
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',

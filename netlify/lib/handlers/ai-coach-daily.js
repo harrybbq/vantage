@@ -50,13 +50,13 @@ function checkRateLimit(ip) {
   return entry.count <= RATE_LIMIT;
 }
 
-const { pauseGate } = require('../lib/killSwitch');
-const sbKeys = require('../lib/sbKeys');
-const { requireUser, underLimit, tooMany } = require('../lib/requireUser');
-const { withinDailyAiCap, overDailyCap } = require('../lib/aiQuota');
-const { isOwnerEmail } = require('../lib/owner');
-const { consentGate } = require('../lib/consentGate');
-const { prepareBrief, callModel, finaliseBrief } = require('../lib/coachPrompt');
+const { pauseGate } = require('../killSwitch');
+const sbKeys = require('../sbKeys');
+const { requireUser, underLimit, tooMany } = require('../requireUser');
+const { withinDailyAiCap, overDailyCap } = require('../aiQuota');
+const { isOwnerEmail } = require('../owner');
+const { consentGate } = require('../consentGate');
+const { prepareBrief, callModel, finaliseBrief } = require('../coachPrompt');
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
