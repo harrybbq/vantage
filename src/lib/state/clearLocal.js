@@ -36,6 +36,7 @@ const KEYS = [
   'vb4_weather_cache',                               // carries the user's location
   'vb4_food_community', 'vb4_logfood_tab', 'vb_habits_selected',
   'vb4_more_pro_chip_dismissed',
+  'vb_build_noted',                                  // census marker (user id + build)
 ];
 /* Per-user stores, suffixed with the user id: the state, the pictures,
  * the unsaved edit. Only the signing-out user's are removed — another

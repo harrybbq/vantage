@@ -31,7 +31,8 @@ export default [
     languageOptions: {
       ecmaVersion: 'latest',
       sourceType: 'module',
-      globals: { ...globals.browser },
+      // __BUILD__: the build stamp vite.config.js defines (lib/buildGate.js).
+      globals: { ...globals.browser, __BUILD__: 'readonly' },
       parserOptions: {
         ecmaFeatures: { jsx: true },
       },
