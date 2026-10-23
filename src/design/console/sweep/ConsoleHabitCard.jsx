@@ -11,6 +11,10 @@
  *   - Cut-down habits: CutWeek and toggleUse for "had one today"
  *   - Quit habits: strikes, and the relapse modal (relapseModal:<id>)
  *   - the ⋯ button opens editHabitModal:<id>
+ * Order: name, clock, then the action row (Log a relapse / the week strip
+ * and Had one today), then the runner lane and ladder. The action sits
+ * under the clock it resets so every card's is near its name; as the last
+ * row it was off screen for all but the first card when Habits opened.
  * Mono for numbers only; labels sentence case; no ⏳ / ⬡ / ✦ glyphs.
  */
 import { useEffect, useState } from 'react';
@@ -108,6 +112,35 @@ export default function ConsoleHabitCard({ habit, update, onShowCoinToast, onOpe
         </span>
       </div>
 
+      {v.cut && <div className="cx-sweep-scope cx-sweep-cutweek"><CutWeek habit={habit} now={now} onToggle={toggleDay} /></div>}
+
+      {/* The action, under the clock it resets. As the card's last row it
+          was off screen for every card but the first when Habits opened. */}
+      <div className="cx-sweep-habit-act">
+        {v.cut ? (
+          <>
+            <span className={`cx-t13 cx-mid${cur.state === 'over' ? ' cx-danger' : ''}`}>
+              <span className="cx-num">{cur.used}</span> of <span className="cx-num">{cur.max}</span> this {per} · {resetsLabel(cur)}
+            </span>
+            <button type="button" className={`cx-btn${cur.usedToday ? ' cx-sweep-on' : ''}`} onClick={() => toggleDay(cur.today)} aria-pressed={cur.usedToday}>
+              {cur.usedToday ? <><Icon name="check" size={16} strokeWidth={2} />Logged today</> : 'Had one today'}
+            </button>
+          </>
+        ) : (
+          <>
+            <span className="cx-t13 cx-mid">
+              {strikes.state !== 'off'
+                ? <><span className="cx-num">{strikes.used}</span> of <span className="cx-num">{strikes.allowed}</span> strikes used{replenish ? ` · ${replenish}` : ''}</>
+                : <><span className="cx-num">{habit.relapseCount || 0}</span> relapse{habit.relapseCount === 1 ? '' : 's'}</>}
+            </span>
+            <button type="button" className="cx-btn" onClick={() => onOpenModal('relapseModal:' + habit.id)}
+                    aria-label={`Log a relapse for ${habit.name}`}>
+              <Icon name="rotate-ccw" size={16} strokeWidth={1.75} />Log a relapse
+            </button>
+          </>
+        )}
+      </div>
+
       {trail ? <HabitTrail habit={habit} now={now} cut={v.cut} /> : (
         <>
           <div className="cx-sweep-habit-lane">
@@ -136,32 +169,6 @@ export default function ConsoleHabitCard({ habit, update, onShowCoinToast, onOpe
           </div>
         </>
       )}
-
-      {v.cut && <div className="cx-sweep-scope cx-sweep-cutweek"><CutWeek habit={habit} now={now} onToggle={toggleDay} /></div>}
-
-      <footer className="cx-sweep-habit-foot">
-        {v.cut ? (
-          <>
-            <span className={`cx-t13 cx-mid${cur.state === 'over' ? ' cx-danger' : ''}`}>
-              <span className="cx-num">{cur.used}</span> of <span className="cx-num">{cur.max}</span> this {per} · {resetsLabel(cur)}
-            </span>
-            <button type="button" className={`cx-btn${cur.usedToday ? ' cx-sweep-on' : ''}`} onClick={() => toggleDay(cur.today)} aria-pressed={cur.usedToday}>
-              {cur.usedToday ? <><Icon name="check" size={16} strokeWidth={2} />Logged today</> : 'Had one today'}
-            </button>
-          </>
-        ) : (
-          <>
-            <span className="cx-t13 cx-mid">
-              {strikes.state !== 'off'
-                ? <><span className="cx-num">{strikes.used}</span> of <span className="cx-num">{strikes.allowed}</span> strikes used{replenish ? ` · ${replenish}` : ''}</>
-                : <><span className="cx-num">{habit.relapseCount || 0}</span> relapse{habit.relapseCount === 1 ? '' : 's'}</>}
-            </span>
-            <button type="button" className="cx-btn" onClick={() => onOpenModal('relapseModal:' + habit.id)}>
-              <Icon name="rotate-ccw" size={16} strokeWidth={1.75} />Log a relapse
-            </button>
-          </>
-        )}
-      </footer>
     </article>
   );
 }

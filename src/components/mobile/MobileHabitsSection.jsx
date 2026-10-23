@@ -12,12 +12,21 @@
  *   │  ───────                     ⏳ 1 week  ⬡ 10 │
  *   │  3d 01h 26m                                 │
  *   │  SINCE LAST RELAPSE                         │
+ *   │  ─────────────────────────────────────      │
+ *   │  10 relapses           [↻ LOG A RELAPSE]    │  ← the action
+ *   │  ─────────────────────────────────────      │
  *   │        🏃  ▭      ▭                         │  ← runner lane
  *   │  ▬▬▬▬▬▬▬│▬▬▬▬▬▬▬▬│▬▬▬▬▬▬▬▬▬▬▬               │  ← ladder + pips
  *   │  RUNNING · DAY 9                       23%  │
- *   │  ─────────────────────────────────────      │
- *   │  10 relapses                ↻ RELAPSE       │
  *   └─────────────────────────────────────────────┘
+ *
+ * The action sits under the clock it resets, not at the foot of the
+ * card: as the last row, under the lane and the ladder, it was off
+ * screen for every card but the first when Habits opened on a phone,
+ * and at 33 px tall with the bare label "Relapse" beside "10 relapses"
+ * it read as part of the count. A Cut-down card puts its week strip
+ * and "Had one today" in the same place. The button only opens the
+ * relapse modal, which asks when it happened and needs a second tap.
  *
  * The lane is the same HabitRunner canvas the desktop card uses: a
  * stick figure walks, then jogs, then runs and vaults obstacles as the
@@ -140,6 +149,43 @@ function MobileHabitCard({ habit, update, onShowCoinToast, onOpenModal }) {
         )}
       </div>
 
+      {v.cut && <CutWeek habit={habit} now={now} onToggle={toggleDay} />}
+
+      {/* The action, directly under the clock it resets — allowance/count
+          + the button. It used to be the card's last row, under the lane,
+          the ladder and the stage line, so on a phone only the first
+          card's was on screen when Habits opened. */}
+      <div className="m-habit-actions">
+        {v.cut ? (
+          <>
+            <div className={`m-habit-count habit-cut-status is-${cur.state}`}>
+              <span className="habit-tokens" aria-hidden="true">
+                {Array.from({ length: Math.max(cur.max, cur.used) }, (_, i) => (
+                  <i key={i} className={i >= cur.max ? 'is-over' : i < cur.used ? 'is-used' : ''} />
+                ))}
+              </span>
+              {cur.used}/{cur.max} · {resetsLabel(cur)}
+            </div>
+            <button className={`m-habit-relapse-btn${cur.usedToday ? ' is-done' : ''}`} onClick={() => toggleDay(cur.today)} aria-pressed={cur.usedToday}>
+              {cur.usedToday ? '✓ Today' : '+ Had one today'}
+            </button>
+          </>
+        ) : (
+          <>
+            <div className={`m-habit-count${strikes.state !== 'off' ? ` habit-strikes strikes-${strikes.state}` : ''}`}>
+              {strikes.state !== 'off'
+                ? `${strikes.state === 'clean' ? '✦ ' : ''}${strikes.used}/${strikes.allowed} strikes${replenishLabel(strikes, now) ? ` · ${replenishLabel(strikes, now)}` : ''}`
+                : `${habit.relapseCount || 0} relapse${habit.relapseCount === 1 ? '' : 's'}`}
+            </div>
+            <button
+              className="m-habit-relapse-btn"
+              onClick={() => onOpenModal('relapseModal:' + habit.id)}
+              aria-label={`Log a relapse for ${habit.name}`}
+            ><Icon name="rotate-ccw" size={14} /> Log a relapse</button>
+          </>
+        )}
+      </div>
+
       {trail ? <HabitTrail habit={habit} now={now} cut={v.cut} /> : (
         <>
           {/* Runner lane + ladder. The canvas pauses itself when it scrolls
@@ -177,39 +223,6 @@ function MobileHabitCard({ habit, update, onShowCoinToast, onOpenModal }) {
           </div>
         </>
       )}
-
-      {v.cut && <CutWeek habit={habit} now={now} onToggle={toggleDay} />}
-
-      {/* Footer — allowance/count + the action */}
-      <div className="m-habit-footer">
-        {v.cut ? (
-          <>
-            <div className={`m-habit-count habit-cut-status is-${cur.state}`}>
-              <span className="habit-tokens" aria-hidden="true">
-                {Array.from({ length: Math.max(cur.max, cur.used) }, (_, i) => (
-                  <i key={i} className={i >= cur.max ? 'is-over' : i < cur.used ? 'is-used' : ''} />
-                ))}
-              </span>
-              {cur.used}/{cur.max} · {resetsLabel(cur)}
-            </div>
-            <button className={`m-habit-relapse-btn${cur.usedToday ? ' is-done' : ''}`} onClick={() => toggleDay(cur.today)} aria-pressed={cur.usedToday}>
-              {cur.usedToday ? '✓ Today' : '+ Had one today'}
-            </button>
-          </>
-        ) : (
-          <>
-            <div className={`m-habit-count${strikes.state !== 'off' ? ` habit-strikes strikes-${strikes.state}` : ''}`}>
-              {strikes.state !== 'off'
-                ? `${strikes.state === 'clean' ? '✦ ' : ''}${strikes.used}/${strikes.allowed} strikes${replenishLabel(strikes, now) ? ` · ${replenishLabel(strikes, now)}` : ''}`
-                : `${habit.relapseCount || 0} relapse${habit.relapseCount === 1 ? '' : 's'}`}
-            </div>
-            <button
-              className="m-habit-relapse-btn"
-              onClick={() => onOpenModal('relapseModal:' + habit.id)}
-            ><span style={{display:'inline-flex',alignItems:'center',gap:5}}><Icon name="rotate-ccw" size={13} /> Relapse</span></button>
-          </>
-        )}
-      </div>
     </div>
   );
 }
