@@ -5,6 +5,7 @@
  * any unread count sitting on the button itself.
  *
  * Status line precedence:
+ *   0. "Muted" for a friend this account has muted (item 113)
  *   1. Active streak (with flame) if streak > 0
  *   2. Last-seen days if recently quiet
  *   3. Handle as a fallback identifier
@@ -37,6 +38,7 @@ function initials(name) {
 }
 
 function statusLine(friend) {
+  if (friend.silenced) return 'Muted';
   if (friend.streak > 0) return `🔥 ${friend.streak}d`;
   if (friend.online) return 'Online now';
   if (friend.lastSeenDays != null) {

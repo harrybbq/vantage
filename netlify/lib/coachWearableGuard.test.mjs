@@ -104,7 +104,7 @@ console.log('ai-coach-daily wiring');
 {
   // The prompt pipeline moved to lib/coachPrompt.js (item 105) so the
   // red-team eval can run it; the handler hands it the raw snapshot.
-  const src = fs.readFileSync(path.join(here, '../functions/ai-coach-daily.js'), 'utf8');
+  const src = fs.readFileSync(path.join(here, './handlers/ai-coach-daily.js'), 'utf8');
   const lib = fs.readFileSync(path.join(here, 'coachPrompt.js'), 'utf8');
   ok(/prepareBrief\(body\.snapshot\)/.test(src), 'function hands the raw snapshot to prepareBrief');
   ok(/require\('\.\/coachWearableGuard'\)/.test(lib), 'pipeline requires the guard');

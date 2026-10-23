@@ -2,8 +2,7 @@
  * Body outlines for the Lifts body map (BodyMap.jsx): front and back,
  * one polygon per muscle region on a 100 × 200 grid, each tagged with the
  * muscle group it belongs to in muscles.js and the muscle PART it shows
- * (adaptive.js PARTS). null = drawn, never filled: head, neck, knees,
- * forearms, the adductors on the back view.
+ * (adaptive.js PARTS). null = drawn, never filled: head, neck, knees.
  *
  * Polygon data from react-body-highlighter 2.0.5 (src/assets/index.ts),
  * MIT licence, Copyright (c) 2020 GV79 —
@@ -19,7 +18,8 @@
  *   front shape is the long head · quadriceps → Quads: the long middle
  *   shape per leg Rectus femoris, the other two Outer & inner quads ·
  *   hamstring → Hamstrings · gluteal → Glutes: Glute max ·
- *   abductors (front) → Glutes, but no part: the shape is the upper inner thigh, not glute medius · calves → Calves:
+ *   abductors (front) and the inner thigh on the back → Adductors (the shapes are the upper inner thigh,
+ *   not glute medius) · forearms → Forearms · calves → Calves:
  *   Gastrocnemius · soleus → Calves: Soleus (mostly below the 200-unit
  *   frame — the library's own figure crops it the same way).
  *
@@ -65,8 +65,8 @@ export const FRONT = [
   ["Shoulders", [["Side delts", "deltOuter"], ["Front delts", "deltInner"]], '78.4,53.1 79.6,47.8 79.2,41.2 75.9,38.0 71.0,36.3 72.2,42.9 71.4,47.3'],
   ["Shoulders", [["Side delts", "deltOuter"], ["Front delts", "deltInner"]], '28.2,47.3 21.2,53.1 20.0,47.8 20.4,40.8 24.5,37.1 28.6,37.1 26.9,43.3'],
   [null, null, '42.4,2.9 40.0,11.8 42.0,19.6 46.1,23.3 49.8,25.3 54.7,22.4 57.6,19.2 59.2,10.2 57.1,2.4 49.8,0.0'],
-  ["Glutes", null, '52.7,110.2 54.3,124.9 60.0,110.2 62.0,100.0 64.9,94.3 60.0,92.7 56.7,104.5'],
-  ["Glutes", null, '47.8,110.6 44.9,125.3 42.0,115.9 40.4,113.1 39.6,107.3 38.0,102.4 34.7,93.9 39.6,92.2 41.6,99.2 43.7,105.3'],
+  ["Adductors", "Adductors", '52.7,110.2 54.3,124.9 60.0,110.2 62.0,100.0 64.9,94.3 60.0,92.7 56.7,104.5'],
+  ["Adductors", "Adductors", '47.8,110.6 44.9,125.3 42.0,115.9 40.4,113.1 39.6,107.3 38.0,102.4 34.7,93.9 39.6,92.2 41.6,99.2 43.7,105.3'],
   ["Quads", "Rectus femoris", '34.7,98.8 37.1,108.2 37.1,127.8 34.3,137.1 31.0,132.7 29.4,120.0 28.2,111.4 29.4,100.8 32.2,94.7'],
   ["Quads", "Rectus femoris", '63.3,105.7 64.5,100.0 66.9,94.7 70.2,101.2 71.0,111.8 68.2,133.1 65.3,137.6 62.4,128.6 62.0,111.4'],
   ["Quads", "Outer & inner quads", '38.8,129.4 38.4,112.2 41.2,118.4 44.5,129.4 42.9,135.1 40.0,146.1 36.3,146.5 35.5,140.0'],
@@ -79,10 +79,10 @@ export const FRONT = [
   ["Calves", "Gastrocnemius", '24.9,194.7 27.8,164.9 28.2,160.4 26.1,154.3 24.9,157.6 22.4,161.6 20.8,167.8 22.0,188.2 20.8,195.5'],
   ["Calves", "Gastrocnemius", '72.7,195.1 69.8,159.2 65.3,158.4 64.1,162.4 64.1,165.3 65.7,177.1'],
   ["Calves", "Gastrocnemius", '35.5,158.4 35.9,162.4 35.9,166.9 35.1,172.2 35.1,176.7 32.2,182.0 30.6,187.3 26.9,194.7 27.3,187.8 28.2,180.4 28.6,175.5 29.0,169.8 29.8,164.1 30.2,158.8'],
-  [null, null, '6.1,88.6 10.2,75.1 14.7,70.2 16.3,74.3 19.2,73.5 4.5,97.6 0.0,100.0'],
-  [null, null, '84.5,69.8 83.3,73.5 80.0,73.1 95.1,98.4 100.0,100.4 93.5,89.4 89.8,76.3'],
-  [null, null, '77.6,72.2 77.6,77.6 80.4,84.1 85.3,89.8 92.2,101.2 94.7,99.6'],
-  [null, null, '6.9,101.2 13.5,90.6 18.8,84.1 21.6,77.1 21.2,71.8 4.9,98.8'],
+  ["Forearms", "Forearms", '6.1,88.6 10.2,75.1 14.7,70.2 16.3,74.3 19.2,73.5 4.5,97.6 0.0,100.0'],
+  ["Forearms", "Forearms", '84.5,69.8 83.3,73.5 80.0,73.1 95.1,98.4 100.0,100.4 93.5,89.4 89.8,76.3'],
+  ["Forearms", "Forearms", '77.6,72.2 77.6,77.6 80.4,84.1 85.3,89.8 92.2,101.2 94.7,99.6'],
+  ["Forearms", "Forearms", '6.9,101.2 13.5,90.6 18.8,84.1 21.6,77.1 21.2,71.8 4.9,98.8'],
 ];
 
 export const BACK = [
@@ -99,14 +99,14 @@ export const BACK = [
   ["Triceps", "Triceps long head", '72.8,58.3 77.0,64.7 80.4,77.4 76.6,75.3 72.8,68.9'],
   ["Lower back", "Lower back", '47.7,72.8 34.5,77.0 35.3,83.4 49.4,102.1 46.8,83.0'],
   ["Lower back", "Lower back", '52.3,72.8 65.5,77.0 64.7,83.4 50.6,102.1 53.2,83.8'],
-  [null, null, '86.4,75.7 91.1,83.4 93.2,94.0 100.0,106.4 96.2,104.3 88.1,89.4 84.3,83.8'],
-  [null, null, '13.6,75.7 8.9,83.8 6.8,93.6 0.0,106.4 3.8,104.3 12.3,88.5 15.7,83.0'],
-  [null, null, '81.3,79.6 77.4,77.9 79.1,84.7 91.1,103.8 93.2,108.9 94.5,104.7'],
-  [null, null, '18.7,79.6 22.1,77.9 20.9,84.3 9.4,103.0 6.8,108.5 5.1,104.7'],
+  ["Forearms", "Forearms", '86.4,75.7 91.1,83.4 93.2,94.0 100.0,106.4 96.2,104.3 88.1,89.4 84.3,83.8'],
+  ["Forearms", "Forearms", '13.6,75.7 8.9,83.8 6.8,93.6 0.0,106.4 3.8,104.3 12.3,88.5 15.7,83.0'],
+  ["Forearms", "Forearms", '81.3,79.6 77.4,77.9 79.1,84.7 91.1,103.8 93.2,108.9 94.5,104.7'],
+  ["Forearms", "Forearms", '18.7,79.6 22.1,77.9 20.9,84.3 9.4,103.0 6.8,108.5 5.1,104.7'],
   ["Glutes", "Glute max", '44.7,99.6 30.2,108.5 29.8,118.7 31.5,126.0 47.2,121.3 49.4,114.9'],
   ["Glutes", "Glute max", '55.3,99.1 51.1,114.5 52.3,120.9 68.1,126.0 69.8,119.1 69.4,108.5'],
-  [null, null, '48.1,123.0 44.7,123.0 41.3,125.5 45.1,144.3 48.5,135.7 48.9,129.4'],
-  [null, null, '51.9,122.6 55.7,123.4 59.1,126.0 54.9,144.3 51.9,136.2 51.1,129.4'],
+  ["Adductors", "Adductors", '48.1,123.0 44.7,123.0 41.3,125.5 45.1,144.3 48.5,135.7 48.9,129.4'],
+  ["Adductors", "Adductors", '51.9,122.6 55.7,123.4 59.1,126.0 54.9,144.3 51.9,136.2 51.1,129.4'],
   ["Hamstrings", "Hamstrings", '28.9,122.1 31.1,129.4 36.6,126.0 35.3,135.3 34.5,150.2 29.4,158.3 28.9,146.8 27.7,141.3 27.2,131.5'],
   ["Hamstrings", "Hamstrings", '71.5,121.7 69.4,128.9 63.8,126.0 65.5,136.6 66.4,150.2 71.1,158.3 71.5,147.7 72.8,142.1 73.6,131.9'],
   ["Hamstrings", "Hamstrings", '38.7,125.5 44.3,146.0 40.4,166.8 36.2,152.8 37.0,135.3'],

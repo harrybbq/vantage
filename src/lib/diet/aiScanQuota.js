@@ -2,7 +2,7 @@
  * The free AI-scan allowance, as the scanner shows it: "2 of 3 free AI
  * scans left this week".
  *
- * The server owns the number (netlify/functions/ai-food-detect.js counts
+ * The server owns the number (netlify/lib/handlers/ai-food-detect.js counts
  * from ai_usage and checks the tier itself) — this only asks and
  * displays, so editing it in the browser changes nothing but the label.
  * Each scan's response carries the new `freeScansLeft`, which `setLeft`

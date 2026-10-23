@@ -56,7 +56,12 @@ html[data-design="console"] .cx-av {
   border-radius: 50%; background: var(--cx-s3); color: var(--cx-mid);
   font-family: var(--cx-sans); font-weight: 600; line-height: 1;
 }
-html[data-design="console"] .cx-av > img { width: 100%; height: 100%; border-radius: 50%; object-fit: cover; }
+/* Pinned to the avatar's box. As a grid item, `height: 100%` has no
+   definite track to resolve against, so a portrait photo (3:4 after the
+   512px resize) used to render 44 × 59: an egg poking out under the
+   prestige ring. Not `overflow: hidden` on .cx-av — that would clip the
+   ring and the online dot, which sit just outside it. */
+html[data-design="console"] .cx-av > img { position: absolute; inset: 0; width: 100%; height: 100%; border-radius: 50%; object-fit: cover; }
 html[data-design="console"] .cx-av.is-self { background: var(--cx-accent-tint); color: var(--cx-accent); }
 html[data-design="console"] .cx-av-on {
   position: absolute; right: -1px; bottom: -1px; width: 10px; height: 10px;
@@ -167,6 +172,21 @@ html[data-design="console"] .cx-hub-pl-tag {
   margin: 0; color: var(--cx-mid); font: 400 var(--cx-fs-13)/var(--cx-lh-13) var(--cx-sans);
   display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden;
 }
+/* Today's events under the name (PlayerStrip TodayEvents): dot · time · title,
+   time in a fixed column so the titles line up; an event that's over dims. */
+html[data-design="console"] .cx-hub-pl-agenda {
+  display: flex; flex-direction: column; gap: 4px; min-width: 0; margin: 0 -8px; padding: 6px 8px;
+  border: 0; border-radius: var(--cx-r-cell); background: none; color: inherit; text-align: left; cursor: pointer;
+}
+html[data-design="console"] .cx-hub-pl-agenda:hover { background: var(--cx-s2); }
+html[data-design="console"] .cx-hub-pl-ev {
+  display: grid; grid-template-columns: 6px 3.4em minmax(0, 1fr); align-items: center; gap: 8px; min-width: 0;
+  font: 400 var(--cx-fs-13)/var(--cx-lh-13) var(--cx-sans); color: var(--cx-text);
+}
+html[data-design="console"] .cx-hub-pl-at { color: var(--cx-mid); font-size: var(--cx-fs-12); white-space: nowrap; }
+html[data-design="console"] .cx-hub-pl-ev.is-past { color: var(--cx-muted); }
+html[data-design="console"] .cx-hub-pl-ev.is-past .cx-hub-dot { opacity: .45; }
+html[data-design="console"] .cx-hub-pl-more { padding-left: calc(6px + 3.4em + 16px); font: 400 var(--cx-fs-12)/var(--cx-lh-12) var(--cx-sans); }
 html[data-design="console"] .cx-hub-pl-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: auto; }
 html[data-design="console"] .cx-hub-pl-h { display: flex; align-items: center; gap: 8px; min-width: 0; font: 400 var(--cx-fs-12)/var(--cx-lh-12) var(--cx-sans); }
 html[data-design="console"] .cx-hub-pl-t { font: 600 var(--cx-fs-13)/var(--cx-lh-13) var(--cx-sans); color: var(--cx-text); }
@@ -457,6 +477,14 @@ html[data-design="console"] .cx-hub-heat i.l1 { background: color-mix(in srgb, v
 html[data-design="console"] .cx-hub-heat i.l2 { background: color-mix(in srgb, var(--cx-accent) 70%, var(--cx-s3)); }
 html[data-design="console"] .cx-hub-heat i.l3 { background: var(--cx-accent); }
 html[data-design="console"] .cx-hub-fc-wins { display: flex; flex-direction: column; gap: 6px; font: 400 var(--cx-fs-13)/var(--cx-lh-13) var(--cx-sans); }
+/* A muted friend's activity, folded (item 113). One quiet line + Show. */
+html[data-design="console"] .cx-hub-fc-muted {
+  display: flex; align-items: center; gap: 12px; padding: 10px 12px;
+  border: 1px dashed var(--cx-line); border-radius: 8px;
+  font: 400 var(--cx-fs-13)/var(--cx-lh-13) var(--cx-sans);
+}
+html[data-design="console"] .cx-hub-fc-muted > .cx-muted { flex: 1 1 auto; min-width: 0; }
+html[data-design="console"] .cx-hub-fc-muted > button { flex: none; }
 html[data-design="console"] .cx-hub-fc-acts { position: relative; display: flex; gap: 8px; }
 html[data-design="console"] .cx-hub-grow { flex: 1 1 auto; }
 html[data-design="console"] .cx-hub-fsheet .cx-sheet-body { padding-top: 4px; }

@@ -9,7 +9,7 @@ import { SETTINGS_FOCUS } from '../../lib/support';
  * Settings → Account → Report a problem.
  *
  * The support channel the app stores ask for. Lands as a ticket in the
- * owner's Security console (netlify/functions/support-ticket.js →
+ * owner's Security console (netlify/lib/handlers/support-ticket.js →
  * public.security_tickets). Five a day per account, enforced server-side.
  *
  * Sends only what is typed here plus the page path — nothing from the

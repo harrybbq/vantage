@@ -10,9 +10,11 @@
  *
  * ── Counting ─────────────────────────────────────────────────────────
  * Working sets only: a warm-up ('W') is not work the target counts. A
- * set credits every muscle tagged on its lift (muscles.js musclesOf):
- * the FIRST tag in full, the others at half — a dip is a chest exercise
- * that also works triceps and shoulders, not three exercises.
+ * set credits each muscle group the weight of the strongest part it
+ * works there (adaptive.js groupWeightsOf — the evidence-based part map
+ * for programme exercises, the muscle tags for any other lift): a dip is
+ * a chest exercise that also works triceps and shoulders, not three
+ * exercises.
  *
  * ── Targets ──────────────────────────────────────────────────────────
  * The workout's session (plan.js sessionOfWorkout — its rotaSession,
@@ -33,16 +35,15 @@
  * asks of it.
  */
 import { PROGRAMME } from '../../data/trainingProgramme.js';
-import { musclesOf, PROGRAMME_MUSCLES, MUSCLES } from './muscles.js';
+import { MUSCLES } from './muscles.js';
 import { sessionOfWorkout } from './plan.js';
-import { PARTS, partsOf, sessionParts } from './adaptive.js';
+import { PARTS, partsOf, sessionParts, groupWeightsOf } from './adaptive.js';
 
-const SECONDARY = 0.5;
 /** Muscles the figure draws. 'Other' has nowhere to go. */
 export const MAP_MUSCLES = MUSCLES.filter(m => m !== 'Other');
 
-const credit = (tags, sets, into) => {
-  tags.forEach((m, i) => { into[m] = (into[m] || 0) + sets * (i === 0 ? 1 : SECONDARY); });
+const credit = (lift, sets, into) => {
+  for (const [m, w] of Object.entries(groupWeightsOf(lift))) into[m] = (into[m] || 0) + sets * w;
   return into;
 };
 const round1 = n => Math.round(n * 10) / 10;
@@ -52,7 +53,7 @@ export function sessionTargets(code) {
   const out = {};
   for (const x of PROGRAMME[code] || []) {
     if (x.optional) continue;
-    credit(PROGRAMME_MUSCLES[x.name] || [], Number(x.sets) || 0, out);
+    credit({ name: x.name }, Number(x.sets) || 0, out);
   }
   return out;
 }
@@ -72,7 +73,7 @@ export function workoutLoad(w, list = []) {
   for (const ex of (w && w.exercises) || []) {
     const lift = list.find(l => l && l.id === ex.liftId);
     const n = (ex.sets || []).filter(s => s && s.done !== false && s.type !== 'W').length;
-    if (n) credit(musclesOf(lift), n, out);
+    if (n) credit(lift || (ex.name ? { name: ex.name } : null), n, out);
   }
   return out;
 }

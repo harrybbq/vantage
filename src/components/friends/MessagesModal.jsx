@@ -20,6 +20,8 @@ import { noteSuspended } from '../../lib/friends/safety';
 import { messageTextProblem } from '../../lib/moderation/messageFilter';
 import { SUSPENDED_SHORT } from '../../lib/moderation/notices';
 import ReportFriendModal from './ReportFriendModal';
+import { announceBlocked } from './StayingSafe';
+import { useMutes } from '../../lib/friends/useMutes';
 import { ClanInviteMenuItem, ClanInviteBubble } from './ClanInvite';
 import { parseInvite } from '../../lib/friends/clanInvite';
 import './friends-dm.css';
@@ -83,6 +85,10 @@ function Conversation({
   // 111) — the same read-only state as a former friend, with its own
   // calm line, instead of every send failing.
   const safety = useSafety(userId);
+  // Mute (item 113): the ⋯ menu offers it beside Report and Block. The
+  // thread itself reads the same muted or not — only badges go quiet.
+  const mutes = useMutes();
+  const isMutedHere = mutes.isMuted(friendId);
   const readOnlyNote = readOnlyNoteProp || (safety.suspended ? SUSPENDED_SHORT : null);
   const name = friend.name || (friend.handle ? `@${friend.handle}` : 'Friend');
   const first = name.replace(/^@/, '').split(' ')[0];
@@ -93,6 +99,7 @@ function Conversation({
   const [status, setStatus] = useState('loading'); // loading | ready | error
   const [errMsg, setErrMsg] = useState('');
   const [toast, setToast] = useState('');
+  const [toastTone, setToastTone] = useState('error'); // 'info' for calm confirmations (mute)
   const [hasMore, setHasMore] = useState(false);
   const [loadingEarlier, setLoadingEarlier] = useState(false);
   const [draft, setDraft] = useState('');
@@ -123,8 +130,9 @@ function Conversation({
   const returnFocusRef = useRef(null);
 
   const toastTimer = useRef(null);
-  const flash = useCallback((text) => {
+  const flash = useCallback((text, tone = 'error') => {
     setToast(text);
+    setToastTone(tone);
     window.clearTimeout(toastTimer.current);
     toastTimer.current = window.setTimeout(() => setToast(''), 4000);
   }, []);
@@ -503,6 +511,17 @@ function Conversation({
     return () => document.removeEventListener('keydown', onKey);
   }, [menu, menuOpen, replyTo, inline, onClose]);
 
+  function toggleMute() {
+    setMenuOpen(false);
+    if (isMutedHere) {
+      mutes.unmute(friendId);
+      flash(`Unmuted. You'll be notified about ${first}'s messages again.`, 'info');
+    } else {
+      mutes.mute({ id: friendId, name: friend.name, handle: friend.handle });
+      flash(`Muted. You won't be notified about ${first}'s messages. They won't know. You can still report them.`, 'info');
+    }
+  }
+
   async function handleBlock() {
     setMenuOpen(false);
     const ok = window.confirm(
@@ -514,6 +533,7 @@ function Conversation({
       invalidatePartnerFacts();
       onBlocked?.(friend);
       onClose?.();
+      announceBlocked({ name, handle: friend.handle });
     } catch (e) {
       flash(e.message || 'Could not block.');
     }
@@ -671,7 +691,7 @@ function Conversation({
             <div className="dm-head-text">
               <div className="msg-head-name">{name}</div>
               <div className="msg-head-handle dm-head-sub">
-                {typing ? <span className="dm-typing-inline">typing…</span> : (friend.handle ? `@${friend.handle}` : '')}
+                {typing ? <span className="dm-typing-inline">typing…</span> : `${friend.handle ? `@${friend.handle}` : ''}${isMutedHere ? `${friend.handle ? ' · ' : ''}Muted` : ''}`}
               </div>
             </div>
           </div>
@@ -702,6 +722,11 @@ function Conversation({
                 <button type="button" role="menuitem" className="fc-menu-item" onClick={() => { setMenuOpen(false); setReporting(true); }}>
                   Report abuse
                 </button>
+                {mutes.ready && (
+                  <button type="button" role="menuitem" className="fc-menu-item" onClick={toggleMute}>
+                    {isMutedHere ? 'Unmute' : 'Mute'}
+                  </button>
+                )}
                 <button type="button" role="menuitem" className="fc-menu-item fc-menu-item-warn" onClick={handleBlock}>
                   Block user
                 </button>
@@ -746,7 +771,7 @@ function Conversation({
           <div className="dm-sr" aria-live="polite" aria-atomic="true">{announce}</div>
         </div>
 
-        {toast && <div className="msg-inline-err dm-toast" role="status">{toast}</div>}
+        {toast && <div className={`msg-inline-err dm-toast${toastTone === 'info' ? ' is-info' : ''}`} role="status">{toast}</div>}
 
         {readOnlyNote ? (
           <div className="dm-readonly">{readOnlyNote}</div>

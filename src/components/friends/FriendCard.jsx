@@ -9,7 +9,7 @@ import PrestigeBadge from '../PrestigeBadge';
  * Expanded "cheerleader" view of a single friend.
  *
  * Sections (top-to-bottom):
- *   1. Header — avatar, name, @handle, OVR badge, ⋯ menu (Report/Block)
+ *   1. Header — avatar, name, @handle, OVR badge, ⋯ menu (Report/Mute/Block)
  *   2. Streak strip — big number + habit name OR a quiet "last active"
  *      line for friends without an active streak (no shaming language)
  *   3. 91-day activity heatmap (with hover tooltip)
@@ -23,8 +23,14 @@ import PrestigeBadge from '../PrestigeBadge';
  *     other person did something wrong. Tucked behind ⋯ so they don't
  *     dominate a card that's meant to celebrate someone.
  *
+ * Mute (item 113) sits between them: quieter than Block, private, and
+ * undone from the same menu. A muted friend (`friend.silenced`) has
+ * sections 2–4 folded behind one "Show" line — folded, never removed.
+ *
  * Callbacks (all optional — card still renders without them):
  *   onReport(friend)    — opens the report flow
+ *   onMute(friend)      — mute (no one is told)
+ *   onUnmute(friend)    — unmute
  *   onBlock(friend)     — block + remove friendship
  *   onUnfriend(friend)  — remove friendship
  */
@@ -48,11 +54,16 @@ export default function FriendCard({
   unread = 0,
   onMessage,
   onReport,
+  onMute,
+  onUnmute,
   onBlock,
   onUnfriend,
 }) {
   const [menuOpen, setMenuOpen] = useState(false);
+  // "Show" on a muted friend's folded activity lasts for this look only.
+  const [showMuted, setShowMuted] = useState(false);
   const menuRef = useRef(null);
+  useEffect(() => { setShowMuted(false); }, [friend?.id]);
 
   // Close menu on outside-click. Lives on FriendCard rather than a
   // shared Popover because the menu is small and lifecycle-tied to
@@ -77,9 +88,12 @@ export default function FriendCard({
   const prestige = ovrTier(ovr);
   const hasStreak = friend.streak > 0;
   const hasHeatmap = Array.isArray(friend.heatmap) && friend.heatmap.length > 0;
-  // Only Report + Block live in the kebab now. Unfriend has its own
+  // Report, Mute and Block live in the kebab. Unfriend has its own
   // footer button so users can find it without opening a menu.
-  const hasMenu = !!(onReport || onBlock);
+  const silenced = !!friend.silenced;
+  const muteAction = silenced ? onUnmute : onMute;
+  const hasMenu = !!(onReport || muteAction || onBlock);
+  const folded = silenced && !showMuted;
 
   function handleMenu(action) {
     setMenuOpen(false);
@@ -135,6 +149,16 @@ export default function FriendCard({
                     Report
                   </button>
                 )}
+                {muteAction && (
+                  <button
+                    type="button"
+                    role="menuitem"
+                    className="fc-menu-item"
+                    onClick={() => handleMenu(muteAction)}
+                  >
+                    {silenced ? 'Unmute' : 'Mute'}
+                  </button>
+                )}
                 {onBlock && (
                   <button
                     type="button"
@@ -165,6 +189,13 @@ export default function FriendCard({
 
       <div className="fc-divider" />
 
+      {/* Muted: streak, heatmap and wins fold into one quiet line. */}
+      {folded ? (
+        <div className="fc-muted-fold">
+          <span>Muted — their activity and message alerts are hidden. They aren&apos;t told.</span>
+          <button type="button" className="fc-muted-show" onClick={() => setShowMuted(true)}>Show</button>
+        </div>
+      ) : (<>
       {/* Streak strip */}
       {hasStreak ? (
         <div className="fc-streak-row">
@@ -220,6 +251,7 @@ export default function FriendCard({
           <div className="fc-empty-wins">{loading ? 'Loading…' : 'None yet'}</div>
         )}
       </div>
+      </>)}
 
       {/* Footer — visible Unfriend action. Subdued styling because the
           card's primary purpose is celebration, not friend management,

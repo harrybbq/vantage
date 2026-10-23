@@ -4,7 +4,7 @@
  * Single source-of-truth for the SERVER side of the ratings system,
  * extracted so both:
  *   • netlify/functions/recompute-ratings.js (user-triggered POST)
- *   • netlify/functions/get-leaderboard.js   (stale-self refresh)
+ *   • netlify/lib/handlers/get-leaderboard.js  (stale-self refresh)
  * call exactly the same maths against the user's raw user_data.state.
  *
  * The CLIENT side (src/lib/ratings/derive.js) is the second source-of-

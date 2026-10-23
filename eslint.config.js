@@ -91,6 +91,25 @@ export default [
     },
   },
 
+  // ── Netlify .mjs: the v2 function entries + their adapter (item 86) ──
+  // ESM with Node globals. Request/Response/Headers/URL are Node 18+
+  // globals, which globals.node includes. Scoped to the shipped code, not
+  // the *.test.mjs scripts beside it, which were never linted.
+  {
+    files: ['netlify/functions/**/*.mjs', 'netlify/lib/v1Adapter.mjs'],
+    languageOptions: {
+      ecmaVersion: 'latest',
+      sourceType: 'module',
+      globals: { ...globals.node },
+    },
+    rules: {
+      ...js.configs.recommended.rules,
+      'no-useless-assignment': 'off',
+      'no-unused-vars': ['warn', { argsIgnorePattern: '^_' }],
+      'no-empty': ['warn', { allowEmptyCatch: true }],
+    },
+  },
+
   // ── Service worker ──
   {
     files: ['public/sw.js'],

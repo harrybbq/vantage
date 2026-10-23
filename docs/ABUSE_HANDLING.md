@@ -358,7 +358,10 @@ the record.
 
 ## Open product gaps (item 113) — small specs for the owner to approve
 
-Not built. Each is additive (new keys or new tables only, per `CLAUDE.md`).
+Each is additive (new keys or new tables only, per `CLAUDE.md`). **G-1 and G-2
+were built on 2026-10-22** (STARTUP_REQUIREMENTS item 113 says where; the
+storage is `S.mutedUsers = { [id]: { at, name, handle } }`, the copy is in
+`src/lib/safety/support.js`). G-3 is not built.
 
 ### G-1. Mute (user control)
 

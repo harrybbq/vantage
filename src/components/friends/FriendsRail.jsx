@@ -17,7 +17,10 @@ import { listConversations } from '../../lib/friends/messages';
 import { useSubscriptionContext } from '../../context/SubscriptionContext';
 import { subscribeDMs, getRealtimeState, onRealtimeState } from '../../lib/friends/realtime';
 import { loadPartnerFacts } from '../../lib/friends/inboxPeople';
-import { buildInbox, bumpConversation, clearUnread, unreadTotal } from '../../lib/friends/dmView';
+import { buildInbox, bumpConversation, clearUnread } from '../../lib/friends/dmView';
+import { useMutes } from '../../lib/friends/useMutes';
+import { silenceInbox, silenceFriends, audibleUnread } from '../../lib/friends/mutes';
+import { announceBlocked } from './StayingSafe';
 import ConversationList, { FriendsTabs } from './ConversationList';
 import Overlay from '../ui/Overlay';
 import './friends-dm.css';
@@ -64,6 +67,8 @@ function readOnlyNoteFor(row) {
 export default function FriendsRail({ userId, onUpgrade, panelSlot = null, layout = 'rail' }) {
   const { hasPro } = useSubscriptionContext();
   const friends = useFriends(userId, hasPro);
+  // Mute (item 113): who this account has muted, from its own state.
+  const mutes = useMutes();
 
   const [selectedId, setSelectedId] = useState(null);
   // Friends' prestige (avatar rings, badges), from the friends board.
@@ -167,12 +172,13 @@ export default function FriendsRail({ userId, onUpgrade, panelSlot = null, layou
     return () => { cancelled = true; };
   }, [userId, partnerKey]);
 
-  // Per-friend unread, for the list rows' message buttons.
+  // Per-friend unread, for the list rows' message buttons. A muted
+  // friend's messages raise no count (they are still there to read).
   const unread = useMemo(() => {
     const m = {};
-    for (const c of conversations) if (c.unread > 0) m[c.friendId] = c.unread;
+    for (const c of conversations) if (c.unread > 0 && !mutes.isMuted(c.friendId)) m[c.friendId] = c.unread;
     return m;
-  }, [conversations]);
+  }, [conversations, mutes]);
 
 
   // The chip asks the rail to show the inbox.
@@ -236,10 +242,18 @@ export default function FriendsRail({ userId, onUpgrade, panelSlot = null, layou
     try {
       await friends.block(f.id);
       setSelectedId(null); // close the card since this friend is gone
+      announceBlocked(f);
     } catch (e) {
       window.alert(e.message || 'Could not block.');
     }
   }
+
+  // Mute is private and instant — no confirm, because it is undone from
+  // the same menu and nobody else is affected.
+  const muteProps = mutes.ready ? {
+    onMute: f => mutes.mute({ id: f.id, name: f.name, handle: f.handle }),
+    onUnmute: f => mutes.unmute(f.id),
+  } : {};
 
   async function handleUnfriend(f) {
     const ok = window.confirm(`Remove ${f.name} from your friends?`);
@@ -338,8 +352,9 @@ export default function FriendsRail({ userId, onUpgrade, panelSlot = null, layou
       // → derivePresence. Drives the "Last active Xd ago" copy in
       // FriendCard's quiet-state strip.
       lastSeenDays: base.lastSeenDays,
+      silenced: mutes.isMuted(base.id),
     };
-  }, [selectedId, friends.friends, selectedStats, prestigeById]);
+  }, [selectedId, friends.friends, selectedStats, prestigeById, mutes]);
 
   // ── friend list row shape (FriendListRow expects the mock shape) ──
   // Sort online-first, then by OVR desc as a tie-breaker so the
@@ -361,16 +376,21 @@ export default function FriendsRail({ userId, onUpgrade, panelSlot = null, layou
       lastSeenDays: f.lastSeenDays,
       unread: unread[f.id] || 0,
     }));
-    return mapped.sort((a, b) => {
+    // Muted friends go to the end of the list, flagged `silenced`.
+    return silenceFriends(mapped.sort((a, b) => {
       if (a.online !== b.online) return a.online ? -1 : 1;
       return (b.ovr || 0) - (a.ovr || 0);
-    });
-  }, [friends.friends, unread, prestigeById]);
+    }), mutes.map);
+  }, [friends.friends, unread, prestigeById, mutes.map]);
 
   // The inbox, joined with the friend list and partner facts. Unread
-  // only counts conversations you can act on (friends, not blocked).
-  const inbox = useMemo(() => buildInbox(conversations, rows, facts), [conversations, rows, facts]);
-  const total = useMemo(() => unreadTotal(inbox), [inbox]);
+  // only counts conversations you can act on (friends, not blocked),
+  // and not muted ones, which sit at the end under "Muted".
+  const inbox = useMemo(
+    () => silenceInbox(buildInbox(conversations, rows, facts), mutes.map),
+    [conversations, rows, facts, mutes.map],
+  );
+  const total = useMemo(() => audibleUnread(inbox), [inbox]);
   // The header chip listens for this, so it moves the moment the rail
   // knows rather than on its own next poll. Not sent until the friend
   // list has loaded — before then every conversation looks foreign.
@@ -542,6 +562,7 @@ export default function FriendsRail({ userId, onUpgrade, panelSlot = null, layou
             unread={unread[selectedFriend.id] || 0}
             onMessage={(f) => openThreadFor(f)}
             onReport={(f) => setReportTarget(f)}
+            {...muteProps}
             onBlock={handleBlock}
             onUnfriend={handleUnfriend}
           />
@@ -558,6 +579,7 @@ export default function FriendsRail({ userId, onUpgrade, panelSlot = null, layou
           onClose={() => setSelectedId(null)}
           onBlocked={() => { setSelectedId(null); friends.refresh().catch(() => {}); pullConversations(); }}
           onReport={(f) => setReportTarget(f)}
+          {...muteProps}
           onBlock={handleBlock}
           onUnfriend={handleUnfriend}
           onActivity={onThreadActivity}

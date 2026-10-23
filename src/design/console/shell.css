@@ -192,13 +192,15 @@ html[data-design="console"] .cx-shell-avatar {
 }
 html[data-design="console"] .cx-shell-avatar::after { content: ''; position: absolute; inset: -6px; border-radius: 50%; }
 html[data-design="console"] .cx-shell-avatar-face {
-  display: grid; place-items: center; overflow: hidden;
+  position: relative; display: grid; place-items: center; overflow: hidden;
   width: 100%; height: 100%; border-radius: 50%;
   background: var(--cx-accent-tint); color: var(--cx-accent);
   box-shadow: inset 0 0 0 1px var(--cx-line);
   font: 600 var(--cx-fs-12)/1 var(--cx-sans);
 }
-html[data-design="console"] .cx-shell-avatar-face img { width: 100%; height: 100%; object-fit: cover; display: block; }
+/* Pinned, as .cx-av > img (hub.css): a grid item's `height: 100%` doesn't
+   resolve, so a portrait photo showed its top instead of its centre. */
+html[data-design="console"] .cx-shell-avatar-face img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; display: block; }
 
 /* ── Phone app bar (52 px + top inset) ── */
 html[data-design="console"] .cx-shell-appbar {

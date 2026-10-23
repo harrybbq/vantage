@@ -51,7 +51,12 @@ process.env.SUPABASE_SERVICE_ROLE_KEY = 'legacy.service.TEST';
 process.env.VITE_SUPABASE_ANON_KEY = 'legacy.anon.TEST';
 process.env.WHOOP_CLIENT_ID = 'id';
 process.env.WHOOP_CLIENT_SECRET = 'secret';
-const fn = name => require(`../functions/${name}.js`);
+// The rate-limited functions (item 86) keep their v1 handler in
+// lib/handlers behind a v2 entry; the rest are still in functions/.
+const fn = name => {
+  try { return require(`./handlers/${name}.js`); } catch (e) { if (e.code !== 'MODULE_NOT_FOUND') throw e; }
+  return require(`../functions/${name}.js`);
+};
 const post = (body = '{}') => ({ httpMethod: 'POST', headers: { authorization: 'Bearer user.jwt' }, body });
 
 const HTTP = {
