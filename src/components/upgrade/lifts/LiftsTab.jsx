@@ -9,7 +9,12 @@
  *
  * Screens (this file only routes; each screen lives in its own file):
  *   home     Today (WorkoutToday: suggested card, resume banner, the week
- *            strip) + the lift list (LiftList)
+ *            strip), This week (WeekMuscles), history (HistoryCard) and the
+ *            lift list (LiftList). On a phone or tablet (< 1024 px) the home
+ *            is three swipeable pages (owner, Oct 2026): Today (the card and
+ *            its start controls) · Week (the rotation strip, the week's body
+ *            map, This week) · History (workouts, then the lifts with their
+ *            bests). Desktop keeps the one long page.
  *   detail   one lift (LiftDetail — also renders embedded in a Sheet:
  *            <LiftDetail liftId embedded onClose />, via the Lifts context)
  *   workout  the live workout (WorkoutLive) while one is open
@@ -31,6 +36,8 @@ import LogSheet from './LogSheet';
 import ManageSheet from './ManageSheet';
 import WorkoutToday from './WorkoutToday';
 import WeekMuscles from './WeekMuscles';
+import WeekStrip from './WeekStrip';
+import BodyMap from './BodyMap';
 import LiftList from './LiftList';
 import WorkoutLive from './WorkoutLive';
 import FinishSheet from './FinishSheet';
@@ -39,7 +46,7 @@ import { liftsLinkedTrackers, linkTrackerToLifts } from '../../../lib/trackers/a
 import NewWorkoutSheet from './workout/NewWorkoutSheet';
 import { takeLiftsResume, onLiftsResume } from '../../../lib/lifts/liveBus';
 import { Toast } from './parts';
-import { Button, PbToast } from './ui';
+import { Button, PbToast, Pager, SwipePage, useInputMode } from './ui';
 import { LiftsScope, useLiftsScope } from './ui/scope';
 import { useLiftsData, todayIso, LiftsProvider } from './useLifts';
 import {
@@ -59,6 +66,9 @@ import './workout.css';
 import './lifts-tokens.css';
 import './home.css';
 
+/** The phone / tablet home pages (owner, Oct 2026). */
+const HOME_PAGES = [{ id: 'today', label: 'Today' }, { id: 'week', label: 'Week' }, { id: 'history', label: 'History' }];
+
 export default function LiftsTab({ S, update, hydrated = true }) {
   const calendarToday = todayIso();
   const today = trainingDayOf(S, new Date());
@@ -73,6 +83,17 @@ export default function LiftsTab({ S, update, hydrated = true }) {
   const [toast, setToast] = useState(null);
   const [pb, setPb] = useState(null);
   const [view, setView] = useState('list');        // 'list' | 'workout'
+  // Phone / tablet home pages (Today · Week · History); kept while Lifts is open.
+  const { layout } = useInputMode();
+  const paged = layout !== 'desktop';
+  const [homePage, setHomePage] = useState(0);
+  const [homeDir, setHomeDir] = useState(0);
+  const goHome = i => {
+    if (i < 0 || i >= HOME_PAGES.length || i === homePage) return;
+    setHomeDir(i > homePage ? 1 : -1);
+    setHomePage(i);
+    window.scrollTo({ top: 0 });
+  };
   const [finish, setFinish] = useState(null);      // { summary, saved, templateSaved }
   const [newSheet, setNewSheet] = useState(null);  // { tab } — the New workout sheet (nothing starts until its Start)
   const [pickOnOpen, setPickOnOpen] = useState(false);
@@ -243,23 +264,53 @@ export default function LiftsTab({ S, update, hydrated = true }) {
                      onQuickLog={() => setSheet({ kind: 'log' })} onCreateLift={manage.onAdd}
                      onToast={text => setToast({ text, n: Date.now() })} />
       )}
-      {screen === 'home' && (
-        <>
-          <div className="lh-frame">
-            <Button variant="quiet" icon="settings" className="lh-frame-manage" onClick={() => setSheet({ kind: 'manage' })} data-testid="lh-manage">Manage</Button>
-          </div>
+      {screen === 'home' && (() => {
+        const today_ = (
           <WorkoutToday S={S} today={today} nightOf={nightOf} now={now} active={active} list={lifts.list}
                         onStart={startSuggested} onBuild={buildOwn} onResume={goWorkout} onDiscard={discard}
                         onQuickLog={() => setSheet({ kind: 'log' })} canQuickLog={inUse.length > 0}
-                        gyms={activeGymList} gym={curGym} onGym={pickGym} gymName={gymName} />
-          <WeekMuscles S={S} today={today} />
-          <HistoryCard S={S} update={update} today={calendarToday} />
-          <LiftList list={lifts.list} summaries={summaries} counts={counts} today={today} activeGym={active && active.gym ? active.gym : curGym}
-                    gymOrder={gymOrder} gymName={gymName} bwOf={bwOf} pbsMonth={totals.pbsMonth}
-                    onOpen={openLift} onLog={id => setSheet({ kind: 'log', liftId: id })} onQuickLog={() => setSheet({ kind: 'log' })}
-                    onManage={() => setSheet({ kind: 'manage' })} />
-        </>
-      )}
+                        gyms={activeGymList} gym={curGym} onGym={pickGym} gymName={gymName} side={!paged} />
+        );
+        const history = (
+          <>
+            <HistoryCard S={S} update={update} today={calendarToday} />
+            <LiftList list={lifts.list} summaries={summaries} counts={counts} today={today} activeGym={active && active.gym ? active.gym : curGym}
+                      gymOrder={gymOrder} gymName={gymName} bwOf={bwOf} pbsMonth={totals.pbsMonth}
+                      onOpen={openLift} onLog={id => setSheet({ kind: 'log', liftId: id })} onQuickLog={() => setSheet({ kind: 'log' })}
+                      onManage={() => setSheet({ kind: 'manage' })} />
+          </>
+        );
+        return (
+          <>
+            <div className="lh-frame">
+              <Button variant="quiet" icon="settings" className="lh-frame-manage" onClick={() => setSheet({ kind: 'manage' })} data-testid="lh-manage">Manage</Button>
+            </div>
+            {paged ? (
+              <>
+                <Pager pages={HOME_PAGES} page={homePage} go={goHome} label="Lifts pages" testId="lh-pager"
+                       stepPrefix="lh-step" arrowPrefix="lh-page" className="lh-pager" />
+                <SwipePage pages={HOME_PAGES} page={homePage} dir={homeDir} go={goHome} testIdPrefix="lh-page" className="lh-homepage">
+                  {homePage === 0 && today_}
+                  {homePage === 1 && (
+                    <>
+                      <WeekStrip S={S} today={today} gymName={gymName} className="lh-card" />
+                      <BodyMap weekOnly view="figure" S={S} today={today} list={lifts.list} />
+                      <WeekMuscles S={S} today={today} />
+                    </>
+                  )}
+                  {homePage === 2 && history}
+                </SwipePage>
+              </>
+            ) : (
+              <>
+                {today_}
+                <WeekMuscles S={S} today={today} />
+                {history}
+              </>
+            )}
+          </>
+        );
+      })()}
       {sheet && sheet.kind === 'log' && (
         <LogSheet entry={sheet.entry} liftId={sheet.liftId} lifts={lifts.list} pickList={pickList} log={lifts.log} bwOf={bwOf}
                   today={today} maxDate={calendarToday} shiftOf={shiftOf} onClose={() => setSheet(null)} onSave={save} onDelete={del}
