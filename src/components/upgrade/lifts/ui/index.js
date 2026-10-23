@@ -12,3 +12,4 @@ export { UndoToast, PbToast } from './toasts';
 export { default as useInputMode } from './useInputMode';
 export { LiftsScope, useLiftsScope, useScope, useScopeStyle } from './scope';
 export { default as NumPad } from '../NumPad';
+export { Pager, SwipePage, SWIPE_PX } from './Pages';

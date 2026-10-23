@@ -269,11 +269,12 @@ html[data-design="console"] .cx-sweep-ladder > b {
 }
 html[data-design="console"] .cx-sweep-ladder > b.is-done { background: var(--cx-gold); }
 html[data-design="console"] .cx-sweep-habit-stage { display: flex; justify-content: space-between; gap: var(--cx-sp-8); margin-top: -4px; }
-html[data-design="console"] .cx-sweep-habit-foot {
-  display: flex; align-items: center; justify-content: space-between; gap: var(--cx-sp-12); flex-wrap: wrap;
-  padding-top: var(--cx-sp-12); border-top: 1px solid var(--cx-line);
+/* The action row, under the clock: ruled off above and below. */
+html[data-design="console"] .cx-sweep-habit-act {
+  display: flex; align-items: center; justify-content: space-between; gap: var(--cx-sp-8) var(--cx-sp-12); flex-wrap: wrap;
+  padding: var(--cx-sp-8) 0; border-top: 1px solid var(--cx-line); border-bottom: 1px solid var(--cx-line);
 }
-html[data-design="console"] .cx-sweep-habit-foot .cx-btn { flex: none; }
+html[data-design="console"] .cx-sweep-habit-act .cx-btn { flex: none; }
 html[data-design="console"] .cx-sweep-on { border-color: var(--cx-accent); color: var(--cx-accent); background: var(--cx-accent-tint); }
 html[data-design="console"] .cx-sweep-cutweek { display: block; }
 html[data-design="console"] .cx-sweep-cutweek :is(.cut-day, button) { border-radius: var(--cx-r-chip); }

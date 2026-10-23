@@ -144,11 +144,12 @@ function useWeek(S, today, session, list) {
 
 const TABS = [{ id: 'workout', label: 'This workout' }, { id: 'week', label: 'This week' }];
 
-export default function BodyMap({ session, list, S = null, today = null, view = 'both', tab: tabIn, onTab, all: allIn, onAll }) {
+export default function BodyMap({ session = null, list, S = null, today = null, view = 'both', tab: tabIn, onTab, all: allIn, onAll, weekOnly = false }) {
   const uid = useId().replace(/[^a-zA-Z0-9_-]/g, '');
   const [tabOwn, setTabOwn] = useState('workout');
   const [allOwn, setAllOwn] = useState(false);
-  const tab = tabIn || tabOwn;
+  // weekOnly: the Lifts home's Week page — the week so far, no workout and no tabs.
+  const tab = weekOnly ? 'week' : (tabIn || tabOwn);
   const setTab = onTab || setTabOwn;
   const all = allIn == null ? allOwn : allIn;
   const setAll = onAll || setAllOwn;
@@ -161,7 +162,7 @@ export default function BodyMap({ session, list, S = null, today = null, view = 
 
   const planned = map.muscles.filter(m => m.planned).sort((a, b) => a.ratio - b.ratio || b.target - a.target);
   const extra = map.muscles.filter(m => !m.planned && m.done > 0).sort((a, b) => b.done - a.done);
-  if (!planned.length && !extra.length) return null;
+  if (weekOnly ? !week : (!planned.length && !extra.length)) return null;
   const onWeek = tab === 'week' && !!week;
 
   // ── What the figure fills and the rows list ──
@@ -238,10 +239,11 @@ export default function BodyMap({ session, list, S = null, today = null, view = 
   );
 
   return (
-    <section className={`lw-body is-${view}`} aria-label={view === 'rows' ? 'Muscle by muscle' : 'Where the work went'} data-testid={view === 'rows' ? 'lw-body-rows' : 'lw-body'}>
-      <p className="lf-eyebrow">{view === 'rows' ? '// Muscle by muscle' : '// Where the work went'}</p>
+    <section className={`lw-body is-${view}${weekOnly ? ' is-week-only' : ''}`} aria-label={weekOnly ? 'This week on the body' : view === 'rows' ? 'Muscle by muscle' : 'Where the work went'}
+             data-testid={weekOnly ? 'lw-body-week' : view === 'rows' ? 'lw-body-rows' : 'lw-body'}>
+      <p className="lf-eyebrow">{weekOnly ? '// This week on the body' : view === 'rows' ? '// Muscle by muscle' : '// Where the work went'}</p>
       <div className="lw-body-ctl">
-        {week && (
+        {week && !weekOnly && (
           <div ref={tabsRef} className="lf-segm is-sm lw-body-tabs" role="tablist" aria-label="Body map range" onKeyDown={onTabKey}>
             {TABS.map(t => {
               const on = t.id === tab;
@@ -260,7 +262,7 @@ export default function BodyMap({ session, list, S = null, today = null, view = 
           <span className="lw-switch-ui" aria-hidden="true" />
         </label>
       </div>
-      {week ? (
+      {week && !weekOnly ? (
         <div role="tabpanel" id={`${uid}-panel`} aria-labelledby={`${uid}-tab-${onWeek ? 'week' : 'workout'}`} className="lw-body-panel">{panel}</div>
       ) : <div className="lw-body-panel">{panel}</div>}
     </section>

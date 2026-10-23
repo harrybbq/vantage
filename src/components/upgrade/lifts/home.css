@@ -16,6 +16,10 @@
 }
 @media (min-width: 600px) { .upg-app .uh-open:has(> .lh-root) { padding: 14px 18px 22px; } }
 .lifts.lh-root { gap: 24px; font-family: var(--lf-font); color: var(--lf-text); }
+/* Phone / tablet home pages (LiftsTab: Today · Week · History) — the page
+   keeps the home's 24px rhythm; the pager sits tight under the header. */
+.lifts .lh-homepage { display: flex; flex-direction: column; gap: 24px; }
+.lifts .lh-pager { margin: -8px -8px -12px; }
 .lifts .lh-frame { position: absolute; top: 6px; right: 0; z-index: 1; }
 @media (min-width: 600px) { .lifts .lh-frame { top: 20px; right: 18px; } }
 @media (min-width: 1024px) { .lifts .lh-frame { display: none; } }

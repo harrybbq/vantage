@@ -32,6 +32,9 @@
  *
  * Desktop (≥ 1024 px): cols 1–7 the card, cols 8–12 the week strip, the
  * stretches (expanded) and "Last session".
+ *
+ * `side={false}`: the phone's Today page (LiftsTab) — the week strip lives
+ * on the Week page instead.
  */
 import { useMemo, useState } from 'react';
 import Icon from '../../Icon';
@@ -51,7 +54,7 @@ const dayTitle = iso => { const [, m, d] = iso.split('-').map(Number); return `$
 
 export default function WorkoutToday({
   S, today, nightOf = null, now, active, list = [], onStart, onBuild, onResume, onDiscard, onQuickLog,
-  gyms = [], gym = null, onGym, gymName = id => id, canQuickLog = true,
+  gyms = [], gym = null, onGym, gymName = id => id, canQuickLog = true, side = true,
 }) {
   const { layout } = useInputMode();
   const desktop = layout === 'desktop';
@@ -189,11 +192,13 @@ export default function WorkoutToday({
         {active && <ResumeBanner active={active} now={now} gymName={gymName} onResume={onResume} onDiscard={onDiscard} />}
         {card}
       </div>
-      <div className="lh-today-side">
-        <WeekStrip S={S} today={today} gymName={gymName} className="lh-card" />
-        {desktop && <Stretches stretches={stretches} rest={sug.restDay} red={red} />}
-        {desktop && last && <LastSession last={last} gymName={gymName} />}
-      </div>
+      {side && (
+        <div className="lh-today-side">
+          <WeekStrip S={S} today={today} gymName={gymName} className="lh-card" />
+          {desktop && <Stretches stretches={stretches} rest={sug.restDay} red={red} />}
+          {desktop && last && <LastSession last={last} gymName={gymName} />}
+        </div>
+      )}
     </div>
   );
 }

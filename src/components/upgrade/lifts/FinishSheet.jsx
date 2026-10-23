@@ -47,16 +47,15 @@
  * onClose, trackers, linked (trackers on a lifts/workout rule), dayLog
  * (S.logs for the workout's day), onLinkTracker(id).
  */
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import Icon from '../../Icon';
-import { Sheet, Button, PbMark, NightMark } from './ui';
+import { Sheet, Button, PbMark, NightMark, Pager, SwipePage } from './ui';
 import { clock, volumeText } from '../../../lib/lifts/workout';
 import { realSetText, roundEstimate } from '../../../lib/lifts/ui';
 import { perGymOf, fmtKg } from '../../../lib/lifts/lifts';
 import BodyMap from './BodyMap';
 
 const PAGES = [{ id: 'body', label: 'Body' }, { id: 'muscles', label: 'Muscles' }, { id: 'summary', label: 'Summary' }];
-const SWIPE_PX = 48;
 
 export default function FinishSheet({
   summary, saved, onSave, onKeepGoing, onDiscard, onSaveTemplate, onClose, templateSaved, gymLabel = null,
@@ -73,7 +72,6 @@ export default function FinishSheet({
   const [dir, setDir] = useState(0);
   const [mapTab, setMapTab] = useState('workout');
   const [mapAll, setMapAll] = useState(false);
-  const touch = useRef(null);
   const go = i => {
     if (i < 0 || i >= PAGES.length || i === page) return;
     setDir(i > page ? 1 : -1);
@@ -192,60 +190,23 @@ export default function FinishSheet({
       )}
     </div>
   );
-  const onPointerUp = e => {
-    const t = touch.current;
-    touch.current = null;
-    if (!t) return;
-    const dx = e.clientX - t.x, dy = e.clientY - t.y;
-    if (Math.abs(dx) >= SWIPE_PX && Math.abs(dx) > 1.5 * Math.abs(dy)) go(page + (dx < 0 ? 1 : -1));
-  };
 
   return (
     <Sheet title={title} eyebrow={eyebrow} onClose={saved ? onClose : onKeepGoing} footer={footer} testId="lw-finish" className="lw-finish" width={560}>
       <div className="lw-fin" data-testid="lw-summary">
-        {!nothing && <Pager page={page} go={go} />}
+        {!nothing && <Pager pages={PAGES} page={page} go={go} label="Finish pages" />}
         {!saved && summary.setsOpen > 0 && !nothing && (
           <p className="lw-fin-warn" data-testid="lw-fin-warn"><Icon name="triangle-alert" size={15} /> {summary.setsOpen} {summary.setsOpen === 1 ? 'set isn’t' : 'sets aren’t'} ticked — {summary.setsOpen === 1 ? 'it won’t' : 'they won’t'} be saved</p>
         )}
         {nothing ? summaryPage : (
-          <div key={page} className={`lw-page${dir > 0 ? ' is-next' : dir < 0 ? ' is-prev' : ''}`} data-testid={`lw-page-${PAGES[page].id}`}
-               onPointerDown={e => { if (e.pointerType !== 'mouse') touch.current = { x: e.clientX, y: e.clientY }; }}
-               onPointerCancel={() => { touch.current = null; }} onPointerUp={onPointerUp}>
+          <SwipePage pages={PAGES} page={page} dir={dir} go={go}>
             {page < 2
               ? <BodyMap session={s} list={lifts} S={S} today={today} view={page === 0 ? 'figure' : 'rows'}
                          tab={mapTab} onTab={setMapTab} all={mapAll} onAll={setMapAll} />
               : summaryPage}
-          </div>
+          </SwipePage>
         )}
       </div>
     </Sheet>
-  );
-}
-
-/** ‹ Body · Muscles · Summary › — the steps are buttons too. */
-function Pager({ page, go }) {
-  const last = PAGES.length - 1;
-  return (
-    // A div, not <nav>: index.css styles every nav as the app's sidebar.
-    <div className="lw-pager" role="navigation" aria-label="Finish pages" data-testid="lw-pager">
-      <button type="button" className="lw-pager-arrow" onClick={() => go(page - 1)} disabled={page === 0}
-              aria-label={page > 0 ? `Back: ${PAGES[page - 1].label}` : 'Back'} data-testid="lw-page-prev">
-        <Icon name="chevron-left" size={20} />
-      </button>
-      <ol className="lw-pager-steps">
-        {PAGES.map((p, i) => (
-          <li key={p.id}>
-            <button type="button" className={i === page ? 'is-on' : ''} aria-current={i === page ? 'step' : undefined}
-                    onClick={() => go(i)} data-testid={`lw-step-${p.id}`}>
-              <i aria-hidden="true" />{p.label}
-            </button>
-          </li>
-        ))}
-      </ol>
-      <button type="button" className="lw-pager-arrow" onClick={() => go(page + 1)} disabled={page === last}
-              aria-label={page < last ? `Next: ${PAGES[page + 1].label}` : 'Next'} data-testid="lw-page-next">
-        <Icon name="chevron-right" size={20} />
-      </button>
-    </div>
   );
 }
