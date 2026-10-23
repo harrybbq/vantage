@@ -9,9 +9,10 @@ const close = (a, b, m) => assert.ok(Math.abs(a - b) < 1e-9, `${m}: ${a} vs ${b}
 // press 3 · Lateral raise 4 · Pushdown 3 · (Overhead extension, optional — out).
 {
   const t = sessionTargets('Push');
-  close(t.Chest, 4 + 3, 'chest: dip + incline press, both chest-first');
+  // Evidence-based part weights (adaptive.js EXERCISE_PARTS): a group takes its strongest part's weight.
+  close(t.Chest, 4 + 3 + 3 * 0.25, 'chest: dip + incline press, both chest-first, + the shoulder press’s upper chest');
   close(t.Shoulders, 4 * 0.5 + 3 * 0.5 + 3 + 4, 'shoulders: half from the presses, full from shoulder press and raises');
-  close(t.Triceps, 4 * 0.5 + 3 * 0.5 + 3, 'triceps: the optional overhead extension is not owed');
+  close(t.Triceps, 4 * 0.5 + 3 * 0.5 + 3 * 0.5 + 3, 'triceps: half from dip, incline and shoulder press; the optional overhead extension is not owed');
   assert.equal(t.Quads, undefined, 'push asks nothing of quads');
 }
 
@@ -42,7 +43,7 @@ const W = {
 {
   const m = Object.fromEntries(bodyMap(W, list).muscles.map(x => [x.muscle, x]));
   assert.equal(bodyMap(W, list).session, 'Push');
-  close(m.Chest.ratio, 3 / 7, 'chest: 3 of 7');
+  close(m.Chest.ratio, 3 / 7.75, 'chest: 3 of 7.75');
   assert.equal(m.Chest.planned, true);
   assert.equal(m.Biceps.planned, false, 'Push does not ask for biceps');
   close(m.Biceps.ratio, Math.min(1, 2 / PEAK_TARGETS.Biceps), 'an off-plan muscle is measured against the most any session asks of it');
@@ -70,7 +71,7 @@ const W = {
   const load = workoutPartLoad(W, list);
   close(load['Mid & lower chest'], 3, 'dip: lower chest first, warm-up out');
   close(load['Triceps lateral & medial'], 1.5, 'dip: triceps at half');
-  close(load['Front delts'], 1.5, 'dip: front delts at half');
+  close(load['Front delts'], 3 * 0.5 + 4 * 0.25, 'dip: front delts at half; lateral raise a quarter (Campos 2020)');
   close(load['Side delts'], 4, 'lateral raise: side delts');
   close(load.Biceps, 2, 'curl');
   assert.equal(load['Upper chest'], undefined, 'no incline work, no upper chest');

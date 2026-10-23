@@ -64,7 +64,10 @@ export default function WeekMuscles({ S, today }) {
     const isOpen = open === g.group;
     const parts = view.parts.filter(p => p.group === g.group);
     const id = `wm-parts-${g.group.replace(/\W+/g, '-').toLowerCase()}`;
-    const label = `${g.group}: ${fmt(g.done)} of ${g.target > 0 ? fmt(g.target) : 'no'} sets, ${hits} of 2 sessions hit`;
+    // Forearms are tracked but not part of the twice-a-week goal (adaptive.js FREQ_EXEMPT):
+    // the dots' space stays so the rows line up, empty.
+    const twice = g.twiceAWeek !== false;
+    const label = `${g.group}: ${fmt(g.done)} of ${g.target > 0 ? fmt(g.target) : 'no'} sets${twice ? `, ${hits} of 2 sessions hit` : ''}`;
     return (
       <li key={g.group} className={`wm-g${isOpen ? ' is-open' : ''}`}>
         <button type="button" className="wm-row" aria-expanded={isOpen} aria-controls={isOpen ? id : undefined} aria-label={label}
@@ -72,7 +75,7 @@ export default function WeekMuscles({ S, today }) {
           <span className="wm-n" aria-hidden="true">{g.group}</span>
           <Bar done={g.done} target={g.target} />
           <Value done={g.done} target={g.target} />
-          <span className="wm-dots" aria-hidden="true">{[0, 1].map(i => <i key={i} className={i < hits ? 'on' : ''} />)}</span>
+          <span className="wm-dots" aria-hidden="true">{twice && [0, 1].map(i => <i key={i} className={i < hits ? 'on' : ''} />)}</span>
           <Icon name={isOpen ? 'chevron-up' : 'chevron-down'} size={14} className="wm-chev" />
         </button>
         {isOpen && (

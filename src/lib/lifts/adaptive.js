@@ -46,15 +46,24 @@ export const PARTS = [
   ['Abs', 'Abs'], ['Obliques', 'Abs'],
   ['Triceps long head', 'Triceps'], ['Triceps lateral & medial', 'Triceps'],
   ['Biceps', 'Biceps'], ['Brachialis', 'Biceps'],
+  ['Forearms', 'Forearms'],
   ['Rectus femoris', 'Quads'], ['Outer & inner quads', 'Quads'],
   ['Hamstrings', 'Hamstrings'],
   ['Glute max', 'Glutes'], ['Glute medius', 'Glutes'],
+  ['Adductors', 'Adductors'],
   ['Gastrocnemius', 'Calves'], ['Soleus', 'Calves'],
 ];
 export const GROUP_OF = Object.fromEntries(PARTS);
 export const GROUPS = [...new Set(PARTS.map(p => p[1]))];
-export const UPPER_GROUPS = ['Shoulders', 'Back', 'Chest', 'Triceps', 'Biceps'];
-export const LOWER_GROUPS = ['Quads', 'Hamstrings', 'Glutes', 'Calves', 'Abs', 'Lower back'];
+export const UPPER_GROUPS = ['Shoulders', 'Back', 'Chest', 'Triceps', 'Biceps', 'Forearms'];
+export const LOWER_GROUPS = ['Quads', 'Hamstrings', 'Glutes', 'Adductors', 'Calves', 'Abs', 'Lower back'];
+/**
+ * Groups tracked and credited but left out of the twice-a-week rule.
+ * Forearms (brachioradialis): only the reverse curl trains them in the
+ * programme, so the rule would add an exercise to Upper on the owner's
+ * shift-length sessions (MAX_EXERCISES) for a small muscle.
+ */
+export const FREQ_EXEMPT = Object.freeze(['Forearms']);
 const ANCHORS = { Upper: ['Push', 'Pull'], Lower: ['Legs'] };
 
 /**
@@ -65,33 +74,68 @@ const ANCHORS = { Upper: ['Push', 'Pull'], Lower: ['Legs'] };
 export const PRIORITY = { 'Side delts': 1.5, 'Rear delts': 1.25, Lats: 1.25, 'Upper chest': 1.25 };
 const prio = p => PRIORITY[p] || 1;
 
-/** What each programme exercise works, by part (main part first). */
+/**
+ * What each programme exercise works, by part (main part first).
+ *
+ * Evidence review, Oct 2026 (owner-commissioned; notes with sources and
+ * confidence in docs/LIFTS_MUSCLE_EVIDENCE.md). Counting is FRACTIONAL —
+ * a set is 1 for the muscle it trains directly and 0.5 for a substantial
+ * secondary — the method that fit best in Pelland et al. 2026 (Sports
+ * Med 56:481–505, the volume/frequency meta-regressions). The 0.25 tier
+ * is this app's own heuristic for a minor contributor; no study tests it.
+ * Where a muscle grew in an MRI/ultrasound trial it is credited from that;
+ * EMG alone earns at most 0.25.
+ */
 export const EXERCISE_PARTS = {
+  // da Silva 2009 EMG; no hypertrophy data — unchanged (a neutral-spine hip
+  // hinge shifts it toward hamstrings, Andersen 2021).
   '45° hyperextension': { 'Lower back': 1, 'Glute max': 0.5, Hamstrings: 0.5 },
-  'Leg extension': { 'Rectus femoris': 1, 'Outer & inner quads': 0.5 },
-  'Machine leg press': { 'Outer & inner quads': 1, 'Glute max': 0.5, 'Rectus femoris': 0.25 },
+  // Kinoshita 2026 (MRI): leg extension grew RF +13% and the vasti as much as leg press did.
+  'Leg extension': { 'Rectus femoris': 1, 'Outer & inner quads': 1 },
+  // Kinoshita 2026: no RF growth from leg press; adductors +4%.
+  'Machine leg press': { 'Outer & inner quads': 1, 'Glute max': 0.5, Adductors: 0.5 },
+  // Kinoshita 2023 (MRI): standing grew the gastrocnemius, not the soleus more than seated.
   'Standing calf raise': { Gastrocnemius: 1, Soleus: 0.5 },
-  'Walking dumbbell lunge': { 'Outer & inner quads': 1, 'Glute max': 0.5, 'Glute medius': 0.25 },
+  // No lunge hypertrophy trial; glute EMG very high (Krause Neto 2020); adductors work in deep lunges.
+  'Walking dumbbell lunge': { 'Outer & inner quads': 1, 'Glute max': 0.5, 'Glute medius': 0.25, Adductors: 0.25 },
   'Ab crunch machine': { Abs: 1 },
+  // No share data; mirrors the bench evidence. Pressing barely grows the long head (Brandão 2020).
   Dip: { 'Mid & lower chest': 1, 'Triceps lateral & medial': 0.5, 'Front delts': 0.5 },
-  'Incline dumbbell press': { 'Upper chest': 1, 'Front delts': 0.5, 'Triceps lateral & medial': 0.25 },
-  'Machine shoulder press': { 'Front delts': 1, 'Side delts': 0.5, 'Triceps lateral & medial': 0.5 },
-  'Dumbbell lateral raise': { 'Side delts': 1 },
-  'Single-arm cable triceps pushdown (cuff)': { 'Triceps lateral & medial': 1 },
-  'Overhead cable bar extension': { 'Triceps long head': 1 },
-  'Lat pulldown': { Lats: 1, Biceps: 0.5, 'Mid-back': 0.25 },
-  'Single-arm cable row': { Lats: 1, 'Mid-back': 0.5, Biceps: 0.25 },
-  'Cable bar pullover': { Lats: 1 },
+  // Chaves 2020: incline grew the mid/lower pec too; Wakahara 2013: pressing grew triceps ~20%.
+  'Incline dumbbell press': { 'Upper chest': 1, 'Mid & lower chest': 0.5, 'Front delts': 0.5, 'Triceps lateral & medial': 0.5 },
+  // Campos 2020 EMG: medial delt near the anterior; front pressing recruits the pec (Coratella 2022).
+  'Machine shoulder press': { 'Front delts': 1, 'Side delts': 0.5, 'Triceps lateral & medial': 0.5, 'Upper chest': 0.25 },
+  // Campos 2020 EMG: anterior and posterior delts active too (EMG only → 0.25).
+  'Dumbbell lateral raise': { 'Side delts': 1, 'Front delts': 0.25, 'Rear delts': 0.25 },
+  // Maeo 2023 (MRI): pushdown grew the long head +19.6% (overhead +28.5%).
+  'Single-arm cable triceps pushdown (cuff)': { 'Triceps lateral & medial': 1, 'Triceps long head': 0.5 },
+  // Maeo 2023: overhead out-grew pushdown for the lateral/medial heads too.
+  'Overhead cable bar extension': { 'Triceps long head': 1, 'Triceps lateral & medial': 1 },
+  // Lehman 2004 / Lee 2017: mid-trap & rhomboid EMG ≈ lats; Gentil 2015: pulldown grew elbow flexors like curls.
+  'Lat pulldown': { Lats: 1, 'Mid-back': 0.5, Biceps: 0.5, Brachialis: 0.25, 'Rear delts': 0.25 },
+  // Mannarino: rows ≈ half of curl-level elbow-flexor growth; Botton 2013: posterior delt active.
+  'Single-arm cable row': { Lats: 1, 'Mid-back': 0.5, Biceps: 0.5, Brachialis: 0.25, 'Rear delts': 0.25 },
+  // Muyor 2022: the standing cable version is lat-dominant; pec and long head minor.
+  'Cable bar pullover': { Lats: 1, 'Triceps long head': 0.25, 'Mid & lower chest': 0.25 },
+  // Horizontal abduction is the rear delt's job (Schoenfeld 2013 EMG); no study of this exercise.
   'Cable archer pull (rear delt)': { 'Rear delts': 1, 'Mid-back': 0.5 },
-  'Incline dumbbell curl, 21s': { Biceps: 1 },
-  'Reverse EZ-bar curl': { Brachialis: 1, Biceps: 0.25 },
-  'Hip thrust': { 'Glute max': 1, Hamstrings: 0.5 },
+  // The brachialis is a prime elbow flexor in every grip (Date 2021; Attarieh 2025).
+  'Incline dumbbell curl, 21s': { Biceps: 1, Brachialis: 0.5 },
+  // Pronated grip: brachioradialis rises most (Kleiber 2015); brachialis grip-independent.
+  'Reverse EZ-bar curl': { Brachialis: 1, Forearms: 1, Biceps: 0.25 },
+  // Plotkin 2023 (MRI): hamstring growth "equivocal"; squats out-grew it for quads.
+  'Hip thrust': { 'Glute max': 1, Hamstrings: 0.25, 'Outer & inner quads': 0.25 },
+  // Maeo 2021: seated beat lying for the hamstrings.
   'Seated leg curl': { Hamstrings: 1 },
-  'Leg press, feet high': { 'Glute max': 1, Hamstrings: 0.5, 'Outer & inner quads': 0.5 },
-  'Reverse lunge': { 'Outer & inner quads': 1, 'Glute max': 0.5, 'Glute medius': 0.25 },
+  // Kinoshita 2026 used this set-up: glute max +15%, vasti as leg extension, hamstrings +3%, adductors +4%.
+  'Leg press, feet high': { 'Glute max': 1, 'Outer & inner quads': 1, Adductors: 0.5, Hamstrings: 0.25 },
+  'Reverse lunge': { 'Outer & inner quads': 1, 'Glute max': 0.5, 'Glute medius': 0.25, Adductors: 0.25 },
+  // Kinoshita 2023: no gastrocnemius growth seated.
   'Seated calf raise': { Soleus: 1 },
+  // Consensus only (one 4-person pilot).
   'Pallof press': { Obliques: 1, Abs: 0.25 },
-  'Wide-grip cable row': { 'Mid-back': 1, 'Rear delts': 0.5, Lats: 0.5 },
+  // Padovan 2025 (HD-EMG): wide grip favours mid-trap; biceps and rear delt as any row.
+  'Wide-grip cable row': { 'Mid-back': 1, 'Rear delts': 0.5, Lats: 0.5, Biceps: 0.5, Brachialis: 0.25 },
 };
 const PROGRAMME_PARTS = Object.fromEntries(Object.entries(EXERCISE_PARTS).map(([k, v]) => [norm(k), v]));
 
@@ -102,6 +146,8 @@ const PART_WORDS = {
   Chest: [[/incline|low-?to-?high|reverse-?grip/i, 'Upper chest'], [/./, 'Mid & lower chest']],
   Triceps: [[/overhead|french|skull|extension/i, 'Triceps long head'], [/./, 'Triceps lateral & medial']],
   Biceps: [[/reverse|hammer|brachial/i, 'Brachialis'], [/./, 'Biceps']],
+  Forearms: [[/./, 'Forearms']],
+  Adductors: [[/./, 'Adductors']],
   Quads: [[/leg\s*extension|sissy/i, 'Rectus femoris'], [/./, 'Outer & inner quads']],
   Glutes: [[/abduct|kickback|side|medius/i, 'Glute medius'], [/./, 'Glute max']],
   Calves: [[/seated|bent-?knee|soleus/i, 'Soleus'], [/./, 'Gastrocnemius']],
@@ -154,14 +200,25 @@ const groupsOfParts = parts => {
 };
 
 /**
- * GROUP counting — the body map's rule (bodymap.js): a set credits every
- * muscle tagged on its lift (muscles.js musclesOf), the first tag in full
- * and the others at half. Group sets, group targets and twice-a-week hits
- * all count this way, so the week and "This workout" agree; parts keep
- * their own finer weights (EXERCISE_PARTS).
+ * GROUP counting, shared with the body map (bodymap.js): a set credits
+ * each group the weight of the strongest part it works in that group
+ * (partsOf). For a programme exercise that is the evidence-based map
+ * above, so a feet-high leg press counts in full for glutes AND quads; for
+ * any other lift partsOf comes from its muscle tags (first 1, others ½),
+ * which is the same rule the tags always had. Group sets, group targets
+ * and twice-a-week hits all count this way, so the week and "This
+ * workout" agree.
  */
+export function groupWeightsOf(lift) {
+  const out = {};
+  for (const [p, w] of Object.entries(partsOf(lift))) {
+    const g = GROUP_OF[p];
+    if (g) out[g] = Math.max(out[g] || 0, w);
+  }
+  return out;
+}
 const creditGroups = (lift, sets, into) => {
-  musclesOf(lift).forEach((m, i) => { if (GROUPS.includes(m)) into[m] = (into[m] || 0) + sets * (i === 0 ? 1 : 0.5); });
+  for (const [g, w] of Object.entries(groupWeightsOf(lift))) into[g] = (into[g] || 0) + sets * w;
   return into;
 };
 /** Group sets one programme session gives → { group: sets } (optional work only with `optional`). */
@@ -430,6 +487,7 @@ export function weekView(S, today, { extra = null } = {}) {
       done: round1((t.groups[group] || 0) + (a.groups[group] || 0)),
       target: base ? Math.max(0, round05(base + moved)) : 0,
       hits: (t.hits[group] || 0) + (a.hits[group] || 0),
+      twiceAWeek: !FREQ_EXEMPT.includes(group),
     };
   }).filter(g => g.target > 0 || g.done > 0);
   return {
@@ -559,7 +617,7 @@ export function buildAdaptive(S, today, session) {
     need[p] = Math.max(0, (targets[p] || 0) - (forgiven[p] || 0) - (done[p] || 0) - (coming[p] || 0));
   }
   const need0 = { ...need };
-  const mustHit = groups.filter(g => (hits[g] || 0) < 2 && PARTS.some(([p, gg]) => gg === g && (targets[p] || 0) > 0));
+  const mustHit = groups.filter(g => !FREQ_EXEMPT.includes(g) && (hits[g] || 0) < 2 && PARTS.some(([p, gg]) => gg === g && (targets[p] || 0) > 0));
 
   const pool = candidates(groups, L.list, today, L.sessions || []);
   const picked = [];

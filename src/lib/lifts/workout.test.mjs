@@ -86,7 +86,9 @@ t('muscle tags: every programme exercise is mapped, all from the picker list', (
     assert.ok(PROGRAMME_MUSCLES[x.name], `${x.name} has muscles`);
     for (const m of PROGRAMME_MUSCLES[x.name]) assert.ok(MUSCLES.includes(m), `${m} is a picker muscle`);
   }
-  assert.deepEqual(musclesOf({ name: 'Machine leg press' }), ['Quads', 'Glutes'], 'the programme map for a seed lift');
+  assert.deepEqual(musclesOf({ name: 'Machine leg press' }), ['Quads', 'Glutes', 'Adductors'], 'the programme map for a seed lift (adductors: Kinoshita 2026)');
+  assert.deepEqual(musclesOf({ name: 'Hammer curl' }), ['Biceps', 'Forearms'], 'guessed: hammer curls train the brachioradialis');
+  assert.ok(!musclesOf({ name: 'Close-grip bench press' }).includes('Forearms'), 'close-grip is not a forearm cue');
   assert.deepEqual(musclesOf({ name: 'Bench press' }), ['Chest'], 'guessed from the name');
   assert.deepEqual(musclesOf({ name: 'Seated leg curl X' }), ['Hamstrings'], 'a leg curl is not a biceps curl');
   assert.deepEqual(musclesOf({ name: 'Thing', muscles: ['Other'] }), ['Other'], 'own tags win');

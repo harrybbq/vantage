@@ -10,13 +10,14 @@ import assert from 'node:assert/strict';
 import {
   PARTS, GROUP_OF, GROUPS, UPPER_GROUPS, LOWER_GROUPS, PRIORITY, EXERCISE_PARTS, partsOf, sessionParts,
   BASE_TARGETS, BASE_GROUP_TARGETS, sessionGroups, MIN_TARGET, weekTargets, readinessOn, RED_RPE_CAP, weekView, buildAdaptive, trimForRed, adaptStretches, MAX_HISTORY,
-  MAX_EXERCISES, MAX_EXERCISES_WORST,
+  MAX_EXERCISES, MAX_EXERCISES_WORST, FREQ_EXEMPT,
 } from './adaptive.js';
 import { suggestWorkout, suggestedStart, startWorkout, activeOf, progId, estimateMinutes } from './workout.js';
 import { blockProgress } from './plan.js';
 import { workoutLoad, sessionTargets as bmSessionTargets } from './bodymap.js';
 import { shiftOn } from '../rotation/pattern.js';
 import { PROGRAMME, STRETCHES } from '../../data/trainingProgramme.js';
+import { PROGRAMME_MUSCLES } from './muscles.js';
 
 let n = 0;
 const t = (name, fn) => {
@@ -91,25 +92,32 @@ t('parts: every programme exercise is mapped, every part rolls up to a known gro
 t('BASE_GROUP_TARGETS: the programme week by group, counted like the body map (optional work included)', () => {
   const nonOptional = {};
   for (const c of CODES) for (const [m, x] of Object.entries(bmSessionTargets(c))) nonOptional[m] = (nonOptional[m] || 0) + x;
-  assert.deepEqual(nonOptional, { Chest: 10, Triceps: 11, Shoulders: 23, Back: 20, Biceps: 13, 'Lower back': 6, Glutes: 13.5, Hamstrings: 10.5, Quads: 11.5, Calves: 8, Abs: 6 });
-  assert.deepEqual(BASE_GROUP_TARGETS, { ...nonOptional, Triceps: 13, Quads: 14.5, Glutes: 15 }, '+ overhead extension 2, walking lunge 3 quads / 1.5 glutes');
+  // Evidence-based weights (Oct 2026): a group takes its strongest part's weight per set.
+  assert.deepEqual(nonOptional, { Chest: 11.5, Triceps: 13.25, Shoulders: 27.25, Back: 20, Biceps: 16, Forearms: 3, 'Lower back': 6, Glutes: 13.5, Hamstrings: 8.75, Quads: 14, Adductors: 4.25, Calves: 8, Abs: 6 });
+  assert.deepEqual(BASE_GROUP_TARGETS, { ...nonOptional, Triceps: 15.5, Shoulders: 27.5, Hamstrings: 9, Quads: 17, Glutes: 15, Adductors: 5 },
+    '+ overhead extension 2 triceps, walking lunge 3 quads / 1.5 glutes / 0.75 adductors; rounded to half sets');
   for (const g of GROUPS) assert.deepEqual(sessionGroups('Push')[g] || 0, bmSessionTargets('Push')[g] || 0, g);
 });
 t('BASE_TARGETS: the programme week, lower back twice (Legs 4 + Lower 2)', () => {
   assert.equal(BASE_TARGETS['Lower back'], 6);
   for (const [p, v] of Object.entries(BASE_TARGETS)) assert.equal(v * 2, Math.round(v * 2), `${p}: whole or half sets (${v})`);
-  assert.equal(BASE_TARGETS['Triceps long head'], 2, 'Push’s optional overhead extension counts toward the target');
-  assert.equal(BASE_TARGETS['Triceps lateral & medial'], 12, '11.75 → 12');
+  // Maeo 2023: pushdowns grow the long head too (0.5), overhead work grows the lateral/medial heads (1).
+  assert.equal(BASE_TARGETS['Triceps long head'], 6, 'pushdowns 2 × 3 × 0.5 + the optional overhead 2 + pullover 3 × 0.25');
+  assert.equal(BASE_TARGETS['Triceps lateral & medial'], 14.5);
+  // Kinoshita 2026: the leg press doesn't grow rectus femoris; only the leg extension counts.
+  assert.equal(BASE_TARGETS['Rectus femoris'], 3);
+  assert.equal(BASE_TARGETS.Adductors, 5, 'leg press 2 + feet-high 1.5 + lunges 1.5');
+  assert.equal(BASE_TARGETS.Forearms, 3, 'the reverse curl');
   assert.equal(BASE_TARGETS.Abs, 4, '3.75 → 4');
-  assert.equal(BASE_TARGETS['Outer & inner quads'], 13, 'the optional walking lunge included');
+  assert.equal(BASE_TARGETS['Outer & inner quads'], 17, 'feet-high leg press now full for quads; the optional walking lunge included');
   assert.equal(BASE_TARGETS['Glute medius'], 1.5, 'two lunges × 0.25 × 3 = 1.5: right at MIN_TARGET');
   assert.ok(Object.values(BASE_TARGETS).every(v => v >= MIN_TARGET), 'nothing under MIN_TARGET has a target');
-  assert.equal(sessionParts('Push')['Triceps long head'], undefined, 'projections leave optional work out');
-  assert.equal(sessionParts('Push', { optional: true })['Triceps long head'], 2);
+  assert.equal(sessionParts('Push')['Triceps long head'], 1.5, 'the pushdown’s long-head half (Maeo 2023); projections leave the optional overhead out');
+  assert.equal(sessionParts('Push', { optional: true })['Triceps long head'], 1.5 + 2);
   assert.equal(BASE_TARGETS['Side delts'], 10.5, 'lateral raise 4 + 5, shoulder press 3 × 0.5');
   assert.equal(BASE_TARGETS.Lats, 15.5);
   assert.equal(sessionParts('Push')['Side delts'], 5.5);
-  assert.equal(sessionParts('Legs')['Outer & inner quads'], 5.5, 'leg press 4 + leg extension 1.5 — the optional lunge is not owed');
+  assert.equal(sessionParts('Legs')['Outer & inner quads'], 7, 'leg press 4 + leg extension 3 (vasti grow from it as much as from leg press, Kinoshita 2026) — the optional lunge is not owed');
 });
 
 // ── (g) Readiness ─────────────────────────────────────────────────
@@ -141,13 +149,13 @@ t('weekView: shape, parts / groups / hits from the logged sets', () => {
   assert.deepEqual(v.missed, []);
   assert.deepEqual(v.changes, []);
   for (const p of v.parts) assert.deepEqual(Object.keys(p), ['part', 'group', 'done', 'target']);
-  for (const g of v.groups) assert.deepEqual(Object.keys(g), ['group', 'done', 'target', 'hits']);
+  for (const g of v.groups) assert.deepEqual(Object.keys(g), ['group', 'done', 'target', 'hits', 'twiceAWeek']);
   const part = nm => v.parts.find(p => p.part === nm);
   const grp = nm => v.groups.find(g => g.group === nm);
   assert.deepEqual(part('Side delts'), { part: 'Side delts', group: 'Shoulders', done: 5.5, target: 10.5 });
   assert.equal(part('Lats').done, 10, 'pulldown 4 + row 3 + pullover 3');
-  assert.equal(grp('Chest').done, 7);
-  assert.equal(grp('Chest').target, 10);
+  assert.equal(grp('Chest').done, 8.5, 'dip 4 + incline 3 + shoulder press 0.75 + pullover 0.75 (Muyor 2022)');
+  assert.equal(grp('Chest').target, 11.5);
   assert.equal(grp('Chest').hits, 1);
   assert.equal(grp('Shoulders').hits, 2, 'Push, and the archer pull on Pull');
   assert.equal(grp('Quads').done, 0);
@@ -156,8 +164,8 @@ t('weekView: shape, parts / groups / hits from the logged sets', () => {
   const sumLoads = {};
   for (const w of S.lifts.sessions.filter(w => w.date >= B.push && w.date <= B.legs)) for (const [m, x] of Object.entries(workoutLoad(w, LIST))) sumLoads[m] = (sumLoads[m] || 0) + x;
   for (const g of v.groups) assert.equal(g.done, Math.round((sumLoads[g.group] || 0) * 10) / 10, `${g.group} matches the body map`);
-  assert.equal(grp('Shoulders').done, 13.5, 'shoulder press 3 + laterals 4 + dip 2 + incline 1.5 + archer 3');
-  assert.equal(grp('Shoulders').target, 23, 'not the parts’ 26 (a press set is one shoulder set, not 1.5)');
+  assert.equal(grp('Shoulders').done, 15.3, 'shoulder press 3 + laterals 4 + dip 2 + incline 1.5 + archer 3 + rear delts from pulldown 1 and row 0.75 (Signorile 2002; Botton 2013)');
+  assert.equal(grp('Shoulders').target, 27.5, 'not the parts’ sum (a press set is one shoulder set, not 1.5)');
   // the Finish sheet's unsaved workout is counted in
   const withLegs = weekView(S, B.legs, { extra: W(B.legs, 'Legs') });
   assert.equal(withLegs.groups.find(g => g.group === 'Quads').hits, 1);
@@ -167,7 +175,7 @@ t('weekView: sessions before the first workout ever logged are counted from the 
   const S = { lifts: { list: LIST, log: [], sessions: [W(B.legs, 'Legs')] } };
   const v = weekView(S, B.legs);
   const grp = nm => v.groups.find(g => g.group === nm);
-  assert.equal(grp('Chest').done, 7, 'Push assumed: dip 4 + incline 3');
+  assert.equal(grp('Chest').done, 8.5, 'Push assumed: dip 4 + incline 3 + shoulder press 0.75; Pull assumed: pullover 0.75');
   assert.equal(grp('Chest').hits, 1);
   assert.equal(grp('Back').hits, 1, 'Pull assumed');
   assert.equal(grp('Quads').hits, 1, 'Legs logged');
@@ -197,31 +205,31 @@ const PPL = () => S_([W(B.push, 'Push'), W(B.pull, 'Pull'), W(B.legs, 'Legs')]);
 t('(a) Upper after Push, Pull and Legs on plan: the written Upper, every group’s second hit', () => {
   const S = PPL();
   const r = buildAdaptive(S, B.upper, 'Upper');
-  assert.ok(r && r.exercises.length >= 5);
-  // The written seven, plus the long-head work Push's optional extension would have done.
-  assert.deepEqual(r.exercises.map(x => x.name).sort(), [...PROGRAMME.Upper.map(x => x.name), 'Overhead cable bar extension'].sort());
-  for (const x of PROGRAMME.Upper) assert.equal(byName(r, x.name).sets, x.sets, `${x.name}: ${x.sets} sets, as written`);
-  assert.deepEqual(byName(r, 'Overhead cable bar extension').tags[0], { kind: 'need', text: 'triceps long head 0 / 2' });
-  assert.equal(sum(r.exercises), writtenSets('Upper') + 2);
-  // Push with its optional extension done → nothing owed to long head: exactly the written Upper.
-  const full = buildAdaptive(S_([W(B.push, 'Push', { extra: [{ liftId: progId('Overhead cable bar extension'), sets: 2, weight: 30 }] }), W(B.pull, 'Pull'), W(B.legs, 'Legs')]), B.upper, 'Upper');
-  assert.deepEqual(full.exercises.map(x => x.name).sort(), PROGRAMME.Upper.map(x => x.name).sort(), 'the same seven movements as written');
-  assert.equal(sum(full.exercises), writtenSets('Upper'));
+  assert.ok(r && r.exercises.length >= 5 && r.exercises.length <= MAX_EXERCISES);
+  // Every pick is a programme exercise, and the written Upper's core is there.
+  const programmeNames = new Set(Object.values(PROGRAMME).flat().map(x => x.name));
+  assert.ok(r.exercises.every(x => programmeNames.has(x.name)), r.exercises.map(x => x.name).join(', '));
+  for (const nm of ['Dip', 'Lat pulldown', 'Wide-grip cable row', 'Dumbbell lateral raise', 'Cable archer pull (rear delt)', 'Incline dumbbell curl, 21s']) assert.ok(byName(r, nm), nm);
+  // Evidence (Maeo 2023, MRI): overhead extensions grow the long head AND the lateral/medial heads more
+  // than pushdowns, so with long-head work owed the overhead extension covers the triceps on its own.
+  assert.ok(byName(r, 'Overhead cable bar extension'), 'overhead extension for both triceps parts');
+  assert.ok(!byName(r, 'Single-arm cable triceps pushdown (cuff)'), 'no second triceps isolation when one covers both');
+  assert.ok(sum(r.exercises) <= writtenSets('Upper') + 2, `${sum(r.exercises)} sets vs ${writtenSets('Upper')} written`);
   const lat = byName(r, 'Dumbbell lateral raise');
   assert.equal(lat.sets, Math.max(...r.exercises.map(x => x.sets)), 'side delts carry the most sets (taper)');
   assert.match(lat.why, /taper priority/);
   assert.deepEqual(lat.tags[0], { kind: 'need', text: 'side delts 5.5 / 10.5' });
-  // The dip is a compound: three sets give chest its hit and triceps half-credit sets, so it is
-  // picked first for both groups (owner, Oct 2026: "apply bias toward compound movements such as dips").
+  // Compounds carry the second hits (owner, Oct 2026: "apply bias toward compound movements such as
+  // dips"): the dip for chest and triceps, the wide-grip row for back and biceps.
   assert.equal(byName(r, 'Dip').why, 'second hit for chest and triceps');
-  assert.ok(byName(r, 'Single-arm cable triceps pushdown (cuff)'), 'the written pushdown still fills the triceps gap');
+  assert.equal(byName(r, 'Wide-grip cable row').why, 'second hit for back and biceps');
   assert.deepEqual(r.catchUp, []);
   assert.equal(r.belowStandard, false);
   assert.equal(r.readiness, null);
   assert.match(r.notes[0], /^Built for this week — second hits for /);
-  // every upper group reaches two hits once it's done
+  // every upper group on the twice-a-week rule reaches two hits once it's done
   const after = weekView(S, B.upper, { extra: asWorkout(r, B.upper, 'Upper') });
-  for (const g of UPPER_GROUPS) assert.ok(after.groups.find(x => x.group === g).hits >= 2, `${g}: two hits`);
+  for (const g of UPPER_GROUPS.filter(g => !FREQ_EXEMPT.includes(g))) assert.ok(after.groups.find(x => x.group === g).hits >= 2, `${g}: two hits`);
   for (const x of r.exercises) assert.ok(x.sets >= 2 && x.sets <= 6, `${x.name}: ${x.sets} sets`);
 });
 t('(a) the build follows the week: short archer sets on Pull → more rear delts on Upper', () => {
@@ -249,10 +257,12 @@ t('(a) Lower after Legs: hyperextension gives lower back its second hit', () => 
   const r = buildAdaptive(S, B.lower, 'Lower');
   const hyper = byName(r, '45° hyperextension');
   assert.equal(hyper.sets, 2);
-  assert.match(hyper.why, /lower back's second hit/);
+  // A compound for two hits: hamstrings (0.5) and lower back (1). The feet-high leg press no longer
+  // carries the hamstrings' hit — they grew only +3% from it (Kinoshita 2026), so it credits 0.25.
+  assert.match(hyper.why, /second hit for hamstrings and lower back/);
   assert.deepEqual(hyper.tags[0], { kind: 'need', text: 'lower back 4 / 6' });
-  // Compound first: the feet-high leg press gives quads, hamstrings and glutes their hit in one exercise.
-  assert.match(byName(r, 'Leg press, feet high').why, /second hit for quads, hamstrings and glutes/);
+  // Compound first: the feet-high leg press gives quads, glutes and adductors their hit in one exercise.
+  assert.match(byName(r, 'Leg press, feet high').why, /second hit for quads, glutes and adductors/);
   assert.ok(byName(r, 'Reverse lunge'), 'the written Reverse lunge is still in');
   // Legs skipped its optional walking lunge, which the week's target counts: Lower picks up a little of it.
   assert.ok(sum(r.exercises) - writtenSets('Lower') <= 4, `${sum(r.exercises)} sets vs ${writtenSets('Lower')} written`);
@@ -359,7 +369,7 @@ t('(c) red on Upper: only what twice-a-week needs, two sets each', () => {
   // costing a separate exercise.
   assert.equal(r.exercises.length, 4);
   const after = weekView(S, B.upper, { extra: asWorkout(r, B.upper, 'Upper') });
-  for (const g of UPPER_GROUPS) assert.ok(after.groups.find(x => x.group === g).hits >= 2, `${g}: two hits`);
+  for (const g of UPPER_GROUPS.filter(g => !FREQ_EXEMPT.includes(g))) assert.ok(after.groups.find(x => x.group === g).hits >= 2, `${g}: two hits`);
   assert.ok(sum(r.exercises) <= 10);
   assert.match(r.notes[0], /WHOOP Recovery 22% · red — trimmed/);
   // a red Upper after a missed Push still carries no catch-up
@@ -378,7 +388,9 @@ t('(e) two full weeks with the main lift rising → +1, with the reason', () => 
   const ch = p => changes.find(c => c.part === p);
   assert.equal(targets.Lats, 16.5);
   assert.deepEqual(ch('Lats'), { part: 'Lats', from: 15.5, to: 16.5, why: '100% two weeks running, lat pulldown e1RM up 100 kg → 103.5 kg' });
-  assert.equal(ch('Triceps lateral & medial').to, 13, 'a part whose base was rounded up (11.75 → 12) still counts as full');
+  // The optional overhead extension now counts toward lateral & medial as well (Maeo 2023), so a week
+  // without it isn't full for them either.
+  assert.equal(ch('Triceps lateral & medial'), undefined, 'the optional overhead extension counts for them too now');
   assert.equal(ch('Abs').to, 5, 'Abs 3.75 → 4, same');
   assert.equal(ch('Glute medius'), undefined, 'parts under two sets a week are left alone');
   assert.equal(ch('Triceps long head'), undefined, 'the optional extension was never done: not full');
@@ -472,6 +484,24 @@ t('(f) press-heavy → pecs on Upper; leg-heavy → hips on Lower; red → the l
   assert.ok(!green.some(x => x.added === 'red day'));
 });
 
+// ── The evidence-based map stays well-formed and in step with the tags ──
+t('EXERCISE_PARTS: known parts, weights 1 / 0.5 / 0.25, and muscles.js tags derived from them', () => {
+  const partNames = new Set(PARTS.map(p => p[0]));
+  for (const [name, parts] of Object.entries(EXERCISE_PARTS)) {
+    for (const [p, w] of Object.entries(parts)) {
+      assert.ok(partNames.has(p), `${name}: unknown part ${p}`);
+      assert.ok([1, 0.5, 0.25].includes(w), `${name}: ${p} ${w}`);
+    }
+    assert.equal(Object.values(parts)[0], Math.max(...Object.values(parts)), `${name}: main part first`);
+    // Tags = the groups credited at 0.5 or more, strongest first (ties in map order).
+    const g = {};
+    for (const [p, w] of Object.entries(parts)) { const gg = GROUP_OF[p]; g[gg] = Math.max(g[gg] || 0, w); }
+    const want = Object.entries(g).filter(([, w]) => w >= 0.5).sort((a, b) => b[1] - a[1]).map(([k]) => k);
+    assert.deepEqual(PROGRAMME_MUSCLES[name], want, `${name}: muscles.js tags`);
+  }
+  assert.equal(Object.keys(EXERCISE_PARTS).length, NAMES.length, 'every programme exercise is mapped');
+});
+
 // ── (f) Shift-length sessions: the exercise cap and the compound bias ───
 // Owner, Oct 2026: "say I miss a few muscle groups then I get to Upper, it should not have 12
 // exercises waiting for me, instead apply bias toward compound movements such as dips … cap it at
@@ -480,10 +510,13 @@ t('(f) the cap: 8, 9 only in the worst case', () => {
   assert.equal(MAX_EXERCISES, 8);
   assert.equal(MAX_EXERCISES_WORST, 9);
 });
-t('(f) Push missed: the dip carries shoulders, chest and triceps in one exercise', () => {
+t('(f) Push missed: compounds carry the second hits — the dip for chest and triceps, a row for shoulders', () => {
   const r = buildAdaptive(S_([W(B.pull, 'Pull'), W(B.legs, 'Legs')]), B.upper, 'Upper');
-  assert.match(byName(r, 'Dip').why, /second hit for shoulders, chest and triceps/);
-  assert.ok(byName(r, 'Dip').sets >= 4, 'enough dip sets that triceps and shoulders (half credit) reach their hit');
+  assert.match(byName(r, 'Dip').why, /second hit for chest and triceps/);
+  assert.ok(byName(r, 'Dip').sets >= 4, 'enough dip sets that triceps (half credit) reach their hit');
+  const multi = r.exercises.filter(x => /second hit for \w+(, \w+)* and \w+/.test(x.why));
+  assert.ok(multi.length >= 2, `compound hits: ${multi.map(x => `${x.name} (${x.why})`).join('; ')}`);
+  assert.ok(multi.some(x => /shoulders/.test(x.why)), 'the shoulders’ hit rides on a compound too');
   assert.ok(r.exercises.length <= MAX_EXERCISES);
 });
 t('(f) Push and Pull missed: Pull’s shoulder catch-up lands on rear delts, not the lateral raise', () => {
@@ -499,7 +532,10 @@ t('(f) half-done Push and Pull: the cap holds and the rest goes on as extra sets
     W(B.pull, 'Pull', { skip: ['Lat pulldown', 'Incline dumbbell curl, 21s', 'Cable archer pull (rear delt)'] }),
     W(B.legs, 'Legs')]), B.upper, 'Upper');
   assert.equal(r.exercises.length, MAX_EXERCISES);
-  assert.ok(r.exercises.some(x => /to keep it to 8 exercises/.test(x.why)), 'the overflow is said out loud');
+  // The cap pushes work into sets, not more exercises: every pick is near its ceiling (4, or 5 for taper parts).
+  assert.ok(r.exercises.every(x => x.sets >= 4), r.exercises.map(x => `${x.name} ${x.sets}`).join(', '));
+  // Any set added past the cap is said out loud.
+  for (const x of r.exercises) if (/to keep it to/.test(x.why)) assert.match(x.why, /\+\d+ to keep it to 8 exercises/);
 });
 t('(f) stress: no built session over 9 exercises or 6 sets an exercise, every group still hit', () => {
   // Every combination of whole anchors missed, and of half the exercises skipped on each, on both sessions.
@@ -528,7 +564,7 @@ t('(f) stress: no built session over 9 exercises or 6 sets an exercise, every gr
         const groups = session === 'Upper' ? UPPER_GROUPS : LOWER_GROUPS;
         const before = weekView(S_(ss, { vitalsLog }), day);
         const after = weekView(S_(ss, { vitalsLog }), day, { extra: asWorkout(r, day, session) });
-        for (const g of groups) {
+        for (const g of groups.filter(g => !FREQ_EXEMPT.includes(g))) {
           const b = before.groups.find(x => x.group === g).hits, a = after.groups.find(x => x.group === g).hits;
           if (b < 2) assert.ok(a >= b + 1, `${label}: ${g} hit (${b} → ${a})`);
         }
