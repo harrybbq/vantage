@@ -2,8 +2,8 @@
  * The player at the top of the hub (DIRECTIONS.md §A, the strip that
  * used to carry Level/XP — Level was retired 2026-10).
  *
- * Desktop strip: identity (avatar in its prestige frame) + prestige /
- * coins chips | Prestige: OVR to the next prestige, a bar of OVR/99 and
+ * Desktop strip: identity (avatar in its prestige frame, today's events
+ * in time order, the coins chip) | Prestige: OVR to the next prestige, a bar of OVR/99 and
  * the next reward, then the league position | OVR donut with the four
  * category bars | Honours with the latest two and the next one. Phone:
  * one compact card with the donut, the prestige bar, the four
@@ -25,7 +25,7 @@
  * rewards sheet, honours the Honours catalogue, the league line the
  * leaderboard, coins the shop.
  */
-import { useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import Icon from '../../../components/Icon';
 import { bandClass, bandVar } from '../../../lib/ratings/bands';
 import { prestigeProgress, prestigeName } from '../../../lib/ratings/prestigeRewards';
@@ -34,12 +34,67 @@ import { donutSegments } from '../../../components/ratings/RatingsDonut';
 import { useDarkSurface } from '../../../hooks/useDarkSurface';
 import { VISIONS, VISIONS_BY_ID } from '../../../lib/visions/definitions';
 import { timeAgo } from '../../../utils/helpers';
+import { eventColour, eventWhen, todayAgenda } from '../../../lib/calendar/events';
 import { Avatar, Diamonds } from './DivisionTable';
 import { boardRows, gapNote, ordinal } from './LeagueWidget';
 
 const CATS = [{ id: 'brain', label: 'Brain' }, { id: 'finance', label: 'Finance' }, { id: 'fitness', label: 'Fitness' }, { id: 'social', label: 'Social' }];
 const CAT_LABEL = { brain: 'Brain', finance: 'Finance', fitness: 'Fitness', social: 'Social' };
 const fmt = n => Number(n || 0).toLocaleString('en-GB');
+
+/** Today's events shown under the name; the rest are "+N more". */
+const AGENDA_MAX = 4;
+
+/** The time now, once a minute, so an event dims the minute it ends. */
+function useMinute() {
+  const [now, setNow] = useState(() => new Date());
+  useEffect(() => {
+    const id = setInterval(() => setNow(new Date()), 60_000);
+    return () => clearInterval(id);
+  }, []);
+  return now;
+}
+
+/**
+ * Today's events under the name (owner, Oct 2026: "if a user has events
+ * the day of viewing, they should show here in chronological order").
+ * lib/calendar/events todayAgenda: trips and multi-day events first (they
+ * frame the day), then by start time, untimed last; one that is over dims
+ * but stays. Nothing on today → nothing drawn. Opens Track, where the
+ * calendar is.
+ */
+function TodayEvents({ S, navigate }) {
+  const now = useMinute();
+  const agenda = todayAgenda(S, now);
+  if (!agenda.length) return null;
+  // What's still to come gets the rows; finished events fill whatever is
+  // left, latest first, so a busy morning doesn't push the afternoon into
+  // "+N more". Still in time order.
+  const left = agenda.filter(e => !e.past).length;
+  const pastRoom = Math.max(0, AGENDA_MAX - left);
+  const past = agenda.filter(e => e.past);
+  const pastKept = new Set(pastRoom > 0 ? past.slice(-pastRoom) : []);
+  const shown = agenda.filter(e => !e.past || pastKept.has(e)).slice(0, AGENDA_MAX);
+  const more = agenda.length - shown.length;
+  const allDay = ev => ev.source === 'span' || ev.source === 'holiday';
+  return (
+    <button type="button" className="cx-hub-pl-agenda" onClick={() => navigate?.('track')}
+            aria-label={`Today: ${agenda.map(ev => [eventWhen(ev) || (allDay(ev) ? 'all day' : ''), ev.label].filter(Boolean).join(' ')).join('; ')}. Open your calendar`}>
+      <span className="cx-hub-pl-h">
+        <span className="cx-hub-pl-t">Today</span><span className="cx-hub-sp" />
+        <span className="cx-muted">{left ? `${left} to go` : 'All done'}</span>
+      </span>
+      {shown.map(ev => (
+        <span key={ev.id} className={`cx-hub-pl-ev${ev.past ? ' is-past' : ''}`} title={[eventWhen(ev), ev.label, ev.location].filter(Boolean).join(' · ')}>
+          <span className="cx-hub-dot" style={{ background: eventColour(ev) }} aria-hidden="true" />
+          <span className="cx-num cx-hub-pl-at">{ev.time || (allDay(ev) ? 'All day' : '')}</span>
+          <span className="cx-hub-ell">{ev.label}</span>
+        </span>
+      ))}
+      {more > 0 && <span className="cx-muted cx-hub-pl-more">+{more} more</span>}
+    </button>
+  );
+}
 
 function usePlayer(S, visionState, hub) {
   return useMemo(() => {
@@ -151,6 +206,7 @@ export function PlayerStrip({ S, visionState, hub, navigate, onOpenVisions, onOp
           </span>
         </button>
         {S.profile?.tagline && <p className="cx-hub-pl-tag">{S.profile.tagline}</p>}
+        <TodayEvents S={S} navigate={navigate} />
         <div className="cx-hub-pl-chips">
           <button type="button" className="cx-chip" onClick={() => navigate?.('shop')} aria-label={`${fmt(S.coins)} coins, open the shop`}>
             <Icon name="coin" size={14} strokeWidth={1.75} /> <span className="cx-num">{fmt(S.coins)}</span>
