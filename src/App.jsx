@@ -48,6 +48,7 @@ import { meaningfulEvidence } from './lib/state/meaningful';
 import Onboarding from './components/onboarding/Onboarding';
 import { pickById, markInvited } from './lib/onboarding/onboarding';
 import { shareInvite } from './lib/onboarding/shareInvite';
+import { ONBOARDING_DO_EVENT } from './lib/onboarding/bus';
 import BackgroundCropModal from './components/BackgroundCropModal';
 import VisionsModal from './components/VisionsModal';
 import { useIsOwner } from './hooks/useIsOwner';
@@ -556,6 +557,15 @@ function Board({ userId, userEmail, onSignOut, initialSettings }) {
       return r;
     });
   }
+  // The hub's Getting started card asks for a pick's first thing by event
+  // (lib/onboarding/bus). A ref keeps the listener on the current closure.
+  const onboardingDoRef = useRef(onboardingDo);
+  onboardingDoRef.current = onboardingDo;
+  useEffect(() => {
+    const run = e => { const id = e?.detail?.id; if (id) onboardingDoRef.current(id, 'hub'); };
+    window.addEventListener(ONBOARDING_DO_EVENT, run);
+    return () => window.removeEventListener(ONBOARDING_DO_EVENT, run);
+  }, []);
 
   // ── AI Coach verb dispatch ──
   // Called when a Pro user taps an action button inside a coach insight.

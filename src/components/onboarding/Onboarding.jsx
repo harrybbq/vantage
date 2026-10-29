@@ -13,7 +13,9 @@
  *
  * The dim behind a stop is paint only: the app underneath stays usable
  * (the ringed button works, the nav works), so nobody is trapped. While
- * one of the app's modals is open (`paused`) the overlay steps aside.
+ * one of the app's modals is open (`paused`), or any other aria-modal
+ * dialog is up (the console's own sheets, the friend dialogs), the overlay
+ * steps aside.
  *
  * Props
  *   S, update        state + additive updater (only onboarding.js updaters)
@@ -43,6 +45,12 @@ function isShown(el) {
   return cs.visibility !== 'hidden' && cs.display !== 'none';
 }
 
+/** Another dialog is open: one of the app's sheets, not ours. */
+function otherDialogOpen() {
+  if (typeof document === 'undefined') return false;
+  return [...document.querySelectorAll('[aria-modal="true"]')].some(el => !el.closest('.ob-root') && isShown(el));
+}
+
 /** The visible element for a target (a button can exist once per layout). */
 function findTarget(target) {
   if (!target || typeof document === 'undefined') return null;
@@ -69,7 +77,7 @@ function cardPos(rect) {
   };
 }
 
-export default function Onboarding({ S, update, visible, paused = false, ctx = {}, onGo, onDo, onClose }) {
+export default function Onboarding({ S, update, visible, paused: modalOpen = false, ctx = {}, onGo, onDo, onClose }) {
   const [phase, setPhase] = useState('pick');   // 'pick' | stop index
   const [chosen, setChosen] = useState([]);
   const [doing, setDoing] = useState(false);    // the first thing was started: step aside
@@ -77,6 +85,21 @@ export default function Onboarding({ S, update, visible, paused = false, ctx = {
   const [busy, setBusy] = useState(false);
   const [rect, setRect] = useState(null);
   const card = useRef(null);
+  const [dialog, setDialog] = useState(false);
+  const paused = modalOpen || dialog;
+
+  // Watch for another dialog opening (only while a stop is up: the pick
+  // screen is itself the dialog). One check per frame at most.
+  const watching = visible && typeof phase === 'number';
+  useEffect(() => {
+    if (!watching || typeof MutationObserver === 'undefined') { setDialog(false); return undefined; }
+    let raf = 0;
+    const check = () => { raf = 0; setDialog(otherDialogOpen()); };
+    const mo = new MutationObserver(() => { if (!raf) raf = requestAnimationFrame(check); });
+    mo.observe(document.body, { childList: true, subtree: true });
+    check();
+    return () => { mo.disconnect(); if (raf) cancelAnimationFrame(raf); };
+  }, [watching]);
 
   // Each time it opens: back to the pick screen, last picks pre-ticked (a replay).
   useEffect(() => {
