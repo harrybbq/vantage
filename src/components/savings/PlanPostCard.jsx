@@ -56,8 +56,10 @@ export default function PlanPostCard({ S, update, showAccounts = false }) {
         <div>
           <h3 className="sb-panel-title">{label} — post it?</h3>
           <p className="sb-panel-sub">
-            This is what your cash flow says moved last month. Confirm it and it lands on
-            the {showAccounts ? 'pots and accounts' : 'pots'} below; change an amount first if it was different.
+            {/* One string, not three text nodes: the owner's copy renders
+                exactly as it did before the accounts gate. */}
+            {`This is what your cash flow says moved last month. Confirm it and it lands on the ${
+              showAccounts ? 'pots and accounts' : 'pots'} below; change an amount first if it was different.`}
           </p>
         </div>
         <div className="pp-total">
