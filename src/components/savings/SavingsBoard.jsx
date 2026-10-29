@@ -170,7 +170,7 @@ function CompletedStrip({ goals, accounts, onUndo, showAccounts }) {
       {goals.map(g => {
         // Where it was drawn from, and what Undo puts back, are both about
         // accounts — said only to someone who can see them.
-        const drained = showAccounts ? (g.drained || []) : [];
+        const drained = OWNER_SURFACES_IN_BUILD && showAccounts ? (g.drained || []) : [];
         const from = drained.map(d => nameOf(d.accountId));
         const back = drained.reduce((s, d) => s + (Number(d.amount) || 0), 0);
         return (
@@ -189,7 +189,7 @@ function CompletedStrip({ goals, accounts, onUndo, showAccounts }) {
                 setArmed(null);
                 onUndo(g.id);
               }}
-            >{armed === g.id ? (back > 0 ? `Put ${money(back)} back?` : 'Reopen?') : 'Undo'}</button>
+            >{armed === g.id ? (OWNER_SURFACES_IN_BUILD && back > 0 ? `Put ${money(back)} back?` : 'Reopen?') : 'Undo'}</button>
           </div>
         );
       })}
@@ -317,7 +317,7 @@ function PotCard({ goal, d, colour, expanded, onToggleExpand, onCollapse, achiev
           {/* Where the money actually sits. A pot spread across an ISA and
               an instant saver is still one pot, and this is the only place
               that says which accounts are carrying it. */}
-          {d.accounts.length > 0 && (
+          {OWNER_SURFACES_IN_BUILD && d.accounts.length > 0 && (
             <div className="sb-potcard-accounts">
               <div className="sb-detail-eyebrow">Held in</div>
               <div className="sb-potcard-acclist">

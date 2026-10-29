@@ -27,11 +27,13 @@
 import { useMemo, useState } from 'react';
 import Icon from '../Icon';
 import { money } from '../../lib/savings/derive';
+import { OWNER_SURFACES_IN_BUILD } from '../../lib/native/ownerSurfaces';
 import {
   duePlanMonth, proposePlanPosts, applyPlanPosts, skipPlanMonth, monthLabel,
 } from '../../lib/savings/planPost';
 
-export default function PlanPostCard({ S, update, showAccounts = false }) {
+export default function PlanPostCard({ S, update, showAccounts: showProp = false }) {
+  const showAccounts = OWNER_SURFACES_IN_BUILD && showProp;
   const month = duePlanMonth(S);
   const proposed = useMemo(() => (month ? proposePlanPosts(S, month) : []), [S, month]);
 

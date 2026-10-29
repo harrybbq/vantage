@@ -29,6 +29,7 @@ import {
   toMonthly, money, potColor, flowSections, sectionColor, SECTION_PALETTE,
 } from '../../lib/savings/derive';
 import { visibleAccounts, visibleItems } from '../../lib/savings/visibleAccounts';
+import { OWNER_SURFACES_IN_BUILD } from '../../lib/native/ownerSurfaces';
 
 const uid = p => p + Date.now().toString(36) + Math.round(Math.random() * 1e4).toString(36);
 
@@ -183,7 +184,8 @@ function FlowRow({
                       {goals.map(g => <option key={g.id} value={g.id}>{g.icon || '💰'} {g.name}</option>)}
                     </select>
                   )}
-                  {accounts.length > 0 && (
+                  {/* Folded out of native builds with the rest of accounts. */}
+                  {OWNER_SURFACES_IN_BUILD && accounts.length > 0 && (
                     <select
                       value={it.accountId || ''} aria-label="Save into account"
                       onChange={e => {
@@ -257,7 +259,8 @@ function FlowRow({
     );
   }
 
-export default function FlowEditor({ S, update, flow, bills = null, showAccounts = false }) {
+export default function FlowEditor({ S, update, flow, bills = null, showAccounts: showProp = false }) {
+  const showAccounts = OWNER_SURFACES_IN_BUILD && showProp;
   const proj = S.projection || {};
   // `items` is what is STORED and what every write below starts from;
   // `shown` is what is drawn (see the header).

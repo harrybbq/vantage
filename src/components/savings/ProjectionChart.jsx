@@ -19,6 +19,7 @@
  */
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { moneyK, money, monthLabel } from '../../lib/savings/derive';
+import { OWNER_SURFACES_IN_BUILD } from '../../lib/native/ownerSurfaces';
 
 const PAD_L = 54;
 const PAD_R = 14;
@@ -28,8 +29,10 @@ const MIN_W = 260;
 
 export default function ProjectionChart({
   cash, sav, horizon, marks, horizons, onHorizon,
-  startBalance, startPlaceholder, onStartBalance, savings = true,
+  startBalance, startPlaceholder, onStartBalance, savings: savingsProp = true,
 }) {
+  // Folds to false in a native build, taking the savings copy with it.
+  const savings = OWNER_SURFACES_IN_BUILD && savingsProp;
   const wrapRef = useRef(null);
   const [W, setW] = useState(720);
   const [H, setH] = useState(250);
