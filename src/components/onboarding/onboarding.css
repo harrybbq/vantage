@@ -25,7 +25,7 @@
   z-index: 9500;   /* above Dark OS's hub chrome, as the old tour was */
   pointer-events: none;
   color: var(--ob-text);
-  font-family: var(--cx-sans, inherit);
+  font-family: var(--cx-sans, 'DM Sans', system-ui, -apple-system, 'Segoe UI', sans-serif);
 }
 /* Classic Dark OS: the brand green is too dark for text on near-black. */
 html[data-theme="dark-os"]:not([data-design="console"]) .ob-root {
@@ -52,7 +52,7 @@ html[data-theme="dark-os"]:not([data-design="console"]) .ob-root {
   min-height: 44px;
   padding: 0 18px;
   border-radius: 8px;
-  font: 600 15px/1 var(--cx-sans, inherit);
+  font: 600 15px/1 var(--cx-sans, 'DM Sans', system-ui, -apple-system, 'Segoe UI', sans-serif);
   cursor: pointer;
   white-space: nowrap;
 }
@@ -71,7 +71,7 @@ html[data-theme="dark-os"]:not([data-design="console"]) .ob-root {
   border: 0;
   background: transparent;
   color: var(--ob-muted);
-  font: 500 13px var(--cx-sans, inherit);
+  font: 500 13px var(--cx-sans, 'DM Sans', system-ui, -apple-system, 'Segoe UI', sans-serif);
   cursor: pointer;
 }
 
