@@ -1,0 +1,256 @@
+/*
+ * Onboarding overlay (components/onboarding/Onboarding.jsx).
+ *
+ * One stylesheet for both designs. The --ob-* tokens read the console
+ * tokens when the console is live (html[data-design="console"] defines
+ * --cx-*) and fall back to the classic ones (--bg-raised, --text, --em…),
+ * so the overlay wears whichever design and theme the user is on.
+ */
+.ob-root {
+  --ob-s1: var(--cx-s1, var(--bg-raised, #fdfaf3));
+  --ob-s2: var(--cx-s2, var(--bg-overlay, #f0eadd));
+  --ob-text: var(--cx-text, var(--text, #1c1a17));
+  --ob-mid: var(--cx-mid, var(--text-mid, #4a4540));
+  --ob-muted: var(--cx-muted, var(--text-muted, #6e675d));
+  --ob-line: var(--cx-line, var(--border, #e2dccf));
+  --ob-line-strong: var(--cx-line-strong, var(--text-muted, #6e675d));
+  --ob-accent: var(--cx-accent, var(--em, #1a7a4a));
+  --ob-fill: var(--cx-accent-fill, var(--em, #1a7a4a));
+  --ob-on-fill: var(--cx-on-accent, #fff);
+  --ob-tint: var(--cx-accent-tint, var(--em-pale, rgba(26, 122, 74, 0.16)));
+  --ob-scrim: var(--cx-scrim, rgba(20, 18, 14, 0.42));
+  --ob-mono: var(--cx-mono, 'DM Mono', ui-monospace, Menlo, monospace);
+  position: fixed;
+  inset: 0;
+  z-index: 9500;   /* above Dark OS's hub chrome, as the old tour was */
+  pointer-events: none;
+  color: var(--ob-text);
+  font-family: var(--cx-sans, inherit);
+}
+/* Classic Dark OS: the brand green is too dark for text on near-black. */
+html[data-theme="dark-os"]:not([data-design="console"]) .ob-root {
+  --ob-accent: var(--em-light, #4dc485);
+  --ob-scrim: rgba(0, 0, 0, 0.55);
+}
+
+.ob-scrim { position: absolute; inset: 0; background: var(--ob-scrim); }
+.ob-pick-root .ob-scrim { pointer-events: auto; }
+/* A stop's dim is paint only: the app underneath keeps working. */
+.ob-scrim-paint { pointer-events: none; }
+
+.ob-ring {
+  position: absolute;
+  border-radius: 12px;
+  border: 2px solid var(--ob-accent);
+  box-shadow: 0 0 0 9999px var(--ob-scrim);
+  pointer-events: none;
+  transition: left .2s ease, top .2s ease, width .2s ease, height .2s ease;
+}
+
+/* ── Buttons ── */
+.ob-btn {
+  min-height: 44px;
+  padding: 0 18px;
+  border-radius: 8px;
+  font: 600 15px/1 var(--cx-sans, inherit);
+  cursor: pointer;
+  white-space: nowrap;
+}
+.ob-btn:focus-visible, .ob-pick-card:focus-visible, .ob-link:focus-visible {
+  outline: 2px solid var(--ob-accent);
+  outline-offset: 2px;
+}
+.ob-btn-primary { border: 0; background: var(--ob-fill); color: var(--ob-on-fill); }
+.ob-btn-primary:disabled { opacity: .5; cursor: default; }
+.ob-btn-ghost { border: 1px solid var(--ob-line-strong); background: transparent; color: var(--ob-text); font-weight: 500; }
+.ob-btn-ghost:disabled { opacity: .5; }
+.ob-btn-sm { min-height: 40px; padding: 0 12px; font-size: 13px; }
+.ob-link {
+  min-height: 36px;
+  padding: 0 4px;
+  border: 0;
+  background: transparent;
+  color: var(--ob-muted);
+  font: 500 13px var(--cx-sans, inherit);
+  cursor: pointer;
+}
+
+/* ── Pick screen ── */
+.ob-pick {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: min(880px, calc(100vw - 32px));
+  max-height: calc(100dvh - 32px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  padding: 40px;
+  border-radius: 16px;
+  border: 1px solid var(--ob-line);
+  background: var(--ob-s1);
+  pointer-events: auto;
+  outline: none;
+}
+.ob-pick-head { display: flex; flex-direction: column; gap: 8px; }
+.ob-kicker {
+  margin: 0;
+  font: 500 12px/16px var(--ob-mono);
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  color: var(--ob-muted);
+}
+.ob-pick-title { margin: 0; font-size: 28px; line-height: 32px; font-weight: 600; color: var(--ob-text); }
+.ob-pick-sub { margin: 0; font-size: 15px; line-height: 22px; color: var(--ob-mid); }
+.ob-pick-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+.ob-pick-card {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  min-height: 120px;
+  padding: 16px;
+  border-radius: 12px;
+  border: 1px solid var(--ob-line);
+  background: var(--ob-s2);
+  color: var(--ob-text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  box-sizing: border-box;
+}
+.ob-pick-card > svg, .ob-pick-card-top > svg:first-child { color: var(--ob-mid); }
+.ob-pick-card.is-on { border: 2px solid var(--ob-accent); padding: 15px; background: var(--ob-tint); }
+.ob-pick-card.is-on .ob-pick-card-top > svg { color: var(--ob-accent); }
+.ob-pick-card-top { display: flex; width: 100%; min-height: 22px; justify-content: space-between; align-items: center; }
+.ob-pick-card-name { font-size: 17px; line-height: 24px; font-weight: 600; }
+.ob-pick-card-line { font-size: 13px; line-height: 18px; color: var(--ob-mid); }
+.ob-pick-foot { display: flex; align-items: center; gap: 12px; }
+.ob-pick-note { margin: 0; flex: 1 1 auto; font-size: 13px; line-height: 18px; color: var(--ob-muted); }
+
+@media (max-width: 699px) {
+  .ob-pick {
+    inset: 0;
+    left: 0; top: 0;
+    transform: none;
+    width: 100%;
+    max-height: none;
+    height: 100%;
+    border: 0;
+    border-radius: 0;
+    gap: 20px;
+    padding: calc(env(safe-area-inset-top, 0px) + 28px) 16px calc(env(safe-area-inset-bottom, 0px) + 20px);
+    background: var(--cx-bg, var(--bg-base, var(--ob-s1)));
+  }
+  .ob-pick-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+  .ob-pick-card { min-height: 128px; padding: 14px; background: var(--ob-s1); }
+  .ob-pick-card.is-on { padding: 13px; }
+  .ob-pick-foot { margin-top: auto; flex-direction: column; align-items: stretch; gap: 10px; }
+  .ob-pick-foot .ob-btn-primary { order: -1; }
+  .ob-pick-note { order: 1; text-align: center; }
+}
+
+/* ── A stop's card ── */
+.ob-card {
+  position: absolute;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 18px;
+  border-radius: 12px;
+  border: 1px solid var(--ob-line);
+  background: var(--ob-s1);
+  box-shadow: 0 12px 36px rgba(0, 0, 0, .22);
+  pointer-events: auto;
+  outline: none;
+  max-height: calc(100dvh - 32px);
+  overflow-y: auto;
+}
+.ob-card.is-centred {
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: min(400px, calc(100vw - 24px));
+}
+@media (max-width: 699px) {
+  .ob-card.is-centred {
+    top: auto;
+    transform: translateX(-50%);
+    bottom: calc(env(safe-area-inset-bottom, 0px) + 84px);
+  }
+}
+.ob-card.is-done { border-color: var(--ob-accent); }
+.ob-card-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 36px; margin: -6px 0 -4px; }
+.ob-step { font-size: 12px; line-height: 16px; color: var(--ob-muted); }
+.ob-num { font-family: var(--ob-mono); }
+.ob-card-title { margin: 0; display: flex; align-items: center; gap: 8px; font-size: 20px; line-height: 26px; font-weight: 600; color: var(--ob-text); }
+.ob-card-body { margin: 0; font-size: 15px; line-height: 22px; color: var(--ob-mid); }
+.ob-card-note { margin: 0; font-size: 13px; line-height: 18px; color: var(--ob-text); overflow-wrap: anywhere; }
+.ob-card-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 4px; flex-wrap: wrap; }
+.ob-card-actions .ob-btn-primary { flex: 0 1 auto; }
+@media (max-width: 699px) {
+  .ob-card-actions .ob-btn { flex: 1 1 0; }
+}
+.ob-done-mark {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  flex: none;
+  border-radius: 50%;
+  background: var(--ob-fill);
+  color: var(--ob-on-fill);
+}
+
+/* ── Doing: a slim bar, clear of the screen's own controls ── */
+.ob-bar {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  bottom: calc(env(safe-area-inset-bottom, 0px) + 84px);
+  width: min(520px, calc(100vw - 24px));
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 8px 8px 14px;
+  border-radius: 12px;
+  border: 1px solid var(--ob-accent);
+  background: var(--ob-s1);
+  box-shadow: 0 8px 28px rgba(0, 0, 0, .22);
+  pointer-events: auto;
+  outline: none;
+}
+@media (min-width: 700px) { .ob-bar { bottom: 24px; } }
+.ob-bar-icon { color: var(--ob-accent); display: inline-flex; flex: none; }
+.ob-bar-text { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; }
+.ob-bar-title { font-size: 15px; line-height: 20px; font-weight: 600; }
+.ob-bar-note { font-size: 12px; line-height: 16px; color: var(--ob-mid); overflow-wrap: anywhere; }
+
+/* Settings › Welcome › "Replay the welcome" (the class name predates the
+   onboarding; console restyles it in sweep.css). */
+.tut-replay-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 16px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.07);
+  border: 1px solid var(--border, #e2dccf);
+  color: var(--text, #1c1a17);
+  font-family: var(--sans, 'DM Sans', sans-serif);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+.tut-replay-btn:hover {
+  border-color: var(--em, #1a7a4a);
+  color: var(--em, #1a7a4a);
+}

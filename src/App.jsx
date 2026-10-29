@@ -23,7 +23,7 @@ import { ConsoleHub } from './design/console/hub';
 import { ConsoleTrack, ConsoleHoliday } from './design/console/track';
 import {
   ConsoleHabits, ConsoleSettings, ConsoleAchievements, ConsoleShop, ConsoleLeaderboard, ConsoleFriends,
-  ConsolePaywall, ConsoleTutorial, ConsoleAuth,
+  ConsolePaywall, ConsoleAuth,
 } from './design/console/sweep';
 // Console chrome (SHELL): sidebar, top bar, phone app bar, tab bar, More.
 // Lazy, so classic never downloads it.
@@ -45,7 +45,9 @@ import CookieBanner from './components/CookieBanner';
 import InstallPrompt from './components/InstallPrompt';
 import { hasLoggedSomething } from './lib/native/installPrompt';
 import { meaningfulEvidence } from './lib/state/meaningful';
-import TutorialOverlay from './components/TutorialOverlay';
+import Onboarding from './components/onboarding/Onboarding';
+import { pickById, markInvited } from './lib/onboarding/onboarding';
+import { shareInvite } from './lib/onboarding/shareInvite';
 import BackgroundCropModal from './components/BackgroundCropModal';
 import VisionsModal from './components/VisionsModal';
 import { useIsOwner } from './hooks/useIsOwner';
@@ -530,6 +532,30 @@ function Board({ userId, userEmail, onSignOut, initialSettings }) {
     setOpenModal(id);
   }
   function handleCloseModal() { setOpenModal(null); }
+
+  // ── Onboarding: the overlay's stops and the hub's Getting started card ──
+  // Friends is its own screen on a phone and the hub's rail on desktop.
+  function onboardingGo(section) {
+    navigate(section === 'friends' && !isMobile ? 'hub' : section);
+  }
+  // Open a pick's real first thing: its screen, then its real add flow
+  // (handleOpenModal, so free-tier caps still apply). Friends shares the
+  // invite link instead and returns shareInvite's result.
+  function onboardingDo(id, from) {
+    const p = pickById(id);
+    if (!p) return undefined;
+    onboardingGo(p.first.section);
+    if (p.first.modal) { handleOpenModal(p.first.modal); return undefined; }
+    if (!p.first.invite) return undefined;
+    return shareInvite().then(r => {
+      if (r.ok) update(prev => markInvited(prev));
+      if (from !== 'overlay') {
+        if (r.ok && r.how === 'copied') showCoinToast('Invite link copied. Paste it to a friend.', false);
+        else if (!r.ok && r.reason !== 'cancelled') showCoinToast(r.message || 'Couldn’t share your invite link.', false);
+      }
+      return r;
+    });
+  }
 
   // ── AI Coach verb dispatch ──
   // Called when a Pro user taps an action button inside a coach insight.
@@ -1219,22 +1245,18 @@ function Board({ userId, userEmail, onSignOut, initialSettings }) {
         />
       )}
 
-      {/* Onboarding tutorial — shows once for new users, replayable
-          from Settings. Dark OS users get the terser voice variant. */}
-      <DesignSlot use={ConsoleTutorial} props={{
-        S,
-        visible: !S.tutorialCompleted,
-        theme: resolveEffectiveTheme(S.theme || 'cream-pro') === 'dark-os' ? 'dark' : 'cream',
-        onNavigate: navigate,
-        onClose: () => update(prev => ({ ...prev, tutorialCompleted: true })),
-      }}>
-      <TutorialOverlay
+      {/* Onboarding — "pick what it's for, then do the first thing".
+          Shows once for new accounts (the old tours' flag, so nobody who
+          finished one sees it), replayable from Settings. Same component
+          in both designs. */}
+      <Onboarding
+        S={S}
+        update={update}
         visible={!S.tutorialCompleted}
-        theme={resolveEffectiveTheme(S.theme || 'cream-pro') === 'dark-os' ? 'dark' : 'cream'}
-        onNavigate={navigate}
-        onClose={() => update(prev => ({ ...prev, tutorialCompleted: true }))}
+        paused={!!openModal}
+        onGo={onboardingGo}
+        onDo={id => onboardingDo(id, 'overlay')}
       />
-      </DesignSlot>
       {/* "Blocked" + who to talk to, after any block (item 113). */}
       <BlockedNoticeHost />
     </MutesProvider>

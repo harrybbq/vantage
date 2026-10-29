@@ -480,45 +480,8 @@ html[data-design="console"] .cx-sweep-auth-link.is-quiet { font-weight: 400; fon
 html[data-design="console"] .cx-sweep-auth-switch { margin: 0; text-align: center; }
 html[data-design="console"] .cx-sweep-auth-legal { margin-top: auto; display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: 0 var(--cx-sp-16); color: var(--cx-muted); }
 
-/* ── 7. Tour ─────────────────────────────────────────────────────────── */
-html[data-design="console"] .cx-sweep-tour { position: fixed; inset: 0; z-index: 2100; }
-html[data-design="console"] .cx-sweep-tour-scrim { position: absolute; inset: 0; background: var(--cx-scrim); }
-html[data-design="console"] .cx-sweep-tour-ring {
-  position: absolute; box-sizing: border-box; pointer-events: none;
-  border: 2px solid var(--cx-accent); border-radius: var(--cx-r-panel);
-  box-shadow: 0 0 0 9999px var(--cx-scrim);
-  transition: left var(--cx-dur) var(--cx-ease), top var(--cx-dur) var(--cx-ease), width var(--cx-dur) var(--cx-ease), height var(--cx-dur) var(--cx-ease);
-}
-html[data-design="console"] .cx-sweep-tour-card {
-  position: absolute; box-sizing: border-box; outline: none;
-  display: flex; flex-direction: column; gap: var(--cx-sp-12);
-  padding: var(--cx-sp-16) var(--cx-sp-20) var(--cx-sp-16);
-  background: var(--cx-s1); color: var(--cx-text); font-family: var(--cx-sans);
-  border: 1px solid var(--cx-line); border-radius: var(--cx-r-panel);
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.18); /* one lifted card over the scrim */
-  max-height: calc(100dvh - 32px); overflow-y: auto;
-}
-html[data-design="console"] .cx-sweep-tour-card.is-centred { left: 50%; top: 50%; transform: translate(-50%, -50%); width: min(420px, calc(100vw - 32px)); }
-html[data-design="console"] .cx-sweep-tour-card p { margin: 0; }
-html[data-design="console"] .cx-sweep-tour-top { display: flex; align-items: center; justify-content: space-between; min-height: 24px; }
-html[data-design="console"] .cx-sweep-tour-skip { padding: 4px 0; border: 0; background: none; cursor: pointer; font: 600 var(--cx-fs-13)/1 var(--cx-sans); color: var(--cx-mid); }
-html[data-design="console"] .cx-sweep-tour-skip:hover { color: var(--cx-text); }
-html[data-design="console"] .cx-sweep-tour-title { margin: 0; font: 600 var(--cx-fs-22)/var(--cx-lh-22) var(--cx-sans); letter-spacing: -0.01em; }
-html[data-design="console"] .cx-sweep-tour-dots { display: flex; gap: 6px; }
-html[data-design="console"] .cx-sweep-tour-dots > i { width: 6px; height: 6px; border-radius: 50%; background: var(--cx-line-strong); }
-html[data-design="console"] .cx-sweep-tour-dots > i.is-on { width: 18px; border-radius: 3px; background: var(--cx-accent-fill); }
-html[data-design="console"] .cx-sweep-tour-foot { display: flex; align-items: center; gap: var(--cx-sp-8); }
-html[data-design="console"] .cx-sweep-start { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
-html[data-design="console"] .cx-sweep-start-row {
-  display: flex; align-items: center; gap: var(--cx-sp-12); width: 100%; min-height: 44px; box-sizing: border-box;
-  padding: 0 var(--cx-sp-12); border-radius: var(--cx-r-cell); border: 1px solid var(--cx-line);
-  background: var(--cx-s2); color: var(--cx-text); font: 400 var(--cx-fs-15)/var(--cx-lh-15) var(--cx-sans); text-align: left;
-}
-html[data-design="console"] button.cx-sweep-start-row { cursor: pointer; }
-html[data-design="console"] button.cx-sweep-start-row:hover { border-color: var(--cx-line-strong); }
-html[data-design="console"] .cx-sweep-start-row.is-done .cx-sweep-start-label { color: var(--cx-muted); text-decoration: line-through; }
-html[data-design="console"] .cx-sweep-start-row .cx-check { pointer-events: none; }
-html[data-design="console"] .cx-sweep-start-label { flex: 1; min-width: 0; }
+/* ── 7. Tour: retired 2026-10-29. The onboarding (components/onboarding)
+   replaced it in both designs and styles itself. ── */
 
 /* ── 8. Honours (trophy case) ────────────────────────────────────────── */
 html[data-design="console"] .cx-sweep-honours { display: flex; flex-direction: column; gap: var(--cx-sp-16); }

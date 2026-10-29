@@ -421,7 +421,7 @@ Schedule the 30-day purge. It is currently "delete by hand".
 (rendered only when `window.__vantageOwner`, `SettingsSection.jsx:1000`) and
 compiled out of native. Yet the policy (`LegalPage.jsx:80,96,98,100`) and the
 Terms (`:287,:322`) describe it as a user feature. So do strings that **ship
-in the native build**: `src/components/TutorialOverlay.jsx:96,138,168`,
+in the native build**: ~~`src/components/TutorialOverlay.jsx`~~ (deleted 2026-10-29: the onboarding replaced it and names neither),
 `src/components/TrackSection.jsx:898`, `src/components/track/AutoFillModal.jsx:29,32,33`,
 `src/components/consent/consentCopy.js:11,13`, `src/components/settings/ConsentCard.jsx:70`.
 *Fix:* remove "Apple Health" from user-facing copy, or gate it on

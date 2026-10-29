@@ -40,10 +40,10 @@ const len = v => (Array.isArray(v) ? v.length : 0);
 export const PICKS = Object.freeze([
   {
     id: 'fitness', label: 'Fitness', icon: 'dumbbell',
-    line: 'Trackers, food, weight and sleep. WHOOP or Oura if you have one.',
+    line: 'Daily trackers, food, weight and sleep.',
     first: {
       title: 'Log one thing today',
-      body: 'A tracker is anything you do daily: the gym, water, 10k steps. You have a few ready to tick, or add your own. One can tick itself from WHOOP or Oura later.',
+      body: 'A tracker is anything you do daily: the gym, water, 10k steps. You have a few ready to tick, or add your own with the button.',
       cta: 'Open my trackers', section: 'trackers', modal: null, target: 'add-tracker',
       check: 'Tick a tracker',
       doneTitle: 'First tracker ticked',

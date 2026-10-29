@@ -31,7 +31,29 @@ retired `cream`/`dark` ids map forward in `resolveEffectiveTheme`.
 - Hub widgets: shared React bodies (see `src/components/widgets/LifeWidgets.jsx`, `savings/SavingsWidgets.jsx`) rendered by `mobile/MobileWidget.jsx` (mobile stack) and as React islands in `HubSection.jsx` (desktop draggable canvas). Add a widget = META entry + renderBody case + both pickers (`AddMobileWidgetModal`, `Modals.jsx`).
 - Netlify functions own anything cross-user or secret: leaderboard, WHOOP sync (`netlify/lib/whoop.js`), AI (`ai-food-detect`, `ai-coach-daily` — need `ANTHROPIC_API_KEY` env).
 - Social: `profiles`/`friendships`/`messages`/`blocks`/`reports` tables, RLS-gated direct queries in `src/lib/friends/`. Report+block UI exists (friend card + DM ⋯ menu).
-- Legal: `/privacy` and `/terms` deep-link pre-auth (store requirement). Tutorial: `TutorialOverlay.jsx`; per-page help: `SectionHelp`.
+- Legal: `/privacy` and `/terms` deep-link pre-auth (store requirement). Onboarding (replaced both old tours, Oct 2026): logic `src/lib/onboarding/onboarding.js`, overlay `components/onboarding/Onboarding.jsx`, hub Getting started card; per-page help: `SectionHelp`.
+
+## Onboarding stays current (owner rule, 2026-10-29)
+Every time a feature is added or changed, decide whether the onboarding
+should cover it, and say which way you decided (and why) in the PR body
+under "Onboarding". If it should, update the onboarding in the same PR.
+- The onboarding is "pick what it's for, then do the first thing": one
+  stop per pick (`PICKS` in `onboarding.js`), each opening the real add
+  flow and done when the STATE says so. Keep it that small. A feature
+  earns a place only if it is a better *first thing* for a pick, a new
+  area big enough to be its own pick, or it changes how an existing
+  first thing works.
+- Changed the flow a pick points at (a modal id, the add button, the
+  section, what counts as done)? Update that pick's `first`, its
+  `data-ob` marker on the real button (both designs), and
+  `onboarding.test.mjs`. A stale stop points at nothing.
+- New pick: add it to `PICKS` (its copy, icon, section, modal, target,
+  check and `done(S)`), mark the button, extend the test, and check the
+  pick screen still fits a 360 px phone.
+- Owner-only features (the Upgrade section, trading, Open Banking) are
+  never in the onboarding.
+- Copy follows the house voice: plain, short, no claims the code doesn't
+  back (check that a "counts toward your rating" line is true first).
 
 ## Startup / store readiness
 `STARTUP_REQUIREMENTS.md` is the ordered checklist for getting Vantage

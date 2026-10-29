@@ -18,7 +18,7 @@ const SLOTS = {
   hub: ['ConsoleHub'],
   track: ['ConsoleTrack', 'ConsoleHoliday'],
   sweep: ['ConsoleHabits', 'ConsoleSettings', 'ConsoleAchievements', 'ConsoleShop', 'ConsoleLeaderboard', 'ConsoleFriends',
-    'ConsolePaywall', 'ConsoleTutorial', 'ConsoleAuth'],
+    'ConsolePaywall', 'ConsoleAuth'],
 };
 
 let n = 0;

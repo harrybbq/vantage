@@ -12,8 +12,24 @@ import { getMyInvite } from '../friends/invites';
  * Cancelling the share sheet is { ok: false, reason: 'cancelled' }.
  * Never throws.
  */
+// The link, fetched ahead of the tap. Safari only lets navigator.share
+// (and the clipboard) run close to the tap that asked for it; a database
+// round trip in between can use that up, so the Friends stop fetches the
+// link as it opens and the tap shares straight away.
+let ready = null;   // { at, promise }
+const FRESH_MS = 60 * 1000;   // short: Friends › Invite can replace the link
+
+/** Start fetching the invite link now; shareInvite() reuses it for a minute. */
+export function prefetchInvite() {
+  if (ready && Date.now() - ready.at < FRESH_MS) return ready.promise;
+  const promise = getMyInvite().catch(() => ({ ok: false, reason: 'error' }));
+  ready = { at: Date.now(), promise };
+  promise.then(r => { if (!r || !r.ok) ready = null; });
+  return promise;
+}
+
 export async function shareInvite() {
-  const invite = await getMyInvite();
+  const invite = await prefetchInvite();
   if (!invite || !invite.ok) {
     return { ok: false, reason: invite?.reason || 'error', message: invite?.message || 'Couldn’t get your invite link. Try again in a moment.' };
   }
