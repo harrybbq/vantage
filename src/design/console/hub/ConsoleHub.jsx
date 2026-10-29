@@ -13,6 +13,8 @@
  * Data safety: the only layout write is S.hubGrid (useHubGrid.commit).
  * The rewards sheet writes S.cardStyle (one additive key, withCardStyle);
  * the chosen finish is drawn through `data-cx-card` on the hub.
+ * The Getting started card's Hide writes S.onboarding.hidden (additive,
+ * lib/onboarding hideGettingStarted); its "Do it" writes nothing.
  * Widget bodies write the same keys they write in classic (logs, habits,
  * vitalsLog …), always through functional `update`.
  */
@@ -39,6 +41,7 @@ import { resolveCardStyle } from '../../../lib/ratings/prestigeRewards';
 import { FriendTakeover, FriendsOverlays, friendsMeta } from './FriendsWidget';
 import { leagueMeta } from './LeagueWidget';
 import { todayMeta } from './TodayWidget';
+import GettingStartedCard from '../../../components/onboarding/GettingStartedCard';
 
 /** Where a widget's title goes. */
 const TITLE_ROUTE = {
@@ -104,6 +107,11 @@ export default function ConsoleHub(props) {
         {isMobile
           ? <PlayerCard S={S} visionState={visionState} hub={hub} navigate={navigate} onOpenVisions={onOpenVisions} onOpenRatings={openRatings} onOpenRewards={openRewards} />
           : <PlayerStrip S={S} visionState={visionState} hub={hub} navigate={navigate} onOpenVisions={onOpenVisions} onOpenRatings={openRatings} onOpenRewards={openRewards} />}
+
+        {/* Onboarding's Getting started: renders nothing unless this
+            account picked (S.onboarding.picks) and has items left. */}
+        <GettingStartedCard S={S} update={update} variant="console" phone={!!isMobile}
+                            friends={hub.friends?.friends?.length} />
 
         {takeover ? (
           <FriendTakeover hub={hub} />

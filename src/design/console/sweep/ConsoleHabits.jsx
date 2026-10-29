@@ -81,7 +81,7 @@ export default function ConsoleHabits({ S, update, isMobile, onOpenModal, onShow
   const stats = !isMobile && habits.length ? habitSummary(habits, now) : [];
 
   const addBtn = (
-    <Button variant="primary" icon="plus" onClick={add} data-testid="cx-habits-add">{isMobile ? 'Add' : 'Add habit'}</Button>
+    <Button variant="primary" icon="plus" onClick={add} data-testid="cx-habits-add" data-ob="add-habit">{isMobile ? 'Add' : 'Add habit'}</Button>
   );
 
   return (

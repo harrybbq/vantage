@@ -34,6 +34,7 @@ import RatingsPanel from '../RatingsPanel';
 import HubDrawer, { EDGE_PX, OPEN_THRESHOLD } from './HubDrawer';
 import { useDailyBrief } from '../../hooks/useDailyBrief';
 import { trackerDone } from '../../lib/trackers/done';
+import GettingStartedCard from '../onboarding/GettingStartedCard';
 
 function pad2(n) { return String(n).padStart(2, '0'); }
 
@@ -199,6 +200,12 @@ export default function MobileHubSection({ S, update, visionState, hasPro, navig
           </button>
         )}
       </section>
+
+      {/* Onboarding's Getting started, under the greeting. Renders
+          nothing unless this account picked and has items left. No
+          friend count here (the friends list isn't loaded on this
+          screen); the Friends item counts once the invite is shared. */}
+      <GettingStartedCard S={S} update={update} variant="classic" phone />
 
       {/* Widget stack. New widgets append below the last; hold one to
           reorder — dragging near the top or bottom edge scrolls the

@@ -85,7 +85,7 @@ export default function HolidaySection({ S, update, active, onOpenModal }) {
             /></div>
           </motion.div>
           {tab === 'trips' && (
-            <motion.button className="btn btn-primary" onClick={() => onOpenModal('addHolidayModal')}
+            <motion.button className="btn btn-primary" data-ob="add-trip" onClick={() => onOpenModal('addHolidayModal')}
               whileHover={{ scale: 1.04 }} whileTap={{ scale: 0.96 }}
               transition={{ type: 'spring', stiffness: 400, damping: 17 }}>+ Plan Trip</motion.button>
           )}

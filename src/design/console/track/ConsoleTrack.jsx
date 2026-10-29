@@ -183,8 +183,8 @@ export default function ConsoleTrack({
         <Segmented label="Track sections" options={TABS} value={tab} onChange={setTab} className="cx-track-tabs" />
         {tab === 'calendar' && (
           wide
-            ? <Button variant="primary" icon="plus" onClick={() => add(selected)} className="cx-track-addbtn">Add</Button>
-            : <Button variant="primary" icon="plus" iconOnly label="Add to calendar" onClick={() => add(selected)} className="cx-track-addbtn" />
+            ? <Button variant="primary" icon="plus" onClick={() => add(selected)} className="cx-track-addbtn" data-ob="add-trip">Add</Button>
+            : <Button variant="primary" icon="plus" iconOnly label="Add to calendar" onClick={() => add(selected)} className="cx-track-addbtn" data-ob="add-trip" />
         )}
       </header>
 

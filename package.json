@@ -29,7 +29,7 @@
     "check:legalroutes": "node src/lib/legalRoutes.test.mjs",
     "check:webaccess": "node src/lib/webAccess.test.mjs",
     "check:buildgate": "node src/lib/buildGate.test.mjs",
-    "check:onboarding": "node src/lib/onboarding/onboarding.test.mjs",
+    "check:onboarding": "node src/lib/onboarding/onboarding.test.mjs && node src/lib/onboarding/bus.test.mjs",
     "check:console": "node scripts/check-console.mjs",
     "check:wearablestrip": "node src/lib/wearables/strip.test.mjs",
     "check:wearablerevoke": "node netlify/lib/wearableRevoke.test.mjs",

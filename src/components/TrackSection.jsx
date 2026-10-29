@@ -96,7 +96,7 @@ function TrackersList({ trackers, logs, streaks, onDelete, onOpenModal, update, 
     <div className="card trackers-panel">
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
         <h3 style={{ margin: 0 }}>Trackers</h3>
-        <motion.button className="btn btn-primary btn-sm" onClick={() => onOpenModal('addTrackerModal')}
+        <motion.button className="btn btn-primary btn-sm" data-ob="add-tracker" onClick={() => onOpenModal('addTrackerModal')}
           whileHover={{ scale: 1.08 }} whileTap={{ scale: 0.93 }}
           transition={{ type: 'spring', stiffness: 400, damping: 17 }}>+</motion.button>
       </div>
@@ -106,7 +106,7 @@ function TrackersList({ trackers, logs, streaks, onDelete, onOpenModal, update, 
             <div className="section-empty-icon"><Icon name="chart-column" size={30} strokeWidth={1.5} /></div>
             <div className="section-empty-title">No trackers yet</div>
             <div className="section-empty-body">Track habits, workouts, water — anything you want to build consistency around.</div>
-            <button className="btn btn-primary btn-sm section-empty-cta" onClick={() => onOpenModal('addTrackerModal')}>Add first tracker</button>
+            <button className="btn btn-primary btn-sm section-empty-cta" data-ob="add-tracker" onClick={() => onOpenModal('addTrackerModal')}>Add first tracker</button>
           </div>
         )}
         {trackers.map((t, index) => {

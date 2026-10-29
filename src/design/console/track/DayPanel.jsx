@@ -195,7 +195,7 @@ export default function DayPanel({
           <TIcon name={all ? 'chevron-up' : 'chevron-down'} size={16} />
         </button>
       )}
-      <button type="button" className="cx-track-link" onClick={onManage}>
+      <button type="button" className="cx-track-link" data-ob="add-tracker" onClick={onManage}>
         <span>Manage trackers</span>
         <span className="cx-track-link-m">Auto-fill · add · remove</span>
       </button>

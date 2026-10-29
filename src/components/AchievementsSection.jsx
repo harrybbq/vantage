@@ -921,6 +921,7 @@ export default function AchievementsSection({ S, update, active, onOpenModal, on
           <motion.button
             type="button"
             className="btn btn-primary"
+            data-ob="add-goal"
             onClick={() => onOpenModal('addAchievementModal')}
             whileHover={{ scale: 1.04 }}
             whileTap={{ scale: 0.96 }}

@@ -127,7 +127,7 @@ export default function FriendsWidget({ hub, size, isMobile, navigate }) {
         <button type="button" className="cx-hub-link is-strong" onClick={() => navigate?.('friends')}>
           <MsgIcon size={15} /> Messages {hub.unreadTotal > 0 && <span className="cx-hub-pill cx-num">{hub.unreadTotal}</span>}
         </button>
-        <button type="button" className="cx-hub-link" onClick={hub.openAdd}>
+        <button type="button" className="cx-hub-link" data-ob="add-friend" onClick={hub.openAdd}>
           <Icon name="user-plus" size={15} strokeWidth={1.75} /> Add a friend
         </button>
         <span className="cx-hub-sp" />
@@ -282,7 +282,7 @@ export function FriendTakeover({ hub }) {
           <span className="cx-muted">{friendsMeta(hub)}</span>
         </div>
         <ul className="cx-hub-list">{hub.rows.map(r => <FriendRow key={r.id} f={r} onOpen={hub.openFriend} selected={r.id === f.id} />)}</ul>
-        <button type="button" className="cx-hub-link" onClick={hub.openAdd}><Icon name="user-plus" size={15} strokeWidth={1.75} /> Add a friend</button>
+        <button type="button" className="cx-hub-link" data-ob="add-friend" onClick={hub.openAdd}><Icon name="user-plus" size={15} strokeWidth={1.75} /> Add a friend</button>
       </div>
       <div className="cx-hub-take-chat">
         <div className="cx-hub-take-h">

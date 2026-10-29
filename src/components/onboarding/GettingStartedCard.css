@@ -1,0 +1,174 @@
+/* ──────────────────────────────────────────────────────────────────────────
+   Getting started card — CLASSIC look (GettingStartedCard variant="classic").
+   Rendered by HubOsLayout (desktop, both themes) and MobileHubSection
+   (phones). Same language as the OS panels round it (hub-dark.css §5):
+   mono caps eyebrow with the // marker, hairline rules, accent text —
+   plus an accent border, because it is the one thing on the hub asking
+   for an action. Every colour is a theme token, so dark-os and cream-pro
+   both follow the user's accent scheme.
+   The console look is in src/design/console/hub.css (.cx-gs-*).
+   ────────────────────────────────────────────────────────────────────────── */
+.ob-gs {
+  border: 1px solid var(--accent-line-mid, rgba(var(--em-rgb), .42));
+  border-radius: 9px;
+  background: var(--bg-raised, #fff);
+  color: var(--text);
+  overflow: hidden;
+  min-width: 0;
+  flex-shrink: 0;
+}
+.ob-gs.is-phone { border-radius: 12px; }
+
+.ob-gs-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 12px 7px;
+}
+.ob-gs-t {
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--mono);
+  font-size: var(--fs-floor);
+  font-weight: 500;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+.ob-gs-t::before { content: '//'; color: var(--em-text); opacity: .7; }
+.ob-gs-count {
+  font-family: var(--mono);
+  font-size: var(--fs-floor);
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  color: var(--em-text);
+  white-space: nowrap;
+}
+
+.ob-gs-bar {
+  height: 3px;
+  background: rgba(var(--em-rgb), .14);
+}
+.ob-gs-bar > i {
+  display: block;
+  height: 100%;
+  background: var(--em);
+  transition: width .3s ease;
+}
+
+.ob-gs-list { list-style: none; margin: 0; padding: 0; }
+.ob-gs-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 44px;
+  padding: 6px 12px;
+  box-sizing: border-box;
+}
+.ob-gs-row + .ob-gs-row { border-top: 1px solid var(--border); }
+
+.ob-gs-mark {
+  flex: none;
+  width: 18px;
+  height: 18px;
+  box-sizing: border-box;
+  border-radius: 50%;
+  border: 1.5px solid var(--text-muted);
+  display: inline-grid;
+  place-items: center;
+}
+.ob-gs-row.is-done .ob-gs-mark {
+  border-color: var(--em);
+  background: var(--em);
+  color: #fff; /* on the accent fill; every scheme's em is dark enough */
+}
+
+.ob-gs-label {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-family: var(--sans);
+  font-size: 13.5px;
+  line-height: 1.35;
+  color: var(--text);
+}
+.ob-gs-row.is-done .ob-gs-label { color: var(--text-muted); }
+
+.ob-gs-pick {
+  flex: none;
+  font-family: var(--mono);
+  font-size: var(--fs-floor);
+  letter-spacing: 1.4px;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+.ob-gs-do {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 30px;
+  padding: 0 14px;
+  border-radius: 7px;
+  border: 1px solid var(--em);
+  background: rgba(var(--em-rgb), .12);
+  color: var(--em-text);
+  font-family: var(--mono);
+  font-size: var(--fs-floor);
+  font-weight: 600;
+  letter-spacing: 1.2px;
+  text-transform: uppercase;
+  white-space: nowrap;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition: background .15s;
+}
+.ob-gs-do:hover { background: rgba(var(--em-rgb), .2); }
+
+.ob-gs-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 4px 6px 4px 12px;
+  border-top: 1px solid var(--border);
+}
+.ob-gs-note {
+  min-width: 0;
+  font-family: var(--sans);
+  font-size: 12px;
+  color: var(--text-muted);
+}
+.ob-gs-hide {
+  flex: none;
+  min-height: 30px;
+  padding: 0 8px;
+  border: 0;
+  background: none;
+  color: var(--text-muted);
+  font-family: var(--mono);
+  font-size: var(--fs-floor);
+  letter-spacing: 1.2px;
+  text-transform: uppercase;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.ob-gs-hide:hover { color: var(--text); }
+
+.ob-gs-do:focus-visible,
+.ob-gs-hide:focus-visible {
+  outline: 2px solid var(--em);
+  outline-offset: 2px;
+}
+
+/* Phones: 44 px targets. */
+.ob-gs.is-phone .ob-gs-row { padding: 6px 8px 6px 14px; }
+.ob-gs.is-phone .ob-gs-do { min-height: 44px; min-width: 64px; }
+.ob-gs.is-phone .ob-gs-hide { min-height: 44px; min-width: 44px; }
+.ob-gs.is-phone .ob-gs-foot { padding-left: 14px; }
