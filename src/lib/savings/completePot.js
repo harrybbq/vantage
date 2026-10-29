@@ -37,11 +37,11 @@ export const livePots = goals => (goals || []).filter(g => g && !g.completedAt);
  * @returns null if no such live pot, else
  *   { goal, amount, draws: [{ id, name, before, take, after }], covered, short, drainable }
  */
-export function planPotCompletion(S, goalId, now = Date.now()) {
+export function planPotCompletion(S, goalId, now = Date.now(), { accounts: useAccounts = true } = {}) {
   const goal = (S?.savings || []).find(g => g.id === goalId);
   if (!goal || goal.completedAt) return null;
   const amount = pence(Math.max(0, Number(goal.current) || 0));
-  const accounts = (S?.savingsAccounts || []).filter(a => a && a.drainable);
+  const accounts = useAccounts ? (S?.savingsAccounts || []).filter(a => a && a.drainable) : [];
   let left = amount;
   const draws = [];
   for (const a of accounts) {
@@ -56,8 +56,27 @@ export function planPotCompletion(S, goalId, now = Date.now()) {
   };
 }
 
-/** The state with the pot completed and its accounts drawn down. */
-export function completePot(prev, goalId, now = Date.now()) {
+/**
+ * The state with the pot completed and its accounts drawn down.
+ *
+ * `{ accounts: false }` is for someone who cannot see accounts (they are
+ * owner-only — lib/savings/visibleAccounts): the pot completes with
+ * nothing drawn, and `savingsAccounts` and `savingsHistory` are not
+ * touched at all — not even re-mapped.
+ */
+export function completePot(prev, goalId, now = Date.now(), { accounts = true } = {}) {
+  if (!accounts) {
+    const plan = planPotCompletion(prev, goalId, now, { accounts: false });
+    if (!plan) return prev;
+    return {
+      ...prev,
+      savings: (prev.savings || []).map(g => (g.id === goalId
+        // A record kept by an earlier accounts-off undo stays put.
+        ? { ...g, completedAt: now, completedAmount: plan.amount,
+            drained: Array.isArray(g.drained) && g.drained.length ? g.drained : [] }
+        : g)),
+    };
+  }
   const plan = planPotCompletion(prev, goalId, now);
   if (!plan) return prev;
   const takes = new Map(plan.draws.map(d => [d.id, d.take]));
@@ -77,11 +96,22 @@ export function completePot(prev, goalId, now = Date.now()) {
 /**
  * Undo a completion: every withdrawal goes back where it came from, and
  * the pot is live again. An account deleted since simply cannot be
- * refunded — the rest still are.
+ * refunded — the rest still are. `{ accounts: false }`: see completePot.
  */
-export function undoCompletePot(prev, goalId, now = Date.now()) {
+export function undoCompletePot(prev, goalId, now = Date.now(), { accounts = true } = {}) {
   const goal = (prev.savings || []).find(g => g.id === goalId);
   if (!goal || !goal.completedAt) return prev;
+  if (!accounts) {
+    // No refund — that would rewrite balances this person cannot see —
+    // and `drained` is KEPT rather than cleared: it is the only record
+    // of what was taken from which account, should the gate ever lift.
+    return {
+      ...prev,
+      savings: (prev.savings || []).map(g => (g.id === goalId
+        ? { ...g, completedAt: null, completedAmount: null }
+        : g)),
+    };
+  }
   const back = new Map();
   for (const d of (goal.drained || [])) {
     if (d && d.accountId) back.set(d.accountId, pence((back.get(d.accountId) || 0) + (Number(d.amount) || 0)));

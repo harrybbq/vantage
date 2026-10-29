@@ -11,8 +11,14 @@
  *   · drag to reorder, and to move between folders
  *   · folders (groups) with rename, collapse and delete
  *   · a from/until window, for money that starts or stops
- *   · routing into a pot AND/OR a savings account
+ *   · routing into a pot AND/OR a savings account (accounts: owner only)
  *   · a pay day for routed income
+ *
+ * Accounts are owner-only (lib/savings/visibleAccounts). For anyone else
+ * the rows are DRAWN from a view in which no row points at an account —
+ * a row that did reads as the plain income or expense it is — but every
+ * write still starts from the stored rows, so a stored `accountId` is
+ * never dropped by an edit, a reorder or "clear".
  * The row shows the first line always; the rest sits on a second line so
  * a plain "Rent, £1,250, monthly" stays a plain one-line row.
  */
@@ -22,6 +28,7 @@ import Icon from '../Icon';
 import {
   toMonthly, money, potColor, flowSections, sectionColor, SECTION_PALETTE,
 } from '../../lib/savings/derive';
+import { visibleAccounts, visibleItems } from '../../lib/savings/visibleAccounts';
 
 const uid = p => p + Date.now().toString(36) + Math.round(Math.random() * 1e4).toString(36);
 
@@ -73,7 +80,7 @@ function ColorPicker({ value, onPick, label }) {
 function FlowRow({
   it, goals, accounts, denom, dropHint, dragId,
   openMore, setOpenMore, setDropHint,
-  updateItem, patchItem, removeItem, reorder,
+  updateItem, patchItem, removeItem, reorder, showAccounts,
 }) {
     const m = toMonthly(it.amount, it.freq);
     const isIncome = it.kind === 'income';
@@ -211,7 +218,11 @@ function FlowRow({
               <button
                 type="button" className="sb-row-less"
                 onClick={() => {
-                  patchItem(it.id, { goalId: null, accountId: null, from: null, until: null });
+                  // Without accounts on screen, "clear" clears what is on
+                  // screen; a stored accountId is not this view's to drop.
+                  patchItem(it.id, showAccounts
+                    ? { goalId: null, accountId: null, from: null, until: null }
+                    : { goalId: null, from: null, until: null });
                   setOpenMore(prev => { const n = new Set(prev); n.delete(it.id); return n; });
                 }}
               >clear</button>
@@ -246,13 +257,16 @@ function FlowRow({
     );
   }
 
-export default function FlowEditor({ S, update, flow, bills = null }) {
+export default function FlowEditor({ S, update, flow, bills = null, showAccounts = false }) {
   const proj = S.projection || {};
+  // `items` is what is STORED and what every write below starts from;
+  // `shown` is what is drawn (see the header).
   const items = proj.items || [];
+  const shown = visibleItems(items, showAccounts);
   const groups = proj.groups || [];
   const horizon = proj.horizon || 12;
   const goals = S.savings || [];
-  const accounts = S.savingsAccounts || [];
+  const accounts = visibleAccounts(S, showAccounts);
 
   const dragId = useRef(null);
   const [dropHint, setDropHint] = useState(null);
@@ -337,11 +351,11 @@ export default function FlowEditor({ S, update, flow, bills = null }) {
 
   const denom = Math.max(1, flow.income);
 
-  const loose = items.filter(i => !i.groupId);
+  const loose = shown.filter(i => !i.groupId);
   /* One band per SECTION, not per row: a folder called Subscriptions is
      one band called Subscriptions, sized by everything in it. Eight
      slivers told you nothing the list below did not already say. */
-  const sections = flowSections(items, groups, new Date(), bills);
+  const sections = flowSections(shown, groups, new Date(), bills);
   const segTip = useSegTip();
   const leftOver = Math.max(0, flow.net) / denom * 100;
 
@@ -418,11 +432,11 @@ export default function FlowEditor({ S, update, flow, bills = null }) {
             dropHint={dropHint} dragId={dragId} openMore={openMore}
             setOpenMore={setOpenMore} setDropHint={setDropHint}
             updateItem={updateItem} patchItem={patchItem}
-            removeItem={removeItem} reorder={reorder} />
+            removeItem={removeItem} reorder={reorder} showAccounts={showAccounts} />
         ))}
 
         {groups.map(g => {
-          const kids = items.filter(i => i.groupId === g.id);
+          const kids = shown.filter(i => i.groupId === g.id);
           const total = kids.reduce((s, i) => s + (i.kind === 'income' ? 1 : -1) * toMonthly(i.amount, i.freq), 0);
           const isShut = collapsed.has(g.id);
           return (
@@ -460,7 +474,7 @@ export default function FlowEditor({ S, update, flow, bills = null }) {
                     dropHint={dropHint} dragId={dragId} openMore={openMore}
                     setOpenMore={setOpenMore} setDropHint={setDropHint}
                     updateItem={updateItem} patchItem={patchItem}
-                    removeItem={removeItem} reorder={reorder} />
+                    removeItem={removeItem} reorder={reorder} showAccounts={showAccounts} />
                     ))
                     : <div className="sb-group-empty">Drag rows in, or add one.</div>}
                 </div>

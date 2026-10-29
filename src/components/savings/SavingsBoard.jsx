@@ -6,6 +6,12 @@
  * PROJECTION (cash and savings out to a horizon, fed by an editable
  * cash flow), and the ACCOUNTS behind the savings line.
  *
+ * ACCOUNTS ARE OWNER-ONLY (decided 2026-10-29). For everyone else this
+ * is pots, contributions and cash flow: no Accounts tab or panel, no
+ * savings line, no "draw from accounts", and every number derived as if
+ * there were no accounts — while S.savingsAccounts stays untouched in
+ * state. See lib/savings/visibleAccounts and hooks/useShowAccounts.
+ *
  * Desktop shows all three down one page; a phone shows one at a time
  * under a sub-tab. Both read the same derivations from
  * src/lib/savings/derive.js, so they cannot disagree about a number.
@@ -20,18 +26,25 @@
  */
 import { balanceNow } from '../../lib/savings/interest';
 import { planPotCompletion, completePot, undoCompletePot, livePots } from '../../lib/savings/completePot';
-import { useEffect, useMemo, useState } from 'react';
+import { Suspense, lazy, useEffect, useMemo, useState } from 'react';
 import Icon from '../Icon';
 import { useIsMobile } from '../../hooks/useIsMobile';
+import { useShowAccounts } from '../../hooks/useShowAccounts';
+import { OWNER_SURFACES_IN_BUILD } from '../../lib/native/ownerSurfaces';
+import { visibleAccounts, visibleItems, savingsView } from '../../lib/savings/visibleAccounts';
 import ProjectionChart from './ProjectionChart';
 import FlowEditor from './FlowEditor';
-import AccountsPanel from './AccountsPanel';
 import PlanPostCard from './PlanPostCard';
 import {
   derivePot, last12Months, potTotals, flowTotals,
   cashSeries, savingsSeries, money, potColor, monthLabel,
 } from '../../lib/savings/derive';
 import { subsStats } from '../../lib/money/recurring';
+
+/* Accounts are owner-only (lib/savings/visibleAccounts). In a native
+   build the flag folds to false and the panel's module graph is not in
+   the bundle at all — absent from the store binary, not hidden in it. */
+const AccountsPanel = OWNER_SURFACES_IN_BUILD ? lazy(() => import('./AccountsPanel')) : null;
 
 const HORIZONS = [{ m: 12, label: '1y' }, { m: 24, label: '2y' }, { m: 60, label: '5y' }];
 
@@ -98,15 +111,18 @@ function Vessel({ goal, d, colour, selected, onSelect }) {
  * The confirm step for completing a pot: exactly what comes out of which
  * account, before anything does. See lib/savings/completePot.
  */
-function CompleteConfirm({ plan, onConfirm, onCancel }) {
+function CompleteConfirm({ plan, onConfirm, onCancel, showAccounts }) {
   if (!plan) return null;
   const none = plan.drainable === 0;
+  /* Without accounts there is nothing to draw on and nothing to say about
+     it: the pot is marked spent, and that is the whole of it. */
+  const accountsNote = OWNER_SURFACES_IN_BUILD && showAccounts && plan.amount > 0;
   return (
     <div className="sb-complete" role="dialog" aria-label={`Complete ${plan.goal.name}`}>
       <div className="sb-complete-head">
         Complete <b>{plan.goal.name}</b>{plan.amount > 0 ? <> — {money(plan.amount)} spent</> : null}
       </div>
-      {plan.amount > 0 && (none ? (
+      {accountsNote && (none ? (
         <p className="sb-complete-note">
           No accounts are ticked to pay out completed pots, so no balance will change.
           Tick them under Accounts (“Pays out completed pots”) and they are drawn on in list order.
@@ -139,7 +155,7 @@ function CompleteConfirm({ plan, onConfirm, onCancel }) {
 }
 
 /** Completed pots: what they cost, where it came from, and Undo. */
-function CompletedStrip({ goals, accounts, onUndo }) {
+function CompletedStrip({ goals, accounts, onUndo, showAccounts }) {
   const [armed, setArmed] = useState(null);
   useEffect(() => {
     if (!armed) return undefined;
@@ -152,8 +168,11 @@ function CompletedStrip({ goals, accounts, onUndo }) {
     <div className="sb-done">
       <div className="sb-eyebrow">Completed</div>
       {goals.map(g => {
-        const from = (g.drained || []).map(d => nameOf(d.accountId));
-        const back = (g.drained || []).reduce((s, d) => s + (Number(d.amount) || 0), 0);
+        // Where it was drawn from, and what Undo puts back, are both about
+        // accounts — said only to someone who can see them.
+        const drained = showAccounts ? (g.drained || []) : [];
+        const from = drained.map(d => nameOf(d.accountId));
+        const back = drained.reduce((s, d) => s + (Number(d.amount) || 0), 0);
         return (
           <div key={g.id} className="sb-done-row">
             <span className="sb-done-icon" aria-hidden="true">{g.icon || '💰'}</span>
@@ -178,7 +197,7 @@ function CompletedStrip({ goals, accounts, onUndo }) {
   );
 }
 
-function PotCard({ goal, d, colour, expanded, onToggleExpand, onCollapse, achievement, onOpenModal, planComplete, onComplete }) {
+function PotCard({ goal, d, colour, expanded, onToggleExpand, onCollapse, achievement, onOpenModal, planComplete, onComplete, showAccounts }) {
   const [confirming, setConfirming] = useState(false);
   const bars = useMemo(() => (expanded ? last12Months(goal) : []), [goal, expanded]);
   const barMax = Math.max(...bars.map(Math.abs), 1);
@@ -273,6 +292,7 @@ function PotCard({ goal, d, colour, expanded, onToggleExpand, onCollapse, achiev
           {confirming && (
             <CompleteConfirm
               plan={planComplete()}
+              showAccounts={showAccounts}
               onCancel={() => setConfirming(false)}
               onConfirm={() => { setConfirming(false); onComplete(); }}
             />
@@ -366,8 +386,15 @@ export default function SavingsBoard({ S, update, onOpenModal }) {
 
   const goals = useMemo(() => S.savings || [], [S.savings]);
   const proj = S.projection || {};
-  const items = useMemo(() => proj.items || [], [proj.items]);
-  const accounts = useMemo(() => S.savingsAccounts || [], [S.savingsAccounts]);
+  /* Accounts are the owner's alone. For anyone else every number below
+     is derived as if there were none — no accounts, and no flow row
+     pointing at one — while S.savingsAccounts stays exactly as stored.
+     These are read-only views: every write below goes through `prev`. */
+  const showAccounts = useShowAccounts();
+  const items = useMemo(() => visibleItems(proj.items || [], showAccounts), [proj.items, showAccounts]);
+  const accounts = visibleAccounts(S, showAccounts);   // stable: S.savingsAccounts itself, or one frozen []
+  const viewS = useMemo(() => savingsView(S, showAccounts), [S, showAccounts]);
+  const accOpts = useMemo(() => ({ accounts: showAccounts }), [showAccounts]);
   const horizon = proj.horizon || 12;
 
   const totals = useMemo(() => potTotals(goals, items, accounts), [goals, items, accounts]);
@@ -494,9 +521,10 @@ export default function SavingsBoard({ S, update, onOpenModal }) {
                   ? (S.achievements || []).find(a => a.id === g.achievementId)
                   : null}
                 onOpenModal={onOpenModal}
-                planComplete={() => planPotCompletion(S, g.id)}
+                planComplete={() => planPotCompletion(S, g.id, Date.now(), accOpts)}
+                showAccounts={showAccounts}
                 onComplete={() => {
-                  update(prev => completePot(prev, g.id, Date.now()));
+                  update(prev => completePot(prev, g.id, Date.now(), accOpts));
                   setSelId(null); setExpanded(false);
                 }}
               />
@@ -518,14 +546,15 @@ export default function SavingsBoard({ S, update, onOpenModal }) {
       <CompletedStrip
         goals={goals.filter(g => g.completedAt).sort((a, b) => b.completedAt - a.completedAt)}
         accounts={accounts}
-        onUndo={id => update(prev => undoCompletePot(prev, id, Date.now()))}
+        showAccounts={showAccounts}
+        onUndo={id => update(prev => undoCompletePot(prev, id, Date.now(), accOpts))}
       />
     </div>
   );
 
   const chartEl = (
     <ProjectionChart
-      cash={cash} sav={sav} horizon={horizon}
+      cash={cash} sav={sav} horizon={horizon} savings={showAccounts}
       marks={totals.derived
         .filter(x => !x.d.done && x.d.etaMonths != null && x.d.etaMonths <= horizon)
         .map(x => ({ m: x.d.etaMonths, label: x.goal.icon || '●', name: x.goal.name }))}
@@ -539,27 +568,37 @@ export default function SavingsBoard({ S, update, onOpenModal }) {
     />
   );
 
-  const flowEl = <FlowEditor S={S} update={update} flow={flow} bills={bills} />;
+  // FlowEditor gets the REAL state: it writes rows from what it is given,
+  // so it filters for display itself and keeps every stored accountId.
+  const flowEl = <FlowEditor S={S} update={update} flow={flow} bills={bills} showAccounts={showAccounts} />;
 
-  const accountsSurface = (
-    <AccountsPanel S={S} update={update} sav={sav} horizon={horizon} items={items} />
-  );
+  const accountsOn = !!(AccountsPanel && showAccounts);
+  const accountsSurface = accountsOn ? (
+    <Suspense fallback={null}>
+      <AccountsPanel S={S} update={update} sav={sav} horizon={horizon} items={items} />
+    </Suspense>
+  ) : null;
+  // A tab that is not offered cannot be the one showing.
+  const shownTab = tab === 'acc' && !accountsOn ? 'pots' : tab;
+  const subtabs = accountsOn
+    ? [['pots', 'Pots'], ['proj', 'Projection'], ['acc', 'Accounts']]
+    : [['pots', 'Pots'], ['proj', 'Projection']];
 
   if (isMobile) {
     return (
       <div className="sb sb-mobile">
         <div className="sb-subtabs" role="tablist">
-          {[['pots', 'Pots'], ['proj', 'Projection'], ['acc', 'Accounts']].map(([id, label]) => (
+          {subtabs.map(([id, label]) => (
             <button
-              key={id} type="button" role="tab" aria-selected={tab === id}
-              className={`sb-subtab${tab === id ? ' is-active' : ''}`}
+              key={id} type="button" role="tab" aria-selected={shownTab === id}
+              className={`sb-subtab${shownTab === id ? ' is-active' : ''}`}
               onClick={() => setTab(id)}
             >{label}</button>
           ))}
         </div>
-        {tab === 'pots' && <>{headline}<PlanPostCard S={S} update={update} />{potsSurface}</>}
-        {tab === 'proj' && <>{chartEl}{flowEl}</>}
-        {tab === 'acc' && accountsSurface}
+        {shownTab === 'pots' && <>{headline}<PlanPostCard S={viewS} update={update} showAccounts={showAccounts} />{potsSurface}</>}
+        {shownTab === 'proj' && <>{chartEl}{flowEl}</>}
+        {shownTab === 'acc' && accountsSurface}
       </div>
     );
   }
@@ -572,10 +611,10 @@ export default function SavingsBoard({ S, update, onOpenModal }) {
     <div className="sb">
       {headline}
       {/* Above the pots, because it is about to change them. */}
-      <PlanPostCard S={S} update={update} />
+      <PlanPostCard S={viewS} update={update} showAccounts={showAccounts} />
       {potsSurface}
       {chartEl}
-      <div className="sb-bottom-row">
+      <div className={`sb-bottom-row${accountsOn ? '' : ' is-solo'}`}>
         {flowEl}
         {accountsSurface}
       </div>

@@ -139,6 +139,15 @@ html[data-theme="dark-os"] .sb-stat-val.is-bad { color: #e07a6b; }
   gap: 16px;
   align-items: start;
 }
+/* No Accounts beside it (owner-only): the flow takes the row, but its
+   label stops growing at a readable width so the amount stays next to
+   the name it belongs to — the reason the row was split in the first
+   place. The monthly figure and the remove button keep the right edge. */
+.sb-bottom-row.is-solo { grid-template-columns: minmax(0, 1fr); }
+@media (min-width: 1101px) {
+  .sb-bottom-row.is-solo .sb-row-label { flex: 0 1 420px; }
+  .sb-bottom-row.is-solo .sb-row-perm { margin-left: auto; }
+}
 
 .sb-legend {
   display: flex;
