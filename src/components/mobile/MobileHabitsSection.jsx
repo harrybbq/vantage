@@ -240,6 +240,7 @@ export default function MobileHabitsSection({ S, update, onOpenModal, onShowCoin
             <div className="m-section-title">Habits</div>
             <button
               className="m-add-btn"
+              data-ob="add-habit"
               onClick={() => onOpenModal('addHabitModal')}
             >+ Add Habit</button>
           </div>

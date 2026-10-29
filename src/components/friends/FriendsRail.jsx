@@ -63,10 +63,18 @@ function readOnlyNoteFor(row) {
  * selection and the public_stats fetch either way; the host only lends
  * a place to put it, which is why this is a DOM node rather than a
  * dozen props threaded through the layout.
+ *
+ * `onFriendCount(n)` (optional) hears the friend count once the list has
+ * loaded and whenever it changes — the hub's Getting started card reads
+ * it, so the host doesn't run a second friends query of its own.
  */
-export default function FriendsRail({ userId, onUpgrade, panelSlot = null, layout = 'rail' }) {
+export default function FriendsRail({ userId, onUpgrade, panelSlot = null, layout = 'rail', onFriendCount = null }) {
   const { hasPro } = useSubscriptionContext();
   const friends = useFriends(userId, hasPro);
+  const friendCount = friends.friends.length;
+  useEffect(() => {
+    if (!friends.loading && typeof onFriendCount === 'function') onFriendCount(friendCount);
+  }, [friends.loading, friendCount, onFriendCount]);
   // Mute (item 113): who this account has muted, from its own state.
   const mutes = useMutes();
 
@@ -547,6 +555,7 @@ export default function FriendsRail({ userId, onUpgrade, panelSlot = null, layou
         <button
           type="button"
           className="btn btn-ghost fc-add-btn"
+          data-ob="add-friend"
           onClick={() => setShowAddModal(true)}
         >
           <span style={{display:'inline-flex',alignItems:'center',gap:6}}><Icon name="plus" size={14} /> {tab === 'messages' ? 'Invite a friend' : 'Add a friend'}</span>

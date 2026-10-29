@@ -418,7 +418,7 @@ export default function SavingsBoard({ S, update, onOpenModal }) {
           date and it will tell you what it needs each month; route money into it from
           your cash flow and it will tell you when it lands.
         </p>
-        <button type="button" className="btn btn-primary"
+        <button type="button" className="btn btn-primary" data-ob="add-savings"
                 onClick={() => onOpenModal('addSavingsGoalModal')}>+ New Goal</button>
       </div>
     );
@@ -512,7 +512,7 @@ export default function SavingsBoard({ S, update, onOpenModal }) {
       ) : (
         <div className="sb-none">No pots yet — add one to start tracking a target.</div>
       )}
-      <button type="button" className="sb-add-pot" onClick={() => onOpenModal('addSavingsGoalModal')}>
+      <button type="button" className="sb-add-pot" data-ob="add-savings" onClick={() => onOpenModal('addSavingsGoalModal')}>
         <Icon name="plus" size={14} /> New goal
       </button>
       <CompletedStrip
