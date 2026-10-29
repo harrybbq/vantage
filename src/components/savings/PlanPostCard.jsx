@@ -17,15 +17,23 @@
  * rows are editable and droppable before anything is written, and
  * "nothing moved" is a first-class answer rather than a way of ignoring
  * the card.
+ *
+ * ── Accounts ─────────────────────────────────────────────────────────
+ * Owner-only (lib/savings/visibleAccounts). SavingsBoard hands everyone
+ * else a view `S` with no accounts in it, so nothing proposed here lands
+ * in one, and the post is written with `{ accounts: false }` so no
+ * balance or savings snapshot is touched either.
  */
 import { useMemo, useState } from 'react';
 import Icon from '../Icon';
 import { money } from '../../lib/savings/derive';
+import { OWNER_SURFACES_IN_BUILD } from '../../lib/native/ownerSurfaces';
 import {
   duePlanMonth, proposePlanPosts, applyPlanPosts, skipPlanMonth, monthLabel,
 } from '../../lib/savings/planPost';
 
-export default function PlanPostCard({ S, update }) {
+export default function PlanPostCard({ S, update, showAccounts: showProp = false }) {
+  const showAccounts = OWNER_SURFACES_IN_BUILD && showProp;
   const month = duePlanMonth(S);
   const proposed = useMemo(() => (month ? proposePlanPosts(S, month) : []), [S, month]);
 
@@ -50,8 +58,10 @@ export default function PlanPostCard({ S, update }) {
         <div>
           <h3 className="sb-panel-title">{label} — post it?</h3>
           <p className="sb-panel-sub">
-            This is what your cash flow says moved last month. Confirm it and it lands on
-            the pots and accounts below; change an amount first if it was different.
+            {/* One string, not three text nodes: the owner's copy renders
+                exactly as it did before the accounts gate. */}
+            {`This is what your cash flow says moved last month. Confirm it and it lands on the ${
+              showAccounts ? 'pots and accounts' : 'pots'} below; change an amount first if it was different.`}
           </p>
         </div>
         <div className="pp-total">
@@ -110,7 +120,7 @@ export default function PlanPostCard({ S, update }) {
         <button
           type="button" className="btn btn-primary"
           disabled={!rows.length || !(total > 0)}
-          onClick={() => update(prev => applyPlanPosts(prev, month, rows))}
+          onClick={() => update(prev => applyPlanPosts(prev, month, rows, Date.now(), { accounts: showAccounts }))}
         >Confirm {money(total)}</button>
       </div>
     </div>

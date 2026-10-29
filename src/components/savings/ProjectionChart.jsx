@@ -7,6 +7,10 @@
  * whole reason the two lines sit on one chart: the question is not
  * "will I have money" but "will I have it when the pot is due".
  *
+ * `savings={false}` draws cash alone: the savings line is the accounts
+ * compounding, and accounts are owner-only (lib/savings/visibleAccounts),
+ * so for anyone else there is no line, no toggle and no word about it.
+ *
  * The viewBox is measured rather than fixed. A fixed viewBox with
  * width:100% scales its height with the container, so the chart grew a
  * little taller on every wider display until it was a banner — the same
@@ -15,6 +19,7 @@
  */
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { moneyK, money, monthLabel } from '../../lib/savings/derive';
+import { OWNER_SURFACES_IN_BUILD } from '../../lib/native/ownerSurfaces';
 
 const PAD_L = 54;
 const PAD_R = 14;
@@ -24,12 +29,15 @@ const MIN_W = 260;
 
 export default function ProjectionChart({
   cash, sav, horizon, marks, horizons, onHorizon,
-  startBalance, startPlaceholder, onStartBalance,
+  startBalance, startPlaceholder, onStartBalance, savings: savingsProp = true,
 }) {
+  // Folds to false in a native build, taking the savings copy with it.
+  const savings = OWNER_SURFACES_IN_BUILD && savingsProp;
   const wrapRef = useRef(null);
   const [W, setW] = useState(720);
   const [H, setH] = useState(250);
-  const [show, setShow] = useState({ cash: true, savings: true });
+  const [picked, setShow] = useState({ cash: true, savings: true });
+  const show = savings ? picked : { ...picked, savings: false };
   const [hover, setHover] = useState(null);
 
   useLayoutEffect(() => {
@@ -90,7 +98,11 @@ export default function ProjectionChart({
       <div className="sb-panel-head">
         <div>
           <h3 className="sb-panel-title">Projection</h3>
-          <p className="sb-panel-sub">Cash from what is left over; savings compounding at each account&apos;s rate.</p>
+          <p className="sb-panel-sub">
+            {savings
+              ? <>Cash from what is left over; savings compounding at each account&apos;s rate.</>
+              : 'Cash from what is left over, month by month.'}
+          </p>
         </div>
         <div className="sb-proj-controls">
           <label className="sb-start">
@@ -117,7 +129,7 @@ export default function ProjectionChart({
       </div>
 
       <div className="sb-series">
-        {[['cash', 'Cash'], ['savings', 'Savings']].map(([k, label]) => (
+        {(savings ? [['cash', 'Cash'], ['savings', 'Savings']] : [['cash', 'Cash']]).map(([k, label]) => (
           <button
             key={k} type="button"
             className={`sb-series-btn is-${k}${show[k] ? ' is-on' : ''}`}
@@ -132,7 +144,7 @@ export default function ProjectionChart({
         <svg
           width={W} height={H} viewBox={`0 0 ${W} ${H}`}
           onMouseMove={onMove} onMouseLeave={() => setHover(null)}
-          role="img" aria-label={`Projected cash and savings over ${horizon} months`}
+          role="img" aria-label={`Projected cash${savings ? ' and savings' : ''} over ${horizon} months`}
         >
           {yTicks.map(t => (
             <g key={t.y}>
@@ -181,9 +193,11 @@ export default function ProjectionChart({
             <div className="sb-tip-month">{hm === 0 ? 'now' : monthLabel(hm)}</div>
             {show.cash && <div className="sb-tip-cash">Cash {money(cash[hm])}</div>}
             {show.savings && <div className="sb-tip-sav">Savings {money(sav[hm])}</div>}
-            <div className="sb-tip-total">
-              Total {money((show.cash ? cash[hm] : 0) + (show.savings ? sav[hm] : 0))}
-            </div>
+            {savings && (
+              <div className="sb-tip-total">
+                Total {money((show.cash ? cash[hm] : 0) + (show.savings ? sav[hm] : 0))}
+              </div>
+            )}
           </div>
         )}
       </div>

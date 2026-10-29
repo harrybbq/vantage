@@ -12,6 +12,8 @@ import { livePots } from '../../lib/savings/completePot';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { PickList } from '../widgets/GoalsWidget';
 import { useBootFill } from '../../hooks/useBootFill';
+import { useShowAccounts } from '../../hooks/useShowAccounts';
+import { visibleAccounts, visibleItems } from '../../lib/savings/visibleAccounts';
 
 function money(n) {
   const neg = n < 0;
@@ -208,8 +210,13 @@ function yLabel(t) {
 
 export function SavingsProjectionBody({ S, navigate }) {
   const proj = S.projection || {};
-  const items = proj.items || [];
-  const accounts = S.savingsAccounts || [];
+  // Accounts are owner-only (lib/savings/visibleAccounts): for anyone
+  // else there is no Savings line, and a row routed into an account is
+  // read as the plain income or expense it is. Read-only — this body
+  // writes nothing.
+  const showAccounts = useShowAccounts();
+  const items = useMemo(() => visibleItems(proj.items || [], showAccounts), [proj.items, showAccounts]);
+  const accounts = visibleAccounts(S, showAccounts);
   const hasAccounts = accounts.length > 0;
   const savedTotal = livePots(S.savings).reduce((s, g) => s + (g.current || 0), 0);
   const start = (proj.startBalance != null && proj.startBalance !== '') ? (parseFloat(proj.startBalance) || 0) : savedTotal;

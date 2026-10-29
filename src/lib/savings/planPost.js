@@ -169,8 +169,10 @@ export const contributionId = (month, itemId) => `plan-${month}-${itemId}`;
  * post is what happened, and those are allowed to differ.
  *
  * Returns `prev` unchanged if the month has already been decided.
+ * `{ accounts: false }`: pots only — a row's `accountId` is ignored and
+ * no account balance or savings snapshot is written.
  */
-export function applyPlanPosts(prev, month, rows, now = Date.now()) {
+export function applyPlanPosts(prev, month, rows, now = Date.now(), { accounts: useAccounts = true } = {}) {
   if (!month || decided(prev, month)) return prev;
 
   const ts = stampFor(month);
@@ -198,7 +200,7 @@ export function applyPlanPosts(prev, month, rows, now = Date.now()) {
     // it is for. A row that names an account moves both, and a row that
     // names only a pot moves only the pot — which is exactly how the
     // two were modelled when accounts were linked to pots.
-    if (row.accountId) {
+    if (useAccounts && row.accountId) {
       const accounts = next.savingsAccounts || [];
       const idx = accounts.findIndex(a => a.id === row.accountId);
       if (idx >= 0) {
@@ -216,16 +218,21 @@ export function applyPlanPosts(prev, month, rows, now = Date.now()) {
   }
 
   const ledger = ledgerOf(next);
-  // The post closes `month`, so the balances after it are that month's
-  // end — stamped as its savings snapshot (lib/savings/history).
-  return withSnapshot({
+  const closed = {
     ...next,
     planLedger: {
       ...ledger,
       from: ledger.from || month,
       months: { ...(ledger.months || {}), [month]: { ts: Date.now(), total, itemIds: posted } },
     },
-  }, now, month);
+  };
+  // Without accounts (owner-only — lib/savings/visibleAccounts) no
+  // balance moved, so there is no month-end figure to stamp, and
+  // `savingsAccounts` / `savingsHistory` are left exactly as they were.
+  if (!useAccounts) return closed;
+  // The post closes `month`, so the balances after it are that month's
+  // end — stamped as its savings snapshot (lib/savings/history).
+  return withSnapshot(closed, now, month);
 }
 
 /** Decide the month by deciding nothing moved. Recorded, so it is not
