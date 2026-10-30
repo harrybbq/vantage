@@ -707,15 +707,24 @@ function Board({ userId, userEmail, onSignOut, initialSettings }) {
   // text that sits straight on the page (headers, tab rows, Settings)
   // can take a reading plate — see "Text over a photo" in index.css.
   // Presentation only: reads S.backgrounds, writes nothing to state.
-  // The console design draws no per-section photo (S.backgrounds is kept,
-  // untouched, for classic), so it never asks for a reading plate.
-  const photoBehind = !isConsole && !!backgrounds[activeSection];
+  // The console has its own attribute (data-cx-photo, console/shell.css):
+  // classic's plates target classic markup, which console pages partly
+  // reuse, so sharing one attribute would plate the wrong things.
+  const hasPhoto = !!backgrounds[activeSection];
+  const photoBehind = !isConsole && hasPhoto;
+  const consolePhoto = isConsole && hasPhoto;
   useEffect(() => {
     const r = document.documentElement;
     if (photoBehind) r.setAttribute('data-bg-photo', '1');
     else r.removeAttribute('data-bg-photo');
     return () => r.removeAttribute('data-bg-photo');
   }, [photoBehind]);
+  useEffect(() => {
+    const r = document.documentElement;
+    if (consolePhoto) r.setAttribute('data-cx-photo', '1');
+    else r.removeAttribute('data-cx-photo');
+    return () => r.removeAttribute('data-cx-photo');
+  }, [consolePhoto]);
 
   if (loading) {
     return (
@@ -905,11 +914,31 @@ function Board({ userId, userEmail, onSignOut, initialSettings }) {
       {/* Console design: its own shell replaces everything from here to
           PageHeader (backdrop, boot sequence, overlays, Nav, mobile chrome,
           PageHeader). Classic renders exactly what it always did. */}
-      {isConsole ? (
+      {isConsole ? (<>
+        {/* The page's photo, behind everything (z -1 over the canvas: the
+            console's pages and bars are not positioned, so a z 0 layer
+            would paint over them). Same S.backgrounds / S.bgFx as classic. */}
+        {currentBg && (
+          <div className="cx-bg-photo" aria-hidden="true" style={{
+            inset: bgFx.blur ? -(bgFx.blur * 2) : 0,
+            backgroundImage: `url(${currentBg})`,
+            filter: bgFx.blur ? `blur(${bgFx.blur}px)` : undefined,
+          }} />
+        )}
+        {currentBg && bgFx.dim > 0 && (
+          <div className="cx-bg-photo-dim" aria-hidden="true" style={{ background: `rgba(0,0,0,${(bgFx.dim / 100).toFixed(3)})` }} />
+        )}
         <Suspense fallback={null}>
-          <ConsoleShell {...sectionProps} />
+          <ConsoleShell
+            {...sectionProps}
+            background={currentBg || null}
+            bgFx={bgFx}
+            onChangeBg={handleChangeBgClick}
+            onRemoveBg={handleRemoveBg}
+            onBgFx={setBgFx}
+          />
         </Suspense>
-      ) : (<>
+      </>) : (<>
       {currentBg && (
         <div style={{
           position: 'fixed',
