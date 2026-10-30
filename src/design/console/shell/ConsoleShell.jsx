@@ -21,6 +21,7 @@ import { usePendingCount } from '../../../lib/friends/usePendingCount';
 import { useUnreadTotal } from '../../../lib/friends/useUnreadTotal';
 import { coinsToday } from '../../../lib/coins/daily';
 import { barRef } from './TopBarActions';
+import BackgroundSheet from './BackgroundSheet';
 import {
   sidebarItems, TABS, moreItems, activeTab, canonicalSection, navSection, sectionTitle,
   longDate, shortDate, greeting, initials, paletteHint,
@@ -53,6 +54,17 @@ function CoinsChip({ S, onOpen }) {
       <Icon name="coin" size={14} strokeWidth={1.75} />
       <span className="cx-num cx-shell-coins-n">{fmt(total)}</span>
       {todayLabel && <span className={cx('cx-num cx-shell-coins-today', today < 0 && 'is-down')}>{todayLabel}</span>}
+    </button>
+  );
+}
+
+/** The page's background photo: opens BackgroundSheet. Lit while one is set. */
+function BgButton({ on, onOpen }) {
+  return (
+    <button type="button" className={cx('cx-shell-chip cx-shell-bgbtn', on && 'is-on')} onClick={onOpen}
+            aria-label={on ? 'Background photo: change, dim or remove' : 'Set a background photo for this page'}
+            title="Background">
+      <Icon name="image" size={16} strokeWidth={1.75} />
     </button>
   );
 }
@@ -113,7 +125,7 @@ function Sidebar({ section, isOwner, navigate, onSignOut }) {
   );
 }
 
-function TopBar({ S, section, userId, navigate, onOpenModal, onOpenPalette, now }) {
+function TopBar({ S, section, userId, navigate, onOpenModal, onOpenPalette, now, bg }) {
   const hint = paletteHint(typeof navigator !== 'undefined' ? (navigator.userAgentData?.platform || navigator.platform) : '');
   return (
     <header className="cx-shell-top" data-shell-bar="top">
@@ -130,6 +142,7 @@ function TopBar({ S, section, userId, navigate, onOpenModal, onOpenPalette, now 
         </button>
       )}
       <SocialChips userId={userId} onOpen={() => navigate('hub')} />
+      {bg && <BgButton on={bg.on} onOpen={bg.open} />}
       {/* The hub's player strip already shows the balance; one is enough. */}
       {section !== 'hub' && <CoinsChip S={S} onOpen={() => onOpenModal('coinHistoryModal')} />}
       <Avatar S={S} onClick={() => navigate('profile')} />
@@ -137,7 +150,7 @@ function TopBar({ S, section, userId, navigate, onOpenModal, onOpenPalette, now 
   );
 }
 
-function AppBar({ S, section, navigate, onOpenModal, now }) {
+function AppBar({ S, section, navigate, onOpenModal, now, bg }) {
   const hub = section === 'hub';
   return (
     <header className={cx('cx-shell-appbar', hub && 'is-hub')} data-shell-bar="app">
@@ -154,6 +167,7 @@ function AppBar({ S, section, navigate, onOpenModal, now }) {
       )}
       <span className="cx-shell-sp" />
       <div className="cx-shell-slot" ref={barRef.end} />
+      {bg && <BgButton on={bg.on} onOpen={bg.open} />}
       <CoinsChip S={S} onOpen={() => onOpenModal('coinHistoryModal')} />
     </header>
   );
@@ -220,19 +234,33 @@ function MoreSheet({ section, isOwner, hasPro, navigate, onOpenPaywall, onClose 
 export default function ConsoleShell({
   S, userId, isMobile, isOwner, hasPro, navigate, activeSection,
   onOpenModal, onOpenPaywall, onOpenPalette, onSignOut,
+  background = null, bgFx = null, onChangeBg, onRemoveBg, onBgFx,
 }) {
   const [moreOpen, setMoreOpen] = useState(false);
+  const [bgOpen, setBgOpen] = useState(false);
   const section = canonicalSection(activeSection);
   const now = new Date();
+  // Background photo for this page (App owns the picker, crop and writes).
+  const bg = onChangeBg ? { on: !!background, open: () => setBgOpen(true) } : null;
+  const bgSheet = bgOpen && bg && (
+    <BackgroundSheet
+      title={sectionTitle(section)} photo={background} fx={bgFx}
+      onChoose={() => { setBgOpen(false); onChangeBg(); }}
+      onRemove={() => { onRemoveBg?.(); }}
+      onFx={next => onBgFx?.(next)}
+      onClose={() => setBgOpen(false)}
+    />
+  );
   if (isMobile) {
     return (
       <>
-        <AppBar S={S} section={section} navigate={navigate} onOpenModal={onOpenModal} now={now} />
+        <AppBar S={S} section={section} navigate={navigate} onOpenModal={onOpenModal} now={now} bg={bg} />
         <TabBar section={section} moreOpen={moreOpen} navigate={navigate} onOpenMore={() => setMoreOpen(true)} />
         {moreOpen && (
           <MoreSheet section={section} isOwner={isOwner} hasPro={hasPro} navigate={navigate}
                      onOpenPaywall={onOpenPaywall} onClose={() => setMoreOpen(false)} />
         )}
+        {bgSheet}
       </>
     );
   }
@@ -240,7 +268,8 @@ export default function ConsoleShell({
     <>
       <Sidebar section={section} isOwner={isOwner} navigate={navigate} onSignOut={onSignOut} />
       <TopBar S={S} section={section} userId={userId} navigate={navigate} onOpenModal={onOpenModal}
-              onOpenPalette={onOpenPalette} now={now} />
+              onOpenPalette={onOpenPalette} now={now} bg={bg} />
+      {bgSheet}
     </>
   );
 }

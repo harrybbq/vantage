@@ -21,6 +21,7 @@ import { confirmAndDeleteAccount } from '../lib/account/deleteAccount';
 import { privacyOn, privacyToggle } from '../lib/friends/privacy';
 import StayingSafeCard from './settings/StayingSafeCard';
 import { SETTINGS_FOCUS } from '../lib/support';
+import { replay as replayOnboarding } from '../lib/onboarding/onboarding';
 
 // Owner-only Apple Health Shortcut panel — compiled out of native builds
 // (lib/native/ownerSurfaces.js); null there, so the branch below drops.
@@ -1117,17 +1118,17 @@ export default function SettingsSection({ S, update, active, userId, userEmail, 
           <Suspense fallback={null}><WearableAccessPanel /></Suspense>
         )}
 
-        {/* Walkthrough / tour */}
+        {/* Welcome (onboarding replay) */}
         <SettingsGroup
-          title="Walkthrough"
-          desc="Replay the intro tour — useful if you want a refresher or you skipped it the first time."
+          title="Welcome"
+          desc="Change what you use Vantage for, and do the first thing for anything new. Your hub and everything you've added stay as they are."
         >
           <button
             type="button"
             className="tut-replay-btn"
-            onClick={() => update(prev => ({ ...prev, tutorialCompleted: false }))}
+            onClick={() => update(prev => replayOnboarding(prev))}
           >
-            <span aria-hidden="true" style={{display:'inline-flex',marginRight:6}}><Icon name="rotate-ccw" size={15} /></span>Replay tutorial
+            <span aria-hidden="true" style={{display:'inline-flex',marginRight:6}}><Icon name="rotate-ccw" size={15} /></span>Replay the welcome
           </button>
         </SettingsGroup>
         </>

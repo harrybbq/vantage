@@ -339,3 +339,78 @@ html[data-design="console"] .cx-page {
     bottom: calc(var(--cx-shell-tab-h) + var(--cx-shell-tab-pad) + var(--cx-sp-8)) !important;
   }
 }
+
+/* ── Background photo (per page; App draws it, BackgroundSheet sets it) ──
+   S.backgrounds / S.bgFx, the same photos classic shows. The layer sits
+   at z -1 over the canvas: pages and bars are not positioned, so a z 0
+   layer would paint over them. html[data-cx-photo] is set while one is
+   behind the current page. */
+html[data-design="console"] .cx-bg-photo,
+html[data-design="console"] .cx-bg-photo-dim {
+  position: fixed; inset: 0; z-index: -1; pointer-events: none;
+}
+html[data-design="console"] .cx-bg-photo { background-size: cover; background-position: center; }
+/* The ground colour moves to <html> while a photo is up: a z -1 layer
+   paints over the root's background but under body's, and the cream
+   themes give <html> a background of its own, so body can't keep one. */
+html[data-design="console"][data-cx-photo] { background: var(--cx-bg); }
+html[data-design="console"][data-cx-photo] body { background: transparent; }
+/* A light veil in the theme's ground colour, so text that sits straight
+   on the page (titles, section labels) keeps its contrast on any photo.
+   The user's own Dim goes on top of it. */
+html[data-design="console"] .cx-bg-photo::after {
+  content: ''; position: absolute; inset: 0;
+  background: var(--cx-bg); opacity: .38;
+}
+/* Bars go glassy over a photo, so the page reads as one surface. */
+html[data-design="console"][data-cx-photo] :is(.cx-shell-side, .cx-shell-top, .cx-shell-appbar, .cx-shell-tabs) {
+  background: var(--cx-bg);    /* WebViews without color-mix */
+  background: color-mix(in srgb, var(--cx-bg) 82%, transparent);
+  -webkit-backdrop-filter: blur(16px); backdrop-filter: blur(16px);
+}
+/* Text that sits straight on the page gets a reading plate in the page
+   colour while a photo is up, so it holds on any photo and any Dim (the
+   classic rule, index.css "Text over a photo", in console tokens). The
+   list came from an audit of every console page for text with nothing
+   opaque behind it: the console's own heads, and the classic markup the
+   console still reuses (Achievements, Shop, Habits' roster). A plate is
+   a background plus a spread shadow, so nothing reflows. */
+html[data-design="console"] { --cx-photo-plate: color-mix(in srgb, var(--cx-bg) 94%, transparent); }
+html[data-design="console"][data-cx-photo] :is(
+  .cx-sweep-head-titles, .cx-sweep-clock, .cx-hub-addbar, .cx-track-legend,
+  .hb-roster-head, .ach-toolbar-title-wrap, .ach-toolbar, .ach-tabs-row, .ppl-steps,
+  .shop-titleblock, .shop-filters, .shop-controls, .shop-category-label
+) {
+  background: var(--cx-photo-plate);
+  box-shadow: 0 0 0 8px var(--cx-photo-plate);
+  border-radius: 8px;
+}
+html[data-design="console"][data-cx-photo] :is(.cx-sweep-head-titles, .shop-category-label) { width: fit-content; max-width: 100%; }
+
+/* Except the sidebar while it is open over the page: glass there would
+   show the page's own content through the labels. */
+html[data-design="console"][data-cx-photo] .cx-shell-side:is(:hover, :has(:focus-visible)) { background: var(--cx-bg); }
+
+html[data-design="console"] .cx-shell-bgbtn { width: 32px; padding: 0; justify-content: center; }
+html[data-design="console"] .cx-shell-appbar .cx-shell-bgbtn { width: 36px; }
+html[data-design="console"] .cx-shell-bgbtn.is-on { color: var(--cx-accent); border-color: var(--cx-accent); }
+
+html[data-design="console"] .cx-shell-bg-body { display: flex; flex-direction: column; gap: var(--cx-sp-16); }
+html[data-design="console"] .cx-shell-bg-preview {
+  position: relative; overflow: hidden;
+  aspect-ratio: 16 / 9; border-radius: var(--cx-r-cell);
+  border: 1px solid var(--cx-line); background: var(--cx-s2);
+  display: flex; align-items: center; justify-content: center; color: var(--cx-muted);
+}
+html[data-design="console"] .cx-shell-bg-preview img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+html[data-design="console"] .cx-shell-bg-preview-dim { position: absolute; inset: 0; background: #000; }
+html[data-design="console"] .cx-shell-bg-note { margin: 0; }
+html[data-design="console"] .cx-shell-bg-actions { display: flex; gap: var(--cx-sp-8); flex-wrap: wrap; }
+html[data-design="console"] .cx-shell-bg-actions .cx-btn { gap: 8px; }
+html[data-design="console"] .cx-shell-bg-fx { display: flex; flex-direction: column; gap: var(--cx-sp-12); }
+html[data-design="console"] .cx-shell-bg-range { display: flex; flex-direction: column; gap: 6px; }
+html[data-design="console"] .cx-shell-bg-range-head {
+  display: flex; justify-content: space-between;
+  font: 500 var(--cx-fs-13)/var(--cx-lh-13) var(--cx-sans); color: var(--cx-mid);
+}
+html[data-design="console"] .cx-shell-bg-range input[type="range"] { width: 100%; min-height: 32px; accent-color: var(--cx-accent-fill); }

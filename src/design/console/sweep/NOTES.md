@@ -10,8 +10,7 @@ changes needed in files this area does not own (see ../README.md §7).
 - `.cx-sweep-pro` (gold ◆ Pro mark), `.cx-sweep-bar` (6 px bar, `.is-gold`), `.cx-sweep-dot.is-<category>` (palette.js colours per theme), `.cx-sweep-tag` ("You"), `.cx-sr` (visually hidden) are candidates for base.css.
 
 ## For SHELL (App.jsx / shell)
-- Tour targets: please put `data-cx-nav="<section id>"` on console nav items (sidebar, tab bar, More button as `more`), and `data-cx-tour="hub"` on the hub's player strip. ConsoleTutorial falls back to classic `#nav-tab-*` ids and the phone tab labels, then to a centred card.
-- ConsoleTutorial accepts an optional `S` prop; passing it in the tutorial slot's props ticks what's already done on the last stop ("Where to start"). Without it only "Create your account" is ticked.
+- (2026-10-29) ConsoleTutorial is gone: the onboarding (`components/onboarding/Onboarding.jsx`) replaced both tours in both designs and rings real add buttons by `data-ob`. `data-cx-nav` / `data-cx-tour` stay as harmless hooks.
 - Paywall "You've used 5 of 5": the slot gets only `openId`, so the console paywall says "You've used all 5 free trackers". A `count` alongside `openId` would allow the literal "5 of 5".
 
 ## For HUB

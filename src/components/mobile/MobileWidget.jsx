@@ -43,6 +43,8 @@ import WidgetBoundary from '../WidgetBoundary';
 import { PRIMES, primeOf, blocksOf, withBlocks, withBlockOpts } from '../../lib/hub/primeBlocks';
 import { PrimeFit } from '../widgets/prime/PrimeCard';
 import { PrimeEditorSheet } from '../widgets/prime/PrimeEditor';
+import { useShowAccounts } from '../../hooks/useShowAccounts';
+import { visibleBlockIds } from '../../lib/savings/visibleAccounts';
 import QuickFoodMenu from '../widgets/prime/QuickFoodMenu';
 import { planDayFor, planGoalFor, planBadge } from '../../lib/plan/planDay';
 
@@ -197,6 +199,9 @@ export default function MobileWidget({ widget, S, update, onRemove, navigate, us
   // context is reachable here (unlike the desktop hub's detached island
   // roots, which have to be handed hasPro as a prop).
   const { hasPro } = useSubscriptionContext();
+  // Owner-only prime blocks (Savings › Account balances) are not drawn
+  // for anyone else, so the count chip does not count them either.
+  const showAccounts = useShowAccounts();
   // Same shape publishing as the desktop islands, and on the same
   // element type (the card, not its body) so one set of CSS covers both.
   const bodyRef = useRef(null);
@@ -490,7 +495,7 @@ export default function MobileWidget({ widget, S, update, onRemove, navigate, us
                 onPointerDown={e => e.stopPropagation()}
                 aria-label={`Edit which blocks ${P.name} shows`}
               >
-                {blocksOf(widget).length} <span aria-hidden="true">▾</span>
+                {visibleBlockIds(primeOf(widget), blocksOf(widget), showAccounts).length || PRIMES[primeOf(widget)].def.length} <span aria-hidden="true">▾</span>
               </button>
             )}
           </div>

@@ -24,6 +24,7 @@ import { useHubModuleMenu, moduleIdFromLabel } from './HubModuleMenu';
 import Icon from './Icon';
 import { useOwnHandle } from '../hooks/useOwnHandle';
 import { eventColour, eventWhen, todayAgenda } from '../lib/calendar/events';
+import GettingStartedCard from './onboarding/GettingStartedCard';
 
 // ── Panel primitive ──────────────────────────────────────────────────────
 // Each panel tags itself with data-hub-module so the right-click
@@ -626,6 +627,9 @@ export default function HubOsLayout({
   /* State, not a ref: the rail portals into this node, so the render
      that creates it has to be followed by one that can see it. */
   const [friendSlot, setFriendSlot] = useState(null);
+  // The rail's friend count, reported up for the Getting started card's
+  // Friends item — the rail already loads the list, so no second query.
+  const [friendCount, setFriendCount] = useState(undefined);
   useStickyColumnState(mainRef);
 
   // Right-click any panel → toggle its background transparency.
@@ -655,6 +659,13 @@ export default function HubOsLayout({
         <OsRatingsPanel S={S} update={update} compact />
       </div>
 
+      {/* Onboarding's Getting started, full width under the top row.
+          Renders nothing unless this account picked and has items left.
+          Deliberately not an OsPanel: that tags data-hub-module, and the
+          right-click transparency menu would start saving a preference
+          for a card that goes away. */}
+      <GettingStartedCard S={S} update={update} variant="classic" friends={friendCount} />
+
       {/* ── MAIN ROW ── */}
       <div className="hub-os-main" ref={mainRef}>
         {/* Left col: actions + friends rail.
@@ -676,7 +687,7 @@ export default function HubOsLayout({
                 visible without scrolling the column past the ledger. Same
                 component as the cream hub, retinted via dark-os overrides
                 on the .fc-* classes in hub-dark.css. */}
-            <FriendsRail userId={userId} onUpgrade={onUpgrade} panelSlot={friendSlot} />
+            <FriendsRail userId={userId} onUpgrade={onUpgrade} panelSlot={friendSlot} onFriendCount={setFriendCount} />
           </div>
         </div>
 

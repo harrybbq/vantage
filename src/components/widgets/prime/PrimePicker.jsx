@@ -23,6 +23,8 @@ import Icon from '../../Icon';
 import { PRIMES, PRIME_IDS, primeOf, primeType } from '../../../lib/hub/primeBlocks';
 import PrimeCard from './PrimeCard';
 import { useDaySummary } from '../../../lib/diet/daySummary';
+import { useShowAccounts } from '../../../hooks/useShowAccounts';
+import { visiblePresets } from '../../../lib/savings/visibleAccounts';
 
 /* The preview is rendered at a real card size and scaled down, so it is
    the actual packer output rather than a drawing of it. */
@@ -37,6 +39,9 @@ const BLURB = {
   habits: 'Streak timers with relapse, milestones, strikes',
   nutrition: 'Macro rings, net calories, burn, weight and vitals',
 };
+/* Accounts are owner-only (lib/savings/visibleAccounts): nobody else is
+   told a card can show them. */
+const BLURB_NO_ACCOUNTS = { ...BLURB, savings: 'Total, pots, runway, bills, where the month goes' };
 
 function Preview({ keyId, blocks, S, ext }) {
   const ref = useRef(null);
@@ -68,8 +73,10 @@ function Preview({ keyId, blocks, S, ext }) {
 
 function PrimeTile({ keyId, S, count, onAdd, compact, ext }) {
   const P = PRIMES[keyId];
+  const showAccounts = useShowAccounts();
+  const presets = visiblePresets(keyId, P.presets, showAccounts);
   const [preset, setPreset] = useState(0);
-  const blocks = P.presets[preset][1];
+  const blocks = (presets[preset] || presets[0])[1];
   return (
     <div
       className={`pp-tile${compact ? ' is-compact' : ''}`}
@@ -82,9 +89,9 @@ function PrimeTile({ keyId, S, count, onAdd, compact, ext }) {
           <span className="pp-name">{P.name}</span>
           {count > 0 && <span className="pp-count">{count} on your hub</span>}
         </div>
-        <p className="pp-blurb">{BLURB[keyId]}</p>
+        <p className="pp-blurb">{(showAccounts ? BLURB : BLURB_NO_ACCOUNTS)[keyId]}</p>
         <div className="pp-presets" role="radiogroup" aria-label={`${P.name} starting layout`}>
-          {P.presets.map(([name], i) => (
+          {presets.map(([name], i) => (
             <button
               key={name}
               type="button"

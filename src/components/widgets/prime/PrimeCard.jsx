@@ -24,6 +24,15 @@
  * The SLOT carries `container-type: size` and the block inside is styled
  * from it. Nothing is ever styled by its own container query, which does
  * not work and has caught this codebase before.
+ *
+ * ── Owner-only blocks ────────────────────────────────────────────────
+ * Savings › Account balances, and every account inside the other Savings
+ * numbers, are the owner's alone (lib/savings/visibleAccounts). For
+ * anyone else a stored `accounts` block is simply not drawn — never
+ * removed from the widget — and the adapters read a view of S with no
+ * accounts in it. A card left with nothing visible draws the prime's
+ * default, the same fallback blocksOf uses for a block that no longer
+ * exists.
  */
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import Icon from '../../Icon';
@@ -32,6 +41,8 @@ import { PRIMES, blocksOf, blockOpts, primeOf } from '../../../lib/hub/primeBloc
 import { blockData } from '../../../lib/hub/primeData';
 import { BlockView } from './PrimeViews';
 import { useDaySummary } from '../../../lib/diet/daySummary';
+import { useShowAccounts } from '../../../hooks/useShowAccounts';
+import { visibleBlockIds, savingsView } from '../../../lib/savings/visibleAccounts';
 
 /** Two packers per prime, built once — `makePacker` closes over the
  *  block registry, which never changes at runtime. The headless one is
@@ -61,16 +72,23 @@ export default function PrimeCard({
   const key = primeOf(widget);
   const P = key ? PRIMES[key] : null;
 
-  const ids = useMemo(() => (key ? blocksOf(widget) : []), [key, widget]);
+  const showAccounts = useShowAccounts();
+  const ids = useMemo(() => {
+    if (!key) return [];
+    const seen = visibleBlockIds(key, blocksOf(widget), showAccounts);
+    return seen.length ? seen : visibleBlockIds(key, PRIMES[key].def, showAccounts);
+  }, [key, widget, showAccounts]);
+  // Read-only: payloads only. Nothing here writes S.
+  const viewS = useMemo(() => savingsView(S, showAccounts), [S, showAccounts]);
 
   /* Payloads are keyed by block id, so a resize that changes only the
      LEVEL of a block re-uses the data it already built. */
   const payloads = useMemo(() => {
     if (!key) return {};
     const out = {};
-    ids.forEach(id => { out[id] = blockData(key, id, S, blockOpts(widget, id), ext); });
+    ids.forEach(id => { out[id] = blockData(key, id, viewS, blockOpts(widget, id), ext); });
     return out;
-  }, [key, ids, S, widget, ext]);
+  }, [key, ids, viewS, widget, ext]);
 
   /* How many records each list block holds, so a list is sized for its
      own rows instead of a typical count (lib/hub/pack.js maxOf). */

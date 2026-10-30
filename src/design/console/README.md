@@ -155,7 +155,7 @@ its area's agent:
 |---|---|
 | `hub/index.js` (HUB) | `ConsoleHub` (desktop and mobile; `isMobile` is in the bag) |
 | `track/index.js` (TRACK) | `ConsoleTrack` ('track') · `ConsoleHoliday` ('holiday' route; Holiday is merged into Track, so this can render Track's trips view) |
-| `sweep/index.js` (SWEEP) | `ConsoleHabits` · `ConsoleSettings` · `ConsoleAchievements` · `ConsoleShop` · `ConsoleLeaderboard` · `ConsoleFriends` · `ConsolePaywall` · `ConsoleTutorial` · `ConsoleAuth` |
+| `sweep/index.js` (SWEEP) | `ConsoleHabits` · `ConsoleSettings` · `ConsoleAchievements` · `ConsoleShop` · `ConsoleLeaderboard` · `ConsoleFriends` · `ConsolePaywall` · `ConsoleAuth` |
 
 Fill a slot with a lazy component so classic users never download console code:
 
@@ -178,7 +178,6 @@ requestedTrackTab, requestedSettingsTab`
 
 The **overlay** slots get the classic component's own props:
 - `ConsolePaywall`: `{ openId, onClose, onManage, onShowToast, onOpenLegal }`
-- `ConsoleTutorial`: `{ visible, theme, onNavigate, onClose }`
 - `ConsoleAuth`: `{ onOpenLegal, webInviteOnly }`
 
 If you need a new key, write it in your `NOTES.md` for SHELL to add to `sectionProps`. Until
@@ -292,7 +291,7 @@ read-only. If you need a change to it, write it in your area's `NOTES.md`
 - Slots: `src/design/console/sweep/index.js` (habits, settings, achievements, shop, leaderboard, friends, paywall, tutorial, auth), and everything under `src/design/console/sweep/`.
 - Owns: Habits; Settings (except the Design switch, which is the foundation's `DesignSwitch.jsx`. **ConsoleSettings must render it** in Appearance with the same gating, `OWNER_SURFACES_IN_BUILD ? lazy(() => import('../../DesignSwitch')) : null`, passing `{ S, update, userId }`); the paywall (opens on the cap that was hit, with a free-vs-Pro table from `FREE_CAPS`, themes listed as free); auth and sign-in; the tutorial; achievements; the shop; the leaderboard page; the friends page; and the copy sweep (no `//` labels, no em-dashes in UI strings, emoji out of chrome).
 - CSS: `src/design/console/sweep.css`.
-- Read-only references: `HabitsSection.jsx`, `mobile/MobileHabitsSection.jsx`, `habits/*`, `SettingsSection.jsx`, `settings/*`, `PaywallModal.jsx`, `AuthScreen.jsx`, `TutorialOverlay.jsx`, `AchievementsSection.jsx`, `achievements/*`, `ShopSection.jsx`, `LeaderboardSection.jsx`, `mobile/MobileFriendsSection.jsx`, `VisionsModal.jsx`.
+- Read-only references: `HabitsSection.jsx`, `mobile/MobileHabitsSection.jsx`, `habits/*`, `SettingsSection.jsx`, `settings/*`, `PaywallModal.jsx`, `AuthScreen.jsx`, `AchievementsSection.jsx`, `achievements/*`, `ShopSection.jsx`, `LeaderboardSection.jsx`, `mobile/MobileFriendsSection.jsx`, `VisionsModal.jsx`.
 
 ### Nobody edits these for the redesign
 

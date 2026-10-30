@@ -83,7 +83,7 @@ export default function HabitsSection({ S, update, active, onOpenModal, onShowCo
             ))}
           </dl>
         )}
-        <button className="btn btn-primary hb-add" onClick={() => onOpenModal('addHabitModal')}>+ Add Habit</button>
+        <button className="btn btn-primary hb-add" data-ob="add-habit" onClick={() => onOpenModal('addHabitModal')}>+ Add Habit</button>
       </div>
 
       {!habits.length ? (

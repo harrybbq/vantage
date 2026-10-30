@@ -22,11 +22,42 @@
  * The last ticked block cannot be unticked. A card showing nothing is
  * not a state worth being able to reach by accident; the way to get rid
  * of a card is to delete it.
+ *
+ * ── Owner-only blocks ────────────────────────────────────────────────
+ * Savings › Account balances is the owner's alone (lib/savings/
+ * visibleAccounts). Anyone else is neither shown it nor offered it, and
+ * an edit never drops it from a card that already holds it: what is
+ * stored is the new visible order with the hidden block put back where
+ * it was (keepHiddenBlocks).
  */
 import { useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import Icon from '../../Icon';
 import { PRIMES, blocksOf, blockOpts, primeOf } from '../../../lib/hub/primeBlocks';
+import { useShowAccounts } from '../../../hooks/useShowAccounts';
+import { visibleBlockIds, visiblePresets, keepHiddenBlocks } from '../../../lib/savings/visibleAccounts';
+
+/**
+ * The editor's view of one card for this viewer: the blocks it shows
+ * (the prime's default when none of the stored ones are visible — the
+ * same fallback the card draws), the blocks it may offer, its presets,
+ * and an `onSet` that keeps any hidden block in storage.
+ */
+function useEditorView(widget, onSet) {
+  const show = useShowAccounts();
+  const key = primeOf(widget);
+  const P = key ? PRIMES[key] : null;
+  if (!P) return { P: null };
+  const stored = blocksOf(widget);
+  const seen = visibleBlockIds(key, stored, show);
+  return {
+    P,
+    ids: seen.length ? seen : visibleBlockIds(key, P.def, show),
+    all: visibleBlockIds(key, Object.keys(P.blocks), show),
+    presets: visiblePresets(key, P.presets, show),
+    onSet: next => onSet(keepHiddenBlocks(key, stored, next, show)),
+  };
+}
 
 /** The shared body: presets, the showing list, the hidden list. */
 /**
@@ -61,7 +92,7 @@ function PotPicks({ pots, picks, onPicks }) {
   );
 }
 
-function EditorBody({ P, ids, onSet, onTitle, title, variant, widget, pots, onOpts }) {
+function EditorBody({ P, ids, all, presets, onSet, onTitle, title, variant, widget, pots, onOpts }) {
   const move = (i, d) => {
     const j = i + d;
     if (j < 0 || j >= ids.length) return;
@@ -69,7 +100,7 @@ function EditorBody({ P, ids, onSet, onTitle, title, variant, widget, pots, onOp
     [next[i], next[j]] = [next[j], next[i]];
     onSet(next);
   };
-  const hidden = Object.keys(P.blocks).filter(id => !ids.includes(id));
+  const hidden = all.filter(id => !ids.includes(id));
   const onlyOne = ids.length === 1;
 
   return (
@@ -87,7 +118,7 @@ function EditorBody({ P, ids, onSet, onTitle, title, variant, widget, pots, onOp
       <div className="pe-group">
         <span className="pe-lbl">Start from</span>
         <div className="pe-presets">
-          {P.presets.map(([name, list]) => {
+          {presets.map(([name, list]) => {
             const on = list.join() === ids.join();
             return (
               <button
@@ -169,8 +200,7 @@ function EditorBody({ P, ids, onSet, onTitle, title, variant, widget, pots, onOp
  */
 export function PrimeEditorPopover({ widget, onSet, onTitle, onOpts, pots, onClose, anchorRect }) {
   const ref = useRef(null);
-  const P = PRIMES[primeOf(widget)];
-  const ids = blocksOf(widget);
+  const { P, ids, all, presets, onSet: setBlocks } = useEditorView(widget, onSet);
 
   useEffect(() => {
     const onDown = e => { if (ref.current && !ref.current.contains(e.target)) onClose(); };
@@ -201,7 +231,7 @@ export function PrimeEditorPopover({ widget, onSet, onTitle, onOpts, pots, onClo
         <span className="pe-lbl">Edit card</span>
         <button type="button" className="pe-done" onClick={onClose}>Done</button>
       </div>
-      <EditorBody P={P} ids={ids} onSet={onSet} onTitle={onTitle} title={widget.title} variant="pop"
+      <EditorBody P={P} ids={ids} all={all} presets={presets} onSet={setBlocks} onTitle={onTitle} title={widget.title} variant="pop"
         widget={widget} pots={pots} onOpts={onOpts} />
     </div>,
     document.body,
@@ -216,8 +246,7 @@ export function PrimeEditorPopover({ widget, onSet, onTitle, onOpts, pots, onClo
  * editing something you should be able to see change.
  */
 export function PrimeEditorSheet({ widget, onSet, onTitle, onOpts, pots, onClose }) {
-  const P = PRIMES[primeOf(widget)];
-  const ids = blocksOf(widget);
+  const { P, ids, all, presets, onSet: setBlocks } = useEditorView(widget, onSet);
 
   useEffect(() => {
     const onKey = e => { if (e.key === 'Escape') onClose(); };
@@ -238,7 +267,7 @@ export function PrimeEditorSheet({ widget, onSet, onTitle, onOpts, pots, onClose
           <button type="button" className="pe-done is-big" onClick={onClose}>Done</button>
         </div>
         <div className="pe-sheet-body">
-          <EditorBody P={P} ids={ids} onSet={onSet} onTitle={onTitle} title={widget.title} variant="sheet"
+          <EditorBody P={P} ids={ids} all={all} presets={presets} onSet={setBlocks} onTitle={onTitle} title={widget.title} variant="sheet"
             widget={widget} pots={pots} onOpts={onOpts} />
         </div>
       </div>

@@ -34,7 +34,7 @@ export default function ConversationList({ rows, userId, selectedId, loading, on
         <div className="dm-inbox-empty">
           <div className="dm-inbox-empty-title">No conversations yet</div>
           <p>Messages with your friends show up here. Know someone who'd keep you honest?</p>
-          <button type="button" className="btn btn-primary btn-sm dm-invite-cta" onClick={onInvite}>
+          <button type="button" className="btn btn-primary btn-sm dm-invite-cta" data-ob="add-friend" onClick={onInvite}>
             <Icon name="user-plus" size={14} /> Invite a friend
           </button>
         </div>

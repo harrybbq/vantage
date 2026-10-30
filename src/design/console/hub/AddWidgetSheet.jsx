@@ -18,6 +18,8 @@ import Icon from '../../../components/Icon';
 import { Sheet } from '../ui';
 import { widgetReadiness } from '../../../lib/widgets/readiness';
 import { isSuperseded } from '../../../lib/hub/primeBlocks';
+import { visiblePresets } from '../../../lib/savings/visibleAccounts';
+import { useShowAccounts } from '../../../hooks/useShowAccounts';
 import { CONSOLE_META, PRIMES, PRIME_IDS, primeType, metaOf, classicPickerTypes, isProWidget } from './catalogue';
 import { sizesFor, SIZE_LABEL, SIZE_DIMS } from './grid';
 import { hasUpcoming } from './useHubGrid';
@@ -47,6 +49,8 @@ function Row({ icon, title, sub, size, state, onClick, pro }) {
 
 function PrimeRow({ k, count, onAdd }) {
   const P = PRIMES[k];
+  // Savings › Accounts is owner-only: its block leaves the presets too.
+  const presets = visiblePresets(k, P.presets, useShowAccounts());
   const [preset, setPreset] = useState(0);
   return (
     <li className="cx-hub-prime">
@@ -54,12 +58,12 @@ function PrimeRow({ k, count, onAdd }) {
         <span className="cx-hub-pick-ic"><Icon name={P.icon} size={18} strokeWidth={1.75} /></span>
         <span className="cx-hub-pick-txt">
           <span className="cx-hub-pick-t">{P.name} card{count > 0 && <span className="cx-muted cx-hub-pick-n"> · {count} on your hub</span>}</span>
-          <span className="cx-hub-pick-s">{P.presets[preset][1].map(id => P.blocks[id]?.name).filter(Boolean).join(', ')}</span>
+          <span className="cx-hub-pick-s">{presets[preset][1].map(id => P.blocks[id]?.name).filter(Boolean).join(', ')}</span>
         </span>
-        <button type="button" className="cx-btn" onClick={() => onAdd({ type: primeType(k), blocks: P.presets[preset][1] })}>Add</button>
+        <button type="button" className="cx-btn" onClick={() => onAdd({ type: primeType(k), blocks: presets[preset][1] })}>Add</button>
       </div>
       <div className="cx-hub-prime-presets" role="radiogroup" aria-label={`${P.name} card starting layout`}>
-        {P.presets.map(([name], i) => (
+        {presets.map(([name], i) => (
           <button key={name} type="button" role="radio" aria-checked={i === preset} className="cx-chip" onClick={() => setPreset(i)}>{name}</button>
         ))}
       </div>

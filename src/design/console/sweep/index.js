@@ -17,7 +17,6 @@
  *
  * Overlays (receive the SAME props as the classic component they replace):
  *   ConsolePaywall       PaywallModal's props: { openId, onClose, onManage, onShowToast, onOpenLegal }
- *   ConsoleTutorial      TutorialOverlay's props: { visible, theme, onNavigate, onClose }
  *   ConsoleAuth          AuthScreen's props: { onOpenLegal, webInviteOnly }
  *
  * ConsoleAuth renders before there is any state, so it only shows once the
@@ -33,5 +32,4 @@ export const ConsoleShop = lazy(() => import('./ConsoleShop'));
 export const ConsoleLeaderboard = lazy(() => import('./ConsoleLeaderboard'));
 export const ConsoleFriends = lazy(() => import('./ConsoleFriends'));
 export const ConsolePaywall = lazy(() => import('./ConsolePaywall'));
-export const ConsoleTutorial = lazy(() => import('./ConsoleTutorial'));
 export const ConsoleAuth = lazy(() => import('./ConsoleAuth'));
