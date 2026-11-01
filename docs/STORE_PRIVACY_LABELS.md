@@ -223,6 +223,8 @@ do not apply to bundled `capacitor://` assets.*
 
 ---
 
+**iPhone calendar (iOS, Pro, from 2026-11-01).** When the user turns it on, Vantage reads the phone's calendar through EventKit and shows the events on its own calendar and hub. The events stay on the device: they are held in memory, never written to `user_data.state`, never synced, and never sent to a Netlify function or a third party (`src/lib/calendar/device.js`, `deviceSource.js`). Apple's definition of collection excludes data processed only on the device, so this adds no row to the label. The Info.plist strings are in STARTUP_REQUIREMENTS item 14.
+
 ## 2. Google Play — Data safety
 
 ### 2.1 Top-level answers
@@ -254,7 +256,7 @@ do not apply to bundled `capacitor://` assets.*
 | Messages | **Other in-app messages** | Yes | No | No | Optional | App functionality, Fraud prevention/security/compliance (reported conversations go into `reports`) | DMs and reactions. |
 | Photos and videos | **Photos** | Yes | No | No | Optional | App functionality, Fraud prevention/security/compliance (image screening) | Avatar, backgrounds, group crests, food-scan frame. |
 | Contacts | **Contacts** | Yes | No | No | Optional | App functionality | The in-app friend list, blocks and invites. The device address book is never read. |
-| Calendar | **Calendar events** | Yes | No | No | Optional | App functionality | Events the user adds to Vantage's own calendar (`S.calendarEvents`, `S.calendarSpans`). The device calendar is never read. *Conservative: Google defines this as "information from a user's calendar", and this is their calendar inside the app.* |
+| Calendar | **Calendar events** | Yes | No | No | Optional | App functionality | Events the user adds to Vantage's own calendar (`S.calendarEvents`, `S.calendarSpans`). The Android app never reads the device calendar (the iPhone-calendar view is iOS-only). *Conservative: Google defines this as "information from a user's calendar", and this is their calendar inside the app.* |
 | App activity | **App interactions** | Yes | No | No | Required | App functionality, Personalization, Fraud prevention/security/compliance (AI abuse caps) | Presence, activity heatmap, `ai_usage`, coach memory. |
 | App activity | **In-app search history** | Yes | No | **Yes** | Optional | App functionality | Food search text and barcodes, news topics. Not stored. |
 | App activity | **Other user-generated content** | Yes | No | No | Required | App functionality, Personalization, Fraud prevention/security/compliance (reports) | Boards, trackers, habits, holidays, wish list, groups, reports, community foods, support tickets, saved AI briefs, gameplay data. |

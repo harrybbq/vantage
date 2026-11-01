@@ -18,6 +18,7 @@ import { recoveryProvider } from '../lib/vitals/recoverySource';
 import { trackerDone, trackerStep, dailyGoalOf, fmtTrackerValue } from '../lib/trackers/done';
 import { useIsOwner } from '../hooks/useIsOwner';
 import { OWNER_SURFACES_IN_BUILD } from '../lib/native/ownerSurfaces';
+import { openInDeviceCalendar } from '../lib/calendar/deviceSource';
 import { shiftChipsInMonth, shiftOn, showsOnCalendar, setShowOnCalendar } from '../lib/rotation/pattern';
 import { effectiveOverrides } from '../lib/lifts/plan';
 
@@ -345,7 +346,17 @@ function DayTickMenu({ x, y, dates, trackers, logs, events, shift, onClose, upda
 
       {!multi && (events || []).length > 0 && (
         <div className="daymenu-events">
-          {events.map(ev => (ev.derived ? (
+          {events.map(ev => (ev.source === 'device' ? (
+            /* The phone's own calendar (lib/calendar/device.js): read-only
+               here, so a click opens it in Apple Calendar. */
+            <button key={ev.id} type="button" className="daymenu-ev"
+                    title={`${ev.title}. From your iPhone calendar; opens in Calendar.`}
+                    onClick={() => { openInDeviceCalendar(ev.startMs); onClose(); }}>
+              <span className="daymenu-ev-dot" style={{ background: eventColour(ev) }} />
+              <span className="daymenu-ev-name">{ev.title}</span>
+              <span className="daymenu-ev-when">{eventWhen(ev) || ev.span || 'All day'}</span>
+            </button>
+          ) : ev.derived ? (
             /* A trip. It is a VIEW of S.holidays, not a stored event, so
                there is nothing here to edit — offering an editor that
                could not save would be worse than not offering one. It

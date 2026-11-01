@@ -40,6 +40,7 @@ import TripEditSheet from './TripEditSheet';
 import AddSheet from './AddSheet';
 import ManageTrackers from './ManageTrackers';
 import TIcon from './icons';
+import { openInDeviceCalendar } from '../../../lib/calendar/deviceSource';
 
 const TABS = [
   { value: 'calendar', label: 'Calendar' },
@@ -137,7 +138,11 @@ export default function ConsoleTrack({
   const trip = useMemo(() => nextTrip(S, today), [S, today]);
   const openTrip = id => setSheet({ type: 'trip', id });
   const openSpan = ev => setSheet({ type: 'edit', event: ev, date: String(ev.id).slice(-10) });
-  const editEvent = (ev, iso) => setSheet({ type: 'edit', event: ev, date: iso });
+  // The phone's own calendar is read-only here (lib/calendar/device.js):
+  // a tap opens it in Apple Calendar instead of an editor that can't save.
+  const editEvent = (ev, iso) => (ev?.source === 'device'
+    ? openInDeviceCalendar(ev.startMs)
+    : setSheet({ type: 'edit', event: ev, date: iso }));
   const add = (iso, kind = 'event') => setSheet({ type: 'add', date: iso || selected, kind });
 
   function step(n) {

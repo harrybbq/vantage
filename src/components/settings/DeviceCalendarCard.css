@@ -1,0 +1,11 @@
+/* Settings › iPhone calendar (DeviceCalendarCard). Classic tokens, with
+   the console's where it is live (Settings renders in both designs). */
+.devcal-list { list-style: none; margin: 0 0 12px; padding: 0; display: flex; flex-direction: column; gap: 2px; }
+.devcal-row {
+  display: flex; align-items: center; gap: 10px; min-height: 44px; padding: 0 4px;
+  color: var(--cx-text, var(--text)); font-size: 14px; cursor: pointer;
+}
+.devcal-row input { width: 18px; height: 18px; flex: none; accent-color: var(--cx-accent-fill, var(--em)); }
+.devcal-dot { width: 10px; height: 10px; border-radius: 50%; flex: none; }
+.devcal-name { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.devcal-acct { flex: none; font-size: 12px; color: var(--cx-muted, var(--text-muted)); max-width: 40%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

@@ -143,6 +143,11 @@ export default function DayPanel({
         {evs.map(ev => {
           const trip = ev.source === 'holiday';
           const span = ev.source === 'span';
+          // From the phone's calendar: a tap opens Apple Calendar (ConsoleTrack).
+          const device = ev.source === 'device';
+          const sub = device
+            ? [ev.end ? eventWhen(ev) : (ev.dayCount > 1 ? ev.span : ''), ev.location, 'iPhone calendar'].filter(Boolean).join(' · ')
+            : null;
           return (
             <button key={ev.id} type="button" className="cx-track-ar"
                     onClick={() => (trip ? onOpenTrip(ev.tripId) : onEditEvent(ev, iso))}>
@@ -150,13 +155,14 @@ export default function DayPanel({
               <span className="cx-track-ar-tm cx-num">{trip || span ? '' : (ev.time || '')}</span>
               <span className="cx-track-ar-main">
                 <span className="cx-track-ar-t">{ev.title}</span>
-                {(trip || span || ev.location || ev.end) && (
+                {device && <span className="cx-track-ar-s">{sub}</span>}
+                {!device && (trip || span || ev.location || ev.end) && (
                   <span className="cx-track-ar-s">
                     {trip || span ? ev.span : [ev.end ? eventWhen(ev) : '', ev.location].filter(Boolean).join(' · ')}
                   </span>
                 )}
               </span>
-              <TIcon name={trip ? 'plane' : span ? 'calendar-days' : (ev.kind === 'training' ? 'dumbbell' : 'clock')} size={16} className="cx-track-ar-i" />
+              <TIcon name={trip ? 'plane' : span || device ? 'calendar-days' : (ev.kind === 'training' ? 'dumbbell' : 'clock')} size={16} className="cx-track-ar-i" />
             </button>
           );
         })}

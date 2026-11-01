@@ -76,7 +76,7 @@ function TodayEvents({ S, navigate }) {
   const pastKept = new Set(pastRoom > 0 ? past.slice(-pastRoom) : []);
   const shown = agenda.filter(e => !e.past || pastKept.has(e)).slice(0, AGENDA_MAX);
   const more = agenda.length - shown.length;
-  const allDay = ev => ev.source === 'span' || ev.source === 'holiday';
+  const allDay = ev => ev.source === 'span' || ev.source === 'holiday' || !!ev.allDay;
   return (
     <button type="button" className="cx-hub-pl-agenda" onClick={() => navigate?.('track')}
             aria-label={`Today: ${agenda.map(ev => [eventWhen(ev) || (allDay(ev) ? 'all day' : ''), ev.label].filter(Boolean).join(' ')).join('; ')}. Open your calendar`}>

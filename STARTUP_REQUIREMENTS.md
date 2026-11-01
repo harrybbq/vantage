@@ -84,6 +84,18 @@ action outside the repo.
 14. `[ ]` **Add native permission strings.** `NSCameraUsageDescription`
     for the food scanner, plus the Android manifest equivalent. A
     missing usage string is an automatic iOS rejection.
+    **iPhone calendar (2026-11-01, Pro, iOS only):** the code is in
+    (`lib/calendar/device*.js`, `@ebarooni/capacitor-calendar`) and stays
+    inert until the iOS project exists. Add to `ios/App/App/Info.plist`:
+    `NSCalendarsFullAccessUsageDescription` (iOS 17+; reading needs Full
+    Access, there is no read-only level) and `NSCalendarsUsageDescription`
+    (iOS 16 and earlier), both saying what it is for, e.g. "Vantage shows
+    your calendar's events on its own calendar and hub. It only reads them,
+    on this iPhone; they are never uploaded or changed." Do NOT add the
+    write-only or reminders keys, and do NOT add READ/WRITE_CALENDAR to
+    the Android manifest: the feature is iOS-only and the plugin's Android
+    side declares nothing. Then test on a device: Settings › iPhone
+    calendar → allow → events on Track and the hub → tap one opens Calendar.
 15. `[ ]` **Set up push credentials** — an APNs key for iOS, FCM for
     Android. The `push-dispatch` function and `FCM_*` env vars already
     exist.
