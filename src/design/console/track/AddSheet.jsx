@@ -23,7 +23,7 @@ import SuggestInput from '../../../components/calendar/SuggestInput';
 import { emptyHolidayForm } from '../../../components/holiday/HolidayFormTabs';
 import { EVENT_COLOURS, addEvent, cleanPatch, eventColour, isTime, makeEvent, removeEvent, updateEvent } from '../../../lib/calendar/events';
 import { MAX_SPAN_DAYS, addDays, addSpan, findSpan, isRealDate, makeSpan, rangeLabel, removeSpan, spanLength, updateSpan } from '../../../lib/calendar/spans';
-import { completion, describe, fillPlan, learnEvents, locationCompletion, suggest, suggestLocations } from '../../../lib/calendar/eventMemory';
+import { completion, describe, fillPlan, keepLength, learnEvents, locationCompletion, suggest, suggestLocations } from '../../../lib/calendar/eventMemory';
 import { useTierLimits } from '../../../hooks/useTierLimits';
 import { addTrip, tripFromForm } from './trips';
 import { CoverField, SavingsPotField, STATUS_OPTIONS } from './TripFields';
@@ -70,9 +70,18 @@ export default function AddSheet({ S, update, date, kind: initialKind = 'event',
   const locGhost = useMemo(() => locationCompletion(memory, location, { title }), [memory, location, title]);
   const values = { title, start, end, location, colour };
   const setters = { title: setTitle, start: setStart, end: setEnd, location: setLocation, colour: setColour };
+  // The length the last suggestion brought (minutes), for an end that
+  // has not been filled yet when the start moves.
+  const lengthRef = useRef(null);
   function userSet(k, v) {
     touched.current.add(k);
     setters[k](v);
+    // Moving the start carries an end the user hasn't typed along with
+    // it, so a 10:00–12:00 lesson moved to 14:00 is 14:00–16:00.
+    if (k === 'start' && !touched.current.has('end')) {
+      const next = keepLength({ start, end }, v, lengthRef.current);
+      if (next) setEnd(next);
+    }
     if (fill && k in fill.prev && k !== 'title') {
       const prev = { ...fill.prev };
       delete prev[k];
@@ -82,6 +91,7 @@ export default function AddSheet({ S, update, date, kind: initialKind = 'event',
   function applyEntry(entry) {
     if (!entry) return;
     const patch = fillPlan(entry, values, touched.current);
+    lengthRef.current = entry.duration || null;
     const prev = {};
     for (const k of Object.keys(patch)) { prev[k] = values[k]; setters[k](patch[k]); }
     setFill(Object.keys(patch).some(k => k !== 'title') ? { prev } : null);

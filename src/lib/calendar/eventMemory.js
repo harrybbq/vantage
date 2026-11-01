@@ -34,8 +34,14 @@
  *   location    weighted most-common non-empty location (+ count)
  *   start/end   weighted most-common (start, end) PAIR, untimed counted
  *               as its own pair — a birthday that is always all-day
- *               remembers "no time" rather than a stray 19:00 (+ count,
- *               + duration in minutes when both ends are known)
+ *               remembers "no time" rather than a stray 19:00 (+ count)
+ *   duration    weighted most-common LENGTH in minutes, learned on its
+ *               own from every occurrence with both ends (owner, Nov
+ *               2026): a two-hour driving lesson booked at 10:00 one
+ *               week and 14:00 the next is still "2 h", even though no
+ *               single start–end pair repeats. Picking the suggestion
+ *               fills the end from it, and moving the start keeps it
+ *               (keepLength).
  *   weekday     weighted most-common weekday (0 = Sun) and its share;
  *               only claimed as "usually Mon" when share ≥ 0.5 and the
  *               event has happened at least twice
@@ -136,7 +142,7 @@ export function learnEvents(calendarEvents, { now = Date.now(), excludeId } = {}
       if (!g) {
         g = { key, words: key.split(' '), spellings: null, best: -1, title: raw, count: 0, weight: 0,
           lastUsed: iso, locs: new Map(), times: new Map(), days: new Map(), dayTimes: new Map(),
-          colours: new Map(), kinds: new Map() };
+          durs: new Map(), colours: new Map(), kinds: new Map() };
         groups.set(key, g);
       }
       g.count++;
@@ -161,6 +167,7 @@ export function learnEvents(calendarEvents, { now = Date.now(), excludeId } = {}
       const start = isTime(ev.time) ? ev.time : '';
       const end = start && isTime(ev.end) && ev.end > start ? ev.end : '';
       tally(g.times, `${start}|${end}`, w, { start, end });
+      if (start && end) tally(g.durs, toMin(end) - toMin(start), w);
       tally(g.days, wd, w);
       let dt = g.dayTimes.get(wd);
       if (!dt) { dt = new Map(); g.dayTimes.set(wd, dt); }
@@ -177,6 +184,7 @@ export function learnEvents(calendarEvents, { now = Date.now(), excludeId } = {}
     // THIS event usually happens at.
     const locList = [...g.locs.values()].sort((a, b) => b.w - a.w).slice(0, 3).map(v => normalise(v.value));
     const tm = top(g.times);
+    const len = top(g.durs);
     const day = top(g.days);
     const daysTotal = [...g.days.values()].reduce((s, v) => s + v.w, 0) || 1;
     const col = top(g.colours);
@@ -205,7 +213,8 @@ export function learnEvents(calendarEvents, { now = Date.now(), excludeId } = {}
       locations: locList,
       start, end,
       timeCount: tm ? tm.n : 0,
-      duration: start && end ? toMin(end) - toMin(start) : null,
+      duration: len ? len.value : null,
+      durationCount: len ? len.n : 0,
       weekday: day ? day.value : null,
       weekdayShare: day ? day.w / daysTotal : 0,
       byWeekday,
@@ -312,7 +321,9 @@ export function suggest(index, typed, { limit = 4, date } = {}) {
     if (habit) {
       s.start = habit.start;
       s.end = habit.end;
-      s.duration = habit.start && habit.end ? toMin(habit.end) - toMin(habit.start) : null;
+      // That weekday's own length when its pair has one; else the
+      // event's usual length still applies.
+      s.duration = habit.start && habit.end ? toMin(habit.end) - toMin(habit.start) : e.duration;
       s.onDay = WEEKDAYS[wd];
     }
     out.push(s);
@@ -395,8 +406,10 @@ export function describe(entry) {
   if (!entry) return '';
   const bits = [];
   if (entry.location) bits.push(entry.location);
-  if (entry.start) bits.push(entry.end ? `${entry.start}–${entry.end}` : entry.start);
+  const endAt = entry.end || endFrom(entry.start, entry.duration) || '';
+  if (entry.start) bits.push(endAt ? `${entry.start}–${endAt}` : entry.start);
   else if (entry.timeCount) bits.push('all day');
+  if (entry.duration) bits.push(lengthLabel(entry.duration));
   const usual = usualWeekday(entry);
   if (entry.onDay && entry.onDay !== usual) bits.push(WEEKDAYS_LONG[WEEKDAYS.indexOf(entry.onDay)]);
   else if (usual) bits.push(`usually ${usual}`);
@@ -433,7 +446,9 @@ export function fillPlan(entry, current = {}, touched = []) {
 
   const hasStart = t.has('start'), hasEnd = t.has('end');
   if (!hasStart && !hasEnd) {
-    if (entry.start) { set('start', entry.start); set('end', entry.end || ''); }
+    // The usual pair; a start remembered without an end takes its end
+    // from the usual length.
+    if (entry.start) { set('start', entry.start); set('end', entry.end || endFrom(entry.start, entry.duration) || ''); }
   } else if (hasStart && !hasEnd && entry.duration && isTime(current.start)) {
     const m = toMin(current.start) + entry.duration;
     if (m < 24 * 60) set('end', fromMin(m));
@@ -444,4 +459,34 @@ export function fillPlan(entry, current = {}, touched = []) {
 
   if (!t.has('colour') && entry.colour) set('colour', entry.colour);
   return patch;
+}
+
+/** start + minutes as 'HH:MM', or null if either is missing or it runs past midnight. */
+export function endFrom(start, minutes) {
+  if (!isTime(start) || !(minutes > 0)) return null;
+  const m = toMin(start) + minutes;
+  return m < 24 * 60 ? fromMin(m) : null;
+}
+
+/** "45 min", "2 h", "1 h 30 min". */
+export function lengthLabel(minutes) {
+  const m = Math.round(Number(minutes) || 0);
+  if (m <= 0) return '';
+  const h = Math.floor(m / 60), r = m % 60;
+  if (!h) return `${r} min`;
+  return r ? `${h} h ${r} min` : `${h} h`;
+}
+
+/**
+ * The start time moved: where should an end the user has NOT typed go?
+ * It keeps the event's current length (or `fallback` minutes — the
+ * remembered one — when there is no valid end yet), so a 10:00–12:00
+ * driving lesson moved to 14:00 becomes 14:00–16:00 instead of ending
+ * before it starts. Returns the new end, or null to leave it alone (no
+ * length known, no valid new start, or it would run past midnight).
+ */
+export function keepLength(current = {}, nextStart, fallback = null) {
+  const { start, end } = current;
+  const len = isTime(start) && isTime(end) && end > start ? toMin(end) - toMin(start) : fallback;
+  return endFrom(nextStart, len);
 }

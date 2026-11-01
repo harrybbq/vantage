@@ -2,7 +2,7 @@
 import assert from 'node:assert/strict';
 import {
   normalise, learnEvents, suggest, completion, suggestLocations, locationCompletion,
-  describe as describeEntry, fillPlan, usualWeekday, oneEditApart, MAX_EVENTS,
+  describe as describeEntry, fillPlan, usualWeekday, oneEditApart, MAX_EVENTS, endFrom, lengthLabel, keepLength,
 } from './eventMemory.js';
 
 let n = 0;
@@ -93,7 +93,7 @@ t('"gy" suggests Gym session first, with its usual time', () => {
   assert.equal(s[0].title, 'Gym session');
   assert.equal(s[0].start, '07:00');
   assert.ok(s.some(x => x.title === 'Gymkhana'));
-  assert.equal(describeEntry(s[0]), 'PureGym Leeds · 07:00–08:00 · usually Mon');
+  assert.equal(describeEntry(s[0]), 'PureGym Leeds · 07:00–08:00 · 1 h · usually Mon');
 });
 
 t('fewer than 2 characters suggests nothing (empty focused field included)', () => {
@@ -167,7 +167,7 @@ t('per-weekday habits: the date being added picks that day\'s times', () => {
   const sun = suggest(i3, 'gy', { date: '2026-10-11' })[0];
   assert.deepEqual([mon.start, mon.end, mon.onDay], ['07:00', '08:00', 'Mon']);
   assert.deepEqual([thu.start, thu.end, thu.duration, thu.onDay], ['18:00', '19:30', 90, 'Thu']);
-  assert.equal(describeEntry(thu), '18:00–19:30 · Thursdays');
+  assert.equal(describeEntry(thu), '18:00–19:30 · 1 h 30 min · Thursdays');
   assert.deepEqual([sun.start, sun.onDay], ['07:00', null], 'no Sunday habit → overall most common');
   assert.equal(fillPlan(thu, {}, []).end, '19:30');
 });
@@ -252,6 +252,48 @@ t('large calendars are capped and stay fast', () => {
   console.log(`  perf: learn ${N} events (capped at ${MAX_EVENTS}, ${bi.entries.length} titles) ${learnMs.toFixed(1)} ms; suggest+completion ${perKey.toFixed(3)} ms/keystroke`);
   assert.ok(learnMs < 250, `learn took ${learnMs}ms`);
   assert.ok(perKey < 10, `suggest took ${perKey}ms`);
+});
+
+t('length is remembered on its own: a 2 h lesson at a different time each week', () => {
+  const cal = {};
+  const starts = ['10:00', '14:00', '09:30', '16:00'];
+  starts.forEach((st, k) => {
+    const iso = daysAgo(7 * (k + 1));
+    const [h, m] = st.split(':').map(Number);
+    const end = `${String(h + 2).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+    (cal[iso] = cal[iso] || []).push(ev('Driving Lesson', { time: st, end }));
+  });
+  const idx2 = learnEvents(cal, { now: NOW });
+  const [s] = suggest(idx2, 'Dri');
+  assert.equal(s.title, 'Driving Lesson');
+  assert.equal(s.duration, 120, 'no start–end pair repeats, the length does');
+  assert.ok(describeEntry(s).includes('2 h'), describeEntry(s));
+  // Picked with a start already typed: the end follows the length.
+  assert.equal(fillPlan(s, { start: '13:00' }, ['start']).end, '15:00');
+  // Picked on a blank form: the most recent pair, which is 2 h too.
+  const p = fillPlan(s, {}, []);
+  assert.equal(endFrom(p.start, 120), p.end);
+});
+
+t('a remembered start without an end takes its end from the length', () => {
+  const cal = {
+    [daysAgo(7)]: [ev('Lesson', { time: '10:00', end: '12:00' })],
+    [daysAgo(14)]: [ev('Lesson', { time: '10:00' })],
+    [daysAgo(21)]: [ev('Lesson', { time: '10:00' })],
+  };
+  const [s] = suggest(learnEvents(cal, { now: NOW }), 'les');
+  assert.deepEqual([s.start, s.end, s.duration], ['10:00', '', 120]);
+  assert.deepEqual(fillPlan(s, {}, []), { title: 'Lesson', start: '10:00', end: '12:00' });
+});
+
+t('moving the start keeps the length; the helpers refuse nonsense', () => {
+  assert.equal(keepLength({ start: '10:00', end: '12:00' }, '14:00'), '16:00');
+  assert.equal(keepLength({ start: '10:00', end: '' }, '14:00', 90), '15:30', 'no end yet → the remembered length');
+  assert.equal(keepLength({ start: '', end: '' }, '14:00'), null, 'no length known → leave the end alone');
+  assert.equal(keepLength({ start: '10:00', end: '12:00' }, '23:00'), null, 'would run past midnight');
+  assert.equal(keepLength({ start: '10:00', end: '12:00' }, ''), null);
+  assert.equal(endFrom('09:15', 45), '10:00');
+  assert.deepEqual([lengthLabel(45), lengthLabel(120), lengthLabel(90), lengthLabel(0)], ['45 min', '2 h', '1 h 30 min', '']);
 });
 
 console.log(`eventMemory: ${n} tests passed`);
