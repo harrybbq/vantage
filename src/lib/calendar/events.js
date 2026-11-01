@@ -60,6 +60,7 @@
  */
 import { holidayEventsInMonth, holidayEventsOn } from './holidayEvents.js';
 import { isSpanEventId, spanEventsInMonth, spanEventsOn, spansOf } from './spans.js';
+import { deviceEventsOn, deviceDatesInMonth, isDeviceEventId } from './device.js';
 
 /** The kinds an event can be. `id` is stored; `label`/`colour` are display. */
 export const EVENT_KINDS = [
@@ -139,7 +140,13 @@ export function eventsOn(S, iso) {
   // last, which is right for "call Mum some time" and wrong for "you
   // are in Lisbon", so trips are prepended rather than merged into it.
   // The user's own multi-day events sit with them, for the same reason.
-  return [...holidayEventsOn(S, iso), ...spanEventsOn(S, iso), ...sortEvents(stored)];
+  // The phone's calendar (device.js), when the view carries it: its
+  // all-day items sit with the other day-framing ones, its timed ones
+  // sort in among the user's own.
+  const device = deviceEventsOn(S, iso);
+  const deviceAllDay = device.filter(e => !e.time);
+  const deviceTimed = device.filter(e => e.time);
+  return [...holidayEventsOn(S, iso), ...spanEventsOn(S, iso), ...deviceAllDay, ...sortEvents([...stored, ...deviceTimed])];
 }
 
 /**
@@ -188,6 +195,7 @@ export function eventsInMonth(S, year, month) {
   // event, which is most days of most trips.
   const dates = new Set([
     ...Object.keys(all && typeof all === 'object' ? all : {}), ...Object.keys(trips), ...Object.keys(spans),
+    ...deviceDatesInMonth(S, year, month),
   ]);
   for (const iso of dates) {
     if (!iso.startsWith(prefix)) continue;
@@ -201,9 +209,10 @@ export function eventsInMonth(S, year, month) {
  *  writers below refuse them rather than quietly doing nothing. */
 export const isDerivedId = id => typeof id === 'string' && id.startsWith('hol:');
 
-/** Ids the single-day writers must not touch: trips (read-only) and the
- *  per-day view of a span (edited whole, in spans.js). */
-const notThisStore = id => isDerivedId(id) || isSpanEventId(id);
+/** Ids the single-day writers must not touch: trips (read-only), the
+ *  per-day view of a span (edited whole, in spans.js) and the phone's
+ *  own calendar (device.js: read-only, never stored). */
+const notThisStore = id => isDerivedId(id) || isSpanEventId(id) || isDeviceEventId(id);
 
 const TIME_RE = /^([01]\d|2[0-3]):[0-5]\d$/;
 export const isTime = v => typeof v === 'string' && TIME_RE.test(v);

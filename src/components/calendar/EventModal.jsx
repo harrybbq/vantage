@@ -47,7 +47,7 @@ import { EVENT_COLOURS, addEvent, cleanPatch, eventColour, isTime, makeEvent, re
 import {
   MAX_SPAN_DAYS, addDays, addSpan, findSpan, isRealDate, makeSpan, rangeLabel, removeSpan, spanLength, updateSpan,
 } from '../../lib/calendar/spans';
-import { completion, describe, fillPlan, learnEvents, locationCompletion, suggest, suggestLocations } from '../../lib/calendar/eventMemory';
+import { completion, describe, fillPlan, keepLength, learnEvents, locationCompletion, suggest, suggestLocations } from '../../lib/calendar/eventMemory';
 import SuggestInput from './SuggestInput';
 
 const prettyDate = iso => new Date(iso + 'T12:00').toLocaleDateString(undefined, {
@@ -119,9 +119,18 @@ export default function EventModal({ dates, event, calendarEvents, calendarSpans
   const setters = { title: setTitle, start: setStart, end: setEnd, location: setLocation, colour: setColour };
 
   /** A user edit: mark the field theirs, and drop it from any pending Undo. */
+  // The length the last suggestion brought (minutes), for an end that
+  // has not been filled yet when the start moves.
+  const lengthRef = useRef(null);
   function userSet(k, v) {
     touched.current.add(k);
     setters[k](v);
+    // Moving the start carries an end the user hasn't typed along with
+    // it, so a 10:00–12:00 lesson moved to 14:00 is 14:00–16:00.
+    if (k === 'start' && !touched.current.has('end')) {
+      const next = keepLength({ start, end }, v, lengthRef.current);
+      if (next) setEnd(next);
+    }
     if (fill && k in fill.prev && k !== 'title') {
       const prev = { ...fill.prev };
       delete prev[k];
@@ -131,6 +140,7 @@ export default function EventModal({ dates, event, calendarEvents, calendarSpans
 
   function applyEntry(entry) {
     const patch = fillPlan(entry, values, touched.current);
+    lengthRef.current = entry.duration || null;
     const prev = {};
     for (const k of Object.keys(patch)) { prev[k] = values[k]; setters[k](patch[k]); }
     // Only worth announcing when more than the name changed.

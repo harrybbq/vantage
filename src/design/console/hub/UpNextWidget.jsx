@@ -42,6 +42,12 @@ export function upcoming(S, now = new Date(), n = 3) {
     const iso = todayIso(d);
     for (const ev of eventsOn(S, iso)) {
       if (ev.source === 'holiday') continue;
+      // A multi-day event from the phone's calendar: once, at the first
+      // day in the window (it may have started before today).
+      if (ev.source === 'device' && ev.dayCount > 1) {
+        if (seenSpan.has('dev:' + ev.deviceId)) continue;
+        seenSpan.add('dev:' + ev.deviceId);
+      }
       if (ev.source === 'span') {
         const key = ev.spanId || ev.id || ev.title;
         if (seenSpan.has(key)) continue;

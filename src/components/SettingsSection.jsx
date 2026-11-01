@@ -12,6 +12,7 @@ import DataExportCard from './settings/DataExportCard';
 import ConsentCard from './settings/ConsentCard';
 import SupportCard from './settings/SupportCard';
 import SettingsGroup from './settings/SettingsGroup';
+import DeviceCalendarCard from './settings/DeviceCalendarCard';
 import { useSubscriptionContext } from '../context/SubscriptionContext';
 import { getOwnProfile, updateOwnProfile } from '../lib/friends/queries';
 import { accentAccess, ACCENT_UNLOCKS, PRESTIGE_ACCENTS } from '../lib/ratings/prestigeRewards';
@@ -1030,6 +1031,9 @@ export default function SettingsSection({ S, update, active, userId, userEmail, 
           )}
         </SettingsGroup>
         )}
+
+        {/* iPhone calendar — iOS app only, Pro (renders nothing elsewhere). */}
+        <DeviceCalendarCard />
 
         {/* Notifications — preferences card. The push delivery
             pipeline reads these to gate which kinds of pushes fire.

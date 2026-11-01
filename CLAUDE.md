@@ -31,6 +31,7 @@ retired `cream`/`dark` ids map forward in `resolveEffectiveTheme`.
 - Hub widgets: shared React bodies (see `src/components/widgets/LifeWidgets.jsx`, `savings/SavingsWidgets.jsx`) rendered by `mobile/MobileWidget.jsx` (mobile stack) and as React islands in `HubSection.jsx` (desktop draggable canvas). Add a widget = META entry + renderBody case + both pickers (`AddMobileWidgetModal`, `Modals.jsx`).
 - Netlify functions own anything cross-user or secret: leaderboard, WHOOP sync (`netlify/lib/whoop.js`), AI (`ai-food-detect`, `ai-coach-daily` — need `ANTHROPIC_API_KEY` env).
 - Social: `profiles`/`friendships`/`messages`/`blocks`/`reports` tables, RLS-gated direct queries in `src/lib/friends/`. Report+block UI exists (friend card + DM ⋯ menu).
+- iPhone calendar (iOS app, Pro, 2026-11-01): `lib/calendar/device.js` + `deviceSource.js`. Read on the device, never stored: App hands calendar surfaces a VIEW of S (`withDeviceEvents`, non-enumerable symbol) — never write it back. Settings card `settings/DeviceCalendarCard.jsx`; prefs per phone in localStorage.
 - Legal: `/privacy` and `/terms` deep-link pre-auth (store requirement). Onboarding (replaced both old tours, Oct 2026): logic `src/lib/onboarding/onboarding.js`, overlay `components/onboarding/Onboarding.jsx`, hub Getting started card; per-page help: `SectionHelp`.
 
 ## Onboarding stays current (owner rule, 2026-10-29)

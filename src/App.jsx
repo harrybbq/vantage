@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, lazy, Suspense } from 'react';
+import { useState, useEffect, useRef, useMemo, lazy, Suspense } from 'react';
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import { supabase } from './lib/supabase';
 import { useVisionBoardState, hasLocalStorageData, clearLocalStorageData } from './hooks/useVisionBoardState';
@@ -49,6 +49,9 @@ import Onboarding from './components/onboarding/Onboarding';
 import { pickById, markInvited } from './lib/onboarding/onboarding';
 import { shareInvite } from './lib/onboarding/shareInvite';
 import { ONBOARDING_DO_EVENT } from './lib/onboarding/bus';
+import { OPEN_PAYWALL_EVENT } from './lib/paywallBus';
+import { useDeviceCalendar } from './hooks/useDeviceCalendar';
+import { withDeviceEvents } from './lib/calendar/device';
 import BackgroundCropModal from './components/BackgroundCropModal';
 import VisionsModal from './components/VisionsModal';
 import { useIsOwner } from './hooks/useIsOwner';
@@ -218,6 +221,12 @@ function Board({ userId, userEmail, onSignOut, initialSettings }) {
   }
   const { atLimit } = useTierLimits();
   const { hasPro } = useSubscriptionContext();
+  // The phone's calendar (iOS app, Pro): read on the device, held in
+  // memory, and handed to the calendar surfaces as a view of S whose
+  // extra events cannot be saved — see lib/calendar/device.js. `S`
+  // itself, and every write, stays exactly as it was.
+  const deviceEvents = useDeviceCalendar(hasPro);
+  const calendarS = useMemo(() => withDeviceEvents(S, deviceEvents), [S, deviceEvents]);
   const { isOwner } = useIsOwner(userId);
   // ── Design switch (console redesign foundation; src/design/console/README.md) ──
   // 'classic' | 'console' from S.design, console owner-preview only until the
@@ -566,6 +575,14 @@ function Board({ userId, userEmail, onSignOut, initialSettings }) {
     window.addEventListener(ONBOARDING_DO_EVENT, run);
     return () => window.removeEventListener(ONBOARDING_DO_EVENT, run);
   }, []);
+  // Upsells from places with no handle on the modal state (lib/paywallBus).
+  const openModalRef = useRef(handleOpenModal);
+  openModalRef.current = handleOpenModal;
+  useEffect(() => {
+    const open = e => openModalRef.current(`paywall:${e?.detail?.key || 'generic'}`);
+    window.addEventListener(OPEN_PAYWALL_EVENT, open);
+    return () => window.removeEventListener(OPEN_PAYWALL_EVENT, open);
+  }, []);
 
   // ── AI Coach verb dispatch ──
   // Called when a Pro user taps an action button inside a coach insight.
@@ -859,7 +876,7 @@ function Board({ userId, userEmail, onSignOut, initialSettings }) {
   // SectionProps — the one prop bag every console section slot receives
   // (src/design/console/README.md). Add to it; never rename a key.
   const sectionProps = {
-    S, update, hydrated, userId, userEmail, isMobile, isOwner, hasPro, visionState,
+    S: calendarS, update, hydrated, userId, userEmail, isMobile, isOwner, hasPro, visionState,
     navigate, activeSection,
     onOpenModal: handleOpenModal,
     onOpenPaywall: (id = 'generic') => handleOpenModal(`paywall:${id}`),
@@ -1067,7 +1084,7 @@ function Board({ userId, userEmail, onSignOut, initialSettings }) {
             <WidgetBoundary variant="section" name="track">
             <DesignSlot use={ConsoleTrack} props={sectionProps}>
             <Suspense fallback={null}>
-              <TrackSection S={S} update={update} active onOpenModal={handleOpenModal} onShowCoinToast={showCoinToast} userId={userId} requestedTab={trackTab} />
+              <TrackSection S={calendarS} update={update} active onOpenModal={handleOpenModal} onShowCoinToast={showCoinToast} userId={userId} requestedTab={trackTab} />
             </Suspense>
             </DesignSlot>
             </WidgetBoundary>
