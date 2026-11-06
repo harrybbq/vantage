@@ -19,6 +19,9 @@ import { trackerDone, trackerStep, dailyGoalOf, fmtTrackerValue } from '../lib/t
 import { useIsOwner } from '../hooks/useIsOwner';
 import { OWNER_SURFACES_IN_BUILD } from '../lib/native/ownerSurfaces';
 import { openInDeviceCalendar } from '../lib/calendar/deviceSource';
+import PayIndicator from './pay/PayIndicator';
+import PayDayModal from './pay/PayDayModal';
+import { payDaysBetween, payOf, freqLabel } from '../lib/money/payday';
 import { shiftChipsInMonth, shiftOn, showsOnCalendar, setShowOnCalendar } from '../lib/rotation/pattern';
 import { effectiveOverrides } from '../lib/lifts/plan';
 
@@ -207,7 +210,7 @@ const TRACK_TABS = [
  * overflow-hidden card; rendered in place it would be clipped by the
  * cell it belongs to.
  */
-function DayTickMenu({ x, y, dates, trackers, logs, events, shift, onClose, update, onAddEvent, onAddSpan, onEditEvent }) {
+function DayTickMenu({ x, y, dates, trackers, logs, events, shift, onClose, update, onAddEvent, onAddSpan, onEditEvent, onMarkPay, payHere, payFreq }) {
   const ref = useRef(null);
 
   // Close on anything that is not this menu: outside click, Escape,
@@ -391,6 +394,13 @@ function DayTickMenu({ x, y, dates, trackers, logs, events, shift, onClose, upda
           Add as one multi-day event
         </button>
       )}
+      {/* Pay day (lib/money/payday): one schedule, marked from any day. */}
+      {!multi && onMarkPay && (
+        <button type="button" className="daymenu-add is-pay" onClick={onMarkPay}>
+          <span className="daymenu-add-plus" aria-hidden="true">£</span>
+          {payHere ? `Pay day · ${payFreq} — change` : 'Mark as pay day'}
+        </button>
+      )}
 
       {trackers.length > 0 && (
         <button type="button" className="daymenu-clear" onClick={clearAll}>
@@ -536,6 +546,8 @@ function CalendarView({ S, update, onShowCoinToast, nutritionMonthData, userId }
   // because the menu closes the moment the modal opens; keeping them in
   // one piece of state made "add event" close its own dialog.
   const [eventForm, setEventForm] = useState(null);
+  // Pay day form: the date it opens on, or null.
+  const [payForm, setPayForm] = useState(null);
 
   function handleDayContext(e, key) {
     e.preventDefault();
@@ -579,6 +591,11 @@ function CalendarView({ S, update, onShowCoinToast, nutritionMonthData, userId }
     const tids = Object.keys(dayLogs);
     cells.push({ day, key, dayLogs, isToday, isSelected, tids, col: (offset + day - 1) % 7 });
   }
+
+  const monthStart = `${calYear}-${String(calMonth + 1).padStart(2, '0')}-01`;
+  const monthEnd = `${calYear}-${String(calMonth + 1).padStart(2, '0')}-${String(dim).padStart(2, '0')}`;
+  const payDays = new Set(payDaysBetween(S, monthStart, monthEnd));
+  const pay = payOf(S);
 
   const selectedKey = S.selectedLogDate;
   const selectedDay = selectedKey ? parseInt(selectedKey.split('-')[2]) : null;
@@ -687,7 +704,10 @@ function CalendarView({ S, update, onShowCoinToast, nutritionMonthData, userId }
   return (
     <div className="card" style={{ padding: '22px' }}>
       <div className="cal-header">
-        <div className="cal-month-title">{months[calMonth]} {calYear}</div>
+        <div className="cal-title-row">
+          <div className="cal-month-title">{months[calMonth]} {calYear}</div>
+          <PayIndicator S={S} onEdit={d => setPayForm(d)} />
+        </div>
         <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
           {owner && (
             <button type="button"
@@ -753,6 +773,7 @@ function CalendarView({ S, update, onShowCoinToast, nutritionMonthData, userId }
               <div className="cal-cell-head">
                 <div className="cal-date">{cell.day}</div>
                 {cell.isToday && <span className="cal-today-tag" aria-hidden="true">Today</span>}
+                {payDays.has(cell.key) && <span className="cal-pay-tag" title="Pay day">£ Pay</span>}
               </div>
               {/* Owner's shift chip: absolutely placed in the cell's
                   top-right, outside the head, so it adds no row and the
@@ -797,8 +818,13 @@ function CalendarView({ S, update, onShowCoinToast, nutritionMonthData, userId }
           onAddEvent={() => { setEventForm({ dates: menu.dates, event: null }); setMenu(null); }}
           onAddSpan={() => { setEventForm({ dates: menu.dates, event: null, multiDay: true }); setMenu(null); }}
           onEditEvent={ev => { setEventForm({ dates: menu.dates, event: ev }); setMenu(null); }}
+          onMarkPay={() => { setPayForm(menu.dates[0]); setMenu(null); }}
+          payHere={menu.dates.length === 1 && payDays.has(menu.dates[0])}
+          payFreq={pay ? freqLabel(pay.freq).toLowerCase() : ''}
         />
       )}
+
+      {payForm && <PayDayModal S={S} date={payForm} update={update} onClose={() => setPayForm(null)} />}
 
       {eventForm && (
         <EventModal

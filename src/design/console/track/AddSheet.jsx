@@ -25,6 +25,8 @@ import { EVENT_COLOURS, addEvent, cleanPatch, eventColour, isTime, makeEvent, re
 import { MAX_SPAN_DAYS, addDays, addSpan, findSpan, isRealDate, makeSpan, rangeLabel, removeSpan, spanLength, updateSpan } from '../../../lib/calendar/spans';
 import { completion, describe, fillPlan, keepLength, learnEvents, locationCompletion, suggest, suggestLocations } from '../../../lib/calendar/eventMemory';
 import { useTierLimits } from '../../../hooks/useTierLimits';
+import PayDayFields from '../../../components/pay/PayDayFields';
+import { payOf, setPayDay, clearPayDay } from '../../../lib/money/payday';
 import { addTrip, tripFromForm } from './trips';
 import { CoverField, SavingsPotField, STATUS_OPTIONS } from './TripFields';
 
@@ -32,6 +34,7 @@ const KINDS = [
   { value: 'event', label: 'Event' },
   { value: 'span', label: 'Multi-day' },
   { value: 'trip', label: 'Trip' },
+  { value: 'pay', label: 'Pay day' },
 ];
 
 export default function AddSheet({ S, update, date, kind: initialKind = 'event', event = null, onClose, onOpenPaywall, onTripAdded }) {
@@ -40,6 +43,11 @@ export default function AddSheet({ S, update, date, kind: initialKind = 'event',
   const [span] = useState(() => (spanId ? findSpan(S, spanId) : null));
   const [kind, setKind] = useState(editing ? (spanId ? 'span' : 'event') : initialKind);
   const { atLimit } = useTierLimits();
+  // Pay day (lib/money/payday): one schedule; this tab sets or replaces it.
+  const pay = payOf(S);
+  const [payDate, setPayDate] = useState(initialKind === 'pay' && isRealDate(date) ? date : (pay?.anchor || date));
+  const [payFreq, setPayFreq] = useState(pay?.freq || 'month');
+  const [payWeekend, setPayWeekend] = useState(pay ? (pay.weekendEarly || pay.freq !== 'month') : true);
 
   // Shared fields
   const [title, setTitle] = useState(event?.title || '');
@@ -108,12 +116,17 @@ export default function AddSheet({ S, update, date, kind: initialKind = 'event',
   const datesBackwards = datesOk && endDate < startDate;
   const tooLong = datesOk && !datesBackwards && spanLength(startDate, endDate) > MAX_SPAN_DAYS;
   const endBackwards = !!end && !!start && end <= start;
-  const canSave = kind === 'trip'
+  const canSave = kind === 'pay' ? isRealDate(payDate) : kind === 'trip'
     ? !!trip.dest.trim()
     : clean.length > 0 && (kind === 'span' ? isRealDate(startDate) : isRealDate(day));
 
   function save() {
     if (!canSave) return;
+    if (kind === 'pay') {
+      update(prev => setPayDay(prev, payDate, payFreq, { weekendEarly: payWeekend }));
+      onClose();
+      return;
+    }
     if (kind === 'trip') {
       if (atLimit('holidays', (S.holidays || []).length)) { onClose(); onOpenPaywall?.('holidays'); return; }
       const rec = tripFromForm(emptyHolidayForm(), trip);
@@ -178,15 +191,16 @@ export default function AddSheet({ S, update, date, kind: initialKind = 'event',
   }
 
   const heading = editing ? (spanId ? 'Edit multi-day event' : 'Edit event') : 'Add to calendar';
-  const primary = kind === 'trip' ? 'Add trip' : editing ? 'Save' : kind === 'span' ? 'Add multi-day event' : 'Add event';
-  const kinds = editing ? KINDS.map(k => (k.value === 'trip' ? { ...k, disabled: true } : k)) : KINDS;
+  const primary = kind === 'pay' ? 'Save pay day' : kind === 'trip' ? 'Add trip' : editing ? 'Save' : kind === 'span' ? 'Add multi-day event' : 'Add event';
+  const kinds = editing ? KINDS.map(k => (k.value === 'trip' || k.value === 'pay' ? { ...k, disabled: true } : k)) : KINDS;
   const tripDays = isRealDate(trip.from) && isRealDate(trip.to) && trip.to >= trip.from ? spanLength(trip.from, trip.to) : 0;
 
   return (
     <Sheet title={heading} onClose={onClose} className="cx-track-addsheet" testId="track-add" initialFocus={editing ? 'input' : '.cx-seg-opt[aria-checked="true"]'}
            footer={(
              <div className="cx-track-foot3">
-               {editing && <Button variant="danger" onClick={del}>Delete</Button>}
+               {editing && kind !== 'pay' && <Button variant="danger" onClick={del}>Delete</Button>}
+               {kind === 'pay' && pay && <Button variant="danger" onClick={() => { update(prev => clearPayDay(prev)); onClose(); }}>Remove pay day</Button>}
                <span className="cx-track-sp" />
                <Button variant="ghost" onClick={onClose}>Cancel</Button>
                <Button variant="primary" onClick={save} disabled={!canSave}>{primary}</Button>
@@ -194,7 +208,10 @@ export default function AddSheet({ S, update, date, kind: initialKind = 'event',
            )}>
       <Segmented label="What to add" options={kinds} value={kind} onChange={setKind} className="cx-track-kinds" />
 
-      {kind !== 'trip' ? (
+      {kind === 'pay' ? (
+        <PayDayFields date={payDate} onDate={setPayDate} freq={payFreq} onFreq={setPayFreq}
+                      weekendEarly={payWeekend} onWeekendEarly={setPayWeekend} dateInputClass="cx-input" />
+      ) : kind !== 'trip' ? (
         <div className="cx-track-form">
           <div className="cx-track-classic">
             <SuggestInput
