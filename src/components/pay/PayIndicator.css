@@ -62,12 +62,5 @@
 .payday-check input { accent-color: var(--cx-accent-fill, var(--em)); width: 16px; height: 16px; margin: 0; }
 .payday-note { margin: 0; font-size: 12.5px; line-height: 18px; color: var(--pi-muted); }
 
-/* A pay day in a calendar cell (classic) */
-.cal-pay-tag {
-  display: inline-flex; align-items: center; gap: 3px; margin-left: 4px;
-  font: 600 10px/1 var(--mono, monospace); letter-spacing: .4px; text-transform: uppercase;
-  color: var(--gold-text, #946d1c);
-}
+
 .payday-date { display: flex; flex-direction: column; gap: 4px; }
-/* Classic Track header: the month title with the indicator beside it */
-.cal-title-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; min-width: 0; }

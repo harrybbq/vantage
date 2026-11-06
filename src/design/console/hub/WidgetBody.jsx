@@ -28,6 +28,7 @@ import { timeAgo } from '../../../utils/helpers';
 import TodayWidget from './TodayWidget';
 import LeagueWidget from './LeagueWidget';
 import UpNextWidget from './UpNextWidget';
+import UntilPayWidget from './UntilPayWidget';
 import FriendsWidget from './FriendsWidget';
 
 const TradingBody = TRADING_WIDGET_BUILD_EXCLUDED ? null : lazy(() => import('../../../components/widgets/TradingWidget'));
@@ -62,6 +63,7 @@ export function renderBody(item, ctx) {
     case 'league':   return <LeagueWidget S={S} navigate={navigate} size={size} isMobile={isMobile} friendsHub={ctx.friendsHub} />;
     case 'friends':  return <FriendsWidget hub={ctx.friendsHub} size={size} isMobile={isMobile} navigate={navigate} />;
     case 'upnext':   return <UpNextWidget S={S} navigate={navigate} size={size} />;
+    case 'untilpay': return <UntilPayWidget S={S} navigate={navigate} size={size} />;
     case 'coins':    return <CoinsBody S={S} navigate={navigate} size={size} />;
     case 'vitals':   return <VitalsBody S={S} update={update} picks={item.picks} onSetPicks={setPicks} />;
     case 'calories': return <BurnBody S={S} update={update} userId={userId} />;

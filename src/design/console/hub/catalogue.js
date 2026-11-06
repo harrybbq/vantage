@@ -19,6 +19,7 @@ export const CONSOLE_META = {
   friends: { title: 'Friends', icon: 'users', blurb: 'Who is online, requests and unread messages' },
   upnext:  { title: 'Up next', icon: 'calendar-days', blurb: 'Your next trip, then the next three things on the calendar' },
   coins:   { title: 'Coins', icon: 'coin', blurb: 'Balance, this week and the next reward' },
+  untilpay: { title: 'Until pay', icon: 'coin', blurb: 'Subscriptions still to come out before your next pay' },
 };
 
 /** Sentence-case titles for classic types whose labels were Title Case. */
