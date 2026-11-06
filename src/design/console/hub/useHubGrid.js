@@ -9,6 +9,7 @@
  * merely viewing the hub never creates the key.
  */
 import { useCallback, useMemo, useRef } from 'react';
+import { payOf } from '../../../lib/money/payday';
 import { readHubGrid, withHubGrid } from './grid';
 import { PRESET_IDS, allowType } from './catalogue';
 import { nextRenewal } from '../../../lib/money/recurring';
@@ -34,10 +35,11 @@ export function useHubGrid(S, update, { isOwner = false } = {}) {
     presetIds: PRESET_IDS,
     allow: type => allowType(type, { isOwner }),
     hasUpcoming: hasUpcoming(S),
+    hasPay: !!payOf(S),
   // The seed only depends on these keys; recomputing on every S change
   // would re-derive on every tracker tick.
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }), [isOwner, S.holidays, S.subscriptions, S.calendarEvents]);
+  }), [isOwner, S.holidays, S.subscriptions, S.calendarEvents, S.pay]);
   const optsRef = useRef(opts);
   optsRef.current = opts;
 

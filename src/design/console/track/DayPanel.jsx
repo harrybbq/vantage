@@ -21,6 +21,7 @@ import { fireTickEffects } from '../../../lib/trackers/tickEffects';
 import { Checkbox, Button } from '../ui';
 import { applyTick, tapValue } from './tick';
 import { itineraryOn, billsInRange, money, trackerCompletion } from './model';
+import { isPayDay, payOf, freqLabel } from '../../../lib/money/payday';
 import TIcon from './icons';
 
 const ITEM_ICON = { travel: 'plane', stay: 'bed', food: 'utensils', activity: 'ticket', other: 'circle-dot' };
@@ -101,12 +102,14 @@ function TrackerRow({ S, t, iso, onSet }) {
 }
 
 export default function DayPanel({
-  S, iso, today, update, onShowCoinToast, onOpenTrip, onEditEvent, onAdd, onManage, shift, compact, wide,
+  S, iso, today, update, onShowCoinToast, onOpenTrip, onEditEvent, onAdd, onManage, onPay, shift, compact, wide,
 }) {
   const [all, setAll] = useState(false);
   const evs = useMemo(() => eventsOn(S, iso), [S, iso]);
   const items = useMemo(() => itineraryOn(S, iso), [S, iso]);
   const bills = useMemo(() => billsInRange(S, iso, iso)[iso] || [], [S, iso]);
+  const payHere = isPayDay(S, iso);
+  const pay = payHere ? payOf(S) : null;
   const trackers = S.trackers || [];
   const comp = trackerCompletion(S, iso);
   const limit = compact && !all ? 5 : trackers.length;
@@ -120,7 +123,7 @@ export default function DayPanel({
   }
 
   const isToday = iso === today;
-  const empty = !evs.length && !items.length && !bills.length && !shift;
+  const empty = !evs.length && !items.length && !bills.length && !shift && !payHere;
 
   return (
     <section className="cx-panel cx-track-day" aria-label={`${longDate(iso)}`}>
@@ -133,6 +136,17 @@ export default function DayPanel({
       </header>
 
       <div className="cx-track-agenda">
+        {payHere && (
+          <button type="button" className="cx-track-ar is-pay" onClick={() => onPay?.(iso)}>
+            <span className="cx-track-kbar" style={{ '--k': 'var(--cx-gold)' }} />
+            <span className="cx-track-ar-tm cx-num">£</span>
+            <span className="cx-track-ar-main">
+              <span className="cx-track-ar-t">Pay day</span>
+              <span className="cx-track-ar-s">{freqLabel(pay.freq)}{pay.weekendEarly ? ', Friday before a weekend' : ''}</span>
+            </span>
+            <TIcon name="pencil" size={16} className="cx-track-ar-i" />
+          </button>
+        )}
         {shift && (
           <div className={`cx-track-ar is-shift is-${shift.shift}`}>
             <span className="cx-track-kbar" style={{ '--k': 'var(--cx-night)' }} />

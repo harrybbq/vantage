@@ -839,3 +839,6 @@ html[data-design="console"] .cx-gs.is-phone { padding: var(--cx-sp-12) var(--cx-
 html[data-design="console"] .cx-gs.is-phone .cx-gs-row { min-height: 52px; }
 html[data-design="console"] .cx-gs.is-phone .cx-gs-do { height: 44px; min-width: 64px; padding: 0 var(--cx-sp-16); }
 html[data-design="console"] .cx-gs.is-phone .cx-gs-hide { min-height: 44px; min-width: 44px; padding: 0 var(--cx-sp-8); }
+
+/* Until pay (UntilPayWidget): the date column of its rows. */
+html[data-design="console"] .cx-hub-untilpay-d { min-width: 78px; }

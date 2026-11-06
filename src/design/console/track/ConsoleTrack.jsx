@@ -41,6 +41,7 @@ import AddSheet from './AddSheet';
 import ManageTrackers from './ManageTrackers';
 import TIcon from './icons';
 import { openInDeviceCalendar } from '../../../lib/calendar/deviceSource';
+import PayIndicator from '../../../components/pay/PayIndicator';
 
 const TABS = [
   { value: 'calendar', label: 'Calendar' },
@@ -169,7 +170,7 @@ export default function ConsoleTrack({
 
   const dayPanel = (
     <DayPanel S={S} iso={selected} today={today} update={update} onShowCoinToast={onShowCoinToast}
-              onOpenTrip={openTrip} onEditEvent={editEvent} onAdd={iso => add(iso)} onManage={() => setSheet({ type: 'manage' })}
+              onOpenTrip={openTrip} onEditEvent={editEvent} onAdd={iso => add(iso)} onPay={iso => add(iso, 'pay')} onManage={() => setSheet({ type: 'manage' })}
               shift={dayShift} compact={!wide} wide={wide} />
   );
   // Owner only (Upgrade › Rotation): show or hide the rota on the calendar.
@@ -202,6 +203,7 @@ export default function ConsoleTrack({
                 <h2 className="cx-track-title" aria-live="polite">{title}</h2>
                 <Button variant="ghost" iconOnly icon="chevron-right" label={`Next ${unit}`} onClick={() => step(1)} />
                 {wide && <Button className="cx-track-todaybtn" onClick={goToday}>Today</Button>}
+                {wide && view !== 'year' && <PayIndicator S={S} onEdit={d => add(d, 'pay')} />}
                 <span className="cx-track-sp" />
                 {owner && wide && shiftToggle}
                 {wide
@@ -211,6 +213,9 @@ export default function ConsoleTrack({
                   <Button variant="ghost" onClick={goToday}>Today</Button>
                 )}
               </div>
+              {!wide && view !== 'year' && (
+                <div className="cx-track-payrow"><PayIndicator S={S} onEdit={d => add(d, 'pay')} /></div>
+              )}
               {view === 'month' && (
                 <MonthGrid S={S} year={ay} month={am} today={today} selected={selected} onSelect={selectDay}
                            onOpenTrip={openTrip} onOpenSpan={openSpan} wide={wide} shiftChips={monthShifts} />

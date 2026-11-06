@@ -626,3 +626,18 @@ html[data-design="console"] .cx-track-classic.cx-track-reskin .tv-rule > i { bac
 /* The classic itinerary intro repeats what the sheet already says. */
 html[data-design="console"] .cx-track-classic .hol-itin-intro { display: none; }
 html[data-design="console"] .cx-track-hint.is-lead { margin: 0; }
+
+/* Pay day (lib/money/payday): a small gold tag beside the date, clear of
+   the owner's shift chip on the right. */
+html[data-design="console"] .cx-track-paytag {
+  position: absolute; top: 6px; left: 26px; max-width: calc(100% - 30px);
+  font: 600 var(--cx-fs-12)/16px var(--cx-sans); color: var(--cx-gold); white-space: nowrap; overflow: hidden;
+}
+html[data-design="console"] .cx-track-month.is-wide .cx-track-paytag { left: 30px; }
+html[data-design="console"] .cx-track-ar.is-pay .cx-track-ar-tm { color: var(--cx-gold); }
+/* The pay indicator in the calendar bar keeps to one line there. */
+html[data-design="console"] .cx-track-bar .payind-wrap { min-width: 0; flex: 0 1 auto; }
+html[data-design="console"] .cx-track-payrow { display: flex; padding: 0 var(--cx-sp-12) var(--cx-sp-8); }
+/* Four kinds (Event · Multi-day · Trip · Pay day) on a 360 px phone: less
+   side padding so no label has to ellipsise. */
+html[data-design="console"] .cx-track-kinds .cx-seg-opt { padding: 0 4px; }
