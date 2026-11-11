@@ -33,7 +33,7 @@
 
 const { pauseGate } = require('../lib/killSwitch');
 const sbKeys = require('../lib/sbKeys');
-const { derivePoints, deriveRatings, loadRatingInputs, writeRatings } = require('../lib/recompute');
+const { derivePoints, deriveRatings, loadRatingInputs, writeRatings, ratingInputsOf } = require('../lib/recompute');
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
@@ -146,7 +146,7 @@ exports.handler = async (event) => {
     const ratings = deriveRatings(inp.state, inp.friends, baseline, inp.macroDays, inp.createdAt);
     const computedAt = await writeRatings(userId, ratings, env);
 
-    return reply(200, { ok: true, prestige: newPrestige, ratings, computedAt, baseline });
+    return reply(200, { ok: true, prestige: newPrestige, ratings, computedAt, baseline, inputs: ratingInputsOf(inp) });
   } catch (e) {
     console.error('prestige-up failed', e?.message);
     return reply(500, { error: 'prestige failed' });
