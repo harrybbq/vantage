@@ -64,6 +64,7 @@ export const WIDGET_SIZES = Object.freeze({
   friends:    T(['medium', 'large'], 'medium'),
   upnext:     T(['small', 'medium'], 'medium'),
   coins:      T(['small', 'medium'], 'small'),
+  untilpay:   T(['small', 'medium'], 'medium'),
   // Classic widget types, rendered with their existing bodies.
   vitals:     T(['small', 'medium', 'large'], 'small'),
   body:       T(['small', 'medium'], 'small'),
@@ -187,7 +188,7 @@ function carry(w) {
  * seeded items, whose ids are derived — kept for symmetry).
  */
 export function seedHubGrid(S, opts = {}) {
-  const { presetIds = null, allow = () => true, hasUpcoming = true } = opts;
+  const { presetIds = null, allow = () => true, hasUpcoming = true, hasPay = false } = opts;
   const desk = list(S && S.hubWidgets).filter(isObj);
   const phone = list(S && S.mobileWidgets).filter(isObj);
   const items = [];
@@ -211,6 +212,8 @@ export function seedHubGrid(S, opts = {}) {
   push('league', WIDGET_SIZES.league.def, {}, 'cx-league');
   push('friends', WIDGET_SIZES.friends.def, {}, 'cx-friends');
   if (hasUpcoming) push('upnext', WIDGET_SIZES.upnext.def, {}, 'cx-upnext');
+  // Until pay: only for someone who has marked a pay day (lib/money/payday).
+  if (hasPay) push('untilpay', WIDGET_SIZES.untilpay.def, {}, 'cx-untilpay');
 
   for (const w of [...desk, ...phone]) {
     if (typeof w.type !== 'string' || NEVER_SEED.has(w.type)) continue;

@@ -41,11 +41,12 @@ import { resolveCardStyle } from '../../../lib/ratings/prestigeRewards';
 import { FriendTakeover, FriendsOverlays, friendsMeta } from './FriendsWidget';
 import { leagueMeta } from './LeagueWidget';
 import { todayMeta } from './TodayWidget';
+import { untilPayMeta } from './UntilPayWidget';
 import GettingStartedCard from '../../../components/onboarding/GettingStartedCard';
 
 /** Where a widget's title goes. */
 const TITLE_ROUTE = {
-  today: 'track', league: 'leaderboard', friends: 'friends', upnext: 'track', coins: 'shop',
+  today: 'track', league: 'leaderboard', friends: 'friends', upnext: 'track', untilpay: 'track', coins: 'shop',
   vitals: 'track', body: 'track', macros: 'diet', calories: 'diet', habits: 'habits', holidays: 'holiday',
   'recent-wins': 'achievements', 'coin-history': 'achievements', goals: 'achievements', 'body-goal': 'track',
 };
@@ -74,6 +75,7 @@ export default function ConsoleHub(props) {
     else if (item.type === 'friends') meta = friendsMeta(hub);
     else if (item.type === 'upnext') meta = 'Calendar';
     else if (item.type === 'coins') meta = 'Shop';
+    else if (item.type === 'untilpay') meta = untilPayMeta(S);
     return { ...m, meta };
   }, [S, hub]);
 

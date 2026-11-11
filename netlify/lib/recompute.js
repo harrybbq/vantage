@@ -526,16 +526,26 @@ async function writeRatings(userId, ratings, { supabaseUrl, serviceKey }) {
  * `opts.createdAt` — the account's creation time if the caller already
  * has it (saves an auth round trip).
  *
- * Returns { ratings, computedAt, prestige, baseline } on success, throws
- * on failure. `baseline` goes back to the app so its local number is net
- * of the last prestige too (S.prestigeBaseline) — without it the app
- * would read 99 while the leaderboard restarted the climb.
+ * Returns { ratings, computedAt, prestige, baseline, inputs } on success,
+ * throws on failure. `baseline` goes back to the app so its local number
+ * is net of the last prestige too (S.prestigeBaseline) — without it the
+ * app would read 99 while the leaderboard restarted the climb. `inputs`
+ * ({ friends, macroDays, createdAt }) are the other things the server
+ * counted with and the app cannot see for itself; the app caches them
+ * (S.ratingInputs) so its local preview is the same sum as this one.
+ * Without them the app counted days before the account existed, with no
+ * day or honours cap, and read a climb of 99 while the server said 22.
  */
 async function recomputeUser(userId, env, opts = {}) {
   const inp = await loadRatingInputs(userId, env, opts);
   const ratings = deriveRatings(inp.state, inp.friends, inp.baseline, inp.macroDays, inp.createdAt);
   const computedAt = await writeRatings(userId, ratings, env);
-  return { ratings, computedAt, prestige: inp.prestige, baseline: inp.baseline };
+  return { ratings, computedAt, prestige: inp.prestige, baseline: inp.baseline, inputs: ratingInputsOf(inp) };
+}
+
+/** What the app needs to repeat this sum (see recomputeUser). */
+function ratingInputsOf(inp) {
+  return { friends: inp.friends || 0, macroDays: inp.macroDays || 0, createdAt: inp.createdAt || null };
 }
 
 /**
@@ -563,5 +573,5 @@ async function refreshOldFormula(profiles, env, cap = 25) {
 
 module.exports = {
   deriveRatings, derivePoints, recomputeUser, fetchMacroDays, refreshOldFormula,
-  loadRatingInputs, writeRatings, fetchCreatedAt, RATING_STATE_KEYS,
+  loadRatingInputs, writeRatings, fetchCreatedAt, ratingInputsOf, RATING_STATE_KEYS,
 };

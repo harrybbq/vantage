@@ -23,12 +23,14 @@ import { useShowAccounts } from '../../../hooks/useShowAccounts';
 import { CONSOLE_META, PRIMES, PRIME_IDS, primeType, metaOf, classicPickerTypes, isProWidget } from './catalogue';
 import { sizesFor, SIZE_LABEL, SIZE_DIMS } from './grid';
 import { hasUpcoming } from './useHubGrid';
+import { payOf } from '../../../lib/money/payday';
 
-const CONSOLE_ORDER = ['today', 'league', 'friends', 'upnext', 'coins'];
+const CONSOLE_ORDER = ['today', 'league', 'friends', 'upnext', 'untilpay', 'coins'];
 
 function consoleReady(type, S) {
   if (type === 'today') return (S.trackers || []).length ? { ready: true } : { ready: false, need: 'Add a tracker first', where: 'track' };
   if (type === 'upnext') return hasUpcoming(S) ? { ready: true } : { ready: false, need: 'Plan a trip or add an event first', where: 'track' };
+  if (type === 'untilpay') return payOf(S) ? { ready: true } : { ready: false, need: 'Mark your pay day on Track first', where: 'track' };
   return { ready: true };
 }
 

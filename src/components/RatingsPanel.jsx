@@ -21,7 +21,7 @@
  */
 import { useState, useRef, useEffect } from 'react';
 import Icon from './Icon';
-import { categoryBreakdown, cleanBaseline } from '../lib/ratings/derive';
+import { categoryBreakdown, cleanBaseline, cleanRatingInputs, ratingCtx } from '../lib/ratings/derive';
 import { categoryProfile, nextStep } from '../lib/ratings/profile';
 import { getTodayStr } from '../utils/helpers';
 import { ovrTier } from '../lib/ratings/tiers';
@@ -143,10 +143,12 @@ export default function RatingsPanel({ S, update, compact = false }) {
       if (!res.ok) throw new Error(body.error || 'Prestige failed.');
       // Adopt the server's post-prestige numbers immediately.
       const baseline = cleanBaseline(body.baseline);
+      const inputs = cleanRatingInputs(body.inputs);
       update(prev => ({
         ...prev,
         prestige: body.prestige,
         ...(baseline ? { prestigeBaseline: baseline } : {}),
+        ...(inputs ? { ratingInputs: inputs } : {}),
         ratings: { ...(prev.ratings || {}), ...(body.ratings || {}), computedAt: body.computedAt },
       }));
     } catch (e) {
@@ -383,7 +385,8 @@ function BreakdownModal({ S, category, onClose, onTakeCheck }) {
   const meta = CATEGORIES.find(c => c.id === category) || { label: category, icon: '·' };
   const score = (S?.ratings || {})[category] || 1;
   const t = tier(score);
-  const rows = categoryBreakdown(S, category);
+  // Counted as the server counts it (S.ratingInputs), so the rows add up to the rating shown.
+  const rows = categoryBreakdown(S, category, ratingCtx(S));
   const totalPoints = rows.reduce((sum, r) => sum + (r.points || 0), 0);
   const step = nextStep(S, category, { today: getTodayStr() });
 

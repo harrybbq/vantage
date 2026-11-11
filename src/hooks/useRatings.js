@@ -18,13 +18,15 @@
  *   - Server canonical value catches up within 30s, plenty for the
  *     friends rail use case.
  */
-import { useEffect, useRef } from 'react';
-import { deriveRatings, cleanBaseline, CATEGORIES } from '../lib/ratings/derive';
+import { useEffect, useRef, useState } from 'react';
+import { deriveRatings, cleanBaseline, cleanRatingInputs, ratingCtx, CATEGORIES } from '../lib/ratings/derive';
 import { supabase } from '../lib/supabase';
 import { apiUrl } from '../lib/authFetch';
 
 const CLIENT_DEBOUNCE_MS = 1500;
 const sameBaseline = (a, b) => !!a && CATEGORIES.every(c => Number(a[c]) === Number(b[c]));
+const sameInputs = (a, b) => !!a && !!b && a.friends === b.friends && a.macroDays === b.macroDays && a.createdAt === b.createdAt;
+const sameRatings = (a, b) => !!a && !!b && ['brain', 'finance', 'fitness', 'social', 'ovr'].every(k => a[k] === b[k]);
 const SERVER_DEBOUNCE_MS = 30_000;
 const MACRO_DAYS_TTL_MS = 5 * 60_000;
 
@@ -37,6 +39,17 @@ export function useRatings(userId, S, update, friendCount = 0, hydrated = true) 
   // preview. Nutrition lives in Supabase (not S), so we count it here
   // on a 5-min TTL — the server recomputes its own canonical count.
   const macroDaysRef = useRef({ value: 0, fetchedAt: 0 });
+  // The account's creation time, until the server's S.ratingInputs has
+  // it: it floors and caps the days counted (lib/ratings/derive ratingCtx).
+  const [sessionCreatedAt, setSessionCreatedAt] = useState(null);
+  useEffect(() => {
+    if (!userId) return undefined;
+    let live = true;
+    supabase.auth.getSession()
+      .then(({ data }) => { if (live) setSessionCreatedAt(data?.session?.user?.created_at || null); })
+      .catch(() => {});
+    return () => { live = false; };
+  }, [userId]);
 
   useEffect(() => {
     if (!userId) return;
@@ -87,15 +100,18 @@ export function useRatings(userId, S, update, friendCount = 0, hydrated = true) 
       brn: Object.keys(S.burnLog || {}).length,
       md:  macroDaysRef.current.value,
       pb:  S.prestigeBaseline || null,
+      ri:  S.ratingInputs || null,
+      ca:  sessionCreatedAt,
     });
 
     // ── Client recompute ──
     if (sig !== lastClientSigRef.current) {
       clearTimeout(clientTimerRef.current);
       clientTimerRef.current = setTimeout(() => {
+        // The same inputs the server counts with (S.ratingInputs), so this
+        // preview is the leaderboard's sum, not a bigger one.
         const next = deriveRatings(S, {
-          friendCount,
-          macroDays: macroDaysRef.current.value,
+          ...ratingCtx(S, { friendCount, macroDays: macroDaysRef.current.value, createdAt: sessionCreatedAt }),
           baseline: S.prestigeBaseline || {},
         });
         const prev = S.ratings || {};
@@ -146,6 +162,15 @@ export function useRatings(userId, S, update, friendCount = 0, hydrated = true) 
             if (baseline) {
               update(p => (sameBaseline(p.prestigeBaseline, baseline) ? p : { ...p, prestigeBaseline: baseline }));
             }
+            // The inputs it counted with (new key, additive), and its
+            // canonical numbers: the app now shows what friends see.
+            const inputs = cleanRatingInputs(body?.inputs);
+            if (inputs) {
+              update(p => (sameInputs(p.ratingInputs, inputs) ? p : { ...p, ratingInputs: inputs }));
+            }
+            if (body?.ratings && typeof body.ratings.ovr === 'number') {
+              update(p => (sameRatings(p.ratings, body.ratings) ? p : { ...p, ratings: { ...(p.ratings || {}), ...body.ratings, computedAt: body.computedAt || p.ratings?.computedAt } }));
+            }
           }
           lastServerSigRef.current = sig;
         } catch {
@@ -159,5 +184,5 @@ export function useRatings(userId, S, update, friendCount = 0, hydrated = true) 
       clearTimeout(serverTimerRef.current);
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [S, userId, friendCount, hydrated]);
+  }, [S, userId, friendCount, hydrated, sessionCreatedAt]);
 }

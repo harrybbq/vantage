@@ -161,6 +161,10 @@ export const DEFAULT_STATE = {
   // climb starts from the floor. Same source and status as `prestige`.
   // null = never prestiged (or not heard back from the server yet).
   prestigeBaseline: null,
+  // Cache of what the server last counted the rating with and the app
+  // can't see for itself: { friends, macroDays, createdAt } (lib/ratings/
+  // derive ratingCtx). null until the first server recompute answers.
+  ratingInputs: null,
   // Result of the most-recent IQ self-check (F5 Sprint 4). Optional;
   // null means the user hasn't taken it. testVersion lets us migrate
   // the test bank later without invalidating old scores silently.

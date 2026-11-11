@@ -542,6 +542,34 @@ export function cleanBaseline(b) {
   return any ? out : null;
 }
 
+/**
+ * The inputs the app cannot see for itself, as the server last counted
+ * them (S.ratingInputs, cached from recompute-ratings / prestige-up):
+ * { friends, macroDays, createdAt } → derivePoints' ctx. The account's
+ * creation time floors and caps the days counted and the honours XP; a
+ * local sum without it counted days from before the account existed,
+ * uncapped, and drifted far above the leaderboard (the app read 99 after
+ * a prestige while the server said 22). `fallback` fills what is not
+ * cached yet (a local macro-day count, the session's created_at).
+ */
+export function ratingCtx(S, fallback = {}) {
+  const ri = S && S.ratingInputs && typeof S.ratingInputs === 'object' ? S.ratingInputs : {};
+  const num = v => (Number.isFinite(Number(v)) && Number(v) >= 0 ? Number(v) : null);
+  return {
+    friendCount: num(ri.friends) ?? (fallback.friendCount || 0),
+    macroDays: num(ri.macroDays) ?? (fallback.macroDays || 0),
+    createdAt: ri.createdAt || fallback.createdAt || null,
+  };
+}
+
+/** A server `inputs` object cleaned for S.ratingInputs, or null. */
+export function cleanRatingInputs(x) {
+  if (!x || typeof x !== 'object') return null;
+  const n = v => (Number.isFinite(Number(v)) && Number(v) >= 0 ? Math.floor(Number(v)) : 0);
+  const created = typeof x.createdAt === 'string' && !Number.isNaN(Date.parse(x.createdAt)) ? x.createdAt : null;
+  return { friends: n(x.friends), macroDays: n(x.macroDays), createdAt: created };
+}
+
 export { OVR_FULL, PILLAR_FULL, DAY_POINTS, BREADTH_WEIGHTS };
 
 /**

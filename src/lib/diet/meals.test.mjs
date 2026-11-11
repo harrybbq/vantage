@@ -92,11 +92,12 @@ t('offered recipes: pending until added, then never again', () => {
 });
 
 t('the shipped recipe log is well-formed and its ingredient lines parse', () => {
-  assert.equal(RECIPE_LOG.length, 2);
+  assert.equal(RECIPE_LOG.length, 3);
   for (const r of RECIPE_LOG) {
     assert.ok(r.id.startsWith('rlog-') && r.title && r.servings === 1);
     for (const k of ['kcal', 'protein', 'carbs', 'fat', 'minutes']) assert.ok(r[k] > 0, `${r.id} ${k}`);
-    assert.ok(r.ingredients.length >= 15 && r.method.includes('1. '));
+    // A full recipe or a two-line shake: at least two ingredients, a numbered method.
+    assert.ok(r.ingredients.length >= 2 && r.method.includes('1. '), r.id);
     const numbered = r.ingredients.filter(l => /^[\d½¼¾⅓⅔⅛]/.test(l));
     for (const l of numbered) { const p = parseLine(l); assert.ok(p && p.qty > 0, `parses: ${l}`); }
   }

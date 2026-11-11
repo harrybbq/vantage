@@ -19,6 +19,7 @@ import { isBarEvent } from '../../../lib/calendar/spans';
 import { monthMatrix, eventsForDays, rowBands, billsInRange, trackerCompletion, MONTHS, DOW } from './model';
 import { photoOf } from './trips';
 import TIcon from './icons';
+import { payDaysBetween } from '../../../lib/money/payday';
 
 const fullDate = iso => new Date(iso + 'T12:00').toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' });
 
@@ -52,6 +53,7 @@ export default function MonthGrid({ S, year, month, today, selected, onSelect, o
     return r;
   }, [S, allIsos, year, month]);
   const bills = useMemo(() => billsInRange(S, allIsos[0], allIsos[allIsos.length - 1]), [S, allIsos]);
+  const payDays = useMemo(() => new Set(payDaysBetween(S, allIsos[0], allIsos[allIsos.length - 1])), [S, allIsos]);
   const tripsById = useMemo(() => Object.fromEntries((S.holidays || []).filter(t => t && t.id).map(t => [t.id, t])), [S.holidays]);
   const maxLanes = wide ? 3 : 2;
 
@@ -88,9 +90,10 @@ export default function MonthGrid({ S, year, month, today, selected, onSelect, o
                 <button key={d.iso} type="button" role="gridcell" className={cls}
                         aria-selected={selected === d.iso}
                         aria-current={isToday ? 'date' : undefined}
-                        aria-label={`${fullDate(d.iso)}${count ? `, ${count} item${count === 1 ? '' : 's'}` : ''}${comp && comp.total ? `, ${comp.done} of ${comp.total} trackers` : ''}`}
+                        aria-label={`${fullDate(d.iso)}${payDays.has(d.iso) ? ', pay day' : ''}${count ? `, ${count} item${count === 1 ? '' : 's'}` : ''}${comp && comp.total ? `, ${comp.done} of ${comp.total} trackers` : ''}`}
                         onClick={() => onSelect(d.iso)}>
                   <span className="cx-track-d cx-num">{d.day}</span>
+                  {d.inMonth && payDays.has(d.iso) && <span className="cx-track-paytag" aria-hidden="true">{wide ? '£ Pay' : '£'}</span>}
                   {shift && <span className={`cx-track-shift is-${shift.shift}`} title={shift.label}>{wide ? shift.chip : shift.tiny}</span>}
                   <span className="cx-track-cellbody">
                     {wide ? (
