@@ -1,0 +1,123 @@
+/* ════════════════════════════════════════════════════════════════════
+   The desktop console, sized to the screen it is on (owner, Nov 2026).
+
+   The console was drawn for a ~1440 px screen: a 1400 px page, 13–17 px
+   text, fixed bars. On a 2560 px monitor that page used 55% of the width
+   and on 4K 36%, at the same small type. Here, by screen width:
+
+     · --cx-ui scales the type, line heights, spacing, control heights,
+       radii, the shell bars and the hub's rows — everything the tokens
+       carry — so the interface reads at the size the screen can afford.
+     · --cx-page-max grows faster than --cx-ui, so the page also uses the
+       extra width instead of floating in the middle.
+
+   Steps rather than a curve: CSS cannot turn a viewport width into a
+   unitless factor, and a few well-chosen sizes test better than a slope.
+   CSS `zoom` was the obvious one-liner and was ruled out: under it 100vw
+   is scaled too, so every full-screen sheet and overlay overflowed.
+
+   Phones and tablets (≤ 1699 px) are untouched: --cx-ui stays 1 and every
+   token keeps the value tokens.css gives it. Short laptop screens get a
+   lower hub row floor instead, so more of the hub fits above the fold.
+   ════════════════════════════════════════════════════════════════════ */
+
+html[data-design="console"] { --cx-ui: 1; }
+
+@media (min-width: 1700px) { html[data-design="console"] { --cx-ui: 1.08; --cx-page-max: calc(1400px * 1.08 * 1.1); } }
+@media (min-width: 2200px) { html[data-design="console"] { --cx-ui: 1.2;  --cx-page-max: calc(1400px * 1.2 * 1.25); } }
+@media (min-width: 2800px) { html[data-design="console"] { --cx-ui: 1.35; --cx-page-max: calc(1400px * 1.35 * 1.35); } }
+@media (min-width: 3400px) { html[data-design="console"] { --cx-ui: 1.5;  --cx-page-max: calc(1400px * 1.5 * 1.45); } }
+
+/* Every scaled token, re-derived from its tokens.css value. Only applied
+   where --cx-ui is above 1, so the base sizes stay plain pixels. */
+@media (min-width: 1700px) {
+  html[data-design="console"] {
+    --cx-fs-12: calc(12px * var(--cx-ui)); --cx-lh-12: calc(16px * var(--cx-ui));
+    --cx-fs-13: calc(13px * var(--cx-ui)); --cx-lh-13: calc(18px * var(--cx-ui));
+    --cx-fs-15: calc(15px * var(--cx-ui)); --cx-lh-15: calc(22px * var(--cx-ui));
+    --cx-fs-17: calc(17px * var(--cx-ui)); --cx-lh-17: calc(24px * var(--cx-ui));
+    --cx-fs-22: calc(22px * var(--cx-ui)); --cx-lh-22: calc(28px * var(--cx-ui));
+    --cx-fs-28: calc(28px * var(--cx-ui)); --cx-lh-28: calc(32px * var(--cx-ui));
+    --cx-fs-40: calc(40px * var(--cx-ui)); --cx-lh-40: calc(44px * var(--cx-ui));
+
+    --cx-sp-4: calc(4px * var(--cx-ui));
+    --cx-sp-8: calc(8px * var(--cx-ui));
+    --cx-sp-12: calc(12px * var(--cx-ui));
+    --cx-sp-16: calc(16px * var(--cx-ui));
+    --cx-sp-20: calc(20px * var(--cx-ui));
+    --cx-sp-24: calc(24px * var(--cx-ui));
+    --cx-sp-32: calc(32px * var(--cx-ui));
+
+    --cx-r-panel: calc(12px * var(--cx-ui));
+    --cx-r-cell: calc(8px * var(--cx-ui));
+    --cx-r-chip: calc(6px * var(--cx-ui));
+    --cx-r-sheet: calc(16px * var(--cx-ui));
+
+    --cx-control-h: calc(40px * var(--cx-ui));
+    --cx-input-h: calc(48px * var(--cx-ui));
+    --cx-chip-h: calc(28px * var(--cx-ui));
+    --cx-check: calc(20px * var(--cx-ui));
+
+    --cx-shell-side-w: calc(64px * var(--cx-ui));
+    --cx-shell-side-open-w: calc(216px * var(--cx-ui));
+    --cx-shell-top-h: calc(60px * var(--cx-ui));
+
+    --cx-hub-row: calc(200px * var(--cx-ui));
+    --cx-hub-gap: calc(16px * var(--cx-ui));
+
+    /* Fixed-width columns that were drawn in px (track.css, hub.css). */
+    --cx-track-side-w: calc(360px * var(--cx-ui));
+  }
+  /* The hub had its own 1440 px cap; it follows the page now. */
+  html[data-design="console"] .cx-hub { max-width: var(--cx-page-max); }
+}
+
+/* What was drawn in fixed px rather than tokens, on the desktop pages
+   people actually sit in front of. Each is its old value × --cx-ui. */
+@media (min-width: 1700px) {
+  /* Icons: every Lucide/track icon is a 24-box inline SVG with a px size.
+     zoom on the leaf SVG is safe (nothing in it uses vw/vh). */
+  html[data-design="console"] svg[viewBox="0 0 24 24"] { zoom: var(--cx-ui); }
+
+  /* Shell */
+  html[data-design="console"] .cx-shell-chip { height: calc(32px * var(--cx-ui)); padding: 0 calc(10px * var(--cx-ui)); }
+  html[data-design="console"] .cx-shell-search { width: calc(240px * var(--cx-ui)); }
+  html[data-design="console"] .cx-shell-bgbtn { width: calc(32px * var(--cx-ui)); }
+  html[data-design="console"] .cx-shell-ni { min-height: calc(44px * var(--cx-ui)); }
+
+  /* Controls */
+  html[data-design="console"] .cx-seg-opt { height: calc(32px * var(--cx-ui)); }
+  html[data-design="console"] .cx-btn--icon { width: calc(36px * var(--cx-ui)); min-width: calc(36px * var(--cx-ui)); }
+  html[data-design="console"] .cx-sheet { width: min(calc(640px * var(--cx-ui)), 100%); }
+  html[data-design="console"] .cx-sheet-root.is-nonmodal .cx-sheet { width: min(calc(560px * var(--cx-ui)), 100%); }
+
+  /* Track */
+  html[data-design="console"] .cx-track-tabs { width: calc(300px * var(--cx-ui)); }
+  html[data-design="console"] .cx-track-bar .cx-btn--icon { width: calc(36px * var(--cx-ui)); min-width: calc(36px * var(--cx-ui)); height: calc(36px * var(--cx-ui)); }
+  html[data-design="console"] .cx-track-views .cx-seg-opt { height: calc(28px * var(--cx-ui)); }
+  html[data-design="console"] .cx-track-cell { min-height: calc(58px * var(--cx-ui)); }
+  html[data-design="console"] .cx-track-month.is-wide .cx-track-cell { min-height: calc(112px * var(--cx-ui)); }
+  html[data-design="console"] .cx-track-d { height: calc(16px * var(--cx-ui)); }
+  html[data-design="console"] .cx-track-chip { height: calc(20px * var(--cx-ui)); }
+  html[data-design="console"] .cx-track-day-head { min-height: calc(48px * var(--cx-ui)); }
+
+  /* Hub */
+  html[data-design="console"] .cx-hub-player {
+    grid-template-columns: minmax(calc(200px * var(--cx-ui)), calc(250px * var(--cx-ui))) minmax(calc(400px * var(--cx-ui)), 1.75fr)
+                           minmax(calc(220px * var(--cx-ui)), 1fr) minmax(calc(220px * var(--cx-ui)), 1fr);
+  }
+  html[data-design="console"] .cx-hub-row { min-height: calc(36px * var(--cx-ui)); }
+
+  /* Narrow readable columns keep their measure at the larger type. */
+  html[data-design="console"] .cx-sweep-tabs { max-width: calc(560px * var(--cx-ui)); }
+  html[data-design="console"] .cx-sweep-stack { max-width: calc(760px * var(--cx-ui)); }
+  html[data-design="console"] .cx-sweep-rail { max-width: calc(720px * var(--cx-ui)); }
+  html[data-design="console"] .cx-sweep-lb-body { max-width: calc(1080px * var(--cx-ui)); }
+  html[data-design="console"] .cx-sweep-classic-settings .settings-panel { max-width: calc(760px * var(--cx-ui)); }
+}
+
+/* Short laptop screens (1366×768, 1280×720): a lower row floor, so the
+   player strip plus a full row of widgets fit before the fold. */
+@media (min-width: 769px) and (max-height: 800px) {
+  html[data-design="console"] { --cx-hub-row: 168px; }
+}

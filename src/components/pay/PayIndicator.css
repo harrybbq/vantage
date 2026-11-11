@@ -13,10 +13,10 @@
 .payind-wrap { position: relative; display: inline-flex; min-width: 0; }
 .payind {
   --pi-line: var(--cx-line, var(--border, #e2dccf));
-  display: inline-flex; align-items: center; gap: 6px; min-height: 32px; max-width: 100%;
+  display: inline-flex; align-items: center; gap: 6px; min-height: calc(32px * var(--cx-ui, 1)); max-width: 100%;
   padding: 0 10px; border-radius: 8px; border: 1px solid var(--pi-line);
   background: transparent; color: var(--cx-mid, var(--text-mid, #4a4540));
-  font: 500 13px/1 var(--cx-sans, inherit); cursor: pointer; white-space: nowrap; overflow: hidden;
+  font: 500 var(--cx-fs-13, 13px)/1 var(--cx-sans, inherit); cursor: pointer; white-space: nowrap; overflow: hidden;
 }
 .payind:hover { color: var(--cx-text, var(--text)); }
 .payind:focus-visible, .payind-link:focus-visible { outline: 2px solid var(--cx-accent, var(--em)); outline-offset: 2px; }
@@ -37,7 +37,7 @@
   position: fixed; z-index: 2200; max-height: min(60vh, 420px); overflow-y: auto;
   box-sizing: border-box; padding: 12px; border-radius: 12px;
   border: 1px solid var(--pi-line); background: var(--pi-s1); color: var(--pi-text);
-  box-shadow: 0 12px 32px rgba(0, 0, 0, .22); font: 400 13px/18px var(--cx-sans, inherit);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, .22); font: 400 var(--cx-fs-13, 13px)/var(--cx-lh-13, 18px) var(--cx-sans, inherit);
 }
 .payind-pop-head { display: flex; justify-content: space-between; gap: 8px; font-weight: 600; margin-bottom: 8px; }
 .payind-pop-head b { font-family: var(--cx-mono, var(--mono, monospace)); font-weight: 500; }
@@ -48,7 +48,7 @@
 .payind-a { font-family: var(--cx-mono, var(--mono, monospace)); }
 .payind-empty { margin: 0; color: var(--pi-muted); }
 .payind-pop-foot { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--pi-line); color: var(--pi-muted); font-size: 12px; }
-.payind-link { border: 0; background: none; padding: 6px 0; color: var(--pi-accent); font: 600 13px var(--cx-sans, inherit); cursor: pointer; }
+.payind-link { border: 0; background: none; padding: 6px 0; color: var(--pi-accent); font: 600 var(--cx-fs-13, 13px) var(--cx-sans, inherit); cursor: pointer; }
 
 /* The form's own bits (PayDayFields) */
 .payday-form { display: flex; flex-direction: column; gap: 12px; color: var(--pi-text); }
