@@ -10,6 +10,7 @@ import DietPanel from './track/DietPanel';
 import { useFoodFrequency } from '../hooks/useFoodFrequency';
 import FoodSearch from './FoodSearch';
 import LogFoodPanel from './diet/LogFoodPanel';
+import MealOfferCard from './diet/MealOfferCard';
 import { useSubscriptionContext } from '../context/SubscriptionContext';
 import { backdropClose } from '../utils/backdropClose';
 import { planDayFor, planGoalFor, planBadge } from '../lib/plan/planDay';
@@ -478,6 +479,8 @@ export default function NutritionSection({ userId, S, selectedDate, calYear, cal
 
   return (
     <div className="nut-wrap">
+      {/* One-tap meals shipped as data (owner only): lib/diet/mealOffers. */}
+      <MealOfferCard S={S} update={update} userId={userId} />
       <DietPanel
         S={S}
         date={date}
