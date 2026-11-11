@@ -102,26 +102,4 @@ export const RECIPE_LOG = [
     ].join('\n'),
     sourceUrl: '',
   },
-  {
-    // Owner's request (Nov 2026). "Green lid" is UK semi-skimmed. The milk
-    // was not specified: 300ml, a standard shaker. Macros assume a typical
-    // 30g whey scoop (~120 kcal, 24g protein) plus 300ml semi-skimmed
-    // (147 kcal, 10.8g protein, 14.4g carbs, 5.4g fat); edit after adding
-    // if the tub says otherwise.
-    id: 'rlog-protein-shake',
-    title: 'Protein Shake (1 scoop + semi-skimmed)',
-    servings: 1,
-    kcal: 267, protein: 35, carbs: 17, fat: 7,
-    minutes: 2,
-    tags: ['High protein', 'Quick'],
-    ingredients: [
-      '1 scoop whey protein powder (about 30g)',
-      '300ml semi-skimmed milk (green lid), cold',
-    ],
-    method: [
-      '1. Pour the milk into a shaker first, so the powder doesn\'t stick to the bottom.',
-      '2. Add the scoop of protein, close the lid and shake hard for 15–20 seconds.',
-    ].join('\n'),
-    sourceUrl: '',
-  },
 ];
