@@ -16,7 +16,7 @@
 
 /* ── Area tokens (candidates for tokens.css; hub/NOTES.md) ── */
 html[data-design="console"] {
-  --cx-hub-row: 200px;       /* desktop grid row floor; a large widget spans two */
+  --cx-hub-row: 200px;       /* row floor of the CSS-grid fallback; desktop is masonry (hub/masonry.js) */
   --cx-hub-gap: 16px;
   --cx-hub-gap-phone: 12px;
 }
@@ -274,6 +274,30 @@ html[data-design="console"] .cx-hub-grid[data-cols="2"] {
   grid-auto-rows: auto;
   gap: var(--cx-hub-gap-phone);
 }
+/* Desktop: cards are placed by the height their content needs
+   (hub/masonry.js). The grid is a positioning box; HubGrid sets its
+   height, each cell's --c (column), --w (columns wide) and top. */
+html[data-design="console"] .cx-hub-grid.is-masonry {
+  display: block;
+  column-gap: var(--cx-hub-gap);   /* read by HubGrid as the vertical gap too */
+}
+html[data-design="console"] .cx-hub-grid.is-masonry > .cx-hub-cell {
+  position: absolute;
+  left: calc((100% + var(--cx-hub-gap)) / 4 * var(--c, 0));
+  width: calc((100% + var(--cx-hub-gap)) / 4 * var(--w, 1) - var(--cx-hub-gap));
+}
+/* The measured wrapper: the body's own flex column, at its natural
+   height whatever the frame is stretched to. */
+html[data-design="console"] .cx-hub-nat { display: flex; flex-direction: column; gap: inherit; flex: 0 0 auto; min-width: 0; }
+/* The macro rings were sized for the classic canvas: the three small
+   rings ran 4 px past a 450 px block, and none of them grew with the
+   console's screen scale. */
+html[data-design="console"] .cx-hub-cell .pv-rings-calwrap > .pv-ring { width: min(100cqh - 6px, 36cqw, calc(132px * var(--cx-ui, 1))); }
+html[data-design="console"] .cx-hub-cell .pv-rings-m .pv-ring { width: min(100cqh - 30px, 12cqw, calc(76px * var(--cx-ui, 1))); }
+/* A prime card carries its own 12 px inset for the classic canvas. Inside
+   a console frame that is a second padding: cancel it, so its blocks line
+   up with the frame's title like every other widget's content. */
+html[data-design="console"] .cx-hub-nat > .prime-fit { margin: calc(-12px * var(--cx-ui, 1)); width: auto; }
 html[data-design="console"] .cx-hub-cell { position: relative; min-width: 0; display: flex; flex-direction: column; }
 html[data-design="console"] .cx-hub-cell > .cx-wf { flex: 1 1 auto; min-height: 0; }
 html[data-design="console"] .cx-hub-cell .cx-wf-head { cursor: grab; touch-action: auto; user-select: none; -webkit-user-select: none; }

@@ -30,6 +30,8 @@
  *   grow   share of spare height at full detail; 0 = fixed
  *   max    ceiling when growing (a list stops when it runs out of rows)
  *   row    row step, so a list snaps to whole rows rather than 1.4 of one
+ *   nat    height when the card is sized to its content (pack natural);
+ *          absent = the ceiling above
  */
 
 /** kind is used by the packer for one decision only: a `hero` in first
@@ -165,7 +167,9 @@ export const PRIMES = {
       ['Body', ['rings', 'weight', 'vitals']],
     ],
     blocks: {
-      rings:  B('Macro rings', 'gauge', 96, 62, ['ringsL', 'ringsM'], { grow: 1, max: 176 }),
+      // nat: the calorie ring tops out at 132px (prime.css), so a card sized
+      // to its content gives the block that and no more.
+      rings:  B('Macro rings', 'gauge', 96, 62, ['ringsL', 'ringsM'], { grow: 1, max: 176, nat: 138 }),
       net:    B('Net calories', 'hero', 66, 42, ['heroL', 'heroM']),
       burned: B('Calories burned', 'list', 84, 44, ['listL', 'statM'], { grow: 1, max: 120, row: 24 }),
       week:   B('Last 14 days', 'chart', 104, 50, ['chartL', 'sparkM'], { grow: 3 }),

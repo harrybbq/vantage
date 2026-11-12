@@ -89,6 +89,7 @@ export const MAX_LIST_ROWS = 12;
 
 export function makePacker(meta, head = HEAD) {
   let curCounts = null;   // row counts for the pack() in progress (see maxOf)
+  let curTight = false;   // natural-height pack in progress (see fullOf)
   /* Both EDGES are snapped, not the offset and the size independently.
      Rounding x and w apart lets a right-hand column end a pixel past the
      card's padding — which is exactly the sort of thing that shows up as
@@ -118,7 +119,7 @@ export function makePacker(meta, head = HEAD) {
     const lv = ids.map(() => 0);
     const hOf = i => {
       const m = meta[ids[i]];
-      return lv[i] === 0 ? m.L : lv[i] === 1 ? m.M : S_H;
+      return lv[i] === 0 ? fullOf(ids[i]) : lv[i] === 1 ? m.M : S_H;
     };
     const need = () => ids.reduce((s, _, i) => s + hOf(i), 0) + GAP * (n - 1);
 
@@ -164,8 +165,19 @@ export function makePacker(meta, head = HEAD) {
       return out;
     }
 
-    const hs = ids.map((_, i) => hOf(i));
+    let hs = ids.map((_, i) => hOf(i));
     let slack = col.h - need();
+
+    // Packing tight: each block starts at the height it WANTS (a list's
+    // rows, a chart's aspect), not at its floor with the spare shared out
+    // by weight — which let a chart take the room a nine-row list needed.
+    // Whatever is left after that (a stretched card, the shorter column)
+    // is shared as usual below.
+    if (curTight && lv.every(l => l === 0)) {
+      const want = ids.map(id => Math.max(fullOf(id), natOf(id, col.w, curCounts)));
+      const total = want.reduce((a, b) => a + b, 0) + GAP * (n - 1);
+      if (total <= col.h + 0.5) { hs = want; slack = col.h - total; }
+    }
 
     if (slack > 0 && !col.fixed) {
       // Proportional by `grow`, capped by `max`. Looped because capping
@@ -217,7 +229,8 @@ export function makePacker(meta, head = HEAD) {
     ids.forEach((id, i) => {
       const m = meta[id];
       if (!m.row || lv[i] !== 0) return;
-      const snapped = m.L + Math.floor((hs[i] - m.L) / m.row) * m.row;
+      const base = fullOf(id);   // m.L, or a short list's own height when packing tight
+      const snapped = base + Math.floor((hs[i] - base) / m.row) * m.row;
       const spare = hs[i] - snapped;
       if (spare <= 0.5) return;
       hs[i] = snapped;
@@ -236,6 +249,30 @@ export function makePacker(meta, head = HEAD) {
     return out;
   }
 
+  /* Natural height only: a list with fewer records than its full-detail
+     height was drawn for is just its header and those rows (one row for
+     the empty-state line), instead of a box sized for a typical list. */
+  function shortList(id, counts) {
+    const m = meta[id];
+    if (!m.row || !counts || !(id in counts)) return null;
+    const n = Math.max(1, Math.min(Number(counts[id]) || 0, MAX_LIST_ROWS));
+    // The views that draw a title line above their rows (prime.css); the
+    // bar and heat views are rows only.
+    const title = m.views[0] === 'listL' || m.views[0] === 'checksL' ? 22 : 0;
+    const h = title + n * m.row;
+    return h < m.L ? h : null;
+  }
+  /* A hero sized exactly: its three lines need a little more than the
+     66 px a dragged box gives them before any spare is shared out. */
+  const HERO_AIR = 8;
+  /** A block's full-detail height for the pack in progress. */
+  function fullOf(id) {
+    if (!curTight) return meta[id].L;
+    if (meta[id].kind === 'hero') return meta[id].L + HERO_AIR;
+    const short = shortList(id, curCounts);
+    return short != null ? short : meta[id].L;
+  }
+
   /* A list block's ceiling follows its RECORDS, not a constant: `max`
      was sized for a typical list (about six trackers), so a seventh row
      spilled under the next block. With a row count it is the list's own
@@ -249,8 +286,70 @@ export function makePacker(meta, head = HEAD) {
     return Math.max(m.L, headH + Math.min(n, MAX_LIST_ROWS) * m.row);
   }
 
-  return function pack(ids, W, H, counts = null) {
+  /* ── Natural height (the console hub, Nov 2026) ─────────────────────
+     A host that sizes the card to its content (rather than content to a
+     dragged box) asks how tall the blocks WANT to be at this width, then
+     packs at exactly that. Each block's natural height is its ceiling:
+     a list its own rows, a gauge its max, a chart an aspect of its
+     column (capped, or it would be a wall on a wide card), a hero its
+     full height. The card's is its tallest column. */
+  const CHART_ASPECT = 2.3;
+  const CHART_MAX = 180;
+  function natOf(id, colW, counts) {
+    const m = meta[id];
+    if (m.nat) return m.nat;                       // a view with a size of its own (the rings)
+    if (m.kind === 'hero') return m.L + HERO_AIR;
+    const short = shortList(id, counts);
+    if (short != null) return short;
+    if (m.kind === 'chart' && m.grow > 0 && !m.max) return Math.max(m.L, Math.min(CHART_MAX, Math.round(colW / CHART_ASPECT)));
+    if (m.views[0] === 'vesselsL') return Math.max(m.L, 140);
+    return maxOf(id, counts) || m.L;
+  }
+  const sumNat = (list, colW, counts) => list.reduce((s, id) => s + natOf(id, colW, counts), 0) + GAP * Math.max(0, list.length - 1);
+
+  /* Where the main column ends. Unbalanced (the dragged-box hosts): the
+     first block alone, as it always was. Balanced: the split of the
+     reading order that leaves the two columns nearest the same height,
+     so neither ends in a hole. */
+  function splitAt(rest, mw, sw, counts, balance) {
+    if (!balance || rest.length < 3) return 1;
+    let best = 1, bestH = Infinity;
+    for (let k = 1; k < rest.length; k++) {
+      const h = Math.max(sumNat(rest.slice(0, k), mw, counts), sumNat(rest.slice(k), sw, counts));
+      if (h < bestH - 0.5) { bestH = h; best = k; }
+    }
+    return best;
+  }
+
+  /** The height this card wants at width W — pack(ids, W, natural(…), counts,
+   *  { ...opts, tight: true }) then has no spare. */
+  function natural(ids, W, counts = null, opts = {}) {
+    const iw = W - PAD * 2;
+    const n = ids.length;
+    if (!n) return head + PAD;
+    // Never a banner: that shape is for a box the user dragged very wide
+    // and short. Given the choice of height, two balanced columns show
+    // every block properly (pack: opts.tight skips the banner too).
+    if (iw >= 520 && n >= 2) {
+      let rest = ids;
+      // The header hero at its full height, exactly (pack: opts.tight).
+      let hero = 0;
+      if (meta[ids[0]].kind === 'hero') { hero = meta[ids[0]].L + HERO_AIR; rest = ids.slice(1); }
+      let body;
+      if (rest.length === 1) body = natOf(rest[0], iw, counts);
+      else {
+        const mw = Math.round((iw - GAP) * 0.58), sw = iw - mw - GAP;
+        const k = splitAt(rest, mw, sw, counts, opts.balance);
+        body = Math.max(sumNat(rest.slice(0, k), mw, counts), sumNat(rest.slice(k), sw, counts));
+      }
+      return Math.round(head + PAD + (hero ? hero + GAP : 0) + body);
+    }
+    return Math.round(head + PAD + sumNat(ids, iw, counts));
+  }
+
+  function pack(ids, W, H, counts = null, opts = {}) {
     curCounts = counts;
+    curTight = !!opts.tight;
     const iw = W - PAD * 2;
 
     // ── Mobile: one column, no ceiling, everything at full detail ──
@@ -273,7 +372,7 @@ export function makePacker(meta, head = HEAD) {
     const n = ids.length;
     let cols;
 
-    if (classify(W, H) === 'banner' && n >= 2) {
+    if (!opts.tight && classify(W, H) === 'banner' && n >= 2) {
       // Very wide and short: read left to right, one block per column.
       const cw = (iw - GAP * (n - 1)) / n;
       cols = ids.map((id, i) => ({ x: i * (cw + GAP), w: cw, ids: [id], y: 0, h: ih }));
@@ -284,7 +383,8 @@ export function makePacker(meta, head = HEAD) {
       // "Move total saved to the top as a large header": a hero FIRST is
       // the instruction, and it spans. Order alone produces the layout.
       if (meta[ids[0]].kind === 'hero') {
-        const hh = ih >= 300 ? meta[ids[0]].L + 20 : meta[ids[0]].M;
+        // tight (natural height): the header at full detail, no more.
+        const hh = opts.tight ? fullOf(ids[0]) : ih >= 300 ? meta[ids[0]].L + 20 : meta[ids[0]].M;
         cols.push({ x: 0, w: iw, ids: [ids[0]], y: 0, h: hh, fixed: true });
         rest = ids.slice(1);
         y = hh + GAP;
@@ -293,9 +393,10 @@ export function makePacker(meta, head = HEAD) {
         cols.push({ x: 0, w: iw, ids: rest, y, h: ih - y });
       } else {
         const mw = Math.round((iw - GAP) * 0.58);
+        const k = splitAt(rest, mw, iw - mw - GAP, counts, opts.balance);
         cols.push(
-          { x: 0, w: mw, ids: [rest[0]], y, h: ih - y },
-          { x: mw + GAP, w: iw - mw - GAP, ids: rest.slice(1), y, h: ih - y },
+          { x: 0, w: mw, ids: rest.slice(0, k), y, h: ih - y },
+          { x: mw + GAP, w: iw - mw - GAP, ids: rest.slice(k), y, h: ih - y },
         );
       }
     } else {
@@ -303,5 +404,7 @@ export function makePacker(meta, head = HEAD) {
     }
 
     return { items: cols.flatMap(fit), height: H };
-  };
+  }
+  pack.natural = natural;
+  return pack;
 }

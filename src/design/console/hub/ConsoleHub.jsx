@@ -85,11 +85,12 @@ export default function ConsoleHub(props) {
     if (act?.kind === 'logfood') setFoodMenu(cur => (cur ? null : { rect: act.rect || null }));
   }, [update, onShowCoinToast]);
 
-  const renderBody = (item, size) => (
+  // `extra`: px a desktop card was stretched by to meet its neighbour (masonry.js).
+  const renderBody = (item, size, extra = 0) => (
     <WidgetBody
       item={item}
       ctx={{
-        S, update, navigate, userId, hasPro, isMobile, size,
+        S, update, navigate, userId, hasPro, isMobile, size, extra,
         patch: fn => commit(g => patchItem(g, item.id, fn)),
         onOpenPaywall, onShowCoinToast, onPrimeAct, friendsHub: hub,
       }}

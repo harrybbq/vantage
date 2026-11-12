@@ -59,6 +59,10 @@ export default function PrimeCard({
   width,
   height = null,          // null = mobile: no ceiling, report the height instead
   grow = false,           // true = may exceed `height` when the content needs it
+  natural = false,        // true = exactly as tall as the blocks need at this width (console desktop)
+  extra = 0,              // with `natural`: px to add, when the host stretched the card
+  scale = 1,              // with `natural`: the host's UI scale (console --cx-ui); the blocks are
+                          // packed in design px and the slots drawn that much larger
   guides = false,
   live = false,           // true while a resize drag is in flight
   head = true,            // false = the host draws the title row
@@ -96,8 +100,10 @@ export default function PrimeCard({
     const out = {};
     for (const id of ids) {
       const d = payloads[id] && payloads[id].d;
-      const n = d && (Array.isArray(d.rows) ? d.rows.length : Array.isArray(d.items) ? d.items.length : 0);
-      if (n) out[id] = n;
+      const list = d && (Array.isArray(d.rows) ? d.rows : Array.isArray(d.items) ? d.items : null);
+      // An empty list is recorded as 0 (not left out): a card sized to
+      // its content then draws one empty-state row, not a full box.
+      if (list) out[id] = list.length;
     }
     return out;
   }, [ids, payloads]);
@@ -109,12 +115,27 @@ export default function PrimeCard({
   const packed = useMemo(() => {
     if (!key) return { items: [], height: height || 0 };
     const pack = PACKERS[key][head ? 'head' : 'bare'];
+    if (natural) {
+      // The card's own height: every block at full detail, columns
+      // balanced, no spare (lib/hub/pack natural).
+      const opts = { balance: true, tight: true };
+      const k = scale > 0 ? scale : 1;
+      const w = width / k;
+      const p = pack(ids, w, pack.natural(ids, w, counts, opts) + Math.max(0, extra) / k, counts, opts);
+      if (k === 1) return p;
+      // Edges are scaled and snapped together, so neighbours still meet exactly.
+      const sx = v => Math.round(v * k);
+      return {
+        height: sx(p.height),
+        items: p.items.map(i => ({ ...i, x: sx(i.x), y: sx(i.y), w: sx(i.x + i.w) - sx(i.x), h: sx(i.y + i.h) - sx(i.y) })),
+      };
+    }
     if (grow && height != null) {
       const natural = pack(ids, width, null, counts);
       if (natural.height > height) return pack(ids, width, natural.height, counts);
     }
     return pack(ids, width, height, counts);
-  }, [key, ids, width, height, head, counts, grow]);
+  }, [key, ids, width, height, head, counts, grow, natural, extra, scale]);
 
   /* Mobile reports the height it needs so the stack can size the card.
      In an effect, not in render: calling a parent's setter mid-render is
@@ -208,7 +229,7 @@ export default function PrimeCard({
  * drops the slot transitions so a resize drag tracks the pointer
  * instead of trailing a quarter-second behind it.
  */
-export function PrimeFit({ auto = false, userId = null, ...rest }) {
+export function PrimeFit({ auto = false, natural = false, userId = null, ...rest }) {
   const ref = useRef(null);
   // Only a Nutrition card fetches; everything else is drawn from S. The
   // fetch is shared and cached (lib/diet/daySummary), so a Nutrition card
@@ -227,7 +248,9 @@ export function PrimeFit({ auto = false, userId = null, ...rest }) {
     const read = () => {
       const w = Math.round(el.clientWidth);
       const h = Math.round(el.clientHeight);
-      setBox(prev => (prev && prev.w === w && prev.h === h ? prev : { w, h }));
+      // The console scales its interface by screen size (design/console/screen.css).
+      const ui = natural ? (parseFloat(getComputedStyle(el).getPropertyValue('--cx-ui')) || 1) : 1;
+      setBox(prev => (prev && prev.w === w && prev.h === h && prev.ui === ui ? prev : { w, h, ui }));
     };
     read();
     if (typeof ResizeObserver === 'undefined') return undefined;
@@ -242,12 +265,12 @@ export function PrimeFit({ auto = false, userId = null, ...rest }) {
     });
     ro.observe(el);
     return () => { ro.disconnect(); cancelAnimationFrame(raf); clearTimeout(idle); };
-  }, []);
+  }, [natural]);
 
   return (
-    <div ref={ref} className={`prime-fit${auto ? ' is-auto' : ''}`}>
+    <div ref={ref} className={`prime-fit${auto || natural ? ' is-auto' : ''}`}>
       {box && box.w > 0 && (
-        <PrimeCard {...rest} ext={ext} width={box.w} height={auto ? null : Math.max(0, box.h)} live={live} />
+        <PrimeCard {...rest} natural={natural} scale={box.ui || 1} ext={ext} width={box.w} height={auto || natural ? null : Math.max(0, box.h)} live={live} />
       )}
     </div>
   );

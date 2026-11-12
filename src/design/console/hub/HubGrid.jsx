@@ -28,6 +28,7 @@ import { createPortal } from 'react-dom';
 import Icon from '../../../components/Icon';
 import { WidgetFrame } from '../ui';
 import { packGrid, dropIndex, effectiveSize, sizesFor, isProSize, SIZE_LABEL, SIZE_DIMS } from './grid';
+import { packMasonry, dropIndexMasonry } from './masonry';
 import { createDragScroller, zoneSize } from '../../../lib/mobile/dragScroll';
 
 const HOLD_MS = 450;
@@ -134,7 +135,76 @@ export default function HubGrid({
     return [...rest.slice(0, drag.to), items[fromIdx], ...rest.slice(drag.to)];
   }, [items, drag, fromIdx]);
   const { cells } = useMemo(() => packGrid(order, cols, sizeOf), [order, cols, sizeOf]);
-  const cellById = useMemo(() => Object.fromEntries(cells.map(c => [c.id, c])), [cells]);
+
+  /* ── Desktop: cards placed by the height their content needs ──
+     (masonry.js). Each card's natural height is measured from its body
+     wrapper, which is never stretched, plus the frame's chrome; the
+     layout is then a pure function of those heights. Phones keep the
+     CSS grid above. */
+  const masonry = cols >= 4;
+  const natRefs = useRef(new Map());            // id → the body wrapper
+  const [heights, setHeights] = useState(() => new Map());
+  const [gap, setGap] = useState(16);
+  const heightOf = useCallback(it => heights.get(it.id) ?? 0, [heights]);
+  const laid = useMemo(
+    () => (masonry ? packMasonry(order, cols, sizeOf, heightOf, gap) : null),
+    [masonry, order, cols, sizeOf, heightOf, gap],
+  );
+  const cellById = useMemo(
+    () => Object.fromEntries((laid ? laid.cells : cells).map(c => [c.id, c])),
+    [laid, cells],
+  );
+
+  /* The measured values live in refs and reach state only when one has
+     really changed. A functional setState here would hand React a fresh
+     Map on every replay of its queue, and this runs in a layout effect:
+     that is an update loop. */
+  const heightsRef = useRef(heights);
+  const gapRef = useRef(gap);
+  const measure = useCallback(() => {
+    const grid = gridRef.current;
+    if (!grid) return;
+    const g = parseFloat(getComputedStyle(grid).columnGap);
+    if (Number.isFinite(g) && g > 0 && Math.abs(gapRef.current - g) >= 0.01) { gapRef.current = g; setGap(g); }
+    const prev = heightsRef.current;
+    let next = null;
+    const seen = new Set();
+    for (const [id, nat] of natRefs.current) {
+      const cell = cellRefs.current.get(id);
+      const body = nat && nat.parentElement;
+      if (!cell || !nat || !body) continue;
+      seen.add(id);
+      const cs = getComputedStyle(body);
+      const inner = body.clientHeight - (parseFloat(cs.paddingTop) || 0) - (parseFloat(cs.paddingBottom) || 0);
+      // A stretched card's wrapper fills the frame (so a footer can sit at
+      // the bottom); its own height is read with that released.
+      let own = nat.offsetHeight;
+      if (nat.style.flexGrow === '1') {
+        nat.style.flexGrow = '0';
+        own = nat.offsetHeight;
+        nat.style.flexGrow = '1';
+      }
+      // Chrome (frame, header, gaps) + the content's own height. A prime
+      // draws the stretch it was given, so that comes back off.
+      const h = Math.max(0, Math.round(cell.offsetHeight - inner + own - (Number(nat.dataset.extra) || 0)));
+      if (prev.get(id) !== h) { next = next || new Map(prev); next.set(id, h); }
+    }
+    for (const id of prev.keys()) if (!seen.has(id)) { next = next || new Map(prev); next.delete(id); }
+    if (next) { heightsRef.current = next; setHeights(next); }
+  }, []);
+
+  // Before the first paint, and again whenever any card's content resizes.
+  useLayoutEffect(() => { if (masonry) measure(); });
+  useEffect(() => {
+    if (!masonry || typeof ResizeObserver === 'undefined') return undefined;
+    let raf = 0;
+    const ro = new ResizeObserver(() => { cancelAnimationFrame(raf); raf = requestAnimationFrame(measure); });
+    for (const el of natRefs.current.values()) if (el) ro.observe(el);
+    if (gridRef.current) ro.observe(gridRef.current);
+    return () => { ro.disconnect(); cancelAnimationFrame(raf); };
+  // Re-armed when the set of cards changes.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [masonry, measure, items.map(i => i.id).join('|')]);
 
   const snapshot = useCallback(skipId => {
     const m = new Map();
@@ -186,6 +256,16 @@ export default function HubGrid({
     const cx = d.r0.left + (d.px - d.sx) + d.r0.width / 2;
     const cy = d.r0.top + (d.py - d.sy) + d.r0.height / 2;
     const colW = (g.width - d.gap * (cols - 1)) / cols;
+    if (masonry) {
+      // Content-height layout: the target is a point in px.
+      const to = dropIndexMasonry(items, d.from, { x: cx - g.left, y: cy - g.top }, cols, sizeOf, heightOf, { colW, gap: d.gap });
+      if (to !== d.to) {
+        d.to = to;
+        flipRef.current = snapshot(d.id);
+        setDrag({ id: d.id, to });
+      }
+      return;
+    }
     const x = (cx - g.left) / (colW + d.gap);
     // Rows have content heights, so map y through the measured row tops.
     const yr = cy - g.top;
@@ -212,10 +292,10 @@ export default function HubGrid({
     if (!el || from < 0 || !gridRef.current) return false;
     const g = rectOf(gridRef.current);
     const cs = getComputedStyle(gridRef.current);
-    const gap = parseFloat(cs.rowGap || cs.gap) || 16;
+    const gap = parseFloat(masonry ? cs.columnGap : (cs.rowGap || cs.gap)) || 16;
     // Row tops relative to the grid, from the cells as they stand.
     const rows = {};
-    for (const it of items) {
+    for (const it of (masonry ? [] : items)) {
       const c = cellById[it.id]; const e = cellRefs.current.get(it.id);
       if (!c || !e) continue;
       const t = rectOf(e).top - g.top;
@@ -446,7 +526,8 @@ export default function HubGrid({
 
   return (
     <>
-      <div ref={gridRef} className={`cx-hub-grid${drag ? ' is-dragging' : ''}`} data-cols={cols}>
+      <div ref={gridRef} className={`cx-hub-grid${masonry ? ' is-masonry' : ''}${drag ? ' is-dragging' : ''}`} data-cols={cols}
+           style={masonry ? { height: laid.height } : undefined}>
         {order.map(item => {
           const c = cellById[item.id];
           if (!c) return null;
@@ -454,14 +535,21 @@ export default function HubGrid({
           const size = sizeOf(item);
           const meta = metaFor(item);
           const lifted = (drag && drag.id === item.id) || (kbd && kbd.id === item.id);
+          // Only a prime redraws itself into the stretch; other cards keep
+          // their content at the top of the taller frame.
+          const extra = masonry && c.extra > 0 ? Math.round(c.extra) : 0;
+          const fills = extra > 0 && typeof item.type === 'string' && item.type.startsWith('prime:');
+          const body = renderBody(item, size, fills ? extra : 0);
           return (
             <div
               key={item.id}
               ref={el => { if (el) cellRefs.current.set(item.id, el); else cellRefs.current.delete(item.id); }}
-              className={`cx-hub-cell is-${size}${lifted ? ' is-picked' : ''}${menuFor === item.id ? ' has-menu' : ''}`}
+              className={`cx-hub-cell is-${size}${masonry && c.widened ? ' is-widened' : ''}${lifted ? ' is-picked' : ''}${menuFor === item.id ? ' has-menu' : ''}`}
               data-id={item.id}
               data-type={item.type}
-              style={{ gridColumn: `${c.col} / span ${c.w}`, gridRow: `${c.row} / span ${c.h}` }}
+              style={masonry
+                ? { '--c': c.col, '--w': c.w, top: c.y, minHeight: extra > 0 ? c.h : undefined }
+                : { gridColumn: `${c.col} / span ${c.w}`, gridRow: `${c.row} / span ${c.h}` }}
               onPointerDown={e => onPointerDown(e, item.id)}
               onTouchStart={isMobile ? e => onTouchStart(e, item.id) : undefined}
               onContextMenu={isMobile ? e => e.preventDefault() : undefined}
@@ -514,7 +602,13 @@ export default function HubGrid({
                   </span>
                 )}
               >
-                {renderBody(item, size)}
+                {masonry ? (
+                  <div className="cx-hub-nat" data-extra={fills ? extra : 0}
+                       style={extra > 0 && !fills ? { flexGrow: 1 } : undefined}
+                       ref={el => { if (el) natRefs.current.set(item.id, el); else natRefs.current.delete(item.id); }}>
+                    {body}
+                  </div>
+                ) : body}
               </WidgetFrame>
             </div>
           );

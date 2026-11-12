@@ -290,4 +290,61 @@ for (let w = 280; w <= 900; w += 37) for (let h = 150; h <= 700; h += 43) SIZES.
   ok(!wasted, 'no block is left compact when full detail would fit — ' + JSON.stringify(wasted));
 }
 
+// ── Natural height: the card is exactly as tall as its blocks need ──
+// (console hub, Nov 2026). For every prime, every preset and default,
+// every width a hub cell can be, with a busy and an empty account:
+// packed at pack.natural() every block is at full detail, nothing
+// overlaps or leaves the card, the tallest column ends on the bottom
+// padding, and balancing never makes the card taller.
+{
+  let bad = null, taller = null, checked = 0;
+  for (const [key, P] of Object.entries(PRIMES)) {
+    const pk = makePacker(P.blocks, 12);
+    const sets = [P.def, ...P.presets.map(x => x[1]), Object.keys(P.blocks)];
+    for (const ids of sets) for (let w = 240; w <= 1500; w += 41) for (const rows of [null, 0, 1, 3, 9]) {
+      const counts = rows == null ? null : Object.fromEntries(ids.filter(id => P.blocks[id].row).map(id => [id, rows]));
+      for (const balance of [false, true]) {
+        const H = pk.natural(ids, w, counts, { balance });
+        const { items } = pk(ids, w, H, counts, { balance, tight: true });
+        checked++;
+        const bottom = Math.max(...items.map(i => i.y + i.h));
+        const fail = why => { bad = bad || { key, ids, w, rows, balance, H, why }; };
+        if (items.length !== ids.length) fail('a block is missing');
+        if (items.some(i => i.level !== 0)) fail('not full detail: ' + items.filter(i => i.level).map(i => i.tag).join(','));
+        if (Math.abs(bottom - (H - PAD)) > 1.5) fail(`tallest column ends at ${bottom}, card inner bottom ${H - PAD}`);
+        if (items.some(i => i.x < PAD - 0.5 || i.x + i.w > w - PAD + 0.5 || i.y < 12 - 0.5)) fail('a slot leaves the card');
+        // Every list has room for its title line and each of its rows (one
+        // row for the empty-state line), up to the 12-row ceiling.
+        if (counts) for (const i of items) {
+          const m = P.blocks[i.key];
+          if (!m.row || !(i.key in counts)) continue;
+          const rowsShown = Math.max(1, Math.min(counts[i.key], 12));
+          const title = m.views[0] === 'listL' || m.views[0] === 'checksL' ? 22 : 0;
+          const short = title + rowsShown * m.row;
+          const want = short < m.L ? short : Math.max(m.L, (m.L % m.row) + rowsShown * m.row);
+          if (i.h < want - 1) fail(`${i.key} has ${i.h}px for ${rowsShown} rows, needs ${want}`);
+        }
+        for (const a of items) for (const b of items) {
+          if (a === b) continue;
+          if (a.x < b.x + b.w - 0.5 && b.x < a.x + a.w - 0.5 && a.y < b.y + b.h - 0.5 && b.y < a.y + a.h - 0.5) fail(`overlap ${a.key}/${b.key}`);
+        }
+      }
+      const hb = pk.natural(ids, w, counts, { balance: true }), hu = pk.natural(ids, w, counts, {});
+      if (hb > hu + 0.5) taller = taller || { key, ids, w, hb, hu };
+    }
+  }
+  ok(!bad, 'natural height packs every block at full detail with no spare and no overlap — ' + JSON.stringify(bad));
+  ok(!taller, 'balancing the columns never makes a card taller — ' + JSON.stringify(taller));
+  ok(checked > 5000, 'natural height was checked across the hub\'s widths');
+  // A list sizes for its own records: nine trackers make a taller card than three.
+  const T = makePacker(PRIMES.trackers.blocks, 12);
+  ok(T.natural(['today'], 400, { today: 9 }) > T.natural(['today'], 400, { today: 3 }), 'a longer list is a taller card');
+  // …and an empty one is a header and a single line, not a box drawn for five rows.
+  ok(T.natural(['today'], 400, { today: 0 }) < T.natural(['today'], 400, null), 'an empty list is a short card');
+  ok(T.natural(['today'], 400, { today: 0 }) === T.natural(['today'], 400, { today: 1 }), 'the empty-state line takes one row');
+  // Trackers default at 800 px: balanced puts the short hero under the list, not beside it.
+  const cnt = { today: 7, targets: 7 };
+  ok(T.natural(['today', 'streaks', 'targets'], 800, cnt, { balance: true }) < T.natural(['today', 'streaks', 'targets'], 800, cnt, {}), 'balanced columns are shorter than first-block-alone');
+}
+
 console.log(`prime packing: ${n} assertions passed`);

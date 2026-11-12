@@ -24,3 +24,11 @@ changes needed in files this area does not own (see ../README.md §7).
 - Level/XP retired: the player strip's second column is now Prestige (OVR to the next prestige, a bar of OVR/99, the next reward); it and the prestige chip open `PrestigeRewards.jsx` (the rewards sheet). Data: `lib/ratings/prestigeRewards.js`.
 - `Avatar` takes `prestige` (ring from `frameAttrs`, styles in `components/prestige-frame.css`, shared with classic); `Diamonds` is solid from Prestige VII. DivisionTable passes `rows[].prestige` to both.
 - Hub card styles: `S.cardStyle` (additive, `withCardStyle`), drawn as `data-cx-card` on `.cx-hub` (hub.css). `CardStylePicker` is also mounted in SWEEP's Settings › Appearance.
+
+## Content-height layout (2026-11-12)
+
+- **Desktop is a masonry, not a row grid.** `hub/masonry.js` (`packMasonry`, `dropIndexMasonry`) places each card by the height its content needs; `HubGrid` measures every body through its `.cx-hub-nat` wrapper and sets `--c`, `--w` and `top` on the cells. `size` still means columns wide (1 or 2) and each widget's row caps; it no longer means a height. Phones (2 columns) keep the CSS grid untouched.
+- Holes are closed, not left: the shorter of two smalls is stretched to its neighbour (`extra`; a non-prime body's wrapper grows so a footer stays at the foot, a prime re-packs into the extra), and a lone small with an empty half beside it is drawn two columns wide (`widened`, view only: `S.hubGrid` is not written).
+- **Prime cards pack at their natural height** (`PrimeFit natural`, `pack.natural` in `lib/hub/pack.js`, `tight` + `balance`): no banner, hero at its own height, short and empty lists at the rows they have, columns balanced. The packer works in design px and `PrimeCard` scales the slots by `--cx-ui`. Classic hosts call `pack` without `opts` and are unchanged.
+- Measuring pitfall: never a functional `setState` in the every-render layout effect (a fresh Map each replay loops); `measure()` compares against a ref and sets only on change.
+- Tests: `hub/masonry.test.mjs` (auto-run by `check:console`), `lib/hub/pack.test.mjs`.
