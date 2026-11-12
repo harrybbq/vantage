@@ -49,7 +49,7 @@ html[data-design="console"] .cx-track-cal { display: grid; grid-template-columns
 html[data-design="console"] .cx-track-main,
 html[data-design="console"] .cx-track-side { display: flex; flex-direction: column; gap: var(--cx-sp-12); min-width: 0; }
 @media (min-width: 1024px) {
-  html[data-design="console"] .cx-track-cal { grid-template-columns: minmax(0, 1fr) 360px; gap: var(--cx-sp-16); }
+  html[data-design="console"] .cx-track-cal { grid-template-columns: minmax(0, 1fr) var(--cx-track-side-w, 360px); gap: var(--cx-sp-16); }
   html[data-design="console"] .cx-track-side { gap: var(--cx-sp-16); }
 }
 html[data-design="console"] .cx-track-board { padding: 10px 8px 6px; }

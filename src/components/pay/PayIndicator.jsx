@@ -54,7 +54,9 @@ export default function PayIndicator({ S, onEdit, today = todayIso() }) {
     if (!open || !ref.current) { setPos(null); return; }
     const r = ref.current.getBoundingClientRect();
     const vw = window.innerWidth, vh = window.innerHeight;
-    const w = Math.min(320, vw - 32);
+    // × the console's --cx-ui (screen.css), so the list keeps pace with the type.
+    const ui = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--cx-ui')) || 1;
+    const w = Math.min(320 * ui, vw - 32);
     const left = Math.max(16, Math.min(r.left, vw - w - 16));
     // Below the button when there's room, else above; never off-screen
     // (the list scrolls inside instead).

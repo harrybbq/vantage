@@ -269,7 +269,8 @@ export function Sheet({
     if (dy > 96 || (dy > 24 && v > 0.6)) close();
   };
 
-  const panelStyle = side === 'right' ? { width: `min(${Math.max(440, Math.min(560, width))}px, 100vw)` } : undefined;
+  // × --cx-ui: wider on a big screen, where the type is larger (screen.css).
+  const panelStyle = side === 'right' ? { width: `min(calc(${Math.max(440, Math.min(560, width))}px * var(--cx-ui, 1)), 100vw)` } : undefined;
   if (typeof document === 'undefined') return null;
   return createPortal(
     <div className={cx('cx-sheet-root', `is-${side}`, !modal && 'is-nonmodal', className)} style={rootStyle}>
