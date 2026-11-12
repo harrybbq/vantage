@@ -184,11 +184,12 @@ function carry(w) {
  *      the classic lists are never touched).
  *
  * `opts.presetIds` (Set of app-preset ids), `opts.allow(type)` (owner-
- * only / build gates), `opts.hasUpcoming`, `opts.makeId` (unused for
+ * only / build gates), `opts.hasUpcoming`, `opts.hasPay`, `opts.social`
+ * (false: no League/Friends cards), `opts.makeId` (unused for
  * seeded items, whose ids are derived — kept for symmetry).
  */
 export function seedHubGrid(S, opts = {}) {
-  const { presetIds = null, allow = () => true, hasUpcoming = true, hasPay = false } = opts;
+  const { presetIds = null, allow = () => true, hasUpcoming = true, hasPay = false, social = true } = opts;
   const desk = list(S && S.hubWidgets).filter(isObj);
   const phone = list(S && S.mobileWidgets).filter(isObj);
   const items = [];
@@ -209,8 +210,13 @@ export function seedHubGrid(S, opts = {}) {
   };
 
   push('today', WIDGET_SIZES.today.def, {}, 'cx-today');
-  push('league', WIDGET_SIZES.league.def, {}, 'cx-league');
-  push('friends', WIDGET_SIZES.friends.def, {}, 'cx-friends');
+  // League and Friends: not for a scoped account that did not ask for
+  // Friends and has none (lib/onboarding/areas.js) — an empty table
+  // asking to be set up is what the smaller app is for removing.
+  if (social) {
+    push('league', WIDGET_SIZES.league.def, {}, 'cx-league');
+    push('friends', WIDGET_SIZES.friends.def, {}, 'cx-friends');
+  }
   if (hasUpcoming) push('upnext', WIDGET_SIZES.upnext.def, {}, 'cx-upnext');
   // Until pay: only for someone who has marked a pay day (lib/money/payday).
   if (hasPay) push('untilpay', WIDGET_SIZES.untilpay.def, {}, 'cx-untilpay');

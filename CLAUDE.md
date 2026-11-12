@@ -51,10 +51,31 @@ under "Onboarding". If it should, update the onboarding in the same PR.
 - New pick: add it to `PICKS` (its copy, icon, section, modal, target,
   check and `done(S)`), mark the button, extend the test, and check the
   pick screen still fits a 360 px phone.
+- The picks also decide the navigation for new accounts (below). A new
+  pick needs an `AREA_NAV` entry in `lib/onboarding/areas.js` (which
+  menu items it turns on) and `areas.test.mjs` extended.
 - Owner-only features (the Upgrade section, trading, Open Banking) are
   never in the onboarding.
 - Copy follows the house voice: plain, short, no claims the code doesn't
   back (check that a "counts toward your rating" line is true first).
+
+## The smaller app (decided 2026-11-12)
+Accounts created from `SMALLER_APP_FROM` (`lib/account/cohort.js`) get
+two things; every earlier account is left exactly as it was.
+- **The redesign by default** (`defaultDesignFor` in `lib/design/design.js`).
+  Nothing is written: the account's creation time decides it, and an
+  explicit `S.design` still wins. `DEFAULT_DESIGN` stays `'classic'`, so
+  for existing accounts the redesign is still the owner preview.
+- **A menu that follows the onboarding picks** (`lib/onboarding/areas.js`).
+  Hub, Track and Settings always show; a pick turns on its areas; an area
+  with data in it always shows; the rest sit behind **Add an area**
+  (console shell). It is a view: routes, search and widgets reach every
+  section, and the only state is `S.onboarding.scoped` / `.added`.
+  "Show me everything" in the onboarding means everything.
+- Not done yet, on purpose: seeded trackers (`Amount Saved`) and the
+  example goals still arrive for everyone — removing them is a delete,
+  which the data rule forbids without a decision. Diet and Vitals tabs
+  inside Track are not scoped either.
 
 ## Startup / store readiness
 `STARTUP_REQUIREMENTS.md` is the ordered checklist for getting Vantage

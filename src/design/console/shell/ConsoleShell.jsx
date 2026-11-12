@@ -12,7 +12,7 @@
  *
  * Pages sit in `.cx-page` (shell.css), whose offsets match these bars.
  */
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import Icon from '../../../components/Icon';
 import Logo from '../../../components/Logo';
 import { Sheet } from '../ui';
@@ -22,8 +22,10 @@ import { useUnreadTotal } from '../../../lib/friends/useUnreadTotal';
 import { coinsToday } from '../../../lib/coins/daily';
 import { barRef } from './TopBarActions';
 import BackgroundSheet from './BackgroundSheet';
+import { navScope, addableAreas } from '../../../lib/onboarding/areas';
+import { addArea } from '../../../lib/onboarding/onboarding';
 import {
-  sidebarItems, TABS, moreItems, activeTab, canonicalSection, navSection, sectionTitle,
+  sidebarItems, tabItems, moreItems, activeTab, canonicalSection, navSection, sectionTitle,
   longDate, shortDate, greeting, initials, paletteHint,
 } from './nav';
 
@@ -96,26 +98,43 @@ function SocialChips({ userId, onOpen }) {
   );
 }
 
-function Sidebar({ section, isOwner, navigate, onSignOut }) {
-  const items = sidebarItems({ isOwner });
+/** Sidebar rows that sit below the "Add an area" row. */
+const SIDE_TAIL = new Set(['upgrade', 'settings']);
+
+function Sidebar({ section, isOwner, navigate, onSignOut, scope, canAdd, onAdd }) {
+  const all = sidebarItems({ isOwner, scope });
+  // Scoped: what was chosen, then "Add an area", then Settings.
+  const items = canAdd ? all.filter(it => !SIDE_TAIL.has(it.id)) : all;
+  const tail = canAdd ? all.filter(it => SIDE_TAIL.has(it.id)) : [];
   const lit = navSection(section);
+  const row = it => {
+    const on = lit === it.id;
+    return (
+      <li key={it.id}>
+        <button type="button" className={cx('cx-shell-ni', on && 'is-on')} aria-current={on ? 'page' : undefined}
+                onClick={() => navigate(it.id)} title={it.label} data-cx-nav={it.id}>
+          <Icon name={it.icon} size={18} strokeWidth={1.75} />
+          <span className="cx-shell-ni-label">{it.label}</span>
+          {it.key && !scope && <kbd className="cx-shell-kbd" aria-label={`Shortcut ${it.key}`}>{it.key}</kbd>}
+        </button>
+      </li>
+    );
+  };
   return (
     <div className="cx-shell-side" role="navigation" aria-label="Main" data-shell-nav="side">
       <div className="cx-shell-brand"><span className="cx-shell-logo" aria-hidden="true"><Logo size={30} c="var(--cx-accent)" c2="var(--cx-gold)" /></span>Vantage</div>
       <ul className="cx-shell-side-list">
-        {items.map(it => {
-          const on = lit === it.id;
-          return (
-            <li key={it.id}>
-              <button type="button" className={cx('cx-shell-ni', on && 'is-on')} aria-current={on ? 'page' : undefined}
-                      onClick={() => navigate(it.id)} title={it.label} data-cx-nav={it.id}>
-                <Icon name={it.icon} size={18} strokeWidth={1.75} />
-                <span className="cx-shell-ni-label">{it.label}</span>
-                {it.key && <kbd className="cx-shell-kbd" aria-label={`Shortcut ${it.key}`}>{it.key}</kbd>}
-              </button>
-            </li>
-          );
-        })}
+        {items.map(row)}
+        {canAdd && (
+          <li>
+            <button type="button" className="cx-shell-ni cx-shell-add" onClick={onAdd} title="Add an area"
+                    aria-haspopup="dialog" data-cx-nav="add-area">
+              <Icon name="plus" size={18} strokeWidth={1.75} />
+              <span className="cx-shell-ni-label">Add an area</span>
+            </button>
+          </li>
+        )}
+        {tail.map(row)}
       </ul>
       <button type="button" className="cx-shell-ni cx-shell-signout" onClick={onSignOut} title="Sign out">
         <Icon name="log-out" size={18} strokeWidth={1.75} />
@@ -173,11 +192,13 @@ function AppBar({ S, section, navigate, onOpenModal, now, bg }) {
   );
 }
 
-function TabBar({ section, moreOpen, navigate, onOpenMore }) {
-  const on = activeTab(section, { moreOpen });
+function TabBar({ section, moreOpen, navigate, onOpenMore, scope }) {
+  const tabs = tabItems({ scope });
+  const on = activeTab(section, { moreOpen, tabs });
   return (
-    <div className="cx-shell-tabs" role="navigation" aria-label="Main" data-shell-nav="tabs">
-      {TABS.map(t => (
+    <div className="cx-shell-tabs" role="navigation" aria-label="Main" data-shell-nav="tabs"
+         style={tabs.length !== 4 ? { '--cx-shell-tabs-n': tabs.length + 1 } : undefined}>
+      {tabs.map(t => (
         <button key={t.id} type="button" className={cx('cx-shell-tab', on === t.id && 'is-on')}
                 aria-current={on === t.id ? 'page' : undefined} data-cx-nav={t.id}
                 onClick={() => { haptic('LIGHT'); navigate(t.id); }}>
@@ -195,12 +216,12 @@ function TabBar({ section, moreOpen, navigate, onOpenMore }) {
   );
 }
 
-function MoreSheet({ section, isOwner, hasPro, navigate, onOpenPaywall, onClose }) {
+function MoreSheet({ section, isOwner, hasPro, navigate, onOpenPaywall, onClose, scope, canAdd, onAdd }) {
   const go = id => { haptic('LIGHT'); onClose(); navigate(id); };
   return (
     <Sheet title="More" onClose={onClose} testId="cx-shell-more" className="cx-shell-more">
       <ul className="cx-shell-more-list" data-shell-more="">
-        {moreItems({ isOwner }).map(it => {
+        {moreItems({ isOwner, scope }).map(it => {
           const on = canonicalSection(section) === it.id;
           return (
             <li key={it.id}>
@@ -215,6 +236,19 @@ function MoreSheet({ section, isOwner, hasPro, navigate, onOpenPaywall, onClose 
             </li>
           );
         })}
+        {canAdd && (
+          <li>
+            <button type="button" className="cx-shell-mi cx-shell-mi-add" aria-haspopup="dialog" data-cx-nav="add-area"
+                    onClick={() => { haptic('LIGHT'); onClose(); onAdd(); }}>
+              <Icon name="plus" size={18} strokeWidth={1.75} />
+              <span className="cx-shell-mi-text">
+                <span className="cx-shell-mi-label">Add an area</span>
+                <span className="cx-shell-mi-desc">The rest of Vantage, when you want it</span>
+              </span>
+              <Icon name="chevron-right" size={16} strokeWidth={1.75} />
+            </button>
+          </li>
+        )}
       </ul>
       {!hasPro && onOpenPaywall && (
         <button type="button" className="cx-shell-mi cx-shell-pro" onClick={() => { haptic('LIGHT'); onClose(); onOpenPaywall('generic'); }}>
@@ -231,14 +265,64 @@ function MoreSheet({ section, isOwner, hasPro, navigate, onOpenPaywall, onClose 
   );
 }
 
+/**
+ * "Add an area" (lib/onboarding/areas.js): the picks this account has not
+ * asked for, with the onboarding's own line for each. Add puts the area
+ * in the navigation and its first thing on the Getting started card,
+ * then opens it.
+ */
+function AddAreaSheet({ areas, onAdd, onClose }) {
+  return (
+    <Sheet title="Add an area" onClose={onClose} testId="cx-shell-addarea" className="cx-shell-more cx-shell-addarea">
+      <p className="cx-shell-addarea-note">Each one joins your menu, with a first step on your hub. Nothing you have is changed.</p>
+      <ul className="cx-shell-more-list">
+        {areas.map(a => (
+          <li key={a.id}>
+            <button type="button" className="cx-shell-mi" onClick={() => onAdd(a)} data-cx-area={a.id}>
+              <Icon name={a.icon} size={18} strokeWidth={1.75} />
+              <span className="cx-shell-mi-text">
+                <span className="cx-shell-mi-label">{a.label}</span>
+                <span className="cx-shell-mi-desc">{a.line}</span>
+              </span>
+              <span className="cx-shell-addarea-go">Add</span>
+            </button>
+          </li>
+        ))}
+      </ul>
+    </Sheet>
+  );
+}
+
 export default function ConsoleShell({
-  S, userId, isMobile, isOwner, hasPro, navigate, activeSection,
+  S, update, userId, isMobile, isOwner, hasPro, navigate, activeSection,
   onOpenModal, onOpenPaywall, onOpenPalette, onSignOut,
   background = null, bgFx = null, onChangeBg, onRemoveBg, onBgFx,
 }) {
   const [moreOpen, setMoreOpen] = useState(false);
   const [bgOpen, setBgOpen] = useState(false);
+  const [addOpen, setAddOpen] = useState(false);
   const section = canonicalSection(activeSection);
+  // The smaller app: a scoped account's navigation follows what it picked
+  // (null = everything, which is every account that is not scoped).
+  const scope = useMemo(() => navScope(S),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [S.onboarding, S.savings, S.achievements, S.habits, S.shopItems, S.ratingInputs]);
+  const areas = useMemo(() => (update ? addableAreas(S) : []),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [S.onboarding, update]);
+  const canAdd = areas.length > 0;
+  const addSheet = addOpen && canAdd && (
+    <AddAreaSheet
+      areas={areas}
+      onClose={() => setAddOpen(false)}
+      onAdd={a => {
+        haptic('LIGHT');
+        update(prev => addArea(prev, a.id));
+        setAddOpen(false);
+        navigate(a.section);
+      }}
+    />
+  );
   const now = new Date();
   // Background photo for this page (App owns the picker, crop and writes).
   const bg = onChangeBg ? { on: !!background, open: () => setBgOpen(true) } : null;
@@ -255,20 +339,24 @@ export default function ConsoleShell({
     return (
       <>
         <AppBar S={S} section={section} navigate={navigate} onOpenModal={onOpenModal} now={now} bg={bg} />
-        <TabBar section={section} moreOpen={moreOpen} navigate={navigate} onOpenMore={() => setMoreOpen(true)} />
+        <TabBar section={section} moreOpen={moreOpen} navigate={navigate} onOpenMore={() => setMoreOpen(true)} scope={scope} />
         {moreOpen && (
           <MoreSheet section={section} isOwner={isOwner} hasPro={hasPro} navigate={navigate}
-                     onOpenPaywall={onOpenPaywall} onClose={() => setMoreOpen(false)} />
+                     onOpenPaywall={onOpenPaywall} onClose={() => setMoreOpen(false)}
+                     scope={scope} canAdd={canAdd} onAdd={() => setAddOpen(true)} />
         )}
+        {addSheet}
         {bgSheet}
       </>
     );
   }
   return (
     <>
-      <Sidebar section={section} isOwner={isOwner} navigate={navigate} onSignOut={onSignOut} />
+      <Sidebar section={section} isOwner={isOwner} navigate={navigate} onSignOut={onSignOut}
+               scope={scope} canAdd={canAdd} onAdd={() => setAddOpen(true)} />
       <TopBar S={S} section={section} userId={userId} navigate={navigate} onOpenModal={onOpenModal}
               onOpenPalette={onOpenPalette} now={now} bg={bg} />
+      {addSheet}
       {bgSheet}
     </>
   );

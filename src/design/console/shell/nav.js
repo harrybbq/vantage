@@ -33,15 +33,23 @@ const ITEM = {
   upgrade:      { id: 'upgrade',      icon: 'trending-up',    label: 'Upgrade',      desc: 'Rotation, diet, career' },
 };
 
+/**
+ * `scope`: the destinations a scoped account shows (a Set of ids from
+ * lib/onboarding/areas.js navScope), or null for everything — which is
+ * every account that is not scoped, so their lists are exactly as before.
+ * Holiday is part of Track, so it follows Track.
+ */
+const keep = (items, scope) => (scope ? items.filter(it => scope.has(it.id === 'holiday' ? 'track' : it.id)) : items);
+
 /** Desktop sidebar items. Upgrade only for the owner, above Settings (as classic). */
-export function sidebarItems({ isOwner = false, showHoliday = CONSOLE_SHOW_HOLIDAY } = {}) {
-  return [
+export function sidebarItems({ isOwner = false, showHoliday = CONSOLE_SHOW_HOLIDAY, scope = null } = {}) {
+  return keep([
     ITEM.hub, ITEM.achievements, ITEM.track, ITEM.shop,
     ...(showHoliday ? [ITEM.holiday] : []),
     ITEM.habits, ITEM.leaderboard,
     ...(isOwner ? [ITEM.upgrade] : []),
     ITEM.settings,
-  ];
+  ], scope);
 }
 
 /** The four routed phone tabs; More is drawn after them. Shop took Holiday's slot (owner decision). */
@@ -52,8 +60,39 @@ export const TABS = [
   { ...ITEM.shop, label: 'Shop' },
 ];
 
-/** Rows in the phone's More sheet. */
-export function moreItems({ isOwner = false, showHoliday = CONSOLE_SHOW_HOLIDAY } = {}) {
+/** A scoped account's spare tab seats, in the order they are offered. */
+const TAB_SEATS = [
+  { ...ITEM.habits },
+  { ...ITEM.leaderboard, label: 'League' },
+  { ...ITEM.friends },
+  { ...ITEM.shop, label: 'Shop' },
+  { ...ITEM.achievements, label: 'Goals' },
+];
+
+/**
+ * The routed phone tabs for a scope. No scope: TABS, as ever. Scoped:
+ * Hub and Track, then the first two shown areas, so what someone chose
+ * takes the seats (League and Friends for a Friends pick, not Habits and
+ * Shop). Fewer areas, fewer tabs; More is always drawn after them.
+ */
+export function tabItems({ scope = null } = {}) {
+  if (!scope) return TABS;
+  return [TABS[0], TABS[1], ...TAB_SEATS.filter(t => scope.has(t.id)).slice(0, 2)];
+}
+
+/**
+ * Rows in the phone's More sheet. Scoped: every shown area that did not
+ * get a tab, then Settings — so each shown destination is on a tab or here.
+ */
+export function moreItems({ isOwner = false, showHoliday = CONSOLE_SHOW_HOLIDAY, scope = null } = {}) {
+  if (scope) {
+    const tabbed = new Set(tabItems({ scope }).map(t => t.id));
+    return [
+      ...[ITEM.achievements, ITEM.friends, ITEM.leaderboard, ITEM.habits, ITEM.shop].filter(it => scope.has(it.id) && !tabbed.has(it.id)),
+      ITEM.settings,
+      ...(isOwner ? [ITEM.upgrade] : []),
+    ];
+  }
   return [
     ITEM.achievements, ITEM.friends, ITEM.leaderboard,
     ...(showHoliday ? [ITEM.holiday] : []),
@@ -78,11 +117,11 @@ export function navSection(id, { showHoliday = CONSOLE_SHOW_HOLIDAY } = {}) {
   return s === 'holiday' && !showHoliday ? 'track' : s;
 }
 
-/** Which phone tab lights up for a section: one of TABS' ids, 'more', or null. */
-export function activeTab(section, { moreOpen = false } = {}) {
+/** Which phone tab lights up for a section: one of the tabs' ids (`tabs`: tabItems), or 'more'. */
+export function activeTab(section, { moreOpen = false, tabs = TABS } = {}) {
   if (moreOpen) return 'more';
   const s = canonicalSection(section);
-  if (TABS.some(t => t.id === s)) return s;
+  if (tabs.some(t => t.id === s)) return s;
   // Holiday is part of Track in the console design; while it still has its
   // own route it lights the Track tab, which is where it is going.
   if (s === 'holiday') return 'track';

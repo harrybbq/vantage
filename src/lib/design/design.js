@@ -13,6 +13,10 @@
  * one updater the Settings control uses, and it only ever adds/changes
  * that single key.
  *
+ * NEW ACCOUNTS (Nov 2026): accounts created from the cut-over on default
+ * to 'console' (defaultDesignFor). Existing accounts are untouched by
+ * that: for them everything below still holds.
+ *
  * PREVIEW GATE. While DEFAULT_DESIGN is 'classic' the console design is
  * owner-only (a UI gate via useIsOwner — fine for a preview, never an
  * access control). The gate is derived from the default, so the public
@@ -23,6 +27,7 @@
  * Pure: no DOM, no React. design.test.mjs pins every rule.
  */
 import { accentFor, onAccent, parseColor } from './contrast.js';
+import { isNewCohort } from '../account/cohort.js';
 
 export const DESIGNS = Object.freeze(['classic', 'console']);
 
@@ -30,6 +35,15 @@ export const DESIGNS = Object.freeze(['classic', 'console']);
 export const DEFAULT_DESIGN = 'classic';
 
 export const isDesign = v => typeof v === 'string' && DESIGNS.includes(v);
+
+/**
+ * The default for ONE account: accounts created from the cut-over on
+ * (lib/account/cohort.js) open in the console; every earlier account
+ * keeps DEFAULT_DESIGN, and with it the owner preview gate. Pass the
+ * answer to resolveDesign as `defaultDesign`. Nothing is written: the
+ * account's creation time decides it.
+ */
+export const defaultDesignFor = createdAt => (isNewCohort(createdAt) ? 'console' : DEFAULT_DESIGN);
 
 /** Whether `defaultDesign` keeps the console behind the owner preview gate. */
 export const isConsoleGated = (defaultDesign = DEFAULT_DESIGN) => (isDesign(defaultDesign) ? defaultDesign : 'classic') !== 'console';

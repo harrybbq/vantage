@@ -33,7 +33,7 @@
     "check:ratingctx": "node src/lib/ratings/ctx.test.mjs",
     "check:payday": "node src/lib/money/payday.test.mjs",
     "check:devicecal": "node src/lib/calendar/device.test.mjs",
-    "check:onboarding": "node src/lib/onboarding/onboarding.test.mjs && node src/lib/onboarding/bus.test.mjs",
+    "check:onboarding": "node src/lib/onboarding/onboarding.test.mjs && node src/lib/onboarding/bus.test.mjs && node src/lib/onboarding/areas.test.mjs && node src/lib/account/cohort.test.mjs",
     "check:console": "node scripts/check-console.mjs",
     "check:wearablestrip": "node src/lib/wearables/strip.test.mjs",
     "check:wearablerevoke": "node netlify/lib/wearableRevoke.test.mjs",

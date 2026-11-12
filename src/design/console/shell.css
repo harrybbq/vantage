@@ -134,6 +134,12 @@ html[data-design="console"] .cx-shell-brand { color: transparent; transition: co
 html[data-design="console"] .cx-shell-side:has(:focus-visible) :is(.cx-shell-ni-label, .cx-shell-ni .cx-shell-kbd) { opacity: 1; }
 html[data-design="console"] .cx-shell-side:has(:focus-visible) .cx-shell-brand { color: var(--cx-text); }
 html[data-design="console"] .cx-shell-signout { margin-top: auto; }
+/* "Add an area" (a scoped account's way to the rest; lib/onboarding/areas.js). */
+html[data-design="console"] .cx-shell-add { position: relative; color: var(--cx-accent); }
+html[data-design="console"] .cx-shell-add::before {
+  content: ""; position: absolute; inset: 0; border: 1px dashed var(--cx-line); border-radius: inherit; pointer-events: none;
+}
+html[data-design="console"] .cx-shell-add:hover::before { border-color: var(--cx-accent); }
 
 /* ── Desktop top bar (60 px) ── */
 html[data-design="console"] .cx-shell-top {
@@ -234,7 +240,7 @@ html[data-design="console"] .cx-shell-tabs {
   height: calc(var(--cx-shell-tab-h) + var(--cx-shell-tab-pad));
   padding: var(--cx-sp-4) max(4px, env(safe-area-inset-right, 0px)) var(--cx-shell-tab-pad) max(4px, env(safe-area-inset-left, 0px));
   box-sizing: border-box;
-  display: grid; grid-template-columns: repeat(5, minmax(0, 1fr));
+  display: grid; grid-template-columns: repeat(var(--cx-shell-tabs-n, 5), minmax(0, 1fr));   /* fewer for a scoped account with few areas */
   background: var(--cx-bg);    /* WebViews without color-mix (Chrome < 111) */
   background: color-mix(in srgb, var(--cx-bg) 94%, transparent);
   -webkit-backdrop-filter: blur(16px); backdrop-filter: blur(16px);
@@ -414,3 +420,14 @@ html[data-design="console"] .cx-shell-bg-range-head {
   font: 500 var(--cx-fs-13)/var(--cx-lh-13) var(--cx-sans); color: var(--cx-mid);
 }
 html[data-design="console"] .cx-shell-bg-range input[type="range"] { width: 100%; min-height: 32px; accent-color: var(--cx-accent-fill); }
+
+/* ── Add an area sheet ── */
+html[data-design="console"] .cx-shell-addarea-note { margin: 0 0 var(--cx-sp-8); color: var(--cx-muted); font: 400 var(--cx-fs-13)/var(--cx-lh-13) var(--cx-sans); }
+html[data-design="console"] .cx-shell-addarea .cx-shell-mi > svg:first-child { color: var(--cx-accent); }
+html[data-design="console"] .cx-shell-addarea-go {
+  flex: none; padding: 0 var(--cx-sp-12); height: var(--cx-chip-h); display: inline-flex; align-items: center;
+  border: 1px solid var(--cx-line); border-radius: var(--cx-r-chip); color: var(--cx-text);
+  font: 600 var(--cx-fs-13)/1 var(--cx-sans);
+}
+html[data-design="console"] .cx-shell-addarea .cx-shell-mi:hover .cx-shell-addarea-go { border-color: var(--cx-accent); color: var(--cx-accent); }
+html[data-design="console"] .cx-shell-mi-add > svg:first-child { color: var(--cx-accent); }

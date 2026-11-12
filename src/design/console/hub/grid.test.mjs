@@ -71,6 +71,9 @@ t('seed: hub-only, mobile-only, empty', () => {
   assert.deepEqual(types(seedHubGrid({ hubWidgets: [{ id: 'a', type: 'body' }] })), ['today', 'league', 'friends', 'upnext', 'body']);
   assert.deepEqual(types(seedHubGrid({ mobileWidgets: [{ id: 'a', type: 'macros' }] })), ['today', 'league', 'friends', 'upnext', 'macros']);
   assert.deepEqual(types(seedHubGrid({})), ['today', 'league', 'friends', 'upnext']);
+  // A scoped account that did not ask for Friends (lib/onboarding/areas.js): no League or Friends card.
+  assert.deepEqual(types(seedHubGrid({}, { social: false })), ['today', 'upnext']);
+  assert.deepEqual(types(seedHubGrid({ hubWidgets: [{ id: 'a', type: 'body' }] }, { social: false })), ['today', 'upnext', 'body']);
   assert.deepEqual(types(seedHubGrid({}, { hasPay: true })), ['today', 'league', 'friends', 'upnext', 'untilpay'], 'a pay day seeds Until pay');
   assert.deepEqual(types(seedHubGrid({}, { hasUpcoming: false })), ['today', 'league', 'friends']);
 });

@@ -21,6 +21,11 @@
  *   S.onboarding          NEW key, additive: { picks: [id], pickedAt,
  *                         hidden, invited } — absent for everyone who
  *                         onboarded before this existed (they see no card)
+ *                         Since Nov 2026 also `scoped` (true: the
+ *                         navigation follows the picks — only ever set
+ *                         for accounts created from the cut-over on) and
+ *                         `added` ([id]: areas added later from "Add an
+ *                         area"). See ./areas.js.
  * Nothing here deletes or rewrites anything else in S.
  */
 
@@ -128,6 +133,18 @@ export function picksOf(S) {
   return PICK_IDS.filter(id => raw.includes(id));
 }
 
+/** Areas added later from "Add an area" (./areas.js), cleaned. [] if none. */
+export function addedOf(S) {
+  const raw = S && S.onboarding && Array.isArray(S.onboarding.added) ? S.onboarding.added : [];
+  return PICK_IDS.filter(id => raw.includes(id));
+}
+
+/** Everything the user has asked for: the picks plus what they added since. */
+export function areasOf(S) {
+  const picks = picksOf(S), added = addedOf(S);
+  return PICK_IDS.filter(id => picks.includes(id) || added.includes(id));
+}
+
 /** Is a pick's first thing done? */
 export function isDone(S, id, ctx = {}) {
   const p = pickById(id);
@@ -147,7 +164,7 @@ export function stops(S, picks, ctx = {}) {
  * hidden.
  */
 export function gettingStarted(S, ctx = {}) {
-  const picks = picksOf(S);
+  const picks = areasOf(S);
   const items = picks.map(id => {
     const p = pickById(id);
     return { id, label: p.first.check, pick: p.label, cta: p.first.cta, done: isDone(S, id, ctx) };
@@ -161,10 +178,29 @@ export function gettingStarted(S, ctx = {}) {
 
 const ob = prev => (prev && prev.onboarding && typeof prev.onboarding === 'object' ? prev.onboarding : {});
 
-/** Save the picks (a replay keeps `invited`; picking again un-hides the card). */
-export function setPicks(prev, picks, now = Date.now()) {
+/**
+ * Save the picks (a replay keeps `invited`; picking again un-hides the card).
+ * `opts.scoped` (the caller passes it only for accounts created from the
+ * Nov 2026 cut-over on): the navigation follows these picks. "Show me
+ * everything" (no picks) turns that off again. Without it the key is
+ * never written, so an earlier account's onboarding is as it was.
+ */
+export function setPicks(prev, picks, now = Date.now(), opts = {}) {
   const clean = PICK_IDS.filter(id => (picks || []).includes(id));
-  return { ...prev, onboarding: { ...ob(prev), picks: clean, pickedAt: now, hidden: false } };
+  const next = { ...ob(prev), picks: clean, pickedAt: now, hidden: false };
+  if (opts && opts.scoped === true) next.scoped = clean.length > 0;
+  return { ...prev, onboarding: next };
+}
+
+/**
+ * "Add an area": the area joins the navigation and its first thing joins
+ * the Getting started card (un-hidden, so the new step is seen). Additive:
+ * only S.onboarding.added / .hidden. `prev` itself for an unknown id or
+ * one already asked for.
+ */
+export function addArea(prev, id) {
+  if (!PICK_IDS.includes(id) || areasOf(prev).includes(id)) return prev;
+  return { ...prev, onboarding: { ...ob(prev), added: [...addedOf(prev), id], hidden: false } };
 }
 
 /** The overlay is done with (finished, skipped or "finish later"). */
