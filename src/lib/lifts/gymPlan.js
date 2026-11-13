@@ -1,48 +1,72 @@
 /**
- * The session plan, fitted to the gym (owner, 2026-11-13: "the app
- * should adjust the session plan based on what gym is selected").
+ * Two gyms, two plans (owner, 2026-11-13: "We should have 2 lift plans
+ * one per gym and the plan simply switches when I toggle what gym I'm
+ * at during the lift session").
  *
- * The two gyms do not hold the same kit. DXC is the smaller one and the
- * programme was written to work there; Greenock has all of that and
- * more. A lift can be marked as done at one gym only (lifts.js
- * onlyGymOf: the lift's own `only`, else GYM_ONLY's default for its
- * name). fitForGym takes a planned session and the gym chosen and
- * returns the session as it can actually be run there:
+ * The plans themselves are WRITTEN — trainingProgramme.js PROGRAMME (DXC)
+ * and PROGRAMME_GREENOCK — not worked out by matching muscles. This file
+ * is the three small things the rest of the logger needs around them:
  *
- *   1. NOT HERE. A planned exercise that only another gym has is
- *      replaced by the closest exercise this gym does have: the same
- *      main muscle part, the nearest overall (cosine of the part
- *      weights, adaptive.js partsOf), a lift already used ahead of one
- *      that never has been. Same sets and reps. Nothing close → it is
- *      left out and the plan says so.
- *   2. ONLY HERE. A lift this gym alone has is there to be used, so it
- *      takes the place of the planned exercise it is closest to (same
- *      main part, cosine ≥ MIN_MATCH) — the incline Smith bench for the
- *      incline dumbbell press at Greenock. One for one, best match
- *      first, and never in place of something that is itself only here.
+ *   planOf(gym, session)   the session as that gym's plan writes it
+ *   switchExercise(...)    what one exercise becomes at the other gym —
+ *                          how a session in progress changes gym
+ *   fitForGym(plan, ctx)   the safety net: a planned exercise the gym
+ *                          chosen does not have (lifts.js availableAt)
+ *                          is never shown there
  *
- * The owner can overrule the matching per lift (`lift.swapFor`, set in
- * Manage lifts): a NAME — it replaces exactly that exercise, and is what
- * the lift falls back to at a gym without it; `false` — it replaces
- * nothing (it stays on the list and in the picker, the plan leaves it
- * alone). Absent → the closest match, as above.
+ * Each exercise in a non-base plan that takes a different exercise's
+ * slot carries `for` (the base plan's name for that slot). That one
+ * field is the whole mapping between plans.
  *
- * Every swap is tagged on the exercise (`{ kind: 'gym' }`) and listed in
- * `swaps`, so the card can say what moved and why. Sets, reps and order
- * are the plan's; only WHICH exercise changes. With no gym chosen, or
- * nothing marked, the very same array comes back.
- *
- * Pure. Nothing is stored: the plan is worked out for the gym each time.
+ * Pure. Nothing is stored: the plan is read for the gym every time.
  */
-import { PROGRAMME } from '../../data/trainingProgramme.js';
+import { PROGRAMME, programmeFor } from '../../data/trainingProgramme.js';
 import { norm } from './muscles.js';
 import { partsOf, GROUP_OF } from './adaptive.js';
-import { onlyGymOf, availableAt, bannedRule } from './lifts.js';
+import { availableAt, bannedRule } from './lifts.js';
 
-/** An only-here lift must be at least this close to the exercise it replaces. */
-export const MIN_MATCH = 0.6;
 /** A stand-in for a missing exercise with a different main part must be at least this close. */
 export const MIN_STANDIN = 0.7;
+
+const same = (a, b) => norm(a) === norm(b);
+const slotOf = x => x.for || x.name;
+const plain = x => { const o = { name: x.name, sets: x.sets, reps: x.reps }; if (x.optional) o.optional = true; return o; };
+
+/** A session as one gym's plan writes it → [{ name, sets, reps, optional? }], or null when it is not a programme session. */
+export function planOf(gym, session) {
+  const list = programmeFor(gym)[session];
+  return Array.isArray(list) ? list.map(plain) : null;
+}
+
+/** Is this a session the plans write (Push, Pull, Legs, Upper, Lower)? */
+export const isPlanSession = session => !!(session && Array.isArray(PROGRAMME[session]));
+
+/**
+ * What an exercise becomes when a session moves from one gym to another.
+ * → { name, sets, reps, optional? }  its counterpart in the other plan
+ *                                    (the same exercise when both plans
+ *                                    write it in that slot)
+ *   'keep'                           not a slot of this session's plan,
+ *                                    and the other gym has it: leave it
+ *   null                             the other gym cannot do it and the
+ *                                    plan has nothing in its place
+ * `can(name)`: can the exercise be done at the gym being moved TO.
+ */
+export function switchExercise(session, name, fromGym, toGym, can = () => true) {
+  const from = programmeFor(fromGym), to = programmeFor(toGym);
+  const mine = (from[session] || []).find(x => same(x.name, name));
+  if (mine) {
+    const theirs = (to[session] || []).find(x => same(slotOf(x), slotOf(mine)));
+    if (theirs) return can(theirs.name) ? plain(theirs) : null;
+    return can(name) ? 'keep' : null;          // an extra the other plan has no slot for
+  }
+  if (can(name)) return 'keep';
+  // Not this session's (an adaptive pick, or one the owner added): its counterpart from any session.
+  const any = Object.values(from).flat().find(x => same(x.name, name));
+  const slot = any ? slotOf(any) : name;
+  const theirs = Object.values(to).flat().find(x => same(slotOf(x), slot) && can(x.name));
+  return theirs ? plain(theirs) : null;
+}
 
 const cosine = (a, b) => {
   let dot = 0, na = 0, nb = 0;
@@ -53,121 +77,75 @@ const cosine = (a, b) => {
   return na && nb ? dot / Math.sqrt(na * nb) : 0;
 };
 const mainPart = parts => Object.entries(parts).sort((a, b) => b[1] - a[1])[0]?.[0] || null;
-
-const PROGRAMME_ROWS = (() => {
-  const out = new Map();
-  for (const code of Object.keys(PROGRAMME)) for (const x of PROGRAMME[code]) if (!out.has(norm(x.name))) out.set(norm(x.name), x);
-  return out;
-})();
-
-const liftFor = (x, list) => (x.liftId && list.find(l => l && l.id === x.liftId)) || list.find(l => l && !l.archived && norm(l.name) === norm(x.name)) || null;
+const liftFor = (x, list) => (x.liftId && list.find(l => l && l.id === x.liftId)) || list.find(l => l && !l.archived && same(l.name, x.name)) || null;
 
 /**
- * → { exercises, swaps: [{ from, to, why: 'missing' | 'only' }], dropped: [name] }
- *   exercises   the plan's items; a swapped one keeps its sets / reps /
- *               optional and gains `name`, `liftId` (or none), `swapFor`
- *               (the planned name) and a `{ kind: 'gym', text }` tag
- *   ctx.gym     the gym chosen (null → nothing changes)
- *   ctx.list    S.lifts.list
- *   ctx.gymIds  ids of the gyms in use (a retired gym restricts nothing)
- *   ctx.gymLabel  "Greenock", for the tag
- *   ctx.used    Set of lift ids with sets logged (familiar ones win ties)
+ * The safety net. A planned session, and the gym chosen:
+ * → { exercises, swaps: [{ from, to }], dropped: [name] }
+ * An exercise this gym does not have becomes its counterpart in this
+ * gym's plan, else the closest exercise the gym has (same main muscle
+ * part; a lift already used ahead of one that never has been), else it
+ * is left out and named in `dropped`. A replaced one keeps its sets and
+ * reps and gains `swapFor` and a `{ kind: 'gym' }` tag.
+ *
+ * The written plans are built to need none of this (trainingProgramme
+ * tests check): it is for a lift the owner marks one-gym-only later,
+ * for the adaptive build, and for a gap in a plan nobody has filled yet.
+ * With no gym chosen, or nothing missing, the very same array comes back.
+ *
+ *   ctx.gym, ctx.list (S.lifts.list), ctx.gymIds (gyms in use),
+ *   ctx.gymLabel ("Greenock"), ctx.used (lift ids with sets)
  */
 export function fitForGym(exercises, ctx = {}) {
   const { gym = null, list = [], gymIds = null, gymLabel = '', used = null } = ctx;
-  const same = { exercises, swaps: [], dropped: [] };
-  if (!gym || !Array.isArray(exercises) || !exercises.length) return same;
+  const asIs = { exercises, swaps: [], dropped: [] };
+  if (!gym || !Array.isArray(exercises) || !exercises.length) return asIs;
   const lifts = (list || []).filter(l => l && !l.archived && !bannedRule(l));
-  const here = l => availableAt(l, gym, gymIds);
-  const onlyHere = lifts.filter(l => onlyGymOf(l, gymIds) === gym);
-  const missing = exercises.some(x => !here(liftFor(x, lifts) || { name: x.name }));
-  if (!missing && !onlyHere.length) return same;
+  const here = x => availableAt(liftFor(x, lifts) || { name: x.name }, gym, gymIds);
+  if (exercises.every(here)) return asIs;
 
   const out = exercises.map(x => ({ ...x }));
   const swaps = [], dropped = [];
   const taken = new Set(out.map(x => norm(x.name)));
   const label = gymLabel || 'this gym';
-  const put = (i, to, why) => {
-    const from = out[i].name;
-    const tags = (out[i].tags || []).filter(t => t.kind !== 'gym');
-    taken.delete(norm(from));
-    const next = { ...out[i], name: to.name, swapFor: from, tags: [...tags, { kind: 'gym', text: why === 'only' ? `${label} · for ${from}` : `Not at ${label}: ${from}` }] };
-    if (to.liftId) next.liftId = to.liftId; else delete next.liftId;
-    if (!next.reps && to.reps) next.reps = to.reps;
-    out[i] = next;
-    taken.add(norm(to.name));
-    swaps.push({ from, to: to.name, why });
-  };
-
-  // 1. Not here → the closest exercise this gym has.
   const pool = () => {
     const m = new Map();
     for (const l of lifts) if (here(l)) m.set(norm(l.name), { name: l.name, liftId: l.id, parts: partsOf(l), own: true, known: !!(used && used.has(l.id)) });
-    for (const [k, x] of PROGRAMME_ROWS) if (!m.has(k) && here({ name: x.name })) m.set(k, { name: x.name, parts: partsOf({ name: x.name }), reps: x.reps, own: false, known: false });
+    for (const x of Object.values(programmeFor(gym)).flat()) {
+      const k = norm(x.name);
+      if (!m.has(k) && here({ name: x.name })) m.set(k, { name: x.name, parts: partsOf({ name: x.name }), reps: x.reps, own: false, known: false });
+    }
     return [...m.values()].filter(c => Object.keys(c.parts).length);
   };
   for (let i = 0; i < out.length; i++) {
+    if (here(out[i])) continue;
+    const from = out[i].name;
     const lift = liftFor(out[i], lifts);
-    if (here(lift || { name: out[i].name })) continue;
-    const want = partsOf(lift || { name: out[i].name });
-    const main = mainPart(want);
     let best = null;
-    const all = pool();
-    // The owner named its counterpart: that, if this gym has it and it is free.
-    const named = lift && typeof lift.swapFor === 'string' && lift.swapFor ? all.find(c => norm(c.name) === norm(lift.swapFor) && !taken.has(norm(c.name))) : null;
-    if (named) best = named;
-    for (const c of best ? [] : all) {
-      if (taken.has(norm(c.name))) continue;
-      const sameMain = mainPart(c.parts) === main;
-      const cos = cosine(want, c.parts);
-      if (!sameMain && !(GROUP_OF[mainPart(c.parts)] === GROUP_OF[main] && cos >= MIN_STANDIN)) continue;
-      const score = cos + (sameMain ? 1 : 0) + (c.known ? 0.05 : 0) + (c.own ? 0 : 0.02);
-      if (!best || score > best.score + 1e-9) best = { ...c, score };
+    // Its counterpart in this gym's plan, when the plans name one.
+    const other = Object.values(programmeFor(gym)).flat().find(x => x.for && same(x.for, from) && here({ name: x.name }) && !taken.has(norm(x.name)));
+    if (other) best = { name: other.name, liftId: (liftFor({ name: other.name }, lifts) || {}).id };
+    if (!best) {
+      const want = partsOf(lift || { name: from });
+      const main = mainPart(want);
+      for (const c of pool()) {
+        if (taken.has(norm(c.name))) continue;
+        const sameMain = mainPart(c.parts) === main;
+        const cos = cosine(want, c.parts);
+        if (!sameMain && !(GROUP_OF[mainPart(c.parts)] === GROUP_OF[main] && cos >= MIN_STANDIN)) continue;
+        const score = cos + (sameMain ? 1 : 0) + (c.known ? 0.05 : 0) + (c.own ? 0 : 0.02);
+        if (!best || score > best.score + 1e-9) best = { ...c, score };
+      }
     }
-    if (best) put(i, best, 'missing');
-    else { dropped.push(out[i].name); taken.delete(norm(out[i].name)); out[i] = null; }
+    taken.delete(norm(from));
+    if (!best) { dropped.push(from); out[i] = null; continue; }
+    const tags = (out[i].tags || []).filter(t => t.kind !== 'gym');
+    const next = { ...out[i], name: best.name, swapFor: from, tags: [...tags, { kind: 'gym', text: `Not at ${label}: ${from}` }] };
+    if (best.liftId) next.liftId = best.liftId; else delete next.liftId;
+    if (!next.reps && best.reps) next.reps = best.reps;
+    out[i] = next;
+    taken.add(norm(best.name));
+    swaps.push({ from, to: best.name });
   }
-
-  // 2. Only here → in place of the planned exercise it is closest to.
-  const pairs = [];
-  for (const l of onlyHere) {
-    if (taken.has(norm(l.name)) || l.swapFor === false) continue;
-    if (typeof l.swapFor === 'string' && l.swapFor) {
-      // Named by the owner: that exercise, when this session has it; nothing otherwise.
-      const i = out.findIndex(x => x && !x.swapFor && norm(x.name) === norm(l.swapFor));
-      if (i >= 0) pairs.push({ l, i, cos: 2 });
-      continue;
-    }
-    const mine = partsOf(l);
-    const main = mainPart(mine);
-    if (!main) continue;
-    out.forEach((x, i) => {
-      if (!x || x.swapFor) return;
-      const xl = liftFor(x, lifts);
-      if (onlyGymOf(xl || { name: x.name }, gymIds) === gym) return;
-      const theirs = partsOf(xl || { name: x.name });
-      if (mainPart(theirs) !== main) return;
-      const cos = cosine(mine, theirs);
-      if (cos >= MIN_MATCH) pairs.push({ l, i, cos });
-    });
-  }
-  pairs.sort((a, b) => b.cos - a.cos || a.i - b.i);
-  const usedLift = new Set(), usedSlot = new Set();
-  for (const p of pairs) {
-    if (usedLift.has(p.l.id) || usedSlot.has(p.i)) continue;
-    usedLift.add(p.l.id); usedSlot.add(p.i);
-    put(p.i, { name: p.l.name, liftId: p.l.id }, 'only');
-  }
-
-  if (!swaps.length && !dropped.length) return same;
   return { exercises: out.filter(Boolean), swaps, dropped };
-}
-
-/** "Incline Smith Machine Bench for Incline dumbbell press" — one line per swap, for the card. */
-export function swapLines(fit, gymLabel = '') {
-  const at = gymLabel || 'this gym';
-  return [
-    ...(fit.swaps || []).map(s => (s.why === 'only' ? `${s.to} in for ${s.from} (only at ${at})` : `${s.to} in for ${s.from} (not at ${at})`)),
-    ...(fit.dropped || []).map(n => `${n} left out: not at ${at}, and nothing close is`),
-  ];
 }

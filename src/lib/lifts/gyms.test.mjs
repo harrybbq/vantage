@@ -101,7 +101,9 @@ t('Previous and the pre-filled weights come from the same gym (machines only)', 
   const legsDay = '2026-10-13';
   const atG = suggestWorkout(S, legsDay, { gym: 'greenock' });
   const atD = suggestWorkout(S, legsDay, { gym: 'dxc' });
-  assert.equal(atG.exercises.find(x => x.liftId === 'lp').weight, 150);
+  // Greenock has its own plan (Nov 2026): its Legs runs the hack squat, not the leg press.
+  assert.ok(!atG.exercises.some(x => x.liftId === 'lp'));
+  assert.ok(atG.exercises.some(x => x.name === 'Hack squat'));
   assert.equal(atD.exercises.find(x => x.liftId === 'lp').weight, 192.5);
   assert.equal(atD.gym, 'dxc');
   assert.equal(suggestWorkout(S, legsDay).gym, 'dxc', 'default: the first gym (no lastGym yet)');

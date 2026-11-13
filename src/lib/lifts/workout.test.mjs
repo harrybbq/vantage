@@ -174,8 +174,11 @@ t('suggestion per session: each programme session maps to its exercises', () => 
   for (const [iso, code] of Object.entries(want)) {
     const s = suggestWorkout(S, iso);
     assert.equal(s.rotaSession, code, iso);
-    assert.equal(s.exercises.length, PROGRAMME[code].length);
-    assert.ok(s.exercises.every((x, i) => x.sets === PROGRAMME[code][i].sets));
+    // The default gym here is DXC, whose plan is PROGRAMME — less the one
+    // exercise DXC turned out not to have (Nov 2026, gymPlan.test.mjs).
+    const written = PROGRAMME[code].filter(x => x.name !== 'Seated leg curl');
+    assert.equal(s.exercises.length, written.length);
+    assert.ok(s.exercises.every((x, i) => x.sets === written[i].sets));
   }
   const push = suggestWorkout(S, '2026-10-11');
   const dip = push.exercises.find(x => x.name === 'Dip');

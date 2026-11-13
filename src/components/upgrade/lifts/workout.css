@@ -334,6 +334,10 @@ html[data-lifts-focus] .lifts .lw-head { top: env(safe-area-inset-top, 0px); }
 .lifts .lw-err { font-size: var(--lf-fs-meta); color: var(--lf-danger); }
 .lifts .lw-gymwarn { margin: 0; padding: 10px 12px; border-radius: var(--lf-r-cell); background: var(--lf-s2); border: 1px solid var(--lf-line-strong);
   font-size: var(--lf-fs-meta); line-height: 18px; color: var(--lf-text); }
+/* What the other gym's plan changes (lib/lifts/workout.js gymSwitchPreview). */
+.lifts .lw-gymplan { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; font-size: var(--lf-fs-floor); line-height: 18px; color: var(--lf-muted); }
+.lifts .lw-gymplan li { min-width: 0; overflow-wrap: anywhere; }
+.lifts .lw-gymplan b { color: var(--lf-text); font-weight: 600; }
 .lifts .lw-switch { position: relative; display: flex; align-items: center; gap: 12px; min-height: 56px; padding: 6px 0; border-bottom: 1px solid var(--lf-line); cursor: pointer; }
 .lifts .lw-switch-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
 .lifts .lw-switch-text b { font-size: var(--lf-fs-body); font-weight: 600; color: var(--lf-text); }

@@ -122,8 +122,11 @@ export function WorkoutMenu({ active, gymLabel, onRename, onNight, onGym, onDisc
   );
 }
 
-export function GymSheet({ gyms, gymNow, doneN, gymName, onMove, onClose }) {
+export function GymSheet({ gyms, gymNow, doneN, gymName, onMove, onClose, planChange = null }) {
   const [pick, setPick] = useState(null);
+  // What the other gym's plan changes in the exercises not started yet (lib/lifts/workout.js gymSwitchPreview).
+  const change = pick && pick !== gymNow && planChange ? planChange(pick) : null;
+  const changed = change ? change.swaps.length + change.dropped.length : 0;
   const footer = pick && pick !== gymNow ? (
     <>
       <Button variant="secondary" size="lg" onClick={() => setPick(null)}>Keep {gymNow ? gymName(gymNow) : 'as is'}</Button>
@@ -134,9 +137,15 @@ export function GymSheet({ gyms, gymNow, doneN, gymName, onMove, onClose }) {
     <Sheet title="Which gym?" eyebrow="// Workout" onClose={onClose} footer={footer} testId="lw-gym" width={440}>
       <div className="lw-menu-sec">
         <GymSwitch gyms={gyms} value={pick || gymNow} label="Gym for this workout" testId="lw-gym-switch" onChange={id => (doneN && id !== gymNow ? setPick(id) : onMove(id))} />
-        <p className="lf-meta">Machines compare within one gym: Previous and the targets come from there.</p>
+        <p className="lf-meta">Each gym has its own plan. Exercises you haven&apos;t started switch to that gym&apos;s; ones with a set done stay. Machines compare within one gym.</p>
         {pick && pick !== gymNow && (
           <p className="lw-gymwarn" role="alert">{doneN} done {doneN === 1 ? 'set' : 'sets'} will be saved under <b>{gymName(pick)}</b> instead of {gymNow ? gymName(gymNow) : 'no gym'}.</p>
+        )}
+        {changed > 0 && (
+          <ul className="lw-gymplan" data-testid="lw-gym-plan">
+            {change.swaps.map(s => <li key={s.from}><span>{s.from}</span> <b>→ {s.to}</b></li>)}
+            {change.dropped.map(n => <li key={n}><span>{n}</span> <b>→ left out (not at {gymName(pick)})</b></li>)}
+          </ul>
         )}
       </div>
     </Sheet>

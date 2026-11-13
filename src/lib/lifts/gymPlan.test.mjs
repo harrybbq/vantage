@@ -1,249 +1,342 @@
 /**
- * The session plan fitted to the gym (gymPlan.js): what only one gym has
- * is swapped in there and out everywhere else, in the suggestion, the
- * adaptive Upper and the built-in templates.
+ * Two gyms, two plans (trainingProgramme.js PROGRAMMES, gymPlan.js): the
+ * session plan is the chosen gym's own, a session in progress switches
+ * with the gym, and nothing a gym lacks is ever shown there.
  * Invented data only — this file is public. Run: npm run check:lifts
  */
 import assert from 'node:assert/strict';
-import { PROGRAMME, GYM_ONLY } from '../../data/trainingProgramme.js';
+import {
+  PROGRAMME, PROGRAMME_GREENOCK, PROGRAMMES, BASE_GYM, programmeFor, PROGRAMME_NAMES, GYM_ONLY, SESSION_CODES, assertNoBannedLifts,
+} from '../../data/trainingProgramme.js';
 import { onlyGymOf, availableAt } from './lifts.js';
-import { setOnlyGym, setSwapFor, DEFAULT_GYMS, setGymArchived, activeGyms } from './store.js';
-import { fitForGym, swapLines, MIN_MATCH } from './gymPlan.js';
-import { suggestWorkout, suggestedStart, startWorkout, activeOf, templateStart, PROGRAMME_TEMPLATES, progId } from './workout.js';
-import { buildAdaptive } from './adaptive.js';
+import { setOnlyGym, DEFAULT_GYMS, setGymArchived, activeGyms } from './store.js';
+import { fitForGym, planOf, switchExercise, isPlanSession } from './gymPlan.js';
+import {
+  suggestWorkout, suggestedStart, startWorkout, activeOf, templateStart, PROGRAMME_TEMPLATES, progId, setWorkoutGym, gymSwitchPreview,
+  followsPlan, toggleDone, updateSet, exerciseLift, finishWorkout,
+} from './workout.js';
+import { buildAdaptive, sessionGroups, partsOf } from './adaptive.js';
+import { dayDetail } from './home.js';
 import { musclesOf } from './muscles.js';
 
 let n = 0;
 const t = (name, fn) => { try { fn(); n++; } catch (e) { console.error(`✗ ${name}`); throw e; } };
 
-const SMITH = { id: 'own-smith', name: 'Incline Smith Machine Bench', load: 'weight', unit: 'kg', muscles: ['Chest', 'Shoulders'] };
-const PEC = { id: 'own-pec', name: 'Pec Deck', load: 'weight', unit: 'kg', muscles: ['Chest'] };
-const NAMES = [...new Set(Object.values(PROGRAMME).flat().map(x => x.name))];
-const PROG_LIST = NAMES.map(name => ({ id: progId(name), name, load: name === 'Dip' ? 'bodyweight_plus' : 'weight', unit: 'kg' }));
-const LIST = [...PROG_LIST, SMITH, PEC];
 const GYMS = DEFAULT_GYMS.map(g => g.id);
-const PUSH = PROGRAMME.Push.map(x => ({ ...x }));
+const LIST = PROGRAMME_NAMES.map(name => ({ id: progId(name), name, load: name === 'Dip' ? 'bodyweight_plus' : 'weight', unit: 'kg' }));
 const names = xs => xs.map(x => x.name);
+const req = list => list.filter(x => !x.optional);
+const sets = list => req(list).reduce((a, x) => a + x.sets, 0);
 // Default rota: 2026-10-11 Push · 12 Pull · 13 Legs · 14 Upper · 15 Lower.
-const DAY = { push: '2026-10-11', pull: '2026-10-12', legs: '2026-10-13', upper: '2026-10-14' };
+const DAY = { Push: '2026-10-11', Pull: '2026-10-12', Legs: '2026-10-13', Upper: '2026-10-14', Lower: '2026-10-15' };
 const S0 = (list = LIST, extra = {}) => ({ lifts: { list, log: [], sessions: [], ...extra } });
+let k = 0;
+const ids = p => `${p}_${++k}`;
 
-t('the default: the incline Smith bench is Greenock only, by name; everything in the programme is at both', () => {
-  assert.equal(GYM_ONLY['Incline Smith Machine Bench'], 'greenock');
-  assert.equal(onlyGymOf(SMITH), 'greenock');
-  assert.equal(onlyGymOf({ name: '  incline  smith machine BENCH ' }), 'greenock');
-  for (const name of NAMES) assert.equal(onlyGymOf({ name }), null, name);
-  assert.equal(availableAt(SMITH, 'greenock'), true);
-  assert.equal(availableAt(SMITH, 'dxc'), false);
-  assert.equal(availableAt(SMITH, null), true, 'no gym chosen: nothing is ruled out');
-  assert.equal(availableAt(PEC, 'dxc'), true);
-  for (const id of Object.values(GYM_ONLY)) assert.ok(GYMS.includes(id), `${id} is one of the gyms`);
+// ── The two plans ─────────────────────────────────────────────────
+t('there is a plan for each gym, DXC is the base, and an unknown gym trains the base', () => {
+  assert.deepEqual(Object.keys(PROGRAMMES), ['dxc', 'greenock']);
+  assert.equal(BASE_GYM, 'dxc');
+  assert.equal(programmeFor('dxc'), PROGRAMME);
+  assert.equal(programmeFor('greenock'), PROGRAMME_GREENOCK);
+  assert.equal(programmeFor('gym-somewhere'), PROGRAMME);
+  assert.equal(programmeFor(null), PROGRAMME);
+  for (const id of Object.keys(PROGRAMMES)) assert.ok(GYMS.includes(id), `${id} is one of the gyms`);
+  assert.deepEqual(Object.keys(PROGRAMME_GREENOCK).sort(), [...SESSION_CODES].sort());
+  assert.ok(isPlanSession('Upper') && !isPlanSession('Arms') && !isPlanSession(null));
 });
 
-t('the lift’s own choice beats the name default, either way', () => {
-  assert.equal(onlyGymOf({ ...SMITH, only: false }), null, '"any gym", said by hand');
-  assert.equal(onlyGymOf({ ...SMITH, only: 'dxc' }), 'dxc');
-  assert.equal(onlyGymOf({ ...PEC, only: 'dxc' }), 'dxc');
-  // A gym no longer in use restricts nothing.
-  assert.equal(onlyGymOf({ ...PEC, only: 'gone' }, GYMS), null);
-  assert.equal(availableAt({ ...PEC, only: 'gone' }, 'dxc', GYMS), true);
+t('the Greenock plan prescribes nothing that is off the table', () => {
+  assert.deepEqual(assertNoBannedLifts(PROGRAMME_GREENOCK), []);
 });
 
-t('setOnlyGym writes one key on one lift, and nothing when nothing changes', () => {
-  const L = { list: LIST.map(l => ({ ...l })), log: [{ id: 'e1', liftId: PEC.id }], sessions: [] };
-  const a = setOnlyGym(L, PEC.id, 'dxc');
-  assert.equal(a.list.find(l => l.id === PEC.id).only, 'dxc');
-  assert.equal(a.log, L.log);
-  for (const l of L.list) if (l.id !== PEC.id) assert.equal(a.list.find(x => x.id === l.id), l, 'other lifts are the same objects');
-  assert.equal(setOnlyGym(a, PEC.id, 'dxc'), a);
-  const any = setOnlyGym(a, SMITH.id, null);
-  assert.equal(any.list.find(l => l.id === SMITH.id).only, false, 'any gym is stored, so it beats the default');
-  assert.equal(setOnlyGym(any, SMITH.id, null), any);
-  assert.equal(setOnlyGym(L, 'nope', 'dxc'), L);
-  assert.equal(setOnlyGym(L, PEC.id, 'not-a-gym'), L);
-});
-
-t('Greenock: the Smith bench takes the incline dumbbell press’s place, sets and reps kept', () => {
-  const fit = fitForGym(PUSH, { gym: 'greenock', list: LIST, gymIds: GYMS, gymLabel: 'Greenock' });
-  assert.deepEqual(fit.swaps, [{ from: 'Incline dumbbell press', to: 'Incline Smith Machine Bench', why: 'only' }]);
-  const i = PUSH.findIndex(x => x.name === 'Incline dumbbell press');
-  const x = fit.exercises[i];
-  assert.equal(x.name, 'Incline Smith Machine Bench');
-  assert.equal(x.liftId, SMITH.id);
-  assert.equal(x.sets, PUSH[i].sets);
-  assert.equal(x.reps, PUSH[i].reps);
-  assert.equal(x.swapFor, 'Incline dumbbell press');
-  assert.deepEqual(x.tags, [{ kind: 'gym', text: 'Greenock · for Incline dumbbell press' }]);
-  assert.deepEqual(names(fit.exercises).filter((_, j) => j !== i), names(PUSH).filter((_, j) => j !== i), 'nothing else moves');
-  assert.equal(fit.exercises.length, PUSH.length);
-  assert.deepEqual(swapLines(fit, 'Greenock'), ['Incline Smith Machine Bench in for Incline dumbbell press (only at Greenock)']);
-  assert.equal(PUSH[i].name, 'Incline dumbbell press', 'the plan passed in is not touched');
-});
-
-t('DXC, or no gym: the plan is the very same array', () => {
-  const ctx = { list: LIST, gymIds: GYMS, gymLabel: 'DXC' };
-  assert.equal(fitForGym(PUSH, { ...ctx, gym: 'dxc' }).exercises, PUSH);
-  assert.equal(fitForGym(PUSH, { ...ctx, gym: null }).exercises, PUSH);
-  assert.equal(fitForGym(PUSH, { gym: 'greenock', list: PROG_LIST, gymIds: GYMS }).exercises, PUSH, 'no Smith bench on the list: nothing to swap');
-  // Sessions with nothing like it are left alone at Greenock too.
-  for (const code of ['Pull', 'Legs', 'Lower']) {
-    const plan = PROGRAMME[code].map(x => ({ ...x }));
-    assert.equal(fitForGym(plan, { ...ctx, gym: 'greenock' }).exercises, plan, code);
+t('slot for slot: the same required sets in every session, so a week is the same amount of work at either gym', () => {
+  for (const code of SESSION_CODES) {
+    assert.equal(sets(PROGRAMME_GREENOCK[code]), sets(PROGRAMME[code]), `${code}: required sets`);
+    assert.equal(req(PROGRAMME_GREENOCK[code]).length, req(PROGRAMME[code]).length, `${code}: required exercises`);
+    assert.ok(PROGRAMME_GREENOCK[code].length <= 9, `${code}: the owner's cap, optional extras included`);
   }
 });
 
-t('a plan holding the Smith bench is fitted back at DXC: the closest thing DXC has', () => {
-  const plan = [{ name: 'Dip', sets: 4, reps: '6–10' }, { name: SMITH.name, liftId: SMITH.id, sets: 3, reps: '8–10' }];
-  const fit = fitForGym(plan, { gym: 'dxc', list: LIST, gymIds: GYMS, gymLabel: 'DXC' });
-  assert.deepEqual(fit.swaps, [{ from: SMITH.name, to: 'Incline dumbbell press', why: 'missing' }]);
-  assert.equal(fit.exercises[1].name, 'Incline dumbbell press');
-  assert.equal(fit.exercises[1].sets, 3);
-  assert.deepEqual(fit.exercises[1].tags, [{ kind: 'gym', text: `Not at DXC: ${SMITH.name}` }]);
-  // Already in the plan → nothing close is left → it is left out, and said.
-  const both = [{ name: 'Incline dumbbell press', sets: 3, reps: '8–10' }, { name: SMITH.name, liftId: SMITH.id, sets: 3, reps: '8–10' }];
-  const fit2 = fitForGym(both, { gym: 'dxc', list: [SMITH, ...PROG_LIST.filter(l => l.name === 'Incline dumbbell press')], gymIds: GYMS, gymLabel: 'DXC' });
-  assert.deepEqual(names(fit2.exercises), ['Incline dumbbell press']);
-  assert.deepEqual(fit2.dropped, [SMITH.name]);
-  assert.match(swapLines(fit2, 'DXC')[0], /left out: not at DXC/);
+t('every `for` names the DXC exercise in that session, at the same sets', () => {
+  for (const code of SESSION_CODES) {
+    for (const x of PROGRAMME_GREENOCK[code]) {
+      if (!x.for) continue;
+      const base = PROGRAMME[code].find(b => b.name === x.for);
+      assert.ok(base, `${code} · ${x.name}: "${x.for}" is in DXC's ${code}`);
+      assert.equal(x.sets, base.sets, `${code} · ${x.name}: sets`);
+      assert.equal(!!x.optional, !!base.optional, `${code} · ${x.name}: optional`);
+      assert.notEqual(x.name, x.for);
+    }
+    // Each DXC slot is filled once at Greenock: by itself or by its stand-in, never both.
+    const slots = PROGRAMME_GREENOCK[code].map(x => x.for || x.name);
+    assert.equal(new Set(slots).size, slots.length, `${code}: no slot twice`);
+    for (const b of PROGRAMME[code]) assert.ok(slots.includes(b.name), `${code}: DXC's ${b.name} has a Greenock slot`);
+  }
 });
 
-t('only-here lifts go one for one, best match first, and only where the main muscle matches', () => {
-  // Pec Deck marked DXC-only: it is a chest fly, so on Push at DXC it stands in for the dip (mid chest), not the incline press.
-  const list = [...PROG_LIST, SMITH, { ...PEC, only: 'dxc' }];
-  const fit = fitForGym(PUSH, { gym: 'dxc', list, gymIds: GYMS, gymLabel: 'DXC' });
-  assert.deepEqual(fit.swaps.map(s => s.to), ['Pec Deck']);
-  assert.equal(fit.swaps[0].from, 'Dip');
-  // Two Greenock-only upper-chest lifts, one slot: one swap, not two.
-  const two = [...PROG_LIST, SMITH, { id: 'own-smith2', name: 'Incline chest press machine', load: 'weight', muscles: ['Chest', 'Shoulders'], only: 'greenock' }];
-  const f2 = fitForGym(PUSH, { gym: 'greenock', list: two, gymIds: GYMS, gymLabel: 'Greenock' });
-  assert.equal(f2.swaps.length, 1);
-  assert.equal(f2.swaps[0].from, 'Incline dumbbell press');
-  // An only-here curl has nothing to replace on Push.
-  const curl = [...PROG_LIST, { id: 'own-preacher', name: 'Preacher curl machine', load: 'weight', muscles: ['Biceps'], only: 'greenock' }];
-  assert.equal(fitForGym(PUSH, { gym: 'greenock', list: curl, gymIds: GYMS }).exercises, PUSH);
-  assert.ok(MIN_MATCH > 0.5 && MIN_MATCH < 1);
+t('each gym’s plan only uses what that gym has', () => {
+  for (const code of SESSION_CODES) for (const x of PROGRAMME_GREENOCK[code]) assert.ok(availableAt({ name: x.name }, 'greenock'), `Greenock ${code} · ${x.name}`);
+  // DXC: one known gap. Seated leg curl was already in Lower and DXC turns
+  // out not to have one; nothing has been named in its place yet.
+  const gaps = [];
+  for (const code of SESSION_CODES) for (const x of PROGRAMME[code]) if (!availableAt({ name: x.name }, 'dxc')) gaps.push(`${code} · ${x.name}`);
+  assert.deepEqual(gaps, ['Lower · Seated leg curl']);
+  // The owner's list.
+  assert.equal(GYM_ONLY['45° hyperextension'], 'dxc');
+  for (const nm of ['Assisted pull-up', 'Assisted dip', 'Lower back machine', 'Seated dip machine', 'Preacher curl machine', 'Seated leg curl',
+    'Adductor machine', 'Abductor machine', 'Chest-supported row', 'Pullover machine', 'Belt squat machine', 'Hack squat',
+    'Elbow-supported pec deck', 'Incline Smith Machine Bench']) assert.equal(GYM_ONLY[nm], 'greenock', nm);
+  for (const id of Object.values(GYM_ONLY)) assert.ok(GYMS.includes(id));
 });
 
-t('the owner can name what a one-gym lift replaces, or say nothing', () => {
-  const ctx = { gym: 'greenock', gymIds: GYMS, gymLabel: 'Greenock' };
-  // Named: exactly that exercise, even though another is the closer match.
-  const named = [...PROG_LIST, { ...SMITH, swapFor: 'Machine shoulder press' }];
-  const f = fitForGym(PUSH, { ...ctx, list: named });
-  assert.deepEqual(f.swaps, [{ from: 'Machine shoulder press', to: SMITH.name, why: 'only' }]);
-  // Named, but this session does not have it: the plan is left alone.
-  const pull = PROGRAMME.Pull.map(x => ({ ...x }));
-  assert.equal(fitForGym(pull, { ...ctx, list: named }).exercises, pull);
-  // Nothing: it never replaces anything.
-  assert.equal(fitForGym(PUSH, { ...ctx, list: [...PROG_LIST, { ...SMITH, swapFor: false }] }).exercises, PUSH);
-  // null is "the closest match" again.
-  assert.equal(fitForGym(PUSH, { ...ctx, list: [...PROG_LIST, { ...SMITH, swapFor: null }] }).swaps[0].from, 'Incline dumbbell press');
-  // At the gym without it, a named counterpart is what it falls back to.
-  const plan = [{ name: SMITH.name, liftId: SMITH.id, sets: 3, reps: '8–10' }];
-  const back = fitForGym(plan, { gym: 'dxc', gymIds: GYMS, gymLabel: 'DXC', list: named });
-  assert.equal(back.exercises[0].name, 'Machine shoulder press');
+t('the Greenock plan is built on the owner’s terms: hyperextension → lower back machine, favourites kept', () => {
+  const G = PROGRAMME_GREENOCK;
+  assert.equal(G.Legs[0].name, 'Lower back machine');
+  assert.equal(G.Legs[0].for, '45° hyperextension');
+  assert.ok(names(G.Lower).includes('Lower back machine'));
+  for (const code of SESSION_CODES) assert.ok(!names(G[code]).includes('45° hyperextension'), code);
+  assert.equal(G.Push[0].name, 'Dip');
+  assert.equal(G.Upper[0].name, 'Dip');
+  assert.ok(names(G.Pull).includes('Incline dumbbell curl, 21s'));
+  assert.ok(names(G.Push).includes('Incline Smith Machine Bench') && !names(G.Push).includes('Incline dumbbell press'));
+  assert.equal(G.Upper.find(x => x.name === 'Dumbbell lateral raise').sets, 5, 'the width work is untouched');
+  // Each muscle group a session is built around is still trained by it.
+  for (const code of SESSION_CODES) {
+    const d = sessionGroups(code);
+    const g = {};
+    for (const x of req(G[code])) for (const [p, w] of Object.entries(partsOf({ name: x.name }))) g[p] = (g[p] || 0) + w * x.sets;
+    assert.ok(Object.keys(g).length > 0);
+    for (const grp of Object.keys(d)) if (d[grp] >= 3) assert.ok(names(req(G[code])).some(nm => musclesOf({ name: nm }).includes(grp)), `${code}: still trains ${grp}`);
+  }
 });
 
-t('setSwapFor writes one key on one lift', () => {
-  const L = { list: LIST.map(l => ({ ...l })), log: [], sessions: [] };
-  const a = setSwapFor(L, SMITH.id, 'Incline dumbbell press');
-  assert.equal(a.list.find(l => l.id === SMITH.id).swapFor, 'Incline dumbbell press');
-  assert.equal(setSwapFor(a, SMITH.id, 'Incline dumbbell press'), a);
-  assert.equal(setSwapFor(a, SMITH.id, false).list.find(l => l.id === SMITH.id).swapFor, false);
-  assert.equal(setSwapFor(a, SMITH.id, null).list.find(l => l.id === SMITH.id).swapFor, null);
-  assert.equal(setSwapFor(L, SMITH.id, null), L, 'absent and null are the same: nothing to write');
-  assert.equal(setSwapFor(L, 'nope', 'x'), L);
-  for (const l of L.list) if (l.id !== SMITH.id) assert.equal(a.list.find(x => x.id === l.id), l);
+// ── Availability ──────────────────────────────────────────────────
+t('where a lift can be done: the name default, and the lift’s own choice over it', () => {
+  assert.equal(onlyGymOf({ name: 'Hack squat' }), 'greenock');
+  assert.equal(onlyGymOf({ name: '  hack   SQUAT ' }), 'greenock');
+  assert.equal(onlyGymOf({ name: '45° hyperextension' }), 'dxc');
+  assert.equal(onlyGymOf({ name: 'Lat pulldown' }), null);
+  assert.equal(availableAt({ name: 'Hack squat' }, 'dxc'), false);
+  assert.equal(availableAt({ name: 'Hack squat' }, null), true, 'no gym chosen: nothing is ruled out');
+  assert.equal(onlyGymOf({ name: 'Hack squat', only: false }), null, '"any gym", said by hand');
+  assert.equal(onlyGymOf({ name: 'Pec Deck', only: 'dxc' }), 'dxc');
+  assert.equal(onlyGymOf({ name: 'Pec Deck', only: 'gone' }, GYMS), null, 'a gym no longer in use restricts nothing');
 });
 
-t('archived and banned lifts are never swapped in', () => {
-  assert.equal(fitForGym(PUSH, { gym: 'greenock', list: [...PROG_LIST, { ...SMITH, archived: true }], gymIds: GYMS }).exercises, PUSH);
-  const squat = { id: 'own-sq', name: 'Barbell back squat', load: 'weight', muscles: ['Quads'], only: 'greenock' };
-  const legs = PROGRAMME.Legs.map(x => ({ ...x }));
-  assert.equal(fitForGym(legs, { gym: 'greenock', list: [...PROG_LIST, squat], gymIds: GYMS }).exercises, legs);
+t('setOnlyGym writes one key on one lift, and nothing when nothing changes', () => {
+  const L = { list: LIST.map(l => ({ ...l })), log: [{ id: 'e1', liftId: LIST[0].id }], sessions: [] };
+  const id = progId('Hack squat');
+  const a = setOnlyGym(L, id, null);
+  assert.equal(a.list.find(l => l.id === id).only, false, 'any gym is stored, so it beats the default');
+  assert.equal(a.log, L.log);
+  for (const l of L.list) if (l.id !== id) assert.equal(a.list.find(x => x.id === l.id), l, 'other lifts are the same objects');
+  assert.equal(setOnlyGym(a, id, null), a);
+  assert.equal(setOnlyGym(a, id, 'greenock').list.find(l => l.id === id).only, 'greenock');
+  assert.equal(setOnlyGym(L, 'nope', 'dxc'), L);
+  assert.equal(setOnlyGym(L, id, 'not-a-gym'), L);
 });
 
-t('the suggestion follows the gym: Push at Greenock has the Smith bench, at DXC the dumbbell press', () => {
+// ── The suggestion ────────────────────────────────────────────────
+t('the suggestion is the chosen gym’s plan, exercise for exercise', () => {
   const S = S0();
-  const g = suggestWorkout(S, DAY.push, { gym: 'greenock' });
-  const d = suggestWorkout(S, DAY.push, { gym: 'dxc' });
-  assert.equal(g.rotaSession, 'Push');
-  assert.ok(names(g.exercises).includes(SMITH.name));
-  assert.ok(!names(g.exercises).includes('Incline dumbbell press'));
-  assert.deepEqual(g.gymFit.swaps, [{ from: 'Incline dumbbell press', to: SMITH.name, why: 'only' }]);
-  const x = g.exercises.find(e => e.name === SMITH.name);
-  assert.equal(x.liftId, SMITH.id);
-  assert.equal(x.swapFor, 'Incline dumbbell press');
-  assert.equal(x.tags[0].kind, 'gym');
-  assert.deepEqual(names(d.exercises), names(PROGRAMME.Push));
-  assert.deepEqual(d.gymFit, { swaps: [], dropped: [] });
-  assert.equal(g.exercises.length, d.exercises.length);
-  // Starting it carries the swapped lift into the workout.
-  let k = 0;
-  const started = startWorkout(S, { ...suggestedStart(g), now: 1000, today: DAY.push, ids: p => `${p}_${++k}` });
-  assert.ok(activeOf(started).exercises.some(e => e.liftId === SMITH.id));
-  assert.equal(activeOf(started).gym, 'greenock');
+  for (const code of SESSION_CODES) {
+    const g = suggestWorkout(S, DAY[code], { gym: 'greenock' });
+    assert.equal(g.rotaSession, code);
+    assert.deepEqual(names(g.exercises), names(PROGRAMME_GREENOCK[code]), `Greenock ${code}`);
+    assert.deepEqual(g.exercises.map(x => [x.sets, x.reps, !!x.optional]), PROGRAMME_GREENOCK[code].map(x => [x.sets, x.reps, !!x.optional]));
+    assert.deepEqual(g.gymFit, { swaps: [], dropped: [] }, `Greenock ${code}: nothing to fix up`);
+    assert.ok(g.exercises.every(x => !(x.tags || []).some(tg => tg.kind === 'gym')));
+    const d = suggestWorkout(S, DAY[code], { gym: 'dxc' });
+    const want = names(PROGRAMME[code]).filter(nm => nm !== 'Seated leg curl');
+    assert.deepEqual(names(d.exercises), want, `DXC ${code}`);
+    assert.deepEqual(d.gymFit.dropped, code === 'Lower' ? ['Seated leg curl'] : []);
+  }
+  // A gym added later has no plan of its own: it trains the base one, less what only another gym has.
+  const other = suggestWorkout(S0(LIST, { gyms: [...DEFAULT_GYMS.map(g => ({ ...g })), { id: 'gym-x', name: 'Elsewhere' }] }), DAY.Push, { gym: 'gym-x' });
+  assert.deepEqual(names(other.exercises), names(PROGRAMME.Push));
 });
 
-t('the weights for a swapped-in machine come from that gym’s own sets', () => {
-  const log = [{ id: 'e1', liftId: SMITH.id, date: '2026-10-04', weight: 60, reps: 8, gym: 'greenock', createdAt: 1 }];
-  const g = suggestWorkout(S0(LIST, { log }), DAY.push, { gym: 'greenock' });
-  assert.equal(g.exercises.find(e => e.name === SMITH.name).weight, 60);
+t('weights for a Greenock machine come from Greenock’s own sets', () => {
+  const id = progId('Hack squat');
+  const log = [{ id: 'e1', liftId: id, date: '2026-10-04', weight: 120, reps: 8, gym: 'greenock', createdAt: 1 }];
+  const g = suggestWorkout(S0(LIST, { log }), DAY.Legs, { gym: 'greenock' });
+  assert.equal(g.exercises.find(e => e.name === 'Hack squat').weight, 120);
 });
 
-t('the owner’s own setting drives it: "any gym" stops the swap, "only DXC" reverses it', () => {
-  const any = S0(LIST.map(l => (l.id === SMITH.id ? { ...l, only: false } : l)));
-  assert.deepEqual(names(suggestWorkout(any, DAY.push, { gym: 'greenock' }).exercises), names(PROGRAMME.Push));
-  const flipped = S0(LIST.map(l => (l.id === SMITH.id ? { ...l, only: 'dxc' } : l)));
-  assert.ok(names(suggestWorkout(flipped, DAY.push, { gym: 'dxc' }).exercises).includes(SMITH.name));
-  assert.ok(!names(suggestWorkout(flipped, DAY.push, { gym: 'greenock' }).exercises).includes(SMITH.name));
+t('the built-in sessions follow the gym; a template the owner saved is left as written', () => {
+  const S = S0();
+  for (const code of SESSION_CODES) {
+    const tpl = PROGRAMME_TEMPLATES.find(x => x.name === code);
+    assert.deepEqual(names(templateStart(S, tpl, DAY[code], { gym: 'greenock' }).exercises), names(PROGRAMME_GREENOCK[code]), code);
+  }
+  assert.deepEqual(names(templateStart(S, PROGRAMME_TEMPLATES.find(x => x.name === 'Push'), DAY.Push, { gym: 'dxc' }).exercises), names(PROGRAMME.Push));
+  const mine = { id: 'tpl1', name: 'Push - DXC', exercises: [{ liftId: progId('Incline dumbbell press'), sets: 3, reps: '8–10' }] };
+  assert.deepEqual(names(templateStart(S, mine, DAY.Push, { gym: 'greenock' }).exercises), ['Incline dumbbell press']);
+});
+
+t('the week strip’s day sheet lists the chosen gym’s plan', () => {
+  const S = S0();
+  const cell = { iso: DAY.Upper, session: 'Upper' };
+  assert.deepEqual(names(dayDetail(S, cell, { gym: 'greenock' }).exercises), names(PROGRAMME_GREENOCK.Upper));
+  assert.deepEqual(names(dayDetail(S, cell, { gym: 'dxc' }).exercises), names(PROGRAMME.Upper));
+  assert.deepEqual(names(dayDetail(S, { iso: DAY.Lower, session: 'Lower' }, { gym: 'dxc' }).exercises), names(PROGRAMME.Lower).filter(nm => nm !== 'Seated leg curl'));
+  assert.deepEqual(names(dayDetail(S0(LIST, { lastGym: 'greenock' }), cell).exercises), names(PROGRAMME_GREENOCK.Upper), 'default: the last gym');
+});
+
+// ── Switching gym during a session ────────────────────────────────
+t('one exercise at the other gym: its counterpart, itself, or nothing', () => {
+  assert.deepEqual(switchExercise('Upper', 'Lat pulldown', 'dxc', 'greenock'), { name: 'Assisted pull-up', sets: 4, reps: '6–10' });
+  assert.deepEqual(switchExercise('Pull', 'Lat pulldown', 'dxc', 'greenock'), { name: 'Lat pulldown', sets: 4, reps: '8–10' }, 'Pull keeps the pulldown');
+  assert.deepEqual(switchExercise('Upper', 'Assisted pull-up', 'greenock', 'dxc'), { name: 'Lat pulldown', sets: 4, reps: '8–10' });
+  assert.deepEqual(switchExercise('Legs', '45° hyperextension', 'dxc', 'greenock'), { name: 'Lower back machine', sets: 4, reps: '12–15' });
+  assert.deepEqual(switchExercise('Lower', 'Lower back machine', 'greenock', 'dxc'), { name: '45° hyperextension', sets: 2, reps: '12–15' });
+  const atDxc = nm => availableAt({ name: nm }, 'dxc');
+  assert.equal(switchExercise('Push', 'Elbow-supported pec deck', 'greenock', 'dxc', atDxc), null, 'a Greenock extra has no DXC slot');
+  assert.equal(switchExercise('Lower', 'Seated leg curl', 'greenock', 'dxc', atDxc), null, 'DXC has no leg curl');
+  assert.equal(switchExercise('Push', 'Cable crossover', 'dxc', 'greenock'), 'keep', 'one the owner added, that both gyms have');
+  // Not this session's, and the other gym cannot do it: its counterpart from wherever the plans name one.
+  assert.deepEqual(switchExercise('Push', 'Hack squat', 'greenock', 'dxc', atDxc), { name: 'Machine leg press', sets: 4, reps: '8–12' });
+});
+
+const start = (S, code, gym) => startWorkout(S, { ...suggestedStart(suggestWorkout(S, DAY[code], { gym })), now: 1000, today: DAY[code], ids });
+const liveNames = S => activeOf(S).exercises.map(ex => exerciseLift(S.lifts.list, ex).name);
+
+t('toggle before a set is done: the whole session becomes the other gym’s plan', () => {
+  for (const code of SESSION_CODES) {
+    const atD = start(S0(), code, 'dxc');
+    assert.ok(followsPlan(activeOf(atD)));
+    const toG = setWorkoutGym(atD, 'greenock', { ids });
+    assert.equal(activeOf(toG).gym, 'greenock');
+    // Greenock's plan for the slots DXC had (its optional extras join only when the session is started there).
+    const slots = PROGRAMME_GREENOCK[code].filter(x => x.for || names(PROGRAMME[code]).includes(x.name));
+    const had = new Set(liveNames(atD));
+    const want = slots.filter(x => had.has(x.for || x.name)).map(x => x.name);
+    assert.deepEqual(liveNames(toG), want, `${code}: DXC → Greenock`);
+    // Sets and reps are the Greenock plan's.
+    activeOf(toG).exercises.forEach(ex => {
+      const nm = exerciseLift(toG.lifts.list, ex).name;
+      const p = PROGRAMME_GREENOCK[code].find(x => x.name === nm);
+      assert.equal(ex.sets.length, p.sets, `${code} · ${nm}: sets`);
+      assert.equal(ex.target, p.reps, `${code} · ${nm}: reps`);
+    });
+    // And back again: exactly where it started.
+    assert.deepEqual(liveNames(setWorkoutGym(toG, 'dxc', { ids })), liveNames(atD), `${code}: and back`);
+  }
+});
+
+t('toggle from Greenock: its extras leave, the rest become DXC’s', () => {
+  const atG = start(S0(), 'Push', 'greenock');
+  assert.ok(liveNames(atG).includes('Elbow-supported pec deck'));
+  const pv = gymSwitchPreview(atG, 'dxc');
+  assert.deepEqual(pv.swaps, [{ from: 'Incline Smith Machine Bench', to: 'Incline dumbbell press' }]);
+  assert.deepEqual(pv.dropped, ['Elbow-supported pec deck']);
+  assert.deepEqual(liveNames(setWorkoutGym(atG, 'dxc', { ids })), names(PROGRAMME.Push));
+  // Lower at Greenock → DXC: no leg curl there, and the hip machines go.
+  const lower = setWorkoutGym(start(S0(), 'Lower', 'greenock'), 'dxc', { ids });
+  assert.deepEqual(liveNames(lower), names(PROGRAMME.Lower).filter(nm => nm !== 'Seated leg curl'));
+});
+
+t('mid-session: an exercise with a set done stays exactly as it is; the rest switch', () => {
+  let S = start(S0(), 'Upper', 'dxc');
+  const before = activeOf(S);
+  const iPull = liveNames(S).indexOf('Lat pulldown');
+  S = toggleDone(updateSet(S, iPull, 0, { weight: 70, reps: 8 }), iPull, 0, 2000);   // one set of pulldowns ticked
+  assert.ok(activeOf(S).exercises[iPull].sets[0].done);
+  const done = activeOf(S).exercises[iPull];
+  const pv = gymSwitchPreview(S, 'greenock');
+  assert.ok(!pv.swaps.some(s => s.from === 'Lat pulldown'), 'the started exercise is not in the preview');
+  assert.deepEqual(pv.swaps.map(s => s.to), ['Chest-supported row', 'Reverse pec deck (rear delt)', 'Preacher curl machine']);
+  const G = setWorkoutGym(S, 'greenock', { ids });
+  const a = activeOf(G);
+  assert.equal(a.exercises[iPull], done, 'the very same object: sets, numbers, ids');
+  assert.deepEqual(liveNames(G), ['Dip', 'Lat pulldown', 'Chest-supported row', 'Dumbbell lateral raise', 'Reverse pec deck (rear delt)', 'Preacher curl machine', 'Single-arm cable triceps pushdown (cuff)']);
+  assert.equal(a.exercises.length, before.exercises.length, 'order and count kept');
+  assert.equal(a.id, before.id);
+  assert.equal(a.startedAt, before.startedAt);
+  // Untouched and the same at both gyms: the same exercise object.
+  assert.equal(a.exercises[0].liftId, before.exercises[0].liftId);
+  // Finishing saves it under Greenock, the swapped lifts included.
+  const F = finishWorkout(toggleDone(updateSet(G, 2, 0, { weight: 60, reps: 10 }), 2, 0, 3000), 4000);
+  const saved = F.lifts.sessions[F.lifts.sessions.length - 1];
+  assert.equal(saved.gym, 'greenock');
+  assert.ok(F.lifts.log.every(e => e.gym === 'greenock'));
+});
+
+t('a workout that is not following a plan is not rearranged', () => {
+  const mine = { id: 'tpl1', name: 'Push - DXC', exercises: [{ liftId: progId('Incline dumbbell press'), sets: 3, reps: '8–10' }, { liftId: progId('45° hyperextension'), sets: 2, reps: '12' }] };
+  const S = startWorkout(S0(), { ...templateStart(S0(), mine, DAY.Push, { gym: 'dxc' }), now: 1, today: DAY.Push, ids });
+  assert.equal(followsPlan(activeOf(S)), false);
+  assert.deepEqual(gymSwitchPreview(S, 'greenock'), { swaps: [], dropped: [] });
+  assert.deepEqual(liveNames(setWorkoutGym(S, 'greenock', { ids })), ['Incline dumbbell press', '45° hyperextension']);
+  const blank = startWorkout(S0(), { source: 'blank', name: 'Workout', now: 1, today: DAY.Push, ids, gym: 'dxc', exercises: [{ liftId: progId('Lat pulldown'), sets: 2 }] });
+  assert.deepEqual(liveNames(setWorkoutGym(blank, 'greenock', { ids })), ['Lat pulldown']);
+});
+
+t('an exercise the owner added to a planned session stays when the other gym has it', () => {
+  let S = start(S0([...LIST, { id: 'own-fly', name: 'Cable Fly (high to low)', load: 'weight', muscles: ['Chest'] }]), 'Push', 'dxc');
+  S = { ...S, lifts: { ...S.lifts, active: { ...activeOf(S), exercises: [...activeOf(S).exercises, { liftId: 'own-fly', sets: [{ id: 'x1', reps: null, weight: null, rpe: null, done: false }] }] } } };
+  const G = setWorkoutGym(S, 'greenock', { ids });
+  assert.ok(liveNames(G).includes('Cable Fly (high to low)'));
+  assert.equal(activeOf(G).exercises.find(ex => ex.liftId === 'own-fly'), activeOf(S).exercises.find(ex => ex.liftId === 'own-fly'));
+});
+
+// ── The safety net, and the adaptive build ────────────────────────
+t('fitForGym: nothing a gym lacks is shown; with nothing missing the same array comes back', () => {
+  const ctx = gym => ({ gym, list: LIST, gymIds: GYMS, gymLabel: gym === 'dxc' ? 'DXC' : 'Greenock' });
+  const push = planOf('dxc', 'Push');
+  assert.equal(fitForGym(push, ctx('dxc')).exercises, push);
+  assert.equal(fitForGym(push, ctx('greenock')).exercises, push);
+  assert.equal(fitForGym(push, { ...ctx('dxc'), gym: null }).exercises, push);
+  // DXC's Legs handed to Greenock: the plans name the hyperextension's counterpart.
+  const legs = fitForGym(planOf('dxc', 'Legs'), ctx('greenock'));
+  assert.deepEqual(legs.swaps, [{ from: '45° hyperextension', to: 'Lower back machine' }]);
+  assert.equal(legs.exercises[0].sets, 4);
+  assert.deepEqual(legs.exercises[0].tags, [{ kind: 'gym', text: 'Not at Greenock: 45° hyperextension' }]);
+  // Greenock's Push at DXC: no counterpart is named for a Greenock exercise, so the closest thing DXC has.
+  const back = fitForGym([{ name: 'Incline Smith Machine Bench', sets: 3, reps: '8–10' }], ctx('dxc'));
+  assert.deepEqual(back.swaps, [{ from: 'Incline Smith Machine Bench', to: 'Incline dumbbell press' }]);
+  // Nothing close: left out, and said.
+  const lower = fitForGym(planOf('dxc', 'Lower'), ctx('dxc'));
+  assert.deepEqual(lower.dropped, ['Seated leg curl']);
+  assert.equal(lower.exercises.length, PROGRAMME.Lower.length - 1);
+  // A lift the owner ties to one gym later is respected without touching the plans.
+  const tied = LIST.map(l => (l.name === 'Machine shoulder press' ? { ...l, only: 'greenock' } : l));
+  const f = fitForGym(push, { ...ctx('dxc'), list: tied });
+  assert.ok(!names(f.exercises).includes('Machine shoulder press'));
 });
 
 t('archiving the gym a lift is tied to frees the lift', () => {
   const L = setGymArchived({ list: LIST, log: [], sessions: [], gyms: DEFAULT_GYMS.map(g => ({ ...g })) }, 'greenock', true).lifts;
   assert.deepEqual(activeGyms(L).map(g => g.id), ['dxc']);
-  const s = suggestWorkout({ lifts: L }, DAY.push, { gym: 'dxc' });
-  assert.deepEqual(s.gymFit, { swaps: [], dropped: [] });
+  assert.deepEqual(suggestWorkout({ lifts: L }, DAY.Lower, { gym: 'dxc' }).gymFit, { swaps: [], dropped: [] }, 'with Greenock gone, the leg curl is not ruled out');
 });
 
-t('the built-in Push template is fitted like the suggestion; a saved template is left as written', () => {
-  const S = S0();
-  const push = PROGRAMME_TEMPLATES.find(x => x.name === 'Push');
-  assert.ok(names(templateStart(S, push, DAY.push, { gym: 'greenock' }).exercises).includes(SMITH.name));
-  assert.deepEqual(names(templateStart(S, push, DAY.push, { gym: 'dxc' }).exercises), names(PROGRAMME.Push));
-  const mine = { id: 'tpl1', name: 'Push - DXC', exercises: [{ liftId: progId('Incline dumbbell press'), sets: 3, reps: '8–10' }] };
-  assert.deepEqual(names(templateStart(S, mine, DAY.push, { gym: 'greenock' }).exercises), ['Incline dumbbell press']);
-});
-
-t('the adaptive Upper never picks the Smith bench at DXC, however recently it was used', () => {
-  // Tracking has started, and the Smith bench was trained this week at Greenock.
-  const done = (date, code, liftIds) => ({ id: `w-${date}`, date, startedAt: 1, finishedAt: 2, name: code, rotaSession: code, gym: 'greenock',
-    exercises: liftIds.map(id => ({ liftId: id, sets: [{ reps: 8, weight: 50, done: true }, { reps: 8, weight: 50, done: true }, { reps: 8, weight: 50, done: true }] })) });
-  const pushIds = PROGRAMME.Push.filter(x => !x.optional).map(x => (x.name === 'Incline dumbbell press' ? SMITH.id : progId(x.name)));
-  const sessions = [
-    done('2026-10-05', 'Legs', PROGRAMME.Legs.map(x => progId(x.name))),
-    done(DAY.push, 'Push', pushIds),
-    done(DAY.pull, 'Pull', PROGRAMME.Pull.map(x => progId(x.name))),
-    done(DAY.legs, 'Legs', PROGRAMME.Legs.map(x => progId(x.name))),
-  ];
-  const S = S0(LIST, { sessions });
+t('the adaptive Upper and Lower are built from the chosen gym’s plan, and only from what it has', () => {
+  const done = (date, code, gym) => ({ id: `w-${date}`, date, startedAt: 1, finishedAt: 2, name: code, rotaSession: code, gym,
+    exercises: req(programmeFor(gym)[code]).map(x => ({ liftId: progId(x.name), sets: Array.from({ length: x.sets }, () => ({ reps: 8, weight: 50, done: true })) })) });
+  const week = gym => S0(LIST, { sessions: [done('2026-10-05', 'Legs', gym), done(DAY.Push, 'Push', gym), done(DAY.Pull, 'Pull', gym), done(DAY.Legs, 'Legs', gym)] });
   const ctx = gym => ({ gym, gymIds: GYMS });
-  const atD = buildAdaptive(S, DAY.upper, 'Upper', ctx('dxc'));
-  assert.ok(atD && atD.exercises.length);
-  assert.ok(!names(atD.exercises).includes(SMITH.name));
-  assert.ok(!names(suggestWorkout(S, DAY.upper, { gym: 'dxc' }).exercises).includes(SMITH.name));
-  // No gym given: the builder is as it was.
-  assert.deepEqual(buildAdaptive(S, DAY.upper, 'Upper'), buildAdaptive(S, DAY.upper, 'Upper', {}));
-  // At Greenock an incline press, if the week calls for one, is the Smith bench.
-  const g = suggestWorkout(S, DAY.upper, { gym: 'greenock' });
-  assert.ok(!names(g.exercises).includes('Incline dumbbell press'));
+  for (const gym of GYMS) {
+    for (const code of ['Upper', 'Lower']) {
+      const r = buildAdaptive(week(gym), DAY[code], code, ctx(gym));
+      assert.ok(r && r.exercises.length, `${gym} ${code} builds`);
+      for (const x of r.exercises) assert.ok(availableAt({ name: x.name }, gym), `${gym} ${code}: ${x.name} is at ${gym}`);
+      const sug = suggestWorkout(week(gym), DAY[code], { gym });
+      for (const x of sug.exercises) assert.ok(availableAt({ name: x.name }, gym), `${gym} ${code} suggestion: ${x.name}`);
+    }
+  }
+  // A week on plan at Greenock comes out close to Greenock's written Upper.
+  const up = buildAdaptive(week('greenock'), DAY.Upper, 'Upper', ctx('greenock'));
+  const written = new Set(names(PROGRAMME_GREENOCK.Upper));
+  assert.ok(names(up.exercises).filter(nm => written.has(nm)).length >= 5, names(up.exercises).join(', '));
+  // No gym given: the builder is exactly as it was.
+  assert.deepEqual(buildAdaptive(week('dxc'), DAY.Upper, 'Upper'), buildAdaptive(week('dxc'), DAY.Upper, 'Upper', {}));
 });
 
 t('"machine" no longer reads as a chin-up: an untagged machine bench is chest', () => {
-  assert.deepEqual(musclesOf({ name: 'Incline Smith Machine Bench' }), ['Chest']);
+  assert.deepEqual(musclesOf({ name: 'Incline Smith bench machine' }), ['Chest']);
   assert.deepEqual(musclesOf({ name: 'Chin-up' }), ['Back']);
-  const untagged = { ...SMITH, muscles: undefined };
-  const fit = fitForGym(PUSH, { gym: 'greenock', list: [...PROG_LIST, untagged], gymIds: GYMS, gymLabel: 'Greenock' });
-  assert.equal(fit.swaps[0].from, 'Incline dumbbell press');
 });
 
 console.log(`gym plan: ${n} tests passed`);

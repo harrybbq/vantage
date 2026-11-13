@@ -43,7 +43,6 @@
 .lifts .lh-menu-row { display: flex; flex-wrap: wrap; gap: 8px; }
 .lifts .lh-menu-row > * { flex: 1 1 140px; }
 .lifts .lh-menu-field { display: flex; flex-direction: column; gap: 6px; }
-.lifts .lh-select { width: 100%; min-height: 44px; padding: 0 10px; box-sizing: border-box; font: inherit; }
 .lifts .lh-confirm { display: flex; flex-direction: column; gap: 12px; padding: 12px; border-radius: var(--lf-r-cell); border: 1px solid var(--lf-danger); background: var(--lf-danger-tint); }
 .lifts .lh-confirm p { margin: 0; }
 .lifts .lh-confirm-acts { display: flex; flex-wrap: wrap; gap: 12px; }

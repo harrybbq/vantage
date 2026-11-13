@@ -23,13 +23,13 @@
  *   resolveLogDate  Quick log's date chip → an ISO date, never past maxDate
  *   lastSessionSummary  desktop Today's "Last session" lines
  */
-import { PROGRAMME } from '../../data/trainingProgramme.js';
+import { PROGRAMME, programmeFor } from '../../data/trainingProgramme.js';
 import { SEQ } from '../rotation/pattern.js';
 import { plannedSessions, blockProgress } from './plan.js';
-import { liftsOf } from './store.js';
+import { liftsOf, defaultGym, activeGyms } from './store.js';
 import {
   num, isIso, addDays, dayNo, workingEntries, entryE1rm, perGymOf, gymOf, gymsUsed, personalBests, REP_MAX_NS,
-  LOW_CONFIDENCE_REPS, isWarmup,
+  LOW_CONFIDENCE_REPS, isWarmup, availableAt,
 } from './lifts.js';
 
 const DOW3 = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
@@ -82,13 +82,20 @@ export function weekPlan(S, today) {
 
 /**
  * One strip day for its sheet → { ...cell, title, exercises: [{ name, sets, reps, optional }],
- * logged: [{ name, sets, gym }], quickSets } — the programme's list for the
+ * logged: [{ name, sets, gym }], quickSets } — the gym's plan for the
  * day's session and whatever was actually logged that day.
  */
-export function dayDetail(S, cell) {
+export function dayDetail(S, cell, opts = {}) {
   if (!cell) return null;
   const L = liftsOf(S);
-  const exercises = cell.session && PROGRAMME[cell.session] ? PROGRAMME[cell.session].map(x => ({ name: x.name, sets: x.sets, reps: x.reps, optional: !!x.optional })) : [];
+  // The session as the gym chosen writes it (opts.gym; default the last gym), less anything that gym lacks.
+  const gym = opts.gym !== undefined ? opts.gym : defaultGym(L);
+  const gymIds = activeGyms(L).map(g => g.id);
+  const exercises = cell.session && PROGRAMME[cell.session]
+    ? programmeFor(gym)[cell.session]
+      .filter(x => availableAt(L.list.find(l => l && !l.archived && l.name === x.name) || { name: x.name }, gym, gymIds))
+      .map(x => ({ name: x.name, sets: x.sets, reps: x.reps, optional: !!x.optional }))
+    : [];
   const logged = (L.sessions || []).filter(s => s && s.date === cell.iso).map(s => ({
     name: s.name || 'Workout', gym: s.gym || null,
     sets: (s.exercises || []).reduce((k, ex) => k + (ex.sets || []).filter(st => st && st.done !== false).length, 0),

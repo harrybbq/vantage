@@ -16,7 +16,7 @@ import { suggestWorkout, suggestedStart, startWorkout, activeOf, progId, estimat
 import { blockProgress } from './plan.js';
 import { workoutLoad, sessionTargets as bmSessionTargets } from './bodymap.js';
 import { shiftOn } from '../rotation/pattern.js';
-import { PROGRAMME, STRETCHES } from '../../data/trainingProgramme.js';
+import { PROGRAMME, PROGRAMME_NAMES, STRETCHES } from '../../data/trainingProgramme.js';
 import { PROGRAMME_MUSCLES } from './muscles.js';
 
 let n = 0;
@@ -499,7 +499,8 @@ t('EXERCISE_PARTS: known parts, weights 1 / 0.5 / 0.25, and muscles.js tags deri
     const want = Object.entries(g).filter(([, w]) => w >= 0.5).sort((a, b) => b[1] - a[1]).map(([k]) => k);
     assert.deepEqual(PROGRAMME_MUSCLES[name], want, `${name}: muscles.js tags`);
   }
-  assert.equal(Object.keys(EXERCISE_PARTS).length, NAMES.length, 'every programme exercise is mapped');
+  // Both gyms' plans (trainingProgramme.js PROGRAMMES): every exercise in either is mapped, and nothing else is.
+  assert.deepEqual(Object.keys(EXERCISE_PARTS).sort(), [...PROGRAMME_NAMES].sort(), 'every programme exercise is mapped');
 });
 
 // ── (f) Shift-length sessions: the exercise cap and the compound bias ───

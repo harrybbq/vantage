@@ -29,7 +29,7 @@
  * the builder aims at; they roll up to the twelve groups the body map
  * and muscles.js use.
  */
-import { PROGRAMME } from '../../data/trainingProgramme.js';
+import { PROGRAMME, PROGRAMMES, programmeFor } from '../../data/trainingProgramme.js';
 import { musclesOf, norm } from './muscles.js';
 import { blockProgress, plannedSessions, sessionOfWorkout, ANCHOR_CODES } from './plan.js';
 import { liftsOf } from './store.js';
@@ -136,6 +136,37 @@ export const EXERCISE_PARTS = {
   'Pallof press': { Obliques: 1, Abs: 0.25 },
   // Padovan 2025 (HD-EMG): wide grip favours mid-trap; biceps and rear delt as any row.
   'Wide-grip cable row': { 'Mid-back': 1, 'Rear delts': 0.5, Lats: 0.5, Biceps: 0.5, Brachialis: 0.25 },
+
+  // ── The Greenock plan (PROGRAMME_GREENOCK, Nov 2026) ──────────────
+  // NOT separately reviewed: each is credited as the reviewed exercise it
+  // stands in for, or as the nearest one above, and says which. Review
+  // these with the rest when docs/LIFTS_MUSCLE_EVIDENCE.md is next opened.
+  // A seated lumbar extension: the erectors without the hip hinge, so no
+  // glute or hamstring credit (unlike the 45° hyperextension).
+  'Lower back machine': { 'Lower back': 1 },
+  // As the leg press: Kinoshita 2026 found no rectus femoris growth from a
+  // multi-joint knee extension; squat patterns grow the adductors (Kubo 2019).
+  'Hack squat': { 'Outer & inner quads': 1, 'Glute max': 0.5, Adductors: 0.5 },
+  // As the hack squat. Glute credit stays at half: belt squats showed lower
+  // glute activity than a back squat (Evans 2019, EMG only).
+  'Belt squat machine': { 'Outer & inner quads': 1, 'Glute max': 0.5, Adductors: 0.5 },
+  // As the incline dumbbell press it replaces.
+  'Incline Smith Machine Bench': { 'Upper chest': 1, 'Mid & lower chest': 0.5, 'Front delts': 0.5, 'Triceps lateral & medial': 0.5 },
+  // A fly: the pec alone, no triceps.
+  'Elbow-supported pec deck': { 'Mid & lower chest': 1 },
+  // As the cable bar pullover it replaces.
+  'Pullover machine': { Lats: 1, 'Triceps long head': 0.25, 'Mid & lower chest': 0.25 },
+  // As the lat pulldown it replaces (the same vertical pull).
+  'Assisted pull-up': { Lats: 1, 'Mid-back': 0.5, Biceps: 0.5, Brachialis: 0.25, 'Rear delts': 0.25 },
+  // As the wide-grip cable row it replaces.
+  'Chest-supported row': { 'Mid-back': 1, 'Rear delts': 0.5, Lats: 0.5, Biceps: 0.5, Brachialis: 0.25 },
+  // As the cable archer pull it replaces (horizontal abduction).
+  'Reverse pec deck (rear delt)': { 'Rear delts': 1, 'Mid-back': 0.5 },
+  // As the incline curl it replaces.
+  'Preacher curl machine': { Biceps: 1, Brachialis: 0.5 },
+  'Adductor machine': { Adductors: 1 },
+  // Hip abduction is the glute medius's job; no growth trial of the machine.
+  'Abductor machine': { 'Glute medius': 1 },
 };
 const PROGRAMME_PARTS = Object.fromEntries(Object.entries(EXERCISE_PARTS).map(([k, v]) => [norm(k), v]));
 
@@ -500,7 +531,7 @@ export function weekView(S, today, { extra = null } = {}) {
 
 const REPS_OF = (() => {
   const out = {};
-  for (const code of Object.keys(PROGRAMME)) for (const x of PROGRAMME[code]) if (!out[norm(x.name)]) out[norm(x.name)] = x.reps;
+  for (const P of Object.values(PROGRAMMES)) for (const code of Object.keys(P)) for (const x of P[code]) if (!out[norm(x.name)]) out[norm(x.name)] = x.reps;
   return out;
 })();
 const PER_SESSION_CAP = 10;
@@ -529,13 +560,15 @@ const fmt = n => (Number.isInteger(n) ? String(n) : n.toFixed(1));
 
 /**
  * Candidates for a session: the programme's exercises for its groups, then the owner's own lifts.
- * `at.gym`: only what that gym has (lifts.js availableAt) — a Smith machine is never picked at DXC.
+ * `at.gym`: that gym's own plan (trainingProgramme.js PROGRAMMES), and only
+ * what it has (lifts.js availableAt) — a hack squat is never picked at DXC.
  */
 function candidates(groups, list, today, sessions = [], at = {}) {
   const out = new Map();
   const here = x => availableAt(x, at.gym || null, at.gymIds || null);
-  for (const code of Object.keys(PROGRAMME)) {
-    for (const x of PROGRAMME[code]) {
+  const P = programmeFor(at.gym || null);
+  for (const code of Object.keys(P)) {
+    for (const x of P[code]) {
       const parts = partsOf({ name: x.name });
       const m = mainPart(parts);
       if (!m || !groups.includes(GROUP_OF[m]) || out.has(norm(x.name)) || !here((list || []).find(l => l && !l.archived && norm(l.name) === norm(x.name)) || { name: x.name })) continue;
@@ -594,7 +627,8 @@ export function buildAdaptive(S, today, session, opts = {}) {
   const readiness = readinessOn(S, today);
   const red = !!(readiness && readiness.band === 'red');
   const { targets } = weekTargets(S, today);
-  const own = new Set((PROGRAMME[session] || []).map(x => norm(x.name)));
+  // The session as the gym chosen writes it wins ties (opts.gym; none → the base plan).
+  const own = new Set((programmeFor(opts.gym || null)[session] || []).map(x => norm(x.name)));
 
   // Done so far (logged + assumed), and what the anchors still to come will cover.
   const t = tally(week.workouts, L.list);

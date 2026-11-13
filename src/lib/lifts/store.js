@@ -4,9 +4,7 @@
  *   S.lifts = {
  *     list: [{ id, name, load: 'weight'|'bodyweight_plus'|'per_hand', unit: 'kg', archived?: true, createdAt,
  *              muscles?: string[], perGym?: boolean,
- *              only?: gymId | false  — the one gym it can be done at (false: any, said by hand),
- *              swapFor?: name | false | null — what it replaces in the plan at that gym
- *                        (a name: exactly that; false: nothing; null / absent: the closest match) }],
+ *              only?: gymId | false  — the one gym it can be done at (false: any, said by hand) }],
  *     log:  [{ id, liftId, date: 'YYYY-MM-DD', weight, reps, notes?, rpe?, shift?, createdAt, sessionId?, gym? }],
  *     // gyms (Oct 2026) — additive:
  *     gyms?:      [{ id, name, archived?: true }] — seeded with DXC / Greenock (fixed ids)
@@ -375,20 +373,6 @@ export function setOnlyGym(lifts, liftId, gymId) {
   const next = gymId || false;
   if (cur.only === next) return lifts;
   return { ...lifts, list: list.map(l => (l.id === liftId ? { ...l, only: next } : l)) };
-}
-
-/**
- * What a one-gym lift replaces in the session plan (gymPlan.js): an
- * exercise NAME, false for "nothing", null for "the closest match".
- * Additive: one key on one lift.
- */
-export function setSwapFor(lifts, liftId, value) {
-  const list = lifts.list || [];
-  const cur = list.find(l => l.id === liftId);
-  if (!cur) return lifts;
-  const next = value === false ? false : typeof value === 'string' && value.trim() ? value.trim().slice(0, LIMITS.name) : null;
-  if ((cur.swapFor ?? null) === next) return lifts;
-  return { ...lifts, list: list.map(l => (l.id === liftId ? { ...l, swapFor: next } : l)) };
 }
 
 // ── Per-lift rest and weight step (additive, optional keys) ──────────

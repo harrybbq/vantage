@@ -16,10 +16,10 @@ import Icon from '../../Icon';
 import { Sheet, NightChip } from './ui';
 import { weekPlan, dayDetail } from '../../../lib/lifts/home';
 
-export default function WeekStrip({ S, today, gymName = id => id, className = '' }) {
+export default function WeekStrip({ S, today, gym, gymName = id => id, className = '' }) {
   const week = useMemo(() => weekPlan(S, today), [S, today]);
   const [open, setOpen] = useState(null);
-  const detail = useMemo(() => (open ? dayDetail(S, week.find(c => c.iso === open)) : null), [S, week, open]);
+  const detail = useMemo(() => (open ? dayDetail(S, week.find(c => c.iso === open), gym !== undefined ? { gym } : {}) : null), [S, week, open, gym]);
   if (!week.length) return null;
   return (
     <section className={`lh-week ${className}`} aria-labelledby="lh-week-h" data-testid="lh-week">

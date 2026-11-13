@@ -199,7 +199,7 @@ export default function WorkoutToday({
       </div>
       {side && (
         <div className="lh-today-side">
-          <WeekStrip S={S} today={today} gymName={gymName} className="lh-card" />
+          <WeekStrip S={S} today={today} gym={gym} gymName={gymName} className="lh-card" />
           {desktop && <Stretches stretches={stretches} rest={sug.restDay} red={red} />}
           {desktop && last && <LastSession last={last} gymName={gymName} />}
         </div>

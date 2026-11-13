@@ -51,7 +51,7 @@ import { LiftsScope, useLiftsScope } from './ui/scope';
 import { useLiftsData, todayIso, LiftsProvider } from './useLifts';
 import {
   ensureLifts, withLifts, makeEntry, editEntry, upsertEntry, removeEntry, restoreEntry, addLift, renameLift, setArchived,
-  moveLift, deleteLift, recentFirst, newId, defaultGym, setLastGym, setPerGym, setOnlyGym, setSwapFor, addGym, renameGym, setGymArchived, deleteGym,
+  moveLift, deleteLift, recentFirst, newId, defaultGym, setLastGym, setPerGym, setOnlyGym, addGym, renameGym, setGymArchived, deleteGym,
   setLiftStep, gymName as gymNameOf,
 } from '../../../lib/lifts/store';
 import { pbMessage, pbKinds, setText, shortLiftName } from '../../../lib/lifts/lifts';
@@ -188,7 +188,6 @@ export default function LiftsTab({ S, update, hydrated = true }) {
     },
     onPerGym: (id, on) => write(l => setPerGym(l, id, on)),
     onOnly: (id, gym) => write(l => setOnlyGym(l, id, gym)),
-    onSwapFor: (id, value) => write(l => setSwapFor(l, id, value)),
     onStep: (id, step, gym = null) => write(l => setLiftStep(l, id, step, gym)),
     onAddGym: name => {
       const out = addGym(lifts, name);
@@ -295,7 +294,7 @@ export default function LiftsTab({ S, update, hydrated = true }) {
                   {homePage === 0 && today_}
                   {homePage === 1 && (
                     <>
-                      <WeekStrip S={S} today={today} gymName={gymName} className="lh-card" />
+                      <WeekStrip S={S} today={today} gym={curGym} gymName={gymName} className="lh-card" />
                       <BodyMap weekOnly view="figure" S={S} today={today} list={lifts.list} />
                       <WeekMuscles S={S} today={today} />
                     </>

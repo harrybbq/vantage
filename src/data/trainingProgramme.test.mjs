@@ -13,7 +13,7 @@
  */
 import assert from 'node:assert/strict';
 import {
-  PROGRAMME, SESSION_CODES, STRETCHES, BANNED_LIFTS,
+  PROGRAMME, PROGRAMMES, SESSION_CODES, STRETCHES, BANNED_LIFTS,
   assertNoBannedLifts, cycleCarbBalance, carbDeltaFor, targetsForDay,
   exercisesFor, stretchesFor, targetsFor, DAY_TYPE_TARGETS, FLOOR_MACROS,
   NIGHT_LOAD_SCALE, KCAL_PER_CARB_G,
@@ -27,6 +27,8 @@ const eq = (a, b, m) => { assert.deepEqual(a, b, m); n++; };
 
 // ── The guard that protects a spine under treatment ──
 eq(assertNoBannedLifts(), [], 'no contraindicated lift is prescribed anywhere');
+// Every gym's plan, not only the base one (two gyms, two plans — Nov 2026).
+for (const [gym, plan] of Object.entries(PROGRAMMES)) eq(assertNoBannedLifts(plan), [], `no contraindicated lift in the ${gym} plan`);
 
 // And it must actually catch one, or the empty result above means nothing.
 const sneaky = {
