@@ -32,7 +32,7 @@
 //   running broken code) is real data loss — see git log f6a7a50 for
 //   the wipe incident this SW caused.
 
-const CACHE_VERSION = 'vb-v186-2026-11-12';
+const CACHE_VERSION = 'vb-v187-2026-11-13';
 const CACHE = CACHE_VERSION;
 
 // Notice: NO '/index.html' and NO '/'. Those are network-first only.

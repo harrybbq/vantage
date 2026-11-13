@@ -33,7 +33,7 @@ import { PROGRAMME } from '../../data/trainingProgramme.js';
 import { musclesOf, norm } from './muscles.js';
 import { blockProgress, plannedSessions, sessionOfWorkout, ANCHOR_CODES } from './plan.js';
 import { liftsOf } from './store.js';
-import { addDays, isIso, num, e1rm, bannedRule, dayNo } from './lifts.js';
+import { addDays, isIso, num, e1rm, bannedRule, dayNo, availableAt } from './lifts.js';
 
 // ── Parts ─────────────────────────────────────────────────────────
 
@@ -142,7 +142,7 @@ const PROGRAMME_PARTS = Object.fromEntries(Object.entries(EXERCISE_PARTS).map(([
 /** Which part of a group a lift's NAME points at, for lifts outside the programme. */
 const PART_WORDS = {
   Shoulders: [[/lateral|side\s*raise|upright/i, 'Side delts'], [/rear|face\s*pull|reverse\s*fly|archer/i, 'Rear delts'], [/./, 'Front delts']],
-  Back: [[/pull-?\s*down|pull-?\s*up|chin|pullover|straight-?arm/i, 'Lats'], [/./, 'Mid-back']],
+  Back: [[/pull-?\s*down|pull-?\s*up|\bchin|pullover|straight-?arm/i, 'Lats'], [/./, 'Mid-back']],
   Chest: [[/incline|low-?to-?high|reverse-?grip/i, 'Upper chest'], [/./, 'Mid & lower chest']],
   Triceps: [[/overhead|french|skull|extension/i, 'Triceps long head'], [/./, 'Triceps lateral & medial']],
   Biceps: [[/reverse|hammer|brachial/i, 'Brachialis'], [/./, 'Biceps']],
@@ -527,14 +527,18 @@ const CATCH_UP_TOP = 6;
 const SLACK = 0.25;
 const fmt = n => (Number.isInteger(n) ? String(n) : n.toFixed(1));
 
-/** Candidates for a session: the programme's exercises for its groups, then the owner's own lifts. */
-function candidates(groups, list, today, sessions = []) {
+/**
+ * Candidates for a session: the programme's exercises for its groups, then the owner's own lifts.
+ * `at.gym`: only what that gym has (lifts.js availableAt) — a Smith machine is never picked at DXC.
+ */
+function candidates(groups, list, today, sessions = [], at = {}) {
   const out = new Map();
+  const here = x => availableAt(x, at.gym || null, at.gymIds || null);
   for (const code of Object.keys(PROGRAMME)) {
     for (const x of PROGRAMME[code]) {
       const parts = partsOf({ name: x.name });
       const m = mainPart(parts);
-      if (!m || !groups.includes(GROUP_OF[m]) || out.has(norm(x.name))) continue;
+      if (!m || !groups.includes(GROUP_OF[m]) || out.has(norm(x.name)) || !here((list || []).find(l => l && !l.archived && norm(l.name) === norm(x.name)) || { name: x.name })) continue;
       out.set(norm(x.name), { name: x.name, parts, main: m, programme: true, gsets: creditGroups({ name: x.name }, 1, {}) });
     }
   }
@@ -543,7 +547,7 @@ function candidates(groups, list, today, sessions = []) {
   const recent = new Set();
   for (const w of sessions) if (w && isIso(w.date) && w.date >= since) for (const ex of w.exercises || []) recent.add(ex.liftId);
   for (const lift of list || []) {
-    if (!lift || lift.archived || bannedRule(lift) || out.has(norm(lift.name))) continue;
+    if (!lift || lift.archived || bannedRule(lift) || out.has(norm(lift.name)) || !here(lift)) continue;
     const used = recent.has(lift.id);
     const parts = partsOf(lift);
     const m = mainPart(parts);
@@ -580,7 +584,7 @@ const poss = g => { const w = g.toLowerCase(); return w.endsWith('s') ? `${w}'` 
  * The session's own written exercises win ties, so a week on plan comes
  * out close to the programme's Upper / Lower.
  */
-export function buildAdaptive(S, today, session) {
+export function buildAdaptive(S, today, session, opts = {}) {
   if (!ANCHORS[session] || !isIso(today)) return null;
   const L = liftsOf(S);
   if (!(L.sessions || []).some(w => w && isIso(w.date) && w.date <= today)) return null;
@@ -619,7 +623,8 @@ export function buildAdaptive(S, today, session) {
   const need0 = { ...need };
   const mustHit = groups.filter(g => !FREQ_EXEMPT.includes(g) && (hits[g] || 0) < 2 && PARTS.some(([p, gg]) => gg === g && (targets[p] || 0) > 0));
 
-  const pool = candidates(groups, L.list, today, L.sessions || []);
+  // opts.gym / opts.gymIds: build from what that gym has (gymPlan.js fits the result after).
+  const pool = candidates(groups, L.list, today, L.sessions || [], opts);
   const picked = [];
   const load = {};    // part sets this session gives (EXERCISE_PARTS weights)
   const gload = {};   // group sets this session gives (body-map counting, for hits)

@@ -127,6 +127,26 @@ export const PROGRAMME = {
   ],
 };
 
+/**
+ * Exercises only ONE gym has (owner, 2026-11-13).
+ *
+ * DXC is the smaller gym, and everything in PROGRAMME above was chosen
+ * to work there; Greenock has all of it and more. So the only gap so far
+ * runs one way: an exercise Greenock has and DXC does not. The session
+ * plan swaps it in when Greenock is the gym, in place of the closest
+ * thing on the list, and never offers it at DXC (lib/lifts/gymPlan.js).
+ *
+ * Keyed by the lift's NAME; the value is a gym id (lib/lifts/store.js
+ * DEFAULT_GYMS). This is only the default: "Where you can do it" on the
+ * lift itself (S.lifts.list[i].only) always wins, and is how new ones are
+ * added without touching this file.
+ */
+export const GYM_ONLY = Object.freeze({
+  // Added by the owner in Nov 2026 and run on the Greenock Push in place
+  // of the incline dumbbell press.
+  'Incline Smith Machine Bench': 'greenock',
+});
+
 /* ══════════════════════════════════════════════════════════════════════
    Stretch and mobility — the Spider-Man block.
    ══════════════════════════════════════════════════════════════════════

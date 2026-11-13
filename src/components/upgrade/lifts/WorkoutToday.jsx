@@ -162,6 +162,11 @@ export default function WorkoutToday({
           {all && !desktop && sug.exercises.length > 4 && (
             <button type="button" className="lh-rowbtn" onClick={() => setAll(false)}>Show fewer</button>
           )}
+          {sug.gymFit && sug.gymFit.dropped.length > 0 && (
+            <p className="lh-warn" data-testid="wk-gymdrop">
+              Left out at {gymLbl || 'this gym'}: {sug.gymFit.dropped.join(', ')}. Nothing close to it is there.
+            </p>
+          )}
           {notCarried > 0 && (
             <p className="lh-warn" data-testid="wk-below">
               This week will finish below standard: {ad.catchUp.join(' and ')}’s other {notCarried} sets aren’t carried.

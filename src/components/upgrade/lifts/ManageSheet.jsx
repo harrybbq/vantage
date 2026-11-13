@@ -15,13 +15,16 @@
  * Archived lifts and gyms sit in a collapsed group with Restore.
  * Every write is additive and touches only that lift / gym (store.js).
  */
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import Icon from '../../Icon';
 import { Sheet, Button, IconButton, Segmented, Chip } from './ui';
 import { STEP_CHOICES } from '../../../lib/lifts/store';
-import { LOAD_TYPES, LOAD_LABEL, bannedRule, perGymOf, perGymByName, stepFor, DEFAULT_STEP } from '../../../lib/lifts/lifts';
+import { PROGRAMME } from '../../../data/trainingProgramme';
+import { LOAD_TYPES, LOAD_LABEL, bannedRule, perGymOf, perGymByName, stepFor, DEFAULT_STEP, onlyGymOf } from '../../../lib/lifts/lifts';
 
 const COMPARE = [{ value: 'gym', label: 'Per gym' }, { value: 'all', label: 'All gyms' }];
+/** The programme's exercise names, in session order (a one-gym lift can stand in for any of them). */
+const PLAN_NAMES = [...new Set(Object.values(PROGRAMME).flat().map(x => x.name))];
 const ROW_H = 64;
 
 /** Name as text + ✎ → an inline input with Save / Cancel. */
@@ -61,12 +64,14 @@ function InlineName({ value, label, max = 60, onSave, testId }) {
 
 function LiftRow({ lift, count, index, total, gyms, focus, onRename, onPerGym, onMenu, drag }) {
   const per = perGymOf(lift);
+  const only = onlyGymOf(lift, gyms.filter(g => !g.archived).map(g => g.id));
   const ref = useRef(null);
   useEffect(() => { if (focus && ref.current) ref.current.scrollIntoView({ block: 'center' }); }, [focus]);
   const steps = per && lift.stepByGym ? Object.entries(lift.stepByGym).map(([g, s]) => `${(gyms.find(x => x.id === g) || { name: g }).name} ${s}`).join(' · ') : null;
   const meta = [
     LOAD_LABEL[lift.load], `${count} ${count === 1 ? 'set' : 'sets'}`,
     lift.step ? `step ${lift.step}` : null, steps ? `step ${steps}` : null,
+    only ? `only at ${(gyms.find(x => x.id === only) || { name: only }).name}` : null,
     bannedRule(lift) ? 'not in programme' : null,
   ].filter(Boolean).join(' · ');
   const dy = drag && drag.id === lift.id ? drag.dy : 0;
@@ -92,9 +97,12 @@ function LiftRow({ lift, count, index, total, gyms, focus, onRename, onPerGym, o
   );
 }
 
-/** The lift's ⋯: move, weight step, archive / delete. */
-function LiftMenu({ lift, count, gyms, first, last, onClose, onMove, onStep, onArchive, onDelete }) {
+/** The lift's ⋯: move, weight step, where it can be done, archive / delete. */
+function LiftMenu({ lift, count, gyms, first, last, swapNames = [], onClose, onMove, onStep, onOnly, onSwapFor, onArchive, onDelete }) {
   const per = perGymOf(lift);
+  const liveGyms = gyms.filter(g => !g.archived);
+  const only = onlyGymOf(lift, liveGyms.map(g => g.id));
+  const whereOpts = [{ value: '', label: 'Any gym' }, ...liveGyms.map(g => ({ value: g.id, label: `Only ${g.name}` }))];
   const def = DEFAULT_STEP[lift.load] || 2.5;
   const stepOpts = [{ value: '', label: `Default · ${def}` }, ...STEP_CHOICES.map(s => ({ value: String(s), label: String(s) }))];
   const act = fn => () => { fn(); onClose(); };
@@ -123,6 +131,33 @@ function LiftMenu({ lift, count, gyms, first, last, onClose, onMove, onStep, onA
           </div>
         )}
         {per && <p className="lf-meta">A machine&apos;s stack differs gym to gym, so each gym keeps its own step.</p>}
+        {!lift.archived && onOnly && liveGyms.length > 1 && (
+          <>
+            <p className="lf-eyebrow">// Where you can do it</p>
+            <div className="lh-menu-field">
+              <Segmented label={`Where you can do ${lift.name}`} size="sm" full options={whereOpts} value={only || ''}
+                         onChange={v => onOnly(lift.id, v || null)} testId="lh-only" />
+            </div>
+            <p className="lf-meta">
+              {only
+                ? `Your session plan uses it at ${(liveGyms.find(g => g.id === only) || { name: only }).name} and swaps it out anywhere else.`
+                : 'Pick a gym if only one has the kit. The session plan then swaps it in there and out everywhere else.'}
+            </p>
+            {only && onSwapFor && (
+              <div className="lh-menu-field">
+                <label className="lf-meta" htmlFor="lh-swapfor">In the plan, use it in place of</label>
+                <select id="lh-swapfor" className="lf-cellbox lh-select" data-testid="lh-swapfor"
+                        value={lift.swapFor === false ? '__none' : typeof lift.swapFor === 'string' && lift.swapFor ? lift.swapFor : ''}
+                        onChange={e => onSwapFor(lift.id, e.target.value === '__none' ? false : e.target.value || null)}>
+                  <option value="">The closest match (same muscle)</option>
+                  <option value="__none">Nothing: keep the plan as written</option>
+                  {typeof lift.swapFor === 'string' && lift.swapFor && !swapNames.includes(lift.swapFor) && <option value={lift.swapFor}>{lift.swapFor}</option>}
+                  {swapNames.filter(nm => nm !== lift.name).map(nm => <option key={nm} value={nm}>{nm}</option>)}
+                </select>
+              </div>
+            )}
+          </>
+        )}
         <div className="lh-menu-gap" />
         <Button variant="secondary" size="lg" block icon={lift.archived ? 'rotate-ccw' : 'archive'} onClick={act(() => onArchive(lift.id, !lift.archived))}>
           {lift.archived ? 'Restore' : 'Archive'}
@@ -226,7 +261,7 @@ function AddGym({ onAddGym }) {
 }
 
 export default function ManageSheet({
-  lifts, counts, onClose, onAdd, onRename, onMove, onArchive, onDelete, onPerGym, onStep,
+  lifts, counts, onClose, onAdd, onRename, onMove, onArchive, onDelete, onPerGym, onStep, onOnly, onSwapFor,
   gyms = [], gymCounts = new Map(), onAddGym, onRenameGym, onArchiveGym, onDeleteGym, focus = null,
 }) {
   const [menu, setMenu] = useState(null);
@@ -237,6 +272,13 @@ export default function ManageSheet({
   const liveGyms = gyms.filter(g => !g.archived);
   const archGyms = gyms.filter(g => g.archived);
   const menuLift = menu ? lifts.find(l => l.id === menu) : null;
+  // What a one-gym lift can stand in for: the programme's exercises, then the owner's other lifts.
+  const swapNames = useMemo(() => {
+    const seen = new Set(), out = [];
+    for (const nm of [...PLAN_NAMES, ...active.map(l => l.name)]) { const k = nm.toLowerCase(); if (!seen.has(k)) { seen.add(k); out.push(nm); } }
+    return out;
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [lifts]);
   const ai = menuLift ? active.findIndex(l => l.id === menuLift.id) : -1;
 
   // Drag the handle: rows follow the finger; on release the lift moves by whole rows.
@@ -324,7 +366,8 @@ export default function ManageSheet({
 
       {menuLift && (
         <LiftMenu lift={menuLift} count={counts.get(menuLift.id) || 0} gyms={gyms} first={ai <= 0} last={ai < 0 || ai === active.length - 1}
-                  onClose={() => setMenu(null)} onMove={onMove} onStep={onStep} onArchive={onArchive} onDelete={onDelete} />
+                  swapNames={swapNames}
+                  onClose={() => setMenu(null)} onMove={onMove} onStep={onStep} onOnly={onOnly} onSwapFor={onSwapFor} onArchive={onArchive} onDelete={onDelete} />
       )}
     </Sheet>
   );

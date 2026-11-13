@@ -52,7 +52,8 @@ const MUSCLE_WORDS = [
   [/hammer|reverse.*curl|wrist|forearm|farmer/i, 'Forearms'],
   [/adduct/i, 'Adductors'],
   [/tricep|pushdown|skull|^(?!.*(leg|back|hyper)).*extension/i, 'Triceps'],
-  [/row|pulldown|pull-?\s*up|chin|pullover/i, 'Back'],
+  // \bchin: 'machine' holds 'chin', which tagged every untagged machine lift as Back.
+  [/row|pulldown|pull-?\s*up|\bchin|pullover/i, 'Back'],
   [/bench|chest|fly|\bdips?\b|push-?\s*up/i, 'Chest'],
   [/shoulder|lateral|overhead\s*press|delt|arnold/i, 'Shoulders'],
   [/crunch|\babs?\b|plank|pallof|sit-?\s*up/i, 'Abs'],

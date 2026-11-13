@@ -71,11 +71,12 @@ import {
   num, isIso, addDays, dayNo, personalBests, pbBasis, pbHeadline, setText, shortLiftName, entriesFor, workingEntries, perGymOf, gymOf,
   stepFor, isWarmup, SET_TYPES,
 } from './lifts.js';
-import { liftsOf, withLifts, makeEntry, LIMITS, newId, defaultGym, setLastGym, withGyms, gymName, gymList } from './store.js';
+import { liftsOf, withLifts, makeEntry, LIMITS, newId, defaultGym, setLastGym, withGyms, gymName, gymList, activeGyms } from './store.js';
 import { PROGRAMME_MUSCLES, musclesOf, norm } from './muscles.js';
 import { cataloguePending } from './catalogue.js';
 import { plannedSessions, blockProgress, EXTRA, ANCHOR_CODES } from './plan.js';
 import { buildAdaptive, trimForRed, readinessOn, RED_RPE_CAP } from './adaptive.js';
+import { fitForGym } from './gymPlan.js';
 
 const ADAPTIVE_CODES = ['Upper', 'Lower'];
 
@@ -294,7 +295,9 @@ const agoWords = (iso, today) => {
  * (source, why, moved), `block` the block's progress. `weight` is the
  * first set's pre-fill (null when the lift has never been trained at
  * this gym — or anywhere, for a free weight); `rows` every set's.
- * opts.gym: the gym to plan weights for (default: S.lifts.lastGym).
+ * opts.gym: the gym to plan for (default: S.lifts.lastGym) — its weights, and
+ *   its kit: `gymFit` { swaps, dropped } says what was changed for it, and a
+ *   swapped exercise carries `swapFor` and a `{ kind: 'gym' }` tag.
  */
 export function suggestWorkout(S, today, opts = {}) {
   const day = isIso(today) ? shiftOn(S, today) : null;
@@ -327,10 +330,15 @@ export function suggestWorkout(S, today, opts = {}) {
   // week still owes; an anchor on a WHOOP-red day loses a set an exercise.
   const readiness = readinessOn(S, today);
   const red = !!(readiness && readiness.band === 'red');
-  const built = ADAPTIVE_CODES.includes(session) ? buildAdaptive(S, today, session) : null;
+  const at = gymContext(L, gym);
+  const built = ADAPTIVE_CODES.includes(session) ? buildAdaptive(S, today, session, at) : null;
   const isAnchor = ANCHOR_CODES.includes(session);
   let plan0 = built && built.exercises.length ? built.exercises : prog.map(x => ({ ...x }));
   if (isAnchor && red) plan0 = trimForRed(plan0).map(x => ({ ...x, tags: [{ kind: 'red', text: `≤ RPE ${x.rpeCap}` }] }));
+  // The gym chosen (gymPlan.js): what only another gym has is swapped out,
+  // what only this one has is swapped in. Same sets and reps.
+  const fit = fitForGym(plan0, at);
+  plan0 = fit.exercises;
   const exercises = plan0.map(x => {
     const lift = (x.liftId && L.list.find(l => l.id === x.liftId)) || findByName(L.list, x.name);
     const { rows } = planFor(S, lift, { sets: x.sets, reps: x.reps, night, gym });
@@ -342,6 +350,7 @@ export function suggestWorkout(S, today, opts = {}) {
     if (x.tags && x.tags.length) out.tags = x.tags;
     if (x.setsWas != null && x.setsWas !== x.sets) out.setsWas = x.setsWas;
     if (x.rpeCap) out.rpeCap = x.rpeCap;
+    if (x.swapFor) out.swapFor = x.swapFor;
     return out;
   });
   const missed = (block && block.missed) || [];
@@ -364,7 +373,15 @@ export function suggestWorkout(S, today, opts = {}) {
   return {
     ...out, name: session, rotaSession: session, restDay: false, night, exercises, reason,
     minutes: estimateMinutes(exercises), adaptive,
+    gymFit: { swaps: fit.swaps, dropped: fit.dropped },
   };
+}
+
+/** What fitForGym and the adaptive builder need to know about the gym chosen. */
+function gymContext(L, gym) {
+  const used = new Set();
+  for (const e of L.log || []) if (e && e.liftId) used.add(e.liftId);
+  return { gym: gym || null, list: L.list, gymIds: activeGyms(L).map(g => g.id), gymLabel: gym ? gymName(L, gym) : '', used };
 }
 
 const DOW3 = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
@@ -1221,7 +1238,9 @@ export function templateStart(S, tpl, today, opts = {}) {
   return {
     source: 'template', name: tpl.name, rotaSession: tpl.rotaSession || null, shift: day ? day.shift : null, ...(gym ? { gym } : {}),
     ...(tpl.builtIn || !tpl.id ? {} : { templateId: tpl.id }),
-    exercises: tpl.exercises.map(x => {
+    // A built-in programme session is fitted to the gym like the suggestion;
+    // a template the owner saved is theirs, exercise for exercise.
+    exercises: (tpl.builtIn ? fitForGym(tpl.exercises, gymContext(L, gym)).exercises : tpl.exercises).map(x => {
       const lift = (x.liftId && list.find(l => l.id === x.liftId)) || (x.name ? findByName(list, x.name) : null);
       const { rows } = planFor(S, lift, { sets: x.sets, reps: x.reps, night, gym });
       return { liftId: lift ? lift.id : null, liftKey: lift ? lift.id : x.name ? progId(x.name) : null, name: lift ? lift.name : x.name, sets: x.sets, reps: x.reps, optional: x.optional, rows };
