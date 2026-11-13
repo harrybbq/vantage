@@ -527,7 +527,7 @@ export default function HubGrid({
   return (
     <>
       <div ref={gridRef} className={`cx-hub-grid${masonry ? ' is-masonry' : ''}${drag ? ' is-dragging' : ''}`} data-cols={cols}
-           style={masonry ? { height: laid.height } : undefined}>
+           style={masonry ? { height: laid.height, '--cx-hub-cols': cols } : undefined}>
         {order.map(item => {
           const c = cellById[item.id];
           if (!c) return null;

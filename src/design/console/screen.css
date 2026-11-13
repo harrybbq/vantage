@@ -22,7 +22,7 @@
    hub/masonry.js.)
    ════════════════════════════════════════════════════════════════════ */
 
-html[data-design="console"] { --cx-ui: 1; }
+html[data-design="console"] { --cx-ui: 1; --cx-zoom: var(--cx-ui); }
 
 @media (min-width: 1700px) { html[data-design="console"] { --cx-ui: 1.08; --cx-page-max: calc(1400px * 1.08 * 1.1); } }
 @media (min-width: 2200px) { html[data-design="console"] { --cx-ui: 1.2;  --cx-page-max: calc(1400px * 1.2 * 1.25); } }
@@ -109,6 +109,16 @@ html[data-design="console"] { --cx-ui: 1; }
   }
   html[data-design="console"] .cx-hub-row { min-height: calc(36px * var(--cx-ui)); }
 
+  /* Found by measuring every small fixed-size thing at 1440 and 3840 px
+     (Nov 2026): these stayed at laptop size while the type around them grew. */
+  html[data-design="console"] .cx-shell-brand { gap: calc(10px * var(--cx-ui)); padding: calc(4px * var(--cx-ui)) calc(9px * var(--cx-ui)) calc(20px * var(--cx-ui)); }
+  html[data-design="console"] .cx-shell-logo { width: calc(26px * var(--cx-ui)); height: calc(26px * var(--cx-ui)); }
+  html[data-design="console"] .cx-shell-logo svg { zoom: var(--cx-ui); }
+  html[data-design="console"] .cx-shell-top .cx-shell-avatar { width: calc(var(--cx-shell-av, 32px) * var(--cx-ui)); height: calc(var(--cx-shell-av, 32px) * var(--cx-ui)); }
+  html[data-design="console"] .cx-hub-more-btn { width: calc(32px * var(--cx-ui)); height: calc(32px * var(--cx-ui)); }
+  html[data-design="console"] .cx-hub-acts { margin: calc(-6px * var(--cx-ui)) calc(-8px * var(--cx-ui)) calc(-6px * var(--cx-ui)) 0; }
+  html[data-design="console"] .cx-hub-addbar { min-height: calc(52px * var(--cx-ui)); gap: calc(10px * var(--cx-ui)); }
+
   /* Narrow readable columns keep their measure at the larger type. */
   html[data-design="console"] .cx-sweep-tabs { max-width: calc(560px * var(--cx-ui)); }
   html[data-design="console"] .cx-sweep-stack { max-width: calc(760px * var(--cx-ui)); }
@@ -117,3 +127,34 @@ html[data-design="console"] { --cx-ui: 1; }
   html[data-design="console"] .cx-sweep-classic-settings .settings-panel { max-width: calc(760px * var(--cx-ui)); }
 }
 
+/* ── Content drawn in fixed pixels: .cx-uizoom ────────────────────────
+   The prime cards (prime.css) and the classic widget bodies the hub
+   reuses (News, Market, Goals, Vitals, Macros …) were drawn in px for the
+   classic app and know nothing of --cx-ui. On a 3840 px screen they sat
+   at laptop size inside frames that had grown by half: 11 px text in a
+   1500 px card, mostly empty.
+
+   Such a subtree is ZOOMED by the same factor instead. `zoom` on a leaf
+   is safe where it was not on the root (nothing inside is sized in vw),
+   and it scales text, spacing, rings and charts together.
+
+   Inside it every scaled token goes back to its tokens.css value and
+   --cx-ui to 1, so anything in there that DOES use a token (the console
+   restyles those bodies from hub.css) is scaled once, by the zoom, not
+   twice. --cx-zoom is the root's --cx-ui, computed there, so it survives
+   the reset. */
+html[data-design="console"] .cx-uizoom {
+  zoom: var(--cx-zoom, 1);
+  --cx-ui: 1;
+  --cx-fs-12: 12px; --cx-lh-12: 16px;
+  --cx-fs-13: 13px; --cx-lh-13: 18px;
+  --cx-fs-15: 15px; --cx-lh-15: 22px;
+  --cx-fs-17: 17px; --cx-lh-17: 24px;
+  --cx-fs-22: 22px; --cx-lh-22: 28px;
+  --cx-fs-28: 28px; --cx-lh-28: 32px;
+  --cx-fs-40: 40px; --cx-lh-40: 44px;
+  --cx-sp-4: 4px; --cx-sp-8: 8px; --cx-sp-12: 12px; --cx-sp-16: 16px; --cx-sp-20: 20px; --cx-sp-24: 24px; --cx-sp-32: 32px;
+  --cx-r-panel: 12px; --cx-r-cell: 8px; --cx-r-chip: 6px; --cx-r-sheet: 16px;
+  --cx-control-h: 40px; --cx-input-h: 48px; --cx-chip-h: 28px; --cx-check: 20px;
+  --cx-hub-gap: 16px;
+}

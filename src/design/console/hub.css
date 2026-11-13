@@ -283,12 +283,17 @@ html[data-design="console"] .cx-hub-grid.is-masonry {
 }
 html[data-design="console"] .cx-hub-grid.is-masonry > .cx-hub-cell {
   position: absolute;
-  left: calc((100% + var(--cx-hub-gap)) / 4 * var(--c, 0));
-  width: calc((100% + var(--cx-hub-gap)) / 4 * var(--w, 1) - var(--cx-hub-gap));
+  left: calc((100% + var(--cx-hub-gap)) / var(--cx-hub-cols, 4) * var(--c, 0));
+  width: calc((100% + var(--cx-hub-gap)) / var(--cx-hub-cols, 4) * var(--w, 1) - var(--cx-hub-gap));
 }
 /* The measured wrapper: the body's own flex column, at its natural
    height whatever the frame is stretched to. */
 html[data-design="console"] .cx-hub-nat { display: flex; flex-direction: column; gap: inherit; flex: 0 0 auto; min-width: 0; }
+/* A widget body, zoomed by the screen scale (.cx-uizoom, screen.css). It lays its
+   children out as the frame body did, in its own (unscaled) tokens, and fills a
+   stretched card so a footer still sits at the foot. */
+html[data-design="console"] .cx-hub-zoom { display: flex; flex-direction: column; gap: var(--cx-sp-12); min-width: 0; flex: 1 1 auto; }
+html[data-design="console"] .cx-hub-cell.is-small .cx-hub-zoom { gap: var(--cx-sp-8); }
 /* The macro rings were sized for the classic canvas: the three small
    rings ran 4 px past a 450 px block, and none of them grew with the
    console's screen scale. */

@@ -25,7 +25,7 @@
  * so does the RPC dependency.
  */
 import { createContext, createElement, useContext, useLayoutEffect, useMemo } from 'react';
-import { resolveDesign, consoleAccentVars, CONSOLE_ACCENT_PROPS } from '../lib/design/design';
+import { resolveDesign, defaultDesignFor, consoleAccentVars, CONSOLE_ACCENT_PROPS } from '../lib/design/design';
 
 /** The design when there is no signed-in state to read. */
 export const NO_SESSION_DESIGN = resolveDesign(null, { allowConsole: false });
@@ -66,13 +66,16 @@ export function applyDesign(design, { accent = null, theme = 'cream-pro' } = {})
  *   isOwner  useIsOwner's answer (always false in native builds)
  *   accent   the user's accent hex (SettingsSection currentAccentHex(S))
  *   theme    the effective theme id (resolveEffectiveTheme(S.theme))
+ *   createdAt  the account's creation time (session.user.created_at)
  * Passed in rather than imported, so this module never imports
  * SettingsSection: screen components import useDesign, and SettingsSection
  * imports screen components. Returns the design. On unmount (sign-out)
  * <html> goes back to the no-session design.
  */
-export function useApplyDesign(S, { isOwner = false, accent = null, theme = 'cream-pro' } = {}) {
-  const design = resolveDesign(S, { allowConsole: !!isOwner });
+export function useApplyDesign(S, { isOwner = false, accent = null, theme = 'cream-pro', createdAt = null } = {}) {
+  // `createdAt` (the session's user.created_at): accounts from the Nov 2026
+  // cut-over on default to the console; earlier ones are as they were.
+  const design = resolveDesign(S, { allowConsole: !!isOwner, defaultDesign: defaultDesignFor(createdAt) });
   const acc = design === 'console' ? accent : null;
   useLayoutEffect(() => {
     applyDesign(design, { accent: acc, theme });

@@ -39,7 +39,7 @@ import { Sheet, Button, IconButton, NightChip, UndoToast, PbToast, useInputMode,
 import {
   activeOf, elapsedSec, clock, volume, volumeText, previousForExercise, previousSession, addExercises, addSet, updateSet, toggleDone, setProblem,
   removeSet, removeExercise, insertSet, insertExercise, swapExercise, setNote, renameWorkout,
-  discardWorkout, setWorkoutGym, setWorkoutShift, doneSetCount, listWithPending, exerciseLift, setSetType, markPbToasted, livePbSets,
+  discardWorkout, setWorkoutGym, gymSwitchPreview, setWorkoutShift, doneSetCount, listWithPending, exerciseLift, setSetType, markPbToasted, livePbSets,
   planProgress, nextOpenSet,
 } from '../../../lib/lifts/workout';
 import { stepFor, perGymOf, personalBests } from '../../../lib/lifts/lifts';
@@ -517,10 +517,17 @@ export default function WorkoutLive({
 
       {gymSheet && (
         <GymSheet gyms={gyms} gymNow={gymNow} doneN={doneN} gymName={gymName} onClose={() => setGymSheet(false)}
+                  planChange={id => gymSwitchPreview(S, id)}
                   onMove={id => {
+                    const pv = gymSwitchPreview(S, id);
+                    const k = pv.swaps.length + pv.dropped.length;
                     update(prev => setWorkoutGym(prev, id));
                     setGymSheet(false);
-                    if (doneN && onToast) onToast(`Now at ${gymName(id)} — ${doneN} ${doneN === 1 ? 'set' : 'sets'} re-tagged`);
+                    const bits = [
+                      k ? `${k} ${k === 1 ? 'exercise' : 'exercises'} switched to its plan` : null,
+                      doneN ? `${doneN} ${doneN === 1 ? 'set' : 'sets'} re-tagged` : null,
+                    ].filter(Boolean);
+                    if (bits.length && onToast) onToast(`Now at ${gymName(id)} — ${bits.join(', ')}`);
                   }} />
       )}
 

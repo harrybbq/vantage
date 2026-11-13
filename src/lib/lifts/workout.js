@@ -65,17 +65,18 @@
  *
  * Not built (yet): supersets and unilateral logging.
  */
-import { PROGRAMME, SESSION_CODES, NIGHT_LOAD_SCALE } from '../../data/trainingProgramme.js';
+import { PROGRAMME, SESSION_CODES, NIGHT_LOAD_SCALE, programmeFor } from '../../data/trainingProgramme.js';
 import { shiftOn } from '../rotation/pattern.js';
 import {
   num, isIso, addDays, dayNo, personalBests, pbBasis, pbHeadline, setText, shortLiftName, entriesFor, workingEntries, perGymOf, gymOf,
-  stepFor, isWarmup, SET_TYPES,
+  stepFor, isWarmup, SET_TYPES, availableAt,
 } from './lifts.js';
-import { liftsOf, withLifts, makeEntry, LIMITS, newId, defaultGym, setLastGym, withGyms, gymName, gymList } from './store.js';
+import { liftsOf, withLifts, makeEntry, LIMITS, newId, defaultGym, setLastGym, withGyms, gymName, gymList, activeGyms } from './store.js';
 import { PROGRAMME_MUSCLES, musclesOf, norm } from './muscles.js';
 import { cataloguePending } from './catalogue.js';
 import { plannedSessions, blockProgress, EXTRA, ANCHOR_CODES } from './plan.js';
 import { buildAdaptive, trimForRed, readinessOn, RED_RPE_CAP } from './adaptive.js';
+import { fitForGym, planOf, switchExercise, isPlanSession } from './gymPlan.js';
 
 const ADAPTIVE_CODES = ['Upper', 'Lower'];
 
@@ -294,7 +295,9 @@ const agoWords = (iso, today) => {
  * (source, why, moved), `block` the block's progress. `weight` is the
  * first set's pre-fill (null when the lift has never been trained at
  * this gym — or anywhere, for a free weight); `rows` every set's.
- * opts.gym: the gym to plan weights for (default: S.lifts.lastGym).
+ * opts.gym: the gym to plan for (default: S.lifts.lastGym) — its own written
+ *   plan (trainingProgramme.js PROGRAMMES) and its weights. `gymFit`
+ *   { swaps, dropped } lists anything that gym turned out not to have.
  */
 export function suggestWorkout(S, today, opts = {}) {
   const day = isIso(today) ? shiftOn(S, today) : null;
@@ -318,7 +321,8 @@ export function suggestWorkout(S, today, opts = {}) {
   if (session === EXTRA) {
     return { ...out, restDay: false, name: 'Extra session', rotaSession: null, reason: `${shiftWord} · ${plan.why}. Build your own, or take the day.` };
   }
-  const prog = PROGRAMME[session];
+  // Two gyms, two plans (trainingProgramme.js): the session as the gym chosen writes it.
+  const prog = PROGRAMME[session] ? programmeFor(gym)[session] : null;
   if (!prog) {
     return { ...out, restDay: false, name: `${session} day`, rotaSession: session, reason: `${session} isn’t one of the five programme sessions — build your own.` };
   }
@@ -327,10 +331,14 @@ export function suggestWorkout(S, today, opts = {}) {
   // week still owes; an anchor on a WHOOP-red day loses a set an exercise.
   const readiness = readinessOn(S, today);
   const red = !!(readiness && readiness.band === 'red');
-  const built = ADAPTIVE_CODES.includes(session) ? buildAdaptive(S, today, session) : null;
+  const at = gymContext(L, gym);
+  const built = ADAPTIVE_CODES.includes(session) ? buildAdaptive(S, today, session, at) : null;
   const isAnchor = ANCHOR_CODES.includes(session);
-  let plan0 = built && built.exercises.length ? built.exercises : prog.map(x => ({ ...x }));
+  let plan0 = built && built.exercises.length ? built.exercises : planOf(gym, session);
   if (isAnchor && red) plan0 = trimForRed(plan0).map(x => ({ ...x, tags: [{ kind: 'red', text: `≤ RPE ${x.rpeCap}` }] }));
+  // The safety net (gymPlan.js): nothing the gym chosen does not have is shown.
+  const fit = fitForGym(plan0, at);
+  plan0 = fit.exercises;
   const exercises = plan0.map(x => {
     const lift = (x.liftId && L.list.find(l => l.id === x.liftId)) || findByName(L.list, x.name);
     const { rows } = planFor(S, lift, { sets: x.sets, reps: x.reps, night, gym });
@@ -342,6 +350,7 @@ export function suggestWorkout(S, today, opts = {}) {
     if (x.tags && x.tags.length) out.tags = x.tags;
     if (x.setsWas != null && x.setsWas !== x.sets) out.setsWas = x.setsWas;
     if (x.rpeCap) out.rpeCap = x.rpeCap;
+    if (x.swapFor) out.swapFor = x.swapFor;
     return out;
   });
   const missed = (block && block.missed) || [];
@@ -364,7 +373,15 @@ export function suggestWorkout(S, today, opts = {}) {
   return {
     ...out, name: session, rotaSession: session, restDay: false, night, exercises, reason,
     minutes: estimateMinutes(exercises), adaptive,
+    gymFit: { swaps: fit.swaps, dropped: fit.dropped },
   };
+}
+
+/** What fitForGym and the adaptive builder need to know about the gym chosen. */
+function gymContext(L, gym) {
+  const used = new Set();
+  for (const e of L.log || []) if (e && e.liftId) used.add(e.liftId);
+  return { gym: gym || null, list: L.list, gymIds: activeGyms(L).map(g => g.id), gymLabel: gym ? gymName(L, gym) : '', used };
 }
 
 const DOW3 = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
@@ -722,21 +739,84 @@ export function renameWorkout(prev, name) {
 }
 
 /**
+ * Is this workout running a plan — started from the suggestion or a
+ * built-in programme session, not from a template the owner saved or
+ * their own build? Only then does a gym change switch its exercises.
+ */
+export const followsPlan = a => !!(a && isPlanSession(a.rotaSession) && !a.templateId && (a.source === 'suggested' || a.source === 'template'));
+
+/**
+ * What moving the workout to `gym` would change → { swaps: [{ from, to }], dropped: [name] }.
+ * Exercises with a set done never change. (For the confirm, and the toast after.)
+ */
+export function gymSwitchPreview(S, gym) {
+  const a = activeOf(S);
+  const out = { swaps: [], dropped: [] };
+  if (!a || !gym || (a.gym || null) === gym || !followsPlan(a)) return out;
+  const L = liftsOf(S);
+  const at = gymContext(L, gym);
+  const can = name => availableAt(findByName(L.list, name) || { name }, gym, at.gymIds);
+  const names = a.exercises.map(ex => (exerciseLift(L.list, ex) || {}).name || '');
+  const have = new Set(names.map(norm));
+  a.exercises.forEach((ex, i) => {
+    if (!names[i] || ex.sets.some(st => st.done)) return;
+    const to = switchExercise(a.rotaSession, names[i], a.gym || null, gym, can);
+    if (to === 'keep') return;
+    if (!to || (norm(to.name) !== norm(names[i]) && have.has(norm(to.name)))) { out.dropped.push(names[i]); return; }
+    if (norm(to.name) !== norm(names[i])) { out.swaps.push({ from: names[i], to: to.name }); have.add(norm(to.name)); }
+  });
+  return out;
+}
+
+/**
  * Move the workout to another gym. Before any set is ticked this is just
  * a switch; with sets done the UI asks first — the done sets keep their
  * numbers and are saved under the new gym (they're tagged on Finish).
  * Not-done rows of a perGym lift still holding the old gym's pre-fill
  * are re-filled from the new gym's history (a typed number is kept).
  * Remembered as lastGym.
+ *
+ * THE PLAN SWITCHES WITH IT (owner, 2026-11-13). In a workout that
+ * follows a plan (followsPlan), every exercise with no set done yet
+ * becomes its counterpart in the new gym's plan (gymPlan.js
+ * switchExercise) — its sets and reps, that gym's weights — or leaves
+ * when the new gym cannot do it and the plan has nothing in its place.
+ * An exercise with a set done stays exactly as it is, and so does one
+ * the owner added that the new gym has. Order is kept.
  */
-export function setWorkoutGym(prev, gym) {
+export function setWorkoutGym(prev, gym, { ids = newId } = {}) {
   const a = activeOf(prev);
   if (!a || !gym || (a.gym || null) === gym) return prev;
   const L = liftsOf(prev);
   if (!gymList(L).some(g => g.id === gym)) return prev;
   const night = a.shift === 'night';
+  const planned = followsPlan(a);
+  const gymIds = activeGyms(L).map(g => g.id);
+  const can = name => availableAt(findByName(L.list, name) || { name }, gym, gymIds);
+  const inUse = new Set(a.exercises.map(ex => ex.liftId));
   const exercises = a.exercises.map(ex => {
     const lift = exerciseLift(L.list, ex);
+    if (planned && lift && !ex.sets.some(st => st.done)) {
+      const to = switchExercise(a.rotaSession, lift.name, a.gym || null, gym, can);
+      if (!to) { inUse.delete(ex.liftId); return null; }
+      if (to !== 'keep' && norm(to.name) !== norm(lift.name)) {
+        const next = findByName(L.list, to.name);
+        const id = next ? next.id : progId(to.name);
+        inUse.delete(ex.liftId);
+        if (inUse.has(id)) return null;               // already in the workout: no second copy
+        inUse.add(id);
+        const filled = ex.sets.some(st => st.weight != null || st.reps != null);
+        const { rows } = planFor(prev, next, { sets: to.sets, reps: to.reps, night, gym });
+        const out = { liftId: id, sets: rows.map(r => row(ids('st'), filled ? r.reps : null, filled ? r.weight : null)) };
+        if (!next) {
+          const ms = PROGRAMME_MUSCLES[to.name] || musclesOf({ name: to.name });
+          out.pending = { key: id, name: to.name, load: guessLoad(to.name), muscles: ms.length ? ms : [] };
+        }
+        if (to.reps) out.target = String(to.reps);
+        if (to.optional) out.optional = true;
+        return out;
+      }
+    }
     if (!perGymOf(lift)) return ex;
     const target = ex.target || null;
     const was = planFor(prev, lift, { sets: ex.sets.length, reps: target, night, gym: a.gym || null }).rows;
@@ -750,7 +830,7 @@ export function setWorkoutGym(prev, gym) {
       return { ...st, weight: w };
     });
     return changed ? { ...ex, sets } : ex;
-  });
+  }).filter(Boolean);
   return withLifts(prev, l => ({ ...setLastGym(withGyms(l), gym), active: { ...a, gym, exercises } }));
 }
 
@@ -1221,7 +1301,9 @@ export function templateStart(S, tpl, today, opts = {}) {
   return {
     source: 'template', name: tpl.name, rotaSession: tpl.rotaSession || null, shift: day ? day.shift : null, ...(gym ? { gym } : {}),
     ...(tpl.builtIn || !tpl.id ? {} : { templateId: tpl.id }),
-    exercises: tpl.exercises.map(x => {
+    // A built-in programme session is the gym's own plan for it, like the
+    // suggestion; a template the owner saved is theirs, exercise for exercise.
+    exercises: (tpl.builtIn && isPlanSession(tpl.rotaSession) ? fitForGym(planOf(gym, tpl.rotaSession), gymContext(L, gym)).exercises : tpl.exercises).map(x => {
       const lift = (x.liftId && list.find(l => l.id === x.liftId)) || (x.name ? findByName(list, x.name) : null);
       const { rows } = planFor(S, lift, { sets: x.sets, reps: x.reps, night, gym });
       return { liftId: lift ? lift.id : null, liftKey: lift ? lift.id : x.name ? progId(x.name) : null, name: lift ? lift.name : x.name, sets: x.sets, reps: x.reps, optional: x.optional, rows };

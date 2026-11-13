@@ -19,7 +19,7 @@ import { useEffect, useRef, useState } from 'react';
 import Icon from '../../Icon';
 import { Sheet, Button, IconButton, Segmented, Chip } from './ui';
 import { STEP_CHOICES } from '../../../lib/lifts/store';
-import { LOAD_TYPES, LOAD_LABEL, bannedRule, perGymOf, perGymByName, stepFor, DEFAULT_STEP } from '../../../lib/lifts/lifts';
+import { LOAD_TYPES, LOAD_LABEL, bannedRule, perGymOf, perGymByName, stepFor, DEFAULT_STEP, onlyGymOf } from '../../../lib/lifts/lifts';
 
 const COMPARE = [{ value: 'gym', label: 'Per gym' }, { value: 'all', label: 'All gyms' }];
 const ROW_H = 64;
@@ -61,12 +61,14 @@ function InlineName({ value, label, max = 60, onSave, testId }) {
 
 function LiftRow({ lift, count, index, total, gyms, focus, onRename, onPerGym, onMenu, drag }) {
   const per = perGymOf(lift);
+  const only = onlyGymOf(lift, gyms.filter(g => !g.archived).map(g => g.id));
   const ref = useRef(null);
   useEffect(() => { if (focus && ref.current) ref.current.scrollIntoView({ block: 'center' }); }, [focus]);
   const steps = per && lift.stepByGym ? Object.entries(lift.stepByGym).map(([g, s]) => `${(gyms.find(x => x.id === g) || { name: g }).name} ${s}`).join(' · ') : null;
   const meta = [
     LOAD_LABEL[lift.load], `${count} ${count === 1 ? 'set' : 'sets'}`,
     lift.step ? `step ${lift.step}` : null, steps ? `step ${steps}` : null,
+    only ? `only at ${(gyms.find(x => x.id === only) || { name: only }).name}` : null,
     bannedRule(lift) ? 'not in programme' : null,
   ].filter(Boolean).join(' · ');
   const dy = drag && drag.id === lift.id ? drag.dy : 0;
@@ -92,9 +94,12 @@ function LiftRow({ lift, count, index, total, gyms, focus, onRename, onPerGym, o
   );
 }
 
-/** The lift's ⋯: move, weight step, archive / delete. */
-function LiftMenu({ lift, count, gyms, first, last, onClose, onMove, onStep, onArchive, onDelete }) {
+/** The lift's ⋯: move, weight step, where it can be done, archive / delete. */
+function LiftMenu({ lift, count, gyms, first, last, onClose, onMove, onStep, onOnly, onArchive, onDelete }) {
   const per = perGymOf(lift);
+  const liveGyms = gyms.filter(g => !g.archived);
+  const only = onlyGymOf(lift, liveGyms.map(g => g.id));
+  const whereOpts = [{ value: '', label: 'Any gym' }, ...liveGyms.map(g => ({ value: g.id, label: `Only ${g.name}` }))];
   const def = DEFAULT_STEP[lift.load] || 2.5;
   const stepOpts = [{ value: '', label: `Default · ${def}` }, ...STEP_CHOICES.map(s => ({ value: String(s), label: String(s) }))];
   const act = fn => () => { fn(); onClose(); };
@@ -123,6 +128,20 @@ function LiftMenu({ lift, count, gyms, first, last, onClose, onMove, onStep, onA
           </div>
         )}
         {per && <p className="lf-meta">A machine&apos;s stack differs gym to gym, so each gym keeps its own step.</p>}
+        {!lift.archived && onOnly && liveGyms.length > 1 && (
+          <>
+            <p className="lf-eyebrow">// Where you can do it</p>
+            <div className="lh-menu-field">
+              <Segmented label={`Where you can do ${lift.name}`} size="sm" full options={whereOpts} value={only || ''}
+                         onChange={v => onOnly(lift.id, v || null)} testId="lh-only" />
+            </div>
+            <p className="lf-meta">
+              {only
+                ? `Only ${(liveGyms.find(g => g.id === only) || { name: only }).name} has the kit. It is never planned or offered at another gym.`
+                : 'Pick a gym if only one has the kit. Each gym has its own plan; this stops the lift being planned where it can’t be done.'}
+            </p>
+          </>
+        )}
         <div className="lh-menu-gap" />
         <Button variant="secondary" size="lg" block icon={lift.archived ? 'rotate-ccw' : 'archive'} onClick={act(() => onArchive(lift.id, !lift.archived))}>
           {lift.archived ? 'Restore' : 'Archive'}
@@ -226,7 +245,7 @@ function AddGym({ onAddGym }) {
 }
 
 export default function ManageSheet({
-  lifts, counts, onClose, onAdd, onRename, onMove, onArchive, onDelete, onPerGym, onStep,
+  lifts, counts, onClose, onAdd, onRename, onMove, onArchive, onDelete, onPerGym, onStep, onOnly,
   gyms = [], gymCounts = new Map(), onAddGym, onRenameGym, onArchiveGym, onDeleteGym, focus = null,
 }) {
   const [menu, setMenu] = useState(null);
@@ -324,7 +343,7 @@ export default function ManageSheet({
 
       {menuLift && (
         <LiftMenu lift={menuLift} count={counts.get(menuLift.id) || 0} gyms={gyms} first={ai <= 0} last={ai < 0 || ai === active.length - 1}
-                  onClose={() => setMenu(null)} onMove={onMove} onStep={onStep} onArchive={onArchive} onDelete={onDelete} />
+                  onClose={() => setMenu(null)} onMove={onMove} onStep={onStep} onOnly={onOnly} onArchive={onArchive} onDelete={onDelete} />
       )}
     </Sheet>
   );

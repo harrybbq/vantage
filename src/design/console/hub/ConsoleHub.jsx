@@ -18,7 +18,7 @@
  * Widget bodies write the same keys they write in classic (logs, habits,
  * vitalsLog …), always through functional `update`.
  */
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import Icon from '../../../components/Icon';
 import { Sheet } from '../ui';
 import RatingsPanel from '../../../components/RatingsPanel';
@@ -30,7 +30,7 @@ import { toggleTrackerToday } from '../../../lib/trackers/tickEffects';
 import { isRetiredWidget } from '../../../lib/widgets/retired';
 import { useHubGrid, makeId } from './useHubGrid';
 import { useFriendsHub } from './useFriendsHub';
-import { sizesFor, setItemSize, removeItem, addItem, patchItem, moveVisible } from './grid';
+import { sizesFor, setItemSize, removeItem, addItem, patchItem, moveVisible, desktopCols } from './grid';
 import { metaOf, allowType } from './catalogue';
 import HubGrid from './HubGrid';
 import WidgetBody from './WidgetBody';
@@ -102,19 +102,40 @@ export default function ConsoleHub(props) {
   const openRatings = () => setRatingsOpen(true);
   const openRewards = () => setRewardsOpen(true);
   const cardStyle = resolveCardStyle(S);
+  // Desktop columns follow the page's width (grid.js desktopCols): six on a very wide screen.
+  const hubRef = useRef(null);
+  const [deskCols, setDeskCols] = useState(4);
+  useLayoutEffect(() => {
+    const el = hubRef.current;
+    if (!el || isMobile) return undefined;
+    const read = () => {
+      const ui = parseFloat(getComputedStyle(el).getPropertyValue('--cx-ui')) || 1;
+      const next = desktopCols(el.clientWidth / ui);
+      setDeskCols(prev => (prev === next ? prev : next));
+    };
+    read();
+    if (typeof ResizeObserver === 'undefined') return undefined;
+    const ro = new ResizeObserver(read);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [isMobile]);
   const takeover = !isMobile && hub.selected;
 
   return (
     <section className={`section active cx-page cx-hub-page${isMobile ? ' is-phone' : ' is-desk'}`} aria-label="Hub">
-      <div className="cx-hub" data-cx-card={cardStyle}>
+      <div className="cx-hub" data-cx-card={cardStyle} ref={hubRef}>
         {isMobile
           ? <PlayerCard S={S} visionState={visionState} hub={hub} navigate={navigate} onOpenVisions={onOpenVisions} onOpenRatings={openRatings} onOpenRewards={openRewards} />
-          : <PlayerStrip S={S} visionState={visionState} hub={hub} navigate={navigate} onOpenVisions={onOpenVisions} onOpenRatings={openRatings} onOpenRewards={openRewards} />}
+          /* Drawn at its design size and zoomed by the screen scale (.cx-uizoom): the ring,
+             avatars, bars and row heights grow with the type, not behind it. */
+          : <div className="cx-uizoom"><PlayerStrip S={S} visionState={visionState} hub={hub} navigate={navigate} onOpenVisions={onOpenVisions} onOpenRatings={openRatings} onOpenRewards={openRewards} /></div>}
 
         {/* Onboarding's Getting started: renders nothing unless this
             account picked (S.onboarding.picks) and has items left. */}
-        <GettingStartedCard S={S} update={update} variant="console" phone={!!isMobile}
-                            friends={hub.friends?.friends?.length} />
+        <div className={isMobile ? undefined : 'cx-uizoom'} style={{ display: 'contents' }}>
+          <GettingStartedCard S={S} update={update} variant="console" phone={!!isMobile}
+                              friends={hub.friends?.friends?.length} />
+        </div>
 
         {takeover ? (
           <FriendTakeover hub={hub} />
@@ -123,7 +144,7 @@ export default function ConsoleHub(props) {
             {items.length ? (
               <HubGrid
                 items={items}
-                cols={isMobile ? 2 : 4}
+                cols={isMobile ? 2 : deskCols}
                 isMobile={isMobile}
                 hasPro={hasPro}
                 presetIds={presetIds}

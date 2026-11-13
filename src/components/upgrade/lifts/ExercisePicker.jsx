@@ -33,14 +33,16 @@
 import { useMemo, useRef, useState } from 'react';
 import Icon from '../../Icon';
 import { Sheet, Segmented, Button, Chip } from './ui';
-import { musclesOf, MUSCLES, PROGRAMME_TEMPLATES } from '../../../lib/lifts/workout';
+import { musclesOf, MUSCLES } from '../../../lib/lifts/workout';
+import { PROGRAMME_NAMES } from '../../../data/trainingProgramme';
 import { perGymOf, dayNo, num } from '../../../lib/lifts/lifts';
 import { realSetText } from '../../../lib/lifts/ui';
 import { norm } from '../../../lib/lifts/muscles';
 import { catalogueFor } from '../../../lib/lifts/catalogue';
 
 const initials = name => String(name || '').split(/[\s,-]+/).filter(w => /^[a-z]/i.test(w)).slice(0, 2).map(w => w[0].toUpperCase()).join('') || '·';
-const PLAN_NAMES = new Set(PROGRAMME_TEMPLATES.flatMap(t => t.exercises.map(x => norm(x.name))));
+// In either gym's plan (trainingProgramme.js PROGRAMMES).
+const PLAN_NAMES = new Set(PROGRAMME_NAMES.map(norm));
 // Curly and straight apostrophes match each other ("captain's" finds "Captain’s").
 const fold = t => String(t || '').toLowerCase().replace(/[’‘`]/g, "'");
 const LOADS = [{ value: 'weight', label: 'Weight' }, { value: 'per_hand', label: 'Per dumbbell' }, { value: 'bodyweight_plus', label: 'Bodyweight + added' }];

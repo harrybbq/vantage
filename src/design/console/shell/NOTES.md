@@ -32,3 +32,11 @@ changes needed in files this area does not own (see ../README.md §7).
 - `data-cx-nav="<id>"` on sidebar items, phone tabs, More rows; `data-cx-nav="more"` on the More tab (SWEEP's tour).
 - `navSection()` in nav.js: the holiday route reads as Track (title and sidebar highlight) while Holiday has no entry. Pinned in nav.test.mjs.
 - Pages no longer draw their own title (PageHead, Track); the bars are the page h1 everywhere.
+
+## The smaller app (2026-11-12)
+
+- **Scoped navigation.** `nav.js` lists take `scope` (a Set from `lib/onboarding/areas.js` `navScope(S)`, or null for everything). Null is every account that is not scoped, and their lists are exactly as before. Scoped: the sidebar holds Hub, Track, the chosen areas, an **Add an area** row, then Settings; the phone tabs are Hub, Track and the first two shown areas (`tabItems`), with the rest in More. Keyboard hints are not drawn when scoped (the numbers would skip).
+- **Add an area** opens `AddAreaSheet` (in `ConsoleShell.jsx`): `addArea` writes `S.onboarding.added` and nothing else, then the shell navigates to the area's first section. The shell now reads `update` from the section prop bag.
+- A destination also shows once it has something in it, so nothing with data is ever out of the menu. Routes, the 1 to 5 keys and search still reach every section: this is a view, not a switch.
+- The hub's League and Friends cards are not seeded for a scoped account without Friends (`grid.js` `opts.social`).
+

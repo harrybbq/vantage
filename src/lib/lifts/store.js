@@ -3,7 +3,8 @@
  *
  *   S.lifts = {
  *     list: [{ id, name, load: 'weight'|'bodyweight_plus'|'per_hand', unit: 'kg', archived?: true, createdAt,
- *              muscles?: string[], perGym?: boolean }],
+ *              muscles?: string[], perGym?: boolean,
+ *              only?: gymId | false  — the one gym it can be done at (false: any, said by hand) }],
  *     log:  [{ id, liftId, date: 'YYYY-MM-DD', weight, reps, notes?, rpe?, shift?, createdAt, sessionId?, gym? }],
  *     // gyms (Oct 2026) — additive:
  *     gyms?:      [{ id, name, archived?: true }] — seeded with DXC / Greenock (fixed ids)
@@ -356,6 +357,22 @@ export function setPerGym(lifts, liftId, on) {
   const cur = list.find(l => l.id === liftId);
   if (!cur || cur.perGym === !!on) return lifts;
   return { ...lifts, list: list.map(l => (l.id === liftId ? { ...l, perGym: !!on } : l)) };
+}
+
+/**
+ * Where a lift can be done: a gym id (only there) or null (any gym). An
+ * explicit choice, stored on the lift as `only` — `false` for "any gym",
+ * so it beats a name default (lifts.js onlyGymOf). Additive: one key on
+ * one lift. The same store back when nothing changes or the gym is gone.
+ */
+export function setOnlyGym(lifts, liftId, gymId) {
+  const list = lifts.list || [];
+  const cur = list.find(l => l.id === liftId);
+  if (!cur) return lifts;
+  if (gymId && !gymList(lifts).some(g => g.id === gymId)) return lifts;
+  const next = gymId || false;
+  if (cur.only === next) return lifts;
+  return { ...lifts, list: list.map(l => (l.id === liftId ? { ...l, only: next } : l)) };
 }
 
 // ── Per-lift rest and weight step (additive, optional keys) ──────────

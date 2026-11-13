@@ -41,7 +41,20 @@ const RANK = { small: 0, medium: 1, large: 2 };
 export const SIZE_LABEL = { small: 'Small', medium: 'Medium', large: 'Large' };
 export const SIZE_DIMS = { small: '1×1', medium: '2×1', large: '2×2' };
 
-/** Cells each size takes: [w, h] on desktop (4 cols) and phone (2 cols). */
+/**
+ * How many columns the desktop grid has, from its width in DESIGN px
+ * (real px ÷ the console's screen scale, --cx-ui). Four, as drawn for a
+ * 1400 px page; six once the page is wide enough that each column is
+ * still a full-size card (owner's 3840 px screen, Nov 2026: four columns
+ * there made every card 1500 px wide, a league table stretched edge to
+ * edge and two cards to a row). Phones are two, decided by the caller.
+ */
+export const WIDE_COLS_FROM = 1860;
+export function desktopCols(designWidth) {
+  return Number(designWidth) >= WIDE_COLS_FROM ? 6 : 4;
+}
+
+/** Cells each size takes: [w, h] on desktop (4 or 6 cols) and phone (2 cols). */
 export function spanOf(size, cols = 4) {
   if (cols <= 2) return size === 'small' ? [1, 1] : [2, 1];
   if (size === 'small') return [1, 1];
@@ -184,11 +197,12 @@ function carry(w) {
  *      the classic lists are never touched).
  *
  * `opts.presetIds` (Set of app-preset ids), `opts.allow(type)` (owner-
- * only / build gates), `opts.hasUpcoming`, `opts.makeId` (unused for
+ * only / build gates), `opts.hasUpcoming`, `opts.hasPay`, `opts.social`
+ * (false: no League/Friends cards), `opts.makeId` (unused for
  * seeded items, whose ids are derived — kept for symmetry).
  */
 export function seedHubGrid(S, opts = {}) {
-  const { presetIds = null, allow = () => true, hasUpcoming = true, hasPay = false } = opts;
+  const { presetIds = null, allow = () => true, hasUpcoming = true, hasPay = false, social = true } = opts;
   const desk = list(S && S.hubWidgets).filter(isObj);
   const phone = list(S && S.mobileWidgets).filter(isObj);
   const items = [];
@@ -209,8 +223,13 @@ export function seedHubGrid(S, opts = {}) {
   };
 
   push('today', WIDGET_SIZES.today.def, {}, 'cx-today');
-  push('league', WIDGET_SIZES.league.def, {}, 'cx-league');
-  push('friends', WIDGET_SIZES.friends.def, {}, 'cx-friends');
+  // League and Friends: not for a scoped account that did not ask for
+  // Friends and has none (lib/onboarding/areas.js) — an empty table
+  // asking to be set up is what the smaller app is for removing.
+  if (social) {
+    push('league', WIDGET_SIZES.league.def, {}, 'cx-league');
+    push('friends', WIDGET_SIZES.friends.def, {}, 'cx-friends');
+  }
   if (hasUpcoming) push('upnext', WIDGET_SIZES.upnext.def, {}, 'cx-upnext');
   // Until pay: only for someone who has marked a pay day (lib/money/payday).
   if (hasPay) push('untilpay', WIDGET_SIZES.untilpay.def, {}, 'cx-untilpay');

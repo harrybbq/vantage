@@ -29,11 +29,11 @@
  * the builder aims at; they roll up to the twelve groups the body map
  * and muscles.js use.
  */
-import { PROGRAMME } from '../../data/trainingProgramme.js';
+import { PROGRAMME, PROGRAMMES, programmeFor } from '../../data/trainingProgramme.js';
 import { musclesOf, norm } from './muscles.js';
 import { blockProgress, plannedSessions, sessionOfWorkout, ANCHOR_CODES } from './plan.js';
 import { liftsOf } from './store.js';
-import { addDays, isIso, num, e1rm, bannedRule, dayNo } from './lifts.js';
+import { addDays, isIso, num, e1rm, bannedRule, dayNo, availableAt } from './lifts.js';
 
 // ── Parts ─────────────────────────────────────────────────────────
 
@@ -136,13 +136,44 @@ export const EXERCISE_PARTS = {
   'Pallof press': { Obliques: 1, Abs: 0.25 },
   // Padovan 2025 (HD-EMG): wide grip favours mid-trap; biceps and rear delt as any row.
   'Wide-grip cable row': { 'Mid-back': 1, 'Rear delts': 0.5, Lats: 0.5, Biceps: 0.5, Brachialis: 0.25 },
+
+  // ── The Greenock plan (PROGRAMME_GREENOCK, Nov 2026) ──────────────
+  // NOT separately reviewed: each is credited as the reviewed exercise it
+  // stands in for, or as the nearest one above, and says which. Review
+  // these with the rest when docs/LIFTS_MUSCLE_EVIDENCE.md is next opened.
+  // A seated lumbar extension: the erectors without the hip hinge, so no
+  // glute or hamstring credit (unlike the 45° hyperextension).
+  'Lower back machine': { 'Lower back': 1 },
+  // As the leg press: Kinoshita 2026 found no rectus femoris growth from a
+  // multi-joint knee extension; squat patterns grow the adductors (Kubo 2019).
+  'Hack squat': { 'Outer & inner quads': 1, 'Glute max': 0.5, Adductors: 0.5 },
+  // As the hack squat. Glute credit stays at half: belt squats showed lower
+  // glute activity than a back squat (Evans 2019, EMG only).
+  'Belt squat machine': { 'Outer & inner quads': 1, 'Glute max': 0.5, Adductors: 0.5 },
+  // As the incline dumbbell press it replaces.
+  'Incline Smith Machine Bench': { 'Upper chest': 1, 'Mid & lower chest': 0.5, 'Front delts': 0.5, 'Triceps lateral & medial': 0.5 },
+  // A fly: the pec alone, no triceps.
+  'Elbow-supported pec deck': { 'Mid & lower chest': 1 },
+  // As the cable bar pullover it replaces.
+  'Pullover machine': { Lats: 1, 'Triceps long head': 0.25, 'Mid & lower chest': 0.25 },
+  // As the lat pulldown it replaces (the same vertical pull).
+  'Assisted pull-up': { Lats: 1, 'Mid-back': 0.5, Biceps: 0.5, Brachialis: 0.25, 'Rear delts': 0.25 },
+  // As the wide-grip cable row it replaces.
+  'Chest-supported row': { 'Mid-back': 1, 'Rear delts': 0.5, Lats: 0.5, Biceps: 0.5, Brachialis: 0.25 },
+  // As the cable archer pull it replaces (horizontal abduction).
+  'Reverse pec deck (rear delt)': { 'Rear delts': 1, 'Mid-back': 0.5 },
+  // As the incline curl it replaces.
+  'Preacher curl machine': { Biceps: 1, Brachialis: 0.5 },
+  'Adductor machine': { Adductors: 1 },
+  // Hip abduction is the glute medius's job; no growth trial of the machine.
+  'Abductor machine': { 'Glute medius': 1 },
 };
 const PROGRAMME_PARTS = Object.fromEntries(Object.entries(EXERCISE_PARTS).map(([k, v]) => [norm(k), v]));
 
 /** Which part of a group a lift's NAME points at, for lifts outside the programme. */
 const PART_WORDS = {
   Shoulders: [[/lateral|side\s*raise|upright/i, 'Side delts'], [/rear|face\s*pull|reverse\s*fly|archer/i, 'Rear delts'], [/./, 'Front delts']],
-  Back: [[/pull-?\s*down|pull-?\s*up|chin|pullover|straight-?arm/i, 'Lats'], [/./, 'Mid-back']],
+  Back: [[/pull-?\s*down|pull-?\s*up|\bchin|pullover|straight-?arm/i, 'Lats'], [/./, 'Mid-back']],
   Chest: [[/incline|low-?to-?high|reverse-?grip/i, 'Upper chest'], [/./, 'Mid & lower chest']],
   Triceps: [[/overhead|french|skull|extension/i, 'Triceps long head'], [/./, 'Triceps lateral & medial']],
   Biceps: [[/reverse|hammer|brachial/i, 'Brachialis'], [/./, 'Biceps']],
@@ -500,7 +531,7 @@ export function weekView(S, today, { extra = null } = {}) {
 
 const REPS_OF = (() => {
   const out = {};
-  for (const code of Object.keys(PROGRAMME)) for (const x of PROGRAMME[code]) if (!out[norm(x.name)]) out[norm(x.name)] = x.reps;
+  for (const P of Object.values(PROGRAMMES)) for (const code of Object.keys(P)) for (const x of P[code]) if (!out[norm(x.name)]) out[norm(x.name)] = x.reps;
   return out;
 })();
 const PER_SESSION_CAP = 10;
@@ -527,14 +558,20 @@ const CATCH_UP_TOP = 6;
 const SLACK = 0.25;
 const fmt = n => (Number.isInteger(n) ? String(n) : n.toFixed(1));
 
-/** Candidates for a session: the programme's exercises for its groups, then the owner's own lifts. */
-function candidates(groups, list, today, sessions = []) {
+/**
+ * Candidates for a session: the programme's exercises for its groups, then the owner's own lifts.
+ * `at.gym`: that gym's own plan (trainingProgramme.js PROGRAMMES), and only
+ * what it has (lifts.js availableAt) — a hack squat is never picked at DXC.
+ */
+function candidates(groups, list, today, sessions = [], at = {}) {
   const out = new Map();
-  for (const code of Object.keys(PROGRAMME)) {
-    for (const x of PROGRAMME[code]) {
+  const here = x => availableAt(x, at.gym || null, at.gymIds || null);
+  const P = programmeFor(at.gym || null);
+  for (const code of Object.keys(P)) {
+    for (const x of P[code]) {
       const parts = partsOf({ name: x.name });
       const m = mainPart(parts);
-      if (!m || !groups.includes(GROUP_OF[m]) || out.has(norm(x.name))) continue;
+      if (!m || !groups.includes(GROUP_OF[m]) || out.has(norm(x.name)) || !here((list || []).find(l => l && !l.archived && norm(l.name) === norm(x.name)) || { name: x.name })) continue;
       out.set(norm(x.name), { name: x.name, parts, main: m, programme: true, gsets: creditGroups({ name: x.name }, 1, {}) });
     }
   }
@@ -543,7 +580,7 @@ function candidates(groups, list, today, sessions = []) {
   const recent = new Set();
   for (const w of sessions) if (w && isIso(w.date) && w.date >= since) for (const ex of w.exercises || []) recent.add(ex.liftId);
   for (const lift of list || []) {
-    if (!lift || lift.archived || bannedRule(lift) || out.has(norm(lift.name))) continue;
+    if (!lift || lift.archived || bannedRule(lift) || out.has(norm(lift.name)) || !here(lift)) continue;
     const used = recent.has(lift.id);
     const parts = partsOf(lift);
     const m = mainPart(parts);
@@ -580,7 +617,7 @@ const poss = g => { const w = g.toLowerCase(); return w.endsWith('s') ? `${w}'` 
  * The session's own written exercises win ties, so a week on plan comes
  * out close to the programme's Upper / Lower.
  */
-export function buildAdaptive(S, today, session) {
+export function buildAdaptive(S, today, session, opts = {}) {
   if (!ANCHORS[session] || !isIso(today)) return null;
   const L = liftsOf(S);
   if (!(L.sessions || []).some(w => w && isIso(w.date) && w.date <= today)) return null;
@@ -590,7 +627,8 @@ export function buildAdaptive(S, today, session) {
   const readiness = readinessOn(S, today);
   const red = !!(readiness && readiness.band === 'red');
   const { targets } = weekTargets(S, today);
-  const own = new Set((PROGRAMME[session] || []).map(x => norm(x.name)));
+  // The session as the gym chosen writes it wins ties (opts.gym; none → the base plan).
+  const own = new Set((programmeFor(opts.gym || null)[session] || []).map(x => norm(x.name)));
 
   // Done so far (logged + assumed), and what the anchors still to come will cover.
   const t = tally(week.workouts, L.list);
@@ -619,7 +657,8 @@ export function buildAdaptive(S, today, session) {
   const need0 = { ...need };
   const mustHit = groups.filter(g => !FREQ_EXEMPT.includes(g) && (hits[g] || 0) < 2 && PARTS.some(([p, gg]) => gg === g && (targets[p] || 0) > 0));
 
-  const pool = candidates(groups, L.list, today, L.sessions || []);
+  // opts.gym / opts.gymIds: build from what that gym has (gymPlan.js fits the result after).
+  const pool = candidates(groups, L.list, today, L.sessions || [], opts);
   const picked = [];
   const load = {};    // part sets this session gives (EXERCISE_PARTS weights)
   const gload = {};   // group sets this session gives (body-map counting, for hits)

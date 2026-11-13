@@ -109,7 +109,6 @@ const RAW = [
   // Legs
   ['Barbell back squat', W, ['Quads', 'Glutes', 'Adductors']],
   ['Front squat', W, ['Quads', 'Glutes', 'Adductors']],
-  ['Hack squat', W, ['Quads', 'Glutes', 'Adductors']],
   ['Smith machine squat', W, ['Quads', 'Glutes', 'Adductors']],
   ['Goblet squat', W, ['Quads', 'Glutes', 'Adductors']],
   ['Bulgarian split squat', H, ['Quads', 'Glutes']],

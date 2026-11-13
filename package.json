@@ -33,7 +33,7 @@
     "check:ratingctx": "node src/lib/ratings/ctx.test.mjs",
     "check:payday": "node src/lib/money/payday.test.mjs",
     "check:devicecal": "node src/lib/calendar/device.test.mjs",
-    "check:onboarding": "node src/lib/onboarding/onboarding.test.mjs && node src/lib/onboarding/bus.test.mjs",
+    "check:onboarding": "node src/lib/onboarding/onboarding.test.mjs && node src/lib/onboarding/bus.test.mjs && node src/lib/onboarding/areas.test.mjs && node src/lib/account/cohort.test.mjs",
     "check:console": "node scripts/check-console.mjs",
     "check:wearablestrip": "node src/lib/wearables/strip.test.mjs",
     "check:wearablerevoke": "node netlify/lib/wearableRevoke.test.mjs",
@@ -115,7 +115,7 @@
     "check:installprompt": "node src/lib/native/installPrompt.test.mjs",
     "check:coachguard": "node netlify/lib/coachWearableGuard.test.mjs",
     "check:books": "node src/lib/books/books.test.mjs && node netlify/lib/booksFunction.test.mjs",
-    "check:lifts": "node src/lib/lifts/adaptive.test.mjs && node src/lib/lifts/bodymap.test.mjs && node src/lib/lifts/history.test.mjs && node src/lib/lifts/lifts.test.mjs && node src/lib/lifts/workout.test.mjs && node src/lib/lifts/gyms.test.mjs && node src/lib/lifts/plan.test.mjs && node src/lib/lifts/ui.test.mjs"
+    "check:lifts": "node src/lib/lifts/adaptive.test.mjs && node src/lib/lifts/bodymap.test.mjs && node src/lib/lifts/history.test.mjs && node src/lib/lifts/lifts.test.mjs && node src/lib/lifts/workout.test.mjs && node src/lib/lifts/gyms.test.mjs && node src/lib/lifts/gymPlan.test.mjs && node src/lib/lifts/plan.test.mjs && node src/lib/lifts/ui.test.mjs"
   },
   "dependencies": {
     "@capacitor/android": "^8.5.3",

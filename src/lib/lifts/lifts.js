@@ -57,7 +57,7 @@
  * a bucket of its own, never rewritten. perGym defaults from the name
  * (perGymByName) until the owner sets it on the lift.
  */
-import { BANNED_LIFTS } from '../../data/trainingProgramme.js';
+import { BANNED_LIFTS, GYM_ONLY } from '../../data/trainingProgramme.js';
 
 export const REP_MAX_NS = [1, 3, 5, 8, 10, 12];
 export const LOW_CONFIDENCE_REPS = 12;
@@ -96,6 +96,29 @@ export function perGymByName(name) {
 }
 /** Does this lift compare within one gym? Its own `perGym` wins over the name rule. */
 export const perGymOf = lift => !!lift && (typeof lift.perGym === 'boolean' ? lift.perGym : perGymByName(lift.name));
+
+/*
+ * ── Where a lift can be done (Nov 2026) ─────────────────────────────
+ * Some kit exists at one gym only (a Smith machine at Greenock, not at
+ * DXC). `lift.only` is that gym's id; `false` is the owner saying "any
+ * gym", which beats the name default below; absent → GYM_ONLY's default
+ * for the name (trainingProgramme.js), else any gym. A gym that is no
+ * longer in use (`gymIds`, when the caller has them) restricts nothing,
+ * so archiving a gym can never leave a lift with nowhere to be done.
+ */
+const ONLY_BY_NAME = Object.fromEntries(Object.entries(GYM_ONLY).map(([k, v]) => [String(k).replace(/\s+/g, ' ').trim().toLowerCase(), v]));
+/** The one gym a lift can be done at → its id, or null for any gym. Works for `{ name }` too. */
+export function onlyGymOf(lift, gymIds = null) {
+  if (!lift || lift.only === false) return null;
+  const own = typeof lift.only === 'string' && lift.only ? lift.only : null;
+  const id = own || ONLY_BY_NAME[String(lift.name || '').replace(/\s+/g, ' ').trim().toLowerCase()] || null;
+  return id && (!gymIds || gymIds.includes(id)) ? id : null;
+}
+/** Can this lift be done at `gym`? No gym chosen → yes. */
+export const availableAt = (lift, gym, gymIds = null) => {
+  const only = onlyGymOf(lift, gymIds);
+  return !only || !gym || only === gym;
+};
 
 /**
  * The log as one gym sees `lift`: for a perGym lift, only its sets at

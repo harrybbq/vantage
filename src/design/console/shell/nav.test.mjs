@@ -3,7 +3,7 @@
  */
 import assert from 'node:assert/strict';
 import {
-  CONSOLE_SHOW_HOLIDAY, sidebarItems, TABS, moreItems, activeTab, canonicalSection, navSection,
+  CONSOLE_SHOW_HOLIDAY, sidebarItems, TABS, tabItems, moreItems, activeTab, canonicalSection, navSection,
   sectionTitle, longDate, shortDate, greeting, initials, paletteHint,
 } from './nav.js';
 
@@ -91,6 +91,47 @@ t('initials and palette hint', () => {
   assert.equal(paletteHint('MacIntel'), '⌘K');
   assert.equal(paletteHint('Win32'), 'Ctrl K');
   assert.equal(paletteHint(undefined), 'Ctrl K');
+});
+
+// ── Scoped navigation (lib/onboarding/areas.js), Nov 2026 ──
+
+t('no scope: every list is exactly what it was', () => {
+  assert.deepEqual(ids(sidebarItems({ scope: null })), ids(sidebarItems()));
+  assert.equal(tabItems(), TABS);
+  assert.equal(tabItems({ scope: null }), TABS);
+  assert.deepEqual(ids(moreItems({ scope: null })), ids(moreItems()));
+});
+
+t('scoped: Fitness + Friends shows Hub, Track, Leaderboard, Settings', () => {
+  const scope = new Set(['hub', 'track', 'settings', 'upgrade', 'leaderboard', 'friends']);
+  assert.deepEqual(ids(sidebarItems({ scope })), ['hub', 'track', 'leaderboard', 'settings']);
+  assert.deepEqual(tabItems({ scope }).map(x => x.label), ['Hub', 'Track', 'League', 'Friends']);
+  assert.deepEqual(ids(moreItems({ scope })), ['settings']);
+  assert.equal(activeTab('leaderboard', { tabs: tabItems({ scope }) }), 'leaderboard');
+  assert.equal(activeTab('habits', { tabs: tabItems({ scope }) }), 'more');
+});
+
+t('scoped: fewer areas, fewer tabs; the owner keeps Upgrade', () => {
+  const bare = new Set(['hub', 'track', 'settings', 'upgrade']);
+  assert.deepEqual(ids(tabItems({ scope: bare })), ['hub', 'track']);
+  assert.deepEqual(ids(sidebarItems({ scope: bare })), ['hub', 'track', 'settings']);
+  assert.deepEqual(ids(sidebarItems({ scope: bare, isOwner: true })), ['hub', 'track', 'upgrade', 'settings']);
+  assert.deepEqual(ids(moreItems({ scope: bare, isOwner: true })), ['settings', 'upgrade']);
+});
+
+t('scoped: every shown destination is on a tab or in More, whatever the scope', () => {
+  const opt = ['achievements', 'shop', 'habits', 'leaderboard', 'friends'];
+  for (let m = 0; m < 1 << opt.length; m++) {
+    const scope = new Set(['hub', 'track', 'settings', 'upgrade', ...opt.filter((_, i) => m & (1 << i))]);
+    const tabs = tabItems({ scope });
+    assert.ok(tabs.length >= 2 && tabs.length <= 4);
+    const reach = new Set([...ids(tabs), ...ids(moreItems({ scope }))]);
+    for (const id of scope) if (id !== 'upgrade') assert.ok(reach.has(id), `${id} unreachable in ${[...scope]}`);
+    for (const id of reach) assert.ok(scope.has(id), `${id} shown but not in scope`);
+    assert.equal(new Set(ids(tabs)).size + ids(moreItems({ scope })).length, reach.size, 'a destination is listed twice');
+    // Friends has no sidebar entry of its own (it is reached from Leaderboard and the top bar).
+    for (const id of ids(sidebarItems({ scope }))) assert.ok(scope.has(id));
+  }
 });
 
 console.log(`shell nav: ${n} tests passed`);

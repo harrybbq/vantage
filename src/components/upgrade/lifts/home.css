@@ -108,6 +108,8 @@
   font-family: var(--lf-mono); font-size: var(--lf-fs-floor); line-height: 16px; color: var(--lf-accent-ink); white-space: nowrap; max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
 .lifts .lh-tag.is-plus { color: var(--lf-pb); border-color: color-mix(in srgb, var(--lf-pb) 60%, transparent); background: var(--lf-pb-tint); }
 .lifts .lh-tag.is-red { color: var(--lf-danger); border-color: color-mix(in srgb, var(--lf-danger) 60%, transparent); background: var(--lf-danger-tint); }
+/* Swapped for the gym chosen (lib/lifts/gymPlan.js): plain ink, it is information, not a prompt. */
+.lifts .lh-tag.is-gym { color: var(--lf-text); border-color: var(--lf-line-strong); }
 .lifts .lh-preview-why { min-width: 0; overflow-wrap: anywhere; }
 .lifts .lh-chip { display: inline-flex; align-items: center; min-height: 32px; padding: 0 10px; box-sizing: border-box; border-radius: var(--lf-r-chip); border: 1px solid var(--lf-line-strong);
   font-family: var(--lf-mono); font-size: var(--lf-fs-floor); letter-spacing: .04em; color: var(--lf-mid); white-space: nowrap; }

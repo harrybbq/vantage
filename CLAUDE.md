@@ -32,6 +32,7 @@ retired `cream`/`dark` ids map forward in `resolveEffectiveTheme`.
 - Netlify functions own anything cross-user or secret: leaderboard, WHOOP sync (`netlify/lib/whoop.js`), AI (`ai-food-detect`, `ai-coach-daily` — need `ANTHROPIC_API_KEY` env).
 - Social: `profiles`/`friendships`/`messages`/`blocks`/`reports` tables, RLS-gated direct queries in `src/lib/friends/`. Report+block UI exists (friend card + DM ⋯ menu).
 - iPhone calendar (iOS app, Pro, 2026-11-01): `lib/calendar/device.js` + `deviceSource.js`. Read on the device, never stored: App hands calendar surfaces a VIEW of S (`withDeviceEvents`, non-enumerable symbol) — never write it back. Settings card `settings/DeviceCalendarCard.jsx`; prefs per phone in localStorage.
+- Lifts, two gyms, two plans (owner-only, 2026-11-13): `data/trainingProgramme.js` holds a written plan per gym, `PROGRAMME` (DXC, the base) and `PROGRAMME_GREENOCK`, same sessions and required sets slot for slot; a Greenock entry that takes a different exercise's slot carries `for` (the DXC name). `GYM_ONLY` records which gym has what (a lift's own `only`, set in Manage lifts › ⋯ › "Where you can do it", wins). `lib/lifts/gymPlan.js`: `planOf(gym, session)`, `switchExercise` (a session in progress changes gym: exercises with no set done become the other plan's counterpart, `workout.js` `setWorkoutGym`), `fitForGym` (safety net: nothing a gym lacks is shown). The adaptive Upper/Lower builds from the chosen gym's plan. A new exercise in either plan needs `EXERCISE_PARTS` (adaptive.js) and `PROGRAMME_MUSCLES` (muscles.js). Open: DXC has no seated leg curl, so DXC's Lower shows it as left out until the owner names what DXC has.
 - Legal: `/privacy` and `/terms` deep-link pre-auth (store requirement). Onboarding (replaced both old tours, Oct 2026): logic `src/lib/onboarding/onboarding.js`, overlay `components/onboarding/Onboarding.jsx`, hub Getting started card; per-page help: `SectionHelp`.
 
 ## Onboarding stays current (owner rule, 2026-10-29)
@@ -51,10 +52,31 @@ under "Onboarding". If it should, update the onboarding in the same PR.
 - New pick: add it to `PICKS` (its copy, icon, section, modal, target,
   check and `done(S)`), mark the button, extend the test, and check the
   pick screen still fits a 360 px phone.
+- The picks also decide the navigation for new accounts (below). A new
+  pick needs an `AREA_NAV` entry in `lib/onboarding/areas.js` (which
+  menu items it turns on) and `areas.test.mjs` extended.
 - Owner-only features (the Upgrade section, trading, Open Banking) are
   never in the onboarding.
 - Copy follows the house voice: plain, short, no claims the code doesn't
   back (check that a "counts toward your rating" line is true first).
+
+## The smaller app (decided 2026-11-12)
+Accounts created from `SMALLER_APP_FROM` (`lib/account/cohort.js`) get
+two things; every earlier account is left exactly as it was.
+- **The redesign by default** (`defaultDesignFor` in `lib/design/design.js`).
+  Nothing is written: the account's creation time decides it, and an
+  explicit `S.design` still wins. `DEFAULT_DESIGN` stays `'classic'`, so
+  for existing accounts the redesign is still the owner preview.
+- **A menu that follows the onboarding picks** (`lib/onboarding/areas.js`).
+  Hub, Track and Settings always show; a pick turns on its areas; an area
+  with data in it always shows; the rest sit behind **Add an area**
+  (console shell). It is a view: routes, search and widgets reach every
+  section, and the only state is `S.onboarding.scoped` / `.added`.
+  "Show me everything" in the onboarding means everything.
+- Not done yet, on purpose: seeded trackers (`Amount Saved`) and the
+  example goals still arrive for everyone — removing them is a delete,
+  which the data rule forbids without a decision. Diet and Vitals tabs
+  inside Track are not scoped either.
 
 ## Startup / store readiness
 `STARTUP_REQUIREMENTS.md` is the ordered checklist for getting Vantage

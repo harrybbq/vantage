@@ -20,6 +20,8 @@
  * Props
  *   S, update        state + additive updater (only onboarding.js updaters)
  *   visible          App: !S.tutorialCompleted
+ *   scoped           App: an account from the Nov 2026 cut-over on, whose
+ *                    navigation then follows these picks (lib/onboarding/areas.js)
  *   paused           App: a modal is open
  *   ctx              { friends } for the Friends check, when known
  *   onGo(section)    App's navigate (Friends → the right place per device)
@@ -77,7 +79,7 @@ function cardPos(rect) {
   };
 }
 
-export default function Onboarding({ S, update, visible, paused: modalOpen = false, ctx = {}, onGo, onDo, onClose }) {
+export default function Onboarding({ S, update, visible, scoped = false, paused: modalOpen = false, ctx = {}, onGo, onDo, onClose }) {
   const [phase, setPhase] = useState('pick');   // 'pick' | stop index
   const [chosen, setChosen] = useState([]);
   const [doing, setDoing] = useState(false);    // the first thing was started: step aside
@@ -205,11 +207,11 @@ export default function Onboarding({ S, update, visible, paused: modalOpen = fal
             <p className="ob-pick-note">Change your picks any time: Settings › Replay the welcome.</p>
             <button
               type="button" className="ob-btn ob-btn-ghost"
-              onClick={() => { update(prev => finishOverlay(setPicks(prev, []))); onGo?.('hub'); onClose?.(); }}
+              onClick={() => { update(prev => finishOverlay(setPicks(prev, [], Date.now(), { scoped }))); onGo?.('hub'); onClose?.(); }}
             >Show me everything</button>
             <button
               type="button" className="ob-btn ob-btn-primary" disabled={n === 0}
-              onClick={() => { update(prev => setPicks(prev, chosen)); setPhase(0); }}
+              onClick={() => { update(prev => setPicks(prev, chosen, Date.now(), { scoped })); setPhase(0); }}
             >{n === 0 ? 'Pick at least one' : `Continue · ${n} picked`}</button>
           </div>
         </div>

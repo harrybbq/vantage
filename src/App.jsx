@@ -16,6 +16,7 @@ import { OWNER_SURFACES_IN_BUILD } from './lib/native/ownerSurfaces';
 import { parseSecurityLink } from './lib/security/deepLink';
 import { SCHEMES, applyScheme, applyTheme, resolveEffectiveTheme, schemeFromHex, currentAccentHex } from './components/SettingsSection';
 import { useApplyDesign, DesignProvider } from './hooks/useDesign';
+import { isNewCohort } from './lib/account/cohort';
 // Console redesign mount points (src/design/console/README.md). Each area's
 // entry module is owned by that area's agent; null = classic renders.
 import DesignSlot from './design/DesignSlot';
@@ -199,7 +200,7 @@ function paywallCount(openId, S) {
   return cap ? cap.count(S) : null;
 }
 
-function Board({ userId, userEmail, onSignOut, initialSettings }) {
+function Board({ userId, userEmail, userCreatedAt = null, onSignOut, initialSettings }) {
   const {
     S, update, loading, hydrated, justMigrated, dismissMigrationBanner,
     loadError, retryLoad, startFresh, restoreFromBackup, hasBackup,
@@ -229,13 +230,15 @@ function Board({ userId, userEmail, onSignOut, initialSettings }) {
   const calendarS = useMemo(() => withDeviceEvents(S, deviceEvents), [S, deviceEvents]);
   const { isOwner } = useIsOwner(userId);
   // ── Design switch (console redesign foundation; src/design/console/README.md) ──
-  // 'classic' | 'console' from S.design, console owner-preview only until the
-  // launch flip. Sets <html data-design> + the console accent vars; provided
+  // 'classic' | 'console' from S.design. Accounts created from the Nov 2026
+  // cut-over on default to console (lib/account/cohort.js); for earlier
+  // accounts it stays an owner preview until the launch flip. Sets <html data-design> + the console accent vars; provided
   // to the tree below via <DesignProvider>. Must stay above any early return.
   const design = useApplyDesign(S, {
     isOwner,
     accent: currentAccentHex(S),
     theme: resolveEffectiveTheme(S.theme || 'cream-pro'),
+    createdAt: userCreatedAt,
   });
   // ── end design switch ──
   const isConsole = design === 'console';
@@ -1309,6 +1312,7 @@ function Board({ userId, userEmail, onSignOut, initialSettings }) {
         S={S}
         update={update}
         visible={!S.tutorialCompleted}
+        scoped={isNewCohort(userCreatedAt)}
         paused={!!openModal}
         onGo={onboardingGo}
         onDo={id => onboardingDo(id, 'overlay')}
@@ -1500,7 +1504,7 @@ export default function App() {
         ) : loader}
       >
         <SubscriptionProvider userId={session.user.id}>
-          <Board userId={session.user.id} userEmail={session.user.email} onSignOut={handleSignOut} initialSettings={pendingSettings} />
+          <Board userId={session.user.id} userEmail={session.user.email} userCreatedAt={session.user.created_at || null} onSignOut={handleSignOut} initialSettings={pendingSettings} />
         </SubscriptionProvider>
       </WebAccessBoundary>
     </BuildGateBoundary>

@@ -128,6 +128,148 @@ export const PROGRAMME = {
 };
 
 /* ══════════════════════════════════════════════════════════════════════
+   Two gyms, two plans (owner, 2026-11-13).
+   ══════════════════════════════════════════════════════════════════════
+
+   "We should have 2 lift plans, one per gym, and the plan simply
+   switches when I toggle what gym I'm at."
+
+   PROGRAMME above is the DXC plan. DXC is the smaller gym and every
+   exercise in it was chosen because DXC has the kit. Greenock has all of
+   it except the 45° hyperextension, and a good deal more; the owner
+   listed what only Greenock has and asked for its plans to be built from
+   the goals and preferences already written down in this file.
+
+   ── How the Greenock plan was built ─────────────────────────────────
+   Same five sessions, same order, same sets and reps slot for slot, so a
+   week trains each muscle the same amount whichever gym it lands in and
+   the adaptive targets (lib/lifts/adaptive.js) hold for both. A Greenock
+   machine goes in only where it does a slot's job better for THIS owner:
+
+     · the back is under treatment, so where a machine takes load off
+       the spine it wins — the belt squat (the load hangs from the hips,
+       nothing sits on the shoulders), the chest-supported row;
+     · width is the goal, so the lats get a second pattern in the week —
+       a pulldown on Pull, a pull-up on Upper — and the pullover moves to
+       the machine, which loads the lat through the whole arc;
+     · what the owner already runs there stays — the incline Smith bench
+       in place of the incline dumbbell press (their own swap, Nov 2026);
+     · favourites are not traded away for novelty: dips still lead Push
+       and Upper, the 21s stay on Pull, the cable triceps work and the
+       lateral raises are untouched. The preacher curl and the reverse
+       pec deck take the Upper's curl and rear-delt slots so the week
+       has two different versions of each rather than the same one twice;
+     · the lower back machine stands in for the hyperextension (owner);
+     · extras are OPTIONAL, never a longer required session: a pec-deck
+       finisher on Push (the owner's own DXC Push has one), adductor and
+       abductor machines on Lower — the only direct work those get.
+
+   Left out on purpose: the seated dip machine and the dip half of the
+   assisted machine (the owner dips with added weight; neither improves
+   on that). Both are in GYM_ONLY, so they are known to be Greenock's if
+   ever added as lifts.
+
+   `for` names the DXC exercise in the same slot. It is what lets a
+   session switch gyms mid-way: an exercise not started yet becomes its
+   counterpart (lib/lifts/gymPlan.js). Proposed, not confirmed — swap
+   freely.
+   ══════════════════════════════════════════════════════════════════════ */
+export const PROGRAMME_GREENOCK = {
+  Legs: [
+    { name: 'Lower back machine', sets: 4, reps: '12–15', for: '45° hyperextension' },
+    { name: 'Leg extension', sets: 3, reps: '12–15' },
+    // Named in the constraint note at the top of this file as the squat
+    // that carries the quad work. Knee-dominant, which is what Legs is.
+    { name: 'Hack squat', sets: 4, reps: '8–12', for: 'Machine leg press' },
+    { name: 'Standing calf raise', sets: 4, reps: '10–12' },
+    { name: 'Walking dumbbell lunge', sets: 3, reps: '10 per leg', optional: true },
+    { name: 'Ab crunch machine', sets: 3, reps: '12–15' },
+  ],
+  Push: [
+    { name: 'Dip', sets: 4, reps: '6–10' },
+    { name: 'Incline Smith Machine Bench', sets: 3, reps: '8–10', for: 'Incline dumbbell press' },
+    { name: 'Machine shoulder press', sets: 3, reps: '8–10' },
+    { name: 'Dumbbell lateral raise', sets: 4, reps: '12–15' },
+    { name: 'Single-arm cable triceps pushdown (cuff)', sets: 3, reps: '12–15 per arm' },
+    { name: 'Overhead cable bar extension', sets: 2, reps: '12–15', optional: true },
+    { name: 'Elbow-supported pec deck', sets: 2, reps: '12–15', optional: true },
+  ],
+  Pull: [
+    { name: 'Lat pulldown', sets: 4, reps: '8–10' },
+    { name: 'Single-arm cable row', sets: 3, reps: '10–12 per arm' },
+    { name: 'Pullover machine', sets: 3, reps: '12–15', for: 'Cable bar pullover' },
+    { name: 'Cable archer pull (rear delt)', sets: 3, reps: '15–20' },
+    { name: 'Incline dumbbell curl, 21s', sets: 3, reps: '7 + 7 + 7' },
+    { name: 'Reverse EZ-bar curl', sets: 3, reps: '12–15' },
+  ],
+  Lower: [
+    { name: 'Hip thrust', sets: 4, reps: '8–12' },
+    { name: 'Seated leg curl', sets: 4, reps: '10–12' },
+    // Hip- and knee-extension with the spine out of it entirely.
+    { name: 'Belt squat machine', sets: 3, reps: '10–12', for: 'Leg press, feet high' },
+    { name: 'Reverse lunge', sets: 3, reps: '10 per leg' },
+    { name: 'Seated calf raise', sets: 4, reps: '15' },
+    { name: 'Pallof press', sets: 3, reps: '12 per side' },
+    { name: 'Lower back machine', sets: 2, reps: '12–15', for: '45° hyperextension' },
+    { name: 'Adductor machine', sets: 2, reps: '12–15', optional: true },
+    { name: 'Abductor machine', sets: 2, reps: '12–15', optional: true },
+  ],
+  Upper: [
+    { name: 'Dip', sets: 3, reps: '6–10' },
+    { name: 'Assisted pull-up', sets: 4, reps: '6–10', for: 'Lat pulldown' },
+    { name: 'Chest-supported row', sets: 3, reps: '10–12', for: 'Wide-grip cable row' },
+    { name: 'Dumbbell lateral raise', sets: 5, reps: '12–15' },
+    { name: 'Reverse pec deck (rear delt)', sets: 3, reps: '15–20', for: 'Cable archer pull (rear delt)' },
+    { name: 'Preacher curl machine', sets: 3, reps: '10–12', for: 'Incline dumbbell curl, 21s' },
+    { name: 'Single-arm cable triceps pushdown (cuff)', sets: 3, reps: '12–15 per arm' },
+  ],
+};
+
+/** The plan per gym, by gym id (lib/lifts/store.js DEFAULT_GYMS). The first is the base the others are written against. */
+export const PROGRAMMES = Object.freeze({ dxc: PROGRAMME, greenock: PROGRAMME_GREENOCK });
+export const BASE_GYM = 'dxc';
+/** The plan for a gym; an unknown gym (one added later, or none chosen) trains the base plan. */
+export const programmeFor = gym => (gym && PROGRAMMES[gym]) || PROGRAMME;
+/** Every exercise name in any gym's plan, in first-seen order. */
+export const PROGRAMME_NAMES = Object.freeze([...new Set(Object.values(PROGRAMMES).flatMap(p => Object.values(p).flat().map(x => x.name)))]);
+
+/**
+ * Exercises only ONE gym has, by NAME → gym id. The record of which gym
+ * holds what: the plans above are written to respect it (the tests
+ * check), the adaptive Upper / Lower only draws on what the gym chosen
+ * has, and an exercise a gym lacks is never shown there.
+ *
+ * This is the default. "Where you can do it" on a lift in Manage lifts
+ * (S.lifts.list[i].only) always wins, and is how a new one is recorded
+ * without touching this file.
+ */
+export const GYM_ONLY = Object.freeze({
+  // DXC only — "everything in DXC is doable in Greenock other than hyperextensions".
+  '45° hyperextension': 'dxc',
+  // Greenock only — the owner's list, 2026-11-13.
+  'Incline Smith Machine Bench': 'greenock',
+  'Assisted pull-up': 'greenock',
+  'Assisted dip': 'greenock',
+  'Lower back machine': 'greenock',
+  'Seated dip machine': 'greenock',
+  'Preacher curl machine': 'greenock',
+  // Was already in Lower; DXC turns out not to have one. Until the owner
+  // says what DXC has for knee-flexion hamstring work, DXC's Lower shows
+  // it as left out rather than pretending (lib/lifts/gymPlan.js).
+  'Seated leg curl': 'greenock',
+  'Adductor machine': 'greenock',
+  'Abductor machine': 'greenock',
+  'Chest-supported row': 'greenock',
+  'Pullover machine': 'greenock',
+  'Belt squat machine': 'greenock',
+  'Hack squat': 'greenock',
+  'Elbow-supported pec deck': 'greenock',
+  // Greenock's pec deck doubles as a rear-delt fly. Whether DXC's does is
+  // not known, so it is Greenock's until the owner says otherwise.
+  'Reverse pec deck (rear delt)': 'greenock',
+});
+
+/* ══════════════════════════════════════════════════════════════════════
    Stretch and mobility — the Spider-Man block.
    ══════════════════════════════════════════════════════════════════════
 

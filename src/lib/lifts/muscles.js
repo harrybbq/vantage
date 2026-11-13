@@ -8,7 +8,7 @@
 export const MUSCLES = ['Shoulders', 'Back', 'Lower back', 'Chest', 'Abs', 'Triceps', 'Biceps', 'Forearms', 'Quads', 'Hamstrings', 'Glutes', 'Adductors', 'Calves', 'Other'];
 
 /**
- * Tags for every exercise in the programme (src/data/trainingProgramme.js):
+ * Tags for every exercise in either gym's plan (src/data/trainingProgramme.js):
  * each group its evidence-based part weights (adaptive.js EXERCISE_PARTS)
  * credit at 0.5 or more, strongest first. adaptive.test.mjs checks the two
  * stay in step, so change the weights there and these with them.
@@ -39,6 +39,19 @@ export const PROGRAMME_MUSCLES = {
   'Seated calf raise': ['Calves'],
   'Pallof press': ['Abs'],
   'Wide-grip cable row': ['Back', 'Shoulders', 'Biceps'],
+  // The Greenock plan (trainingProgramme.js PROGRAMME_GREENOCK).
+  'Lower back machine': ['Lower back'],
+  'Hack squat': ['Quads', 'Glutes', 'Adductors'],
+  'Belt squat machine': ['Quads', 'Glutes', 'Adductors'],
+  'Incline Smith Machine Bench': ['Chest', 'Shoulders', 'Triceps'],
+  'Elbow-supported pec deck': ['Chest'],
+  'Pullover machine': ['Back'],
+  'Assisted pull-up': ['Back', 'Biceps'],
+  'Chest-supported row': ['Back', 'Shoulders', 'Biceps'],
+  'Reverse pec deck (rear delt)': ['Shoulders', 'Back'],
+  'Preacher curl machine': ['Biceps'],
+  'Adductor machine': ['Adductors'],
+  'Abductor machine': ['Glutes'],
 };
 
 // Keyword fallback for lifts the owner added by hand without tags.
@@ -52,7 +65,8 @@ const MUSCLE_WORDS = [
   [/hammer|reverse.*curl|wrist|forearm|farmer/i, 'Forearms'],
   [/adduct/i, 'Adductors'],
   [/tricep|pushdown|skull|^(?!.*(leg|back|hyper)).*extension/i, 'Triceps'],
-  [/row|pulldown|pull-?\s*up|chin|pullover/i, 'Back'],
+  // \bchin: 'machine' holds 'chin', which tagged every untagged machine lift as Back.
+  [/row|pulldown|pull-?\s*up|\bchin|pullover/i, 'Back'],
   [/bench|chest|fly|\bdips?\b|push-?\s*up/i, 'Chest'],
   [/shoulder|lateral|overhead\s*press|delt|arnold/i, 'Shoulders'],
   [/crunch|\babs?\b|plank|pallof|sit-?\s*up/i, 'Abs'],
