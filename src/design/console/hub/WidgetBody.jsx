@@ -55,33 +55,39 @@ export function renderBody(item, ctx) {
     );
   }
   const preset = getAppPreset(item.type);
-  if (preset) return <PresetBody preset={preset} />;
+  if (preset) return zoomed(<PresetBody preset={preset} />);
   if (RETIRED_PRESETS[item.type]) {
     return <p className="cx-hub-empty">{RETIRED_PRESETS[item.type]} has been removed. Remove this widget from its menu.</p>;
   }
+  // Every body is laid out at its design size and ZOOMED by the screen
+  // scale (.cx-uizoom, screen.css). The classic bodies are drawn in fixed
+  // px and know nothing of the scale; the console's own mix scaled text
+  // with fixed-px avatars, rows and bars. Zooming the body is the one
+  // thing that keeps all of it in proportion on a wide screen.
+  const zoomed = body => (isMobile || body == null ? body : <div className="cx-uizoom cx-hub-zoom">{body}</div>);
   switch (item.type) {
-    case 'today':    return <TodayWidget S={S} update={update} navigate={navigate} size={size} isMobile={isMobile} onShowCoinToast={ctx.onShowCoinToast} />;
-    case 'league':   return <LeagueWidget S={S} navigate={navigate} size={size} isMobile={isMobile} friendsHub={ctx.friendsHub} />;
-    case 'friends':  return <FriendsWidget hub={ctx.friendsHub} size={size} isMobile={isMobile} navigate={navigate} />;
-    case 'upnext':   return <UpNextWidget S={S} navigate={navigate} size={size} />;
-    case 'untilpay': return <UntilPayWidget S={S} navigate={navigate} size={size} />;
-    case 'coins':    return <CoinsBody S={S} navigate={navigate} size={size} />;
-    case 'vitals':   return <VitalsBody S={S} update={update} picks={item.picks} onSetPicks={setPicks} />;
-    case 'calories': return <BurnBody S={S} update={update} userId={userId} />;
-    case 'macros':   return <MacrosBody S={S} userId={userId} navigate={navigate} />;
-    case 'body':     return <BodyBody S={S} update={update} navigate={navigate} />;
-    case 'goals':    return <GoalsBody S={S} picks={item.picks} onSetPicks={setPicks} compact={isMobile} navigate={navigate} hasPro={hasPro} />;
-    case 'body-goal': return <BodyGoalBody S={S} update={update} navigate={navigate} userId={userId} hasPro={hasPro} onUpgrade={() => ctx.onOpenPaywall?.('generic')} />;
-    case 'market':   return <MarketBody S={S} update={update} hasPro={hasPro} compact={isMobile} />;
-    case 'news':     return <NewsBody S={S} update={update} hasPro={hasPro} compact={isMobile} />;
+    case 'today':    return zoomed(<TodayWidget S={S} update={update} navigate={navigate} size={size} isMobile={isMobile} onShowCoinToast={ctx.onShowCoinToast} />);
+    case 'league':   return zoomed(<LeagueWidget S={S} navigate={navigate} size={size} isMobile={isMobile} friendsHub={ctx.friendsHub} />);
+    case 'friends':  return zoomed(<FriendsWidget hub={ctx.friendsHub} size={size} isMobile={isMobile} navigate={navigate} />);
+    case 'upnext':   return zoomed(<UpNextWidget S={S} navigate={navigate} size={size} />);
+    case 'untilpay': return zoomed(<UntilPayWidget S={S} navigate={navigate} size={size} />);
+    case 'coins':    return zoomed(<CoinsBody S={S} navigate={navigate} size={size} />);
+    case 'vitals':   return zoomed(<VitalsBody S={S} update={update} picks={item.picks} onSetPicks={setPicks} />);
+    case 'calories': return zoomed(<BurnBody S={S} update={update} userId={userId} />);
+    case 'macros':   return zoomed(<MacrosBody S={S} userId={userId} navigate={navigate} />);
+    case 'body':     return zoomed(<BodyBody S={S} update={update} navigate={navigate} />);
+    case 'goals':    return zoomed(<GoalsBody S={S} picks={item.picks} onSetPicks={setPicks} compact={isMobile} navigate={navigate} hasPro={hasPro} />);
+    case 'body-goal': return zoomed(<BodyGoalBody S={S} update={update} navigate={navigate} userId={userId} hasPro={hasPro} onUpgrade={() => ctx.onOpenPaywall?.('generic')} />);
+    case 'market':   return zoomed(<MarketBody S={S} update={update} hasPro={hasPro} compact={isMobile} />);
+    case 'news':     return zoomed(<NewsBody S={S} update={update} hasPro={hasPro} compact={isMobile} />);
     case 'trading':  return (TradingBody && tradingWidgetAvailable())
-      ? <Suspense fallback={null}><TradingBody compact={isMobile} /></Suspense> : null;
-    case 'habits':   return <HabitsBody S={S} update={update} navigate={navigate} size={size} />;
-    case 'holidays': return <HolidaysBody S={S} navigate={navigate} />;
-    case 'recent-wins': return <RecentWinsBody S={S} />;
-    case 'coin-history': return <CoinHistoryBody S={S} />;
-    case 'github':   return <LinkCardBody S={S} kind="github" />;
-    case 'linkedin': return <LinkCardBody S={S} kind="linkedin" />;
+      ? zoomed(<Suspense fallback={null}><TradingBody compact={isMobile} /></Suspense>) : null;
+    case 'habits':   return zoomed(<HabitsBody S={S} update={update} navigate={navigate} size={size} />);
+    case 'holidays': return zoomed(<HolidaysBody S={S} navigate={navigate} />);
+    case 'recent-wins': return zoomed(<RecentWinsBody S={S} />);
+    case 'coin-history': return zoomed(<CoinHistoryBody S={S} />);
+    case 'github':   return zoomed(<LinkCardBody S={S} kind="github" />);
+    case 'linkedin': return zoomed(<LinkCardBody S={S} kind="linkedin" />);
     default:         return <p className="cx-hub-empty">This widget isn’t available in the new design yet.</p>;
   }
 }

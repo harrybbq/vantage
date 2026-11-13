@@ -61,7 +61,7 @@ export default function PrimeCard({
   grow = false,           // true = may exceed `height` when the content needs it
   natural = false,        // true = exactly as tall as the blocks need at this width (console desktop)
   extra = 0,              // with `natural`: px to add, when the host stretched the card
-  scale = 1,              // with `natural`: the host's UI scale (console --cx-ui); the blocks are
+  scale = 1,              // with `natural`: a UI scale to multiply the slots by (unused since the console zooms the card instead); the blocks are
                           // packed in design px and the slots drawn that much larger
   guides = false,
   live = false,           // true while a resize drag is in flight
@@ -270,7 +270,14 @@ export function PrimeFit({ auto = false, natural = false, userId = null, ...rest
   return (
     <div ref={ref} className={`prime-fit${auto || natural ? ' is-auto' : ''}`}>
       {box && box.w > 0 && (
-        <PrimeCard {...rest} natural={natural} scale={box.ui || 1} ext={ext} width={box.w} height={auto || natural ? null : Math.max(0, box.h)} live={live} />
+        <PrimeCard {...rest} natural={natural} ext={ext} live={live}
+                   /* Console desktop: the card is laid out at its design size and ZOOMED by the
+                      screen scale (.cx-uizoom, design/console/screen.css), so its text, rings and
+                      charts grow with the frame around it instead of sitting small inside it. */
+                   className={`${rest.className || ''}${natural ? ' cx-uizoom' : ''}`}
+                   width={natural ? box.w / (box.ui || 1) : box.w}
+                   extra={natural ? (rest.extra || 0) / (box.ui || 1) : rest.extra}
+                   height={auto || natural ? null : Math.max(0, box.h)} />
       )}
     </div>
   );

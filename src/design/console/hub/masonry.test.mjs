@@ -101,4 +101,28 @@ t('drop: the dragged card goes where it lands nearest the pointer; staying put w
   assert.equal(dropIndexMasonry(items, 9, { x: 0, y: 0 }, 4, i => i.size, i => i.h, geom), 9, 'bad index is returned as is');
 });
 
+t('six columns (a very wide screen): three large cards to a row, and the same rules hold', () => {
+  const pack6 = items => packMasonry(items, 6, x => x.size, x => x.h, 16);
+  const r = by(pack6([it('a', 'large', 300), it('b', 'large', 200), it('c', 'large', 250), it('d', 'medium', 100), it('e', 'small', 80), it('f', 'small', 120)]));
+  assert.deepEqual([r.a.col, r.b.col, r.c.col], [0, 2, 4], 'left to right across the three halves');
+  assert.deepEqual([r.a.y, r.b.y, r.c.y], [0, 0, 0]);
+  assert.deepEqual([r.d.col, r.d.y], [2, 216], 'the next card goes under the shortest');
+  // The two smalls share the next-shortest pair of columns and end level.
+  assert.equal(r.e.w, 1); assert.equal(r.f.w, 1);
+  assert.equal(r.e.y + r.e.h, r.f.y + r.f.h);
+  // No overlaps, nothing outside the six columns, at random sizes and heights.
+  let seed = 7; const rnd = () => (seed = (seed * 1103515245 + 12345) % 2147483648) / 2147483648;
+  for (let k = 0; k < 60; k++) {
+    const items = Array.from({ length: 3 + Math.floor(rnd() * 12) }, (_, i) => it('x' + i, ['small', 'medium', 'large'][Math.floor(rnd() * 3)], 60 + Math.floor(rnd() * 400)));
+    const out = pack6(items);
+    for (const c of out.cells) assert.ok(c.col >= 0 && c.col + c.w <= 6 && (c.w === 1 || c.col % 2 === 0), `cell in bounds, wide cards on a pair: ${JSON.stringify(c)}`);
+    for (let i = 0; i < out.cells.length; i++) for (let j = i + 1; j < out.cells.length; j++) {
+      const a = out.cells[i], b = out.cells[j];
+      const side = a.col < b.col + b.w && b.col < a.col + a.w, up = a.y < b.y + b.h - 0.01 && b.y < a.y + a.h - 0.01;
+      assert.ok(!(side && up), `overlap ${a.id}/${b.id}`);
+    }
+    assert.ok(out.height >= Math.max(...out.cells.map(c => c.y + c.h)) - 0.01);
+  }
+});
+
 console.log(`hub masonry: ${n} tests passed`);

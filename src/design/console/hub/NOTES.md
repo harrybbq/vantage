@@ -32,3 +32,12 @@ changes needed in files this area does not own (see ../README.md §7).
 - **Prime cards pack at their natural height** (`PrimeFit natural`, `pack.natural` in `lib/hub/pack.js`, `tight` + `balance`): no banner, hero at its own height, short and empty lists at the rows they have, columns balanced. The packer works in design px and `PrimeCard` scales the slots by `--cx-ui`. Classic hosts call `pack` without `opts` and are unchanged.
 - Measuring pitfall: never a functional `setState` in the every-render layout effect (a fresh Map each replay loops); `measure()` compares against a ref and sets only on change.
 - Tests: `hub/masonry.test.mjs` (auto-run by `check:console`), `lib/hub/pack.test.mjs`.
+
+## Wide screens (2026-11-13)
+
+- **Everything in the hub scales by one rule.** The owner's 3840 px screen showed the token scaling from #247 was only half the job: text on tokens grew ×1.5 while everything drawn in fixed px stayed put (the prime cards and classic bodies whole, and in the console's own widgets the avatars, row heights, bars, the ring and the prestige tag). Now every widget body, each prime card, the player strip and the Getting started card are laid out at design size and **zoomed** by the screen scale: class `.cx-uizoom` (screen.css), which also resets the scaled tokens to their base values inside it so nothing scales twice. Frames, gaps and the shell still scale by token.
+- New body or strip content needs nothing: `renderBody` wraps every body (`zoomed`), and `PrimeFit natural` zooms its card. Draw at design px. Do NOT multiply by `--cx-ui` inside a body (it is 1 in there).
+- Measuring: `HubGrid` reads the un-zoomed `.cx-hub-nat` wrapper, so heights are real px. A popover that positions itself from `getBoundingClientRect` must be portalled outside the zoomed body (rects are real px).
+- **Six columns** when the page is at least `WIDE_COLS_FROM` design px wide (`grid.js desktopCols`; a 3840 px screen): three large cards to a row instead of two 1500 px ones. `HubGrid` sets `--cx-hub-cols`; `masonry.js` was already generic in `cols`.
+- How it was found and is checked: render at 1440 and at 3840, and compare every text node's effective font size and every small element's height. Both should differ by exactly the scale.
+

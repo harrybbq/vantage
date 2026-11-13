@@ -3,7 +3,7 @@
 import assert from 'node:assert/strict';
 import {
   PRO_SIZES_GATED, WIDGET_SIZES, SIZES, sizesFor, isProSize, validateSize, effectiveSize,
-  seedHubGrid, readHubGrid, withHubGrid, moveItem, nudgeItem, setItemSize, patchItem, removeItem, addItem,
+  seedHubGrid, readHubGrid, withHubGrid, desktopCols, WIDE_COLS_FROM, moveItem, nudgeItem, setItemSize, patchItem, removeItem, addItem,
   packGrid, dropIndex, spanOf, moveVisible,
 } from './grid.js';
 
@@ -195,6 +195,16 @@ t('dropIndex: staying put is stable; dragging to a far cell picks that slot', ()
   assert.equal(dropIndex(items, 3, { x: 1, y: 0.5 }, 4), 0);
   // phone: one column of mediums, y decides
   assert.equal(dropIndex(items, 0, { x: 1, y: 2.6 }, 2), 2);
+});
+
+t('desktop columns: four as drawn, six once the page is wide enough for full-size cards', () => {
+  // Design px = real px ÷ the screen scale. A 1400 px page, a 1920 and a 2560 screen stay on four…
+  for (const w of [980, 1400, 1540, 1750, WIDE_COLS_FROM - 1]) assert.equal(desktopCols(w), 4, String(w));
+  // …a 3840 px screen (page 3045 px at ×1.5 = 2030 design px) gets six: three large cards to a row.
+  for (const w of [WIDE_COLS_FROM, 1890, 2030, 2600]) assert.equal(desktopCols(w), 6, String(w));
+  for (const w of [undefined, null, NaN, 'x', 0]) assert.equal(desktopCols(w), 4, 'unknown width: four');
+  // A column at six is never narrower than one at the smallest desktop (980 px page ÷ 4).
+  assert.ok(WIDE_COLS_FROM / 6 >= 980 / 4);
 });
 
 console.log(`hub grid: ${n} tests passed`);
