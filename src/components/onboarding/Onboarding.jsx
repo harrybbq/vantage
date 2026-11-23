@@ -125,7 +125,7 @@ export default function Onboarding({ S, update, visible, scoped = false, paused:
     if (!visible || !stop) return;
     setDoing(false);
     setNote(null);
-    onGo?.(stop.first.section);
+    onGo?.(stop.first.section, stop.first.sub);
     if (stop.first.invite) prefetchInvite();
   // The stop's identity, not its live `done`.
   // eslint-disable-next-line react-hooks/exhaustive-deps

@@ -1,5 +1,9 @@
 /**
- * Track, console design: Calendar · Diet · Vitals.
+ * Track, console design: the calendar, the food log and vitals — three
+ * views of one route. Which one shows is the navigation's call since the
+ * three sections (shell/nav.js): the calendar is Track › Calendar, food
+ * and vitals are Health › Food and Health › Vitals. The view arrives as
+ * `activeSub.track`; this page no longer draws a switch of its own.
  *
  * The Holiday section is merged in here: trips live on the calendar
  * (photo bands on the Month view, plain colours on the Year view), open
@@ -42,12 +46,8 @@ import ManageTrackers from './ManageTrackers';
 import TIcon from './icons';
 import { openInDeviceCalendar } from '../../../lib/calendar/deviceSource';
 import PayIndicator from '../../../components/pay/PayIndicator';
+import TopBarActions from '../shell/TopBarActions';
 
-const TABS = [
-  { value: 'calendar', label: 'Calendar' },
-  { value: 'diet', label: 'Diet' },
-  { value: 'vitals', label: 'Vitals' },
-];
 const VIEWS = [
   { value: 'month', label: 'Month' },
   { value: 'week', label: 'Week' },
@@ -97,22 +97,17 @@ function ViewMenu({ value, onChange }) {
 }
 
 export default function ConsoleTrack({
-  S, update, userId, isOwner, onOpenModal, onOpenPaywall, onShowCoinToast, requestedTrackTab, initialView = 'month',
+  S, update, userId, isOwner, onOpenModal, onOpenPaywall, onShowCoinToast, activeSub = null, initialView = 'month', forceTab = null,
 }) {
   const wide = useWide(1024);
   const today = getTodayStr();
-  const [tab, setTab] = useState('calendar');
+  // forceTab: the 'holiday' route is always the calendar (ConsoleHoliday).
+  const tab = forceTab || TAB_FOR[activeSub && activeSub.track] || 'calendar';
   const [view, setView] = useState(initialView);
   const [anchor, setAnchor] = useState(today);
   const [selected, setSelected] = useState(today);
   const [sheet, setSheet] = useState(null);
   const [autoFor, setAutoFor] = useState(null);
-
-  // Deep links (navigate('diet') etc.) carry a nonce, as classic's do.
-  useEffect(() => {
-    const t = requestedTrackTab && TAB_FOR[requestedTrackTab.tab];
-    if (t) setTab(t);
-  }, [requestedTrackTab]);
 
   // Owner only, compiled out of native builds — the classic gate.
   const owner = OWNER_SURFACES_IN_BUILD && !!isOwner;
@@ -185,14 +180,15 @@ export default function ConsoleTrack({
 
   return (
     <section className="section active cx-page cx-track-page" aria-label="Track">
-      <header className="cx-track-head">
-        <Segmented label="Track sections" options={TABS} value={tab} onChange={setTab} className="cx-track-tabs" />
-        {tab === 'calendar' && (
-          wide
+      {/* Add sits in the shell's bar, beside the coins (TopBarActions): the page's own header held
+          only the Calendar / Diet / Vitals switch, which is the navigation's now. */}
+      {tab === 'calendar' && (
+        <TopBarActions placement="end">
+          {wide
             ? <Button variant="primary" icon="plus" onClick={() => add(selected)} className="cx-track-addbtn" data-ob="add-trip">Add</Button>
-            : <Button variant="primary" icon="plus" iconOnly label="Add to calendar" onClick={() => add(selected)} className="cx-track-addbtn" data-ob="add-trip" />
-        )}
-      </header>
+            : <Button variant="primary" icon="plus" iconOnly label="Add to calendar" onClick={() => add(selected)} className="cx-track-addbtn" data-ob="add-trip" />}
+        </TopBarActions>
+      )}
 
       {tab === 'calendar' && (
         <div className={`cx-track-cal is-${view}`}>

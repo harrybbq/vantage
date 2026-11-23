@@ -79,7 +79,8 @@ export const inScope = (scope, navId) => !scope || scope.has(navId);
 
 /**
  * What "Add an area" offers: the picks not asked for yet, as
- * [{ id, label, icon, line, section }]. Fitness is never offered — it
+ * [{ id, label, icon, line, section, sub }] (`sub`: the view of that page
+ * the pick is about, where the page has several). Fitness is never offered — it
  * turns nothing on that is not already there. [] when not scoped or
  * nothing is left, and the row goes.
  */
@@ -88,5 +89,5 @@ export function addableAreas(S) {
   const have = areasOf(S);
   return PICKS
     .filter(p => !have.includes(p.id) && (AREA_NAV[p.id] || []).length > 0)
-    .map(p => ({ id: p.id, label: p.label, icon: p.icon, line: p.line, section: p.first.section }));
+    .map(p => ({ id: p.id, label: p.label, icon: p.icon, line: p.line, section: p.first.section, sub: p.first.sub || null }));
 }

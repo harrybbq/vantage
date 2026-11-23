@@ -559,3 +559,8 @@
 /* A session's day is told apart by hue, so it starts stronger than the accent's lightest step. */
 .lifts .lh-hm-c.is-sess.is-1 { fill: color-mix(in srgb, var(--lf-accent) 68%, var(--lf-s3)); }
 .lifts .lh-hm-c.is-sess.is-2 { fill: color-mix(in srgb, var(--lf-accent) 86%, var(--lf-s3)); }
+
+/* ── Train as a page of its own (UpgradeSection only="lifts", the 'train'
+   route: Health › Train) ── no "‹ Upgrade" bar above it, so no panel
+   round the page either, and Manage moves to the app's bar (LiftsTab). */
+.upg-app.is-only .uh-open:has(> .lh-root), .upg-app.is-only .uh-open { margin: 0; padding: 0; border: 0; border-radius: 0; background: transparent; box-shadow: none; animation: none; }

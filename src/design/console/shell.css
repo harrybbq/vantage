@@ -214,9 +214,14 @@ html[data-design="console"] .cx-shell-appbar {
   height: calc(var(--cx-shell-app-h) + env(safe-area-inset-top, 0px));
   padding: env(safe-area-inset-top, 0px) var(--cx-sp-16) 0;
   box-sizing: border-box;
-  display: flex; align-items: center; gap: 10px;
+  display: flex; flex-direction: column; align-items: stretch;
   background: var(--cx-bg);
   font-family: var(--cx-sans);
+}
+/* The bar itself; a section's tabs are a second row under it (.cx-shell-sub.is-row). */
+html[data-design="console"] .cx-shell-appbar-row { flex: none; display: flex; align-items: center; gap: 10px; height: 52px; min-width: 0; }
+html[data-design="console"] .cx-shell-appbar.has-sub {
+  height: calc(96px + env(safe-area-inset-top, 0px)); border-bottom: 1px solid var(--cx-line);
 }
 html[data-design="console"] .cx-shell-appbar-title {
   margin: 0; min-width: 0;
@@ -234,7 +239,7 @@ html[data-design="console"] .cx-shell-appbar-greet {
 html[data-design="console"] .cx-shell-appbar .cx-shell-chip { height: 36px; }
 html[data-design="console"] .cx-shell-appbar .cx-shell-chip::after { inset: -4px -2px; }
 
-/* ── Phone tab bar: 5 tabs, 12 px labels, ≥ 84 px tall ── */
+/* ── Phone tab bar: Hub and the sections (3 to 5 seats), 12 px labels, ≥ 84 px tall ── */
 html[data-design="console"] .cx-shell-tabs {
   position: fixed; left: 0; right: 0; bottom: 0; z-index: 195;
   height: calc(var(--cx-shell-tab-h) + var(--cx-shell-tab-pad));
@@ -259,6 +264,56 @@ html[data-design="console"] .cx-shell-tab-label { font: 500 var(--cx-fs-12)/var(
 html[data-design="console"] .cx-shell-tab.is-on { color: var(--cx-text); }
 html[data-design="console"] .cx-shell-tab.is-on svg { color: var(--cx-accent); }
 html[data-design="console"] .cx-shell-tab.is-on .cx-shell-tab-label { font-weight: 600; }
+html[data-design="console"] .cx-shell-tab-ico { position: relative; display: inline-flex; }
+html[data-design="console"] .cx-shell-tab-ico .cx-shell-badge { position: absolute; top: -5px; left: 14px; }
+
+/* ── Sections (Nov 2026): the open section's tabs ─────────────────────
+   Track, Health and Social each hold three or four tabs (shell/nav.js).
+   Desktop: text tabs beside the section's name in the top bar. Phone: a
+   44 px second row of the app bar, the tabs sharing its width. While
+   that row is up, html[data-cx-subnav] (set by the shell) makes
+   --cx-shell-app-h 96 px, so every page offset that reads it (and
+   classic's --m-appbar-h, which is defined from it) clears both rows. */
+html[data-design="console"][data-cx-subnav] { --cx-shell-app-h: 96px; }
+html[data-design="console"] .cx-shell-sub {
+  display: flex; align-items: stretch; gap: 2px; align-self: stretch; min-width: 0;
+  margin-left: var(--cx-sp-8);
+  overflow-x: auto; scrollbar-width: none;
+}
+html[data-design="console"] .cx-shell-sub::-webkit-scrollbar { display: none; }
+html[data-design="console"] .cx-shell-st {
+  position: relative; flex: none;
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  min-width: 0; padding: 0 12px; margin: 0;
+  border: 0; border-radius: var(--cx-r-cell); background: none;
+  color: var(--cx-muted); cursor: pointer; white-space: nowrap;
+  font: 500 var(--cx-fs-15)/var(--cx-lh-15) var(--cx-sans);
+  -webkit-tap-highlight-color: transparent;
+  transition: color var(--cx-dur-fast) var(--cx-ease);
+}
+html[data-design="console"] .cx-shell-st:hover { color: var(--cx-text); }
+html[data-design="console"] .cx-shell-st:active { transform: none; }
+html[data-design="console"] .cx-shell-st.is-on { color: var(--cx-text); font-weight: 600; }
+html[data-design="console"] .cx-shell-st.is-on::after {
+  content: ''; position: absolute; left: 12px; right: 12px; bottom: 0; height: 2px; border-radius: 2px 2px 0 0; background: var(--cx-accent);
+}
+html[data-design="console"] .cx-shell-st:focus-visible { outline: 2px solid var(--cx-accent); outline-offset: -3px; }
+html[data-design="console"] .cx-shell-sub.is-row {
+  flex: none; display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: 0;
+  height: 44px; margin: 0; overflow: visible;
+}
+html[data-design="console"] .cx-shell-sub.is-row .cx-shell-st { padding: 0 2px; }
+html[data-design="console"] .cx-shell-sub.is-row .cx-shell-st > span:first-child { overflow: hidden; text-overflow: ellipsis; }
+html[data-design="console"] .cx-shell-sub.is-row .cx-shell-st.is-on::after { left: 8px; right: 8px; }
+
+/* What is waiting behind an entry: friend requests and unread messages. */
+html[data-design="console"] .cx-shell-badge {
+  flex: none; min-width: 16px; height: 16px; box-sizing: border-box; padding: 0 4px; border-radius: 8px;
+  background: var(--cx-gold); color: var(--cx-bg);
+  font: 600 11px/16px var(--cx-mono); text-align: center;
+}
+html[data-design="console"] .cx-shell-ni { position: relative; }
+html[data-design="console"] .cx-shell-ni-badge { position: absolute; left: 26px; top: 5px; }
 
 /* ── More sheet ── */
 html[data-design="console"] .cx-shell-more-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
@@ -431,3 +486,5 @@ html[data-design="console"] .cx-shell-addarea-go {
 }
 html[data-design="console"] .cx-shell-addarea .cx-shell-mi:hover .cx-shell-addarea-go { border-color: var(--cx-accent); color: var(--cx-accent); }
 html[data-design="console"] .cx-shell-mi-add > svg:first-child { color: var(--cx-accent); }
+/* Settings on a phone: the Go Pro row the More sheet used to hold. */
+html[data-design="console"] .cx-sweep-gopro { width: 100%; margin: 0 0 var(--cx-sp-12); }

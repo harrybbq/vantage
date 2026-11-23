@@ -64,11 +64,15 @@ function readOnlyNoteFor(row) {
  * a place to put it, which is why this is a DOM node rather than a
  * dozen props threaded through the layout.
  *
+ * `tab` ('friends' | 'messages') + `hideTabs` (optional): the host owns
+ * the Friends / Messages switch and draws it itself; left out, the rail
+ * keeps its own, remembered per viewer.
+ *
  * `onFriendCount(n)` (optional) hears the friend count once the list has
  * loaded and whenever it changes — the hub's Getting started card reads
  * it, so the host doesn't run a second friends query of its own.
  */
-export default function FriendsRail({ userId, onUpgrade, panelSlot = null, layout = 'rail', onFriendCount = null }) {
+export default function FriendsRail({ userId, onUpgrade, panelSlot = null, layout = 'rail', onFriendCount = null, tab: tabIn = null, hideTabs = false }) {
   const { hasPro } = useSubscriptionContext();
   const friends = useFriends(userId, hasPro);
   const friendCount = friends.friends.length;
@@ -93,7 +97,9 @@ export default function FriendsRail({ userId, onUpgrade, panelSlot = null, layou
   // a desktop rail, the full-screen conversation on a phone. Also how a
   // read-only conversation (a former friend) opens everywhere.
   const [threadTarget, setThreadTarget] = useState(null); // { friend, readOnlyNote }
-  const [tab, setTabState] = useState(readTab);
+  const [tabOwn, setTabState] = useState(readTab);
+  // A host that draws the switch itself passes the tab (the console's Social › Friends / Messages).
+  const tab = tabIn === 'messages' || tabIn === 'friends' ? tabIn : tabOwn;
   const setTab = useCallback(t => {
     setTabState(t);
     try { localStorage.setItem(TAB_KEY, t); } catch { /* private mode */ }
@@ -523,7 +529,7 @@ export default function FriendsRail({ userId, onUpgrade, panelSlot = null, layou
         }}
       />
 
-      <FriendsTabs tab={tab} onTab={setTab} friendCount={rows.length} unread={total} />
+      {!hideTabs && <FriendsTabs tab={tab} onTab={setTab} friendCount={rows.length} unread={total} />}
 
       {friends.friends.length > 0 && <FriendsPrestigeSource onData={setPrestigeById} />}
       {tab === 'messages' ? (

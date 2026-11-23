@@ -1,8 +1,13 @@
 /**
  * The console shell: everything around a page in the console design.
  *
- *   desktop (> 768 px)  216 px sidebar + 60 px top bar
- *   phone   (≤ 768 px)  52 px app bar + 5-tab bottom bar + the More sheet
+ *   desktop (> 768 px)  sidebar + 60 px top bar; the open section's tabs
+ *                       sit beside its name in the bar
+ *   phone   (≤ 768 px)  52 px app bar, with the section's tabs as a second
+ *                       row, + the bottom bar: Hub and the sections
+ *
+ * Three sections (nav.js): Track, Health and Social. Settings is behind
+ * the avatar, which is on every page's bar; there is no More sheet.
  *
  * App.jsx renders this INSTEAD of Nav, PageHeader, MobileAppBar,
  * BottomTabBar, MoreDrawer, HubFooter and BootSequence when the design is
@@ -12,7 +17,7 @@
  *
  * Pages sit in `.cx-page` (shell.css), whose offsets match these bars.
  */
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import Icon from '../../../components/Icon';
 import Logo from '../../../components/Logo';
 import { Sheet } from '../ui';
@@ -25,7 +30,7 @@ import BackgroundSheet from './BackgroundSheet';
 import { navScope, addableAreas } from '../../../lib/onboarding/areas';
 import { addArea } from '../../../lib/onboarding/onboarding';
 import {
-  sidebarItems, tabItems, moreItems, activeTab, canonicalSection, navSection, sectionTitle,
+  sidebarItems, tabItems, activeTab, canonicalSection, navSection, sectionTitle, placeOf, groupTabs,
   longDate, shortDate, greeting, initials, paletteHint,
 } from './nav';
 
@@ -71,50 +76,81 @@ function BgButton({ on, onOpen }) {
   );
 }
 
-/** Friend requests and unread messages: absent at zero (as classic's header). Desktop only. */
-function SocialChips({ userId, onOpen }) {
+/** Friend requests and unread messages for a signed-in account; zeros while `userId` is null. */
+function useSocialCounts(userId) {
   const requests = usePendingCount(userId);
   const unread = useUnreadTotal(userId);
-  const n = v => (v > 9 ? '9+' : String(v));
+  return useMemo(() => ({ requests: requests || 0, unread: unread || 0 }), [requests, unread]);
+}
+const upTo9 = v => (v > 9 ? '9+' : String(v));
+
+/** Friend requests and unread messages: absent at zero. Desktop only; each opens its Social tab. */
+function SocialChips({ counts, navigate }) {
+  const { requests, unread } = counts;
   return (
     <>
       {!!requests && (
-        <button type="button" className="cx-shell-chip cx-shell-ask" onClick={onOpen}
+        <button type="button" className="cx-shell-chip cx-shell-ask" onClick={() => navigate('friends', 'friends')}
                 aria-label={`${requests} friend request${requests === 1 ? '' : 's'} waiting`}>
-          <Icon name="user-plus" size={14} strokeWidth={1.75} /><span className="cx-num">{n(requests)}</span>
+          <Icon name="user-plus" size={14} strokeWidth={1.75} /><span className="cx-num">{upTo9(requests)}</span>
         </button>
       )}
       {!!unread && (
-        <button type="button" className="cx-shell-chip cx-shell-ask"
-                onClick={() => {
-                  onOpen();
-                  try { window.dispatchEvent(new CustomEvent('vantage:friends-tab', { detail: 'messages' })); } catch { /* old browsers */ }
-                }}
+        <button type="button" className="cx-shell-chip cx-shell-ask" onClick={() => navigate('friends', 'messages')}
                 aria-label={`${unread} unread message${unread === 1 ? '' : 's'}`}>
-          <Icon name="mail" size={14} strokeWidth={1.75} /><span className="cx-num">{n(unread)}</span>
+          <Icon name="mail" size={14} strokeWidth={1.75} /><span className="cx-num">{upTo9(unread)}</span>
         </button>
       )}
     </>
   );
 }
 
-/** Sidebar rows that sit below the "Add an area" row. */
-const SIDE_TAIL = new Set(['upgrade', 'settings']);
+/** What is waiting behind a nav entry or a tab: a count, or nothing. */
+function waiting(id, counts) {
+  if (!counts) return 0;
+  if (id === 'social') return counts.requests + counts.unread;
+  if (id === 'friends') return counts.requests;
+  if (id === 'messages') return counts.unread;
+  return 0;
+}
 
-function Sidebar({ section, isOwner, navigate, onSignOut, scope, canAdd, onAdd }) {
+/**
+ * The open section's tabs: beside the title on a desktop, the app bar's
+ * second row on a phone. Each is a place (nav.js): a route and its view.
+ */
+function SectionTabs({ place, tabs, counts, navigate, className }) {
+  return (
+    <div className={cx('cx-shell-sub', className)} role="navigation" aria-label={`${place.group.label} tabs`} data-shell-sub={place.group.id}>
+      {tabs.map(tb => {
+        const on = tb.id === place.tab.id;
+        const n = waiting(tb.id, counts);
+        return (
+          <button key={tb.id} type="button" className={cx('cx-shell-st', on && 'is-on')} aria-current={on ? 'page' : undefined}
+                  onClick={() => { haptic('LIGHT'); navigate(tb.section, tb.sub); }} data-cx-tab={tb.id}>
+            <span>{tb.label}</span>
+            {!!n && <span className="cx-shell-badge cx-num" aria-label={`${n} waiting`}>{upTo9(n)}</span>}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+function Sidebar({ lit, isOwner, navigate, goGroup, onSignOut, scope, canAdd, onAdd, counts }) {
   const all = sidebarItems({ isOwner, scope });
-  // Scoped: what was chosen, then "Add an area", then Settings.
-  const items = canAdd ? all.filter(it => !SIDE_TAIL.has(it.id)) : all;
-  const tail = canAdd ? all.filter(it => SIDE_TAIL.has(it.id)) : [];
-  const lit = navSection(section);
+  // Hub and the sections, then "Add an area" (a scoped account), then the owner's Upgrade.
+  const items = all.filter(it => it.id !== 'upgrade');
+  const tail = all.filter(it => it.id === 'upgrade');
   const row = it => {
     const on = lit === it.id;
+    const n = waiting(it.id, counts);
     return (
       <li key={it.id}>
         <button type="button" className={cx('cx-shell-ni', on && 'is-on')} aria-current={on ? 'page' : undefined}
-                onClick={() => navigate(it.id)} title={it.label} data-cx-nav={it.id}>
+                onClick={() => (it.tabs ? goGroup(it) : navigate(it.id))} title={it.label} data-cx-nav={it.id}>
           <Icon name={it.icon} size={18} strokeWidth={1.75} />
           <span className="cx-shell-ni-label">{it.label}</span>
+          {!!n && <span className="cx-shell-badge cx-shell-ni-badge cx-num" aria-label={`${n} waiting`}>{upTo9(n)}</span>}
           {it.key && !scope && <kbd className="cx-shell-kbd" aria-label={`Shortcut ${it.key}`}>{it.key}</kbd>}
         </button>
       </li>
@@ -144,12 +180,14 @@ function Sidebar({ section, isOwner, navigate, onSignOut, scope, canAdd, onAdd }
   );
 }
 
-function TopBar({ S, section, userId, navigate, onOpenModal, onOpenPalette, now, bg }) {
+function TopBar({ S, section, title, place, tabs, counts, navigate, onOpenModal, onOpenPalette, now, bg }) {
   const hint = paletteHint(typeof navigator !== 'undefined' ? (navigator.userAgentData?.platform || navigator.platform) : '');
   return (
     <header className="cx-shell-top" data-shell-bar="top">
-      <h1 className="cx-shell-title">{sectionTitle(section)}</h1>
-      <span className="cx-shell-context">{longDate(now)}</span>
+      <h1 className="cx-shell-title">{title}</h1>
+      {place
+        ? <SectionTabs place={place} tabs={tabs} counts={counts} navigate={navigate} />
+        : <span className="cx-shell-context">{longDate(now)}</span>}
       <div className="cx-shell-slot cx-shell-slot-start" ref={barRef.start} />
       <span className="cx-shell-sp" />
       <div className="cx-shell-slot" ref={barRef.end} />
@@ -160,7 +198,7 @@ function TopBar({ S, section, userId, navigate, onOpenModal, onOpenPalette, now,
           <kbd className="cx-shell-kbd">{hint}</kbd>
         </button>
       )}
-      <SocialChips userId={userId} onOpen={() => navigate('hub')} />
+      <SocialChips counts={counts} navigate={navigate} />
       {bg && <BgButton on={bg.on} onOpen={bg.open} />}
       {/* The hub's player strip already shows the balance; one is enough. */}
       {section !== 'hub' && <CoinsChip S={S} onOpen={() => onOpenModal('coinHistoryModal')} />}
@@ -169,99 +207,61 @@ function TopBar({ S, section, userId, navigate, onOpenModal, onOpenPalette, now,
   );
 }
 
-function AppBar({ S, section, navigate, onOpenModal, now, bg }) {
+function AppBar({ S, section, title, place, tabs, counts, navigate, onOpenModal, now, bg }) {
   const hub = section === 'hub';
   return (
-    <header className={cx('cx-shell-appbar', hub && 'is-hub')} data-shell-bar="app">
-      {hub ? (
-        <>
-          <Avatar S={S} size={32} onClick={() => navigate('profile')} />
-          <div className="cx-shell-appbar-titles">
-            <span className="cx-shell-appbar-date">{shortDate(now)}</span>
-            <h1 className="cx-shell-appbar-greet">{greeting(now, S.profile?.name)}</h1>
-          </div>
-        </>
-      ) : (
-        <h1 className="cx-shell-appbar-title">{sectionTitle(section)}</h1>
-      )}
-      <span className="cx-shell-sp" />
-      <div className="cx-shell-slot" ref={barRef.end} />
-      {bg && <BgButton on={bg.on} onOpen={bg.open} />}
-      <CoinsChip S={S} onOpen={() => onOpenModal('coinHistoryModal')} />
+    <header className={cx('cx-shell-appbar', hub && 'is-hub', place && 'has-sub')} data-shell-bar="app">
+      <div className="cx-shell-appbar-row">
+        {hub ? (
+          <>
+            <Avatar S={S} size={32} onClick={() => navigate('profile')} />
+            <div className="cx-shell-appbar-titles">
+              <span className="cx-shell-appbar-date">{shortDate(now)}</span>
+              <h1 className="cx-shell-appbar-greet">{greeting(now, S.profile?.name)}</h1>
+            </div>
+          </>
+        ) : (
+          <h1 className="cx-shell-appbar-title">{title}</h1>
+        )}
+        <span className="cx-shell-sp" />
+        <div className="cx-shell-slot" ref={barRef.end} />
+        {bg && <BgButton on={bg.on} onOpen={bg.open} />}
+        <CoinsChip S={S} onOpen={() => onOpenModal('coinHistoryModal')} />
+        {/* Settings is behind the avatar: it leads the hub's bar and closes every other page's. */}
+        {!hub && <Avatar S={S} size={32} onClick={() => navigate('profile')} />}
+      </div>
+      {place && <SectionTabs place={place} tabs={tabs} counts={counts} navigate={navigate} className="is-row" />}
     </header>
   );
 }
 
-function TabBar({ section, moreOpen, navigate, onOpenMore, scope }) {
-  const tabs = tabItems({ scope });
-  const on = activeTab(section, { moreOpen, tabs });
+function TabBar({ lit, tabs, navigate, goGroup, counts, canAdd, onAdd }) {
   return (
     <div className="cx-shell-tabs" role="navigation" aria-label="Main" data-shell-nav="tabs"
-         style={tabs.length !== 4 ? { '--cx-shell-tabs-n': tabs.length + 1 } : undefined}>
-      {tabs.map(t => (
-        <button key={t.id} type="button" className={cx('cx-shell-tab', on === t.id && 'is-on')}
-                aria-current={on === t.id ? 'page' : undefined} data-cx-nav={t.id}
-                onClick={() => { haptic('LIGHT'); navigate(t.id); }}>
-          <Icon name={t.icon} size={22} strokeWidth={1.75} />
-          <span className="cx-shell-tab-label">{t.label}</span>
-        </button>
-      ))}
-      <button type="button" className={cx('cx-shell-tab', on === 'more' && 'is-on')}
-              aria-haspopup="dialog" aria-expanded={moreOpen} data-cx-nav="more"
-              onClick={() => { haptic('LIGHT'); onOpenMore(); }}>
-        <Icon name="menu" size={22} strokeWidth={1.75} />
-        <span className="cx-shell-tab-label">More</span>
-      </button>
-    </div>
-  );
-}
-
-function MoreSheet({ section, isOwner, hasPro, navigate, onOpenPaywall, onClose, scope, canAdd, onAdd }) {
-  const go = id => { haptic('LIGHT'); onClose(); navigate(id); };
-  return (
-    <Sheet title="More" onClose={onClose} testId="cx-shell-more" className="cx-shell-more">
-      <ul className="cx-shell-more-list" data-shell-more="">
-        {moreItems({ isOwner, scope }).map(it => {
-          const on = canonicalSection(section) === it.id;
-          return (
-            <li key={it.id}>
-              <button type="button" className={cx('cx-shell-mi', on && 'is-on')} aria-current={on ? 'page' : undefined} onClick={() => go(it.id)} data-cx-nav={it.id}>
-                <Icon name={it.icon} size={18} strokeWidth={1.75} />
-                <span className="cx-shell-mi-text">
-                  <span className="cx-shell-mi-label">{it.label}</span>
-                  {it.desc && <span className="cx-shell-mi-desc">{it.desc}</span>}
-                </span>
-                <Icon name="chevron-right" size={16} strokeWidth={1.75} />
-              </button>
-            </li>
-          );
-        })}
-        {canAdd && (
-          <li>
-            <button type="button" className="cx-shell-mi cx-shell-mi-add" aria-haspopup="dialog" data-cx-nav="add-area"
-                    onClick={() => { haptic('LIGHT'); onClose(); onAdd(); }}>
-              <Icon name="plus" size={18} strokeWidth={1.75} />
-              <span className="cx-shell-mi-text">
-                <span className="cx-shell-mi-label">Add an area</span>
-                <span className="cx-shell-mi-desc">The rest of Vantage, when you want it</span>
-              </span>
-              <Icon name="chevron-right" size={16} strokeWidth={1.75} />
-            </button>
-          </li>
-        )}
-      </ul>
-      {!hasPro && onOpenPaywall && (
-        <button type="button" className="cx-shell-mi cx-shell-pro" onClick={() => { haptic('LIGHT'); onClose(); onOpenPaywall('generic'); }}>
-          <Icon name="sparkles" size={18} strokeWidth={1.75} />
-          <span className="cx-shell-mi-text">
-            <span className="cx-shell-mi-label">Go Pro</span>
-            {/* No price here: prices come from the store (App Store 3.1.2), and the paywall shows them. */}
-            <span className="cx-shell-mi-desc">Higher limits, more widgets, accent colours</span>
-          </span>
-          <Icon name="chevron-right" size={16} strokeWidth={1.75} />
+         style={{ '--cx-shell-tabs-n': tabs.length + (canAdd ? 1 : 0) }}>
+      {tabs.map(t => {
+        const n = waiting(t.id, counts);
+        return (
+          <button key={t.id} type="button" className={cx('cx-shell-tab', lit === t.id && 'is-on')}
+                  aria-current={lit === t.id ? 'page' : undefined} data-cx-nav={t.id}
+                  onClick={() => { haptic('LIGHT'); if (t.tabs) goGroup(t); else navigate(t.id); }}>
+            <span className="cx-shell-tab-ico">
+              <Icon name={t.icon} size={22} strokeWidth={1.75} />
+              {!!n && <span className="cx-shell-badge cx-num" aria-label={`${n} waiting`}>{upTo9(n)}</span>}
+            </span>
+            <span className="cx-shell-tab-label">{t.label}</span>
+          </button>
+        );
+      })}
+      {/* A scoped account's way to the rest (lib/onboarding/areas.js). It was a row in the More sheet. */}
+      {canAdd && (
+        <button type="button" className="cx-shell-tab cx-shell-tab-add" aria-haspopup="dialog" data-cx-nav="add-area"
+                onClick={() => { haptic('LIGHT'); onAdd(); }}>
+          <span className="cx-shell-tab-ico"><Icon name="plus" size={22} strokeWidth={1.75} /></span>
+          <span className="cx-shell-tab-label">Add</span>
         </button>
       )}
-    </Sheet>
+    </div>
   );
 }
 
@@ -294,11 +294,10 @@ function AddAreaSheet({ areas, onAdd, onClose }) {
 }
 
 export default function ConsoleShell({
-  S, update, userId, isMobile, isOwner, hasPro, navigate, activeSection,
-  onOpenModal, onOpenPaywall, onOpenPalette, onSignOut,
+  S, update, userId, isMobile, isOwner, navigate, activeSection, activeSub = null,
+  onOpenModal, onOpenPalette, onSignOut,
   background = null, bgFx = null, onChangeBg, onRemoveBg, onBgFx,
 }) {
-  const [moreOpen, setMoreOpen] = useState(false);
   const [bgOpen, setBgOpen] = useState(false);
   const [addOpen, setAddOpen] = useState(false);
   const section = canonicalSection(activeSection);
@@ -311,6 +310,35 @@ export default function ConsoleShell({
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [S.onboarding, update]);
   const canAdd = areas.length > 0;
+
+  // Where this page sits: a section and one of its tabs, or null (Hub, Settings, Upgrade).
+  const sub = activeSub ? activeSub[section] || null : null;
+  const place = useMemo(() => placeOf(section, sub), [section, sub]);
+  const tabs = useMemo(() => (place ? groupTabs(place.group, { isOwner, scope }) : []), [place, isOwner, scope]);
+  const lit = navSection(section, sub);
+  const title = sectionTitle(section, sub);
+  // A section reopens on the tab it was left on; tapping the open section goes to its first.
+  const last = useRef({});
+  useEffect(() => { if (place) last.current[place.group.id] = place.tab.id; }, [place]);
+  const goGroup = g => {
+    const here = place && place.group.id === g.id;
+    const tab = g.tabs.find(x => !here && x.id === last.current[g.id]) || g.tabs[0];
+    if (tab) navigate(tab.section, tab.sub);
+  };
+  // Requests and unread messages, for the Social entry and its tabs — only where Social is shown.
+  const social = useMemo(() => tabItems({ isOwner, scope }).some(x => x.id === 'social'), [isOwner, scope]);
+  const counts = useSocialCounts(social ? userId : null);
+
+  // The tabs are drawn when there is a choice to make: a scoped account's Track may be the calendar alone.
+  const shown = place && tabs.length > 1 ? place : null;
+  // A phone's app bar grows a second row for the tabs; pages offset from --cx-shell-app-h (shell.css).
+  const strip = !!isMobile && !!shown;
+  useEffect(() => {
+    const r = document.documentElement;
+    r.toggleAttribute('data-cx-subnav', strip);
+    return () => r.removeAttribute('data-cx-subnav');
+  }, [strip]);
+
   const addSheet = addOpen && canAdd && (
     <AddAreaSheet
       areas={areas}
@@ -319,7 +347,7 @@ export default function ConsoleShell({
         haptic('LIGHT');
         update(prev => addArea(prev, a.id));
         setAddOpen(false);
-        navigate(a.section);
+        navigate(a.section, a.sub);
       }}
     />
   );
@@ -328,7 +356,7 @@ export default function ConsoleShell({
   const bg = onChangeBg ? { on: !!background, open: () => setBgOpen(true) } : null;
   const bgSheet = bgOpen && bg && (
     <BackgroundSheet
-      title={sectionTitle(section)} photo={background} fx={bgFx}
+      title={place ? place.tab.label : title} photo={background} fx={bgFx}
       onChoose={() => { setBgOpen(false); onChangeBg(); }}
       onRemove={() => { onRemoveBg?.(); }}
       onFx={next => onBgFx?.(next)}
@@ -336,15 +364,13 @@ export default function ConsoleShell({
     />
   );
   if (isMobile) {
+    const bar = tabItems({ isOwner, scope });
     return (
       <>
-        <AppBar S={S} section={section} navigate={navigate} onOpenModal={onOpenModal} now={now} bg={bg} />
-        <TabBar section={section} moreOpen={moreOpen} navigate={navigate} onOpenMore={() => setMoreOpen(true)} scope={scope} />
-        {moreOpen && (
-          <MoreSheet section={section} isOwner={isOwner} hasPro={hasPro} navigate={navigate}
-                     onOpenPaywall={onOpenPaywall} onClose={() => setMoreOpen(false)}
-                     scope={scope} canAdd={canAdd} onAdd={() => setAddOpen(true)} />
-        )}
+        <AppBar S={S} section={section} title={title} place={shown} tabs={tabs} counts={counts}
+                navigate={navigate} onOpenModal={onOpenModal} now={now} bg={bg} />
+        <TabBar lit={activeTab(section, sub, { tabs: bar })} tabs={bar} navigate={navigate} goGroup={goGroup} counts={counts}
+                canAdd={canAdd} onAdd={() => setAddOpen(true)} />
         {addSheet}
         {bgSheet}
       </>
@@ -352,10 +378,10 @@ export default function ConsoleShell({
   }
   return (
     <>
-      <Sidebar section={section} isOwner={isOwner} navigate={navigate} onSignOut={onSignOut}
-               scope={scope} canAdd={canAdd} onAdd={() => setAddOpen(true)} />
-      <TopBar S={S} section={section} userId={userId} navigate={navigate} onOpenModal={onOpenModal}
-              onOpenPalette={onOpenPalette} now={now} bg={bg} />
+      <Sidebar lit={lit} isOwner={isOwner} navigate={navigate} goGroup={goGroup} onSignOut={onSignOut}
+               scope={scope} canAdd={canAdd} onAdd={() => setAddOpen(true)} counts={counts} />
+      <TopBar S={S} section={section} title={title} place={shown} tabs={tabs} counts={counts} navigate={navigate}
+              onOpenModal={onOpenModal} onOpenPalette={onOpenPalette} now={now} bg={bg} />
       {addSheet}
       {bgSheet}
     </>

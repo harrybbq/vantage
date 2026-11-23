@@ -62,7 +62,7 @@ function DivisionView() {
   return <DivisionBoard data={data} division={division ?? data.group?.division ?? 10} onPickDivision={setDivision} />;
 }
 
-export default function ConsoleLeaderboard({ userId, isMobile, navigate }) {
+export default function ConsoleLeaderboard({ userId, navigate }) {
   const [tab, setTab] = useState('group');
   const clock = useWeekClock();
 
@@ -91,7 +91,7 @@ export default function ConsoleLeaderboard({ userId, isMobile, navigate }) {
             <LeaderboardPanel
               userId={userId}
               onOpenSelfBreakdown={() => navigate?.('hub')}
-              onAddFriends={() => navigate?.(isMobile ? 'friends' : 'hub')}
+              onAddFriends={() => navigate?.('friends')}
               onOpenSettings={() => navigate?.('settings')}
             />
           </div>

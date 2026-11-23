@@ -62,7 +62,7 @@ export const PICKS = Object.freeze([
     first: {
       title: 'Start a savings goal',
       body: 'Name something you’re saving for and a target. Vantage works out what to put away each month.',
-      cta: 'Add a savings goal', section: 'achievements', modal: 'addSavingsGoalModal', target: 'add-savings',
+      cta: 'Add a savings goal', section: 'achievements', sub: 'savings', modal: 'addSavingsGoalModal', target: 'add-savings',
       check: 'Add a savings goal',
       doneTitle: 'Savings goal added',
       doneBody: 'Log a contribution whenever you put money in; it counts toward your Finance rating.',

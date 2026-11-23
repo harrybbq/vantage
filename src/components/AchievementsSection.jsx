@@ -436,7 +436,7 @@ function AchNode({
 
 // ── Main section ─────────────────────────────────────────────────────
 
-export default function AchievementsSection({ S, update, active, onOpenModal, onShowCoinToast, onOpenVisions }) {
+export default function AchievementsSection({ S, update, active, onOpenModal, onShowCoinToast, onOpenVisions, tab = null, hideTabs = false }) {
   const achievements = S.achievements || [];
   const visionsUnlocked = Object.keys(S.visions || {}).length;
   // Rating credit, shown rather than hidden — see achievementCreditState.
@@ -616,7 +616,11 @@ export default function AchievementsSection({ S, update, active, onOpenModal, on
   // 'savings' = monetary goals list. Sticky to component state so a
   // refresh resets to goals (canvas is the dominant surface).
   const isMobile = useIsMobile();
-  const [activeTab, setActiveTab] = useState('goals');
+  // `tab` ('goals' | 'savings'): the host picks the view and draws its own
+  // switch (the console's Track › Goals and Track › Money, with hideTabs).
+  // Left out, the section keeps its own switch and state, as classic does.
+  const [ownTab, setActiveTab] = useState('goals');
+  const activeTab = tab === 'goals' || tab === 'savings' ? tab : ownTab;
   // Tracks the live position of a node currently being dragged so the
   // SVG connections re-render without committing to global state on
   // every mousemove. AchNode commits position on mouseup; in between
@@ -936,6 +940,7 @@ export default function AchievementsSection({ S, update, active, onOpenModal, on
           which capped how far the board could extend south. Moving it up
           here (right of the tabs) frees the board's bottom edge entirely. */}
       <div className="ach-tabs-row">
+        {!hideTabs && (
         <div className="ach-tabs" role="tablist">
           <button
             role="tab"
@@ -950,6 +955,7 @@ export default function AchievementsSection({ S, update, active, onOpenModal, on
             onClick={() => setActiveTab('savings')}
           >Savings</button>
         </div>
+        )}
         {activeTab === 'goals' && (
           <div className="ach-stats">
             <div className="ach-stats-item">

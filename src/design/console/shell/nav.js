@@ -2,104 +2,70 @@
  * Console shell: what the navigation holds. Pure, no React, no DOM, so
  * nav.test.mjs can pin it.
  *
- * One list per surface:
- *   SIDEBAR   desktop rail, top to bottom (Sign out is drawn separately)
- *   TABS      the 5-tab phone bar: Hub · Track · Habits · Shop · More
- *   MORE      the rows in the phone's More sheet
+ * THREE SECTIONS (owner, 2026-11-23, from the "Four Sections" mockup):
+ * the Hub plus Track, Health and Social. Settings sits behind the
+ * avatar; a phone has no More drawer.
  *
- * Holiday. Trips live in Track's calendar (Calendar › Year has trips, the
- * next trip and Visited), so Holiday has no entry of its own in the console
- * sidebar or More. CONSOLE_SHOW_HOLIDAY brings it back if ever needed. The
- * 'holiday' route itself stays (deep links, saved tabs, the 5 shortcut),
- * rendered by TRACK's ConsoleHoliday as Track › Calendar › Year.
+ *   Track    Calendar · Goals · Money · Rewards
+ *   Health   Train · Food · Vitals · Habits
+ *   Social   League · Friends · Messages
  *
- * Keyboard hints show the shortcuts that work today (useKeyboardShortcuts:
- * 1 Hub, 2 Achievements, 3 Track, 4 Shop, 5 Holiday). The Direction A mock
- * drew letters; those are not bound, so they are not shown.
+ * A section is a GROUP of tabs, and a tab is a PLACE: an existing route
+ * (App's activeSection) plus, where that page has views of its own, the
+ * view to show (`sub`). Nothing was moved or renamed underneath: Goals
+ * and Money are the 'achievements' route's two views, Food and Vitals
+ * are the 'track' route's, Messages is the 'friends' route's. So every
+ * old route, deep link, shortcut and widget still lands, and lights the
+ * tab it now belongs to (placeOf).
+ *
+ *   sidebar (desktop)   Hub · the groups · Upgrade (owner)
+ *   tab bar (phone)     Hub · the groups (· Add, drawn by the shell)
+ *   the strip           the open group's tabs: beside the title on a
+ *                       desktop, a second row of the app bar on a phone
+ *
+ * Train is the gym tracker. It is the owner's until it opens to
+ * everyone (the next step), so its tab is owner-only and Health starts
+ * at Food for anyone else. The rest of the owner's Upgrade area keeps
+ * its own sidebar entry; on a phone it is reached from Settings › Tools.
+ *
+ * Holiday has no tab: trips live on Track's calendar, and the 'holiday'
+ * route (deep links, the 5 shortcut) reads as Track › Calendar.
+ *
+ * Keyboard hints: the number keys still jump to routes (1 Hub, 2 Goals,
+ * 3 Calendar, 4 Rewards, 5 trips), which no longer line up one to one
+ * with the sidebar, so only Hub shows its key.
  */
 
-export const CONSOLE_SHOW_HOLIDAY = false;
-
-const ITEM = {
-  hub:          { id: 'hub',          icon: 'house',          label: 'Hub',          key: '1' },
-  achievements: { id: 'achievements', icon: 'star',           label: 'Achievements', key: '2', desc: 'Your goal map' },
-  track:        { id: 'track',        icon: 'calendar-days',  label: 'Track',        key: '3' },
-  shop:         { id: 'shop',         icon: 'shopping-bag',   label: 'Shopping',     key: '4', short: 'Shop' },
-  holiday:      { id: 'holiday',      icon: 'plane',          label: 'Holiday',      key: '5', desc: 'Trips, until they move into Track' },
-  habits:       { id: 'habits',       icon: 'flame',          label: 'Habits' },
-  leaderboard:  { id: 'leaderboard',  icon: 'trophy',         label: 'Leaderboard',  desc: 'Where you rank overall' },
-  friends:      { id: 'friends',      icon: 'users',          label: 'Friends',      desc: 'Your friends and messages' },
-  settings:     { id: 'settings',     icon: 'settings',       label: 'Settings',     desc: 'Account, appearance, data' },
-  upgrade:      { id: 'upgrade',      icon: 'trending-up',    label: 'Upgrade',      desc: 'Rotation, diet, career' },
-};
+const HUB = { id: 'hub', icon: 'house', label: 'Hub', key: '1' };
+const UPGRADE = { id: 'upgrade', icon: 'trending-up', label: 'Upgrade' };
 
 /**
- * `scope`: the destinations a scoped account shows (a Set of ids from
- * lib/onboarding/areas.js navScope), or null for everything — which is
- * every account that is not scoped, so their lists are exactly as before.
- * Holiday is part of Track, so it follows Track.
+ * `area`: the id lib/onboarding/areas.js scopes by (a route id). A tab
+ * with no area is always shown: the calendar, food and vitals all live
+ * on the Track route, which every account has.
  */
-const keep = (items, scope) => (scope ? items.filter(it => scope.has(it.id === 'holiday' ? 'track' : it.id)) : items);
+export const GROUPS = Object.freeze([
+  Object.freeze({ id: 'track', icon: 'calendar-days', label: 'Track', tabs: Object.freeze([
+    Object.freeze({ id: 'calendar', label: 'Calendar', section: 'track', sub: 'calendar' }),
+    Object.freeze({ id: 'goals', label: 'Goals', section: 'achievements', sub: 'goals', area: 'achievements' }),
+    Object.freeze({ id: 'money', label: 'Money', section: 'achievements', sub: 'savings', area: 'achievements' }),
+    Object.freeze({ id: 'rewards', label: 'Rewards', section: 'shop', area: 'shop' }),
+  ]) }),
+  Object.freeze({ id: 'health', icon: 'activity', label: 'Health', tabs: Object.freeze([
+    Object.freeze({ id: 'train', label: 'Train', section: 'train', owner: true }),
+    Object.freeze({ id: 'food', label: 'Food', section: 'track', sub: 'diet' }),
+    Object.freeze({ id: 'vitals', label: 'Vitals', section: 'track', sub: 'vitals' }),
+    Object.freeze({ id: 'habits', label: 'Habits', section: 'habits', area: 'habits' }),
+  ]) }),
+  Object.freeze({ id: 'social', icon: 'users', label: 'Social', tabs: Object.freeze([
+    Object.freeze({ id: 'league', label: 'League', section: 'leaderboard', area: 'leaderboard' }),
+    Object.freeze({ id: 'friends', label: 'Friends', section: 'friends', sub: 'friends', area: 'friends' }),
+    Object.freeze({ id: 'messages', label: 'Messages', section: 'friends', sub: 'messages', area: 'friends' }),
+  ]) }),
+]);
 
-/** Desktop sidebar items. Upgrade only for the owner, above Settings (as classic). */
-export function sidebarItems({ isOwner = false, showHoliday = CONSOLE_SHOW_HOLIDAY, scope = null } = {}) {
-  return keep([
-    ITEM.hub, ITEM.achievements, ITEM.track, ITEM.shop,
-    ...(showHoliday ? [ITEM.holiday] : []),
-    ITEM.habits, ITEM.leaderboard,
-    ...(isOwner ? [ITEM.upgrade] : []),
-    ITEM.settings,
-  ], scope);
-}
-
-/** The four routed phone tabs; More is drawn after them. Shop took Holiday's slot (owner decision). */
-export const TABS = [
-  { ...ITEM.hub },
-  { ...ITEM.track },
-  { ...ITEM.habits },
-  { ...ITEM.shop, label: 'Shop' },
-];
-
-/** A scoped account's spare tab seats, in the order they are offered. */
-const TAB_SEATS = [
-  { ...ITEM.habits },
-  { ...ITEM.leaderboard, label: 'League' },
-  { ...ITEM.friends },
-  { ...ITEM.shop, label: 'Shop' },
-  { ...ITEM.achievements, label: 'Goals' },
-];
-
-/**
- * The routed phone tabs for a scope. No scope: TABS, as ever. Scoped:
- * Hub and Track, then the first two shown areas, so what someone chose
- * takes the seats (League and Friends for a Friends pick, not Habits and
- * Shop). Fewer areas, fewer tabs; More is always drawn after them.
- */
-export function tabItems({ scope = null } = {}) {
-  if (!scope) return TABS;
-  return [TABS[0], TABS[1], ...TAB_SEATS.filter(t => scope.has(t.id)).slice(0, 2)];
-}
-
-/**
- * Rows in the phone's More sheet. Scoped: every shown area that did not
- * get a tab, then Settings — so each shown destination is on a tab or here.
- */
-export function moreItems({ isOwner = false, showHoliday = CONSOLE_SHOW_HOLIDAY, scope = null } = {}) {
-  if (scope) {
-    const tabbed = new Set(tabItems({ scope }).map(t => t.id));
-    return [
-      ...[ITEM.achievements, ITEM.friends, ITEM.leaderboard, ITEM.habits, ITEM.shop].filter(it => scope.has(it.id) && !tabbed.has(it.id)),
-      ITEM.settings,
-      ...(isOwner ? [ITEM.upgrade] : []),
-    ];
-  }
-  return [
-    ITEM.achievements, ITEM.friends, ITEM.leaderboard,
-    ...(showHoliday ? [ITEM.holiday] : []),
-    ITEM.settings,
-    ...(isOwner ? [ITEM.upgrade] : []),
-  ];
-}
+/** The view a route opens on when none is asked for. */
+export const DEFAULT_SUB = Object.freeze({ track: 'calendar', achievements: 'goals', friends: 'friends' });
 
 /** Routes an id resolves to before highlighting ('schedule' is Upgrade's old id). */
 export function canonicalSection(id) {
@@ -107,35 +73,80 @@ export function canonicalSection(id) {
   return id || 'hub';
 }
 
+/** A route's view, normalised: classic's 'trackers' tab is the calendar here. */
+function subOf(section, sub) {
+  if (section === 'track' && sub === 'trackers') return 'calendar';
+  return sub || DEFAULT_SUB[section] || null;
+}
+
 /**
- * The nav entry a section belongs to. While Holiday has no entry of its
- * own, its route renders Track (Calendar › Year), so it is Track: the
- * sidebar highlights Track and the bars title the page "Track".
+ * Where a route (and its view) sits → { group, tab } or null for a
+ * page outside the three sections (Hub, Settings, Upgrade).
  */
-export function navSection(id, { showHoliday = CONSOLE_SHOW_HOLIDAY } = {}) {
-  const s = canonicalSection(id);
-  return s === 'holiday' && !showHoliday ? 'track' : s;
+export function placeOf(section, sub = null) {
+  let s = canonicalSection(section);
+  if (s === 'holiday') { s = 'track'; sub = 'calendar'; }
+  const want = subOf(s, sub);
+  for (const group of GROUPS) {
+    const tab = group.tabs.find(t => t.section === s && (t.sub || null) === (t.sub ? want : null));
+    if (tab) return { group, tab };
+  }
+  return null;
 }
 
-/** Which phone tab lights up for a section: one of the tabs' ids (`tabs`: tabItems), or 'more'. */
-export function activeTab(section, { moreOpen = false, tabs = TABS } = {}) {
-  if (moreOpen) return 'more';
-  const s = canonicalSection(section);
-  if (tabs.some(t => t.id === s)) return s;
-  // Holiday is part of Track in the console design; while it still has its
-  // own route it lights the Track tab, which is where it is going.
-  if (s === 'holiday') return 'track';
-  return 'more';
+/**
+ * A group's tabs for this account. `scope`: the routes a scoped account
+ * shows (a Set from lib/onboarding/areas.js navScope), or null for
+ * everything, which is every account that is not scoped.
+ */
+export function groupTabs(group, { isOwner = false, scope = null } = {}) {
+  return group.tabs.filter(t => (!t.owner || isOwner) && (!t.area || !scope || scope.has(t.area)));
 }
 
-const TITLES = {
-  hub: 'Hub', achievements: 'Achievements', track: 'Track', shop: 'Shopping', holiday: 'Holiday',
-  habits: 'Habits', leaderboard: 'Leaderboard', settings: 'Settings', friends: 'Friends', upgrade: 'Upgrade',
-};
+/** The groups this account sees, each with its visible tabs. A group with none is left out. */
+export function navGroups(opts = {}) {
+  return GROUPS.map(g => ({ ...g, tabs: groupTabs(g, opts) })).filter(g => g.tabs.length > 0);
+}
 
-/** Page title for the top bar and the phone app bar. Never empty. */
-export function sectionTitle(section, opts) {
-  return TITLES[navSection(section, opts)] || 'Vantage';
+/** Desktop sidebar: Hub, the groups, and Upgrade for the owner. Settings is behind the avatar. */
+export function sidebarItems({ isOwner = false, scope = null } = {}) {
+  return [HUB, ...navGroups({ isOwner, scope }), ...(isOwner ? [UPGRADE] : [])];
+}
+
+/** The phone's tab bar: Hub and the groups. Never more than four. */
+export function tabItems({ isOwner = false, scope = null } = {}) {
+  return [HUB, ...navGroups({ isOwner, scope })];
+}
+
+/**
+ * The tab a group opens on: the one last open in it (`last`, a tab id)
+ * while it is still shown, otherwise its first.
+ */
+export function groupTarget(group, last = null) {
+  return group.tabs.find(t => t.id === last) || group.tabs[0] || null;
+}
+
+/**
+ * The nav entry a page belongs to: 'hub', a group's id, or the route
+ * itself for a page outside the groups ('settings', 'upgrade').
+ */
+export function navSection(section, sub = null) {
+  const place = placeOf(section, sub);
+  return place ? place.group.id : canonicalSection(section);
+}
+
+/** Which phone tab lights up: one of the tabs' ids, or null (Settings, Upgrade). */
+export function activeTab(section, sub = null, { tabs = tabItems() } = {}) {
+  const id = navSection(section, sub);
+  return tabs.some(t => t.id === id) ? id : null;
+}
+
+const TITLES = { hub: 'Hub', settings: 'Settings', upgrade: 'Upgrade' };
+
+/** Page title for the top bar and the phone app bar: the section's name. Never empty. */
+export function sectionTitle(section, sub = null) {
+  const place = placeOf(section, sub);
+  return place ? place.group.label : TITLES[canonicalSection(section)] || 'Vantage';
 }
 
 const DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];

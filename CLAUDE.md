@@ -74,11 +74,12 @@ against it.
   is. (The Nov 2026 Habits rework made Habits better and left the tab
   count where it was. Say so plainly when that is the trade.)
 - **Done so far:** Holiday folded into Track (its route remains for deep
-  links); new accounts only see the areas they picked (below).
-- **Where the count stands** (new design): desktop Hub, Achievements,
-  Track, Shopping, Habits, Leaderboard, Settings (+ Upgrade for the
-  owner); phone tabs Hub, Track, Habits, Shop, with Achievements,
-  Friends, Leaderboard and Settings under More.
+  links); new accounts only see the areas they picked (below); the new
+  design's navigation is the Hub plus three sections (2026-11-23).
+- **Where the count stands** (new design): Hub, Track, Health, Social,
+  on desktop and phone alike (+ Upgrade in the owner's sidebar).
+  Settings is behind the avatar and the phone's More sheet is gone.
+  Classic still has its seven; it was left alone on purpose.
 - **The structure is decided (owner, 2026-11-23, from mockups):** the Hub
   plus THREE sections, with Settings behind the avatar and no More
   drawer on a phone.
@@ -87,9 +88,19 @@ against it.
   - **Health** — Train (the gym tracker, out of the owner-only Upgrade
     area) · Food · Vitals · Habits.
   - **Social** — League · Friends · Messages.
+- **How the sections are built** (`design/console/shell/nav.js`): a
+  section is a GROUP of tabs and a tab is a PLACE, an existing route
+  plus the view of that page to show. Nothing moved underneath: Goals
+  and Money are the `achievements` route's two views, Food and Vitals
+  the `track` route's, Messages the `friends` route's. `navigate(route,
+  view)` in App carries the view (`subTab`, session state) and console
+  pages read it as `activeSub`. So every old route, shortcut and widget
+  still lands and lights its tab. A new page goes in as a tab of a
+  group, never as a new sidebar entry. Train is the `train` route
+  (`UpgradeSection only="lifts"`), owner-only until step 3.
 - **Order agreed:** (1) the gym tracker's UI, where it lives now — done,
   see Lifts below; (2) restructure the navigation into the three
-  sections; (3) open Train to everyone as a PLAIN LOGGER first (start a
+  sections — done; (3) open Train to everyone as a PLAIN LOGGER first (start a
   workout, log sets, history, bests), with pick-a-plan as a later piece.
   The owner's programme, rota, two gyms and avoided lifts are written
   into the app today and must sit behind the owner's account before
@@ -106,9 +117,10 @@ two things; every earlier account is left exactly as it was.
   explicit `S.design` still wins. `DEFAULT_DESIGN` stays `'classic'`, so
   for existing accounts the redesign is still the owner preview.
 - **A menu that follows the onboarding picks** (`lib/onboarding/areas.js`).
-  Hub, Track and Settings always show; a pick turns on its areas; an area
-  with data in it always shows; the rest sit behind **Add an area**
-  (console shell). It is a view: routes, search and widgets reach every
+  Hub, Track (the calendar) and Health (Food, Vitals) always show; a
+  pick turns on its tabs, and Social appears with the Friends pick; an
+  area with data in it always shows; the rest sit behind **Add an area**
+  (the sidebar's row on desktop, an Add seat on the phone's tab bar). It is a view: routes, search and widgets reach every
   section, and the only state is `S.onboarding.scoped` / `.added`.
   "Show me everything" in the onboarding means everything.
 - Not done yet, on purpose: seeded trackers (`Amount Saved`) and the
