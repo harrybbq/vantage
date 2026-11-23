@@ -305,6 +305,15 @@ html[data-design="console"] .cx-shell-sub.is-row {
 html[data-design="console"] .cx-shell-sub.is-row .cx-shell-st { padding: 0 2px; }
 html[data-design="console"] .cx-shell-sub.is-row .cx-shell-st > span:first-child { overflow: hidden; text-overflow: ellipsis; }
 html[data-design="console"] .cx-shell-sub.is-row .cx-shell-st.is-on::after { left: 8px; right: 8px; }
+/* The sliding line: one underline for the strip, moved to the open tab (measured by SectionTabs). Until
+   it has been measured, the open tab draws its own, so there is always one. */
+html[data-design="console"] .cx-shell-sub { position: relative; }
+html[data-design="console"] .cx-shell-sub.has-line .cx-shell-st.is-on::after { display: none; }
+html[data-design="console"] .cx-shell-line { position: absolute; left: 0; bottom: 0; height: 2px; pointer-events: none; }
+html[data-design="console"] .cx-shell-line::after { content: ''; position: absolute; left: 12px; right: 12px; top: 0; bottom: 0; border-radius: 2px 2px 0 0; background: var(--cx-accent); }
+html[data-design="console"] .cx-shell-sub.is-row .cx-shell-line::after { left: 8px; right: 8px; }
+html[data-design="console"] .cx-shell-line.is-live { transition: transform 320ms cubic-bezier(.2, .7, .2, 1), width 320ms cubic-bezier(.2, .7, .2, 1); }
+@media (prefers-reduced-motion: reduce) { html[data-design="console"] .cx-shell-line.is-live { transition: none; } }
 
 /* What is waiting behind an entry: friend requests and unread messages. */
 html[data-design="console"] .cx-shell-badge {

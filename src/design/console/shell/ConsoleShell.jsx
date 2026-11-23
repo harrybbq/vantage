@@ -17,7 +17,7 @@
  *
  * Pages sit in `.cx-page` (shell.css), whose offsets match these bars.
  */
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import Icon from '../../../components/Icon';
 import Logo from '../../../components/Logo';
 import { Sheet } from '../ui';
@@ -133,8 +133,28 @@ function waiting(id, counts) {
  * second row on a phone. Each is a place (nav.js): a route and its view.
  */
 function SectionTabs({ place, tabs, counts, navigate, className }) {
+  // The line under the open tab slides to the one you tap, so a section's tabs read as one thing
+  // you move along. It is measured from the tab itself, and placed (not slid) the first time.
+  const root = useRef(null);
+  const [line, setLine] = useState(null);     // { x, w }
+  const [live, setLive] = useState(false);
+  useLayoutEffect(() => {
+    const el = root.current;
+    if (!el) return undefined;
+    const measure = () => {
+      const on = el.querySelector('.cx-shell-st.is-on');
+      if (on) setLine(prev => (prev && prev.x === on.offsetLeft && prev.w === on.offsetWidth ? prev : { x: on.offsetLeft, w: on.offsetWidth }));
+    };
+    measure();
+    if (typeof ResizeObserver === 'undefined') return undefined;
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [place.tab.id, tabs.length]);
+  useEffect(() => { const id = requestAnimationFrame(() => setLive(true)); return () => cancelAnimationFrame(id); }, []);
   return (
-    <div className={cx('cx-shell-sub', className)} role="navigation" aria-label={`${place.group.label} tabs`} data-shell-sub={place.group.id}>
+    <div ref={root} className={cx('cx-shell-sub', line && 'has-line', className)} role="navigation" aria-label={`${place.group.label} tabs`} data-shell-sub={place.group.id}>
+      {line && <span className={cx('cx-shell-line', live && 'is-live')} style={{ width: `${line.w}px`, transform: `translateX(${line.x}px)` }} aria-hidden="true" />}
       {tabs.map(tb => {
         const on = tb.id === place.tab.id;
         const n = waiting(tb.id, counts);
@@ -200,7 +220,7 @@ function TopBar({ S, section, title, place, tabs, counts, navigate, onOpenModal,
     <header className="cx-shell-top" data-shell-bar="top">
       <h1 className="cx-shell-title">{title}</h1>
       {place
-        ? <SectionTabs place={place} tabs={tabs} counts={counts} navigate={navigate} />
+        ? <SectionTabs key={place.group.id} place={place} tabs={tabs} counts={counts} navigate={navigate} />
         : <span className="cx-shell-context">{longDate(now)}</span>}
       <div className="cx-shell-slot cx-shell-slot-start" ref={barRef.start} />
       <span className="cx-shell-sp" />
@@ -244,7 +264,7 @@ function AppBar({ S, section, title, place, tabs, counts, navigate, onOpenModal,
         {/* Settings is behind the avatar: it leads the hub's bar and closes every other page's. */}
         {!hub && <Avatar S={S} size={32} onClick={() => navigate('profile')} />}
       </div>
-      {place && <SectionTabs place={place} tabs={tabs} counts={counts} navigate={navigate} className="is-row" />}
+      {place && <SectionTabs key={place.group.id} place={place} tabs={tabs} counts={counts} navigate={navigate} className="is-row" />}
     </header>
   );
 }
