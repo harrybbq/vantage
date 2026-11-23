@@ -32,7 +32,7 @@ retired `cream`/`dark` ids map forward in `resolveEffectiveTheme`.
 - Netlify functions own anything cross-user or secret: leaderboard, WHOOP sync (`netlify/lib/whoop.js`), AI (`ai-food-detect`, `ai-coach-daily` — need `ANTHROPIC_API_KEY` env).
 - Social: `profiles`/`friendships`/`messages`/`blocks`/`reports` tables, RLS-gated direct queries in `src/lib/friends/`. Report+block UI exists (friend card + DM ⋯ menu).
 - iPhone calendar (iOS app, Pro, 2026-11-01): `lib/calendar/device.js` + `deviceSource.js`. Read on the device, never stored: App hands calendar surfaces a VIEW of S (`withDeviceEvents`, non-enumerable symbol) — never write it back. Settings card `settings/DeviceCalendarCard.jsx`; prefs per phone in localStorage.
-- Lifts, two gyms, two plans (owner-only, 2026-11-13): `data/trainingProgramme.js` holds a written plan per gym, `PROGRAMME` (DXC, the base) and `PROGRAMME_GREENOCK`, same sessions and required sets slot for slot; a Greenock entry that takes a different exercise's slot carries `for` (the DXC name). `GYM_ONLY` records which gym has what (a lift's own `only`, set in Manage lifts › ⋯ › "Where you can do it", wins). `lib/lifts/gymPlan.js`: `planOf(gym, session)`, `switchExercise` (a session in progress changes gym: exercises with no set done become the other plan's counterpart, `workout.js` `setWorkoutGym`), `fitForGym` (safety net: nothing a gym lacks is shown). The adaptive Upper/Lower builds from the chosen gym's plan. A new exercise in either plan needs `EXERCISE_PARTS` (adaptive.js) and `PROGRAMME_MUSCLES` (muscles.js). Open: DXC has no seated leg curl, so DXC's Lower shows it as left out until the owner names what DXC has.
+- Lifts, two gyms, two plans (owner-only, 2026-11-13): `data/trainingProgramme.js` holds a written plan per gym, `PROGRAMME` (DXC, the base) and `PROGRAMME_GREENOCK`, same sessions and required sets slot for slot; a Greenock entry that takes a different exercise's slot carries `for` (the DXC name). `GYM_ONLY` records which gym has what (a lift's own `only`, set in Manage lifts › ⋯ › "Where you can do it", wins). `lib/lifts/gymPlan.js`: `planOf(gym, session)`, `switchExercise` (a session in progress changes gym: exercises with no set done become the other plan's counterpart, `workout.js` `setWorkoutGym`), `fitForGym` (safety net: nothing a gym lacks is shown). The adaptive Upper/Lower builds from the chosen gym's plan. A new exercise in either plan needs `EXERCISE_PARTS` (adaptive.js) and `PROGRAMME_MUSCLES` (muscles.js). Open: DXC has no seated leg curl, so DXC's Lower shows it as left out until the owner names what DXC has. Home UI (2026-11-23): three views on every screen (Today · Lifts · History, `LiftsTab` `HOME_PAGES`); the Today card puts Start first and folds the coaching detail (muscle tallies, catch-up tags, WHOOP chip, below-standard note) behind one "why" line (`WorkoutToday`); lifts are one list of rows with search, never-logged lifts in a collapsed group (`LiftList`); one week strip, no pips; labels have no `//` and take the console label style in the new design.
 - Habits (reworked 2026-11-23, "less like a chore"): the new design's page is **the track** — one lane a habit, all running at once (`design/console/sweep/HabitTrack.jsx` + `habit-track.css`, hosted by `ConsoleHabits.jsx`); classic keeps its roster + detail. The runner (`components/habits/HabitRunner.jsx`), stages, ghost and the relapse rules are untouched. Three shared rules, all in `lib/habits/`, so they apply in both designs and the hub widgets: `record.js` (the number that doesn't reset: clean days of the last 30, or closed periods on budget; it also grows the runner's scenery via `view.js sceneryLevel`), `road.js` (an endless habit past its own milestones gets the next one automatically; one additive key `habit.autoPaid`; first look pays nothing; paid by `useHabitAwards`), and `relapse.js undoRelapse` (the one-tap "I slipped" offers Undo; it restores the habit only if nothing else touched it). A lane's face shows three things only (this run, what's next, the record); totals and the relapse count live in the opened lane's History.
 - Legal: `/privacy` and `/terms` deep-link pre-auth (store requirement). Onboarding (replaced both old tours, Oct 2026): logic `src/lib/onboarding/onboarding.js`, overlay `components/onboarding/Onboarding.jsx`, hub Getting started card; per-page help: `SectionHelp`.
 
@@ -79,11 +79,24 @@ against it.
   Track, Shopping, Habits, Leaderboard, Settings (+ Upgrade for the
   owner); phone tabs Hub, Track, Habits, Shop, with Achievements,
   Friends, Leaderboard and Settings under More.
-- **The purpose is not settled.** The candidate on the table is the OVR
-  rating as the spine: one number for your life, in a league with your
-  friends, and every section is either the number, what moves it, what
-  you are aiming at, or who you are up against. Nothing is decided until
-  the owner picks; do not restructure the navigation on an assumption.
+- **The structure is decided (owner, 2026-11-23, from mockups):** the Hub
+  plus THREE sections, with Settings behind the avatar and no More
+  drawer on a phone.
+  - **Track** — Calendar · Goals (today's Achievements) · Money (savings,
+    which lives inside Achievements today) · Rewards (today's Shopping).
+  - **Health** — Train (the gym tracker, out of the owner-only Upgrade
+    area) · Food · Vitals · Habits.
+  - **Social** — League · Friends · Messages.
+- **Order agreed:** (1) the gym tracker's UI, where it lives now — done,
+  see Lifts below; (2) restructure the navigation into the three
+  sections; (3) open Train to everyone as a PLAIN LOGGER first (start a
+  workout, log sets, history, bests), with pick-a-plan as a later piece.
+  The owner's programme, rota, two gyms and avoided lifts are written
+  into the app today and must sit behind the owner's account before
+  step 3: every other user gets no plan by default. Train also has to
+  leave the owner-only bundle, which is compiled out of the native build.
+- The wider purpose statement (the OVR rating as the spine) is still a
+  candidate, not a decision.
 
 ## The smaller app (decided 2026-11-12)
 Accounts created from `SMALLER_APP_FROM` (`lib/account/cohort.js`) get

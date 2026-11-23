@@ -86,7 +86,7 @@ export default function HistoryCard({ S, update, today }) {
   return (
     <section className="lh-card lh-hist" aria-labelledby="lh-hist-h" data-testid="lh-hist">
       <div className="lh-hist-top">
-        <p className="lf-eyebrow" id="lh-hist-h">// Workout history</p>
+        <p className="lf-eyebrow" id="lh-hist-h">Workout history</p>
         {grids.length > 1 && <span className="lf-meta">{plural(all, 'workout')} since {grids[grids.length - 1].year}</span>}
       </div>
       {lifted.sets > 0 && (
@@ -104,7 +104,7 @@ export default function HistoryCard({ S, update, today }) {
       </div>
 
       {sheet === 'all' && (
-        <Sheet title="Workout history" eyebrow={`// ${plural(all, 'workout')}`} onClose={() => setSheet(null)} testId="lh-hist-sheet" width={560} className="lh-hist-sheet">
+        <Sheet title="Workout history" eyebrow={`${plural(all, 'workout')}`} onClose={() => setSheet(null)} testId="lh-hist-sheet" width={560} className="lh-hist-sheet">
           <div className="lh-hist-years">
             {grids.map(g => <YearBlock key={g.year} g={g} today={today} />)}
             <Legend />
@@ -130,7 +130,7 @@ function ImportSheet({ today, imported, onClose, onAdd }) {
     ? <Button variant="primary" size="lg" block onClick={onClose} data-testid="lh-imp-done">Done</Button>
     : <Button variant="primary" size="lg" block disabled={!count} onClick={add} data-testid="lh-imp-add">{count ? `Add ${plural(count, 'day')}` : 'Paste some dates'}</Button>;
   return (
-    <Sheet title="Add past workouts" eyebrow="// Workout history" onClose={onClose} footer={footer} testId="lh-imp" width={480} initialFocus="textarea">
+    <Sheet title="Add past workouts" eyebrow="Workout history" onClose={onClose} footer={footer} testId="lh-imp" width={480} initialFocus="textarea">
       <div className="lh-imp">
         <p className="lf-meta">Paste the days you trained, from another app or your notes: one date per workout day, written 2024-12-23. Add “x2” after a date that had two workouts.</p>
         <p className="lf-meta">They only fill the history grid. Nothing you’ve logged here changes, and adding the same days again does nothing.</p>

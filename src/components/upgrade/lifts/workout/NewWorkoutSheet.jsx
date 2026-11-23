@@ -98,7 +98,7 @@ export default function NewWorkoutSheet({ S, today, gyms = [], gym: gym0 = null,
   );
 
   return (
-    <Sheet title="New workout" eyebrow="// New workout" onClose={onClose} footer={footer} testId="lw-new" className="lw-new" width={520}>
+    <Sheet title="New workout" eyebrow="Workout" onClose={onClose} footer={footer} testId="lw-new" className="lw-new" width={520}>
       <div className="lw-new-body">
         <Segmented options={TABS} value={tab} onChange={changeTab} label="Start from" full testId="lw-new-tabs" />
         {gyms.length > 0 && (

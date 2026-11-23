@@ -133,7 +133,7 @@ export function CompareScope({ lift, gymLabel = null, onManage = null, className
         <span className="lf-scope-txt">{sc.text}</span>
       </button>
       {open && (
-        <Sheet title={sc.perGym ? `Compared within ${sc.short}` : 'Compared across gyms'} eyebrow="// How this lift is compared" onClose={() => setOpen(false)}
+        <Sheet title={sc.perGym ? `Compared within ${sc.short}` : 'Compared across gyms'} eyebrow="How this lift is compared" onClose={() => setOpen(false)}
                testId="lf-scope-sheet"
                footer={onManage ? <Button variant="secondary" size="lg" block iconRight="chevron-right" onClick={() => { setOpen(false); onManage(lift); }}>Change in Manage lifts</Button> : null}>
           <div className="lf-explain">

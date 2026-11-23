@@ -63,7 +63,7 @@ export function LiftHistorySheet({ liftId, onClose }) {
   const { summaries } = useLiftsCtx();
   const s = summaries.get(liftId);
   return (
-    <Sheet title={s ? s.lift.name : 'Lift'} eyebrow="// History" onClose={onClose} width={560} testId="lh-history">
+    <Sheet title={s ? s.lift.name : 'Lift'} eyebrow="History" onClose={onClose} width={560} testId="lh-history">
       <LiftDetail liftId={liftId} embedded onClose={onClose} />
     </Sheet>
   );
@@ -138,7 +138,7 @@ function Detail({ all, ctx, embedded, onClose, backLabel, desktop, bwOf, gyms, t
   const chart = (
     <section className="lh-dsec lh-dchart" aria-labelledby={`lh-ch-${lift.id}`}>
       <div className="lh-dsec-head">
-        <p className="lf-eyebrow" id={`lh-ch-${lift.id}`}>// est. 1RM over time (kg) · estimate</p>
+        <p className="lf-eyebrow" id={`lh-ch-${lift.id}`}>est. 1RM over time (kg) · estimate</p>
         {!empty && <Segmented label="Chart range" size="sm" options={RANGES} value={range} onChange={setRange} testId="lh-range" />}
       </div>
       {empty
@@ -150,7 +150,7 @@ function Detail({ all, ctx, embedded, onClose, backLabel, desktop, bwOf, gyms, t
 
   const repTable = !empty && (
     <section className="lh-dsec lh-drm" aria-labelledby={`lh-rm-${lift.id}`}>
-      <p className="lf-eyebrow" id={`lh-rm-${lift.id}`}>// Rep maxes · real sets{gymLabel ? ` · ${gymShort(gymLabel)}` : ''}</p>
+      <p className="lf-eyebrow" id={`lh-rm-${lift.id}`}>Rep maxes · real sets{gymLabel ? ` · ${gymShort(gymLabel)}` : ''}</p>
       <table className="lh-rm" data-testid="lh-rm">
         <thead><tr><th scope="col">Reps</th><th scope="col">Best real set</th><th scope="col" className="is-num">est. 1RM</th><th scope="col" className="is-num">When</th></tr></thead>
         <tbody>
@@ -234,7 +234,7 @@ function LogList({ sets, lift, perGym, one, gymLabel, pbIds, bwOf, today, gymNam
         const [y, m] = g.k.split('-').map(Number);
         return (
           <div key={g.k} className="lh-month">
-            <p className="lh-month-head lf-eyebrow">// Log · {MONTHS[m - 1].slice(0, 3)} {y} · {g.rows.length} {g.rows.length === 1 ? 'set' : 'sets'}</p>
+            <p className="lh-month-head lf-eyebrow">Log · {MONTHS[m - 1].slice(0, 3)} {y} · {g.rows.length} {g.rows.length === 1 ? 'set' : 'sets'}</p>
             <ul className="lh-logrows">
               {g.rows.map(e => (
                 <LogRow key={e.id} e={e} lift={lift} perGym={perGym} one={one} pb={pbIds.get(e.id)} bwOf={bwOf} gymName={gymName}
@@ -249,7 +249,7 @@ function LogList({ sets, lift, perGym, one, gymLabel, pbIds, bwOf, today, gymNam
         <Button variant="secondary" block onClick={() => setMonths(n => n + PAGE)}>Show older · {groups.length - months} more {groups.length - months === 1 ? 'month' : 'months'}</Button>
       )}
       {menu && (
-        <Sheet title={`${realSetText(menu.weight, menu.reps, lift)} · ${whenLabel(menu.date, today)}`} eyebrow={`// ${lift.name}`} onClose={() => setMenu(null)} testId="lh-rowmenu">
+        <Sheet title={`${realSetText(menu.weight, menu.reps, lift)} · ${whenLabel(menu.date, today)}`} eyebrow={`${lift.name}`} onClose={() => setMenu(null)} testId="lh-rowmenu">
           <div className="lh-menu">
             <Button variant="secondary" size="lg" block icon="pencil" onClick={() => { const e = menu; setMenu(null); onEdit(e); }}>Edit set</Button>
             <div className="lh-menu-gap" />

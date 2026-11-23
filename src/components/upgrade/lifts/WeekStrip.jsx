@@ -16,14 +16,14 @@ import Icon from '../../Icon';
 import { Sheet, NightChip } from './ui';
 import { weekPlan, dayDetail } from '../../../lib/lifts/home';
 
-export default function WeekStrip({ S, today, gym, gymName = id => id, className = '' }) {
+export default function WeekStrip({ S, today, gym, gymName = id => id, className = '', note = null }) {
   const week = useMemo(() => weekPlan(S, today), [S, today]);
   const [open, setOpen] = useState(null);
   const detail = useMemo(() => (open ? dayDetail(S, week.find(c => c.iso === open), gym !== undefined ? { gym } : {}) : null), [S, week, open, gym]);
   if (!week.length) return null;
   return (
     <section className={`lh-week ${className}`} aria-labelledby="lh-week-h" data-testid="lh-week">
-      <p className="lf-eyebrow" id="lh-week-h">// This week</p>
+      <p className="lf-eyebrow" id="lh-week-h">This week{note ? ` · ${note}` : ''}</p>
       <ol className="lh-week-row">
         {week.map(c => {
           const label = `${c.dow} ${c.date}: ${c.session || (c.inPattern ? 'rest' : 'outside the rota')}${c.code ? `, ${c.code}` : ''}`
@@ -51,7 +51,7 @@ export default function WeekStrip({ S, today, gym, gymName = id => id, className
 function DaySheet({ d, today, gymName, onClose }) {
   const when = d.iso === today ? 'Today' : d.iso < today ? 'Past day' : 'Coming up';
   return (
-    <Sheet title={`${d.title}${d.session ? ` · ${d.session}` : ''}`} eyebrow={`// ${when}${d.code ? ` · ${d.code}` : ''}`} onClose={onClose} testId="lh-daysheet">
+    <Sheet title={`${d.title}${d.session ? ` · ${d.session}` : ''}`} eyebrow={`${when}${d.code ? ` · ${d.code}` : ''}`} onClose={onClose} testId="lh-daysheet">
       <div className="lh-dsheet">
         <div className="lh-dsheet-tags">
           {d.night && <NightChip />}
@@ -62,7 +62,7 @@ function DaySheet({ d, today, gymName, onClose }) {
         {d.why && <p className="lf-body lh-dsheet-why">{d.why}</p>}
         {d.exercises.length > 0 ? (
           <>
-            <p className="lf-eyebrow">// {d.session} · {d.exercises.length} exercises</p>
+            <p className="lf-eyebrow">{d.session} · {d.exercises.length} exercises</p>
             <ol className="lh-plist">
               {d.exercises.map(x => (
                 <li key={x.name}>
@@ -77,7 +77,7 @@ function DaySheet({ d, today, gymName, onClose }) {
         )}
         {(d.logged.length > 0 || d.quickSets > 0) && (
           <>
-            <p className="lf-eyebrow">// Logged</p>
+            <p className="lf-eyebrow">Logged</p>
             <ul className="lh-plist">
               {d.logged.map((w, i) => (
                 <li key={i}><span className="lh-plist-n">{w.name}{w.gym ? ` · ${gymName(w.gym)}` : ''}</span><span className="lh-plist-t lf-num">{w.sets} sets</span></li>

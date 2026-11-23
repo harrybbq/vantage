@@ -104,7 +104,7 @@ function LiftMenu({ lift, count, gyms, first, last, onClose, onMove, onStep, onO
   const stepOpts = [{ value: '', label: `Default · ${def}` }, ...STEP_CHOICES.map(s => ({ value: String(s), label: String(s) }))];
   const act = fn => () => { fn(); onClose(); };
   return (
-    <Sheet title={lift.name} eyebrow="// Manage lift" onClose={onClose} testId="lh-liftmenu">
+    <Sheet title={lift.name} eyebrow="Manage lift" onClose={onClose} testId="lh-liftmenu">
       <div className="lh-menu">
         {!lift.archived && (
           <div className="lh-menu-row">
@@ -112,7 +112,7 @@ function LiftMenu({ lift, count, gyms, first, last, onClose, onMove, onStep, onO
             <Button variant="secondary" icon="arrow-down" onClick={() => onMove(lift.id, 1)} disabled={last}>Move down</Button>
           </div>
         )}
-        <p className="lf-eyebrow">// Weight step (the ± on the pad)</p>
+        <p className="lf-eyebrow">Weight step (the ± on the pad)</p>
         {per ? gyms.filter(g => !g.archived).map(g => (
           <div key={g.id} className="lh-menu-field">
             <span className="lf-meta">{g.name} · now {stepFor(lift, g.id)} kg</span>
@@ -130,7 +130,7 @@ function LiftMenu({ lift, count, gyms, first, last, onClose, onMove, onStep, onO
         {per && <p className="lf-meta">A machine&apos;s stack differs gym to gym, so each gym keeps its own step.</p>}
         {!lift.archived && onOnly && liveGyms.length > 1 && (
           <>
-            <p className="lf-eyebrow">// Where you can do it</p>
+            <p className="lf-eyebrow">Where you can do it</p>
             <div className="lh-menu-field">
               <Segmented label={`Where you can do ${lift.name}`} size="sm" full options={whereOpts} value={only || ''}
                          onChange={v => onOnly(lift.id, v || null)} testId="lh-only" />
@@ -171,7 +171,7 @@ function GymRow({ gym, used, onRename, onArchive, onDelete }) {
       </div>
       <IconButton icon="ellipsis" label={`More for the gym ${gym.name}`} onClick={() => setMenu(true)} />
       {menu && (
-        <Sheet title={gym.name} eyebrow="// Manage gym" onClose={() => setMenu(false)}>
+        <Sheet title={gym.name} eyebrow="Manage gym" onClose={() => setMenu(false)}>
           <div className="lh-menu">
             <Button variant="secondary" size="lg" block icon={gym.archived ? 'rotate-ccw' : 'archive'} onClick={() => act(onArchive, gym.id, !gym.archived)}>
               {gym.archived ? 'Restore' : 'Archive'}
@@ -285,9 +285,9 @@ export default function ManageSheet({
   const dragState = drag ? { ...dragApi, ...drag } : dragApi;
 
   return (
-    <Sheet title="Manage lifts" eyebrow="// Lifts" onClose={onClose} width={480} className="lh-manage" testId="lh-manage-sheet">
+    <Sheet title="Manage lifts" eyebrow="Lifts" onClose={onClose} width={480} className="lh-manage" testId="lh-manage-sheet">
       <section aria-labelledby="lh-m-h">
-        <p className="lf-eyebrow" id="lh-m-h">// In use · {active.length}</p>
+        <p className="lf-eyebrow" id="lh-m-h">In use · {active.length}</p>
         <p className="lf-meta lh-mnote"><b>Per gym</b> compares a machine only with itself — DXC&apos;s stack with DXC&apos;s. <b>All gyms</b> keeps one record everywhere.</p>
         <ul className="lh-mlist">
           {active.map((l, i) => (
@@ -300,7 +300,7 @@ export default function ManageSheet({
 
       {onAddGym && (
         <section className="lh-mgyms" aria-labelledby="lh-g-h">
-          <p className="lf-eyebrow" id="lh-g-h">// Gyms · {liveGyms.length}</p>
+          <p className="lf-eyebrow" id="lh-g-h">Gyms · {liveGyms.length}</p>
           <p className="lf-meta lh-mnote">A gym with sets can be archived, not removed — its sets keep their gym.</p>
           <ul className="lh-mlist">
             {liveGyms.map(g => <GymRow key={g.id} gym={g} used={gymCounts.get(g.id) || 0} onRename={onRenameGym} onArchive={onArchiveGym} onDelete={onDeleteGym} />)}

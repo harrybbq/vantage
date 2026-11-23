@@ -241,7 +241,7 @@ export default function BodyMap({ session = null, list, S = null, today = null, 
   return (
     <section className={`lw-body is-${view}${weekOnly ? ' is-week-only' : ''}`} aria-label={weekOnly ? 'This week on the body' : view === 'rows' ? 'Muscle by muscle' : 'Where the work went'}
              data-testid={weekOnly ? 'lw-body-week' : view === 'rows' ? 'lw-body-rows' : 'lw-body'}>
-      <p className="lf-eyebrow">{weekOnly ? '// This week on the body' : view === 'rows' ? '// Muscle by muscle' : '// Where the work went'}</p>
+      <p className="lf-eyebrow">{weekOnly ? 'This week on the body' : view === 'rows' ? 'Muscle by muscle' : 'Where the work went'}</p>
       <div className="lw-body-ctl">
         {week && !weekOnly && (
           <div ref={tabsRef} className="lf-segm is-sm lw-body-tabs" role="tablist" aria-label="Body map range" onKeyDown={onTabKey}>

@@ -33,8 +33,10 @@
  * Desktop (≥ 1024 px): cols 1–7 the card, cols 8–12 the week strip, the
  * stretches (expanded) and "Last session".
  *
- * `side={false}`: the phone's Today page (LiftsTab) — the week strip lives
- * on the Week page instead.
+ * Order of the card (Nov 2026, for bringing the tracker to everyone): the
+ * session and Start first; then one line of why, which opens the chips,
+ * the tags and the notes described above; then the exercises. Phones get
+ * the week strip under the card. The pips row is gone: the strip says it.
  */
 import { useMemo, useState } from 'react';
 import Icon from '../../Icon';
@@ -67,11 +69,12 @@ export default function WorkoutToday({
   const ready = ad && ad.readiness;
   const red = !!(ad && ad.red);
   const [all, setAll] = useState(false);
+  const [why, setWhy] = useState(false);
 
   const noProgramme = !sug.label && !sug.plan;
   const training = sug.exercises.length > 0;
   const shiftWord = sug.label ? sug.label.split(' · ')[0] : '';
-  const eyebrow = nightOf ? `// Counts for ${dowLong(nightOf)}'s night shift` : `// Today · ${dayTitle(today)}${shiftWord ? ` · ${shiftWord}` : ''}`;
+  const eyebrow = nightOf ? `Counts for ${dowLong(nightOf)}'s night shift` : `Today · ${dayTitle(today)}${shiftWord ? ` · ${shiftWord}` : ''}`;
   // The eyebrow already carries "Night 1": the reason line starts at the why.
   const reason = shiftWord && sug.reason.startsWith(`${shiftWord} · `) ? sug.reason.slice(shiftWord.length + 3) : sug.reason;
   // Adaptive (lib/lifts/adaptive.js): the catch-up sentence, else the plan's move, else what the build is for.
@@ -89,6 +92,11 @@ export default function WorkoutToday({
   const liftOf = x => (x.liftId ? list.find(l => l.id === x.liftId) : null);
   const isMachine = x => { const l = liftOf(x); return l ? perGymOf(l) : perGymByName(x.name); };
 
+  // What the "why" line can open: the WHOOP and catch-up chips, each row's tags, the below-standard note.
+  const hasDetail = training && (sug.exercises.some(x => (x.tags && x.tags.length) || x.why) || notCarried > 0 || (ready && !red) || (ad && ad.catchUpSets > 0));
+  const whyText = noProgramme ? 'Today sits outside your rota pattern. Build your own workout, or log a set.' : restLine || whyLine || reason;
+  const moved = sug.plan && sug.plan.source === 'dynamic';
+
   const card = (
     <section className={`lh-card lh-sug${active ? ' is-dimmed' : ''}`} aria-labelledby="lh-sug-name" data-testid="wk-suggested">
       <p className="lf-eyebrow" data-testid="wk-eyebrow">{eyebrow}</p>
@@ -96,10 +104,27 @@ export default function WorkoutToday({
         <h3 id="lh-sug-name" className="lh-sug-name">{title}</h3>
         {training && <span className="lh-sug-meta lf-num">{sug.exercises.length} ex · ~{sug.minutes} min</span>}
       </div>
-      <p className="lh-sug-why" data-testid="wk-reason">
-        {sug.plan && sug.plan.source === 'dynamic' && <span className="lh-moved" title="Moved by the plan"><Icon name="repeat" size={12} /> </span>}
-        {noProgramme ? 'Today sits outside your rota pattern. Build your own workout, or log a set.' : restLine || whyLine || reason}
-      </p>
+      {/* Start comes first (Nov 2026): the one button that matters sits above the list it starts,
+          not below eight rows of it. */}
+      <div className="lh-sug-acts">
+        {training && (
+          active
+            ? <Button variant="secondary" size="lg" block className="lh-start" disabled data-testid="wk-start"><span className="lf-live-dot" aria-hidden="true" /> In progress</Button>
+            : <Button variant="primary" size="lg" block icon="play" className="lh-start" onClick={() => onStart(sug)} data-testid="wk-start">
+                Start {sug.name}{gymLbl && showGym ? ` · ${gymLbl}` : ''}
+              </Button>
+        )}
+        <div className="lh-sec2">
+          <Button variant="secondary" icon="plus" onClick={onBuild} disabled={!!active} data-testid="wk-build">Build my own</Button>
+          <Button variant="secondary" icon="zap" onClick={onQuickLog} disabled={!canQuickLog} data-testid="wk-quicklog">Quick log<span className="lh-wide"> a set</span></Button>
+        </div>
+      </div>
+      {(sug.night || (showGym && training)) && (
+        <div className="lh-chiprow">
+          {showGym && training && <GymSwitch gyms={gyms} value={gym} onChange={onGym} label="Gym for this workout" testId="wk-gym" />}
+          {sug.night && <NightChip className="lh-nightchip" />}
+        </div>
+      )}
       {training && red && ready && (
         <p className="lh-redbox" data-testid="wk-redbox">
           <b>WHOOP Recovery {ready.score}% · red.</b>{' '}
@@ -107,29 +132,39 @@ export default function WorkoutToday({
             : `Same exercises, one set fewer each, and keep every set to about RPE ${sug.exercises.find(x => x.rpeCap)?.rpeCap || 7}. ${sug.name} still counts as done for the week.`}
         </p>
       )}
-      {(sug.night || (showGym && training) || (training && (ready || (ad && ad.catchUpSets > 0)))) && (
+      {/* One line of why. The reasoning behind the session — which muscle each exercise is for,
+          what is being caught up, the recovery score — opens from it; it is not asked of every glance. */}
+      {hasDetail ? (
+        <button type="button" className={`lh-why${why ? ' is-open' : ''}`} aria-expanded={why} onClick={() => setWhy(v => !v)} data-testid="wk-why">
+          <span className="lh-why-txt" data-testid="wk-reason">{moved && <Icon name="repeat" size={12} />}{whyText}</span>
+          <span className="lh-why-more">{why ? 'Less' : 'Why'}<Icon name={why ? 'chevron-up' : 'chevron-down'} size={14} /></span>
+        </button>
+      ) : (
+        <p className="lh-sug-why" data-testid="wk-reason">
+          {moved && <span className="lh-moved" title="Moved by the plan"><Icon name="repeat" size={12} /> </span>}
+          {whyText}
+        </p>
+      )}
+      {why && training && (ready || (ad && ad.catchUpSets > 0)) && (
         <div className="lh-chiprow">
           {/* WHOOP's score in WHOOP's name and WHOOP's band colour (item 126):
               the band is the dot; the words stay in theme ink, because
               WHOOP's yellow cannot carry text on a light surface. */}
-          {training && ready && !red && (
+          {ready && !red && (
             <span className="lh-chip" data-testid="wk-ready">
               <i className="lh-chip-dot" style={{ background: WHOOP_RECOVERY_COLOURS[ready.band] }} aria-hidden="true" />
               WHOOP Recovery {ready.score}% · {ready.band}
             </span>
           )}
-          {training && red && (
+          {red && (
             <span className="lh-chip is-red" data-testid="wk-ready">
               <i className="lh-chip-dot" style={{ background: WHOOP_RECOVERY_COLOURS.red }} aria-hidden="true" />
               red · {ad.built ? 'twice-a-week only' : '−1 set per exercise'}
             </span>
           )}
-          {training && ad && ad.catchUpSets > 0 && <span className="lh-chip is-plus" data-testid="wk-catchup">+{ad.catchUpSets} sets · {ad.catchUp.join(' + ')} catch-up</span>}
-          {sug.night && <NightChip className="lh-nightchip" />}
-          {showGym && training && <GymSwitch gyms={gyms} value={gym} onChange={onGym} label="Gym for this workout" testId="wk-gym" />}
+          {ad && ad.catchUpSets > 0 && <span className="lh-chip is-plus" data-testid="wk-catchup">+{ad.catchUpSets} sets · {ad.catchUp.join(' + ')} catch-up</span>}
         </div>
       )}
-      {pips && pips.pips.length > 0 && <BlockPips bp={pips} />}
       {training && (
         <>
           <ol className="lh-preview" data-testid="wk-preview">
@@ -146,12 +181,16 @@ export default function WorkoutToday({
                       {w && <span className={`lh-preview-w${sug.night ? ' is-night' : ''}`}>{w}</span>}
                     </span>
                   </div>
-                  {(tags.length > 0 || x.why) && (
-                    <div className="lh-preview-tags" data-testid="wk-tags">
-                      {tags.map(tg => <span key={tg.text} className={`lh-tag is-${tg.kind}`}>{tg.text}</span>)}
-                      {x.why && <span className="lh-preview-why">{x.why}</span>}
-                    </div>
-                  )}
+                  {/* A red-day cap is a safety line and always shows; the rest waits for "Why". */}
+                  {(() => {
+                    const shown = why ? tags : tags.filter(tg => tg.kind === 'red' || tg.kind === 'gym');
+                    return (shown.length > 0 || (why && x.why)) && (
+                      <div className="lh-preview-tags" data-testid="wk-tags">
+                        {shown.map(tg => <span key={tg.text} className={`lh-tag is-${tg.kind}`}>{tg.text}</span>)}
+                        {why && x.why && <span className="lh-preview-why">{x.why}</span>}
+                      </div>
+                    );
+                  })()}
                 </li>
               );
             })}
@@ -167,7 +206,7 @@ export default function WorkoutToday({
               Left out at {gymLbl || 'this gym'}: {sug.gymFit.dropped.join(', ')}. Nothing close to it is there.
             </p>
           )}
-          {notCarried > 0 && (
+          {why && notCarried > 0 && (
             <p className="lh-warn" data-testid="wk-below">
               This week will finish below standard: {ad.catchUp.join(' and ')}’s other {notCarried} sets aren’t carried.
             </p>
@@ -175,19 +214,6 @@ export default function WorkoutToday({
         </>
       )}
       {!desktop && <Stretches stretches={stretches} rest={sug.restDay} red={red} folded />}
-      <div className="lh-sug-acts">
-        {training && (
-          active
-            ? <Button variant="secondary" size="lg" block className="lh-start" disabled data-testid="wk-start"><span className="lf-live-dot" aria-hidden="true" /> In progress</Button>
-            : <Button variant="primary" size="lg" block icon="play" className="lh-start" onClick={() => onStart(sug)} data-testid="wk-start">
-                Start {sug.name}{gymLbl && showGym ? ` · ${gymLbl}` : ''}
-              </Button>
-        )}
-        <div className="lh-sec2">
-          <Button variant="secondary" icon="plus" onClick={onBuild} disabled={!!active} data-testid="wk-build">Build my own</Button>
-          <Button variant="secondary" icon="zap" onClick={onQuickLog} disabled={!canQuickLog} data-testid="wk-quicklog">Quick log<span className="lh-wide"> a set</span></Button>
-        </div>
-      </div>
     </section>
   );
 
@@ -197,37 +223,16 @@ export default function WorkoutToday({
         {active && <ResumeBanner active={active} now={now} gymName={gymName} onResume={onResume} onDiscard={onDiscard} />}
         {card}
       </div>
-      {side && (
+      {/* One week strip (Nov 2026): the days, the session on each and a mark when trained. It
+          replaced the pips row in the card and the phone's separate Week page. */}
+      {(side || !desktop) && (
         <div className="lh-today-side">
-          <WeekStrip S={S} today={today} gym={gym} gymName={gymName} className="lh-card" />
+          <WeekStrip S={S} today={today} gym={gym} gymName={gymName} className="lh-card"
+                     note={pips && pips.pips.length ? `${pips.done} of ${pips.total} sessions done` : null} />
           {desktop && <Stretches stretches={stretches} rest={sug.restDay} red={red} />}
           {desktop && last && <LastSession last={last} gymName={gymName} />}
         </div>
       )}
-    </div>
-  );
-}
-
-/**
- * WEEK ▮▮▮▯▯ 3 of 5 · P P L U L — done accent, today outlined, missed hatched
- * (an anchor accepted as missed; a missed Upper / Lower adds a carry arrow).
- * The week is one rota block (lib/lifts/plan.js).
- */
-function BlockPips({ bp }) {
-  const words = p => (p.state === 'missed' ? (p.carried ? 'missed, carried forward' : 'missed') : { done: 'done', today: 'today', todo: 'to do' }[p.state]);
-  const aria = `This week: ${bp.done} of ${bp.total} done — ${bp.pips.map(p => `${p.code} ${words(p)}`).join(', ')}`;
-  return (
-    <div className="lh-pips" role="img" aria-label={aria} data-testid="wk-block">
-      <span className="lh-pips-lbl" aria-hidden="true">Week</span>
-      <span className="lh-pips-bar" aria-hidden="true">
-        {bp.pips.map(p => <i key={p.code} className={`lh-pip is-${p.state}`} />)}
-      </span>
-      <span className="lh-pips-n lf-num" aria-hidden="true">{bp.done} of {bp.total}</span>
-      <span className="lh-pips-codes" aria-hidden="true">
-        {bp.pips.map(p => (
-          <span key={p.code} className={`lh-pipc is-${p.state}`} title={p.code}>{p.carried && <Icon name="arrow-right" size={10} />}{p.letter}</span>
-        ))}
-      </span>
     </div>
   );
 }
@@ -249,7 +254,7 @@ function ResumeBanner({ active, now, gymName, onResume, onDiscard }) {
         <IconButton icon="ellipsis" label="Workout options" className="lh-resume-more" onClick={() => setMenu(true)} data-testid="wk-resume-more" />
       </div>
       {menu && (
-        <Sheet title={active.name} eyebrow={`// In progress · ${mins}`} onClose={close} testId="wk-resume-menu">
+        <Sheet title={active.name} eyebrow={`In progress · ${mins}`} onClose={close} testId="wk-resume-menu">
           <div className="lh-menu">
             <Button variant="secondary" size="lg" block icon="play" onClick={() => { close(); onResume(); }}>Resume workout</Button>
             <div className="lh-menu-gap" />
@@ -306,7 +311,7 @@ function Stretches({ stretches, rest, red = false, folded = false }) {
   }
   return (
     <section className="lh-card lh-stretch is-open" data-testid="wk-stretch">
-      <p className="lf-eyebrow">// {head}{tuned && <span className="lh-stretch-tuned"> · {tuned}</span>}</p>
+      <p className="lf-eyebrow">{head}{tuned && <span className="lh-stretch-tuned"> · {tuned}</span>}</p>
       {body}
     </section>
   );
@@ -317,7 +322,7 @@ function LastSession({ last, gymName }) {
   const s = last.session;
   return (
     <section className="lh-card lh-last" data-testid="lh-last">
-      <p className="lf-eyebrow">// Last session · {s.name || 'Workout'} · {dayTitle(s.date)}{s.gym ? ` · ${gymName(s.gym)}` : ''}{s.shift === 'night' ? ' · ☾' : ''}</p>
+      <p className="lf-eyebrow">Last session · {s.name || 'Workout'} · {dayTitle(s.date)}{s.gym ? ` · ${gymName(s.gym)}` : ''}{s.shift === 'night' ? ' · ☾' : ''}</p>
       <ul className="lh-plist">
         {last.rows.map(r => (
           <li key={r.liftId}>

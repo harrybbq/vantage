@@ -395,7 +395,7 @@ export default function WorkoutLive({
 
       {active.exercises.length === 0 ? (
         <section className="lw-empty">
-          <p className="lf-eyebrow">// {active.name}</p>
+          <p className="lf-eyebrow">{active.name}</p>
           <p className="lf-body">No exercises yet. Add them from your lifts, or create one — the clock is running.</p>
           <Button variant="primary" size="lg" icon="plus" block onClick={() => setPicker({ mode: 'add' })} data-testid="lw-add-first">Add exercises</Button>
           {onQuickLog && <Button variant="quiet" icon="zap" onClick={onQuickLog}>Or quick log one set</Button>}
@@ -500,7 +500,7 @@ export default function WorkoutLive({
       )}
 
       {history && (
-        <Sheet title={(list.find(l => l.id === history) || {}).name || 'History'} eyebrow="// History" onClose={() => setHistory(null)} width={560}
+        <Sheet title={(list.find(l => l.id === history) || {}).name || 'History'} eyebrow="History" onClose={() => setHistory(null)} width={560}
                testId="lw-history" className="lw-history">
           {renderHistory ? renderHistory(history, () => setHistory(null)) : <p className="lf-meta">History isn&apos;t available here.</p>}
         </Sheet>
