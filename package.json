@@ -29,7 +29,7 @@
     "check:legalroutes": "node src/lib/legalRoutes.test.mjs",
     "check:webaccess": "node src/lib/webAccess.test.mjs",
     "check:buildgate": "node src/lib/buildGate.test.mjs",
-    "check:mealoffers": "node src/lib/diet/mealOffers.test.mjs",
+    "check:mealoffers": "node src/lib/diet/mealOffers.test.mjs && node src/lib/diet/foodDay.test.mjs",
     "check:ratingctx": "node src/lib/ratings/ctx.test.mjs",
     "check:payday": "node src/lib/money/payday.test.mjs",
     "check:devicecal": "node src/lib/calendar/device.test.mjs",

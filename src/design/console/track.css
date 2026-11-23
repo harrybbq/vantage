@@ -641,3 +641,26 @@ html[data-design="console"] .cx-track-payrow { display: flex; padding: 0 var(--c
 /* Four kinds (Event · Multi-day · Trip · Pay day) on a 360 px phone: less
    side padding so no label has to ellipsise. */
 html[data-design="console"] .cx-track-kinds .cx-seg-opt { padding: 0 4px; }
+
+/* ── Small motion (Nov 2026): ticking a tracker ───────────────────────
+   The most-tapped control in the app. The box springs when it becomes
+   done by hand; when that tick meets the tracker's week, the coins it
+   pays travel from the row to the balance in the bar (which counts up
+   to match) and the row takes one pass of light. */
+html[data-design="console"] .cx-track-tr { position: relative; }
+html[data-design="console"] .cx-track-tr.is-just .cx-check[aria-checked="true"] { animation: cx-track-pop 380ms cubic-bezier(.2, .9, .3, 1.5); }
+html[data-design="console"] .cx-track-tr.is-just .cx-track-tr-v { animation: cx-track-bump 380ms ease-out; }
+html[data-design="console"] .cx-track-tr.is-paid::after { content: ''; position: absolute; inset: 0; pointer-events: none; border-radius: inherit;
+  background: linear-gradient(90deg, transparent, var(--cx-gold-tint), transparent) no-repeat; background-size: 45% 100%; animation: cx-track-sweep 800ms ease-out both; }
+/* The coins, drawn over the page so the panel cannot clip them: from the row to the balance in the bar
+   (--dx / --dy are measured by DayPanel when the award lands). */
+html[data-design="console"] .cx-track-coinfly { position: fixed; z-index: 400; pointer-events: none; font: 600 var(--cx-fs-15)/1 var(--cx-mono); color: var(--cx-gold); opacity: 0;
+  animation: cx-track-fly 850ms cubic-bezier(.45, .05, .3, 1) 140ms both; }
+@keyframes cx-track-pop { from { transform: scale(.6); } 60% { transform: scale(1.18); } to { transform: none; } }
+@keyframes cx-track-bump { 40% { transform: translateY(-2px); color: var(--cx-text); } }
+@keyframes cx-track-sweep { from { background-position: -66% 0; } to { background-position: 166% 0; } }
+@keyframes cx-track-fly { 0% { opacity: 0; transform: translate(0, 6px); } 15% { opacity: 1; transform: translate(0, -4px); } 85% { opacity: 1; } 100% { opacity: 0; transform: translate(var(--dx, 0px), var(--dy, -40px)) scale(.8); } }
+@media (prefers-reduced-motion: reduce) {
+  html[data-design="console"] :is(.cx-track-tr.is-just .cx-check, .cx-track-tr.is-just .cx-track-tr-v) { animation: none; }
+  html[data-design="console"] .cx-track-tr.is-paid::after, html[data-design="console"] .cx-track-coinfly { display: none; }
+}

@@ -1,0 +1,130 @@
+/* The food page, console design (FoodDay.jsx). Bars with a goal mark,
+   the day grouped by time. Three colours with a meaning: the accent
+   while short or landed, the warning colour past a target, and gold
+   nowhere (gold is coins and bests). Targets are 44 px. */
+html[data-design="console"] .cx-fd { display: flex; flex-direction: column; gap: var(--cx-sp-16); min-width: 0; font-family: var(--cx-sans); color: var(--cx-text); }
+html[data-design="console"] .cx-fd.is-wide { display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: var(--cx-sp-16); align-items: start; }
+html[data-design="console"] .cx-fd-main, html[data-design="console"] .cx-fd-rail { display: flex; flex-direction: column; gap: var(--cx-sp-12); min-width: 0; }
+html[data-design="console"] .cx-fd-card { display: flex; flex-direction: column; gap: var(--cx-sp-12); padding: var(--cx-sp-16); border: 1px solid var(--cx-line); border-radius: var(--cx-r-panel); background: var(--cx-s1); min-width: 0; }
+html[data-design="console"] .cx-fd-h { display: flex; align-items: baseline; gap: var(--cx-sp-8); margin: 0; font: 600 var(--cx-fs-15)/var(--cx-lh-15) var(--cx-sans); color: var(--cx-text); }
+html[data-design="console"] .cx-fd-h span { margin-left: auto; font: 400 var(--cx-fs-12)/var(--cx-lh-12) var(--cx-sans); color: var(--cx-muted); }
+html[data-design="console"] .cx-fd-note { margin: 0; font-size: var(--cx-fs-12); line-height: var(--cx-lh-12); color: var(--cx-muted); }
+
+/* the day switcher */
+html[data-design="console"] .cx-fd-dayswitch { display: flex; align-items: center; gap: var(--cx-sp-4); min-height: 44px; }
+html[data-design="console"] .cx-fd-dayswitch > button { flex: none; display: grid; place-items: center; min-width: 44px; height: 44px; padding: 0 var(--cx-sp-8); margin: 0; border: 0; border-radius: var(--cx-r-cell); background: none; color: var(--cx-mid); font: 600 var(--cx-fs-13)/1 var(--cx-sans); cursor: pointer; }
+html[data-design="console"] .cx-fd-dayswitch > button:hover:not(:disabled) { background: var(--cx-s2); color: var(--cx-text); }
+html[data-design="console"] .cx-fd-dayswitch > button:disabled { opacity: .3; cursor: default; }
+html[data-design="console"] .cx-fd-dayswitch .cx-fd-today { color: var(--cx-accent); }
+html[data-design="console"] .cx-fd-daylabel { flex: 1 1 auto; min-width: 0; text-align: center; font: 600 var(--cx-fs-15)/var(--cx-lh-15) var(--cx-sans); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+html[data-design="console"] .cx-fd :is(button, a):focus-visible { outline: 2px solid var(--cx-accent); outline-offset: 2px; border-radius: var(--cx-r-cell); }
+
+/* summary */
+html[data-design="console"] .cx-fd-kcal { display: flex; align-items: baseline; gap: var(--cx-sp-8); flex-wrap: wrap; }
+html[data-design="console"] .cx-fd-kcal b { font-size: var(--cx-fs-28); line-height: var(--cx-lh-28); font-weight: 500; letter-spacing: -0.02em; }
+html[data-design="console"] .cx-fd-kcal span { font-size: var(--cx-fs-13); color: var(--cx-muted); }
+html[data-design="console"] .cx-fd-kcal em { margin-left: auto; font: 600 var(--cx-fs-13)/var(--cx-lh-13) var(--cx-sans); font-style: normal; color: var(--cx-accent); }
+html[data-design="console"] .cx-fd-kcal em.is-over { color: var(--cx-danger); }
+html[data-design="console"] .cx-fd-track { position: relative; display: block; height: 8px; border-radius: 4px; background: var(--cx-s3); min-width: 0; }
+html[data-design="console"] .cx-fd-track.is-big { height: 12px; border-radius: 6px; }
+html[data-design="console"] .cx-fd-track i { position: absolute; left: 0; top: 0; bottom: 0; border-radius: inherit; background: var(--cx-accent); transition: width 650ms cubic-bezier(.2, .7, .2, 1), background-color 300ms; }
+html[data-design="console"] .cx-fd-track.is-over i { background: var(--cx-danger); }
+/* the target: 80 % along (lib/diet/foodDay.js MARK) */
+html[data-design="console"] .cx-fd-track u { position: absolute; left: 80%; top: -3px; bottom: -3px; width: 2px; border-radius: 1px; background: var(--cx-text); text-decoration: none; }
+html[data-design="console"] .cx-fd-macro { display: grid; grid-template-columns: 84px minmax(0, 1fr) 92px; align-items: center; gap: var(--cx-sp-12); }
+html[data-design="console"] .cx-fd-macro-n { display: inline-flex; align-items: center; gap: 6px; font-size: var(--cx-fs-13); line-height: var(--cx-lh-13); color: var(--cx-mid); }
+html[data-design="console"] .cx-fd-macro-v { font-size: var(--cx-fs-13); color: var(--cx-text); white-space: nowrap; text-align: right; }
+html[data-design="console"] .cx-fd-macro-v small { font-size: var(--cx-fs-12); color: var(--cx-muted); }
+html[data-design="console"] .cx-fd-macro.is-over .cx-fd-macro-v { color: var(--cx-danger); }
+html[data-design="console"] .cx-fd-met { flex: none; display: inline-grid; place-items: center; width: 16px; height: 16px; border-radius: 50%; background: var(--cx-accent); color: var(--cx-bg); }
+html[data-design="console"] .cx-fd-met.is-fresh { animation: cx-fd-pop 450ms cubic-bezier(.2, .9, .3, 1.5); }
+@keyframes cx-fd-pop { from { transform: scale(.5); } 60% { transform: scale(1.2); } to { transform: none; } }
+html[data-design="console"] .cx-fd-rest { display: flex; align-items: flex-start; gap: var(--cx-sp-12); }
+html[data-design="console"] .cx-fd-rest p { flex: 1 1 auto; min-width: 0; margin: 0; font-size: var(--cx-fs-12); line-height: 18px; color: var(--cx-muted); }
+html[data-design="console"] .cx-fd-rest b { color: var(--cx-mid); font-weight: 500; }
+html[data-design="console"] .cx-fd-link { flex: none; display: inline-flex; align-items: center; gap: 2px; min-height: 44px; margin: -13px -6px -13px 0; padding: 0 6px; border: 0; background: none; color: var(--cx-accent); font: 600 var(--cx-fs-13)/1 var(--cx-sans); cursor: pointer; white-space: nowrap; }
+
+/* one tap again */
+html[data-design="console"] .cx-fd-chips { display: flex; gap: var(--cx-sp-8); overflow-x: auto; scrollbar-width: none; margin: 0 calc(-1 * var(--cx-sp-16)); padding: 0 var(--cx-sp-16); }
+html[data-design="console"] .cx-fd-chips::-webkit-scrollbar { display: none; }
+html[data-design="console"] .cx-fd-chip { flex: none; display: inline-flex; align-items: center; gap: 6px; max-width: 220px; min-height: 40px; padding: 0 14px 0 10px; margin: 0; border: 1px solid var(--cx-line); border-radius: 20px; background: var(--cx-s1); color: var(--cx-text); font: 600 var(--cx-fs-13)/1 var(--cx-sans); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; cursor: pointer; }
+html[data-design="console"] .cx-fd-chip svg { flex: none; color: var(--cx-accent); }
+html[data-design="console"] .cx-fd-chip:disabled, html[data-design="console"] .cx-fd-again button:disabled { opacity: .5; cursor: progress; }
+html[data-design="console"] .cx-fd-again { list-style: none; margin: 0 calc(-1 * var(--cx-sp-8)); padding: 0; display: flex; flex-direction: column; }
+html[data-design="console"] .cx-fd-again button { display: flex; align-items: center; gap: var(--cx-sp-12); width: 100%; min-height: 48px; padding: 6px var(--cx-sp-8); margin: 0; border: 0; border-radius: var(--cx-r-cell); background: none; color: inherit; font: inherit; text-align: left; cursor: pointer; }
+html[data-design="console"] .cx-fd-again button:hover:not(:disabled) { background: var(--cx-s2); }
+html[data-design="console"] .cx-fd-again button svg { flex: none; color: var(--cx-accent); }
+html[data-design="console"] .cx-fd-again-t { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+html[data-design="console"] .cx-fd-again-t b { font: 600 var(--cx-fs-13)/var(--cx-lh-13) var(--cx-sans); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+html[data-design="console"] .cx-fd-again-t small { font-size: var(--cx-fs-12); color: var(--cx-muted); }
+html[data-design="console"] .cx-fd-again-k { flex: none; font-size: var(--cx-fs-13); color: var(--cx-mid); }
+
+/* the day */
+html[data-design="console"] .cx-fd-day { display: flex; flex-direction: column; gap: var(--cx-sp-8); min-width: 0; }
+html[data-design="console"] .cx-fd-empty { margin: 0; padding: var(--cx-sp-16); border: 1px dashed var(--cx-line); border-radius: var(--cx-r-panel); font-size: var(--cx-fs-13); line-height: var(--cx-lh-13); color: var(--cx-muted); }
+html[data-design="console"] .cx-fd-meal { border: 1px solid var(--cx-line); border-radius: var(--cx-r-panel); background: var(--cx-s1); overflow: hidden; }
+html[data-design="console"] .cx-fd-meal-h { display: flex; align-items: baseline; gap: var(--cx-sp-12); padding: 8px var(--cx-sp-12); background: var(--cx-s2); font: 600 var(--cx-fs-13)/var(--cx-lh-13) var(--cx-sans); color: var(--cx-mid); }
+html[data-design="console"] .cx-fd-meal-h .cx-num:first-child { color: var(--cx-text); }
+html[data-design="console"] .cx-fd-meal-k { margin-left: auto; color: var(--cx-text); font-weight: 500; }
+html[data-design="console"] .cx-fd-meal ul { list-style: none; margin: 0; padding: 0; }
+html[data-design="console"] .cx-fd-meal li + li { border-top: 1px solid var(--cx-line); }
+html[data-design="console"] .cx-fd-row { display: flex; align-items: center; gap: var(--cx-sp-12); width: 100%; min-height: 48px; padding: 6px var(--cx-sp-12); margin: 0; border: 0; background: none; color: inherit; font: inherit; text-align: left; cursor: pointer; }
+html[data-design="console"] .cx-fd-row:hover { background: var(--cx-s2); }
+html[data-design="console"] .cx-fd-row-t { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+html[data-design="console"] .cx-fd-row-t b { font: 600 var(--cx-fs-15)/20px var(--cx-sans); color: var(--cx-text); overflow-wrap: anywhere; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+html[data-design="console"] .cx-fd-row-t small { font-size: var(--cx-fs-12); line-height: var(--cx-lh-12); color: var(--cx-muted); }
+html[data-design="console"] .cx-fd-row-k { flex: none; font-size: var(--cx-fs-15); color: var(--cx-text); }
+/* a new entry drops in */
+html[data-design="console"] .cx-fd-meal li.is-new { animation: cx-fd-enter 500ms cubic-bezier(.2, .8, .2, 1) both; background: var(--cx-accent-tint); }
+@keyframes cx-fd-enter { from { opacity: 0; transform: translateY(-10px); } }
+
+/* the week */
+html[data-design="console"] .cx-fd-week { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 6px; }
+html[data-design="console"] .cx-fd-wk { display: flex; flex-direction: column; align-items: stretch; gap: 6px; min-height: 44px; padding: 4px 0; margin: 0; border: 0; border-radius: var(--cx-r-cell); background: none; color: var(--cx-muted); font: 500 var(--cx-fs-12)/1 var(--cx-sans); cursor: pointer; }
+html[data-design="console"] .cx-fd-wk:disabled { cursor: default; }
+html[data-design="console"] .cx-fd-wk-bar { position: relative; display: flex; align-items: flex-end; height: 64px; }
+/* the target line, at 100 % of a 125 % scale */
+html[data-design="console"] .cx-fd-wk-bar::before { content: ''; position: absolute; left: -3px; right: -3px; bottom: 80%; border-top: 1px dashed var(--cx-line-strong); }
+html[data-design="console"] .cx-fd-wk-bar i { display: block; width: 100%; border-radius: 3px 3px 0 0; background: var(--cx-s3); transition: height 400ms cubic-bezier(.2, .7, .2, 1); }
+html[data-design="console"] .cx-fd-wk.is-on .cx-fd-wk-bar i { background: var(--cx-accent-fill); }
+html[data-design="console"] .cx-fd-wk.is-off .cx-fd-wk-bar i { background: var(--cx-line-strong); }
+html[data-design="console"] .cx-fd-wk-l { text-align: center; }
+html[data-design="console"] .cx-fd-wk.is-sel { color: var(--cx-text); font-weight: 600; }
+html[data-design="console"] .cx-fd-wk.is-sel .cx-fd-wk-bar i { outline: 2px solid var(--cx-text); outline-offset: 1px; }
+
+/* undo */
+html[data-design="console"] .cx-fd-undo { position: fixed; z-index: 190; left: max(var(--cx-sp-16), env(safe-area-inset-left, 0px)); right: max(var(--cx-sp-16), env(safe-area-inset-right, 0px));
+  bottom: calc(var(--cx-shell-tab-h) + var(--cx-shell-tab-pad) + var(--cx-sp-12)); display: flex; align-items: center; gap: var(--cx-sp-12); min-height: 48px; box-sizing: border-box; padding: 0 6px 0 var(--cx-sp-16);
+  border: 1px solid var(--cx-line-strong); border-radius: var(--cx-r-panel); background: var(--cx-s2); font-size: var(--cx-fs-13); color: var(--cx-mid); box-shadow: 0 10px 30px -12px rgba(0, 0, 0, .6); }
+@media (min-width: 769px) { html[data-design="console"] .cx-fd-undo { left: auto; right: 28px; bottom: 28px; width: 360px; } }
+html[data-design="console"] .cx-fd-undo span { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+html[data-design="console"] .cx-fd-undo b { color: var(--cx-text); font-weight: 600; }
+html[data-design="console"] .cx-fd-undo button { flex: none; min-height: 44px; padding: 0 var(--cx-sp-12); border: 0; background: none; color: var(--cx-accent); font: 600 var(--cx-fs-15)/1 var(--cx-sans); cursor: pointer; }
+
+/* sheets */
+html[data-design="console"] .cx-fd-sheet-in { display: flex; flex-direction: column; gap: var(--cx-sp-12); min-width: 0; }
+html[data-design="console"] .cx-fd-ek { margin: 0; font-size: var(--cx-fs-15); color: var(--cx-muted); }
+html[data-design="console"] .cx-fd-ek b { font-size: var(--cx-fs-28); line-height: var(--cx-lh-28); font-weight: 500; color: var(--cx-text); }
+html[data-design="console"] .cx-fd-ebits { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1px; margin: 0; border: 1px solid var(--cx-line); border-radius: var(--cx-r-panel); background: var(--cx-line); overflow: hidden; }
+html[data-design="console"] .cx-fd-ebits > div { display: flex; flex-direction: column; gap: 2px; padding: 10px var(--cx-sp-12); background: var(--cx-s1); }
+html[data-design="console"] .cx-fd-ebits dt { font-size: var(--cx-fs-12); color: var(--cx-muted); }
+html[data-design="console"] .cx-fd-ebits dd { margin: 0; font-size: var(--cx-fs-15); color: var(--cx-text); }
+html[data-design="console"] .cx-fd-targets { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
+html[data-design="console"] .cx-fd-targets li + li { border-top: 1px solid var(--cx-line); }
+html[data-design="console"] .cx-fd-target { display: grid; grid-template-columns: 84px minmax(0, 1fr) 96px 16px; align-items: center; gap: var(--cx-sp-12); width: 100%; min-height: 48px; padding: 0; margin: 0; border: 0; background: none; color: inherit; font: inherit; text-align: left; cursor: pointer; }
+html[data-design="console"] .cx-fd-target-n { font: 600 var(--cx-fs-15)/var(--cx-lh-15) var(--cx-sans); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+html[data-design="console"] .cx-fd-target-v { font-size: var(--cx-fs-13); color: var(--cx-mid); white-space: nowrap; text-align: right; }
+html[data-design="console"] .cx-fd-target svg { color: var(--cx-muted); }
+html[data-design="console"] .cx-fd-targets li.is-edit { padding: var(--cx-sp-12) 0; }
+html[data-design="console"] .cx-fd-targets form { display: flex; flex-direction: column; gap: var(--cx-sp-12); }
+html[data-design="console"] .cx-fd-fields { display: flex; flex-wrap: wrap; gap: var(--cx-sp-8); }
+html[data-design="console"] .cx-fd-fields label { flex: 1 1 120px; min-width: 0; display: flex; flex-direction: column; gap: 4px; font-size: var(--cx-fs-12); color: var(--cx-muted); }
+html[data-design="console"] .cx-fd-fields label.is-unit { flex: 0 0 84px; }
+html[data-design="console"] .cx-fd-fields input { width: 100%; box-sizing: border-box; height: 44px; padding: 0 var(--cx-sp-12); border: 1px solid var(--cx-line-strong); border-radius: var(--cx-r-cell); background: var(--cx-s2); color: var(--cx-text); font: 400 16px/1 var(--cx-sans); }
+html[data-design="console"] .cx-fd-fields input:focus { outline: 2px solid var(--cx-accent); outline-offset: 1px; }
+html[data-design="console"] .cx-fd-editacts { display: flex; align-items: center; flex-wrap: wrap; gap: var(--cx-sp-8); }
+html[data-design="console"] .cx-fd-sp { flex: 1 1 auto; }
+@media (prefers-reduced-motion: reduce) {
+  html[data-design="console"] .cx-fd-track i, html[data-design="console"] .cx-fd-wk-bar i { transition: none; }
+  html[data-design="console"] .cx-fd-met.is-fresh, html[data-design="console"] .cx-fd-meal li.is-new { animation: none; }
+}

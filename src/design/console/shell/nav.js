@@ -19,14 +19,16 @@
  * tab it now belongs to (placeOf).
  *
  *   sidebar (desktop)   Hub · the groups · Upgrade (owner)
- *   tab bar (phone)     Hub · the groups (· Add, drawn by the shell)
+ *   tab bar (phone)     Hub · the groups · Upgrade (owner) (· Add, drawn
+ *                       by the shell)
  *   the strip           the open group's tabs: beside the title on a
  *                       desktop, a second row of the app bar on a phone
  *
  * Train is the gym tracker. It is the owner's until it opens to
  * everyone (the next step), so its tab is owner-only and Health starts
  * at Food for anyone else. The rest of the owner's Upgrade area keeps
- * its own sidebar entry; on a phone it is reached from Settings › Tools.
+ * its own entry: last in the sidebar, and the fifth seat on the phone's
+ * tab bar. Nobody else is shown either.
  *
  * Holiday has no tab: trips live on Track's calendar, and the 'holiday'
  * route (deep links, the 5 shortcut) reads as Track › Calendar.
@@ -113,9 +115,15 @@ export function sidebarItems({ isOwner = false, scope = null } = {}) {
   return [HUB, ...navGroups({ isOwner, scope }), ...(isOwner ? [UPGRADE] : [])];
 }
 
-/** The phone's tab bar: Hub and the groups. Never more than four. */
+/**
+ * The phone's tab bar: Hub and the groups, then Upgrade for the owner —
+ * the same entry the desktop sidebar ends with. (It was only reachable
+ * from Settings › Tools on a phone once the More sheet went, which is
+ * three taps and a scroll for the owner's most-used area.) Four seats
+ * for everyone else, five for the owner.
+ */
 export function tabItems({ isOwner = false, scope = null } = {}) {
-  return [HUB, ...navGroups({ isOwner, scope })];
+  return [HUB, ...navGroups({ isOwner, scope }), ...(isOwner ? [UPGRADE] : [])];
 }
 
 /**
@@ -135,7 +143,7 @@ export function navSection(section, sub = null) {
   return place ? place.group.id : canonicalSection(section);
 }
 
-/** Which phone tab lights up: one of the tabs' ids, or null (Settings, Upgrade). */
+/** Which phone tab lights up: one of the tabs' ids, or null (Settings; Upgrade for anyone but the owner). */
 export function activeTab(section, sub = null, { tabs = tabItems() } = {}) {
   const id = navSection(section, sub);
   return tabs.some(t => t.id === id) ? id : null;

@@ -12,7 +12,8 @@
  * markManual, streaks, the symmetric weekly coin award. Toasts and
  * confetti fire exactly as classic fires them.
  */
-import { useMemo, useState } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { eventColour, eventWhen, eventsOn } from '../../../lib/calendar/events';
 import { trackerDone, trackerProgress, trackerStep, dailyGoalOf, fmtTrackerValue } from '../../../lib/trackers/done';
 import { sourceById, isAutoFilled, autoProvenance } from '../../../lib/trackers/autoLog';
@@ -58,8 +59,12 @@ function NumberEdit({ tracker, value, onSave, onCancel }) {
   );
 }
 
-function TrackerRow({ S, t, iso, onSet }) {
+function TrackerRow({ S, t, iso, onSet, award = null }) {
   const [editing, setEditing] = useState(false);
+  // The tick's moment: the box springs when it becomes done by hand (not on load, not when unticked).
+  const [just, setJust] = useState(false);
+  const mark = () => { setJust(true); setTimeout(() => setJust(false), 900); };
+  const paid = award && award.id === t.id ? award : null;
   const v = ((S.logs || {})[iso] || {})[t.id];
   const done = trackerDone(t, v);
   const auto = isAutoFilled(S, iso, t.id) ? autoProvenance(S, iso, t.id) : null;
@@ -67,9 +72,9 @@ function TrackerRow({ S, t, iso, onSet }) {
   const colour = t.color || 'var(--cx-accent)';
   if (t.type === 'boolean') {
     return (
-      <div className="cx-track-tr">
-        <Checkbox checked={v === true} onChange={next => onSet(t, next)} label={t.name} />
-        <span className="cx-track-tr-n" onClick={() => onSet(t, v !== true)}>{t.name}</span>
+      <div className={`cx-track-tr${just ? ' is-just' : ''}${paid ? ' is-paid' : ''}`} data-tracker={t.id}>
+        <Checkbox checked={v === true} onChange={next => { if (next) mark(); onSet(t, next); }} label={t.name} />
+        <span className="cx-track-tr-n" onClick={() => { if (v !== true) mark(); onSet(t, v !== true); }}>{t.name}</span>
         {auto && <span className="cx-track-auto" title={`${auto.text}. Change it and it stays yours.`}>Auto</span>}
         <span className="cx-track-tr-v cx-num">{week != null ? `${week}/${t.weeklyTarget} wk` : ''}</span>
       </div>
@@ -79,7 +84,7 @@ function TrackerRow({ S, t, iso, onSet }) {
   const goal = dailyGoalOf(t);
   const step = trackerStep(t, sourceById(t.auto?.source)?.step);
   return (
-    <div className={`cx-track-tr is-num${editing ? ' is-editing' : ''}`}>
+    <div className={`cx-track-tr is-num${editing ? ' is-editing' : ''}${paid ? ' is-paid' : ''}`} data-tracker={t.id}>
       <button type="button" className="cx-track-ring" onClick={() => onSet(t, tapValue(t, v, step))}
               aria-label={`${t.name}: add ${fmtTrackerValue(step)}${t.unit ? ' ' + t.unit : ''}`}>
         {done ? <span className="cx-track-ring-done" style={{ background: colour }}><TIcon name="check" size={13} strokeWidth={2.5} /></span>
@@ -114,19 +119,48 @@ export default function DayPanel({
   const comp = trackerCompletion(S, iso);
   const limit = compact && !all ? 5 : trackers.length;
 
+  // A tick that meets a tracker's week pays coins (tick.js): they rise from that row, and the
+  // balance in the bar counts up to match (the shell's coin chip).
+  const [award, setAward] = useState(null);     // { id, amount, n }
   function setValue(t, value) {
     update(prev => {
       const r = applyTick(prev, { day: iso, trackerId: t.id, value, today: getTodayStr() });
       fireTickEffects(r.effects, onShowCoinToast);
+      const paid = (r.effects || []).find(e => e.type === 'award');
+      if (paid) setAward({ id: t.id, amount: paid.amount, n: Date.now() });
       return r.next;
     });
   }
+  useEffect(() => {
+    if (!award) return undefined;
+    const timer = setTimeout(() => setAward(null), 1300);
+    return () => clearTimeout(timer);
+  }, [award]);
+  // The coins travel from the row to the balance in the bar. Drawn over the page (a portal), because
+  // the panel would clip them; measured when the award lands. No chip on screen: they rise and fade.
+  const [fly, setFly] = useState(null);      // { n, amount, x, y, dx, dy }
+  useLayoutEffect(() => {
+    if (!award || typeof document === 'undefined') { setFly(null); return; }
+    if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    const row = document.querySelector(`.cx-track-tr[data-tracker="${String(award.id).replace(/"/g, '')}"]`);
+    if (!row) return;
+    const r = row.getBoundingClientRect();
+    const chip = document.querySelector('.cx-shell-coins');
+    const c = chip ? chip.getBoundingClientRect() : null;
+    const x = r.right - 56, y = r.top + r.height / 2 - 8;
+    setFly({ n: award.n, amount: award.amount, x, y, dx: c ? c.left + c.width / 2 - x - 12 : 0, dy: c ? c.top + c.height / 2 - y - 8 : -40 });
+  }, [award]);
 
   const isToday = iso === today;
   const empty = !evs.length && !items.length && !bills.length && !shift && !payHere;
 
   return (
     <section className="cx-panel cx-track-day" aria-label={`${longDate(iso)}`}>
+      {fly && createPortal(
+        <span key={fly.n} className="cx-track-coinfly cx-num" aria-hidden="true"
+              style={{ left: `${fly.x}px`, top: `${fly.y}px`, '--dx': `${fly.dx}px`, '--dy': `${fly.dy}px` }}>+{fly.amount}</span>,
+        document.body,
+      )}
       <header className="cx-track-day-head">
         {wide && isToday
           ? <h2 className="cx-track-day-t">Today <span className="cx-track-day-sub">{shortDate(iso)}</span></h2>
@@ -207,7 +241,7 @@ export default function DayPanel({
       </div>
       {!trackers.length && <p className="cx-track-empty">No trackers yet.</p>}
       <div className="cx-track-trs">
-        {trackers.slice(0, limit).map(t => <TrackerRow key={t.id} S={S} t={t} iso={iso} onSet={setValue} />)}
+        {trackers.slice(0, limit).map(t => <TrackerRow key={t.id} S={S} t={t} iso={iso} onSet={setValue} award={award} />)}
       </div>
       {compact && trackers.length > 5 && (
         <button type="button" className="cx-track-link" onClick={() => setAll(a => !a)} aria-expanded={all}>
