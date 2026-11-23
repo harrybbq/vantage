@@ -1,57 +1,31 @@
 /**
- * Console Habits.
+ * Console Habits — the track (owner, Nov 2026; mockup A).
  *
- * Desktop: a console header (title, the three summary figures, "Add
- * habit"), then classic's HabitRoster and HabitDetail mounted as they are
- * (they own the roster's award effects, the runner lanes, the trail and
- * every write) and restyled from outside through the sweep.css token
- * bridge. The runner trail stays: it is the one illustration with a job.
+ * Every habit is a lane with its own live runner (HabitTrack.jsx), on
+ * desktop and phone alike. This page owns the two things a lane cannot:
+ * which lane is open, and the bar that follows a slip.
  *
- * Phone: a stack of ConsoleHabitCard, the console counterpart of the
- * classic mobile card (same award pipeline, same modals, same writes).
+ * ONE-TAP SLIP. "I slipped" logs it now, through the same applyRelapse
+ * as the dialog. For a few seconds a bar offers Undo (the habit is put
+ * back exactly as it was; lib/habits/relapse.js undoRelapse refuses if
+ * anything else has touched it since) and "It was earlier", which takes
+ * the slip back and opens the dialog to date it. The dialog is now only
+ * ever seen for back-dating.
  *
- * The open habit on desktop is the same per-browser preference classic
- * keeps (vb_habits_selected), so switching design keeps your place.
+ * Which lane is open is the same per-browser preference classic keeps
+ * (vb_habits_selected), so switching design keeps your place. Nothing
+ * is open until a lane is pressed.
  */
-import { useEffect, useMemo, useState } from 'react';
-import HabitRoster from '../../../components/habits/HabitRoster';
-import HabitDetail from '../../../components/habits/HabitDetail';
-import { habitView, etaLabel, shortSpan } from '../../../lib/habits/view';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Icon from '../../../components/Icon';
+import { applyRelapse, undoRelapse } from '../../../lib/habits/relapse';
 import { Button } from '../ui';
 import PageHead from './PageHead';
-import ConsoleHabitCard from './ConsoleHabitCard';
-// The roster and detail are styled by the classic page sheet; HabitsSection
-// normally brings it in, and it only targets classic classes.
-import '../../../components/habits/habits-page.css';
+import HabitLane, { faceClock } from './HabitTrack';
 
-const PICK_KEY = 'vb_habits_selected';
-
-/** The three header figures, as classic HabitsSection works them out. Pure. */
-export function habitSummary(habits, now) {
-  const vs = habits.map(h => ({ h, v: habitView(h, now) }));
-  const next = vs
-    .filter(x => x.v.nextIdx >= 0)
-    .map(x => ({ ...x, m: x.v.sorted[x.v.nextIdx], left: x.v.sorted[x.v.nextIdx].duration - x.v.elapsed }))
-    .sort((a, b) => a.left - b.left)[0];
-  const live = vs.filter(x => x.v.pbAt != null).length;
-  const chasing = vs.filter(x => x.v.ghost).length;
-  const cuts = vs.filter(x => x.v.cut);
-  const out = [
-    next
-      ? { k: 'Next milestone', v: next.m.label, sub: `${next.h.name}, in ${etaLabel(next.h, next.v, next.m.duration)}` }
-      : { k: 'Next milestone', v: 'All cleared', sub: 'Every ladder is finished' },
-    { k: 'Personal bests', v: `${live} ahead`, sub: chasing ? `${chasing} chasing a past best` : live ? 'Nothing left to chase' : 'Bests build as runs end' },
-  ];
-  if (cuts.length) {
-    const ok = cuts.filter(x => x.v.cur.state !== 'over').length;
-    out.push({ k: 'Budgets this week', v: `${ok} of ${cuts.length}`, sub: ok === cuts.length ? 'All within budget' : `${cuts.length - ok} over`, bad: ok < cuts.length });
-  } else {
-    const long = vs.slice().sort((a, b) => b.v.elapsed - a.v.elapsed)[0];
-    if (long) out.push({ k: 'Longest run now', v: shortSpan(long.v.elapsed), sub: long.h.name });
-  }
-  return out;
-}
+const OPEN_KEY = 'vb_habits_open';
+/** How long the slip bar stays (ms). Long enough to read and reach; short enough not to sit there. */
+export const SLIP_BAR_MS = 9000;
 
 function Empty({ onAdd }) {
   return (
@@ -65,57 +39,72 @@ function Empty({ onAdd }) {
 }
 
 export default function ConsoleHabits({ S, update, isMobile, onOpenModal, onShowCoinToast }) {
-  const habits = useMemo(() => S.habits || [], [S.habits]);
-  const [picked, setPicked] = useState(() => { try { return localStorage.getItem(PICK_KEY); } catch { return null; } });
-  const [now, setNow] = useState(Date.now());
-  useEffect(() => {
-    const id = setInterval(() => setNow(Date.now()), 15000);
-    return () => clearInterval(id);
-  }, []);
-  const pick = id => {
-    setPicked(id);
-    try { localStorage.setItem(PICK_KEY, id); } catch { /* private mode */ }
+  const habits = useMemo(() => (S.habits || []).filter(h => h && h.id), [S.habits]);
+  const [open, setOpen] = useState(() => { try { return localStorage.getItem(OPEN_KEY) || null; } catch { return null; } });
+  const toggle = id => {
+    const next = open === id ? null : id;
+    setOpen(next);
+    try { if (next) localStorage.setItem(OPEN_KEY, next); else localStorage.removeItem(OPEN_KEY); } catch { /* private mode */ }
   };
   const add = () => onOpenModal('addHabitModal');
-  const selected = habits.find(h => h.id === picked) || habits[0] || null;
-  const stats = !isMobile && habits.length ? habitSummary(habits, now) : [];
 
-  const addBtn = (
-    <Button variant="primary" icon="plus" onClick={add} data-testid="cx-habits-add" data-ob="add-habit">{isMobile ? 'Add' : 'Add habit'}</Button>
-  );
+  // The slip bar. `last` holds the habit as it was the moment before the
+  // slip, captured INSIDE the update so it is the state's own object, not
+  // a render-old copy; Undo reads it later, well after that update ran.
+  const [bar, setBar] = useState(null);                 // { id, name, ran }
+  const last = useRef(null);                            // { before, at }
+  const timer = useRef(0);
+  const closeBar = useCallback(() => { clearTimeout(timer.current); setBar(null); }, []);
+  useEffect(() => () => clearTimeout(timer.current), []);
+
+  const slip = habit => {
+    const at = Date.now();
+    update(prev => {
+      const cur = (prev.habits || []).find(h => h && h.id === habit.id);
+      if (!cur) return prev;
+      last.current = { before: cur, at };
+      return applyRelapse(prev, habit.id, at);
+    });
+    setBar({ id: habit.id, name: habit.name, ran: Math.max(0, at - (Number(habit.startTime) || at)) });
+    clearTimeout(timer.current);
+    timer.current = setTimeout(() => setBar(null), SLIP_BAR_MS);
+  };
+  const undo = () => {
+    const l = last.current;
+    if (l) update(prev => undoRelapse(prev, l.before, l.at));
+    last.current = null;
+    closeBar();
+  };
+  const earlier = () => {
+    const id = bar && bar.id;
+    undo();
+    if (id) onOpenModal('relapseModal:' + id);
+  };
 
   return (
     <section className={`section active cx-page cx-sweep-page cx-sweep-habits${isMobile ? ' is-phone' : ''}`}>
       <PageHead
         title="Habits"
-        meta={isMobile ? null : 'Quit with a timer, or cut down with a budget. Every run is kept on the trail.'}
-        actions={addBtn}
-      >
-        {stats.length > 0 && (
-          <dl className="cx-sweep-stats">
-            {stats.map(s => (
-              <div key={s.k} className={s.bad ? 'is-bad' : ''}>
-                <dt>{s.k}</dt>
-                <dd>{s.v}</dd>
-                <span>{s.sub}</span>
-              </div>
-            ))}
-          </dl>
-        )}
-      </PageHead>
+        meta={isMobile || !habits.length ? null : 'Every habit runs its own lane. Press one for what’s ahead and its history.'}
+        actions={<Button variant="primary" icon="plus" onClick={add} data-testid="cx-habits-add" data-ob="add-habit">{isMobile ? 'Add' : 'Add habit'}</Button>}
+      />
 
-      {!habits.length ? <Empty onAdd={add} /> : isMobile ? (
-        <div className="cx-sweep-habit-list">
+      {!habits.length ? <Empty onAdd={add} /> : (
+        <div className="cx-ht" data-testid="cx-habit-track">
           {habits.map(h => (
-            <ConsoleHabitCard key={h.id} habit={h} update={update} onShowCoinToast={onShowCoinToast} onOpenModal={onOpenModal} />
+            <HabitLane key={h.id} habit={h} phone={!!isMobile} open={open === h.id} onToggle={() => toggle(h.id)}
+                       update={update} onOpenModal={onOpenModal} onShowCoinToast={onShowCoinToast} onSlip={slip} />
           ))}
         </div>
-      ) : (
-        <div className="cx-sweep-scope cx-sweep-hb">
-          <div className="hb-layout">
-            <HabitRoster habits={habits} selectedId={selected.id} onSelect={pick} update={update} onShowCoinToast={onShowCoinToast} />
-            <HabitDetail key={selected.id} habit={selected} update={update} onOpenModal={onOpenModal} />
-          </div>
+      )}
+
+      {bar && (
+        <div className={`cx-ht-bar${isMobile ? ' is-phone' : ''}`} role="status" aria-live="polite" data-testid="cx-habit-slipbar">
+          <span><b>{bar.name}:</b> run ended at {faceClock(bar.ran)}.</span>
+          <span className="cx-ht-bar-acts">
+            <Button onClick={undo} data-testid="cx-habit-undo">Undo</Button>
+            <Button variant="ghost" onClick={earlier}>It was earlier</Button>
+          </span>
         </div>
       )}
     </section>

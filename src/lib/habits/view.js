@@ -8,14 +8,19 @@
 import { ladderProgress, sortedMilestones, allMilestonesDone } from './ladder.js';
 import { isCut, current, budgetOf, periods, streak, DAY, PERIOD_MS } from './cutdown.js';
 import { habitElapsed, runnerDays, weeksToDays, ghostOf, bestRunMs, odometerMs, runsOf, cutHeadline } from './progress.js';
+import { recordOf } from './record.js';
 
 /**
- * Scenery level, in days. Quit: the days of this run. Cut down: on-target
+ * Scenery level, in days. Quit: the days of this run, or the clean days
+ * of the last 30 if more. Cut down: on-target
  * periods in the last year MINUS over-budget ones, so a bad week takes a
  * week of growth away instead of clearing the lane.
  */
 export function sceneryLevel(h, now = Date.now()) {
-  if (!isCut(h)) return habitElapsed(h, now) / DAY;
+  // Quit (Nov 2026): the days of this run, or the clean days of the last
+  // 30 when that is more (record.js). A slip sends the runner back to
+  // walking; it no longer clears what has grown around him.
+  if (!isCut(h)) return Math.max(habitElapsed(h, now) / DAY, recordOf(h, now).good);
   const ps = periods(h, now).filter(p => p.tracked && !p.current).slice(-(budgetOf(h).per === 'month' ? 12 : 52));
   const net = ps.filter(p => p.onTarget).length - ps.filter(p => p.over).length;
   return Math.max(0, net) * (PERIOD_MS[budgetOf(h).per] / DAY);
