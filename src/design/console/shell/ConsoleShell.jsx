@@ -25,6 +25,7 @@ import { haptic } from '../../../hooks/useCapacitor';
 import { usePendingCount } from '../../../lib/friends/usePendingCount';
 import { useUnreadTotal } from '../../../lib/friends/useUnreadTotal';
 import { coinsToday } from '../../../lib/coins/daily';
+import { useCountUp } from '../../../hooks/useCountUp';
 import { barRef } from './TopBarActions';
 import BackgroundSheet from './BackgroundSheet';
 import { navScope, addableAreas } from '../../../lib/onboarding/areas';
@@ -55,11 +56,24 @@ function CoinsChip({ S, onOpen }) {
   const today = coinsToday(S.coinHistory);
   const total = S.coins || 0;
   const todayLabel = today ? `${today > 0 ? '+' : '−'}${fmt(Math.abs(today))}` : '';
+  // The balance counts to its new value, and glints gold when it has grown: whatever paid (a tracker's
+  // week, a goal, a habit), this is where the coins land.
+  const shown = useCountUp(total);
+  const was = useRef(total);
+  const [up, setUp] = useState(false);
+  useEffect(() => {
+    const grew = total > was.current;
+    was.current = total;
+    if (!grew) return undefined;
+    setUp(true);
+    const t = setTimeout(() => setUp(false), 800);
+    return () => clearTimeout(t);
+  }, [total]);
   return (
-    <button type="button" className="cx-shell-chip cx-shell-coins" onClick={onOpen} data-admin-target="coins"
+    <button type="button" className={cx('cx-shell-chip cx-shell-coins', up && 'is-up')} onClick={onOpen} data-admin-target="coins"
             aria-label={`${fmt(total)} coins${todayLabel ? `, ${todayLabel} today` : ''}. Open coin history`}>
       <Icon name="coin" size={14} strokeWidth={1.75} />
-      <span className="cx-num cx-shell-coins-n">{fmt(total)}</span>
+      <span className="cx-num cx-shell-coins-n">{fmt(shown)}</span>
       {todayLabel && <span className={cx('cx-num cx-shell-coins-today', today < 0 && 'is-down')}>{todayLabel}</span>}
     </button>
   );

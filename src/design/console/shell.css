@@ -488,3 +488,13 @@ html[data-design="console"] .cx-shell-addarea .cx-shell-mi:hover .cx-shell-addar
 html[data-design="console"] .cx-shell-mi-add > svg:first-child { color: var(--cx-accent); }
 /* Settings on a phone: the Go Pro row the More sheet used to hold. */
 html[data-design="console"] .cx-sweep-gopro { width: 100%; margin: 0 0 var(--cx-sp-12); }
+
+/* ── Small motion (Nov 2026): the balance, when it grows ──────────────
+   Coins earned anywhere land here: the number counts up (useCountUp)
+   and the chip glints gold for a moment. */
+html[data-design="console"] .cx-shell-coins { transition: border-color 300ms var(--cx-ease); }
+html[data-design="console"] .cx-shell-coins.is-up { border-color: var(--cx-gold); }
+html[data-design="console"] .cx-shell-coins.is-up .cx-shell-coins-n { color: var(--cx-gold); }
+html[data-design="console"] .cx-shell-coins.is-up > svg { color: var(--cx-gold); animation: cx-shell-pop 450ms cubic-bezier(.2, .9, .3, 1.5); }
+@keyframes cx-shell-pop { from { transform: scale(.7); } 60% { transform: scale(1.25); } to { transform: none; } }
+@media (prefers-reduced-motion: reduce) { html[data-design="console"] .cx-shell-coins.is-up > svg { animation: none; } }

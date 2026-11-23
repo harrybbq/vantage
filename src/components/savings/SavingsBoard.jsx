@@ -28,6 +28,7 @@ import { balanceNow } from '../../lib/savings/interest';
 import { planPotCompletion, completePot, undoCompletePot, livePots } from '../../lib/savings/completePot';
 import { Suspense, lazy, useEffect, useMemo, useState } from 'react';
 import Icon from '../Icon';
+import { CountUp } from '../../hooks/useCountUp';
 import { useIsMobile } from '../../hooks/useIsMobile';
 import { useShowAccounts } from '../../hooks/useShowAccounts';
 import { OWNER_SURFACES_IN_BUILD } from '../../lib/native/ownerSurfaces';
@@ -82,7 +83,7 @@ function Vessel({ goal, d, colour, selected, onSelect }) {
           <div className="sb-vessel-pace" style={{ bottom: `${d.pace * 100}%` }} aria-hidden="true" />
         )}
         <div className={`sb-vessel-pct${d.pct > 0.78 ? ' is-over' : ''}`}>{pct}%</div>
-        <div className={`sb-vessel-amt${d.pct > 0.14 ? ' is-over' : ''}`}>{money(d.current)}</div>
+        <div className={`sb-vessel-amt${d.pct > 0.14 ? ' is-over' : ''}`}><CountUp value={d.current} fmt={money} when="console" ms={700} /></div>
       </div>
       <div className="sb-vessel-name">
         <span className="sb-vessel-icon" aria-hidden="true">{goal.icon || '💰'}</span>
@@ -254,7 +255,7 @@ function PotCard({ goal, d, colour, expanded, onToggleExpand, onCollapse, achiev
 
           <div className="sb-potcard-nums">
             <span className="sb-potcard-pct">{Math.round(d.pct * 100)}%</span>
-            <span className="sb-potcard-cur">{money(d.current)}</span>
+            <span className="sb-potcard-cur"><CountUp value={d.current} fmt={money} when="console" ms={700} /></span>
             <span className="sb-potcard-target">/ {money(d.target)}</span>
           </div>
 
@@ -456,7 +457,7 @@ export default function SavingsBoard({ S, update, onOpenModal }) {
       <div className="sb-headline-total">
         <div className="sb-eyebrow">Total in pots</div>
         <div className="sb-headline-nums">
-          <span className="sb-headline-saved">{money(totals.saved)}</span>
+          <span className="sb-headline-saved"><CountUp value={totals.saved} fmt={money} when="console" ms={700} /></span>
           <span className="sb-headline-of">of {money(totals.target)}</span>
         </div>
         <div className="sb-headline-bar">

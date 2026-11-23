@@ -275,7 +275,7 @@ function useDesktop() {
 }
 
 // ── Main NutritionSection ────────────────────────────────────────────────
-export default function NutritionSection({ userId, S, selectedDate, calYear, calMonth, onShowCoinToast, onMonthDataReady, onOpenModal, update }) {
+export default function NutritionSection({ userId, S, selectedDate, calYear, calMonth, onShowCoinToast, onMonthDataReady, onOpenModal, update, view: View = null, onDate = null }) {
   const date = selectedDate || getTodayStr();
   const { macros: rawMacros, summary, logEntries, monthSummary, loading, reload, recalcSummary, loadMonth } = useNutrition(userId, date);
 
@@ -442,9 +442,10 @@ export default function NutritionSection({ userId, S, selectedDate, calYear, cal
     reload();
   }
 
-  async function handleDeleteMacro(macro) {
+  async function handleDeleteMacro(macro, { asked = false } = {}) {
     if (macro.is_default) return;
-    if (!window.confirm(`Delete "${macro.name}" macro?`)) return;
+    // `asked`: the caller has its own confirm step (the console's targets sheet).
+    if (!asked && !window.confirm(`Delete "${macro.name}" macro?`)) return;
     await supabase.from('nutrition_macros').delete().eq('id', macro.id);
     setMenuMacro(null);
     reload();
@@ -477,10 +478,57 @@ export default function NutritionSection({ userId, S, selectedDate, calYear, cal
   const burnToday = ((S?.burnLog || {})[date] || [])
     .reduce((sum, a) => sum + (Number(a?.kcal) || 0), 0);
 
+  /* Removing and putting back one entry, for a host view that offers Undo
+     in place of a confirm box. Putting back is a fresh insert of the same
+     row with its original time, so it lands where it was in the day. */
+  async function removeEntry(entry) {
+    await supabase.from('nutrition_log').delete().eq('id', entry.id);
+    await recalcSummary(date);
+    reload();
+    freq.refresh();
+  }
+  async function restoreEntry(entry) {
+    if (!userId || !entry) return;
+    const { id: _id, count: _count, ...row } = entry;
+    const { error } = await supabase.from('nutrition_log').insert({ ...row, user_id: userId });
+    if (error) { onShowCoinToast?.('Could not put that back — log it again.', false); return; }
+    await recalcSummary(date);
+    reload();
+    freq.refresh();
+  }
+
   return (
     <div className="nut-wrap">
       {/* One-tap meals shipped as data (owner only): lib/diet/mealOffers. */}
       <MealOfferCard S={S} update={update} userId={userId} />
+      {/* `view`: a host's own reading of the day (the console's FoodDay:
+          bars, the day grouped by time, targets as a sheet). It replaces
+          the panel and the goals card below and is handed the same data
+          and handlers; logging, the plan, the goal toasts and the %
+          history above are all still this component's. */}
+      {View ? (
+        <View
+          S={S}
+          date={date}
+          today={getTodayStr()}
+          summary={summary}
+          logEntries={logEntries}
+          macros={macros}
+          plan={plan}
+          burnKcal={burnToday}
+          recents={freq.items}
+          valueOf={m => getMacroValue(summary, m)}
+          onLogFood={() => setShowFoodSearch(true)}
+          onQuickAdd={quickAdd}
+          onRemoveEntry={removeEntry}
+          onRestoreEntry={restoreEntry}
+          onDate={onDate}
+          onSaveMacro={handleSaveMacro}
+          onDeleteMacro={m => handleDeleteMacro(m, { asked: true })}
+          onMoveMacro={handleMove}
+          onAddMacro={() => setShowAddSheet(true)}
+        />
+      ) : (<>
       <DietPanel
         S={S}
         date={date}
@@ -584,6 +632,7 @@ export default function NutritionSection({ userId, S, selectedDate, calYear, cal
           </div>
         </div>
       )}
+      </>)}
 
       {/* Sheets */}
       <AnimatePresence>

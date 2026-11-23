@@ -641,3 +641,23 @@ html[data-design="console"] .cx-track-payrow { display: flex; padding: 0 var(--c
 /* Four kinds (Event · Multi-day · Trip · Pay day) on a 360 px phone: less
    side padding so no label has to ellipsise. */
 html[data-design="console"] .cx-track-kinds .cx-seg-opt { padding: 0 4px; }
+
+/* ── Small motion (Nov 2026): ticking a tracker ───────────────────────
+   The most-tapped control in the app. The box springs when it becomes
+   done by hand; when that tick meets the tracker's week, the coins it
+   pays rise from the row (the balance in the bar counts up to match)
+   and the row takes one pass of light. */
+html[data-design="console"] .cx-track-tr { position: relative; }
+html[data-design="console"] .cx-track-tr.is-just .cx-check[aria-checked="true"] { animation: cx-track-pop 380ms cubic-bezier(.2, .9, .3, 1.5); }
+html[data-design="console"] .cx-track-tr.is-just .cx-track-tr-v { animation: cx-track-bump 380ms ease-out; }
+html[data-design="console"] .cx-track-tr.is-paid::after { content: ''; position: absolute; inset: 0; pointer-events: none; border-radius: inherit;
+  background: linear-gradient(90deg, transparent, var(--cx-gold-tint), transparent) no-repeat; background-size: 45% 100%; animation: cx-track-sweep 800ms ease-out both; }
+html[data-design="console"] .cx-track-fly { position: absolute; right: 8px; top: 0; z-index: 2; pointer-events: none; font: 600 var(--cx-fs-13)/1 var(--cx-mono); color: var(--cx-gold); opacity: 0; animation: cx-track-fly 1100ms cubic-bezier(.3, .1, .3, 1) 120ms both; }
+@keyframes cx-track-pop { from { transform: scale(.6); } 60% { transform: scale(1.18); } to { transform: none; } }
+@keyframes cx-track-bump { 40% { transform: translateY(-2px); color: var(--cx-text); } }
+@keyframes cx-track-sweep { from { background-position: -66% 0; } to { background-position: 166% 0; } }
+@keyframes cx-track-fly { 0% { opacity: 0; transform: translateY(6px); } 18% { opacity: 1; } 100% { opacity: 0; transform: translateY(-34px); } }
+@media (prefers-reduced-motion: reduce) {
+  html[data-design="console"] :is(.cx-track-tr.is-just .cx-check, .cx-track-tr.is-just .cx-track-tr-v) { animation: none; }
+  html[data-design="console"] .cx-track-tr.is-paid::after, html[data-design="console"] .cx-track-fly { display: none; }
+}

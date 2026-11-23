@@ -483,3 +483,13 @@ html[data-design="console"] .cx-sweep-achievements {
   --ach-node-locked-bdr: var(--cx-line);
 }
 html[data-design="console"] .cx-sweep-rail .fc-card-slot { scroll-margin-top: calc(var(--m-appbar-h, 52px) + 12px); }
+
+/* ── Small motion (Nov 2026): savings ─────────────────────────────────
+   A deposit is seen to count: each pot's fill and bar grow to their new
+   size, and the amounts count up (CountUp in SavingsBoard, new design
+   only). Classic's board is not animated. */
+html[data-design="console"] .sb-vessel-fill { transition: height 700ms cubic-bezier(.2, .7, .2, 1); }
+html[data-design="console"] :is(.sb-detail-bar-fill, .sb-headline-bar-fill) { transition: width 700ms cubic-bezier(.2, .7, .2, 1); }
+@media (prefers-reduced-motion: reduce) {
+  html[data-design="console"] :is(.sb-vessel-fill, .sb-detail-bar-fill, .sb-headline-bar-fill) { transition: none; }
+}

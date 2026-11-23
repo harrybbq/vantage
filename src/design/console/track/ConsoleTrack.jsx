@@ -17,8 +17,11 @@
  * writers (lib/calendar, trips.js ≙ the Holiday section, tick.js ≙
  * QuickLog/TrackSection), so every key written is one classic writes.
  *
- * Diet and Vitals are the classic NutritionSection and VitalsPanel,
- * mounted as they are and re-skinned from outside by track.css.
+ * Vitals is the classic VitalsPanel, mounted as it is and re-skinned
+ * from outside by track.css. Food is the classic NutritionSection for
+ * its data and every way of logging, with the day itself drawn by
+ * FoodDay (bars, the day grouped by time, its own day switcher, which
+ * moves the same selected day the calendar uses).
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Panel, Button, Segmented, Sheet } from '../ui';
@@ -47,6 +50,7 @@ import TIcon from './icons';
 import { openInDeviceCalendar } from '../../../lib/calendar/deviceSource';
 import PayIndicator from '../../../components/pay/PayIndicator';
 import TopBarActions from '../shell/TopBarActions';
+import FoodDay from './FoodDay';
 
 const VIEWS = [
   { value: 'month', label: 'Month' },
@@ -261,7 +265,8 @@ export default function ConsoleTrack({
         <div className="cx-track-classic cx-track-reskin cx-track-diet">
           {userId
             ? <NutritionSection userId={userId} S={S} update={update} selectedDate={selected === today ? null : selected}
-                                calYear={ay} calMonth={am} onShowCoinToast={onShowCoinToast} onMonthDataReady={noop} onOpenModal={onOpenModal} />
+                                calYear={ay} calMonth={am} onShowCoinToast={onShowCoinToast} onMonthDataReady={noop} onOpenModal={onOpenModal}
+                                view={FoodDay} onDate={d => { setSelected(d); setAnchor(d); }} />
             : <Panel className="cx-track-pad"><p className="cx-track-empty">Sign in to log food.</p></Panel>}
         </div>
       )}

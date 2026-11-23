@@ -95,3 +95,16 @@ html[data-design="console"] .cx-gl-trail-st { flex: none; font-size: var(--cx-fs
 html[data-design="console"] .cx-gl-trail li.is-here .cx-gl-trail-st { color: var(--cx-accent); }
 html[data-design="console"] .cx-gl-acts { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--cx-sp-8); }
 html[data-design="console"] .cx-gl-sure { margin: 0; font-size: var(--cx-fs-13); line-height: var(--cx-lh-13); color: var(--cx-danger); }
+
+/* ── Small motion ── a ticked row fills and slides away; what it unlocked arrives; the path's bar moves on. */
+html[data-design="console"] .cx-gl-tick.is-on { background: var(--cx-accent-fill); border-color: var(--cx-accent-fill); color: var(--cx-on-accent, #fff); animation: cx-gl-pop 300ms cubic-bezier(.2, .9, .3, 1.5); }
+html[data-design="console"] .cx-gl-row.is-leaving { animation: cx-gl-leave 260ms ease-in 110ms both; }
+html[data-design="console"] .cx-gl-row.is-arrived { animation: cx-gl-arrive 500ms cubic-bezier(.2, .8, .2, 1) both; background: var(--cx-accent-tint); }
+html[data-design="console"] .cx-gl-steps i { transition: background-color 500ms var(--cx-ease); }
+@keyframes cx-gl-pop { from { transform: scale(.7); } 60% { transform: scale(1.14); } to { transform: none; } }
+@keyframes cx-gl-leave { to { opacity: 0; transform: translateX(36px); } }
+@keyframes cx-gl-arrive { from { opacity: 0; transform: translateY(-10px); } }
+@media (prefers-reduced-motion: reduce) {
+  html[data-design="console"] :is(.cx-gl-tick.is-on, .cx-gl-row.is-leaving, .cx-gl-row.is-arrived) { animation: none; }
+  html[data-design="console"] .cx-gl-steps i { transition: none; }
+}

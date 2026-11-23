@@ -24,6 +24,11 @@
  * A tick completes at once, as the player's button did, and offers Undo
  * for a few seconds (the same toggle; it refunds the coins).
  *
+ * Motion (the training tracker's rules: short, once, on what changed):
+ * a ticked row fills and slides away, the goal it unlocked arrives in
+ * its place, and its path's bar turns one more step gold. The confetti
+ * the section already fires on a finished goal is untouched.
+ *
  * Linking keeps the section's two-step rule: Link on a goal makes it the
  * one that comes first, then the page becomes a picker for what it
  * unlocks. An existing link unlinks; a loop is refused (and marked).
@@ -43,6 +48,8 @@ import './goals-phone.css';
 const CATS = { finance: 'Finance', fitness: 'Fitness', brain: 'Brain', social: 'Social', general: 'General' };
 const WORD = { completed: 'Done', locked: 'Locked', active: 'Open' };
 const UNDO_MS = 7000;
+const LEAVE_MS = 360;     // a ticked row fills, then slides away, before the goal is written as done
+const still = () => typeof window !== 'undefined' && !!window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 const fmt = n => Math.round(Number(n) || 0).toLocaleString('en-GB');
 
 function GoalIcon({ goal }) {
@@ -50,9 +57,9 @@ function GoalIcon({ goal }) {
 }
 
 /** One goal as a row: tap the row for its sheet; `action` is the control at its end. */
-function GoalRow({ goal, sub, state, prog = null, onOpen, action = null }) {
+function GoalRow({ goal, sub, state, prog = null, onOpen, action = null, flag = '' }) {
   return (
-    <li className={`cx-gl-row is-${state}`} data-goal={goal.id}>
+    <li className={`cx-gl-row is-${state}${flag}`} data-goal={goal.id}>
       <button type="button" className="cx-gl-row-main" onClick={onOpen}>
         <GoalIcon goal={goal} />
         <span className="cx-gl-row-text">
@@ -148,7 +155,22 @@ export default function GoalsPhone({
   const [showDone, setShowDone] = useState(false);
   const [undo, setUndo] = useState(null);     // { id, name, n }
   const timer = useRef(null);
-  useEffect(() => () => clearTimeout(timer.current), []);
+  const leaveTimer = useRef(null);
+  useEffect(() => () => { clearTimeout(timer.current); clearTimeout(leaveTimer.current); }, []);
+  // Motion: the row being ticked (it fills and slides away), and rows that have just arrived in
+  // Next up because the goal before them was finished.
+  const [leaving, setLeaving] = useState(null);
+  const seen = useRef(null);
+  const [arrived, setArrived] = useState(() => new Set());
+  useEffect(() => {
+    const ids = new Set(view.next.map(e => e.goal.id));
+    const added = seen.current ? [...ids].filter(id => !seen.current.has(id)) : [];
+    seen.current = ids;
+    if (!added.length) return undefined;
+    setArrived(new Set(added));
+    const t = setTimeout(() => setArrived(new Set()), 1200);
+    return () => clearTimeout(t);
+  }, [view]);
 
   const byId = id => achievements.find(a => a.id === id) || null;
   const open = openId ? byId(openId) : null;
@@ -164,6 +186,14 @@ export default function GoalsPhone({
     timer.current = setTimeout(() => setUndo(null), UNDO_MS);
   };
   const undoIt = () => { if (undo) onComplete?.(undo.id); clearTimeout(timer.current); setUndo(null); };
+  /** The row's own tick: show it land, then complete. Straight through under reduced motion. */
+  const tick = goal => {
+    if (leaving) return;
+    if (still()) { complete(goal); return; }
+    setLeaving(goal.id);
+    clearTimeout(leaveTimer.current);
+    leaveTimer.current = setTimeout(() => { setLeaving(null); complete(goal); }, LEAVE_MS);
+  };
 
   if (!achievements.length) {
     return (
@@ -234,8 +264,9 @@ export default function GoalsPhone({
           <ul className="cx-gl-list" data-testid="cx-gl-next">
             {view.next.map(e => (
               <GoalRow key={e.goal.id} goal={e.goal} sub={sub(e)} state="active" prog={linkProg[e.goal.id]} onOpen={() => setOpenId(e.goal.id)}
+                       flag={`${leaving === e.goal.id ? ' is-leaving' : ''}${arrived.has(e.goal.id) ? ' is-arrived' : ''}`}
                        action={(
-                         <button type="button" className="cx-gl-tick" onClick={() => complete(e.goal)} aria-label={`Mark ${e.goal.name} complete`} data-testid="cx-gl-tick">
+                         <button type="button" className={`cx-gl-tick${leaving === e.goal.id ? ' is-on' : ''}`} onClick={() => tick(e.goal)} aria-label={`Mark ${e.goal.name} complete`} data-testid="cx-gl-tick">
                            <Icon name="check" size={18} strokeWidth={2.6} />
                          </button>
                        )} />
