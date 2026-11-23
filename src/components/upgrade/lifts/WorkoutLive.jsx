@@ -35,7 +35,8 @@ import NumPad from './NumPad';
 import { SetMenu, ExerciseMenu, WorkoutMenu, GymSheet } from './workout/Menus';
 import { useFocusMode } from './workout/feedback';
 import { setLiftsLive } from '../../../lib/lifts/liveBus';
-import { Sheet, Button, IconButton, NightChip, UndoToast, PbToast, useInputMode, useScopeStyle } from './ui';
+import { Sheet, Button, IconButton, NightChip, UndoToast, PbToast, useInputMode, useScope } from './ui';
+import { sessionVars } from '../../../lib/lifts/sessionColour';
 import {
   activeOf, elapsedSec, clock, volume, volumeText, previousForExercise, previousSession, addExercises, addSet, updateSet, toggleDone, setProblem,
   removeSet, removeExercise, insertSet, insertExercise, swapExercise, setNote, renameWorkout,
@@ -74,7 +75,10 @@ export default function WorkoutLive({
   const log = L.log;
   const list = useMemo(() => listWithPending(listIn, active), [listIn, active]);
   const { coarse, layout } = useInputMode();
-  const scopeStyle = useScopeStyle();
+  // The workout wears its session's colour (Push, Pull …); any other workout keeps the accent.
+  const scope = useScope();
+  const sess = useMemo(() => sessionVars(active, scope.theme), [active && active.rotaSession, active && active.name, scope.theme]); // eslint-disable-line react-hooks/exhaustive-deps
+  const scopeStyle = useMemo(() => (sess ? { ...scope.style, ...sess } : scope.style), [scope.style, sess]);
   useFocusMode(layout !== 'desktop');
   useEffect(() => { setLiftsLive(true); return () => setLiftsLive(false); }, []);
 
@@ -88,6 +92,7 @@ export default function WorkoutLive({
   const [history, setHistory] = useState(null);    // liftId
   const [problem, setProb] = useState(null);       // { ei, si, text, n }
   const [flash, setFlash] = useState(null);        // set id
+  const [just, setJust] = useState(null);          // { id, ei, all, n } — the set ticked a moment ago (its row animates once)
   const [cursor, setCursor] = useState(0);         // the exercise being worked on
   const [undo, setUndo] = useState(null);          // { text, undo, n }
   const [pbToast, setPbToast] = useState(null);    // { text, kinds, n }
@@ -209,6 +214,12 @@ export default function WorkoutLive({
     return () => io.disconnect();
   }, [exCount]);
 
+  // The tick's moment is over once its animations are (the longest is the gold rise, 1.3 s).
+  useEffect(() => {
+    if (!just) return undefined;
+    const t = setTimeout(() => setJust(null), 1600);
+    return () => clearTimeout(t);
+  }, [just]);
   // A flash lasts 120 ms (plus a frame).
   useEffect(() => {
     if (!flash) return undefined;
@@ -315,6 +326,8 @@ export default function WorkoutLive({
     update(prev => toggleDone(prev, ei, si, t, opts));
     if (st.done) return;
     setCursor(ei);
+    // The tick's moment: this row pops; the exercise's last set turns its count into Done.
+    setJust({ id: st.id, ei, all: ex.sets.every((x, i) => i === si || x.done), n: t });
     // The PB moment — real sets only, the foundation's rules (livePb).
     const edited = ticked.current.has(st.id) || (today && active.date < today);
     ticked.current.add(st.id);
@@ -371,7 +384,7 @@ export default function WorkoutLive({
   const padEx = pad ? active.exercises[pad.ei] : null;
 
   return (
-    <div ref={rootRef} className={`lw-live is-${layout}${coarse ? ' is-coarse' : ' is-fine'}`} style={{ '--lw-dock': `${dockH}px` }} data-testid="lw-live">
+    <div ref={rootRef} className={`lw-live is-${layout}${coarse ? ' is-coarse' : ' is-fine'}`} style={{ ...sess, '--lw-dock': `${dockH}px` }} data-testid="lw-live">
       <header className="lw-head">
         <div className="lw-bar">
           <IconButton icon="chevron-down" label="Minimise — the workout keeps running" onClick={onMinimise} className="lw-min" data-testid="lw-minimise" size={22} />
@@ -391,11 +404,14 @@ export default function WorkoutLive({
           <span aria-hidden="true" className="lw-stats-ex">·</span><span className="lw-stats-ex">{progress.exercisesDone}/{progress.exercises} ex</span>
           {night && <NightChip variant="inline" className="lw-stats-night" />}
         </p>
+        {progress.sets > 0 && (
+          <div className="lw-prog" aria-hidden="true" data-testid="lw-prog"><i style={{ width: `${Math.round((progress.done / progress.sets) * 100)}%` }} /></div>
+        )}
       </header>
 
       {active.exercises.length === 0 ? (
         <section className="lw-empty">
-          <p className="lf-eyebrow">// {active.name}</p>
+          <p className="lf-eyebrow">{active.name}</p>
           <p className="lf-body">No exercises yet. Add them from your lifts, or create one — the clock is running.</p>
           <Button variant="primary" size="lg" icon="plus" block onClick={() => setPicker({ mode: 'add' })} data-testid="lw-add-first">Add exercises</Button>
           {onQuickLog && <Button variant="quiet" icon="zap" onClick={onQuickLog}>Or quick log one set</Button>}
@@ -419,7 +435,7 @@ export default function WorkoutLive({
             return (
               <ExerciseBlock key={`${ex.liftId}-${ei}`} ex={ex} ei={ei} lift={lift} rows={rows} sub={sub} coarse={coarse} layout={layout} night={night}
                              gymLabel={gymNow ? gymName(gymNow) : null} activeSi={activeSi} editing={pad && pad.ei === ei ? pad : null} flash={flash}
-                             pbMarks={pbMarks} problem={problem && problem.ei === ei ? problem : null} noteOpen={noteOpen === ei}
+                             pbMarks={pbMarks} just={just && just.ei === ei ? just : null} problem={problem && problem.ei === ei ? problem : null} noteOpen={noteOpen === ei}
                              onCell={openCell} onInput={(a, b, patch) => update(prev => updateSet(prev, a, b, patch))} onToggle={toggle} onCopyPrev={copyPrev}
                              onSetMenu={(a, b) => { setPad(null); setSetMenu({ ei: a, si: b }); }} onDelete={deleteSet}
                              onAddSet={a => update(prev => addSet(prev, a))} onMenu={a => { setPad(null); setExMenu(a); }}
@@ -500,7 +516,7 @@ export default function WorkoutLive({
       )}
 
       {history && (
-        <Sheet title={(list.find(l => l.id === history) || {}).name || 'History'} eyebrow="// History" onClose={() => setHistory(null)} width={560}
+        <Sheet title={(list.find(l => l.id === history) || {}).name || 'History'} eyebrow="History" onClose={() => setHistory(null)} width={560}
                testId="lw-history" className="lw-history">
           {renderHistory ? renderHistory(history, () => setHistory(null)) : <p className="lf-meta">History isn&apos;t available here.</p>}
         </Sheet>

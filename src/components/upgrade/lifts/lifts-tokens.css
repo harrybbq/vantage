@@ -148,3 +148,15 @@ html[data-theme="dark-os"] .lifts {
   .lifts .lf-live-dot { animation: none; }
   .lifts, .lifts * { transition-duration: 0s !important; animation-duration: 0s !important; }
 }
+
+/* ── In the new design (Nov 2026) ─────────────────────────────────────
+   The tracker had its own label style: mono, upper case, a "//" before
+   every one. The rest of the new design dropped all three (its audit's
+   tells 2 and 3), which made the tracker read as a different app. The
+   "//" is gone from the markup; here the labels take the console's own
+   small-label style. Classic keeps the mono caps. */
+html[data-design="console"] .lifts .lf-eyebrow {
+  font-family: var(--cx-sans, var(--lf-font)); font-size: var(--cx-fs-12, 12px); line-height: var(--cx-lh-12, 16px);
+  font-weight: 600; letter-spacing: 0; text-transform: none; color: var(--cx-muted, var(--lf-muted));
+}
+

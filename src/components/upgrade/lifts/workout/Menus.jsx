@@ -37,7 +37,7 @@ export function SetMenu({ si, set, liftName, onType, onDelete, onClose }) {
   const cur = set && set.type ? set.type : null;
   const opts = [['W', 'Warm-up'], ['D', 'Drop set'], ['F', 'Failure'], [null, 'Normal']];
   return (
-    <Sheet title={`Set ${si + 1}`} eyebrow={`// ${liftName}`} onClose={onClose} testId="lw-setmenu" width={440}>
+    <Sheet title={`Set ${si + 1}`} eyebrow={`${liftName}`} onClose={onClose} testId="lw-setmenu" width={440}>
       <ul className="lw-menu" role="radiogroup" aria-label="Set type">
         {opts.map(([t, label]) => (
           <li key={label}>
@@ -60,7 +60,7 @@ export function ExerciseMenu({ ex, lift, gymLabel, onSwap, onNote, onHistory, on
   const pending = !!(lift && lift.pending);
   const name = lift ? lift.name : 'Exercise';
   return (
-    <Sheet title={name} eyebrow="// Exercise" onClose={onClose} testId="lw-exmenu" width={460}>
+    <Sheet title={name} eyebrow="Exercise" onClose={onClose} testId="lw-exmenu" width={460}>
       <ul className="lw-menu">
         <MenuRow icon="repeat" onClick={onSwap} testId="lw-m-swap">Swap exercise</MenuRow>
         <MenuRow icon="notebook-pen" onClick={onNote} testId="lw-m-note">{ex.note ? 'Edit note' : 'Add note'}</MenuRow>
@@ -87,7 +87,7 @@ export function WorkoutMenu({ active, gymLabel, onRename, onNight, onGym, onDisc
   const [asking, setAsking] = useState(false);
   const night = active.shift === 'night';
   return (
-    <Sheet title="Workout" eyebrow={`// ${active.name}`} onClose={onClose} testId="lw-wkmenu" width={480}>
+    <Sheet title="Workout" eyebrow={`${active.name}`} onClose={onClose} testId="lw-wkmenu" width={480}>
       <div className="lw-menu-sec">
         <label className="lw-field" htmlFor="lw-wk-name">
           <span className="lf-eyebrow">Name</span>
@@ -134,7 +134,7 @@ export function GymSheet({ gyms, gymNow, doneN, gymName, onMove, onClose, planCh
     </>
   ) : null;
   return (
-    <Sheet title="Which gym?" eyebrow="// Workout" onClose={onClose} footer={footer} testId="lw-gym" width={440}>
+    <Sheet title="Which gym?" eyebrow="Workout" onClose={onClose} footer={footer} testId="lw-gym" width={440}>
       <div className="lw-menu-sec">
         <GymSwitch gyms={gyms} value={pick || gymNow} label="Gym for this workout" testId="lw-gym-switch" onChange={id => (doneN && id !== gymNow ? setPick(id) : onMove(id))} />
         <p className="lf-meta">Each gym has its own plan. Exercises you haven&apos;t started switch to that gym&apos;s; ones with a set done stay. Machines compare within one gym.</p>

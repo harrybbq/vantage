@@ -198,7 +198,7 @@ export default function LogSheet({
   );
 
   return (
-    <Sheet title={editing ? 'Edit set' : 'Log a set'} eyebrow={editing ? `// ${lift ? lift.name : 'Set'}` : '// Lifts'} onClose={onClose}
+    <Sheet title={editing ? 'Edit set' : 'Log a set'} eyebrow={editing ? `${lift ? lift.name : 'Set'}` : 'Lifts'} onClose={onClose}
            className="lh-logsheet" testId="lh-logsheet" width={440} footer={footer}>
       <form id="lh-log-form" ref={form} className="lh-form" onSubmit={submit} noValidate>
         <div className="lh-frow">
@@ -294,7 +294,7 @@ function LiftPicker({ current, log, today, value, onPick, onClose }) {
   }, [log]);
   const shown = current.filter(l => !q.trim() || l.name.toLowerCase().includes(q.trim().toLowerCase()));
   return (
-    <Sheet title="Pick a lift" eyebrow="// Log a set" onClose={onClose} testId="lh-liftpicker" initialFocus="input">
+    <Sheet title="Pick a lift" eyebrow="Log a set" onClose={onClose} testId="lh-liftpicker" initialFocus="input">
       <div className="lh-search">
         <Icon name="search" size={16} />
         <input type="search" value={q} onChange={e => setQ(e.target.value)} placeholder="Search lifts" aria-label="Search lifts" data-testid="lh-liftpicker-q" />
@@ -324,7 +324,7 @@ function DateSheet({ value, today, maxDate, onPick, onClose }) {
   const g = monthGrid(ym, { maxDate, today });
   const maxYm = (maxDate || today).slice(0, 7);
   return (
-    <Sheet title="When was this set?" eyebrow="// Date" onClose={onClose} testId="lh-datesheet">
+    <Sheet title="When was this set?" eyebrow="Date" onClose={onClose} testId="lh-datesheet">
       <div className="lh-datequick">
         <Chip selected={value === today} onClick={() => onPick(resolveLogDate('today', { today, maxDate }))}>Today · {dateChipLabel(today, '')}</Chip>
         <Chip selected={value === resolveLogDate('yesterday', { today, maxDate })} onClick={() => onPick(resolveLogDate('yesterday', { today, maxDate }))}>Yesterday</Chip>

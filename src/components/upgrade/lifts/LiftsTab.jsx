@@ -36,7 +36,6 @@ import LogSheet from './LogSheet';
 import ManageSheet from './ManageSheet';
 import WorkoutToday from './WorkoutToday';
 import WeekMuscles from './WeekMuscles';
-import WeekStrip from './WeekStrip';
 import BodyMap from './BodyMap';
 import LiftList from './LiftList';
 import WorkoutLive from './WorkoutLive';
@@ -45,8 +44,9 @@ import HistoryCard from './HistoryCard';
 import { liftsLinkedTrackers, linkTrackerToLifts } from '../../../lib/trackers/autoLog';
 import NewWorkoutSheet from './workout/NewWorkoutSheet';
 import { takeLiftsResume, onLiftsResume } from '../../../lib/lifts/liveBus';
+import { blockPips } from '../../../lib/lifts/home';
 import { Toast } from './parts';
-import { Button, PbToast, Pager, SwipePage, useInputMode } from './ui';
+import { Button, PbToast, Pager, SwipePage, Segmented, useInputMode } from './ui';
 import { LiftsScope, useLiftsScope } from './ui/scope';
 import { useLiftsData, todayIso, LiftsProvider } from './useLifts';
 import {
@@ -67,7 +67,9 @@ import './lifts-tokens.css';
 import './home.css';
 
 /** The phone / tablet home pages (owner, Oct 2026). */
-const HOME_PAGES = [{ id: 'today', label: 'Today' }, { id: 'week', label: 'Week' }, { id: 'history', label: 'History' }];
+// Three views on every screen size (Nov 2026): the desktop page was one 3,851 px scroll of all of this.
+const HOME_PAGES = [{ id: 'today', label: 'Today' }, { id: 'lifts', label: 'Lifts' }, { id: 'history', label: 'History' }];
+const HOME_TABS = HOME_PAGES.map(p => ({ value: p.id, label: p.label }));
 
 export default function LiftsTab({ S, update, hydrated = true }) {
   const calendarToday = todayIso();
@@ -223,9 +225,16 @@ export default function LiftsTab({ S, update, hydrated = true }) {
   };
   const saveWorkout = () => {
     const { summary } = finish;
+    // Where the week stands once this one is in — worked out on a copy, before the save, so the saved
+    // moment can tell the block's last session from any other. Fails soft: no week line.
+    let week = null;
+    try {
+      const before = blockPips(S, today);
+      const after = blockPips(finishWorkout(S, summary.session.finishedAt), today);
+      if (after && after.total) week = { done: after.done, total: after.total, completed: !!before && before.done < before.total && after.done >= after.total };
+    } catch { week = null; }
     update(prev => finishWorkout(prev, summary.session.finishedAt));
-    // The sheet lists the PBs (and each was toasted when its set was ticked) — no second celebration.
-    setFinish(f => ({ ...f, saved: true }));
+    setFinish(f => ({ ...f, saved: true, week }));
   };
   const closeFinish = () => { const was = finish && finish.saved; setFinish(null); if (was) setView('list'); };
   // Save as template; started from a saved one → "Update template" replaces it in place (same id).
@@ -272,43 +281,41 @@ export default function LiftsTab({ S, update, hydrated = true }) {
                         onQuickLog={() => setSheet({ kind: 'log' })} canQuickLog={inUse.length > 0}
                         gyms={activeGymList} gym={curGym} onGym={pickGym} gymName={gymName} side={!paged} />
         );
+        const liftList = (
+          <LiftList list={lifts.list} summaries={summaries} counts={counts} today={today} activeGym={active && active.gym ? active.gym : curGym}
+                    gymOrder={gymOrder} gymName={gymName} bwOf={bwOf} pbsMonth={totals.pbsMonth}
+                    onOpen={openLift} onLog={id => setSheet({ kind: 'log', liftId: id })} onQuickLog={() => setSheet({ kind: 'log' })}
+                    onManage={() => setSheet({ kind: 'manage' })} />
+        );
         const history = (
           <>
             <HistoryCard S={S} update={update} today={calendarToday} />
-            <LiftList list={lifts.list} summaries={summaries} counts={counts} today={today} activeGym={active && active.gym ? active.gym : curGym}
-                      gymOrder={gymOrder} gymName={gymName} bwOf={bwOf} pbsMonth={totals.pbsMonth}
-                      onOpen={openLift} onLog={id => setSheet({ kind: 'log', liftId: id })} onQuickLog={() => setSheet({ kind: 'log' })}
-                      onManage={() => setSheet({ kind: 'manage' })} />
+            <BodyMap weekOnly view="figure" S={S} today={today} list={lifts.list} />
+            <WeekMuscles S={S} today={today} />
           </>
         );
+        const page = homePage === 0 ? today_ : homePage === 1 ? liftList : history;
         return (
           <>
             <div className="lh-frame">
               <Button variant="quiet" icon="settings" className="lh-frame-manage" onClick={() => setSheet({ kind: 'manage' })} data-testid="lh-manage">Manage</Button>
             </div>
+            {!paged && (
+              <div className="lh-tabsrow">
+                <Segmented label="Lifts views" options={HOME_TABS} value={HOME_PAGES[homePage].id} testId="lh-tabs"
+                           onChange={v => goHome(HOME_PAGES.findIndex(p => p.id === v))} />
+                <Button variant="quiet" icon="settings" onClick={() => setSheet({ kind: 'manage' })}>Manage lifts</Button>
+              </div>
+            )}
             {paged ? (
               <>
                 <Pager pages={HOME_PAGES} page={homePage} go={goHome} label="Lifts pages" testId="lh-pager"
                        stepPrefix="lh-step" arrowPrefix="lh-page" className="lh-pager" />
                 <SwipePage pages={HOME_PAGES} page={homePage} dir={homeDir} go={goHome} testIdPrefix="lh-page" className="lh-homepage">
-                  {homePage === 0 && today_}
-                  {homePage === 1 && (
-                    <>
-                      <WeekStrip S={S} today={today} gym={curGym} gymName={gymName} className="lh-card" />
-                      <BodyMap weekOnly view="figure" S={S} today={today} list={lifts.list} />
-                      <WeekMuscles S={S} today={today} />
-                    </>
-                  )}
-                  {homePage === 2 && history}
+                  {page}
                 </SwipePage>
               </>
-            ) : (
-              <>
-                {today_}
-                <WeekMuscles S={S} today={today} />
-                {history}
-              </>
-            )}
+            ) : page}
           </>
         );
       })()}
@@ -328,6 +335,7 @@ export default function LiftsTab({ S, update, hydrated = true }) {
       )}
       {finish && (
         <FinishSheet summary={finish.summary} saved={finish.saved} templateSaved={finish.templateSaved} lifts={lifts.list} S={S} today={today}
+                     week={finish.week || null} gym={finish.summary.session.gym || curGym} gymName={gymName}
                      gymLabel={finish.summary.session.gym ? gymName(finish.summary.session.gym) : null}
                      trackers={S.trackers || []} linked={liftsLinkedTrackers(S)}
                      dayLog={(S.logs || {})[finish.summary.session.date] || {}}

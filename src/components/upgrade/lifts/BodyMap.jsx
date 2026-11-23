@@ -15,6 +15,8 @@
  * and an "All muscles" switch: off, the twelve groups; on, the muscle
  * PARTS (front / side / rear delts, upper / lower chest, the triceps
  * heads …) on the figure and in the rows, grouped under their group.
+ * `bare` draws the two figures alone, filling from the top down — the
+ * saved moment (workout/SavedMoment.jsx).
  * Both are view state — nothing here writes to S. The Finish sheet pages
  * it (`view`: 'figure' on its first page, 'rows' on the next) and holds
  * the tab and the switch itself (`tab`/`onTab`, `all`/`onAll`), so both
@@ -45,12 +47,19 @@ const partLabel = (part, group) => {
   return part;
 };
 
-function Figure({ shapes, ratios, parts, label, uid }) {
+// The saved moment fills the body from the top down: a region's delay follows how far down the figure it sits.
+const sweepDelay = pts => {
+  const ys = String(pts).trim().split(/\s+/).map(p => Number(p.split(',')[1])).filter(Number.isFinite);
+  const cy = ys.length ? ys.reduce((a, b) => a + b, 0) / ys.length : 0;
+  return `${Math.round(Math.max(0, cy - 30) * 7)}ms`;
+};
+
+function Figure({ shapes, ratios, parts, label, uid, sweep = false }) {
   const clipId = c => `${uid}-${c}`;
   const zone = (key, pts, r, clip) => (
     <g key={key} clipPath={clip ? `url(#${clipId(clip)})` : undefined}>
       <polygon points={pts} className="lw-body-zone" />
-      {r > 0 && <polygon points={pts} className="lw-body-fill" style={{ fillOpacity: r }} />}
+      {r > 0 && <polygon points={pts} className="lw-body-fill" style={sweep ? { fillOpacity: r, '--d': sweepDelay(pts) } : { fillOpacity: r }} />}
     </g>
   );
   return (
@@ -144,7 +153,7 @@ function useWeek(S, today, session, list) {
 
 const TABS = [{ id: 'workout', label: 'This workout' }, { id: 'week', label: 'This week' }];
 
-export default function BodyMap({ session = null, list, S = null, today = null, view = 'both', tab: tabIn, onTab, all: allIn, onAll, weekOnly = false }) {
+export default function BodyMap({ session = null, list, S = null, today = null, view = 'both', tab: tabIn, onTab, all: allIn, onAll, weekOnly = false, bare = false }) {
   const uid = useId().replace(/[^a-zA-Z0-9_-]/g, '');
   const [tabOwn, setTabOwn] = useState('workout');
   const [allOwn, setAllOwn] = useState(false);
@@ -159,6 +168,19 @@ export default function BodyMap({ session = null, list, S = null, today = null, 
   const map = useMemo(() => bodyMap(session, list), [session, list]);
   const mapParts = useMemo(() => (all ? bodyMapParts(session, list) : null), [all, session, list]);
   const week = useWeek(S, today, session, list);
+
+  // bare: the two figures and nothing else, filling from the top (the saved moment, workout/SavedMoment.jsx).
+  if (bare) {
+    const trained = map.muscles.filter(m => m.done > 0);
+    if (!trained.length) return null;
+    const r = Object.fromEntries(map.muscles.map(m => [m.muscle, m.ratio]));
+    return (
+      <div className="lw-body-figs is-bare" role="img" aria-label={`Body map of this workout: ${trained.map(m => m.muscle).join(', ')} trained`} data-testid="lw-body-bare">
+        <Figure shapes={FRONT} ratios={r} parts={false} label="Front" uid={`${uid}f`} sweep />
+        <Figure shapes={BACK} ratios={r} parts={false} label="Back" uid={`${uid}b`} sweep />
+      </div>
+    );
+  }
 
   const planned = map.muscles.filter(m => m.planned).sort((a, b) => a.ratio - b.ratio || b.target - a.target);
   const extra = map.muscles.filter(m => !m.planned && m.done > 0).sort((a, b) => b.done - a.done);
@@ -241,7 +263,7 @@ export default function BodyMap({ session = null, list, S = null, today = null, 
   return (
     <section className={`lw-body is-${view}${weekOnly ? ' is-week-only' : ''}`} aria-label={weekOnly ? 'This week on the body' : view === 'rows' ? 'Muscle by muscle' : 'Where the work went'}
              data-testid={weekOnly ? 'lw-body-week' : view === 'rows' ? 'lw-body-rows' : 'lw-body'}>
-      <p className="lf-eyebrow">{weekOnly ? '// This week on the body' : view === 'rows' ? '// Muscle by muscle' : '// Where the work went'}</p>
+      <p className="lf-eyebrow">{weekOnly ? 'This week on the body' : view === 'rows' ? 'Muscle by muscle' : 'Where the work went'}</p>
       <div className="lw-body-ctl">
         {week && !weekOnly && (
           <div ref={tabsRef} className="lf-segm is-sm lw-body-tabs" role="tablist" aria-label="Body map range" onKeyDown={onTabKey}>

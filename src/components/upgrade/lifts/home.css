@@ -505,3 +505,57 @@
   .lifts .lh-lifted dt { font-size: var(--lf-fs-body); }
   .lifts .lh-lifted dd { font-size: 18px; line-height: 24px; overflow: hidden; text-overflow: ellipsis; }
 }
+
+/* ── Nov 2026: three views, Start first, one line of why, lifts as a list ── */
+.lifts .lh-tabsrow { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.lifts .lh-sug-acts { margin-top: 0; }
+/* The "why" line: the plan's one sentence, opening the chips, tags and notes behind it. */
+.lifts .lh-why {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px; width: 100%; box-sizing: border-box;
+  min-height: 44px; padding: 8px 12px; margin: 0; text-align: left; cursor: pointer;
+  border: 1px solid var(--lf-line); border-radius: var(--lf-r-cell); background: var(--lf-s2); color: var(--lf-mid);
+  font: inherit; font-size: max(13px, var(--lf-fs-floor)); line-height: 20px;
+}
+.lifts .lh-why:hover, .lifts .lh-why.is-open { color: var(--lf-text); border-color: var(--lf-line-strong); }
+.lifts .lh-why:focus-visible { outline: 2px solid var(--lf-focus); outline-offset: 2px; }
+.lifts .lh-why-txt { min-width: 0; display: inline-flex; align-items: baseline; gap: 6px; }
+.lifts .lh-why-txt svg { flex: none; align-self: center; }
+.lifts .lh-why-more { flex: none; display: inline-flex; align-items: center; gap: 4px; font-weight: 600; color: var(--lf-accent-ink); white-space: nowrap; }
+/* Find a lift */
+.lifts .lh-search { display: inline-flex; align-items: center; gap: 8px; flex: 1 1 200px; max-width: 320px; min-height: 40px; padding: 0 10px; box-sizing: border-box;
+  border: 1px solid var(--lf-line-strong); border-radius: var(--lf-r-cell); background: var(--lf-s1); color: var(--lf-muted); }
+.lifts .lh-search:focus-within { outline: 2px solid var(--lf-focus); outline-offset: 2px; }
+.lifts .lh-search input { flex: 1 1 auto; min-width: 0; border: 0; outline: 0; background: none; color: var(--lf-text); font: inherit; font-size: max(14px, var(--lf-fs-floor)); padding: 0; }
+.lifts .lh-search input::-webkit-search-cancel-button { filter: grayscale(1); }
+.lifts .lh-nomatch { padding: 16px; }
+/* A wide screen: the rows in two columns. The hairline between rows becomes a top rule on every row but the first of each column. */
+@media (min-width: 1200px) {
+  .lifts .lh-panel.is-wide { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: 0; }
+  .lifts .lh-panel.is-wide > li { border-top: 1px solid var(--lf-line); margin-top: -1px; }
+  .lifts .lh-panel.is-wide > li:nth-child(odd) { border-right: 1px solid var(--lf-line); }
+  .lifts .lh-panel.is-wide > li.lh-emptygrp, .lifts .lh-panel.is-wide > li.lh-nomatch { grid-column: 1 / -1; border-right: 0; }
+}
+
+
+/* ── A colour per session (Nov 2026) ──────────────────────────────────
+   WeekStrip lays each day's session colour over --lf-accent on its own
+   button (sessionColour.js), so the rules here only say where the
+   colour goes: the session's name as text, and the whole cell once the
+   session has been trained. A missed or rest day stays muted. */
+.lifts .lh-day[data-sess] .lh-day-s { color: var(--lf-accent-ink); }
+.lifts .lh-day[data-sess].is-missed .lh-day-s { color: var(--lf-muted); }
+.lifts .lh-day.is-trained { background: var(--lf-accent); border-color: var(--lf-accent); }
+.lifts .lh-day.is-trained:hover { border-color: var(--lf-accent); }
+.lifts .lh-day.is-trained .lh-day-d, .lifts .lh-day.is-trained .lh-day-d b, .lifts .lh-day.is-trained .lh-day-s,
+.lifts .lh-day.is-trained .lh-day-code, .lifts .lh-day.is-trained .lh-day-code.is-night { color: var(--lf-on-accent); }
+.lifts .lh-day.is-trained .lh-day-dot { background: var(--lf-on-accent); }
+.lifts .lh-day.is-trained.is-today { border-color: var(--lf-text); }
+/* History: the session key beside the Less / More legend. */
+.lifts .lh-hm-keys { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 6px 12px; }
+.lifts .lh-hm-keys .lh-hm-legend { margin-left: auto; }
+.lifts .lh-hm-sess { display: flex; flex-wrap: wrap; gap: 4px 12px; margin: 0; font-size: 12px; line-height: 16px; color: var(--lf-mid); }
+.lifts .lh-hm-sess span { display: inline-flex; align-items: center; gap: 5px; }
+.lifts .lh-hm-sess i { width: 10px; height: 10px; border-radius: 3px; background: var(--lf-accent); }
+/* A session's day is told apart by hue, so it starts stronger than the accent's lightest step. */
+.lifts .lh-hm-c.is-sess.is-1 { fill: color-mix(in srgb, var(--lf-accent) 68%, var(--lf-s3)); }
+.lifts .lh-hm-c.is-sess.is-2 { fill: color-mix(in srgb, var(--lf-accent) 86%, var(--lf-s3)); }

@@ -168,7 +168,7 @@ export default function ExercisePicker({
 
   const chips = [{ id: 'all', label: 'All' }, { id: 'recent', label: 'Recent' }, { id: 'plan', label: 'In plan' }];
   return (
-    <Sheet title={title || (mode === 'swap' ? 'Swap exercise' : 'Add exercises')} eyebrow="// Workout" onClose={onClose} footer={footer}
+    <Sheet title={title || (mode === 'swap' ? 'Swap exercise' : 'Add exercises')} eyebrow="Workout" onClose={onClose} footer={footer}
            width={560} testId="lw-pick" className="lw-pick" initialFocus="input[type=search]">
       <div className="lw-pick-top">
         <div className="lw-pick-searchrow">
@@ -204,7 +204,7 @@ export default function ExercisePicker({
         )}
       </ul>
       {muscleSheet && (
-        <Sheet title="Muscle" eyebrow="// Filter" onClose={() => setMuscleSheet(false)} testId="lw-muscles" width={440}
+        <Sheet title="Muscle" eyebrow="Filter" onClose={() => setMuscleSheet(false)} testId="lw-muscles" width={440}
                footer={<><Button variant="quiet" size="lg" onClick={() => setMuscles([])} disabled={!muscles.length}>Clear</Button><Button variant="primary" size="lg" onClick={() => setMuscleSheet(false)}>Show {muscles.length ? 'matches' : 'all'}</Button></>}>
           <ul className="lw-checklist">
             {muscleChoices.map(m => {
@@ -245,7 +245,7 @@ function CreateForm({ onCreate, onCancel, onClose, initialName = '', swap = fals
     </>
   );
   return (
-    <Sheet title="Create exercise" eyebrow="// Workout" onClose={onClose} footer={footer} width={560} testId="lw-create" initialFocus="#lw-c-name">
+    <Sheet title="Create exercise" eyebrow="Workout" onClose={onClose} footer={footer} width={560} testId="lw-create" initialFocus="#lw-c-name">
       <form className="lw-create" onSubmit={submit} noValidate>
         <label className={`lw-field${err ? ' has-error' : ''}`} htmlFor="lw-c-name">
           <span className="lf-eyebrow">Name</span>

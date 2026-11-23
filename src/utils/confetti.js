@@ -8,6 +8,9 @@ export function fireBurst(opts = {}) {
     colors: opts.colors ?? ['#c8970a', '#4dc485', '#6bbf90', '#ffffff', '#a0e0c0'],
     startVelocity: opts.startVelocity ?? 30,
     scalar: opts.scalar ?? 1,
+    // Over a modal sheet, and off under reduced motion — only when the caller asks (Lifts' saved moment).
+    ...(opts.zIndex != null ? { zIndex: opts.zIndex } : null),
+    ...(opts.disableForReducedMotion ? { disableForReducedMotion: true } : null),
   });
 }
 

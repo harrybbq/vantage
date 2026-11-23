@@ -2,7 +2,7 @@
  * THIS WEEK, by muscle — the adaptive-training panel on the Lifts home
  * (owner's design, 2026-10-21; mockup 04). A week is one rota block.
  *
- *   // This week · 19–26 Oct · 3 of 5 done
+ *   This week · 19–26 Oct · 3 of 5 done
  *   Shoulders  ▬▬▬▬▭▭▭  12 / 30  ●○
  *   …
  *   Dots: sessions this week with 2+ sets for that muscle.
@@ -96,7 +96,7 @@ export default function WeekMuscles({ S, today }) {
   return (
     <section className="lh-card wm" aria-labelledby="lh-wm-h" data-testid="wm">
       <p className="lf-eyebrow" id="lh-wm-h">
-        // This week · {spanLabel(view.start, view.end)}{view.count && <> · <span className="lf-num">{view.count.done} of {view.count.total}</span> done</>}
+        This week · {spanLabel(view.start, view.end)}{view.count && <> · <span className="lf-num">{view.count.done} of {view.count.total}</span> done</>}
       </p>
       <div className="wm-cols">
         {cols.map((c, i) => <ul key={i} className="wm-list">{c.map(row)}</ul>)}
