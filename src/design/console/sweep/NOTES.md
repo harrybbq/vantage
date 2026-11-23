@@ -32,3 +32,12 @@ changes needed in files this area does not own (see ../README.md §7).
 - Tour targets exist: `data-cx-nav` on sidebar items, phone tabs, More (`more`) and More rows; `data-cx-tour="hub"` on the player strip. The tutorial slot now gets `S`.
 - The paywall slot now gets `count`; `headline()` says "5 of 5" exactly at the cap and keeps "all 5" over it.
 - PageHead no longer prints a title (the shell bar is the page h1); `title` stays as the header's accessible name. Settings dropped its empty PageHead. Classic `.sec-title` text inside `.cx-sweep-scope` is hidden (desktop keeps its "?" help; phones drop the row).
+
+## Habits: the track (2026-11-23)
+
+- **Layout.** `ConsoleHabits.jsx` renders one `HabitLane` (`HabitTrack.jsx`) per habit on desktop and phone; `ConsoleHabitCard.jsx`, the classic roster + detail bridge and the three header figures are gone from the console (classic still uses `HabitRoster` / `HabitDetail`). Styles are the lane's own sheet, `habit-track.css`, imported by the component; the Habits section of `sweep.css` is now a pointer.
+- **A lane's face says three things:** this run, what it is working toward (`lib/habits/road.js nextTarget`), and the record that does not reset (`lib/habits/record.js`). Anything else belongs in the opened lane (What's ahead, History). Do not add a fourth figure to the face.
+- **Awards.** Each lane calls `useHabitAwards` once, as each roster card did. One lane per habit, so they fire once.
+- **One-tap slip.** `ConsoleHabits` owns the bar (`SLIP_BAR_MS`). The pre-slip habit is captured INSIDE the `update` call (a ref), so Undo restores the state's own object, not a render-old copy. "It was earlier" = undo, then the classic relapse dialog.
+- **Screen scale.** Fixed sizes in `habit-track.css` are × `--cx-ui` (as `--u`), and the runner is passed `scale × --cx-ui`, because `HabitRunner` sizes its canvas from the real rect: a CSS zoom wrapper would enlarge the lane but not the figure.
+

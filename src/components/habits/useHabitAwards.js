@@ -11,6 +11,8 @@
  *     re-arms a Quit habit's. Nothing is taken back.
  *   · Cut down only: a closed period with no use at all pays a small dry
  *     bonus, for the LAST closed period only — never a backlog.
+ *   · An endless habit past its own milestones is paid the road's next
+ *     step as it reaches it (lib/habits/road.js), once per run.
  *   · Passing your best previous run while you watch fires the confetti.
  *     That is session-only: no state is written for it.
  *
@@ -21,6 +23,7 @@ import { useEffect, useRef } from 'react';
 import { fireGoal } from '../../utils/confetti';
 import { isCut, streakMs, dryBonusDue, DRY_BONUS } from '../../lib/habits/cutdown';
 import { habitElapsed, ghostOf } from '../../lib/habits/progress';
+import { hasRoad, nextRoadStep, roadBase, settleRoad } from '../../lib/habits/road';
 
 export default function useHabitAwards(habit, now, update, onShowCoinToast) {
   const pending = useRef(new Set());
@@ -97,6 +100,27 @@ export default function useHabitAwards(habit, now, update, onShowCoinToast) {
           };
         });
         onShowCoinToast(`+${DRY_BONUS} ⬡ — ${habit.name}: a dry ${habit.budget?.per === 'month' ? 'month' : 'week'}!`, true);
+      }
+    }
+
+    // The road past the user's own milestones (lib/habits/road.js): for an
+    // endless habit the next milestone arrives by itself. settleRoad decides
+    // inside `update` (first look pays nothing; a step pays once), so this
+    // only has to notice that there is something to settle, and say so.
+    if (hasRoad(habit)) {
+      const settled = habit.autoPaid;
+      const step = nextRoadStep(habit);
+      const first = settled === undefined && metric >= roadBase(habit).duration;
+      const stale = settled !== undefined && Number(settled) > metric;
+      const due = settled !== undefined && !stale && !!step && metric >= step.duration;
+      const key = first ? 'road:first' : stale ? `road:stale:${settled}` : due ? `road:pay:${step.id}:${settled}` : null;
+      if (key && !pending.current.has(key)) {
+        pending.current.add(key);
+        update(prev => settleRoad(prev, habit.id, Date.now()).state);
+        if (due) {
+          onShowCoinToast(`+${step.coins} ⬡ — ${habit.name} ${step.label}${cut ? ' on target' : ''}!`, true);
+          fireGoal();
+        }
       }
     }
 

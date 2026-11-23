@@ -89,7 +89,33 @@ export function applyRelapse(prev, id, whenTs) {
         strikeTimes: recent,
         relapseCount: (h.relapseCount || 0) + 1,
         milestones: (h.milestones || []).map(m => ({ ...m, awarded: false })),
+        // The road past the user's own milestones (road.js) starts again too.
+        ...(h.autoPaid !== undefined ? { autoPaid: 0 } : {}),
       };
     }),
   };
+}
+
+/**
+ * Take a slip back (the one-tap "I slipped" offers Undo for a few
+ * seconds). `before` is the habit exactly as it was the moment before
+ * applyRelapse ran, and `at` the instant that slip was logged for.
+ *
+ * The habit is put back whole — its start, runs, strikes, count and
+ * milestone flags — but ONLY while that slip is still the last thing
+ * that happened to it (its start is still `at`). If anything else has
+ * moved the habit since, or it has gone, `prev` comes back by identity
+ * and nothing is written: an Undo can never overwrite newer history.
+ *
+ * Nothing else in the state is touched. A slip pays and takes no coins,
+ * so there is nothing to refund.
+ */
+export function undoRelapse(prev, before, at) {
+  const habits = (prev && prev.habits) || [];
+  if (!before || !before.id) return prev;
+  const cur = habits.find(h => h && h.id === before.id);
+  if (!cur || isCut(cur) || isCut(before)) return prev;
+  if (!Number.isFinite(Number(at)) || Number(cur.startTime) !== Number(at)) return prev;
+  if ((cur.relapseCount || 0) !== (before.relapseCount || 0) + 1) return prev;
+  return { ...prev, habits: habits.map(h => (h && h.id === before.id ? before : h)) };
 }
