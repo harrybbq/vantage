@@ -78,7 +78,8 @@ against it.
   links); new accounts only see the areas they picked (below); the new
   design's navigation is the Hub plus three sections (2026-11-23).
 - **Where the count stands** (new design): Hub, Track, Health, Social,
-  on desktop and phone alike (+ Upgrade in the owner's sidebar).
+  on desktop and phone alike (+ Upgrade for the owner: last in the
+  sidebar, and a fifth seat on the phone's tab bar).
   Settings is behind the avatar and the phone's More sheet is gone.
   Classic still has its seven; it was left alone on purpose.
 - **The structure is decided (owner, 2026-11-23, from mockups):** the Hub

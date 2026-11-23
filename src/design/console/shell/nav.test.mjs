@@ -30,10 +30,19 @@ t('sidebar: Hub, the three sections, Upgrade only for the owner; Settings is beh
   assert.ok(!ids(sidebarItems({ isOwner: true })).includes('settings'));
 });
 
-t('phone bar: Hub · Track · Health · Social, and no More', () => {
+t('phone bar: Hub · Track · Health · Social, and no More; the owner gets Upgrade as a fifth seat', () => {
   assert.deepEqual(tabItems().map(x => x.label), ['Hub', 'Track', 'Health', 'Social']);
-  assert.deepEqual(tabItems({ isOwner: true }).map(x => x.label), ['Hub', 'Track', 'Health', 'Social']);
+  assert.deepEqual(tabItems({ isOwner: true }).map(x => x.label), ['Hub', 'Track', 'Health', 'Social', 'Upgrade']);
   assert.ok(!ids(tabItems()).includes('more'));
+  assert.ok(!ids(tabItems()).includes('upgrade'), 'nobody else is shown it');
+  // the owner's bar lights Upgrade on its route (and on its old id); nobody else's does
+  const owner = tabItems({ isOwner: true });
+  assert.equal(activeTab('upgrade', null, { tabs: owner }), 'upgrade');
+  assert.equal(activeTab('schedule', null, { tabs: owner }), 'upgrade');
+  assert.equal(activeTab('train', null, { tabs: owner }), 'health', 'Train is Health, not Upgrade');
+  assert.equal(activeTab('upgrade'), null);
+  // the same entry on both surfaces
+  assert.equal(owner[owner.length - 1].id, sidebarItems({ isOwner: true }).slice(-1)[0].id);
 });
 
 t('Train is the owner\'s for now: Health starts at Food for anyone else', () => {
