@@ -8,6 +8,10 @@
  * arrives as `activeSub.achievements`, so the section's own Goals /
  * Savings switch is hidden here.
  *
+ * On a phone the goals are the "Next up" list (GoalsPhone.jsx), which
+ * the section mounts in place of its path player and feeds the same
+ * handlers. The desktop board below is unchanged.
+ *
  * The board is not rebuilt. It is a viewport-height canvas with its own
  * touch handling (pan, pinch, long-press) and every write the goals and
  * savings make; nothing is laid out above it.
@@ -15,6 +19,7 @@
 import { useState } from 'react';
 import AchievementsSection from '../../../components/AchievementsSection';
 import HonoursCase from './HonoursCase';
+import GoalsPhone from './GoalsPhone';
 
 export default function ConsoleAchievements({ S, update, onOpenModal, onShowCoinToast, activeSub = null }) {
   const [honours, setHonours] = useState(false);
@@ -29,6 +34,7 @@ export default function ConsoleAchievements({ S, update, onOpenModal, onShowCoin
         onOpenVisions={() => setHonours(true)}
         tab={activeSub && activeSub.achievements === 'savings' ? 'savings' : 'goals'}
         hideTabs
+        phoneGoals={GoalsPhone}
       />
       {honours && <HonoursCase S={S} onClose={() => setHonours(false)} />}
     </div>
