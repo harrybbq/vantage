@@ -436,7 +436,7 @@ function AchNode({
 
 // ── Main section ─────────────────────────────────────────────────────
 
-export default function AchievementsSection({ S, update, active, onOpenModal, onShowCoinToast, onOpenVisions }) {
+export default function AchievementsSection({ S, update, active, onOpenModal, onShowCoinToast, onOpenVisions, tab = null, hideTabs = false, phoneGoals: PhoneGoals = null }) {
   const achievements = S.achievements || [];
   const visionsUnlocked = Object.keys(S.visions || {}).length;
   // Rating credit, shown rather than hidden — see achievementCreditState.
@@ -616,7 +616,11 @@ export default function AchievementsSection({ S, update, active, onOpenModal, on
   // 'savings' = monetary goals list. Sticky to component state so a
   // refresh resets to goals (canvas is the dominant surface).
   const isMobile = useIsMobile();
-  const [activeTab, setActiveTab] = useState('goals');
+  // `tab` ('goals' | 'savings'): the host picks the view and draws its own
+  // switch (the console's Track › Goals and Track › Money, with hideTabs).
+  // Left out, the section keeps its own switch and state, as classic does.
+  const [ownTab, setActiveTab] = useState('goals');
+  const activeTab = tab === 'goals' || tab === 'savings' ? tab : ownTab;
   // Tracks the live position of a node currently being dragged so the
   // SVG connections re-render without committing to global state on
   // every mousemove. AchNode commits position on mouseup; in between
@@ -847,6 +851,35 @@ export default function AchievementsSection({ S, update, active, onOpenModal, on
     return achievements.map(a => a.id === dragHint.id ? { ...a, x: dragHint.x, y: dragHint.y } : a);
   }, [achievements, dragHint]);
 
+  // `phoneGoals`: a host's own phone view of the goals (the console's
+  // "Next up" list, design/console/sweep/GoalsPhone.jsx). It replaces the
+  // toolbar, the stats strip and the path player, and is handed the same
+  // handlers they use, so completing, linking and deleting stay one
+  // implementation. No id on the section: #achievements is the fixed,
+  // viewport-height frame the board and the player need, and this page
+  // scrolls. Classic passes nothing and keeps the player below.
+  if (isMobile && activeTab === 'goals' && PhoneGoals) {
+    return (
+      <section className={`section cx-page cx-goals-page${active ? ' active' : ''}`} data-section="achievements">
+        <PhoneGoals
+          achievements={liveAchievements}
+          connections={connections}
+          linkProg={linkProg}
+          connectingFrom={S.connectingFrom || null}
+          onComplete={handleToggleComplete}
+          onEdit={handleEdit}
+          onConnect={handleConnect}
+          onDelete={handleDelete}
+          onCancelConnect={handleCancelConnect}
+          onNew={() => onOpenModal('addAchievementModal')}
+          onOpenVisions={onOpenVisions}
+          visions={{ unlocked: visionsUnlocked, total: VISIONS.length }}
+          credit={credit}
+        />
+      </section>
+    );
+  }
+
   // `is-player` compacts the chrome above the board on a phone. The
   // player is a fixed frame rather than a scroller, so every pixel the
   // toolbar takes is a pixel the goal card does not get — and 339 of the
@@ -936,6 +969,7 @@ export default function AchievementsSection({ S, update, active, onOpenModal, on
           which capped how far the board could extend south. Moving it up
           here (right of the tabs) frees the board's bottom edge entirely. */}
       <div className="ach-tabs-row">
+        {!hideTabs && (
         <div className="ach-tabs" role="tablist">
           <button
             role="tab"
@@ -950,6 +984,7 @@ export default function AchievementsSection({ S, update, active, onOpenModal, on
             onClick={() => setActiveTab('savings')}
           >Savings</button>
         </div>
+        )}
         {activeTab === 'goals' && (
           <div className="ach-stats">
             <div className="ach-stats-item">

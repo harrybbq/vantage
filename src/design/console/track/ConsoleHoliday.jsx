@@ -8,5 +8,5 @@
 import ConsoleTrack from './ConsoleTrack';
 
 export default function ConsoleHoliday(props) {
-  return <ConsoleTrack {...props} initialView="year" />;
+  return <ConsoleTrack {...props} initialView="year" forceTab="calendar" />;
 }

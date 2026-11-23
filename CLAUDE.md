@@ -34,6 +34,7 @@ retired `cream`/`dark` ids map forward in `resolveEffectiveTheme`.
 - iPhone calendar (iOS app, Pro, 2026-11-01): `lib/calendar/device.js` + `deviceSource.js`. Read on the device, never stored: App hands calendar surfaces a VIEW of S (`withDeviceEvents`, non-enumerable symbol) — never write it back. Settings card `settings/DeviceCalendarCard.jsx`; prefs per phone in localStorage.
 - Lifts, two gyms, two plans (owner-only, 2026-11-13): `data/trainingProgramme.js` holds a written plan per gym, `PROGRAMME` (DXC, the base) and `PROGRAMME_GREENOCK`, same sessions and required sets slot for slot; a Greenock entry that takes a different exercise's slot carries `for` (the DXC name). `GYM_ONLY` records which gym has what (a lift's own `only`, set in Manage lifts › ⋯ › "Where you can do it", wins). `lib/lifts/gymPlan.js`: `planOf(gym, session)`, `switchExercise` (a session in progress changes gym: exercises with no set done become the other plan's counterpart, `workout.js` `setWorkoutGym`), `fitForGym` (safety net: nothing a gym lacks is shown). The adaptive Upper/Lower builds from the chosen gym's plan. A new exercise in either plan needs `EXERCISE_PARTS` (adaptive.js) and `PROGRAMME_MUSCLES` (muscles.js). Open: DXC has no seated leg curl, so DXC's Lower shows it as left out until the owner names what DXC has. Home UI (2026-11-23): three views on every screen (Today · Lifts · History, `LiftsTab` `HOME_PAGES`); the Today card puts Start first and folds the coaching detail (muscle tallies, catch-up tags, WHOOP chip, below-standard note) behind one "why" line (`WorkoutToday`); lifts are one list of rows with search, never-logged lifts in a collapsed group (`LiftList`); one week strip, no pips; labels have no `//` and take the console label style in the new design. Colour and motion (2026-11-23, mockup "Workout Moments"): each of the five sessions has its own colour (`lib/lifts/sessionColour.js`, a view of the session's name, nothing stored; it lays the colour over `--lf-accent` on the Today card, the live workout, the Finish sheet, each week-strip day and History's grid, so write new rules against `--lf-accent` and they follow); a workout that is not one of the five keeps the accent. Gold stays a best, indigo a night, red a problem, which is why Push is lime. The moments: a ticked set springs and moves a progress bar, a finished exercise gets a Done chip, a best bursts gold, and the save is the body map filling in (`workout/SavedMoment.jsx`). Confetti is rare on purpose: a small gold burst for a best, the full thing only when the save finishes the week.
 - Habits (reworked 2026-11-23, "less like a chore"): the new design's page is **the track** — one lane a habit, all running at once (`design/console/sweep/HabitTrack.jsx` + `habit-track.css`, hosted by `ConsoleHabits.jsx`); classic keeps its roster + detail. The runner (`components/habits/HabitRunner.jsx`), stages, ghost and the relapse rules are untouched. Three shared rules, all in `lib/habits/`, so they apply in both designs and the hub widgets: `record.js` (the number that doesn't reset: clean days of the last 30, or closed periods on budget; it also grows the runner's scenery via `view.js sceneryLevel`), `road.js` (an endless habit past its own milestones gets the next one automatically; one additive key `habit.autoPaid`; first look pays nothing; paid by `useHabitAwards`), and `relapse.js undoRelapse` (the one-tap "I slipped" offers Undo; it restores the habit only if nothing else touched it). A lane's face shows three things only (this run, what's next, the record); totals and the relapse count live in the opened lane's History.
+- Goals on a phone (2026-11-23, mockup "Goals on a Phone", option A): in the new design the phone's Goals page is **Next up**, a list of every goal that can be finished now across all paths, then the paths as cards, then Waiting and Done folded (`design/console/sweep/GoalsPhone.jsx`, arranged by `lib/achievements/goalsList.js`). A goal's sheet holds its path as a trail and Edit, Link and Delete as buttons; nothing is behind a long press. `AchievementsSection` mounts it through its `phoneGoals` prop and hands it the board's own handlers, so there is one implementation of completing, linking and deleting. The desktop board and classic's phone player (`achievements/PathPlayer.jsx`) are untouched, on purpose.
 - Legal: `/privacy` and `/terms` deep-link pre-auth (store requirement). Onboarding (replaced both old tours, Oct 2026): logic `src/lib/onboarding/onboarding.js`, overlay `components/onboarding/Onboarding.jsx`, hub Getting started card; per-page help: `SectionHelp`.
 
 ## Onboarding stays current (owner rule, 2026-10-29)
@@ -74,11 +75,12 @@ against it.
   is. (The Nov 2026 Habits rework made Habits better and left the tab
   count where it was. Say so plainly when that is the trade.)
 - **Done so far:** Holiday folded into Track (its route remains for deep
-  links); new accounts only see the areas they picked (below).
-- **Where the count stands** (new design): desktop Hub, Achievements,
-  Track, Shopping, Habits, Leaderboard, Settings (+ Upgrade for the
-  owner); phone tabs Hub, Track, Habits, Shop, with Achievements,
-  Friends, Leaderboard and Settings under More.
+  links); new accounts only see the areas they picked (below); the new
+  design's navigation is the Hub plus three sections (2026-11-23).
+- **Where the count stands** (new design): Hub, Track, Health, Social,
+  on desktop and phone alike (+ Upgrade in the owner's sidebar).
+  Settings is behind the avatar and the phone's More sheet is gone.
+  Classic still has its seven; it was left alone on purpose.
 - **The structure is decided (owner, 2026-11-23, from mockups):** the Hub
   plus THREE sections, with Settings behind the avatar and no More
   drawer on a phone.
@@ -87,9 +89,19 @@ against it.
   - **Health** — Train (the gym tracker, out of the owner-only Upgrade
     area) · Food · Vitals · Habits.
   - **Social** — League · Friends · Messages.
+- **How the sections are built** (`design/console/shell/nav.js`): a
+  section is a GROUP of tabs and a tab is a PLACE, an existing route
+  plus the view of that page to show. Nothing moved underneath: Goals
+  and Money are the `achievements` route's two views, Food and Vitals
+  the `track` route's, Messages the `friends` route's. `navigate(route,
+  view)` in App carries the view (`subTab`, session state) and console
+  pages read it as `activeSub`. So every old route, shortcut and widget
+  still lands and lights its tab. A new page goes in as a tab of a
+  group, never as a new sidebar entry. Train is the `train` route
+  (`UpgradeSection only="lifts"`), owner-only until step 3.
 - **Order agreed:** (1) the gym tracker's UI, where it lives now — done,
   see Lifts below; (2) restructure the navigation into the three
-  sections; (3) open Train to everyone as a PLAIN LOGGER first (start a
+  sections — done; (3) open Train to everyone as a PLAIN LOGGER first (start a
   workout, log sets, history, bests), with pick-a-plan as a later piece.
   The owner's programme, rota, two gyms and avoided lifts are written
   into the app today and must sit behind the owner's account before
@@ -106,9 +118,10 @@ two things; every earlier account is left exactly as it was.
   explicit `S.design` still wins. `DEFAULT_DESIGN` stays `'classic'`, so
   for existing accounts the redesign is still the owner preview.
 - **A menu that follows the onboarding picks** (`lib/onboarding/areas.js`).
-  Hub, Track and Settings always show; a pick turns on its areas; an area
-  with data in it always shows; the rest sit behind **Add an area**
-  (console shell). It is a view: routes, search and widgets reach every
+  Hub, Track (the calendar) and Health (Food, Vitals) always show; a
+  pick turns on its tabs, and Social appears with the Friends pick; an
+  area with data in it always shows; the rest sit behind **Add an area**
+  (the sidebar's row on desktop, an Add seat on the phone's tab bar). It is a view: routes, search and widgets reach every
   section, and the only state is `S.onboarding.scoped` / `.added`.
   "Show me everything" in the onboarding means everything.
 - Not done yet, on purpose: seeded trackers (`Amount Saved`) and the

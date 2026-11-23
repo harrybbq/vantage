@@ -502,6 +502,20 @@ function Board({ userId, userEmail, userCreatedAt = null, onSignOut, initialSett
   // Account.
   const [settingsTab, setSettingsTab] = useState(initialSettings || null);
   const [trackTab, setTrackTab] = useState(null);
+  // The view each route is showing, for pages that hold more than one
+  // (Track: calendar / diet / vitals · Achievements: goals / savings ·
+  // Friends: friends / messages). The console's section tabs are places
+  // made of a route and one of these (design/console/shell/nav.js), so
+  // the shell reads it to light the right tab and the console pages
+  // take their view from it. Session state only; classic ignores it.
+  const [subTab, setSubTab] = useState({});
+  // The friends rail can be told to switch from elsewhere (an unread
+  // chip, a push): keep the tabs in step with it.
+  useEffect(() => {
+    const onTab = e => { if (e.detail === 'messages' || e.detail === 'friends') setSubTab(prev => ({ ...prev, friends: e.detail })); };
+    window.addEventListener('vantage:friends-tab', onTab);
+    return () => window.removeEventListener('vantage:friends-tab', onTab);
+  }, []);
 
   // Native WHOOP / Oura return (lib/native/deepLinks): the app's version
   // of landing on `/?whoop=connected`. Go to Settings › Tools, where the
@@ -513,7 +527,10 @@ function Board({ userId, userEmail, userCreatedAt = null, onSignOut, initialSett
     return () => window.removeEventListener(WEARABLE_RETURN_EVENT, go);
   }, []);
 
-  function navigate(id) {
+  // navigate(route) or navigate(route, view): the second argument picks
+  // the view of a page that has several (see subTab above). A bare
+  // navigate('track') means the page's first view.
+  function navigate(id, view = null) {
     // 'profile' is no longer a section of its own — the photo, name,
     // email and password it used to hold live in Settings → Account.
     // The id stays routable so existing callers (and any stale deep
@@ -528,9 +545,13 @@ function Board({ userId, userEmail, userCreatedAt = null, onSignOut, initialSett
     // second click every time.
     if (id === 'diet' || id === 'vitals' || id === 'trackers') {
       setTrackTab({ tab: id, n: Date.now() });
+      setSubTab(prev => ({ ...prev, track: id }));
       setActiveSection('track');
       return;
     }
+    const sub = typeof view === 'string' && view ? view : null;
+    if (id === 'track' && sub) setTrackTab({ tab: sub, n: Date.now() });
+    if (id === 'track' || id === 'achievements' || id === 'friends') setSubTab(prev => ({ ...prev, [id]: sub }));
     setActiveSection(id);
   }
   function handleOpenModal(id) {
@@ -548,8 +569,8 @@ function Board({ userId, userEmail, userCreatedAt = null, onSignOut, initialSett
 
   // ── Onboarding: the overlay's stops and the hub's Getting started card ──
   // Friends is its own screen on a phone and the hub's rail on desktop.
-  function onboardingGo(section) {
-    navigate(section === 'friends' && !isMobile ? 'hub' : section);
+  function onboardingGo(section, sub = null) {
+    navigate(section === 'friends' && !isMobile ? 'hub' : section, sub);
   }
   // Open a pick's real first thing: its screen, then its real add flow
   // (handleOpenModal, so free-tier caps still apply). Friends shares the
@@ -557,7 +578,7 @@ function Board({ userId, userEmail, userCreatedAt = null, onSignOut, initialSett
   function onboardingDo(id, from) {
     const p = pickById(id);
     if (!p) return undefined;
-    onboardingGo(p.first.section);
+    onboardingGo(p.first.section, p.first.sub);
     if (p.first.modal) { handleOpenModal(p.first.modal); return undefined; }
     if (!p.first.invite) return undefined;
     return shareInvite().then(r => {
@@ -891,6 +912,7 @@ function Board({ userId, userEmail, userCreatedAt = null, onSignOut, initialSett
     onOpenShortcuts: () => setShortcutsOpen(true),
     onSignOut: handleExplicitSignOut,
     requestedTrackTab: trackTab,
+    activeSub: subTab,
     requestedSettingsTab: settingsTab,
   };
 
@@ -1171,6 +1193,19 @@ function Board({ userId, userEmail, userCreatedAt = null, onSignOut, initialSett
             </WidgetBoundary>
           </motion.div>
         )}
+        {/* Train — the gym tracker as a page of its own: Health › Train in
+            the console's sections (design/console/shell/nav.js). Still the
+            owner's, and still in the owner-only bundle, until it opens to
+            everyone; it is the same LiftsTab the Upgrade menu opens. */}
+        {UpgradeSection && activeSection === 'train' && (
+          <motion.div key="train" {...pm}>
+            <WidgetBoundary variant="section" name="train">
+            <Suspense fallback={null}>
+              <UpgradeSection S={S} update={update} active isOwner={isOwner} userId={userId} hydrated={hydrated} only="lifts" />
+            </Suspense>
+            </WidgetBoundary>
+          </motion.div>
+        )}
         {/* Friends — mobile-only route. Desktop puts FriendsRail in
             the hub right rail; mobile gives it a dedicated screen via
             MoreDrawer. Render on desktop too so deep-linking works,
@@ -1230,7 +1265,7 @@ function Board({ userId, userEmail, userCreatedAt = null, onSignOut, initialSett
       {!isConsole && <HubFooter visible={activeSection === 'hub'} onOpenLegal={setLegalPage} />}
       {LiftsMiniBar && isOwner && S.lifts && S.lifts.active && (
         <Suspense fallback={null}>
-          <LiftsMiniBar S={S} isMobile={isMobile} onOpen={() => navigate('upgrade')} />
+          <LiftsMiniBar S={S} isMobile={isMobile} onOpen={() => navigate(isConsole ? 'train' : 'upgrade')} />
         </Suspense>
       )}
       <CoinToast message={coinToast.message} type={coinToast.type}
@@ -1241,6 +1276,7 @@ function Board({ userId, userEmail, userCreatedAt = null, onSignOut, initialSett
         navigate={navigate}
         openModal={handleOpenModal}
         S={S}
+        sections={isConsole}
       />
       <ShortcutsModal open={shortcutsOpen} onClose={() => setShortcutsOpen(false)} />
       <CookieBanner onOpenLegal={setLegalPage} />

@@ -25,6 +25,10 @@
  * except for a Security deep link (/?upgrade=security&ticket=<id>, what
  * a phone alert opens), which lands on that ticket.
  *
+ * `only="lifts"` renders the gym tracker alone, with no menu and no back
+ * bar: the 'train' route, which the console's navigation shows as
+ * Health › Train.
+ *
  * Gating: entry points only render for the owner and this re-checks
  * isOwner, so a deep link shows nothing for anyone else. Owner identity
  * is a UI gate (useIsOwner → is_app_owner()) — everything here is personal
@@ -45,7 +49,7 @@ import { parseSecurityLink, stripSecurityParams } from '../../lib/security/deepL
 import { peekLiftsResume, onLiftsResume } from '../../lib/lifts/liveBus';
 import './Upgrade.css';
 
-export default function UpgradeSection({ S, update, active, isOwner, userId, hydrated = true }) {
+export default function UpgradeSection({ S, update, active, isOwner, userId, hydrated = true, only = null }) {
   const isMobile = useIsMobile();
   const [tab, setTab] = useState(null);           // null = the home menu
   const [origin, setOrigin] = useState('50% 30%');
@@ -91,10 +95,10 @@ export default function UpgradeSection({ S, update, active, isOwner, userId, hyd
   tabRef.current = tab;
   useEffect(() => {
     if (!isOwner) return undefined;
-    const go = () => { if (peekLiftsResume() && tabRef.current !== 'lifts') open('lifts'); };
+    const go = () => { if (!only && peekLiftsResume() && tabRef.current !== 'lifts') open('lifts'); };
     go();
     return onLiftsResume(go);
-  }, [isOwner, open]);
+  }, [isOwner, open, only]);
   const back = useCallback(() => {
     if (pushed.current) window.history.back();   // popstate closes it
     else setTab(null);
@@ -104,6 +108,16 @@ export default function UpgradeSection({ S, update, active, isOwner, userId, hyd
     return (
       <section id="upgrade" className={`section${active ? ' active' : ''}`}>
         <div className="settings-empty">This page isn&apos;t available.</div>
+      </section>
+    );
+  }
+
+  // only="lifts": the gym tracker as a page of its own (the 'train' route — Health › Train in the
+  // console's sections). No menu and no back bar: the page's own navigation says where it is.
+  if (only === 'lifts') {
+    return (
+      <section id="upgrade" ref={root} className={`section upg-app is-open is-only${active ? ' active' : ''}`}>
+        <div className="uh-open"><LiftsTab S={S} update={update} hydrated={hydrated} bare /></div>
       </section>
     );
   }

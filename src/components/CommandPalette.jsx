@@ -35,7 +35,7 @@ function Cmd({ label, hint, onSelect }) {
   );
 }
 
-export default function CommandPalette({ open, onClose, navigate, openModal, S }) {
+export default function CommandPalette({ open, onClose, navigate, openModal, S, sections = false }) {
   const [search, setSearch] = useState('');
 
   // Reset search on open
@@ -106,10 +106,29 @@ export default function CommandPalette({ open, onClose, navigate, openModal, S }
 
                 <Command.Group heading="Navigate" style={{ '--cmdk-group-heading-color': 'rgba(255,255,255,.35)', '--cmdk-group-heading-font-size': '10px', '--cmdk-group-heading-letter-spacing': '1px', '--cmdk-group-heading-padding': '6px 14px 4px', fontFamily: 'var(--mono)' }}>
                   <Cmd label="Go to Hub" hint={['1']} onSelect={() => go(() => navigate('hub'))} />
-                  <Cmd label="Go to Achievements" hint={['2']} onSelect={() => go(() => navigate('achievements'))} />
-                  <Cmd label="Go to Track" hint={['3']} onSelect={() => go(() => navigate('track'))} />
-                  <Cmd label="Go to Shopping" hint={['4']} onSelect={() => go(() => navigate('shop'))} />
-                  <Cmd label="Go to Holiday" hint={['5']} onSelect={() => go(() => navigate('holiday'))} />
+                  {sections ? (
+                    /* The console's three sections (design/console/shell/nav.js): every tab by the name it has there. */
+                    <>
+                      <Cmd label="Go to Calendar" hint={['3']} onSelect={() => go(() => navigate('track'))} />
+                      <Cmd label="Go to Goals" hint={['2']} onSelect={() => go(() => navigate('achievements'))} />
+                      <Cmd label="Go to Money" onSelect={() => go(() => navigate('achievements', 'savings'))} />
+                      <Cmd label="Go to Rewards" hint={['4']} onSelect={() => go(() => navigate('shop'))} />
+                      <Cmd label="Go to Food" onSelect={() => go(() => navigate('diet'))} />
+                      <Cmd label="Go to Vitals" onSelect={() => go(() => navigate('vitals'))} />
+                      <Cmd label="Go to Habits" onSelect={() => go(() => navigate('habits'))} />
+                      <Cmd label="Go to League" onSelect={() => go(() => navigate('leaderboard'))} />
+                      <Cmd label="Go to Friends" onSelect={() => go(() => navigate('friends'))} />
+                      <Cmd label="Go to Messages" onSelect={() => go(() => navigate('friends', 'messages'))} />
+                      <Cmd label="Go to Settings" onSelect={() => go(() => navigate('settings'))} />
+                    </>
+                  ) : (
+                    <>
+                      <Cmd label="Go to Achievements" hint={['2']} onSelect={() => go(() => navigate('achievements'))} />
+                      <Cmd label="Go to Track" hint={['3']} onSelect={() => go(() => navigate('track'))} />
+                      <Cmd label="Go to Shopping" hint={['4']} onSelect={() => go(() => navigate('shop'))} />
+                      <Cmd label="Go to Holiday" hint={['5']} onSelect={() => go(() => navigate('holiday'))} />
+                    </>
+                  )}
                 </Command.Group>
 
                 <Command.Group heading="Actions" style={{ '--cmdk-group-heading-color': 'rgba(255,255,255,.35)', '--cmdk-group-heading-font-size': '10px', '--cmdk-group-heading-letter-spacing': '1px', '--cmdk-group-heading-padding': '6px 14px 4px', fontFamily: 'var(--mono)' }}>

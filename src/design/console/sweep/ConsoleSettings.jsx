@@ -176,7 +176,7 @@ function Appearance({ S, update, userId, hasPro }) {
 }
 
 export default function ConsoleSettings({
-  S, update, userId, userEmail, isOwner, navigate, onSignOut, onOpenLegal, onOpenPalette, onOpenShortcuts,
+  S, update, userId, userEmail, isOwner, isMobile, navigate, onSignOut, onOpenLegal, onOpenPalette, onOpenShortcuts, onOpenPaywall,
   requestedSettingsTab,
 }) {
   // Tools → Honours opens the console trophy case, not the classic list.
@@ -205,6 +205,18 @@ export default function ConsoleSettings({
 
   return (
     <section className="section active cx-page cx-sweep-page cx-sweep-settings">
+      {/* The phone's More sheet held this row until the sections replaced it (Nov 2026). */}
+      {isMobile && !hasPro && onOpenPaywall && (
+        <button type="button" className="cx-shell-mi cx-shell-pro cx-sweep-gopro" onClick={() => onOpenPaywall('generic')} data-testid="cx-settings-pro">
+          <Icon name="sparkles" size={18} strokeWidth={1.75} />
+          <span className="cx-shell-mi-text">
+            <span className="cx-shell-mi-label">Go Pro</span>
+            {/* No price here: prices come from the store (App Store 3.1.2), and the paywall shows them. */}
+            <span className="cx-shell-mi-desc">Higher limits, more widgets, accent colours</span>
+          </span>
+          <Icon name="chevron-right" size={16} strokeWidth={1.75} />
+        </button>
+      )}
       <Segmented label="Settings" options={TABS} value={tab} onChange={choose} className="cx-sweep-tabs is-scroll" />
       {tab === 'appearance' ? (
         <Appearance S={S} update={update} userId={userId} hasPro={hasPro} />

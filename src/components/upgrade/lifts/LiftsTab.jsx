@@ -34,6 +34,8 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import LiftDetail from './LiftDetail';
 import LogSheet from './LogSheet';
 import ManageSheet from './ManageSheet';
+import Icon from '../../Icon';
+import TopBarActions from '../../../design/console/shell/TopBarActions';
 import WorkoutToday from './WorkoutToday';
 import WeekMuscles from './WeekMuscles';
 import BodyMap from './BodyMap';
@@ -71,7 +73,7 @@ import './home.css';
 const HOME_PAGES = [{ id: 'today', label: 'Today' }, { id: 'lifts', label: 'Lifts' }, { id: 'history', label: 'History' }];
 const HOME_TABS = HOME_PAGES.map(p => ({ value: p.id, label: p.label }));
 
-export default function LiftsTab({ S, update, hydrated = true }) {
+export default function LiftsTab({ S, update, hydrated = true, bare = false }) {
   const calendarToday = todayIso();
   const today = trainingDayOf(S, new Date());
   const nightOf = today !== calendarToday ? today : null;
@@ -297,9 +299,21 @@ export default function LiftsTab({ S, update, hydrated = true }) {
         const page = homePage === 0 ? today_ : homePage === 1 ? liftList : history;
         return (
           <>
-            <div className="lh-frame">
-              <Button variant="quiet" icon="settings" className="lh-frame-manage" onClick={() => setSheet({ kind: 'manage' })} data-testid="lh-manage">Manage</Button>
-            </div>
+            {bare ? (
+              /* Train as a page of its own: no "‹ Upgrade" bar to sit in, so Manage goes in the
+                 app's bar (a phone or tablet; a desktop has "Manage lifts" beside the views). */
+              paged && (
+                <TopBarActions placement="end">
+                  <button type="button" className="cx-shell-chip" onClick={() => setSheet({ kind: 'manage' })} aria-label="Manage lifts" title="Manage lifts" data-testid="lh-manage">
+                    <Icon name="settings" size={16} strokeWidth={1.75} />
+                  </button>
+                </TopBarActions>
+              )
+            ) : (
+              <div className="lh-frame">
+                <Button variant="quiet" icon="settings" className="lh-frame-manage" onClick={() => setSheet({ kind: 'manage' })} data-testid="lh-manage">Manage</Button>
+              </div>
+            )}
             {!paged && (
               <div className="lh-tabsrow">
                 <Segmented label="Lifts views" options={HOME_TABS} value={HOME_PAGES[homePage].id} testId="lh-tabs"

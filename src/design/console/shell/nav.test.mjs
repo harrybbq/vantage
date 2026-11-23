@@ -3,73 +3,102 @@
  */
 import assert from 'node:assert/strict';
 import {
-  CONSOLE_SHOW_HOLIDAY, sidebarItems, TABS, tabItems, moreItems, activeTab, canonicalSection, navSection,
+  GROUPS, DEFAULT_SUB, sidebarItems, tabItems, navGroups, groupTabs, groupTarget, placeOf, activeTab, canonicalSection, navSection,
   sectionTitle, longDate, shortDate, greeting, initials, paletteHint,
 } from './nav.js';
+import { AREA_NAV, ALWAYS_NAV } from '../../../lib/onboarding/areas.js';
 
 let n = 0;
 const t = (name, fn) => { try { fn(); n++; } catch (e) { console.error(`✗ ${name}`); throw e; } };
 const ids = list => list.map(i => i.id);
 
-t('the holiday route reads as Track while Holiday has no entry', () => {
-  assert.equal(navSection('holiday'), 'track');
-  assert.equal(sectionTitle('holiday'), 'Track');
-  assert.equal(navSection('holiday', { showHoliday: true }), 'holiday');
-  assert.equal(sectionTitle('holiday', { showHoliday: true }), 'Holiday');
+t('three sections, in the decided order, with the decided tabs', () => {
+  assert.deepEqual(ids(GROUPS), ['track', 'health', 'social']);
+  assert.deepEqual(GROUPS.map(g => g.tabs.map(x => x.label).join(' · ')), [
+    'Calendar · Goals · Money · Rewards',
+    'Train · Food · Vitals · Habits',
+    'League · Friends · Messages',
+  ]);
+  const tabIds = GROUPS.flatMap(g => ids(g.tabs));
+  assert.equal(new Set(tabIds).size, tabIds.length, 'a tab id is used twice');
+  for (const g of GROUPS) for (const x of [g, ...g.tabs]) assert.match(x.label, /^[A-Z][a-z]+$/, `${x.label} is one sentence-case word`);
+});
+
+t('sidebar: Hub, the three sections, Upgrade only for the owner; Settings is behind the avatar', () => {
+  assert.deepEqual(ids(sidebarItems()), ['hub', 'track', 'health', 'social']);
+  assert.deepEqual(ids(sidebarItems({ isOwner: true })), ['hub', 'track', 'health', 'social', 'upgrade']);
+  assert.ok(!ids(sidebarItems({ isOwner: true })).includes('settings'));
+});
+
+t('phone bar: Hub · Track · Health · Social, and no More', () => {
+  assert.deepEqual(tabItems().map(x => x.label), ['Hub', 'Track', 'Health', 'Social']);
+  assert.deepEqual(tabItems({ isOwner: true }).map(x => x.label), ['Hub', 'Track', 'Health', 'Social']);
+  assert.ok(!ids(tabItems()).includes('more'));
+});
+
+t('Train is the owner\'s for now: Health starts at Food for anyone else', () => {
+  const health = GROUPS.find(g => g.id === 'health');
+  assert.deepEqual(ids(groupTabs(health)), ['food', 'vitals', 'habits']);
+  assert.deepEqual(ids(groupTabs(health, { isOwner: true })), ['train', 'food', 'vitals', 'habits']);
+  assert.equal(groupTarget({ tabs: groupTabs(health) }).id, 'food');
+  assert.equal(groupTarget({ tabs: groupTabs(health, { isOwner: true }) }).id, 'train');
+});
+
+t('every old route lands in a section and lights the right tab', () => {
+  const at = (s, sub) => { const p = placeOf(s, sub); return p ? `${p.group.id}/${p.tab.id}` : null; };
+  assert.equal(at('track'), 'track/calendar');
+  assert.equal(at('track', 'calendar'), 'track/calendar');
+  assert.equal(at('track', 'trackers'), 'track/calendar', "classic's Trackers tab is the calendar");
+  assert.equal(at('holiday'), 'track/calendar', 'trips live on the calendar');
+  assert.equal(at('holiday', 'diet'), 'track/calendar');
+  assert.equal(at('achievements'), 'track/goals');
+  assert.equal(at('achievements', 'savings'), 'track/money');
+  assert.equal(at('shop'), 'track/rewards');
+  assert.equal(at('train'), 'health/train');
+  assert.equal(at('track', 'diet'), 'health/food');
+  assert.equal(at('track', 'vitals'), 'health/vitals');
+  assert.equal(at('habits'), 'health/habits');
+  assert.equal(at('leaderboard'), 'social/league');
+  assert.equal(at('friends'), 'social/friends');
+  assert.equal(at('friends', 'messages'), 'social/messages');
+  for (const s of ['hub', 'settings', 'upgrade', 'schedule', 'nonsense', undefined]) assert.equal(at(s), null, String(s));
+  assert.deepEqual(DEFAULT_SUB, { track: 'calendar', achievements: 'goals', friends: 'friends' });
+});
+
+t('every tab is a place that resolves back to itself', () => {
+  for (const g of GROUPS) for (const tab of g.tabs) {
+    const p = placeOf(tab.section, tab.sub);
+    assert.equal(p && p.tab.id, tab.id, tab.id);
+    assert.equal(p.group.id, g.id);
+    assert.equal(navSection(tab.section, tab.sub), g.id);
+    assert.equal(sectionTitle(tab.section, tab.sub), g.label);
+  }
+});
+
+t('a group opens on its last tab while that tab is still shown, else its first', () => {
+  const track = navGroups().find(g => g.id === 'track');
+  assert.equal(groupTarget(track).id, 'calendar');
+  assert.equal(groupTarget(track, 'money').id, 'money');
+  assert.equal(groupTarget(track, 'habits').id, 'calendar', 'a tab from another group');
+  const scoped = navGroups({ scope: new Set(['hub', 'track']) }).find(g => g.id === 'track');
+  assert.equal(groupTarget(scoped, 'money').id, 'calendar', 'a tab the scope hides');
+});
+
+t('active tab and titles', () => {
+  assert.equal(activeTab('hub'), 'hub');
+  assert.equal(activeTab('shop'), 'track');
+  assert.equal(activeTab('track', 'diet'), 'health');
+  assert.equal(activeTab('holiday'), 'track');
+  assert.equal(activeTab('friends', 'messages'), 'social');
+  assert.equal(activeTab('settings'), null);
+  assert.equal(activeTab('schedule'), null);
+  assert.equal(activeTab('leaderboard', null, { tabs: tabItems({ scope: new Set(['hub', 'track']) }) }), null, 'Social is not shown');
+  assert.equal(canonicalSection('schedule'), 'upgrade');
   assert.equal(navSection('schedule'), 'upgrade');
   assert.equal(sectionTitle('settings'), 'Settings');
-});
-
-t('Holiday is merged into Track: no entry of its own, but it can come back', () => {
-  assert.equal(CONSOLE_SHOW_HOLIDAY, false, 'trips live in Track › Calendar');
-  assert.ok(!ids(sidebarItems()).includes('holiday'));
-  assert.ok(!ids(moreItems()).includes('holiday'));
-  assert.ok(ids(sidebarItems({ showHoliday: true })).includes('holiday'));
-  assert.ok(ids(moreItems({ showHoliday: true })).includes('holiday'));
-  assert.ok(!ids(sidebarItems({ showHoliday: false })).includes('holiday'));
-  assert.ok(!ids(moreItems({ showHoliday: false })).includes('holiday'));
-});
-
-t('sidebar order, sentence case, Upgrade only for the owner and above Settings', () => {
-  assert.deepEqual(ids(sidebarItems({ showHoliday: false })),
-    ['hub', 'achievements', 'track', 'shop', 'habits', 'leaderboard', 'settings']);
-  const owner = ids(sidebarItems({ isOwner: true, showHoliday: false }));
-  assert.deepEqual(owner.slice(-2), ['upgrade', 'settings']);
-  for (const i of sidebarItems({ isOwner: true })) {
-    assert.match(i.label, /^[A-Z][a-z ]+$/, `${i.label} is sentence case`);
-  }
-  assert.equal(sidebarItems().find(i => i.id === 'track').icon, 'calendar-days');
-});
-
-t('phone bar: Hub · Track · Habits · Shop, then More', () => {
-  assert.deepEqual(TABS.map(x => x.label), ['Hub', 'Track', 'Habits', 'Shop']);
-  assert.ok(!ids(TABS).includes('holiday'));
-});
-
-t('every section is reachable on the phone (a tab or a More row)', () => {
-  const routed = ['hub', 'achievements', 'track', 'shop', 'holiday', 'habits', 'leaderboard', 'settings', 'friends'];
-  const reach = new Set([...ids(TABS), ...ids(moreItems())]);
-  // Holiday is reached through Track (Calendar › Year), which its route lights.
-  for (const r of routed) assert.ok(reach.has(r) || (r === 'holiday' && activeTab(r) === 'track'), r);
-  assert.ok(ids(moreItems({ isOwner: true })).includes('upgrade'));
-  assert.ok(!ids(moreItems()).includes('upgrade'));
-});
-
-t('active tab', () => {
-  assert.equal(activeTab('hub'), 'hub');
-  assert.equal(activeTab('shop'), 'shop');
-  assert.equal(activeTab('holiday'), 'track');
-  assert.equal(activeTab('settings'), 'more');
-  assert.equal(activeTab('schedule'), 'more');
-  assert.equal(activeTab('hub', { moreOpen: true }), 'more');
-  assert.equal(canonicalSection('schedule'), 'upgrade');
-});
-
-t('titles never empty', () => {
-  for (const s of ['hub', 'track', 'shop', 'friends', 'upgrade', 'schedule', 'nonsense', undefined]) {
-    assert.ok(sectionTitle(s).length > 0, String(s));
-  }
-  assert.equal(sectionTitle('shop'), 'Shopping');
+  assert.equal(sectionTitle('shop'), 'Track');
+  assert.equal(sectionTitle('train'), 'Health');
+  for (const s of ['hub', 'track', 'shop', 'friends', 'upgrade', 'schedule', 'nonsense', undefined]) assert.ok(sectionTitle(s).length > 0, String(s));
 });
 
 t('dates and greeting (no clock, no emoji)', () => {
@@ -95,42 +124,41 @@ t('initials and palette hint', () => {
 
 // ── Scoped navigation (lib/onboarding/areas.js), Nov 2026 ──
 
-t('no scope: every list is exactly what it was', () => {
-  assert.deepEqual(ids(sidebarItems({ scope: null })), ids(sidebarItems()));
-  assert.equal(tabItems(), TABS);
-  assert.equal(tabItems({ scope: null }), TABS);
-  assert.deepEqual(ids(moreItems({ scope: null })), ids(moreItems()));
+t('no scope: everything, exactly as with no argument', () => {
+  assert.deepEqual(navGroups({ scope: null }), navGroups());
+  assert.deepEqual(ids(tabItems({ scope: null })), ids(tabItems()));
 });
 
-t('scoped: Fitness + Friends shows Hub, Track, Leaderboard, Settings', () => {
-  const scope = new Set(['hub', 'track', 'settings', 'upgrade', 'leaderboard', 'friends']);
-  assert.deepEqual(ids(sidebarItems({ scope })), ['hub', 'track', 'leaderboard', 'settings']);
-  assert.deepEqual(tabItems({ scope }).map(x => x.label), ['Hub', 'Track', 'League', 'Friends']);
-  assert.deepEqual(ids(moreItems({ scope })), ['settings']);
-  assert.equal(activeTab('leaderboard', { tabs: tabItems({ scope }) }), 'leaderboard');
-  assert.equal(activeTab('habits', { tabs: tabItems({ scope }) }), 'more');
+t('every area a tab is scoped by is one the onboarding can turn on', () => {
+  const known = new Set([...ALWAYS_NAV, ...Object.values(AREA_NAV).flat()]);
+  for (const g of GROUPS) for (const tab of g.tabs) if (tab.area) assert.ok(known.has(tab.area), `${tab.id} scopes by ${tab.area}`);
 });
 
-t('scoped: fewer areas, fewer tabs; the owner keeps Upgrade', () => {
-  const bare = new Set(['hub', 'track', 'settings', 'upgrade']);
-  assert.deepEqual(ids(tabItems({ scope: bare })), ['hub', 'track']);
-  assert.deepEqual(ids(sidebarItems({ scope: bare })), ['hub', 'track', 'settings']);
-  assert.deepEqual(ids(sidebarItems({ scope: bare, isOwner: true })), ['hub', 'track', 'upgrade', 'settings']);
-  assert.deepEqual(ids(moreItems({ scope: bare, isOwner: true })), ['settings', 'upgrade']);
+t('scoped: Fitness alone is Hub, Track (the calendar) and Health (Food, Vitals)', () => {
+  const scope = new Set(['hub', 'track', 'settings', 'upgrade']);
+  assert.deepEqual(ids(tabItems({ scope })), ['hub', 'track', 'health']);
+  const g = Object.fromEntries(navGroups({ scope }).map(x => [x.id, ids(x.tabs)]));
+  assert.deepEqual(g, { track: ['calendar'], health: ['food', 'vitals'] });
 });
 
-t('scoped: every shown destination is on a tab or in More, whatever the scope', () => {
+t('scoped: Fitness + Friends adds Social; Money adds Goals and Money', () => {
+  const friends = new Set(['hub', 'track', 'settings', 'upgrade', 'leaderboard', 'friends']);
+  assert.deepEqual(ids(tabItems({ scope: friends })), ['hub', 'track', 'health', 'social']);
+  assert.deepEqual(ids(navGroups({ scope: friends }).find(x => x.id === 'social').tabs), ['league', 'friends', 'messages']);
+  const money = new Set(['hub', 'track', 'settings', 'upgrade', 'achievements']);
+  assert.deepEqual(ids(navGroups({ scope: money }).find(x => x.id === 'track').tabs), ['calendar', 'goals', 'money']);
+  assert.ok(!ids(tabItems({ scope: money })).includes('social'));
+});
+
+t('scoped: whatever the scope, the bar is 3 or 4 tabs and every shown route has a tab', () => {
   const opt = ['achievements', 'shop', 'habits', 'leaderboard', 'friends'];
   for (let m = 0; m < 1 << opt.length; m++) {
     const scope = new Set(['hub', 'track', 'settings', 'upgrade', ...opt.filter((_, i) => m & (1 << i))]);
     const tabs = tabItems({ scope });
-    assert.ok(tabs.length >= 2 && tabs.length <= 4);
-    const reach = new Set([...ids(tabs), ...ids(moreItems({ scope }))]);
-    for (const id of scope) if (id !== 'upgrade') assert.ok(reach.has(id), `${id} unreachable in ${[...scope]}`);
-    for (const id of reach) assert.ok(scope.has(id), `${id} shown but not in scope`);
-    assert.equal(new Set(ids(tabs)).size + ids(moreItems({ scope })).length, reach.size, 'a destination is listed twice');
-    // Friends has no sidebar entry of its own (it is reached from Leaderboard and the top bar).
-    for (const id of ids(sidebarItems({ scope }))) assert.ok(scope.has(id));
+    assert.ok(tabs.length >= 3 && tabs.length <= 4);
+    const shown = navGroups({ scope }).flatMap(g => g.tabs);
+    for (const id of opt) assert.equal(shown.some(x => x.area === id), scope.has(id), `${id} in ${[...scope]}`);
+    for (const x of shown) assert.equal(activeTab(x.section, x.sub, { tabs }), placeOf(x.section, x.sub).group.id);
   }
 });
 
