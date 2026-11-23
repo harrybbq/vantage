@@ -1,7 +1,7 @@
 /**
  * Finish (brief §3.7) — what Finish WOULD save, before anything is written.
  *
- *   eyebrow  // PUSH · DXC · ☾ NIGHT 80 %
+ *   eyebrow  Push · DXC · ☾ Night 80 % (the label style upper-cases it in classic)
  *   tiles    DURATION · VOLUME · SETS 17/19 · EXERCISES — 2×2 (value 28
  *            mono, label 12 mono; the 560 px dialog is too narrow for 4×1)
  *   ◆ N NEW BESTS · REAL SETS, one row each: "◆ Machine shoulder press ·
@@ -84,7 +84,7 @@ export default function FinishSheet({
   const nothing = summary.setsDone === 0;
   const night = s.shift === 'night';
   const planned = summary.setsPlanned || summary.setsDone + summary.setsOpen;
-  const eyebrow = ['//', String(s.name || 'Workout').toUpperCase(), gymLabel ? `· ${gymLabel}` : '', night ? '· ☾ NIGHT 80 %' : ''].filter(Boolean).join(' ');
+  const eyebrow = [String(s.name || 'Workout'), gymLabel ? `· ${gymLabel}` : '', night ? '· ☾ Night 80 %' : ''].filter(Boolean).join(' ');
   const title = saved ? 'Workout saved' : nothing ? 'Nothing ticked yet' : 'Finish workout';
   const tpl = summary.template;
 

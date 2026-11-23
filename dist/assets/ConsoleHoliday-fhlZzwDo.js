@@ -1,0 +1,1 @@
+import{j as r}from"./index-h8hUZjmF.js";import i from"./ConsoleTrack-B9dYU-3a.js";import"./ui-BfiRssLS.js";import"./useKeyboardInset-DqMZbVu4.js";import"./eventMemory-DWqxNNAP.js";import"./foodSearch-CNbh4keh.js";import"./VisitedTab-DLjsl8z0.js";import"./payday-DVYY0epb.js";function f(o){return r.jsx(i,{...o,initialView:"year"})}export{f as default};
