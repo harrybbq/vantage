@@ -61,6 +61,30 @@ under "Onboarding". If it should, update the onboarding in the same PR.
 - Copy follows the house voice: plain, short, no claims the code doesn't
   back (check that a "counts toward your rating" line is true first).
 
+## Direction: fewer tabs, one clear purpose (owner, restated 2026-11-23)
+The owner's standing goal for the product, above any single feature:
+**shrink the number of tabs and give the app a clearer purpose.** Today it
+reads as "a bit of this and a bit of that". Weigh every piece of work
+against it.
+- **No new top-level destination.** A new feature goes inside an existing
+  section, or it replaces one. If it seems to need its own tab, stop and
+  ask where it folds first.
+- **When touching a section, ask whether it should still be a section.**
+  Polishing a tab is not progress on this goal; removing or merging one
+  is. (The Nov 2026 Habits rework made Habits better and left the tab
+  count where it was. Say so plainly when that is the trade.)
+- **Done so far:** Holiday folded into Track (its route remains for deep
+  links); new accounts only see the areas they picked (below).
+- **Where the count stands** (new design): desktop Hub, Achievements,
+  Track, Shopping, Habits, Leaderboard, Settings (+ Upgrade for the
+  owner); phone tabs Hub, Track, Habits, Shop, with Achievements,
+  Friends, Leaderboard and Settings under More.
+- **The purpose is not settled.** The candidate on the table is the OVR
+  rating as the spine: one number for your life, in a league with your
+  friends, and every section is either the number, what moves it, what
+  you are aiming at, or who you are up against. Nothing is decided until
+  the owner picks; do not restructure the navigation on an assumption.
+
 ## The smaller app (decided 2026-11-12)
 Accounts created from `SMALLER_APP_FROM` (`lib/account/cohort.js`) get
 two things; every earlier account is left exactly as it was.
