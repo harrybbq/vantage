@@ -36,6 +36,9 @@
  *   Summary   the tiles, bests, night comparison and estimate; after
  *             saving, the tracker line and Save as template — Save lands
  *             here.
+ * Once saved, the first page becomes the saved moment (workout/
+ * SavedMoment.jsx): the body filling in, the numbers counting up, the
+ * bests and the week, all in the session's colour.
  * The unticked-sets warning sits above the pages, so it shows on all
  * three; the actions stay in the footer. Nothing ticked → no body map,
  * so no pages: the summary alone.
@@ -49,18 +52,21 @@
  */
 import { useEffect, useState } from 'react';
 import Icon from '../../Icon';
-import { Sheet, Button, PbMark, NightMark, Pager, SwipePage } from './ui';
+import { Sheet, Button, PbMark, NightMark, Pager, SwipePage, useScope } from './ui';
 import { clock, volumeText } from '../../../lib/lifts/workout';
 import { realSetText, roundEstimate } from '../../../lib/lifts/ui';
 import { perGymOf, fmtKg } from '../../../lib/lifts/lifts';
 import BodyMap from './BodyMap';
+import SavedMoment from './workout/SavedMoment';
+import { sessionVars } from '../../../lib/lifts/sessionColour';
 
 const PAGES = [{ id: 'body', label: 'Body' }, { id: 'muscles', label: 'Muscles' }, { id: 'summary', label: 'Summary' }];
 
 export default function FinishSheet({
   summary, saved, onSave, onKeepGoing, onDiscard, onSaveTemplate, onClose, templateSaved, gymLabel = null,
-  trackers = [], linked = [], dayLog = {}, onLinkTracker = null, lifts = [], S = null, today = null,
+  trackers = [], linked = [], dayLog = {}, onLinkTracker = null, lifts = [], S = null, today = null, week = null, gym, gymName = id => id,
 }) {
+  const { theme } = useScope();
   const [name, setName] = useState(summary ? summary.session.name : '');
   // The likeliest "gym" tracker first; the owner can pick any other.
   const [linkId, setLinkId] = useState(() => {
@@ -77,15 +83,20 @@ export default function FinishSheet({
     setDir(i > page ? 1 : -1);
     setPage(i);
   };
-  // Saving lands on Summary, where the template and tracker lines are.
-  useEffect(() => { if (saved) go(PAGES.length - 1); }, [saved]); // eslint-disable-line react-hooks/exhaustive-deps
+  // Saving lands on the first page, which becomes the saved moment; Summary keeps the template and tracker lines.
+  useEffect(() => { if (saved) { setDir(-1); setPage(0); } }, [saved]);
   if (!summary) return null;
   const s = summary.session;
   const nothing = summary.setsDone === 0;
   const night = s.shift === 'night';
   const planned = summary.setsPlanned || summary.setsDone + summary.setsOpen;
   const eyebrow = [String(s.name || 'Workout'), gymLabel ? `· ${gymLabel}` : '', night ? '· ☾ Night 80 %' : ''].filter(Boolean).join(' ');
-  const title = saved ? 'Workout saved' : nothing ? 'Nothing ticked yet' : 'Finish workout';
+  const title = saved ? (
+    <span className="lw-saved-title">
+      <svg className="lw-saved-tick" viewBox="0 0 22 22" aria-hidden="true"><circle cx="11" cy="11" r="11" /><path d="M6.5 11.5l3 3 6-6.5" /></svg>
+      Workout saved
+    </span>
+  ) : nothing ? 'Nothing ticked yet' : 'Finish workout';
   const tpl = summary.template;
 
   const footer = saved ? (
@@ -192,7 +203,7 @@ export default function FinishSheet({
   );
 
   return (
-    <Sheet title={title} eyebrow={eyebrow} onClose={saved ? onClose : onKeepGoing} footer={footer} testId="lw-finish" className="lw-finish" width={560}>
+    <Sheet title={title} eyebrow={eyebrow} onClose={saved ? onClose : onKeepGoing} footer={footer} testId="lw-finish" className="lw-finish" width={560} style={sessionVars(s, theme)}>
       <div className="lw-fin" data-testid="lw-summary">
         {!nothing && <Pager pages={PAGES} page={page} go={go} label="Finish pages" />}
         {!saved && summary.setsOpen > 0 && !nothing && (
@@ -200,7 +211,9 @@ export default function FinishSheet({
         )}
         {nothing ? summaryPage : (
           <SwipePage pages={PAGES} page={page} dir={dir} go={go}>
-            {page < 2
+            {saved && page === 0
+              ? <SavedMoment summary={summary} lifts={lifts} S={S} today={today} gym={gym} gymName={gymName} gymLabel={gymLabel} week={week} onMore={() => go(2)} />
+              : page < 2
               ? <BodyMap session={s} list={lifts} S={S} today={today} view={page === 0 ? 'figure' : 'rows'}
                          tab={mapTab} onTab={setMapTab} all={mapAll} onAll={setMapAll} />
               : summaryPage}

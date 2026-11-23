@@ -10,12 +10,17 @@
  *           day); the preview says how many days and workouts it found
  *           before anything is written. Additive only.
  *
+ * A day that holds one of the five sessions is drawn in that session's
+ * colour (sessionColour.js), with a key under the grid; any other day
+ * keeps the accent. Darker still means more workouts.
+ *
  * The grid is one SVG so 53 columns fit a 390 px phone without scrolling
  * (cells scale with the card); each cell carries a <title> for hover, and
  * the SVG an aria-label with the year's totals.
  */
 import { useMemo, useState } from 'react';
-import { Sheet, Button } from './ui';
+import { Sheet, Button, useScope } from './ui';
+import { SESSION_COLOURS, sessionKeyOf, sessionVars } from '../../../lib/lifts/sessionColour';
 import { workoutDays, yearGrid, historyYears, parsePastDays, mergePastDays, pastDayCount, liftedTotals, liftedText } from '../../../lib/lifts/history';
 
 const CELL = 10, GAP = 3, PITCH = CELL + GAP;
@@ -28,7 +33,7 @@ const longDate = iso => {
 const plural = (n, one, many = `${one}s`) => `${n.toLocaleString('en-GB')} ${n === 1 ? one : many}`;
 
 // Labels are HTML so they stay readable while the cells scale with the card.
-function YearGrid({ g, today }) {
+function YearGrid({ g, today, tint = null }) {
   const n = g.cols.length;
   const w = n * PITCH - GAP;
   const h = 7 * PITCH - GAP;
@@ -42,8 +47,8 @@ function YearGrid({ g, today }) {
         <svg className="lh-hm-svg" viewBox={`0 0 ${w} ${h}`} role="img" data-testid="lh-hm"
              aria-label={`${g.year}: ${plural(g.total, 'workout')} on ${plural(g.days, 'day')}`}>
           {g.cols.map((col, c) => col.map((cell, r) => cell && (
-            <rect key={cell.iso} x={c * PITCH} y={r * PITCH} width={CELL} height={CELL} rx={2}
-                  className={`lh-hm-c is-${cell.future ? 'future' : cell.shade}${cell.iso === today ? ' is-today' : ''}`}>
+            <rect key={cell.iso} x={c * PITCH} y={r * PITCH} width={CELL} height={CELL} rx={2} style={(tint && cell.n && tint(cell.iso)) || undefined}
+                  className={`lh-hm-c is-${cell.future ? 'future' : cell.shade}${cell.iso === today ? ' is-today' : ''}${tint && cell.n && tint(cell.iso) ? ' is-sess' : ''}`}>
               <title>{`${longDate(cell.iso)}: ${cell.n ? plural(cell.n, 'workout') : 'no workout'}`}</title>
             </rect>
           )))}
@@ -61,7 +66,7 @@ function Legend() {
   );
 }
 
-function YearBlock({ g, today, head = 'h3' }) {
+function YearBlock({ g, today, head = 'h3', tint = null }) {
   const H = head;
   return (
     <section className="lh-hm-year" data-testid="lh-hm-year">
@@ -69,7 +74,7 @@ function YearBlock({ g, today, head = 'h3' }) {
         <H className="lh-hm-y lf-num">{g.year}</H>
         <span className="lh-hm-total">{plural(g.total, 'workout')}</span>
       </div>
-      <YearGrid g={g} today={today} />
+      <YearGrid g={g} today={today} tint={tint} />
     </section>
   );
 }
@@ -80,6 +85,16 @@ export default function HistoryCard({ S, update, today }) {
   const years = useMemo(() => historyYears(counts, today), [counts, today]);
   const grids = useMemo(() => years.map(y => yearGrid(y, counts, today)), [years, counts, today]);
   const [sheet, setSheet] = useState(null);   // 'all' | 'import'
+  // The session each day held (the first of the five found on it) → that day's colour.
+  const { theme } = useScope();
+  const { tint, keys } = useMemo(() => {
+    const byDay = new Map();
+    const list = S && S.lifts && Array.isArray(S.lifts.sessions) ? S.lifts.sessions : [];
+    for (const s of list) { const k = s && !byDay.has(s.date) ? sessionKeyOf(s) : null; if (k) byDay.set(s.date, k); }
+    const vars = Object.fromEntries(Object.keys(SESSION_COLOURS).map(k => [k, { '--lf-accent': sessionVars(k, theme)['--lf-accent'] }]));
+    const order = Object.keys(SESSION_COLOURS).filter(k => [...byDay.values()].includes(k));
+    return { tint: byDay.size ? iso => vars[byDay.get(iso)] : null, keys: order.map(k => ({ k, style: vars[k] })) };
+  }, [S, theme]);
   const imported = pastDayCount(S);
   const all = grids.reduce((a, g) => a + g.total, 0);
 
@@ -96,8 +111,15 @@ export default function HistoryCard({ S, update, today }) {
           <div><dt>This month</dt><dd className="lf-num">{liftedText(lifted.month)}</dd></div>
         </dl></div>
       )}
-      <YearBlock g={grids[0]} today={today} />
-      <Legend />
+      <YearBlock g={grids[0]} today={today} tint={tint} />
+      <div className="lh-hm-keys">
+        {keys.length > 0 && (
+          <p className="lh-hm-sess" data-testid="lh-hm-sess">
+            {keys.map(x => <span key={x.k} style={x.style}><i aria-hidden="true" />{x.k[0].toUpperCase() + x.k.slice(1)}</span>)}
+          </p>
+        )}
+        <Legend />
+      </div>
       <div className="lh-hist-acts">
         {grids.length > 1 && <Button variant="secondary" onClick={() => setSheet('all')} data-testid="lh-hist-all">All years</Button>}
         <Button variant="quiet" icon="plus" onClick={() => setSheet('import')} data-testid="lh-hist-import">Add past workouts</Button>
@@ -106,7 +128,7 @@ export default function HistoryCard({ S, update, today }) {
       {sheet === 'all' && (
         <Sheet title="Workout history" eyebrow={`${plural(all, 'workout')}`} onClose={() => setSheet(null)} testId="lh-hist-sheet" width={560} className="lh-hist-sheet">
           <div className="lh-hist-years">
-            {grids.map(g => <YearBlock key={g.year} g={g} today={today} />)}
+            {grids.map(g => <YearBlock key={g.year} g={g} today={today} tint={tint} />)}
             <Legend />
           </div>
         </Sheet>

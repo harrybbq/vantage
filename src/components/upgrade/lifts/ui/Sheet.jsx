@@ -36,13 +36,15 @@ const FOCUSABLE = 'a[href], button:not([disabled]), input:not([disabled]), selec
 
 export default function Sheet({
   title, eyebrow, onClose, children, footer = null, modal = true, width = 480, placement = 'auto', className = '', testId,
-  initialFocus = null, labelId, closeLabel = 'Close',
+  initialFocus = null, labelId, closeLabel = 'Close', style: styleOver = null,
 }) {
   const panel = useRef(null);
   const me = useRef({});
   const autoId = useId();
   const titleId = labelId || `lf-sheet-${autoId.replace(/[^a-zA-Z0-9_-]/g, '')}`;
-  const style = useScopeStyle();
+  const scopeStyle = useScopeStyle();
+  // styleOver: custom properties laid over the scope's — a session's colour (lib/lifts/sessionColour.js).
+  const style = styleOver ? { ...scopeStyle, ...styleOver } : scopeStyle;
   const { layout } = useInputMode();
   const side = modal && (placement === 'right' || (placement === 'auto' && layout === 'desktop')) ? 'right' : 'bottom';
   // A bottom sheet sits on the keyboard, not under it (iOS overlays it).

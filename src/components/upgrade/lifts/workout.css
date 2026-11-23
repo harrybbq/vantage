@@ -525,3 +525,102 @@ html[data-lifts-focus] .lifts .lw-head { top: env(safe-area-inset-top, 0px); }
 @media (prefers-reduced-motion: reduce) {
   .lifts .lw-cell.is-flash, .lifts .lw-ok.is-shake { animation: none !important; }
 }
+
+/* ── Moments (Nov 2026, the "Workout Moments" mockup) ─────────────────
+   Colour and motion at four points: a set ticked, an exercise finished,
+   a best, the save. Each plays once, over controls that already work.
+   The colour is the workout's own (lib/lifts/sessionColour.js lays a
+   session's colour over --lf-accent on the workout's root, the Today
+   card, the Finish sheet and each week-strip day), so nothing below
+   names a colour except gold, which stays a best.
+   Reduced motion: lifts-tokens.css zeroes every animation under .lifts;
+   the pseudo-element sweeps are switched off at the foot of this block. */
+
+/* Progress: a 3 px bar under the stats strip. */
+.lifts .lw-prog { height: 3px; margin: 0 calc(-1 * var(--lw-gutter)); background: var(--lf-s3); }
+.lifts .lw-live.is-desktop .lw-prog { margin: 0 -24px; }
+.lifts .lw-prog i { display: block; height: 100%; background: var(--lf-accent); transition: width 450ms var(--lf-ease); }
+
+/* A set ticked a moment ago: the tick springs. The row may draw outside itself for the gold burst. */
+.lifts .lw-rowwrap.is-just { overflow: visible; z-index: 2; }
+.lifts .lw-rowwrap.is-just .lw-del { visibility: hidden; }
+.lifts .lw-row.is-just .lw-ok.is-on { animation: lw-pop 380ms cubic-bezier(.2, .9, .3, 1.5); }
+@keyframes lw-pop { from { transform: scale(.7); } 60% { transform: scale(1.12); } to { transform: none; } }
+
+/* An exercise with every set ticked: its count becomes a Done chip and its muscles take the colour. */
+.lifts .lw-ex { position: relative; }
+.lifts .lw-ex-done { flex: none; display: inline-flex; align-items: center; gap: 4px; height: 24px; padding: 0 9px 0 7px; border-radius: 12px;
+  background: var(--lf-accent); color: var(--lf-on-accent); font-size: var(--lf-fs-floor); line-height: 16px; font-weight: 700; }
+.lifts .lw-ex.is-all .lw-ex-m { color: var(--lf-accent-ink); }
+.lifts .lw-ex.is-just-all .lw-ex-done { animation: lw-pop 420ms cubic-bezier(.2, .9, .3, 1.4); }
+.lifts .lw-ex.is-just-all::after, .lifts .lw-row.is-just.is-pb::after { content: ''; position: absolute; inset: 0; pointer-events: none;
+  background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--lw-sweep, var(--lf-accent)) 18%, transparent), transparent) no-repeat;
+  background-size: 40% 100%; animation: lw-sweep 750ms ease-out both; }
+@keyframes lw-sweep { from { background-position: -66% 0; } to { background-position: 166% 0; } }
+
+/* A best, the moment it is ticked: a gold sweep along the row, a burst from the tick, what it beat the old one by. */
+.lifts .lw-row.is-just.is-pb { --lw-sweep: var(--lf-pb); }
+.lifts .lw-row.is-just.is-pb .lw-pbbadge { animation: lw-pop 420ms cubic-bezier(.2, .9, .3, 1.5); }
+.lifts .lw-c-ok { position: relative; }
+.lifts .lw-sparks { position: absolute; left: 50%; top: 50%; width: 0; height: 0; pointer-events: none; }
+.lifts .lw-sparks i { position: absolute; left: -1.5px; top: -5px; width: 3px; height: 10px; border-radius: 2px; background: var(--lf-pb); opacity: 0;
+  transform: rotate(calc(var(--k) * 45deg)) translateY(-24px); animation: lw-spark 700ms ease-out both; }
+@keyframes lw-spark { 0% { opacity: 1; transform: rotate(calc(var(--k) * 45deg)) translateY(-24px); }
+  100% { opacity: 0; transform: rotate(calc(var(--k) * 45deg)) translateY(-42px) scaleY(.4); } }
+.lifts .lw-rise { position: absolute; right: 0; top: -6px; white-space: nowrap; font-size: var(--lf-fs-meta); font-weight: 700; color: var(--lf-pb);
+  opacity: 0; pointer-events: none; animation: lw-rise 1300ms ease-out 150ms both; }
+@keyframes lw-rise { 0% { opacity: 0; transform: translateY(8px); } 20% { opacity: 1; } 100% { opacity: 0; transform: translateY(-20px); } }
+
+/* The saved moment (workout/SavedMoment.jsx). */
+.lifts .lw-saved-title { display: inline-flex; align-items: center; gap: 8px; }
+.lifts .lw-saved-tick { width: 22px; height: 22px; flex: none; }
+.lifts .lw-saved-tick circle { fill: var(--lf-accent); transform-origin: center; transform-box: fill-box; animation: lw-pop 450ms cubic-bezier(.2, .9, .3, 1.5) both; }
+.lifts .lw-saved-tick path { fill: none; stroke: var(--lf-on-accent); stroke-width: 2.6; stroke-linecap: round; stroke-linejoin: round;
+  stroke-dasharray: 16; animation: lw-draw 400ms ease-out 200ms both; }
+@keyframes lw-draw { from { stroke-dashoffset: 16; } to { stroke-dashoffset: 0; } }
+.lifts .lw-saved { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
+.lifts .lw-saved-top { display: flex; align-items: center; justify-content: center; gap: 8px 20px; min-width: 0; }
+.lifts .lw-body-figs.is-bare { flex: none; gap: 8px; }
+.lifts .lw-body-figs.is-bare .lw-body-fig { width: 86px; }
+.lifts .lw-body-figs.is-bare figcaption { display: none; }
+.lifts .lw-body-figs.is-bare .lw-body-fill { transition: none; animation: lw-fillin 500ms ease-out both; animation-delay: calc(300ms + var(--d, 0ms)); }
+@keyframes lw-fillin { from { fill-opacity: 0; } }
+.lifts .lw-saved-mus { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; align-items: flex-start; gap: 6px; min-width: 0; }
+.lifts .lw-saved-mus li { display: inline-flex; align-items: baseline; gap: 6px; min-height: 28px; box-sizing: border-box; padding: 4px 10px; border-radius: 14px;
+  border: 1px solid var(--lf-accent); color: var(--lf-accent-ink); font-size: var(--lf-fs-meta); line-height: 18px; font-weight: 600;
+  animation: lw-chip 420ms cubic-bezier(.2, .9, .3, 1.4) both; animation-delay: calc(450ms + var(--i, 0) * 220ms); }
+.lifts .lw-saved-mus li b { color: var(--lf-text); font-weight: 600; }
+@keyframes lw-chip { from { opacity: 0; transform: scale(.7); } 60% { opacity: 1; transform: scale(1.08); } to { opacity: 1; transform: none; } }
+.lifts .lw-saved-tiles { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr) minmax(0, 1fr) minmax(0, .8fr); margin: 0; border: 1px solid var(--lf-line); border-radius: var(--lf-r-panel); }
+.lifts .lw-saved-tiles > div { display: flex; flex-direction: column; align-items: center; gap: 2px; min-width: 0; padding: 10px 4px; }
+.lifts .lw-saved-tiles > div + div { border-left: 1px solid var(--lf-line); }
+.lifts .lw-saved-tiles dt { font-size: var(--lf-fs-floor); line-height: 16px; font-weight: 600; color: var(--lf-muted); }
+.lifts .lw-saved-tiles dd { margin: 0; font-family: var(--lf-mono); font-size: 17px; line-height: 22px; font-weight: 600; color: var(--lf-text); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.lifts .lw-saved-tiles dd small { font-size: var(--lf-fs-floor); font-weight: 500; color: var(--lf-muted); }
+.lifts .lw-saved-pbs { animation: lw-up 400ms ease-out 1700ms both; }
+@keyframes lw-up { from { opacity: 0; transform: translateY(8px); } }
+.lifts .lw-saved-weekdone { display: flex; align-items: center; justify-content: center; gap: 6px; margin: 0; font-size: 16px; line-height: 22px; font-weight: 700; color: var(--lf-text);
+  animation: lw-up 400ms ease-out 2200ms both; }
+.lifts .lw-saved-weekdone svg { color: var(--lf-accent-ink); }
+/* Today's box fills last; on a finished week the trained days hop in a row. */
+.lifts .lw-saved-week .lh-day.is-today.is-trained { animation: lw-pop 450ms cubic-bezier(.2, .9, .3, 1.5) 2000ms both; }
+.lifts .lw-saved.is-weekdone .lw-saved-week li:nth-child(1) .lh-day.is-trained { --hop: 0; }
+.lifts .lw-saved.is-weekdone .lw-saved-week li:nth-child(2) .lh-day.is-trained { --hop: 1; }
+.lifts .lw-saved.is-weekdone .lw-saved-week li:nth-child(3) .lh-day.is-trained { --hop: 2; }
+.lifts .lw-saved.is-weekdone .lw-saved-week li:nth-child(4) .lh-day.is-trained { --hop: 3; }
+.lifts .lw-saved.is-weekdone .lw-saved-week li:nth-child(5) .lh-day.is-trained { --hop: 4; }
+.lifts .lw-saved.is-weekdone .lw-saved-week li:nth-child(6) .lh-day.is-trained { --hop: 5; }
+.lifts .lw-saved.is-weekdone .lw-saved-week li:nth-child(7) .lh-day.is-trained { --hop: 6; }
+.lifts .lw-saved.is-weekdone .lw-saved-week .lh-day.is-trained { animation: lw-hop 500ms ease-out both; animation-delay: calc(2300ms + var(--hop, 0) * 80ms); }
+@keyframes lw-hop { 40% { transform: translateY(-7px); } }
+.lifts .lw-saved-more { align-self: center; display: inline-flex; align-items: center; gap: 4px; min-height: 44px; padding: 0 8px; border: 0; background: none;
+  color: var(--lf-mid); font: inherit; font-size: var(--lf-fs-meta); font-weight: 600; cursor: pointer; }
+.lifts .lw-saved-more:hover { color: var(--lf-text); }
+.lifts .lw-saved-more:focus-visible { outline: 2px solid var(--lf-focus); outline-offset: 2px; border-radius: var(--lf-r-chip); }
+@media (prefers-reduced-motion: reduce) {
+  .lifts .lw-ex.is-just-all::after, .lifts .lw-row.is-just.is-pb::after { display: none; }
+  .lifts .lw-sparks, .lifts .lw-rise { display: none; }
+  .lifts .lw-prog i { transition: none; }
+  /* The saved moment's steps are staggered by delays, which the global zeroing leaves in place: show the last frame at once. */
+  .lifts .lw-saved *, .lifts .lw-saved-tick * { animation: none !important; }
+}

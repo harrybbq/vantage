@@ -20,6 +20,7 @@ import { useEffect, useState, useSyncExternalStore } from 'react';
 import { activeOf, miniBarModel } from '../../../../lib/lifts/workout';
 import { isLiftsLive, subscribeLiftsLive, requestLiftsResume } from '../../../../lib/lifts/liveBus';
 import { useLiftsScope } from '../ui/scope';
+import { sessionVars } from '../../../../lib/lifts/sessionColour';
 import '../lifts-tokens.css';
 import './minibar.css';
 
@@ -49,7 +50,7 @@ export default function MiniBar({ S, isMobile = false, onOpen }) {
   const m = miniBarModel(active, now);
   const resume = () => { requestLiftsResume(); if (onOpen) onOpen(); };
   return (
-    <div className={`lifts lw-mini is-${isMobile ? 'bar' : 'pill'}`} style={scope.style} data-testid="lw-mini">
+    <div className={`lifts lw-mini is-${isMobile ? 'bar' : 'pill'}`} style={{ ...scope.style, ...sessionVars(active, scope.theme) }} data-testid="lw-mini">
       <button type="button" className="lw-mini-btn" onClick={resume}
               aria-label={`Workout in progress: ${m.name}, ${m.clock}, ${m.done} of ${m.sets} sets. Resume`}>
         <span className="lf-live-dot" aria-hidden="true" />

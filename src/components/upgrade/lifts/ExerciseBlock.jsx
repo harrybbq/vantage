@@ -35,14 +35,23 @@ import { musclesOf } from '../../../lib/lifts/workout';
 import { realSetText } from '../../../lib/lifts/ui';
 
 const fmt = v => (v == null || v === '' ? '' : String(Math.round(Number(v) * 100) / 100));
+/** "+2.5 kg" (heavier than the old best) or "+1 rep" (same weight, more reps); null when there was no old best to beat. */
+export function pbGain(set, was) {
+  if (!set || !was || set.weight == null || was.weight == null) return null;
+  const dw = Math.round((Number(set.weight) - Number(was.weight)) * 100) / 100;
+  if (dw > 0) return `+${fmt(dw)} kg`;
+  const dr = Number(set.reps) - Number(was.reps);
+  return dw === 0 && dr > 0 ? `+${dr} ${dr === 1 ? 'rep' : 'reps'}` : null;
+}
 const DEL_W = 72;
 
 export default function ExerciseBlock({
-  ex, ei, lift, rows, sub, coarse, layout, night = false, gymLabel = null, activeSi = -1, editing = null, flash = null, pbMarks = null,
+  ex, ei, lift, rows, sub, coarse, layout, night = false, gymLabel = null, activeSi = -1, editing = null, flash = null, pbMarks = null, just = null,
   problem = null, noteOpen = false, onCell, onInput, onToggle, onCopyPrev, onSetMenu, onDelete, onAddSet, onMenu, onNote, onNoteOpen, onManage, onEnter,
 }) {
   const name = lift ? lift.name : 'Unknown lift';
   const doneN = ex.sets.filter(s => s.done).length;
+  const all = ex.sets.length > 0 && doneN === ex.sets.length;
   const per = lift && lift.load === 'per_hand';
   const bw = lift && lift.load === 'bodyweight_plus';
   const ms = musclesOf(lift).slice(0, 2);
@@ -51,14 +60,20 @@ export default function ExerciseBlock({
   const copies = last && last.weight != null && last.reps != null ? realSetText(last.weight, last.reps, lift) : null;
   const swipe = coarse || layout === 'phone';
   return (
-    <section className="lw-ex" aria-labelledby={`lw-ex-${ei}`} data-testid="lw-ex">
+    <section className={`lw-ex${all ? ' is-all' : ''}${all && just && just.all ? ' is-just-all' : ''}`} aria-labelledby={`lw-ex-${ei}`} data-testid="lw-ex">
       <header className="lw-ex-head">
         <h3 className="lf-name lw-ex-name" id={`lw-ex-${ei}`}>{name}</h3>
-        <span className="lw-ex-count lf-num" aria-label={`${doneN} of ${ex.sets.length} sets done`}>{doneN}/{ex.sets.length}</span>
+        {all ? (
+          <span className="lw-ex-done" aria-label={`All ${ex.sets.length} sets done`} data-testid="lw-ex-done"><Icon name="check" size={13} strokeWidth={3} />Done</span>
+        ) : (
+          <span className="lw-ex-count lf-num" aria-label={`${doneN} of ${ex.sets.length} sets done`}>{doneN}/{ex.sets.length}</span>
+        )}
         <IconButton icon="ellipsis" label={`More for ${name}`} onClick={() => onMenu(ei)} className="lw-ex-more" data-testid="lw-ex-menu" />
       </header>
       <div className="lw-ex-meta">
-        {[target, ...ms.map(m => m.toUpperCase()), ex.optional ? 'OPTIONAL' : null].filter(Boolean).map((t, i) => <span key={i}>{t}</span>)}
+        {target && <span>{target}</span>}
+        {ms.map(m => <span key={m} className="lw-ex-m">{m.toUpperCase()}</span>)}
+        {ex.optional && <span>OPTIONAL</span>}
         {lift && <CompareScope lift={lift} gymLabel={gymLabel} onManage={lift.pending ? null : onManage} className="lw-ex-scope" />}
       </div>
       {(noteOpen || ex.note) && (
@@ -76,7 +91,7 @@ export default function ExerciseBlock({
         {ex.sets.map((s, si) => (
           <SetRow key={s.id} s={s} si={si} ei={ei} lift={lift} row={rows[si] || {}} coarse={coarse} swipe={swipe} night={night}
                   active={si === activeSi} sub={si === activeSi ? sub : null}
-                  editing={editing && editing.si === si ? editing : null} flash={flash === s.id} pb={pbMarks ? pbMarks.get(s.id) : null}
+                  editing={editing && editing.si === si ? editing : null} flash={flash === s.id} pb={pbMarks ? pbMarks.get(s.id) : null} just={!!just && just.id === s.id}
                   problem={problem && problem.si === si ? problem : null} name={name}
                   onCell={onCell} onInput={onInput} onToggle={onToggle} onCopyPrev={onCopyPrev} onSetMenu={onSetMenu} onDelete={onDelete} onEnter={onEnter} />
         ))}
@@ -88,7 +103,7 @@ export default function ExerciseBlock({
   );
 }
 
-function SetRow({ s, si, ei, lift, row, coarse, swipe, night, active, sub, editing, flash, pb, problem, name, onCell, onInput, onToggle, onCopyPrev, onSetMenu, onDelete, onEnter }) {
+function SetRow({ s, si, ei, lift, row, coarse, swipe, night, active, sub, editing, flash, pb, just, problem, name, onCell, onInput, onToggle, onCopyPrev, onSetMenu, onDelete, onEnter }) {
   const [dx, setDx] = useState(0);
   const [open, setOpen] = useState(false);
   const g = useRef(null);
@@ -139,10 +154,12 @@ function SetRow({ s, si, ei, lift, row, coarse, swipe, night, active, sub, editi
   const label = f => `Set ${si + 1} ${f === 'weight' ? 'kilograms' : f === 'rpe' ? 'RPE' : 'reps'}`;
   const nightPh = night && row.label;
   const setLabel = type || (mark ? null : String(si + 1));
-  const cls = ['lw-tr', 'lw-row', 'lf-st', s.done && 'is-done', mark && 'is-pb', active && !s.done && 'is-current', type && `is-type-${type}`].filter(Boolean).join(' ');
+  const cls = ['lw-tr', 'lw-row', 'lf-st', s.done && 'is-done', mark && 'is-pb', just && s.done && 'is-just', active && !s.done && 'is-current', type && `is-type-${type}`].filter(Boolean).join(' ');
+  // A best ticked a moment ago: what it beat the old one by, rising off the row.
+  const gain = just && mark ? pbGain(s, pb && pb.was) : null;
 
   return (
-    <div ref={wrap} id={`lw-r-${s.id}`} className={`lw-rowwrap${active && !s.done ? ' is-current' : ''}${problem ? ' has-problem' : ''}`} role="rowgroup">
+    <div ref={wrap} id={`lw-r-${s.id}`} className={`lw-rowwrap${active && !s.done ? ' is-current' : ''}${problem ? ' has-problem' : ''}${just && s.done ? ' is-just' : ''}`} role="rowgroup">
       {swipe && (
         <button type="button" className="lw-del" style={{ transform: `translateX(${Math.max(0, DEL_W + dx)}px)` }} onClick={() => { setOpen(false); setDx(0); onDelete(ei, si); }}
                 tabIndex={open ? 0 : -1} aria-hidden={!open} aria-label={`Delete set ${si + 1} of ${name}`} data-testid="lw-row-del">
@@ -176,6 +193,10 @@ function SetRow({ s, si, ei, lift, row, coarse, swipe, night, active, sub, editi
                   aria-label={`${s.done ? 'Undo' : 'Mark'} set ${si + 1} done`} data-testid="lw-ok" key={problem ? problem.n : 'ok'}>
             <Icon name="check" size={20} strokeWidth={2.8} />
           </button>
+          {just && mark && (
+            <span className="lw-sparks" aria-hidden="true">{[0, 1, 2, 3, 4, 5, 6, 7].map(k => <i key={k} style={{ '--k': k }} />)}</span>
+          )}
+          {gain && <span className="lw-rise lf-num" aria-hidden="true">{gain}</span>}
         </span>
       </div>
       {sub && <p className="lw-sub" data-testid="lw-sub">{sub}</p>}

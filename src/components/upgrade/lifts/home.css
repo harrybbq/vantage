@@ -536,3 +536,26 @@
   .lifts .lh-panel.is-wide > li.lh-emptygrp, .lifts .lh-panel.is-wide > li.lh-nomatch { grid-column: 1 / -1; border-right: 0; }
 }
 
+
+/* ── A colour per session (Nov 2026) ──────────────────────────────────
+   WeekStrip lays each day's session colour over --lf-accent on its own
+   button (sessionColour.js), so the rules here only say where the
+   colour goes: the session's name as text, and the whole cell once the
+   session has been trained. A missed or rest day stays muted. */
+.lifts .lh-day[data-sess] .lh-day-s { color: var(--lf-accent-ink); }
+.lifts .lh-day[data-sess].is-missed .lh-day-s { color: var(--lf-muted); }
+.lifts .lh-day.is-trained { background: var(--lf-accent); border-color: var(--lf-accent); }
+.lifts .lh-day.is-trained:hover { border-color: var(--lf-accent); }
+.lifts .lh-day.is-trained .lh-day-d, .lifts .lh-day.is-trained .lh-day-d b, .lifts .lh-day.is-trained .lh-day-s,
+.lifts .lh-day.is-trained .lh-day-code, .lifts .lh-day.is-trained .lh-day-code.is-night { color: var(--lf-on-accent); }
+.lifts .lh-day.is-trained .lh-day-dot { background: var(--lf-on-accent); }
+.lifts .lh-day.is-trained.is-today { border-color: var(--lf-text); }
+/* History: the session key beside the Less / More legend. */
+.lifts .lh-hm-keys { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 6px 12px; }
+.lifts .lh-hm-keys .lh-hm-legend { margin-left: auto; }
+.lifts .lh-hm-sess { display: flex; flex-wrap: wrap; gap: 4px 12px; margin: 0; font-size: 12px; line-height: 16px; color: var(--lf-mid); }
+.lifts .lh-hm-sess span { display: inline-flex; align-items: center; gap: 5px; }
+.lifts .lh-hm-sess i { width: 10px; height: 10px; border-radius: 3px; background: var(--lf-accent); }
+/* A session's day is told apart by hue, so it starts stronger than the accent's lightest step. */
+.lifts .lh-hm-c.is-sess.is-1 { fill: color-mix(in srgb, var(--lf-accent) 68%, var(--lf-s3)); }
+.lifts .lh-hm-c.is-sess.is-2 { fill: color-mix(in srgb, var(--lf-accent) 86%, var(--lf-s3)); }

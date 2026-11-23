@@ -44,6 +44,7 @@ import HistoryCard from './HistoryCard';
 import { liftsLinkedTrackers, linkTrackerToLifts } from '../../../lib/trackers/autoLog';
 import NewWorkoutSheet from './workout/NewWorkoutSheet';
 import { takeLiftsResume, onLiftsResume } from '../../../lib/lifts/liveBus';
+import { blockPips } from '../../../lib/lifts/home';
 import { Toast } from './parts';
 import { Button, PbToast, Pager, SwipePage, Segmented, useInputMode } from './ui';
 import { LiftsScope, useLiftsScope } from './ui/scope';
@@ -224,9 +225,16 @@ export default function LiftsTab({ S, update, hydrated = true }) {
   };
   const saveWorkout = () => {
     const { summary } = finish;
+    // Where the week stands once this one is in — worked out on a copy, before the save, so the saved
+    // moment can tell the block's last session from any other. Fails soft: no week line.
+    let week = null;
+    try {
+      const before = blockPips(S, today);
+      const after = blockPips(finishWorkout(S, summary.session.finishedAt), today);
+      if (after && after.total) week = { done: after.done, total: after.total, completed: !!before && before.done < before.total && after.done >= after.total };
+    } catch { week = null; }
     update(prev => finishWorkout(prev, summary.session.finishedAt));
-    // The sheet lists the PBs (and each was toasted when its set was ticked) — no second celebration.
-    setFinish(f => ({ ...f, saved: true }));
+    setFinish(f => ({ ...f, saved: true, week }));
   };
   const closeFinish = () => { const was = finish && finish.saved; setFinish(null); if (was) setView('list'); };
   // Save as template; started from a saved one → "Update template" replaces it in place (same id).
@@ -327,6 +335,7 @@ export default function LiftsTab({ S, update, hydrated = true }) {
       )}
       {finish && (
         <FinishSheet summary={finish.summary} saved={finish.saved} templateSaved={finish.templateSaved} lifts={lifts.list} S={S} today={today}
+                     week={finish.week || null} gym={finish.summary.session.gym || curGym} gymName={gymName}
                      gymLabel={finish.summary.session.gym ? gymName(finish.summary.session.gym) : null}
                      trackers={S.trackers || []} linked={liftsLinkedTrackers(S)}
                      dayLog={(S.logs || {})[finish.summary.session.date] || {}}

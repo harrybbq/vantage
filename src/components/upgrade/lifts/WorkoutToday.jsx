@@ -40,12 +40,13 @@
  */
 import { useMemo, useState } from 'react';
 import Icon from '../../Icon';
-import { Button, IconButton, Sheet, NightChip, GymSwitch, useInputMode } from './ui';
+import { Button, IconButton, Sheet, NightChip, GymSwitch, useInputMode, useScope } from './ui';
 import WeekStrip from './WeekStrip';
 import { suggestWorkout, minutesText, elapsedSec } from '../../../lib/lifts/workout';
 import { blockPips, nextTraining, lastSessionSummary, dowOf } from '../../../lib/lifts/home';
 import { perGymOf, perGymByName, fmtKg } from '../../../lib/lifts/lifts';
 import { adaptStretches } from '../../../lib/lifts/adaptive';
+import { sessionVars } from '../../../lib/lifts/sessionColour';
 import { WHOOP_RECOVERY_COLOURS } from '../../../lib/vitals/recoverySource';
 import { STRETCH_GOAL, STRETCHES } from '../../../data/trainingProgramme';
 
@@ -59,6 +60,7 @@ export default function WorkoutToday({
   gyms = [], gym = null, onGym, gymName = id => id, canQuickLog = true, side = true,
 }) {
   const { layout } = useInputMode();
+  const { theme } = useScope();
   const desktop = layout === 'desktop';
   const sug = useMemo(() => suggestWorkout(S, today, { gym }), [S, today, gym]);
   const pips = useMemo(() => blockPips(S, today), [S, today]);
@@ -98,7 +100,8 @@ export default function WorkoutToday({
   const moved = sug.plan && sug.plan.source === 'dynamic';
 
   const card = (
-    <section className={`lh-card lh-sug${active ? ' is-dimmed' : ''}`} aria-labelledby="lh-sug-name" data-testid="wk-suggested">
+    <section className={`lh-card lh-sug${active ? ' is-dimmed' : ''}`} aria-labelledby="lh-sug-name" data-testid="wk-suggested"
+             style={(!sug.restDay && sessionVars(sug.rotaSession || sug.name, theme)) || undefined}>
       <p className="lf-eyebrow" data-testid="wk-eyebrow">{eyebrow}</p>
       <div className="lh-sug-head">
         <h3 id="lh-sug-name" className="lh-sug-name">{title}</h3>

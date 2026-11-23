@@ -6,6 +6,8 @@
  *   Push     the plan's session (Rest on a rest day)
  *   N1 ●     the shift code (N1–N4 indigo, Off muted) · a trained dot
  *
+ * A session day is in its session's colour (sessionColour.js): the name
+ * as text, and the whole cell filled once it has been trained.
  * Today has an accent border, a moved session a ↻, a missed one is muted
  * and struck. 7 × 46 + 6 × 6 = 358 px — fits 390 with no scroll. Tap a day
  * → a Sheet with that day's plan and anything logged on it.
@@ -13,12 +15,14 @@
  */
 import { useMemo, useState } from 'react';
 import Icon from '../../Icon';
-import { Sheet, NightChip } from './ui';
+import { Sheet, NightChip, useScope } from './ui';
+import { sessionVars } from '../../../lib/lifts/sessionColour';
 import { weekPlan, dayDetail } from '../../../lib/lifts/home';
 
 export default function WeekStrip({ S, today, gym, gymName = id => id, className = '', note = null }) {
   const week = useMemo(() => weekPlan(S, today), [S, today]);
   const [open, setOpen] = useState(null);
+  const { theme } = useScope();
   const detail = useMemo(() => (open ? dayDetail(S, week.find(c => c.iso === open), gym !== undefined ? { gym } : {}) : null), [S, week, open, gym]);
   if (!week.length) return null;
   return (
@@ -30,7 +34,8 @@ export default function WeekStrip({ S, today, gym, gymName = id => id, className
             + `${c.trained ? ', trained' : ''}${c.moved ? ', moved by the plan' : ''}${c.missed ? ', missed — it carries forward' : ''}${c.today ? ', today' : ''}`;
           return (
             <li key={c.iso}>
-              <button type="button" className={`lh-day${c.today ? ' is-today' : ''}${c.session ? '' : ' is-rest'}${c.missed ? ' is-missed' : ''}${c.past ? ' is-past' : ''}`}
+              <button type="button" className={`lh-day${c.today ? ' is-today' : ''}${c.session ? '' : ' is-rest'}${c.missed ? ' is-missed' : ''}${c.past ? ' is-past' : ''}${c.session && c.trained ? ' is-trained' : ''}`}
+                      style={(c.session && sessionVars(c.session, theme)) || undefined} data-sess={c.session || undefined}
                       onClick={() => setOpen(c.iso)} aria-label={label} data-testid="lh-day">
                 <span className="lh-day-d" aria-hidden="true">{c.dow[0]}<b>{c.date}</b></span>
                 <span className="lh-day-s" aria-hidden="true">{c.short}{c.moved && <Icon name="repeat" size={11} />}</span>
